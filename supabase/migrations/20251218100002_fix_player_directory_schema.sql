@@ -18,7 +18,8 @@ begin
       where conrelid = 'public.player_directory'::regclass
         and contype = 'p'
     loop
-      execute format('alter table public.player_directory drop constraint %I', r.conname);
+      -- Use CASCADE because old pipeline attempts may have foreign keys that depend on this PK/index.
+      execute format('alter table public.player_directory drop constraint %I cascade', r.conname);
     end loop;
   exception when others then
     -- ignore
@@ -41,6 +42,17 @@ begin
   update public.player_directory
     set season = 2025
   where season is null;
+
+  -- Drop rows that cannot be made valid for the new schema
+  delete from public.player_directory
+  where player_id is null or full_name is null;
+
+  -- Deduplicate any (season, player_id) collisions before adding the composite PK
+  delete from public.player_directory a
+  using public.player_directory b
+  where a.ctid < b.ctid
+    and a.season = b.season
+    and a.player_id = b.player_id;
 
   -- Enforce NOT NULL on required columns (only after backfill)
   alter table public.player_directory alter column season set not null;
