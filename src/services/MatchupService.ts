@@ -937,14 +937,15 @@ export const MatchupService = {
         hits: p.hits || 0,
         blockedShots: p.blocks || 0,
         xGoals: p.xGoals || 0,
-        corsi: p.corsi || 0,
-        fenwick: p.fenwick || 0,
+        pim: (p as any).pim || 0,
+        powerPlayPoints: (p as any).ppp || 0,
+        shortHandedPoints: (p as any).shp || 0,
         wins: p.wins || 0,
         losses: p.losses || 0,
         otl: p.ot_losses || 0,
         gaa: p.goals_against_average || 0,
         savePct: p.save_percentage || 0,
-        shutouts: 0
+        shutouts: (p as any).shutouts || 0
       },
       team: p.team,
       teamAbbreviation: p.team,

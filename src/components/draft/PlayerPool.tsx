@@ -193,7 +193,7 @@ export const PlayerPool = ({
             <td className="px-3 py-2 text-xs text-center">{player.hits}</td>
             <td className="px-3 py-2 text-xs text-center">{player.blocks}</td>
             <td className="px-3 py-2 text-xs text-center text-muted-foreground">{player.xGoals.toFixed(2)}</td>
-            <td className="px-3 py-2 text-xs text-center text-muted-foreground">{player.corsi.toFixed(1)}%</td>
+            {/* Corsi/Fenwick intentionally removed */}
           </>
         )}
         <td className="px-3 py-2">

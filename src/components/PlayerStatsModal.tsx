@@ -333,27 +333,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                       </p>
                     </CardContent>
                   </Card>
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">Corsi For %</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
-                        {stats.corsi ? (stats.corsi * 100).toFixed(1) : '0.0'}%
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">Possession Dominance</p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">Fenwick For %</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
-                         {stats.fenwick ? (stats.fenwick * 100).toFixed(1) : '0.0'}%
-                      </div>
-                    </CardContent>
-                  </Card>
+                  {/* Corsi/Fenwick intentionally removed (not tracked) */}
                    <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm font-medium">Hits</CardTitle>

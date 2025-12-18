@@ -93,7 +93,7 @@ const FreeAgents = () => {
         }
       }
       
-      // Get all players from staging files (staging_2025_skaters & staging_2025_goalies)
+      // Get all players from our pipeline tables (player_directory + player_season_stats)
       // PlayerService.getAllPlayers() is the ONLY source for player data
       const allPlayers = await PlayerService.getAllPlayers();
       
@@ -465,14 +465,7 @@ const FreeAgents = () => {
           aValue = a.xGoals || 0;
           bValue = b.xGoals || 0;
           break;
-        case 'corsi':
-          aValue = a.corsi || 0;
-          bValue = b.corsi || 0;
-          break;
-        case 'fenwick':
-          aValue = a.fenwick || 0;
-          bValue = b.fenwick || 0;
-          break;
+        // corsi/fenwick intentionally removed
         case 'wins':
           aValue = a.wins || 0;
           bValue = b.wins || 0;
@@ -564,14 +557,7 @@ const FreeAgents = () => {
             aValue = a.xGoals || 0;
             bValue = b.xGoals || 0;
             break;
-          case 'corsi':
-            aValue = a.corsi || 0;
-            bValue = b.corsi || 0;
-            break;
-          case 'fenwick':
-            aValue = a.fenwick || 0;
-            bValue = b.fenwick || 0;
-            break;
+          // corsi/fenwick intentionally removed
           case 'wins':
             aValue = a.wins || 0;
             bValue = b.wins || 0;
@@ -645,8 +631,7 @@ const FreeAgents = () => {
       hits: p.hits || 0,
       blockedShots: p.blocks || 0,
       xGoals: p.xGoals || 0,
-      corsi: p.corsi || 0,
-      fenwick: p.fenwick || 0,
+      // corsi/fenwick intentionally removed
       wins: p.wins || 0,
       losses: p.losses || 0,
       otl: p.ot_losses || 0,
@@ -1012,24 +997,7 @@ const FreeAgents = () => {
                                       {getSortIcon('xGoals')}
                                     </div>
                                   </TableHead>
-                                  <TableHead 
-                                    className="text-right cursor-pointer hover:bg-muted/50 select-none"
-                                    onClick={() => handleSort('corsi')}
-                                  >
-                                    <div className="flex items-center justify-end">
-                                      Corsi
-                                      {getSortIcon('corsi')}
-                                    </div>
-                                  </TableHead>
-                                  <TableHead 
-                                    className="text-right cursor-pointer hover:bg-muted/50 select-none"
-                                    onClick={() => handleSort('fenwick')}
-                                  >
-                                    <div className="flex items-center justify-end">
-                                      Fenwick
-                                      {getSortIcon('fenwick')}
-                                    </div>
-                                  </TableHead>
+                                  {/* Corsi/Fenwick intentionally removed */}
                                 </>
                               )}
                               {/* Goalie Stats - only show if there are goalies */}
@@ -1096,8 +1064,7 @@ const FreeAgents = () => {
                                       <TableCell className="text-right">{player.hits || 0}</TableCell>
                                       <TableCell className="text-right">{player.blocks || 0}</TableCell>
                                       <TableCell className="text-right">{typeof player.xGoals === 'number' ? player.xGoals.toFixed(1) : '-'}</TableCell>
-                                      <TableCell className="text-right">{typeof player.corsi === 'number' ? player.corsi.toFixed(1) : '-'}</TableCell>
-                                      <TableCell className="text-right">{typeof player.fenwick === 'number' ? player.fenwick.toFixed(1) : '-'}</TableCell>
+                                      {/* Corsi/Fenwick intentionally removed */}
                                     </>
                                   )}
                                   {/* Goalie Stats - only render for goalies */}
@@ -1508,24 +1475,7 @@ const FreeAgents = () => {
                                 {getSortIcon('xGoals')}
                               </div>
                             </TableHead>
-                            <TableHead 
-                              className="text-right cursor-pointer hover:bg-muted/50 select-none"
-                              onClick={() => handleSort('corsi')}
-                            >
-                              <div className="flex items-center justify-end">
-                                Corsi
-                                {getSortIcon('corsi')}
-                              </div>
-                            </TableHead>
-                            <TableHead 
-                              className="text-right cursor-pointer hover:bg-muted/50 select-none"
-                              onClick={() => handleSort('fenwick')}
-                            >
-                              <div className="flex items-center justify-end">
-                                Fenwick
-                                {getSortIcon('fenwick')}
-                              </div>
-                            </TableHead>
+                            {/* Corsi/Fenwick intentionally removed */}
                           </>
                         )}
                         {/* Goalie Stats - only show if there are goalies */}
@@ -1594,8 +1544,7 @@ const FreeAgents = () => {
                                 <TableCell className="text-right">{player.hits || 0}</TableCell>
                                 <TableCell className="text-right">{player.blocks || 0}</TableCell>
                                 <TableCell className="text-right">{typeof player.xGoals === 'number' ? player.xGoals.toFixed(1) : '-'}</TableCell>
-                                <TableCell className="text-right">{typeof player.corsi === 'number' ? player.corsi.toFixed(1) : '-'}</TableCell>
-                                <TableCell className="text-right">{typeof player.fenwick === 'number' ? player.fenwick.toFixed(1) : '-'}</TableCell>
+                                {/* Corsi/Fenwick intentionally removed */}
                               </>
                             )}
                             {/* Goalie Stats - only render for goalies */}

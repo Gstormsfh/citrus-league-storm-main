@@ -343,7 +343,7 @@ const Roster = () => {
       if (!keepCurrentRoster) {
         setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
       }
-        // Get all players from staging files (staging_2025_skaters & staging_2025_goalies)
+        // Get all players from our pipeline tables (player_directory + player_season_stats)
         // PlayerService.getAllPlayers() is the ONLY source for player data
         const allPlayers = await PlayerService.getAllPlayers();
         
@@ -474,9 +474,17 @@ const Roster = () => {
           setTransactions([]);
         }
         
-        // Transform players from staging files to HockeyPlayer format
-        // All data (names, stats, positions, teams) comes from staging files via PlayerService
+        // Transform players from pipeline tables to HockeyPlayer format
+        // All data (names, stats, positions, teams) comes from PlayerService (player_directory + player_season_stats)
         console.log('[Roster] Transforming', dbPlayers.length, 'players to HockeyPlayer format');
+
+        const formatSecondsToMMSS = (totalSeconds: number): string => {
+          const s = Math.max(0, Math.round(totalSeconds || 0));
+          const m = Math.floor(s / 60);
+          const r = s % 60;
+          return `${m}:${r < 10 ? '0' : ''}${r}`;
+        };
+
         const transformedPlayers: HockeyPlayer[] = dbPlayers.map((p) => ({
           id: p.id,
           name: p.full_name,
@@ -493,14 +501,19 @@ const Roster = () => {
             hits: p.hits || 0,
             blockedShots: p.blocks || 0,
             xGoals: p.xGoals || 0,
-            corsi: p.corsi || 0,
-            fenwick: p.fenwick || 0,
+            pim: (p as any).pim || 0,
+            powerPlayPoints: (p as any).ppp || 0,
+            shortHandedPoints: (p as any).shp || 0,
+            // TOI shown in the UI is average TOI per game (TOI/60) formatted as MM:SS
+            toi: formatSecondsToMMSS(
+              (Number((p as any).icetime_seconds || 0) / Math.max(1, Number(p.games_played || 0)))
+            ),
             wins: p.wins || 0,
             losses: p.losses || 0,
             otl: p.ot_losses || 0,
             gaa: p.goals_against_average || 0,
             savePct: p.save_percentage || 0,
-            shutouts: 0 // Not in DB yet
+            shutouts: (p as any).shutouts || 0
           },
           team: p.team,
           teamAbbreviation: p.team, // DB has 'EDM' etc
@@ -841,8 +854,7 @@ const Roster = () => {
                 hits: p.hits || 0,
                 blockedShots: p.blocks || 0,
                 xGoals: p.xGoals || 0,
-                corsi: p.corsi || 0,
-                fenwick: p.fenwick || 0,
+                // corsi/fenwick intentionally removed
                 wins: p.wins || 0,
                 losses: p.losses || 0,
                 otl: p.ot_losses || 0,
@@ -2061,8 +2073,7 @@ const Roster = () => {
                   hits: p.hits || 0,
                   blockedShots: p.blocks || 0,
                   xGoals: p.xGoals || 0,
-                  corsi: p.corsi || 0,
-                  fenwick: p.fenwick || 0,
+                  // corsi/fenwick intentionally removed
                   wins: p.wins || 0,
                   losses: p.losses || 0,
                   otl: p.ot_losses || 0,

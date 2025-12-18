@@ -29,8 +29,6 @@ export interface HockeyPlayer {
     toi?: string; // Time on ice, e.g., "21:34"
     toiPercentage?: number; // Percentage of team's total TOI
     xGoals?: number;
-    corsi?: number;
-    fenwick?: number;
     // Goalie stats
     wins?: number;
     losses?: number;
@@ -43,8 +41,6 @@ export interface HockeyPlayer {
     
     // Advanced / CitrusPuck stats can be mapped here or accessed via citrusPuckData
     // xGoals?: number; // Moved up
-    // corsi?: number; // Moved up
-    // fenwick?: number; // Moved up
   };
   team: string;
   teamAbbreviation?: string; // e.g., "EDM", "COL"
@@ -209,8 +205,7 @@ const HockeyPlayerCardContent = ({
     const hits = typeof data.I_F_hits === 'string' ? parseFloat(data.I_F_hits) : (data.I_F_hits || 0);
     const blockedShots = typeof data.shotsBlockedByPlayer === 'string' ? parseFloat(data.shotsBlockedByPlayer) : (data.shotsBlockedByPlayer || 0);
     const xGoals = typeof data.I_F_xGoals === 'string' ? parseFloat(data.I_F_xGoals) : (data.I_F_xGoals || 0);
-    const corsi = typeof data.onIce_corsiPercentage === 'string' ? parseFloat(data.onIce_corsiPercentage) : (data.onIce_corsiPercentage || 0);
-    const fenwick = typeof data.onIce_fenwickPercentage === 'string' ? parseFloat(data.onIce_fenwickPercentage) : (data.onIce_fenwickPercentage || 0);
+    // Note: Corsi/Fenwick are intentionally not shown/tracked in the app UI.
     
     // Goalie stats (derived if present in advanced data, otherwise fallback)
     const wins = 0; 
@@ -234,14 +229,13 @@ const HockeyPlayerCardContent = ({
         goals: Math.round(goals),
         assists: Math.round(assists),
         points: Math.round(points),
-        plusMinus: 0, 
+        // Prefer our pipeline season +/- when available on the player object
+        plusMinus: player.stats?.plusMinus ?? 0,
         shots: Math.round(shots),
         gamesPlayed: gamesPlayed,
         hits: Math.round(hits),
         blockedShots: Math.round(blockedShots),
         xGoals: xGoals,
-        corsi: corsi,
-        fenwick: fenwick,
         wins: wins, 
         gaa: gaa,
         savePct: savePct,

@@ -86,7 +86,7 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick 
   const projectedPoints = player.projectedPoints || (player.points / 20);
   const projectionPercentage = Math.min((projectedPoints / maxProjection) * 100, 100);
   
-  // Get unique stats for top right corner: F Pts, PPP, xG
+  // Get unique stats for top right corner: F Pts, xG
   const getUniqueStats = () => {
     const stats: Array<{ label: string; value: string }> = [];
     
@@ -94,14 +94,6 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick 
     stats.push({ 
       label: 'F Pts', 
       value: player.points.toFixed(1) 
-    });
-    
-    // PPP - Power Play Points (estimate as ~30% of total points, or use actual if available)
-    // For now, estimate based on typical power play point percentage
-    const estimatedPPP = (player.points * 0.3).toFixed(1);
-    stats.push({ 
-      label: 'PPP', 
-      value: estimatedPPP 
     });
     
     // xG - Expected Goals

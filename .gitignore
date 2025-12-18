@@ -42,7 +42,13 @@ dist-ssr
 temp_*.json
 test-*.html
 fix_*.sql
+# PowerShell scripts are part of ops automation and should be tracked
+# (We still ignore user-specific PS temp files below if needed)
+#!*.ps1
+
+# Ignore stray PowerShell scratch scripts, but allow our ops scripts
 *.ps1
+!ops/windows/*.ps1
 git-*.txt
 git-*.log
 git-diagnostic-output/

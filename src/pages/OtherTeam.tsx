@@ -125,8 +125,7 @@ const OtherTeam = () => {
               hits: p.hits || 0,
               blockedShots: p.blocks || 0,
               xGoals: p.xGoals || 0,
-              corsi: p.corsi || 0,
-              fenwick: p.fenwick || 0,
+              // corsi/fenwick intentionally removed
               wins: p.wins || 0,
               losses: p.losses || 0,
               otl: p.ot_losses || 0,
@@ -336,8 +335,7 @@ const OtherTeam = () => {
             hits: p.hits || 0,
             blockedShots: p.blocks || 0,
             xGoals: p.xGoals || 0,
-            corsi: p.corsi || 0,
-            fenwick: p.fenwick || 0,
+            // corsi/fenwick intentionally removed
             wins: p.wins || 0,
             losses: p.losses || 0,
             otl: p.ot_losses || 0,

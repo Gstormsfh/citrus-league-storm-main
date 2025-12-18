@@ -1,18 +1,14 @@
 import { supabase } from "@/integrations/supabase/client";
-import { Database } from "@/integrations/supabase/types";
 
 /**
  * PlayerService - SINGLE SOURCE OF TRUTH
- * 
- * ALL player data (names, stats, positions, teams) comes EXCLUSIVELY from staging files:
- * - staging_2025_skaters (for skaters)
- * - staging_2025_goalies (for goalies)
- * 
- * This service replaces the old roster upload system and ensures consistency across the app.
- * No other source should be used for player data.
+ *
+ * ALL player identity + stats are sourced from our own pipeline tables:
+ * - public.player_directory (names/teams/positions)
+ * - public.player_season_stats (season rollup)
+ *
+ * No reliance on staging tables.
  */
-
-// Player interface based on Staging Table structure (NOT the old 'players' table)
 export interface Player {
   id: string; // Using string ID to be consistent with app usage, but will store NHL ID
   full_name: string;
@@ -32,22 +28,68 @@ export interface Player {
   shots: number;
   hits: number;
   blocks: number;
+  pim?: number;
+  ppp?: number;
+  shp?: number;
+  icetime_seconds?: number;
   
   // Advanced stats (new)
   xGoals: number;
-  corsi: number;
-  fenwick: number;
   
   // Goalie specific
   wins: number | null;
   losses: number | null;
   ot_losses: number | null;
   saves: number | null;
+  shutouts?: number | null;
+  shots_faced?: number | null;
+  goals_against?: number | null;
   goals_against_average: number | null;
   save_percentage: number | null;
   highDangerSavePct: number;
   goalsSavedAboveExpected: number;
 }
+
+type PlayerDirectoryRow = {
+  season: number;
+  player_id: number;
+  full_name: string;
+  team_abbrev: string | null;
+  position_code: string | null;
+  is_goalie: boolean;
+  jersey_number: string | null;
+  headshot_url: string | null;
+};
+
+type PlayerSeasonStatsRow = {
+  season: number;
+  player_id: number;
+  team_abbrev: string | null;
+  position_code: string | null;
+  is_goalie: boolean;
+  games_played: number;
+  icetime_seconds: number;
+  goals: number;
+  primary_assists: number;
+  secondary_assists: number;
+  points: number;
+  shots_on_goal: number;
+  hits: number;
+  blocks: number;
+  pim: number;
+  ppp: number;
+  shp: number;
+  plus_minus: number;
+  x_goals: number;
+  x_assists: number;
+  goalie_gp: number;
+  wins: number;
+  saves: number;
+  shots_faced: number;
+  goals_against: number;
+  shutouts: number;
+  save_pct: number | null;
+};
 
 // In-memory cache for player data
 interface CacheEntry {
@@ -67,9 +109,9 @@ export const PlayerService = {
   },
 
   /**
-   * Get all players from staging files (SINGLE SOURCE OF TRUTH)
-   * Returns both skaters and goalies with all stats from staging_2025_skaters and staging_2025_goalies
-   * Results are cached for 5 minutes to improve performance
+   * Get all players from our pipeline tables (SINGLE SOURCE OF TRUTH)
+   * Returns players from player_directory joined with player_season_stats.
+   * Results are cached for 5 minutes to improve performance.
    */
   async getAllPlayers(): Promise<Player[]> {
     // Check cache first
@@ -79,150 +121,89 @@ export const PlayerService = {
     }
 
     try {
-      // 1. Fetch Skaters from staging_2025_skaters (situation = 'all')
-      // This is the ONLY source for skater data - names, stats, positions, teams all come from here
-      const { data: skaters, error: skaterError } = await supabase
-        .from('staging_2025_skaters')
-        .select('*')
-        .eq('situation', 'all');
+      const DEFAULT_SEASON = 2025;
+      const [{ data: dirRowsRaw, error: dirErr }, { data: statRowsRaw, error: statErr }] = await Promise.all([
+        (supabase as any)
+          .from("player_directory")
+          .select("season, player_id, full_name, team_abbrev, position_code, is_goalie, jersey_number, headshot_url")
+          .eq("season", DEFAULT_SEASON),
+        (supabase as any)
+          .from("player_season_stats")
+          .select("season, player_id, team_abbrev, position_code, is_goalie, games_played, icetime_seconds, goals, primary_assists, secondary_assists, points, shots_on_goal, hits, blocks, pim, ppp, shp, plus_minus, x_goals, x_assists, goalie_gp, wins, saves, shots_faced, goals_against, shutouts, save_pct")
+          .eq("season", DEFAULT_SEASON),
+      ]);
 
-      if (skaterError) throw skaterError;
+      if (dirErr) throw dirErr;
+      if (statErr) throw statErr;
 
-      // 2. Fetch Goalies from staging_2025_goalies (situation = 'all')
-      // This is the ONLY source for goalie data - names, stats, positions, teams all come from here
-      const { data: goalies, error: goalieError } = await supabase
-        .from('staging_2025_goalies')
-        .select('*')
-        .eq('situation', 'all');
+      const dirRows = (dirRowsRaw || []) as PlayerDirectoryRow[];
+      const statRows = (statRowsRaw || []) as PlayerSeasonStatsRow[];
 
-      if (goalieError) throw goalieError;
-
-      // 3. Map Skaters from staging_2025_skaters to Player Interface
-      // ALL data comes from staging files - names, positions, teams, stats
-      const mappedSkaters = (skaters || []).map((s: any) => {
-          // Calculate Assists correctly (parse strings from staging data)
-          const pri = typeof s.I_F_primaryAssists === 'string' ? parseFloat(s.I_F_primaryAssists) : (s.I_F_primaryAssists || 0);
-          const sec = typeof s.I_F_secondaryAssists === 'string' ? parseFloat(s.I_F_secondaryAssists) : (s.I_F_secondaryAssists || 0);
-          const totalAssists = pri + sec;
-
-          // Safety check for ID
-          if (!s.playerId) return null;
-
-          return {
-            id: s.playerId.toString(), // NHL ID from staging file
-            full_name: s.name, // Player name from staging file
-            position: s.position, // Position from staging file
-            team: s.team, // Team abbreviation from staging file
-            jersey_number: null, // Not available in staging files - would need separate source
-            status: 'active', // Default to active since they have stats in staging
-            headshot_url: `https://assets.nhle.com/mugs/nhl/20242025/${s.team}/${s.playerId}.png`, // Constructed from staging data
-            last_updated: new Date().toISOString(),
-            games_played: typeof s.games_played === 'string' ? parseInt(s.games_played) : (s.games_played || 0),
-            
-            // All stats from staging_2025_skaters table
-            goals: typeof s.I_F_goals === 'string' ? parseFloat(s.I_F_goals) : (s.I_F_goals || 0),
-            assists: totalAssists,
-            points: typeof s.I_F_points === 'string' ? parseFloat(s.I_F_points) : (s.I_F_points || 0),
-            plus_minus: 0, // Not in MoneyPuck 'all' situation
-            shots: typeof s.I_F_shotsOnGoal === 'string' ? parseFloat(s.I_F_shotsOnGoal) : (s.I_F_shotsOnGoal || 0),
-            hits: typeof s.I_F_hits === 'string' ? parseFloat(s.I_F_hits) : (s.I_F_hits || 0),
-            blocks: typeof s.shotsBlockedByPlayer === 'string' ? parseFloat(s.shotsBlockedByPlayer) : (s.shotsBlockedByPlayer || 0),
-            // Advanced stats from staging files
-            xGoals: typeof s.I_F_xGoals === 'string' ? parseFloat(s.I_F_xGoals) : (s.I_F_xGoals || 0),
-            corsi: typeof s.onIce_corsiPercentage === 'string' ? parseFloat(s.onIce_corsiPercentage) : (s.onIce_corsiPercentage || 0),
-            fenwick: typeof s.onIce_fenwickPercentage === 'string' ? parseFloat(s.onIce_fenwickPercentage) : (s.onIce_fenwickPercentage || 0),
-            highDangerSavePct: 0,
-            goalsSavedAboveExpected: 0,
-            
-            wins: null,
-            losses: null,
-            ot_losses: null,
-            saves: null,
-            goals_against_average: null,
-            save_percentage: null
-          };
+      const statsByPlayerId = new Map<number, PlayerSeasonStatsRow>();
+      statRows.forEach((r) => {
+        if (r?.player_id != null) statsByPlayerId.set(Number(r.player_id), r);
       });
 
-      // 4. Map Goalies from staging_2025_goalies to Player Interface
-      // ALL data comes from staging files - names, positions, teams, stats
-      const mappedGoalies = (goalies || []).map((g: any) => {
-          if (!g.playerId) return null;
-          return {
-            id: g.playerId.toString(), // NHL ID from staging file
-            full_name: g.name, // Player name from staging file
-            position: 'G', // Position from staging file
-            team: g.team, // Team abbreviation from staging file
-            jersey_number: null, // Not available in staging files
-            status: 'active', // Default to active since they have stats in staging
-            headshot_url: `https://assets.nhle.com/mugs/nhl/20242025/${g.team}/${g.playerId}.png`, // Constructed from staging data
-            last_updated: new Date().toISOString(),
-            games_played: typeof g.games_played === 'string' ? parseInt(g.games_played) : (g.games_played || 0),
-            
-            // Skater stats not applicable to goalies
-            goals: 0,
-            assists: 0,
-            points: 0,
-            plus_minus: 0,
-            shots: 0,
-            hits: 0,
-            blocks: 0,
-            xGoals: 0,
-            corsi: 0,
-            fenwick: 0,
-            
-            // Advanced goalie stats calculated from staging_2025_goalies data
-            highDangerSavePct: parseFloat(g.highDangerShots) > 0
-                ? (parseFloat(g.highDangerShots) - parseFloat(g.highDangerGoals)) / parseFloat(g.highDangerShots)
-                : 0,
-            goalsSavedAboveExpected: (parseFloat(g.xGoals) - parseFloat(g.goals)) || 0,
-            
-            // Goalie stats calculated from staging_2025_goalies data
-            // Note: Wins/Losses not available in MoneyPuck staging files
-            wins: 0, // Not in staging files
-            losses: 0, // Not in staging files
-            ot_losses: 0, // Not in staging files
-            
-            // Derived stats from staging file data
-            saves: (parseFloat(g.ongoal) - parseFloat(g.goals)) || 0,
-            goals_against_average: parseFloat(g.icetime) > 0 
-                ? (parseFloat(g.goals) * 3600) / parseFloat(g.icetime) 
-                : 0,
-            save_percentage: parseFloat(g.ongoal) > 0 
-                ? (parseFloat(g.ongoal) - parseFloat(g.goals)) / parseFloat(g.ongoal) 
-                : 0,
-          };
+      const players: Player[] = dirRows.map((d) => {
+        const pid = Number(d.player_id);
+        const s = statsByPlayerId.get(pid);
+        const assists = Number(s?.primary_assists ?? 0) + Number(s?.secondary_assists ?? 0);
+
+        const team = d.team_abbrev || s?.team_abbrev || "";
+        const pos = d.position_code || s?.position_code || (d.is_goalie ? "G" : "");
+        const headshot =
+          d.headshot_url ||
+          (team && pid ? `https://assets.nhle.com/mugs/nhl/20242025/${team}/${pid}.png` : null);
+
+        return {
+          id: String(pid),
+          full_name: d.full_name,
+          position: pos || "",
+          team: team || "",
+          jersey_number: d.jersey_number ?? null,
+          status: "active",
+          headshot_url: headshot,
+          last_updated: new Date().toISOString(),
+          games_played: Number(s?.games_played ?? 0),
+
+          goals: Number(s?.goals ?? 0),
+          assists,
+          points: Number(s?.points ?? 0),
+          plus_minus: Number(s?.plus_minus ?? 0),
+          shots: Number(s?.shots_on_goal ?? 0),
+          hits: Number(s?.hits ?? 0),
+          blocks: Number(s?.blocks ?? 0),
+          pim: Number(s?.pim ?? 0),
+          ppp: Number(s?.ppp ?? 0),
+          shp: Number(s?.shp ?? 0),
+          icetime_seconds: Number(s?.icetime_seconds ?? 0),
+
+          xGoals: Number(s?.x_goals ?? 0),
+
+          wins: d.is_goalie ? Number(s?.wins ?? 0) : null,
+          losses: null,
+          ot_losses: null,
+          saves: d.is_goalie ? Number(s?.saves ?? 0) : null,
+          shutouts: d.is_goalie ? Number(s?.shutouts ?? 0) : null,
+          shots_faced: d.is_goalie ? Number(s?.shots_faced ?? 0) : null,
+          goals_against: d.is_goalie ? Number(s?.goals_against ?? 0) : null,
+          goals_against_average: null,
+          save_percentage: d.is_goalie ? (s?.save_pct ?? null) : null,
+          highDangerSavePct: 0,
+          goalsSavedAboveExpected: 0,
+        };
       });
 
-      // 5. Combine and Deduplicate players from staging files
-      // Filter out nulls from mapping
-      const validSkaters = mappedSkaters.filter((p): p is Player => p !== null);
-      const validGoalies = mappedGoalies.filter((p): p is Player => p !== null);
-      
-      const allPlayers = [...validSkaters, ...validGoalies];
-      
-      // Deduplicate by player ID (in case of any duplicates in staging)
-      const uniquePlayers = new Map<string, Player>();
-      allPlayers.forEach(p => {
-        if (!uniquePlayers.has(p.id)) {
-          uniquePlayers.set(p.id, p);
-        } else {
-            // If duplicate exists, keep the first one (shouldn't happen with proper staging data)
-        }
-      });
+      const sortedPlayers = players.sort((a, b) => (b.points || 0) - (a.points || 0));
 
-      // Return sorted by points (all data from staging files)
-      const sortedPlayers = Array.from(uniquePlayers.values()).sort((a, b) => b.points - a.points);
-      
-      // Cache the results
       playersCache = {
         data: sortedPlayers,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
-      
-      return sortedPlayers;
 
+      return sortedPlayers;
     } catch (error) {
-      console.error('Error fetching players from staging tables (staging_2025_skaters/staging_2025_goalies):', error);
+      console.error("Error fetching players from pipeline tables (player_directory/player_season_stats):", error);
       return [];
     }
   },
@@ -252,117 +233,83 @@ export const PlayerService = {
     if (playerIds.length === 0) return [];
     
     try {
-      // Fetch skaters
-      const { data: skaters, error: skaterError } = await supabase
-        .from('staging_2025_skaters')
-        .select('*')
-        .eq('situation', 'all')
-        .in('playerId', playerIds.map(id => parseInt(id)).filter(id => !isNaN(id)));
-      
-      if (skaterError) throw skaterError;
+      const DEFAULT_SEASON = 2025;
+      const intIds = playerIds.map((id) => Number(id)).filter((n) => !Number.isNaN(n));
 
-      // Fetch goalies
-      const { data: goalies, error: goalieError } = await supabase
-        .from('staging_2025_goalies')
-        .select('*')
-        .eq('situation', 'all')
-        .in('playerId', playerIds.map(id => parseInt(id)).filter(id => !isNaN(id)));
-      
-      if (goalieError) throw goalieError;
+      const [{ data: dirRowsRaw, error: dirErr }, { data: statRowsRaw, error: statErr }] = await Promise.all([
+        (supabase as any)
+          .from("player_directory")
+          .select("season, player_id, full_name, team_abbrev, position_code, is_goalie, jersey_number, headshot_url")
+          .eq("season", DEFAULT_SEASON)
+          .in("player_id", intIds),
+        (supabase as any)
+          .from("player_season_stats")
+          .select("season, player_id, team_abbrev, position_code, is_goalie, games_played, icetime_seconds, goals, primary_assists, secondary_assists, points, shots_on_goal, hits, blocks, pim, ppp, shp, plus_minus, x_goals, x_assists, goalie_gp, wins, saves, shots_faced, goals_against, shutouts, save_pct")
+          .eq("season", DEFAULT_SEASON)
+          .in("player_id", intIds),
+      ]);
 
-      // Map skaters (same mapping logic as getAllPlayers)
-      const mappedSkaters = (skaters || []).map((s: any) => {
-        if (!s.playerId) return null;
-        const pri = typeof s.I_F_primaryAssists === 'string' ? parseFloat(s.I_F_primaryAssists) : (s.I_F_primaryAssists || 0);
-        const sec = typeof s.I_F_secondaryAssists === 'string' ? parseFloat(s.I_F_secondaryAssists) : (s.I_F_secondaryAssists || 0);
-        const totalAssists = pri + sec;
+      if (dirErr) throw dirErr;
+      if (statErr) throw statErr;
+
+      const dirRows = (dirRowsRaw || []) as PlayerDirectoryRow[];
+      const statRows = (statRowsRaw || []) as PlayerSeasonStatsRow[];
+
+      const statsByPlayerId = new Map<number, PlayerSeasonStatsRow>();
+      statRows.forEach((r) => {
+        if (r?.player_id != null) statsByPlayerId.set(Number(r.player_id), r);
+      });
+
+      const players: Player[] = dirRows.map((d) => {
+        const pid = Number(d.player_id);
+        const s = statsByPlayerId.get(pid);
+        const assists = Number(s?.primary_assists ?? 0) + Number(s?.secondary_assists ?? 0);
+        const team = d.team_abbrev || s?.team_abbrev || "";
+        const pos = d.position_code || s?.position_code || (d.is_goalie ? "G" : "");
+        const headshot =
+          d.headshot_url ||
+          (team && pid ? `https://assets.nhle.com/mugs/nhl/20242025/${team}/${pid}.png` : null);
 
         return {
-          id: s.playerId.toString(),
-          full_name: s.name,
-          position: s.position,
-          team: s.team,
-          jersey_number: null,
-          status: 'active',
-          headshot_url: `https://assets.nhle.com/mugs/nhl/20242025/${s.team}/${s.playerId}.png`,
+          id: String(pid),
+          full_name: d.full_name,
+          position: pos || "",
+          team: team || "",
+          jersey_number: d.jersey_number ?? null,
+          status: "active",
+          headshot_url: headshot,
           last_updated: new Date().toISOString(),
-          games_played: typeof s.games_played === 'string' ? parseInt(s.games_played) : (s.games_played || 0),
-          goals: typeof s.I_F_goals === 'string' ? parseFloat(s.I_F_goals) : (s.I_F_goals || 0),
-          assists: totalAssists,
-          points: typeof s.I_F_points === 'string' ? parseFloat(s.I_F_points) : (s.I_F_points || 0),
-          plus_minus: 0,
-          shots: typeof s.I_F_shotsOnGoal === 'string' ? parseFloat(s.I_F_shotsOnGoal) : (s.I_F_shotsOnGoal || 0),
-          hits: typeof s.I_F_hits === 'string' ? parseFloat(s.I_F_hits) : (s.I_F_hits || 0),
-          blocks: typeof s.shotsBlockedByPlayer === 'string' ? parseFloat(s.shotsBlockedByPlayer) : (s.shotsBlockedByPlayer || 0),
-          xGoals: typeof s.I_F_xGoals === 'string' ? parseFloat(s.I_F_xGoals) : (s.I_F_xGoals || 0),
-          corsi: typeof s.onIce_corsiPercentage === 'string' ? parseFloat(s.onIce_corsiPercentage) : (s.onIce_corsiPercentage || 0),
-          fenwick: typeof s.onIce_fenwickPercentage === 'string' ? parseFloat(s.onIce_fenwickPercentage) : (s.onIce_fenwickPercentage || 0),
-          highDangerSavePct: 0,
-          goalsSavedAboveExpected: 0,
-          wins: null,
+          games_played: Number(s?.games_played ?? 0),
+
+          goals: Number(s?.goals ?? 0),
+          assists,
+          points: Number(s?.points ?? 0),
+          plus_minus: Number(s?.plus_minus ?? 0),
+          shots: Number(s?.shots_on_goal ?? 0),
+          hits: Number(s?.hits ?? 0),
+          blocks: Number(s?.blocks ?? 0),
+          pim: Number(s?.pim ?? 0),
+          ppp: Number(s?.ppp ?? 0),
+          shp: Number(s?.shp ?? 0),
+          icetime_seconds: Number(s?.icetime_seconds ?? 0),
+
+          xGoals: Number(s?.x_goals ?? 0),
+
+          wins: d.is_goalie ? Number(s?.wins ?? 0) : null,
           losses: null,
           ot_losses: null,
-          saves: null,
+          saves: d.is_goalie ? Number(s?.saves ?? 0) : null,
+          shutouts: d.is_goalie ? Number(s?.shutouts ?? 0) : null,
+          shots_faced: d.is_goalie ? Number(s?.shots_faced ?? 0) : null,
+          goals_against: d.is_goalie ? Number(s?.goals_against ?? 0) : null,
           goals_against_average: null,
-          save_percentage: null
+          save_percentage: d.is_goalie ? (s?.save_pct ?? null) : null,
+          highDangerSavePct: 0,
+          goalsSavedAboveExpected: 0,
         };
       });
 
-      // Map goalies (same mapping logic as getAllPlayers)
-      const mappedGoalies = (goalies || []).map((g: any) => {
-        if (!g.playerId) return null;
-        return {
-          id: g.playerId.toString(),
-          full_name: g.name,
-          position: 'G',
-          team: g.team,
-          jersey_number: null,
-          status: 'active',
-          headshot_url: `https://assets.nhle.com/mugs/nhl/20242025/${g.team}/${g.playerId}.png`,
-          last_updated: new Date().toISOString(),
-          games_played: typeof g.games_played === 'string' ? parseInt(g.games_played) : (g.games_played || 0),
-          goals: 0,
-          assists: 0,
-          points: 0,
-          plus_minus: 0,
-          shots: 0,
-          hits: 0,
-          blocks: 0,
-          xGoals: 0,
-          corsi: 0,
-          fenwick: 0,
-          highDangerSavePct: parseFloat(g.highDangerShots) > 0
-              ? (parseFloat(g.highDangerShots) - parseFloat(g.highDangerGoals)) / parseFloat(g.highDangerShots)
-              : 0,
-          goalsSavedAboveExpected: (parseFloat(g.xGoals) - parseFloat(g.goals)) || 0,
-          wins: 0,
-          losses: 0,
-          ot_losses: 0,
-          saves: (parseFloat(g.ongoal) - parseFloat(g.goals)) || 0,
-          goals_against_average: parseFloat(g.icetime) > 0 
-              ? (parseFloat(g.goals) * 3600) / parseFloat(g.icetime) 
-              : 0,
-          save_percentage: parseFloat(g.ongoal) > 0 
-              ? (parseFloat(g.ongoal) - parseFloat(g.goals)) / parseFloat(g.ongoal) 
-              : 0,
-        };
-      });
-
-      const validSkaters = mappedSkaters.filter((p): p is Player => p !== null);
-      const validGoalies = mappedGoalies.filter((p): p is Player => p !== null);
-      
-      const allPlayers = [...validSkaters, ...validGoalies];
-      
-      // Deduplicate by player ID
-      const uniquePlayers = new Map<string, Player>();
-      allPlayers.forEach(p => {
-        if (!uniquePlayers.has(p.id)) {
-          uniquePlayers.set(p.id, p);
-        }
-      });
-
-      // Return sorted by points
-      return Array.from(uniquePlayers.values()).sort((a, b) => b.points - a.points);
+      return players.sort((a, b) => (b.points || 0) - (a.points || 0));
     } catch (error) {
       console.error('Error fetching players by IDs:', error);
       // Fallback to getAllPlayers and filter

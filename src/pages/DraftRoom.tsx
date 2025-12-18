@@ -1724,8 +1724,7 @@ const DraftRoom = () => {
           hits: player.hits || 0,
           blockedShots: player.blocks || 0,
           xGoals: player.xGoals || 0,
-          corsi: player.corsi || 0,
-          fenwick: player.fenwick || 0,
+          // corsi/fenwick intentionally removed
           wins: player.wins || 0,
           losses: player.losses || 0,
           otl: player.ot_losses || 0,
