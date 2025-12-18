@@ -143,10 +143,10 @@ def compute_plus_minus(season: int, sb: Client) -> Dict[int, int]:
             except Exception:
                 pass
 
-    print(f"[LOAD] player_shifts ...")
+    print(f"[LOAD] player_shifts_official ...")
     shift_rows = _fetch_all(
         sb,
-        "player_shifts",
+        "player_shifts_official",
         "player_id,game_id,period,shift_start_time_seconds,shift_end_time_seconds,team_id",
         filters=[
             ("gte", "game_id", game_id_min),
@@ -156,7 +156,7 @@ def compute_plus_minus(season: int, sb: Client) -> Dict[int, int]:
         batch_size=2000,
     )
     if not shift_rows:
-        print("[WARN] No player_shifts found. (+/- will remain 0)")
+        print("[WARN] No player_shifts_official found. (+/- will remain 0)")
         return {}
 
     # Normalize shifts and group by (game_id, period)
