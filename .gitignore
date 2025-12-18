@@ -1,0 +1,82 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.code-workspace
+.idea
+.idea/
+*.iml
+*.ipr
+*.iws
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+.atom/
+.buildlog/
+.history
+.svn/
+
+# Miscellaneous
+*.class
+*.pyc
+
+# Temporary files
+temp_*.json
+test-*.html
+fix_*.sql
+*.ps1
+git-*.txt
+git-*.log
+git-diagnostic-output/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+/build/
+
+# Environment variables - NEVER commit .env files with secrets!
+.env
+.env.local
+.env.*.local
+
+# Firebase – this is necessary if you use Firebase since it could otherwise 
+# lead to leaking of private certificates to your repository, which is no bueno.
+.firebase/
+
+# Web related
+lib/generated_plugin_registrant.dart
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release

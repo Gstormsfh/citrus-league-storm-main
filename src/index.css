@@ -1,0 +1,979 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 44 50% 96%; /* Cream background */
+    --foreground: 142 24% 20%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 142 24% 20%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 142 24% 20%;
+
+    --primary: 142 32% 59%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 39 96% 70%;
+    --secondary-foreground: 142 24% 20%;
+
+    --muted: 142 14% 90%;
+    --muted-foreground: 142 8% 46%;
+
+    --accent: 23 100% 73%;
+    --accent-foreground: 142 30% 10%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 142 10% 80%;
+    --input: 142 10% 80%;
+    --ring: 142 32% 59%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 142 42% 96%;
+    --sidebar-foreground: 142 24% 20%;
+    --sidebar-primary: 142 32% 59%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 39 96% 70%;
+    --sidebar-accent-foreground: 142 24% 20%;
+    --sidebar-border: 142 10% 80%;
+    --sidebar-ring: 142 32% 59%;
+    
+    /* Vibrant accent colors - Soft colorful versions */
+    --vibrant-orange: 27 70% 70%;
+    --vibrant-peach: 23 75% 78%;
+    --vibrant-green: 142 55% 68%;
+    --vibrant-yellow: 39 70% 72%;
+    --vibrant-lime: 78 65% 72%;
+  }
+
+  .dark {
+    --background: 142 24% 10%;
+    --foreground: 142 10% 90%;
+
+    --card: 142 24% 12%;
+    --card-foreground: 142 10% 90%;
+
+    --popover: 142 24% 12%;
+    --popover-foreground: 142 10% 90%;
+
+    --primary: 142 32% 59%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 39 96% 70%;
+    --secondary-foreground: 142 24% 20%;
+
+    --muted: 142 14% 20%;
+    --muted-foreground: 142 10% 70%;
+
+    --accent: 23 100% 73%;
+    --accent-foreground: 142 24% 20%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 142 14% 30%;
+    --input: 142 14% 30%;
+    --ring: 142 32% 59%;
+
+    --sidebar-background: 142 24% 12%;
+    --sidebar-foreground: 142 10% 90%;
+    --sidebar-primary: 142 32% 59%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 39 96% 70%;
+    --sidebar-accent-foreground: 142 24% 20%;
+    --sidebar-border: 142 14% 30%;
+    --sidebar-ring: 142 32% 59%;
+    
+    /* Dark mode vibrant accent colors - Soft colorful versions */
+    --vibrant-orange: 27 65% 70%;
+    --vibrant-peach: 23 70% 75%;
+    --vibrant-green: 142 50% 65%;
+    --vibrant-yellow: 39 65% 70%;
+    --vibrant-lime: 78 60% 70%;
+  }
+
+  /* Loading screen pulse animation */
+  @keyframes pulse {
+    0%, 100% {
+      width: 60%;
+    }
+    50% {
+      width: 80%;
+    }
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    overflow-x: hidden;
+    @apply bg-background text-foreground font-sans;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display font-bold;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    width: 100%;
+  }
+  
+  #root {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+  }
+
+  /* Override any focus rings with our theme colors */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-primary/70;
+  }
+  
+  /* Ensure radix portals properly render above content without breaking layout */
+  [data-radix-popper-content-wrapper] {
+    @apply z-[60] !important;
+  }
+}
+
+@layer components {
+  /* Premium navigation buttons with animated underline */
+  .nav-button {
+    @apply relative inline-flex items-center justify-center box-border font-medium text-foreground transition-colors hover:text-primary;
+    width: auto;
+    min-width: 80px;
+    padding: 0.5rem 1rem;
+  }
+  
+  .nav-button::after {
+    @apply content-[''] absolute -bottom-1 left-0 w-0 h-0.5 bg-primary transition-all duration-300 opacity-0;
+  }
+  
+  .nav-button:hover::after {
+    @apply w-full opacity-100;
+  }
+  
+  .nav-button.active::after {
+    @apply w-full opacity-100;
+  }
+  
+  /* Premium dropdown styling with glass morphism */
+  .dropdown-menu {
+    @apply absolute top-full left-0 mt-1 w-56 rounded-xl bg-background/95 backdrop-blur-lg shadow-lg border border-border/40 overflow-hidden z-[60];
+  }
+  
+  .dropdown-item {
+    @apply block w-full text-left px-4 py-2.5 hover:bg-accent/20 transition-colors rounded-lg my-0.5;
+  }
+  
+  /* Fixed width selects to prevent shifting */
+  .select-width-fixed {
+    @apply w-[160px] !important;
+  }
+  
+  /* Premium button styles */
+  .btn-citrus {
+    @apply px-6 py-3 font-medium rounded-full bg-primary text-white hover:bg-primary/90 transition-colors shadow-md hover:shadow-lg;
+  }
+  
+  .btn-citrus-outline {
+    @apply px-6 py-3 font-medium rounded-full border-2 border-primary text-primary hover:bg-primary/10 transition-colors;
+  }
+  
+  .btn-citrus-secondary {
+    @apply px-6 py-3 font-medium rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/90 transition-colors shadow-md hover:shadow-lg;
+  }
+  
+  .btn-vibrant-orange {
+    @apply px-6 py-3 font-medium rounded-full bg-[hsl(var(--vibrant-orange))] text-white hover:bg-[hsl(var(--vibrant-orange))]/90 transition-colors shadow-md hover:shadow-lg;
+  }
+
+  .btn-vibrant-peach {
+    @apply px-6 py-3 font-medium rounded-full bg-[hsl(var(--vibrant-peach))] text-white hover:bg-[hsl(var(--vibrant-peach))]/90 transition-colors shadow-md hover:shadow-lg;
+  }
+  
+  /* Premium card styles */
+  .card-citrus {
+    @apply bg-white rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow border border-border/10;
+  }
+  
+  /* Matchup wrapper - ensure no padding/margin affects layout */
+  .matchup-wrapper {
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  
+  /* Matchup grid - ensure equal split */
+  .matchup-grid {
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  
+  /* Team container - ensure no margins/padding affect width */
+  .team-container,
+  .user-team-container,
+  .opponent-team-container {
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+  
+  /* Matchup team cards - ensure identical sizing */
+  .matchup-team-card {
+    @apply w-full flex flex-col;
+    min-height: 0;
+    flex-basis: 50% !important;
+    flex-grow: 1 !important;
+    flex-shrink: 1 !important;
+    overflow: hidden !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+  }
+  
+  .matchup-team-card .table-container {
+    @apply flex-1 w-full;
+    min-height: 0;
+    overflow: visible;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  /* Force the Table component's wrapper div to be constrained */
+  .matchup-team-card .table-container > div {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+  }
+  
+  .matchup-team-card table {
+    table-layout: fixed !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    border-collapse: collapse !important;
+  }
+  
+  /* Force ALL table cells to respect column widths */
+  .matchup-team-card td,
+  .matchup-team-card th {
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+  }
+  
+  /* Force exact widths for fixed columns with overflow protection */
+  .matchup-team-card td:first-child,
+  .matchup-team-card th:first-child {
+    width: 60px !important;
+    min-width: 60px !important;
+    max-width: 60px !important;
+    overflow: hidden !important;
+    text-overflow: clip !important;
+    white-space: nowrap !important;
+  }
+  
+  .matchup-team-card td:nth-child(3),
+  .matchup-team-card th:nth-child(3),
+  .matchup-team-card td:nth-child(4),
+  .matchup-team-card th:nth-child(4) {
+    width: 50px !important;
+    min-width: 50px !important;
+    max-width: 50px !important;
+    overflow: hidden !important;
+    text-overflow: clip !important;
+    white-space: nowrap !important;
+  }
+  
+  .matchup-team-card td:nth-child(5),
+  .matchup-team-card th:nth-child(5),
+  .matchup-team-card td:nth-child(6),
+  .matchup-team-card th:nth-child(6) {
+    width: 60px !important;
+    min-width: 60px !important;
+    max-width: 60px !important;
+    overflow: hidden !important;
+    text-overflow: clip !important;
+    white-space: nowrap !important;
+  }
+  
+  .matchup-team-card td:last-child,
+  .matchup-team-card th:last-child {
+    width: 70px !important;
+    min-width: 70px !important;
+    max-width: 70px !important;
+    overflow: hidden !important;
+    text-overflow: clip !important;
+    white-space: nowrap !important;
+  }
+  
+  /* Player column (2nd) - flexible but constrained */
+  .matchup-team-card td:nth-child(2),
+  .matchup-team-card th:nth-child(2) {
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+  }
+  
+  /* Ensure consistent row heights for player names - smaller on desktop */
+  .matchup-team-card tbody tr {
+    min-height: 60px;
+  }
+  
+  @media (max-width: 767px) {
+    .matchup-team-card tbody tr {
+      min-height: 72px;
+    }
+  }
+  
+  .matchup-team-card .player-name-cell {
+    min-height: 56px;
+  }
+  
+  /* Ensure player names truncate properly */
+  .matchup-team-card .player-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+  
+  .card-premium {
+    @apply bg-white/70 backdrop-blur-md rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border border-white/20;
+  }
+  
+  /* Premium section padding */
+  .section-padding {
+    @apply py-20 px-6 md:px-12 lg:px-24;
+  }
+  
+  /* Element animations */
+  .animated-element {
+    @apply opacity-0;
+  }
+  
+  .animated-element.animate {
+    @apply animate-fade-in;
+  }
+  
+  /* Premium gradients */
+  .citrus-gradient {
+    @apply bg-gradient-to-br from-[hsl(var(--vibrant-green))] to-[hsl(var(--vibrant-yellow))];
+  }
+  
+  .citrus-gradient-text {
+    @apply bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent;
+  }
+  
+  /* Premium vibrant gradients */
+  .vibrant-gradient-1 {
+    @apply bg-gradient-to-r from-[hsl(var(--vibrant-green))] to-[hsl(var(--vibrant-yellow))];
+  }
+  
+  .vibrant-gradient-2 {
+    @apply bg-gradient-to-r from-[hsl(var(--vibrant-green))] to-[hsl(var(--vibrant-orange))];
+  }
+  
+  .vibrant-gradient-3 {
+    @apply bg-gradient-to-r from-[hsl(var(--vibrant-orange))] to-[hsl(var(--vibrant-yellow))];
+  }
+
+  /* Premium UI glass effect */
+  .glass-panel {
+    @apply bg-white/30 backdrop-blur-md border border-white/20 shadow-lg;
+  }
+  
+  .dark .glass-panel {
+    @apply bg-black/30 backdrop-blur-md border border-white/10 shadow-lg;
+  }
+  
+  /* Premium tab styles */
+  .premium-tabs {
+    @apply p-1 rounded-lg bg-muted/30;
+  }
+  
+  .premium-tab {
+    @apply px-4 py-2 rounded-md font-medium text-sm transition-all duration-200;
+  }
+  
+  .premium-tab.active {
+    @apply bg-background text-foreground shadow-sm;
+  }
+
+  .background-mesh {
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='currentColor' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  }
+
+  .startup-gradient {
+    @apply bg-gradient-to-br from-[hsl(var(--vibrant-orange))] via-primary to-[hsl(var(--vibrant-purple))];
+  }
+  
+  .glass-card {
+    @apply bg-gradient-to-br from-background/90 to-muted/70 border-primary/10 backdrop-blur-sm;
+  }
+}
+
+/* Fix positioning for Radix UI dropdown components */
+[data-radix-portal] {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+}
+
+[data-radix-portal] > * {
+  pointer-events: auto;
+}
+
+/* Ensure dropdowns and popovers stay in viewport and don't shift layout */
+:root {
+  --portal-z-index: 60;
+}
+
+/* ================================================= */
+/* 🌎 MATCHUP COMPARISON LAYOUT - UNIVERSAL SETUP */
+/* ================================================= */
+/* Note: box-sizing: border-box is already set globally, so we don't override it here */
+
+.matchup-position-group {
+  width: 100%;
+  /* No border or margin - all players shown together */
+}
+
+/* ================================================= */
+/* 📱 MOBILE-FIRST DEFAULTS (SIDE-BY-SIDE COMPARISON) */
+/* ================================================= */
+.matchup-comparison-row {
+  display: grid;
+  /* Side-by-side comparison even on mobile: 47% (User) | 6% (Center) | 47% (Opponent) */
+  grid-template-columns: 47% 6% 47%;
+  align-items: stretch;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* Mobile position header removed - positions are now shown via colored borders */
+
+.matchup-center-column {
+  /* Show center column on all screens for side-by-side comparison */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: hsl(var(--muted) / 0.15);
+  border-left: 2px solid hsl(var(--border) / 0.3);
+  border-right: 2px solid hsl(var(--border) / 0.3);
+  padding: 4px 3px;
+  text-align: center;
+  gap: 3px;
+  min-width: 40px;
+  min-height: 48px;
+}
+
+.player-card {
+  width: 100%; /* Ensures the card takes full width of its grid column */
+  padding: 6px 8px; /* Compact padding */
+  border-bottom: 1px solid hsl(var(--border) / 0.2);
+  /* Use flex inside the card for internal text arrangement */
+  display: flex; 
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden; /* Guards against internal overflow breaking the container */
+  background-color: hsl(var(--card));
+  min-height: 48px; /* Consistent compact height */
+}
+
+/* 🔒 World-Class Alignment Fix: Text Overflow/Ellipsis */
+.player-card .player-name {
+  font-size: 0.875rem; /* 14px - smaller than before */
+  font-weight: 600;
+  line-height: 1.4;
+  /* Each name part can truncate independently */
+}
+
+.player-card .player-name > div {
+  /* Forces text to stay on one line and adds "..." if it exceeds the card width */
+  white-space: nowrap; 
+  overflow: hidden; 
+  text-overflow: ellipsis;
+}
+
+.player-stats {
+  font-size: 0.9rem;
+  color: #666;
+  line-height: 1.4;
+}
+
+/* On mobile, hide mobile score since center column is visible */
+.player-card .player-mobile-score {
+  display: none;
+}
+
+/* Remove bottom border from the last card in each row */
+.matchup-position-group > .matchup-comparison-row:last-child .player-card {
+  border-bottom: none;
+}
+
+/* ================================================= */
+/* 💻 DESKTOP/TABLET OVERRIDE - SAME AS MOBILE (SIDE-BY-SIDE) */
+/* ================================================= */
+@media (min-width: 768px) {
+  
+  /* Same grid layout as mobile - side-by-side comparison */
+  .matchup-comparison-row {
+    display: grid;
+    /* Sleeper-style split: 47% (User) | 6% (Center) | 47% (Opponent) - wider center for bars */
+    grid-template-columns: 47% 6% 47%; 
+    align-items: stretch; /* Ensures all three columns share the same height */
+    /* Remove any gap between rows */
+    margin: 0;
+    padding: 0;
+  }
+  
+  /* Reduce spacing between rows with subtle dividers - Sleeper style */
+  .matchup-position-group > .matchup-comparison-row {
+    border-bottom: 1px solid hsl(var(--border) / 0.2); /* Very subtle divider */
+  }
+  
+  .matchup-position-group > .matchup-comparison-row:last-child {
+    border-bottom: none;
+  }
+  
+  /* Center column styles already defined in mobile-first section - no override needed */
+  
+  /* Position-specific center column colors - High-Contrast Citrus Palette */
+  .matchup-center-column-fantasy-primary {
+    background: rgba(249, 224, 118, 0.2);
+    border-left-color: rgba(249, 224, 118, 0.6);
+    border-right-color: rgba(249, 224, 118, 0.6);
+  }
+  
+  .matchup-center-column-fantasy-secondary {
+    background: rgba(69, 147, 69, 0.2);
+    border-left-color: rgba(69, 147, 69, 0.6);
+    border-right-color: rgba(69, 147, 69, 0.6);
+  }
+  
+  .matchup-center-column-fantasy-tertiary {
+    background: rgba(249, 164, 54, 0.2);
+    border-left-color: rgba(249, 164, 54, 0.6);
+    border-right-color: rgba(249, 164, 54, 0.6);
+  }
+  
+  /* Defense - Yellow-Green (#A8D85C) */
+  .matchup-center-column-defense {
+    background: rgba(168, 216, 92, 0.2);
+    border-left-color: rgba(168, 216, 92, 0.6);
+    border-right-color: rgba(168, 216, 92, 0.6);
+  }
+  
+  /* Goalie - Contrast Grapefruit Pink (#FF6F80) */
+  .matchup-center-column-goalie {
+    background: rgba(255, 111, 128, 0.2);
+    border-left-color: rgba(255, 111, 128, 0.6);
+    border-right-color: rgba(255, 111, 128, 0.6);
+  }
+  
+  /* Utility - Citrus Apricot (#FFB84D) - distinct orange-yellow blend */
+  .matchup-center-column-utility {
+    background: rgba(255, 184, 77, 0.2);
+    border-left-color: rgba(255, 184, 77, 0.6);
+    border-right-color: rgba(255, 184, 77, 0.6);
+  }
+  
+  .matchup-center-column .position-label {
+    font-weight: 800;
+    font-size: 0.6875rem; /* 11px */
+    text-transform: uppercase;
+    line-height: 1;
+    color: hsl(var(--foreground));
+    letter-spacing: 0.5px;
+    display: block;
+    margin-bottom: 1px;
+  }
+  
+  /* Position-specific label colors - High-Contrast Citrus Palette */
+  .position-label-fantasy-primary {
+    color: #F9E076; /* Center - Bright Lemon Peel */
+  }
+  
+  .position-label-fantasy-secondary {
+    color: #459345; /* Left Wing - Deep Lime Green */
+  }
+  
+  .position-label-fantasy-tertiary {
+    color: #F9A436; /* Right Wing - Zesty Tangerine */
+  }
+  
+  .position-label-defense {
+    color: #A8D85C; /* Defense - Yellow-Green */
+  }
+  
+  .position-label-goalie {
+    color: #FF6F80; /* Goalie - Contrast Grapefruit Pink */
+  }
+  
+  .position-label-utility {
+    color: #4DD4F0; /* Utility - Soft Cyan */
+  }
+  
+  /* Projection Container - Centered and Compact */
+  .matchup-center-column .projection-container {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+    flex: 1;
+    justify-content: center;
+    align-items: center;
+    padding: 2px 0;
+  }
+  
+  .matchup-center-column .projection-item {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    width: 22.5%; /* 50% of previous 45% width */
+    align-items: center;
+  }
+  
+  /* Projection Bar Wrapper - Smaller */
+  .matchup-center-column .projection-bar-wrapper {
+    width: 100%;
+    height: 6px; /* Smaller height */
+    background: hsl(var(--muted) / 0.3);
+    border-radius: 3px;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .matchup-center-column .projection-bar {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+    min-width: 1px;
+  }
+  
+  .matchup-center-column .projection-bar-user {
+    background: linear-gradient(to right, #7CB518, rgba(124, 181, 24, 0.85)); /* Citrus Green */
+  }
+  
+  .matchup-center-column .projection-bar-opponent {
+    background: linear-gradient(to right, hsl(var(--vibrant-orange)), hsl(var(--vibrant-orange) / 0.85)); /* Citrus Orange */
+  }
+  
+  /* Projected Scores - Citrus Colors - Smaller */
+  .matchup-center-column .projected-score {
+    font-size: 0.5625rem; /* 9px - smaller */
+    font-weight: 700;
+    line-height: 1;
+    display: block;
+    margin-top: 1px;
+  }
+  
+  .matchup-center-column .projected-score-user {
+    color: #A8D85C; /* Soft Lime Green */
+  }
+  
+  .matchup-center-column .projected-score-opponent {
+    color: hsl(var(--vibrant-orange)); /* Soft Orange */
+  }
+  
+  /* World-Class Player Card - Sleeper Aesthetic (Ultra Compact) */
+  .player-card {
+    position: relative;
+    width: auto;
+    border-bottom: none;
+    padding: 6px 8px;
+    min-height: 48px;
+    border-radius: 4px;
+    border: 1px solid hsl(var(--border) / 0.4);
+    background: hsl(var(--card));
+    overflow: hidden;
+  }
+  
+  /* Background Position Text */
+  .player-card-bg-text {
+    position: absolute;
+    top: 8px;
+    left: 10px;
+    font-size: 1.5rem;
+    font-weight: 900;
+    color: hsl(var(--muted-foreground) / 0.05);
+    line-height: 1;
+    pointer-events: none;
+    user-select: none;
+    z-index: 0;
+    text-transform: uppercase;
+  }
+  
+  /* Background Score Number */
+  .player-card-bg-number {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
+    font-size: 2rem;
+    font-weight: 900;
+    color: hsl(var(--muted-foreground) / 0.05);
+    line-height: 1;
+    pointer-events: none;
+    user-select: none;
+    z-index: 0;
+  }
+  
+  /* Card Content - Simplified Layout */
+  .player-card-content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    height: 100%;
+  }
+  
+  /* Header Section - Full Name + Unique Stats */
+  .player-card-header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    align-items: start;
+  }
+  
+  .player-header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 1px; /* Minimal gap - key stats directly under name */
+    min-width: 0;
+  }
+  
+  .player-name {
+    font-size: 0.6875rem; /* 11px - much smaller */
+    font-weight: 700;
+    line-height: 1.2;
+    color: hsl(var(--foreground));
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+  
+  /* Key Stats Below Name - Italicized Gray - Directly under name */
+  .player-key-stats {
+    font-size: 0.625rem; /* 10px - smaller for compact cards */
+    font-style: italic;
+    color: hsl(var(--muted-foreground));
+    line-height: 1.1;
+    margin-top: 1px; /* Minimal gap - directly under name */
+    margin-bottom: 0;
+  }
+  
+  /* Unique Stats Box - Top Right Corner */
+  .player-unique-stats-box {
+    background: hsl(var(--muted) / 0.3);
+    border: 1px solid hsl(var(--border) / 0.4);
+    border-radius: 3px;
+    padding: 4px 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 70px;
+    flex-shrink: 0;
+  }
+  
+  .unique-stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.625rem; /* 10px */
+    line-height: 1.2;
+  }
+  
+  .unique-stat-label {
+    color: hsl(var(--muted-foreground));
+    font-weight: 600;
+  }
+  
+  .unique-stat-value {
+    color: hsl(var(--foreground));
+    font-weight: 700;
+  }
+  
+  /* Projection Bar - Smaller but More Obvious - Compact */
+  .player-projection-bar-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin-top: auto;
+    align-items: center; /* Center the projection bar and text */
+  }
+  
+  .player-projection-bar-wrapper {
+    width: 75%; /* Centered and only 75% of card width */
+    height: 3px; /* Even smaller height for compact cards */
+    background: hsl(var(--muted) / 0.2);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid hsl(var(--border) / 0.3); /* Border for more visibility */
+    margin: 0 auto; /* Center the bar */
+  }
+  
+  .player-projection-bar {
+    height: 100%;
+    background: linear-gradient(to right, #22c55e, #16a34a); /* Bright green gradient */
+    border-radius: 2px;
+    transition: width 0.3s ease;
+    min-width: 1px;
+    box-shadow: 0 0 2px rgba(34, 197, 94, 0.5); /* Subtle glow for visibility */
+  }
+  
+  .player-projection-text {
+    font-size: 0.5rem; /* 8px - even smaller for compact cards */
+    text-align: center; /* Center the text */
+    color: hsl(var(--muted-foreground));
+    font-weight: 600;
+    line-height: 1;
+  }
+  
+  /* Hide mobile score on desktop - scores are in center column */
+  .player-card .player-mobile-score {
+    display: none;
+  }
+  
+  /* Empty card styling */
+  .player-card-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100px;
+  }
+  
+  /* Symmetrical text alignment - Sleeper style */
+  .user-team {
+    /* Left side data aligns to the center axis */
+    text-align: right; 
+    padding-right: 12px;
+    padding-left: 0;
+  }
+  
+  /* Both sides use identical formatting - no alignment differences */
+  .user-team,
+  .opponent-team {
+    text-align: left;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  
+  /* Both sides align stats the same way */
+  .user-team .player-tier1-stats,
+  .opponent-team .player-tier1-stats {
+    justify-items: start;
+  }
+  
+  .user-team .player-tier2-stats,
+  .opponent-team .player-tier2-stats {
+    justify-content: flex-start;
+  }
+  
+  .user-team .player-data-bars,
+  .opponent-team .player-data-bars {
+    align-items: flex-start;
+  }
+  
+  .user-team .data-bar-item,
+  .opponent-team .data-bar-item {
+    align-items: flex-start;
+  }
+  
+  /* Ensure the last card is visible for the grid */
+  .matchup-position-group > .matchup-comparison-row > .player-card:last-of-type {
+    border-bottom: none;
+  }
+  
+  /* Total Row Styling - Sleeper style clean */
+  .matchup-total-row {
+    display: grid;
+    grid-template-columns: 47% 6% 47%;
+    align-items: stretch;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid hsl(var(--border) / 0.3);
+  }
+  
+  .matchup-total-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 8px 10px;
+    background: transparent;
+  }
+  
+  .matchup-total-user {
+    text-align: right;
+    align-items: flex-end;
+  }
+  
+  .matchup-total-opponent {
+    text-align: left;
+    align-items: flex-start;
+  }
+  
+  .matchup-total-label {
+    font-size: 0.6875rem; /* 11px */
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: hsl(var(--muted-foreground));
+    margin-bottom: 2px;
+  }
+  
+  .matchup-total-score {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1;
+    color: hsl(var(--foreground));
+    letter-spacing: -0.3px;
+  }
+  
+  .matchup-total-user .matchup-total-score {
+    color: hsl(var(--primary));
+  }
+  
+  .matchup-total-opponent .matchup-total-score {
+    color: hsl(var(--accent));
+  }
+  
+  .matchup-total-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+}
