@@ -8,6 +8,22 @@ begin
     return;
   end if;
 
+  -- Drop ANY existing primary key constraint, regardless of its name.
+  -- (Earlier experiments may have created PKs like player_directory_pkey, player_directory_id_pkey, etc.)
+  declare r record;
+  begin
+    for r in
+      select conname
+      from pg_constraint
+      where conrelid = 'public.player_directory'::regclass
+        and contype = 'p'
+    loop
+      execute format('alter table public.player_directory drop constraint %I', r.conname);
+    end loop;
+  exception when others then
+    -- ignore
+  end;
+
   -- Ensure required columns exist (safe no-ops if already present)
   alter table public.player_directory add column if not exists season integer;
   alter table public.player_directory add column if not exists player_id integer;
@@ -32,13 +48,6 @@ begin
   alter table public.player_directory alter column full_name set not null;
 
   -- Ensure composite primary key (season, player_id)
-  -- (If an old PK exists, it is almost always named player_directory_pkey in Postgres)
-  begin
-    alter table public.player_directory drop constraint if exists player_directory_pkey;
-  exception when others then
-    -- ignore
-  end;
-
   alter table public.player_directory
     add constraint player_directory_pkey primary key (season, player_id);
 
