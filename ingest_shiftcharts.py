@@ -18,7 +18,7 @@ from typing import Dict, List, Optional
 
 import requests
 from dotenv import load_dotenv
-from supabase import create_client, Client
+from supabase_rest import SupabaseRest
 
 load_dotenv()
 SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
@@ -29,8 +29,8 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 SHIFTCHARTS_URL = "https://api.nhle.com/stats/rest/en/shiftcharts"
 
 
-def supabase_client() -> Client:
-  return create_client(SUPABASE_URL, SUPABASE_KEY)
+def supabase_client() -> SupabaseRest:
+  return SupabaseRest(SUPABASE_URL, SUPABASE_KEY)
 
 
 def _now_iso() -> str:
@@ -58,20 +58,26 @@ def fetch_shiftcharts(game_id: int) -> List[dict]:
   return payload.get("data") or []
 
 
-def upsert_shifts(db: Client, shifts: List[dict]) -> None:
+def upsert_shifts(db: SupabaseRest, shifts: List[dict]) -> None:
   if not shifts:
     return
   CHUNK = 1000
   for i in range(0, len(shifts), CHUNK):
-    db.table("player_shifts_official").upsert(shifts[i:i + CHUNK], on_conflict="shift_id").execute()
+    db.upsert("player_shifts_official", shifts[i:i + CHUNK], on_conflict="shift_id")
 
 
-def iter_game_ids_from_raw_nhl_data(db: Client, season: int, limit: int) -> List[int]:
+def iter_game_ids_from_raw_nhl_data(db: SupabaseRest, season: int, limit: int) -> List[int]:
   # Use game_id prefix range for season
   game_id_min = int(f"{season}000000")
   game_id_max = int(f"{season + 1}000000")
-  res = db.table("raw_nhl_data").select("game_id").gte("game_id", game_id_min).lt("game_id", game_id_max).order("game_id").limit(limit).execute()
-  return [int(r["game_id"]) for r in (res.data or []) if r.get("game_id") is not None]
+  rows = db.select(
+    "raw_nhl_data",
+    select="game_id",
+    filters=[("game_id", "gte", game_id_min), ("game_id", "lt", game_id_max)],
+    order="game_id.asc",
+    limit=limit,
+  )
+  return [int(r["game_id"]) for r in rows if r.get("game_id") is not None]
 
 
 def main() -> int:

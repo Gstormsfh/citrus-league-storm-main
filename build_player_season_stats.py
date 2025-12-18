@@ -6,13 +6,13 @@ Rollup: aggregate public.player_game_stats into public.player_season_stats for f
 Optionally enrich with xG/xA totals from public.raw_shots (if available).
 """
 
+from dotenv import load_dotenv
 import os
 import sys
 import datetime as dt
 from typing import Dict, List
 
-from dotenv import load_dotenv
-from supabase import create_client, Client
+from supabase_rest import SupabaseRest
 
 load_dotenv()
 SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
@@ -23,29 +23,27 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 DEFAULT_SEASON = int(os.getenv("CITRUS_DEFAULT_SEASON", "2025"))
 
 
-def supabase_client() -> Client:
-  return create_client(SUPABASE_URL, SUPABASE_KEY)
+def supabase_client() -> SupabaseRest:
+  return SupabaseRest(SUPABASE_URL, SUPABASE_KEY)
 
 
 def _now_iso() -> str:
   return dt.datetime.now(dt.timezone.utc).isoformat()
 
 
-def fetch_all_player_game_stats(db: Client, season: int) -> List[dict]:
+def fetch_all_player_game_stats(db: SupabaseRest, season: int) -> List[dict]:
   # naive full pull (MVP); can be paginated later
-  resp = db.table("player_game_stats").select("*").eq("season", season).execute()
-  return resp.data or []
+  return db.select("player_game_stats", select="*", filters=[("season", "eq", season)])
 
 
-def try_fetch_xg_totals(db: Client, season: int) -> Dict[int, Dict[str, float]]:
+def try_fetch_xg_totals(db: SupabaseRest, season: int) -> Dict[int, Dict[str, float]]:
   """
   Returns player_id -> {x_goals, x_assists}
   Best-effort: if raw_shots schema differs or unavailable, return empty.
   """
   try:
     # raw_shots has player_id and xg; xA might be xa or expected_assists depending on schema.
-    resp = db.table("raw_shots").select("player_id, xg, xa").execute()
-    rows = resp.data or []
+    rows = db.select("raw_shots", select="player_id,xg,xa")
     out: Dict[int, Dict[str, float]] = {}
     for r in rows:
       pid = r.get("player_id")
@@ -61,12 +59,12 @@ def try_fetch_xg_totals(db: Client, season: int) -> Dict[int, Dict[str, float]]:
     return {}
 
 
-def upsert_player_season_stats(db: Client, season_rows: List[dict]) -> None:
+def upsert_player_season_stats(db: SupabaseRest, season_rows: List[dict]) -> None:
   if not season_rows:
     return
   CHUNK = 500
   for i in range(0, len(season_rows), CHUNK):
-    db.table("player_season_stats").upsert(season_rows[i:i + CHUNK], on_conflict="season,player_id").execute()
+    db.upsert("player_season_stats", season_rows[i:i + CHUNK], on_conflict="season,player_id")
 
 
 def main() -> int:

@@ -14,7 +14,7 @@ import datetime as dt
 from typing import Dict, Optional
 
 from dotenv import load_dotenv
-from supabase import create_client, Client
+from supabase_rest import SupabaseRest
 
 load_dotenv()
 SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
@@ -25,8 +25,8 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 DEFAULT_SEASON = int(os.getenv("CITRUS_DEFAULT_SEASON", "2025"))
 
 
-def supabase_client() -> Client:
-  return create_client(SUPABASE_URL, SUPABASE_KEY)
+def supabase_client() -> SupabaseRest:
+  return SupabaseRest(SUPABASE_URL, SUPABASE_KEY)
 
 
 def _now_iso() -> str:
@@ -45,8 +45,7 @@ def main() -> int:
   season = DEFAULT_SEASON
 
   # Pull a chunk of raw_nhl_data (MVP). Can paginate later.
-  resp = db.table("raw_nhl_data").select("game_id, raw_json").order("game_id", desc=True).limit(200).execute()
-  rows = resp.data or []
+  rows = db.select("raw_nhl_data", select="game_id,raw_json", order="game_id.desc", limit=500)
 
   seen: Dict[int, dict] = {}
 
@@ -77,7 +76,7 @@ def main() -> int:
         }
 
   if seen:
-    db.table("player_directory").upsert(list(seen.values()), on_conflict="season,player_id").execute()
+    db.upsert("player_directory", list(seen.values()), on_conflict="season,player_id")
     print(f"[populate_player_directory] upserted players={len(seen)}")
   else:
     print("[populate_player_directory] no players found in sampled raw_nhl_data payloads")

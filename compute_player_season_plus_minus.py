@@ -21,7 +21,7 @@ import time
 from typing import Dict, List, Set, Tuple
 
 from dotenv import load_dotenv
-from supabase import create_client, Client
+from supabase_rest import SupabaseRest
 
 
 def _require_env(name: str) -> str:
@@ -32,7 +32,7 @@ def _require_env(name: str) -> str:
 
 
 def _fetch_all(
-    sb: Client,
+    sb: SupabaseRest,
     table: str,
     select: str,
     filters: List[Tuple[str, str, object]] | None = None,
@@ -42,25 +42,11 @@ def _fetch_all(
     rows: List[dict] = []
     offset = 0
     while True:
-        q = sb.table(table).select(select).range(offset, offset + batch_size - 1)
+        rest_filters = []
         if filters:
             for op, col, val in filters:
-                if op == "eq":
-                    q = q.eq(col, val)
-                elif op == "neq":
-                    q = q.neq(col, val)
-                elif op == "gte":
-                    q = q.gte(col, val)
-                elif op == "lt":
-                    q = q.lt(col, val)
-                elif op == "in":
-                    q = q.in_(col, val)
-                else:
-                    raise ValueError(f"Unsupported filter op: {op}")
-        if order:
-            q = q.order(order)
-        res = q.execute()
-        data = res.data or []
+                rest_filters.append((col, op, val))
+        data = sb.select(table, select=select, filters=rest_filters or None, order=order, limit=batch_size, offset=offset)
         rows.extend(data)
         if len(data) < batch_size:
             break
@@ -68,7 +54,7 @@ def _fetch_all(
     return rows
 
 
-def compute_plus_minus(season: int, sb: Client) -> Dict[int, int]:
+def compute_plus_minus(season: int, sb: SupabaseRest) -> Dict[int, int]:
     # NHL game_id is like 2025020xxx; use numeric range filter for the year prefix.
     game_id_min = int(f"{season}000000")
     game_id_max = int(f"{season + 1}000000")
@@ -215,7 +201,7 @@ def compute_plus_minus(season: int, sb: Client) -> Dict[int, int]:
     return pm
 
 
-def upsert_plus_minus(sb: Client, season: int, pm: Dict[int, int]):
+def upsert_plus_minus(sb: SupabaseRest, season: int, pm: Dict[int, int]):
     if not pm:
         print("[WRITE] Nothing to write (no +/- computed).")
         return
@@ -226,7 +212,7 @@ def upsert_plus_minus(sb: Client, season: int, pm: Dict[int, int]):
     print(f"[WRITE] Upserting {len(rows):,} player_season_stats rows...")
     chunk = 1000
     for i in range(0, len(rows), chunk):
-        sb.table("player_season_stats").upsert(rows[i:i + chunk], on_conflict="season,player_id").execute()
+        sb.upsert("player_season_stats", rows[i:i + chunk], on_conflict="season,player_id")
         if (i // chunk) % 5 == 0:
             print(f"  wrote {min(i + chunk, len(rows)):,}/{len(rows):,}")
 
@@ -240,7 +226,7 @@ def main():
     load_dotenv()
     url = _require_env("VITE_SUPABASE_URL")
     key = _require_env("SUPABASE_SERVICE_ROLE_KEY")
-    sb = create_client(url, key)
+    sb = SupabaseRest(url, key)
 
     pm = compute_plus_minus(args.season, sb)
 

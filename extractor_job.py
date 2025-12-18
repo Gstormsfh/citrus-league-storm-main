@@ -22,7 +22,7 @@ import datetime as dt
 from typing import Any, Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
-from supabase import create_client, Client
+from supabase_rest import SupabaseRest
 
 load_dotenv()
 SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
@@ -35,8 +35,8 @@ POLL_SECONDS = int(os.getenv("CITRUS_EXTRACT_POLL_SECONDS", "120"))
 MAX_BATCH = int(os.getenv("CITRUS_EXTRACT_BATCH", "25"))
 
 
-def supabase_client() -> Client:
-  return create_client(SUPABASE_URL, SUPABASE_KEY)
+def supabase_client() -> SupabaseRest:
+  return SupabaseRest(SUPABASE_URL, SUPABASE_KEY)
 
 
 def _now_iso() -> str:
@@ -253,22 +253,27 @@ def _aggregate_player_stats_from_pbp(pbp: dict, season: int) -> Dict[int, dict]:
   return acc
 
 
-def _upsert_player_game_stats(db: Client, rows: List[dict]) -> None:
+def _upsert_player_game_stats(db: SupabaseRest, rows: List[dict]) -> None:
   if not rows:
     return
   # chunk to avoid large payload limits
   CHUNK = 500
   for i in range(0, len(rows), CHUNK):
-    db.table("player_game_stats").upsert(rows[i:i + CHUNK], on_conflict="season,game_id,player_id").execute()
+    db.upsert("player_game_stats", rows[i:i + CHUNK], on_conflict="season,game_id,player_id")
 
 
-def _mark_extracted_if_final(db: Client, game_id: int) -> None:
-  db.table("raw_nhl_data").update({"stats_extracted": True, "stats_extracted_at": _now_iso()}).eq("game_id", game_id).execute()
+def _mark_extracted_if_final(db: SupabaseRest, game_id: int) -> None:
+  db.update("raw_nhl_data", {"stats_extracted": True, "stats_extracted_at": _now_iso()}, filters=[("game_id", "eq", game_id)])
 
 
-def _get_unextracted_games(db: Client, limit: int) -> List[dict]:
-  resp = db.table("raw_nhl_data").select("game_id, game_date, raw_json, stats_extracted").eq("stats_extracted", False).limit(limit).execute()
-  return resp.data or []
+def _get_unextracted_games(db: SupabaseRest, limit: int) -> List[dict]:
+  return db.select(
+    "raw_nhl_data",
+    select="game_id,game_date,raw_json,stats_extracted",
+    filters=[("stats_extracted", "eq", "false")],
+    order="game_id.asc",
+    limit=limit,
+  )
 
 
 def main() -> int:

@@ -21,7 +21,7 @@ from typing import Dict, Optional, Tuple
 
 import requests
 from dotenv import load_dotenv
-from supabase import create_client, Client
+from supabase_rest import SupabaseRest
 
 load_dotenv()
 
@@ -36,8 +36,8 @@ POLL_SECONDS = int(os.getenv("CITRUS_INGEST_POLL_SECONDS", "60"))
 COOLDOWN_SECONDS = int(os.getenv("CITRUS_INGEST_COOLDOWN_SECONDS", "45"))
 
 
-def supabase_client() -> Client:
-  return create_client(SUPABASE_URL, SUPABASE_KEY)
+def supabase_client() -> SupabaseRest:
+  return SupabaseRest(SUPABASE_URL, SUPABASE_KEY)
 
 
 def _now_iso() -> str:
@@ -75,8 +75,9 @@ def extract_game_state_and_last_updated(pbp_json: dict) -> Tuple[Optional[str], 
   return game_state, last_updated, game_date
 
 
-def upsert_raw_game(db: Client, game_id: int, game_date: str, pbp_json: dict) -> None:
-  db.table("raw_nhl_data").upsert(
+def upsert_raw_game(db: SupabaseRest, game_id: int, game_date: str, pbp_json: dict) -> None:
+  db.upsert(
+    "raw_nhl_data",
     {
       "game_id": int(game_id),
       "game_date": game_date,
@@ -84,7 +85,7 @@ def upsert_raw_game(db: Client, game_id: int, game_date: str, pbp_json: dict) ->
       "scraped_at": _now_iso(),
     },
     on_conflict="game_id",
-  ).execute()
+  )
 
 
 def main() -> int:
