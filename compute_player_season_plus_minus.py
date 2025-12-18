@@ -20,7 +20,6 @@ import os
 import time
 from typing import Dict, List, Set, Tuple
 
-import pandas as pd
 from dotenv import load_dotenv
 from supabase import create_client, Client
 
@@ -93,35 +92,56 @@ def compute_plus_minus(season: int, sb: Client) -> Dict[int, int]:
         print("[WARN] No eligible goals found. (+/- will remain 0)")
         return {}
 
-    goals = pd.DataFrame(goal_rows)
-
-    # Determine scoring_team_id (prefer home/away ids, fall back to event_owner_team_id)
-    def scoring_team_id(row) -> int | None:
-        try:
-            if row.get("is_home_team") is True:
-                return int(row.get("home_team_id") or row.get("event_owner_team_id") or 0) or None
-            if row.get("is_home_team") is False:
-                return int(row.get("away_team_id") or row.get("event_owner_team_id") or 0) or None
-            return int(row.get("event_owner_team_id") or 0) or None
-        except Exception:
-            return None
-
-    goals["scoring_team_id"] = goals.apply(scoring_team_id, axis=1)
-    goals = goals[goals["scoring_team_id"].notna()].copy()
-
-    # Convert time_remaining -> time_elapsed in period (player_shifts uses elapsed time in period)
+    # Normalize goals list
     def period_len(p: int) -> int:
-        # Regular season: OT is 5 minutes. Good-enough default.
         return 1200 if int(p) <= 3 else 300
 
-    goals["period_length"] = goals["period"].apply(lambda p: period_len(int(p)) if pd.notna(p) else 1200)
-    goals["time_elapsed"] = goals["period_length"] - pd.to_numeric(goals["time_remaining_seconds"], errors="coerce").fillna(0).astype(int)
+    goals = []
+    for r in goal_rows:
+        try:
+            p = int(r.get("period") or 0)
+            tr = int(r.get("time_remaining_seconds") or 0)
+        except Exception:
+            continue
+
+        # Determine scoring_team_id (prefer home/away ids, fall back to event_owner_team_id)
+        scoring_team_id = None
+        try:
+            if r.get("is_home_team") is True:
+                scoring_team_id = int(r.get("home_team_id") or r.get("event_owner_team_id") or 0) or None
+            elif r.get("is_home_team") is False:
+                scoring_team_id = int(r.get("away_team_id") or r.get("event_owner_team_id") or 0) or None
+            else:
+                scoring_team_id = int(r.get("event_owner_team_id") or 0) or None
+        except Exception:
+            scoring_team_id = None
+
+        if scoring_team_id is None:
+            continue
+
+        time_elapsed = period_len(p) - tr
+        goals.append(
+            {
+                "game_id": int(r.get("game_id")),
+                "period": p,
+                "time_elapsed": int(time_elapsed),
+                "scoring_team_id": int(scoring_team_id),
+                "goalie_id": r.get("goalie_id"),
+                "goalie_in_net_id": r.get("goalie_in_net_id"),
+            }
+        )
 
     # Build goalie id set (exclude from +/-)
     goalie_ids: Set[int] = set()
-    for col in ["goalie_id", "goalie_in_net_id"]:
-        if col in goals.columns:
-            goalie_ids.update(int(x) for x in goals[col].dropna().astype(int).tolist())
+    for g in goals:
+        for col in ["goalie_id", "goalie_in_net_id"]:
+            v = g.get(col)
+            if v is None:
+                continue
+            try:
+                goalie_ids.add(int(v))
+            except Exception:
+                pass
 
     print(f"[LOAD] player_shifts ...")
     shift_rows = _fetch_all(
@@ -139,62 +159,56 @@ def compute_plus_minus(season: int, sb: Client) -> Dict[int, int]:
         print("[WARN] No player_shifts found. (+/- will remain 0)")
         return {}
 
-    shifts = pd.DataFrame(shift_rows)
-    # Normalize numeric types
-    for c in ["player_id", "game_id", "period", "team_id"]:
-        shifts[c] = pd.to_numeric(shifts[c], errors="coerce")
-    shifts["shift_start_time_seconds"] = pd.to_numeric(shifts["shift_start_time_seconds"], errors="coerce").fillna(0.0)
-    shifts["shift_end_time_seconds"] = pd.to_numeric(shifts["shift_end_time_seconds"], errors="coerce")
+    # Normalize shifts and group by (game_id, period)
+    shifts_by_gp: Dict[Tuple[int, int], List[dict]] = {}
+    for r in shift_rows:
+        try:
+            pid = int(r.get("player_id"))
+            gid = int(r.get("game_id"))
+            per = int(r.get("period"))
+            tid = int(r.get("team_id"))
+        except Exception:
+            continue
 
-    shifts = shifts.dropna(subset=["player_id", "game_id", "period", "team_id"]).copy()
-    shifts["player_id"] = shifts["player_id"].astype(int)
-    shifts["game_id"] = shifts["game_id"].astype(int)
-    shifts["period"] = shifts["period"].astype(int)
-    shifts["team_id"] = shifts["team_id"].astype(int)
+        start_s = float(r.get("shift_start_time_seconds") or 0.0)
+        end_raw = r.get("shift_end_time_seconds")
+        end_s = float(end_raw) if end_raw is not None else float(period_len(per))
 
-    # Fill missing shift_end_time_seconds with end of period
-    def fill_end(row) -> float:
-        end = row["shift_end_time_seconds"]
-        if pd.notna(end):
-            return float(end)
-        return float(period_len(int(row["period"])))
+        shifts_by_gp.setdefault((gid, per), []).append(
+            {
+                "player_id": pid,
+                "team_id": tid,
+                "start": start_s,
+                "end": end_s,
+            }
+        )
 
-    shifts["shift_end_filled"] = shifts.apply(fill_end, axis=1)
-
-    # Group shifts by (game_id, period) for efficient overlap checks
-    shifts_by_gp: Dict[Tuple[int, int], pd.DataFrame] = {
-        k: g for k, g in shifts.groupby(["game_id", "period"], sort=False)
-    }
+    # Group goals by (game_id, period)
+    goals_by_gp: Dict[Tuple[int, int], List[dict]] = {}
+    for g in goals:
+        goals_by_gp.setdefault((int(g["game_id"]), int(g["period"])), []).append(g)
 
     pm: Dict[int, int] = {}
-    goals_by_gp = goals.groupby(["game_id", "period"], sort=False)
 
     print(f"[COMPUTE] Processing {len(goals):,} eligible goals across {len(goals_by_gp):,} game-period groups...")
     start = time.time()
 
-    for (game_id, period), gdf in goals_by_gp:
-        gp_shifts = shifts_by_gp.get((int(game_id), int(period)))
-        if gp_shifts is None or gp_shifts.empty:
+    for (game_id, period), g_list in goals_by_gp.items():
+        gp_shifts = shifts_by_gp.get((int(game_id), int(period)), [])
+        if not gp_shifts:
             continue
 
-        # For each goal time, find overlapping shifts
-        for _, goal in gdf.iterrows():
+        for goal in g_list:
             t = float(goal["time_elapsed"])
             scoring_tid = int(goal["scoring_team_id"])
 
-            on_ice = gp_shifts[
-                (gp_shifts["shift_start_time_seconds"] <= t) &
-                (gp_shifts["shift_end_filled"] >= t)
-            ]
-            if on_ice.empty:
-                continue
-
-            for _, srow in on_ice.iterrows():
-                pid = int(srow["player_id"])
-                if pid in goalie_ids:
-                    continue
-                delta = 1 if int(srow["team_id"]) == scoring_tid else -1
-                pm[pid] = pm.get(pid, 0) + delta
+            for sh in gp_shifts:
+                if sh["start"] <= t <= sh["end"]:
+                    pid = int(sh["player_id"])
+                    if pid in goalie_ids:
+                        continue
+                    delta = 1 if int(sh["team_id"]) == scoring_tid else -1
+                    pm[pid] = pm.get(pid, 0) + delta
 
     elapsed = time.time() - start
     print(f"[COMPUTE] Done in {elapsed:.1f}s. Players with nonzero +/-: {sum(1 for v in pm.values() if v != 0):,}")

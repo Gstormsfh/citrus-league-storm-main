@@ -11,7 +11,6 @@ import sys
 import datetime as dt
 from typing import Dict, List
 
-import pandas as pd
 from dotenv import load_dotenv
 from supabase import create_client, Client
 
@@ -79,58 +78,93 @@ def main() -> int:
     print("[build_player_season_stats] No player_game_stats rows found.")
     return 0
 
-  df = pd.DataFrame(rows)
+  # Pure-Python rollup (no pandas) for Windows friendliness
+  acc: Dict[tuple, dict] = {}
 
-  # roll up
-  grp = df.groupby(["season", "player_id"], dropna=False)
-  rolled = grp.agg(
-    team_abbrev=("team_abbrev", "last"),
-    position_code=("position_code", "last"),
-    is_goalie=("is_goalie", "max"),
-    games_played=("game_id", "nunique"),
-    icetime_seconds=("icetime_seconds", "sum"),
+  for r in rows:
+    pid = int(r.get("player_id"))
+    key = (season, pid)
 
-    goals=("goals", "sum"),
-    primary_assists=("primary_assists", "sum"),
-    secondary_assists=("secondary_assists", "sum"),
-    points=("points", "sum"),
-    shots_on_goal=("shots_on_goal", "sum"),
-    hits=("hits", "sum"),
-    blocks=("blocks", "sum"),
-    pim=("pim", "sum"),
-    ppp=("ppp", "sum"),
-    shp=("shp", "sum"),
-    plus_minus=("plus_minus", "sum"),
+    if key not in acc:
+      acc[key] = {
+        "season": season,
+        "player_id": pid,
+        "team_abbrev": r.get("team_abbrev"),
+        "position_code": r.get("position_code"),
+        "is_goalie": bool(r.get("is_goalie") or False),
+        "games_played": 0,
+        "icetime_seconds": 0,
 
-    goalie_gp=("goalie_gp", "sum"),
-    wins=("wins", "sum"),
-    saves=("saves", "sum"),
-    shots_faced=("shots_faced", "sum"),
-    goals_against=("goals_against", "sum"),
-    shutouts=("shutouts", "sum"),
-  ).reset_index()
+        "goals": 0,
+        "primary_assists": 0,
+        "secondary_assists": 0,
+        "points": 0,
+        "shots_on_goal": 0,
+        "hits": 0,
+        "blocks": 0,
+        "pim": 0,
+        "ppp": 0,
+        "shp": 0,
+        "plus_minus": 0,
 
-  # compute save_pct
-  def save_pct(row):
-    sf = float(row.get("shots_faced") or 0)
-    sv = float(row.get("saves") or 0)
-    if sf <= 0:
-      return None
-    return sv / sf
+        "x_goals": 0.0,
+        "x_assists": 0.0,
 
-  rolled["save_pct"] = rolled.apply(save_pct, axis=1)
-  rolled["x_goals"] = 0.0
-  rolled["x_assists"] = 0.0
-  rolled["updated_at"] = _now_iso()
+        "goalie_gp": 0,
+        "wins": 0,
+        "saves": 0,
+        "shots_faced": 0,
+        "goals_against": 0,
+        "shutouts": 0,
+        "save_pct": None,
 
+        "updated_at": _now_iso(),
+      }
+
+    out = acc[key]
+    out["team_abbrev"] = r.get("team_abbrev") or out["team_abbrev"]
+    out["position_code"] = r.get("position_code") or out["position_code"]
+    out["is_goalie"] = bool(out["is_goalie"] or (r.get("is_goalie") or False))
+
+    # games_played is count distinct games
+    # We'll approximate by incrementing once per row, since table is (season, game_id, player_id) PK.
+    out["games_played"] += 1
+
+    out["icetime_seconds"] += int(r.get("icetime_seconds") or 0)
+    out["goals"] += int(r.get("goals") or 0)
+    out["primary_assists"] += int(r.get("primary_assists") or 0)
+    out["secondary_assists"] += int(r.get("secondary_assists") or 0)
+    out["points"] += int(r.get("points") or 0)
+    out["shots_on_goal"] += int(r.get("shots_on_goal") or 0)
+    out["hits"] += int(r.get("hits") or 0)
+    out["blocks"] += int(r.get("blocks") or 0)
+    out["pim"] += int(r.get("pim") or 0)
+    out["ppp"] += int(r.get("ppp") or 0)
+    out["shp"] += int(r.get("shp") or 0)
+    out["plus_minus"] += int(r.get("plus_minus") or 0)
+
+    out["goalie_gp"] += int(r.get("goalie_gp") or 0)
+    out["wins"] += int(r.get("wins") or 0)
+    out["saves"] += int(r.get("saves") or 0)
+    out["shots_faced"] += int(r.get("shots_faced") or 0)
+    out["goals_against"] += int(r.get("goals_against") or 0)
+    out["shutouts"] += int(r.get("shutouts") or 0)
+
+  # Save pct
+  for out in acc.values():
+    sf = float(out.get("shots_faced") or 0)
+    sv = float(out.get("saves") or 0)
+    out["save_pct"] = (sv / sf) if sf > 0 else None
+
+  # xG enrich (optional)
   xg = try_fetch_xg_totals(db, season)
   if xg:
-    def xg_goals(pid): return float(xg.get(int(pid), {}).get("x_goals", 0.0))
-    def xg_assists(pid): return float(xg.get(int(pid), {}).get("x_assists", 0.0))
-    rolled["x_goals"] = rolled["player_id"].apply(xg_goals)
-    rolled["x_assists"] = rolled["player_id"].apply(xg_assists)
+    for out in acc.values():
+      pid = int(out["player_id"])
+      out["x_goals"] = float(xg.get(pid, {}).get("x_goals", 0.0))
+      out["x_assists"] = float(xg.get(pid, {}).get("x_assists", 0.0))
 
-  season_rows = rolled.to_dict(orient="records")
+  season_rows = list(acc.values())
   upsert_player_season_stats(db, season_rows)
 
   print(f"[build_player_season_stats] upserted player_season_stats rows={len(season_rows)} season={season}")
