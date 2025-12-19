@@ -89,20 +89,39 @@ def upsert_raw_game(db: SupabaseRest, game_id: int, game_date: str, pbp_json: di
 
 
 def main() -> int:
-  print("[ingest_live_raw_nhl] Starting live ingest loop.")
-  print(f"[ingest_live_raw_nhl] poll={POLL_SECONDS}s cooldown={COOLDOWN_SECONDS}s")
-
-  db = supabase_client()
+  print("=" * 80)
+  print("[ingest_live_raw_nhl] STARTING LIVE INGEST LOOP")
+  print("=" * 80)
+  print(f"Poll interval: {POLL_SECONDS}s")
+  print(f"Cooldown: {COOLDOWN_SECONDS}s")
+  print(f"Timestamp: {_now_iso()}")
+  print()
+  
+  try:
+    db = supabase_client()
+    print("[ingest_live_raw_nhl] Connected to Supabase")
+  except Exception as e:
+    print(f"[ingest_live_raw_nhl] ERROR: Failed to connect: {e}")
+    return 1
 
   # game_id -> (lastUpdated, last_fetch_epoch)
   cooldown: Dict[int, Tuple[Optional[str], float]] = {}
   # game_id -> bool (final pull completed)
   finalized: Dict[int, bool] = {}
+  
+  total_ingested = 0
+  last_progress_time = time.time()
 
   while True:
     try:
       sched = get_schedule_now()
       games = (sched.get("games") or [])
+      
+      # Progress update even when no games
+      current_time = time.time()
+      if current_time - last_progress_time >= 15:
+        print(f"[ingest_live_raw_nhl] [PROGRESS] Polling schedule... (total ingested: {total_ingested})")
+        last_progress_time = current_time
 
       for g in games:
         try:
@@ -133,6 +152,7 @@ def main() -> int:
 
         upsert_raw_game(db, game_id, game_date, pbp)
         cooldown[game_id] = (last_updated, time.time())
+        total_ingested += 1
 
         print(f"[ingest_live_raw_nhl] upserted game_id={game_id} state={pbp_state} lastUpdated={last_updated}")
 

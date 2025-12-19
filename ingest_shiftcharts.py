@@ -70,21 +70,38 @@ def iter_game_ids_from_raw_nhl_data(db: SupabaseRest, season: int, limit: int) -
   # Use game_id prefix range for season
   game_id_min = int(f"{season}000000")
   game_id_max = int(f"{season + 1}000000")
-  rows = db.select(
-    "raw_nhl_data",
-    select="game_id",
-    filters=[("game_id", "gte", game_id_min), ("game_id", "lt", game_id_max)],
-    order="game_id.asc",
-    limit=limit,
-  )
-  return [int(r["game_id"]) for r in rows if r.get("game_id") is not None]
+  
+  # Get games with pagination
+  all_game_ids = []
+  offset = 0
+  while True:
+    page = db.select(
+      "raw_nhl_data",
+      select="game_id",
+      filters=[("game_id", "gte", game_id_min), ("game_id", "lt", game_id_max)],
+      order="game_id.asc",
+      limit=1000,
+      offset=offset,
+    )
+    if not page:
+      break
+    all_game_ids.extend([int(r["game_id"]) for r in page if r.get("game_id") is not None])
+    if len(page) < 1000:
+      break
+    offset += 1000
+    if limit and len(all_game_ids) >= limit:
+      break
+  
+  if limit and limit > 0:
+    return all_game_ids[:limit]
+  return all_game_ids
 
 
 def main() -> int:
   ap = argparse.ArgumentParser()
   ap.add_argument("--game-id", type=int, default=None, help="Ingest a single game")
   ap.add_argument("--season", type=int, default=2025, help="Season year prefix used in NHL game_id")
-  ap.add_argument("--limit", type=int, default=200, help="How many games to ingest when using --season")
+  ap.add_argument("--limit", type=int, default=200, help="How many games to ingest when using --season (0 = all)")
   ap.add_argument("--sleep", type=float, default=0.2, help="Delay between games to avoid rate limiting")
   args = ap.parse_args()
 
@@ -92,8 +109,21 @@ def main() -> int:
   game_ids = [args.game_id] if args.game_id else iter_game_ids_from_raw_nhl_data(db, args.season, args.limit)
 
   print(f"[ingest_shiftcharts] ingesting games={len(game_ids)}")
+  success_count = 0
+  skip_count = 0
+  no_data_count = 0
+  error_count = 0
+  
   for idx, gid in enumerate(game_ids, start=1):
     try:
+      # Quick check: skip if this game already has shifts (simple query for this specific game)
+      existing = db.select("player_shifts_official", select="shift_id", filters=[("game_id", "eq", gid)], limit=1)
+      if existing:
+        skip_count += 1
+        if idx % 50 == 0:  # Only print every 50th skip to avoid spam
+          print(f"[ingest_shiftcharts] ({idx}/{len(game_ids)}) game_id={gid} - already has shifts, skipping (skipped: {skip_count})")
+        continue
+      
       rows = fetch_shiftcharts(gid)
       shift_rows = []
       for r in rows:
@@ -124,11 +154,28 @@ def main() -> int:
           }
         )
 
-      upsert_shifts(db, shift_rows)
-      print(f"[ingest_shiftcharts] ({idx}/{len(game_ids)}) game_id={gid} shifts={len(shift_rows)}")
+      if shift_rows:
+        upsert_shifts(db, shift_rows)
+        success_count += 1
+        print(f"[ingest_shiftcharts] ({idx}/{len(game_ids)}) game_id={gid} shifts={len(shift_rows)} - OK")
+      else:
+        no_data_count += 1
+        if idx % 25 == 0:  # Only print every 25th no-data to avoid spam
+          print(f"[ingest_shiftcharts] ({idx}/{len(game_ids)}) game_id={gid} - no shifts in API (no data: {no_data_count})")
+      
+      # Progress update every 25 games
+      if idx % 25 == 0:
+        print(f"[ingest_shiftcharts] Progress: {idx}/{len(game_ids)} | Success: {success_count} | Skipped: {skip_count} | No data: {no_data_count} | Errors: {error_count}")
+      
       time.sleep(max(0.0, args.sleep))
     except Exception as e:
-      print(f"[ingest_shiftcharts] ERROR game_id={gid}: {e}")
+      error_count += 1
+      print(f"[ingest_shiftcharts] ERROR game_id={gid} ({idx}/{len(game_ids)}): {e}")
+      import traceback
+      traceback.print_exc()
+  
+  print(f"\n[ingest_shiftcharts] COMPLETE: Processed {len(game_ids)} games")
+  print(f"  Success: {success_count} | Skipped: {skip_count} | No data: {no_data_count} | Errors: {error_count}")
 
   return 0
 

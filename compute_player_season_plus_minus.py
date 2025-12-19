@@ -178,6 +178,8 @@ def compute_plus_minus(season: int, sb: SupabaseRest) -> Dict[int, int]:
 
     print(f"[COMPUTE] Processing {len(goals):,} eligible goals across {len(goals_by_gp):,} game-period groups...")
     start = time.time()
+    last_progress_time = start
+    processed_groups = 0
 
     for (game_id, period), g_list in goals_by_gp.items():
         gp_shifts = shifts_by_gp.get((int(game_id), int(period)), [])
@@ -195,6 +197,13 @@ def compute_plus_minus(season: int, sb: SupabaseRest) -> Dict[int, int]:
                         continue
                     delta = 1 if int(sh["team_id"]) == scoring_tid else -1
                     pm[pid] = pm.get(pid, 0) + delta
+        
+        processed_groups += 1
+        # Progress every 15 seconds
+        current_time = time.time()
+        if current_time - last_progress_time >= 15:
+          print(f"  [PROGRESS] Processed {processed_groups:,}/{len(goals_by_gp):,} game-period groups...")
+          last_progress_time = current_time
 
     elapsed = time.time() - start
     print(f"[COMPUTE] Done in {elapsed:.1f}s. Players with nonzero +/-: {sum(1 for v in pm.values() if v != 0):,}")
@@ -223,10 +232,20 @@ def main():
     parser.add_argument("--write", action="store_true", help="Actually write results (default: compute only).")
     args = parser.parse_args()
 
+    print("=" * 80)
+    print("[compute_player_season_plus_minus] STARTING")
+    print("=" * 80)
+    print(f"Season: {args.season}")
+    print(f"Write mode: {'ENABLED' if args.write else 'DRY RUN'}")
+    print(f"Timestamp: {dt.datetime.now(dt.timezone.utc).isoformat()}")
+    print()
+
     load_dotenv()
     url = _require_env("VITE_SUPABASE_URL")
     key = _require_env("SUPABASE_SERVICE_ROLE_KEY")
     sb = SupabaseRest(url, key)
+    print("[compute_player_season_plus_minus] Connected to Supabase")
+    print()
 
     pm = compute_plus_minus(args.season, sb)
 

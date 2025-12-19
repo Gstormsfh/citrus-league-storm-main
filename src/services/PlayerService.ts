@@ -68,7 +68,10 @@ type PlayerSeasonStatsRow = {
   position_code: string | null;
   is_goalie: boolean;
   games_played: number;
-  icetime_seconds: number;
+  icetime_seconds: number; // Our calculated TOI (for GAR)
+  nhl_toi_seconds?: number; // NHL.com official TOI (for display) - optional until migration runs
+  plus_minus: number; // Our calculated plus/minus (for internal use)
+  nhl_plus_minus?: number; // NHL.com official plus/minus (for display) - optional until migration runs
   goals: number;
   primary_assists: number;
   secondary_assists: number;
@@ -77,9 +80,6 @@ type PlayerSeasonStatsRow = {
   hits: number;
   blocks: number;
   pim: number;
-  ppp: number;
-  shp: number;
-  plus_minus: number;
   x_goals: number;
   x_assists: number;
   goalie_gp: number;
@@ -129,7 +129,7 @@ export const PlayerService = {
           .eq("season", DEFAULT_SEASON),
         (supabase as any)
           .from("player_season_stats")
-          .select("season, player_id, team_abbrev, position_code, is_goalie, games_played, icetime_seconds, goals, primary_assists, secondary_assists, points, shots_on_goal, hits, blocks, pim, ppp, shp, plus_minus, x_goals, x_assists, goalie_gp, wins, saves, shots_faced, goals_against, shutouts, save_pct")
+          .select("season, player_id, team_abbrev, position_code, is_goalie, games_played, icetime_seconds, nhl_toi_seconds, goals, primary_assists, secondary_assists, points, shots_on_goal, hits, blocks, pim, ppp, shp, plus_minus, nhl_plus_minus, x_goals, x_assists, goalie_gp, wins, saves, shots_faced, goals_against, shutouts, save_pct")
           .eq("season", DEFAULT_SEASON),
       ]);
 
@@ -176,7 +176,10 @@ export const PlayerService = {
           pim: Number(s?.pim ?? 0),
           ppp: Number(s?.ppp ?? 0),
           shp: Number(s?.shp ?? 0),
-          icetime_seconds: Number(s?.icetime_seconds ?? 0),
+          // Use NHL.com TOI for display, fallback to our calculated TOI
+          icetime_seconds: Number(s?.nhl_toi_seconds ?? s?.icetime_seconds ?? 0),
+          // Use NHL.com plus/minus for display, fallback to our calculated plus/minus
+          plus_minus: Number(s?.nhl_plus_minus ?? s?.plus_minus ?? 0),
 
           xGoals: Number(s?.x_goals ?? 0),
 
@@ -244,7 +247,7 @@ export const PlayerService = {
           .in("player_id", intIds),
         (supabase as any)
           .from("player_season_stats")
-          .select("season, player_id, team_abbrev, position_code, is_goalie, games_played, icetime_seconds, goals, primary_assists, secondary_assists, points, shots_on_goal, hits, blocks, pim, ppp, shp, plus_minus, x_goals, x_assists, goalie_gp, wins, saves, shots_faced, goals_against, shutouts, save_pct")
+          .select("season, player_id, team_abbrev, position_code, is_goalie, games_played, icetime_seconds, nhl_toi_seconds, goals, primary_assists, secondary_assists, points, shots_on_goal, hits, blocks, pim, ppp, shp, plus_minus, nhl_plus_minus, x_goals, x_assists, goalie_gp, wins, saves, shots_faced, goals_against, shutouts, save_pct")
           .eq("season", DEFAULT_SEASON)
           .in("player_id", intIds),
       ]);
@@ -291,7 +294,10 @@ export const PlayerService = {
           pim: Number(s?.pim ?? 0),
           ppp: Number(s?.ppp ?? 0),
           shp: Number(s?.shp ?? 0),
-          icetime_seconds: Number(s?.icetime_seconds ?? 0),
+          // Use NHL.com TOI for display, fallback to our calculated TOI
+          icetime_seconds: Number(s?.nhl_toi_seconds ?? s?.icetime_seconds ?? 0),
+          // Use NHL.com plus/minus for display, fallback to our calculated plus/minus
+          plus_minus: Number(s?.nhl_plus_minus ?? s?.plus_minus ?? 0),
 
           xGoals: Number(s?.x_goals ?? 0),
 

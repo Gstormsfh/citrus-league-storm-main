@@ -89,10 +89,20 @@ class SupabaseRest:
     return r.json() if r.text else []
 
   def upsert(self, table: str, rows: Union[dict, List[dict]], on_conflict: str) -> None:
+    """
+    Upsert rows with merge-duplicates resolution.
+    
+    Note: merge-duplicates in PostgREST merges NULL values from existing rows with
+    non-NULL values from new rows. For integer fields with default 0, this means
+    that 0 values in new rows will overwrite existing 0 values (which is desired).
+    However, if you want to preserve existing non-zero values, you should use
+    update() instead or ensure your rows contain all desired values.
+    """
     url = f"{self.rest_base}/{table}?{self._build_query(on_conflict=on_conflict)}"
     hdr = self._headers(
       {
-        # Merge duplicates on conflict
+        # Merge duplicates on conflict - merges NULL from existing with non-NULL from new
+        # For our use case (stats extraction), we want to overwrite with extracted values
         "Prefer": "resolution=merge-duplicates,return=minimal",
       }
     )

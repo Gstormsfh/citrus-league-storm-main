@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
 """
 pull_season_data.py
-Pull all 2025 season shot data using our data acquisition pipeline.
+Pull all 2025 season shot data using the optimized two-phase data pipeline.
+
+Phase 1: Fast parallel scraping of raw JSON from NHL API (ingest_raw_nhl.py)
+Phase 2: Process raw JSON and calculate xG/xA stats (process_xg_stats.py)
+
 Saves to CSV for comparison with MoneyPuck data.
 """
 
 import sys
 import datetime
 import pandas as pd
-from data_acquisition import scrape_pbp_and_process, supabase
+import argparse
+from data_acquisition import supabase
 from dotenv import load_dotenv
 import os
 
@@ -141,23 +146,32 @@ def cleanup_raw_shots_table(confirm=True):
         traceback.print_exc()
         return 0
 
-def pull_season_data(start_date='2025-10-07', end_date=None, days_per_batch=7, cleanup_first=False):
+def pull_season_data(start_date='2025-10-07', end_date=None, cleanup_first=False, 
+                     max_processes=10, batch_size=10, skip_ingestion=False, skip_processing=False):
     """
-    Pull all season data by processing games in date batches.
+    Pull all season data using the optimized two-phase pipeline.
+    
+    Phase 1: Fast parallel scraping of raw JSON from NHL API
+    Phase 2: Process raw JSON and calculate xG/xA stats
     
     Args:
         start_date: Season start date
         end_date: Season end date (default: today)
-        days_per_batch: Number of days to process per batch (to show progress)
+        cleanup_first: If True, clean up old data from raw_shots table
+        max_processes: Number of parallel processes for Phase 1 (default: 10)
+        batch_size: Number of games to process per batch in Phase 2 (default: 10)
+        skip_ingestion: If True, skip Phase 1 (assume raw data already exists)
+        skip_processing: If True, skip Phase 2 (only scrape, don't process)
     """
     if end_date is None:
         end_date = datetime.date.today().strftime('%Y-%m-%d')
     
     print("=" * 80)
-    print("PULLING 2025 SEASON DATA")
+    print("🚀 OPTIMIZED TWO-PHASE SEASON DATA PULL")
     print("=" * 80)
     print(f"Date range: {start_date} to {end_date}")
-    print(f"Processing in batches of {days_per_batch} days")
+    print(f"Phase 1 (Ingestion): {max_processes} parallel processes")
+    print(f"Phase 2 (Processing): {batch_size} games per batch")
     print()
     
     # Cleanup old data if requested
@@ -166,40 +180,77 @@ def pull_season_data(start_date='2025-10-07', end_date=None, days_per_batch=7, c
         cleanup_raw_shots_table(confirm=True)
         print()
     
-    # Process by date (scrape_pbp_and_process handles individual dates)
-    start = datetime.datetime.strptime(start_date, '%Y-%m-%d').date()
-    end = datetime.datetime.strptime(end_date, '%Y-%m-%d').date()
-    
-    current_date = start
-    total_dates = (end - start).days + 1
-    dates_processed = 0
-    
-    print("Processing games by date...")
-    print("(This will save all shots to raw_shots table)")
-    print()
-    
-    while current_date <= end:
-        date_str = current_date.strftime('%Y-%m-%d')
-        dates_processed += 1
-        
-        print(f"[{dates_processed}/{total_dates}] Processing {date_str}...")
+    # ===== PHASE 1: RAW DATA INGESTION =====
+    if not skip_ingestion:
+        print("=" * 80)
+        print("PHASE 1: RAW DATA INGESTION")
+        print("=" * 80)
+        print("Scraping raw JSON from NHL API and saving to raw_nhl_data table...")
+        print()
         
         try:
-            final_stats_df = scrape_pbp_and_process(date_str=date_str)
-            # Note: scrape_pbp_and_process saves to raw_shots table automatically
+            # Import Phase 1 functions
+            from ingest_raw_nhl import get_unprocessed_games, ingest_games_parallel
+            
+            # Get games to scrape
+            game_ids = get_unprocessed_games(start_date, end_date)
+            
+            if not game_ids:
+                print("No new games to scrape (all games already in raw_nhl_data table)")
+            else:
+                # Ingest in parallel
+                ingest_summary = ingest_games_parallel(game_ids, max_processes=max_processes)
+                print(f"\n[OK] Phase 1 complete: {ingest_summary['successes']:,} games saved to raw_nhl_data")
+                
+                if ingest_summary['failures'] > 0:
+                    print(f"[WARNING] {ingest_summary['failures']:,} games failed to scrape")
+        except ImportError as e:
+            print(f"[ERROR] Could not import Phase 1 functions: {e}")
+            print("Make sure ingest_raw_nhl.py is available")
+            return None
         except Exception as e:
-            print(f"  [WARNING]  Error processing {date_str}: {e}")
+            print(f"[ERROR] Phase 1 failed: {e}")
             import traceback
             traceback.print_exc()
-        
-        current_date += datetime.timedelta(days=1)
-        
-        # Delay between dates to avoid overwhelming API
-        import time
-        time.sleep(1.0)  # Increased to 1 second to reduce rate limiting
+            return None
+    else:
+        print("[SKIP] Phase 1 skipped (assuming raw data already exists)")
     
-    print("\n" + "=" * 80)
-    print("All dates processed. Fetching from raw_shots table...")
+    print()
+    
+    # ===== PHASE 2: DATA PROCESSING =====
+    if not skip_processing:
+        print("=" * 80)
+        print("PHASE 2: DATA PROCESSING")
+        print("=" * 80)
+        print("Processing raw JSON, calculating xG/xA, and saving to raw_shots table...")
+        print()
+        
+        try:
+            # Import Phase 2 functions
+            from process_xg_stats import process_games_batch
+            
+            # Process all unprocessed games
+            process_summary = process_games_batch(batch_size=batch_size)
+            print(f"\n[OK] Phase 2 complete: {process_summary['processed']:,} games processed")
+            
+            if process_summary['failed'] > 0:
+                print(f"[WARNING] {process_summary['failed']:,} games failed to process")
+        except ImportError as e:
+            print(f"[ERROR] Could not import Phase 2 functions: {e}")
+            print("Make sure process_xg_stats.py is available")
+            return None
+        except Exception as e:
+            print(f"[ERROR] Phase 2 failed: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+    else:
+        print("[SKIP] Phase 2 skipped (only scraping, not processing)")
+    
+    print()
+    print("=" * 80)
+    print("Fetching processed shots from raw_shots table...")
     print("=" * 80)
     
     # Fetch all shots from raw_shots table with pagination
@@ -229,10 +280,13 @@ def pull_season_data(start_date='2025-10-07', end_date=None, days_per_batch=7, c
             df_shots = pd.DataFrame(all_shots)
             print(f"[OK] Fetched {len(df_shots):,} shot records (all records)")
             
+            # Ensure data directory exists
+            os.makedirs('data', exist_ok=True)
+            
             # Save to CSV
             output_file = 'data/our_shots_2025.csv'
             df_shots.to_csv(output_file, index=False)
-            print(f"\n[OK] Saved {len(df_shots)} shots to {output_file}")
+            print(f"\n[OK] Saved {len(df_shots):,} shots to {output_file}")
             
             # Print summary
             print("\n" + "=" * 80)
@@ -240,18 +294,37 @@ def pull_season_data(start_date='2025-10-07', end_date=None, days_per_batch=7, c
             print("=" * 80)
             print(f"Total shots: {len(df_shots):,}")
             print(f"Unique games: {df_shots['game_id'].nunique()}")
-            print(f"Unique players: {df_shots['player_id'].nunique()}")
-            print(f"xG statistics:")
-            print(f"  Mean: {df_shots['xg_value'].mean():.4f}")
-            print(f"  Median: {df_shots['xg_value'].median():.4f}")
-            print(f"  Max: {df_shots['xg_value'].max():.4f}")
-            print(f"  Min: {df_shots['xg_value'].min():.4f}")
-            print(f"\nShots with xG > 0.3: {(df_shots['xg_value'] > 0.3).sum():,}")
-            print(f"Shots with xG > 0.2: {(df_shots['xg_value'] > 0.2).sum():,}")
+            
+            # Handle player_id column (might be missing or named differently)
+            if 'player_id' in df_shots.columns:
+                print(f"Unique players: {df_shots['player_id'].nunique()}")
+            
+            # Handle xG column name variations (xg_value, xG_Value, etc.)
+            xg_column = None
+            for col in ['xG_Value', 'xg_value', 'xG_value', 'xg_Value']:
+                if col in df_shots.columns:
+                    xg_column = col
+                    break
+            
+            if xg_column:
+                xg_data = pd.to_numeric(df_shots[xg_column], errors='coerce')
+                print(f"xG statistics (column: {xg_column}):")
+                print(f"  Mean: {xg_data.mean():.4f}")
+                print(f"  Median: {xg_data.median():.4f}")
+                print(f"  Max: {xg_data.max():.4f}")
+                print(f"  Min: {xg_data.min():.4f}")
+                print(f"\nShots with xG > 0.3: {(xg_data > 0.3).sum():,}")
+                print(f"Shots with xG > 0.2: {(xg_data > 0.2).sum():,}")
+            else:
+                print("[WARNING] No xG column found in data")
             
             return df_shots
         else:
-            print("[WARNING]  No shots found in raw_shots table")
+            if skip_processing:
+                print("[INFO] No shots found in raw_shots table (Phase 2 was skipped)")
+                print("[INFO] Run Phase 2 processing to generate shots: python process_xg_stats.py")
+            else:
+                print("[WARNING] No shots found in raw_shots table")
             return None
             
     except Exception as e:
@@ -261,17 +334,55 @@ def pull_season_data(start_date='2025-10-07', end_date=None, days_per_batch=7, c
         return None
 
 if __name__ == "__main__":
-    # 2025-26 season started October 7, 2025
-    start_date = '2025-10-07'
-    end_date = datetime.date.today().strftime('%Y-%m-%d')
-    cleanup_first = True  # Clean up old data before processing
+    parser = argparse.ArgumentParser(
+        description='Pull season data using optimized two-phase pipeline',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Full pipeline (default: scrape + process)
+  python pull_season_data.py
+  
+  # Specific date range
+  python pull_season_data.py 2025-10-07 2025-12-16
+  
+  # Only scrape, don't process
+  python pull_season_data.py --skip-processing
+  
+  # Only process existing scraped data
+  python pull_season_data.py --skip-ingestion
+  
+  # Custom parallelism
+  python pull_season_data.py --max-processes 12 --batch-size 20
+        """
+    )
     
-    if len(sys.argv) > 1:
-        start_date = sys.argv[1]
-    if len(sys.argv) > 2:
-        end_date = sys.argv[2]
-    if len(sys.argv) > 3:
-        cleanup_first = sys.argv[3].lower() in ('true', '1', 'yes', 'y')
+    parser.add_argument('start_date', nargs='?', default='2025-10-07',
+                       help='Start date (YYYY-MM-DD), default: 2025-10-07')
+    parser.add_argument('end_date', nargs='?', default=None,
+                       help='End date (YYYY-MM-DD), default: today')
+    parser.add_argument('--cleanup-first', action='store_true', default=False,
+                       help='Clean up old data from raw_shots table before processing')
+    parser.add_argument('--max-processes', '-p', type=int, default=10,
+                       help='Number of parallel processes for Phase 1 (default: 10)')
+    parser.add_argument('--batch-size', '-b', type=int, default=10,
+                       help='Number of games per batch for Phase 2 (default: 10)')
+    parser.add_argument('--skip-ingestion', action='store_true',
+                       help='Skip Phase 1 (assume raw data already exists)')
+    parser.add_argument('--skip-processing', action='store_true',
+                       help='Skip Phase 2 (only scrape, don\'t process)')
     
-    pull_season_data(start_date=start_date, end_date=end_date, cleanup_first=cleanup_first)
+    args = parser.parse_args()
+    
+    if args.end_date is None:
+        args.end_date = datetime.date.today().strftime('%Y-%m-%d')
+    
+    pull_season_data(
+        start_date=args.start_date,
+        end_date=args.end_date,
+        cleanup_first=args.cleanup_first,
+        max_processes=args.max_processes,
+        batch_size=args.batch_size,
+        skip_ingestion=args.skip_ingestion,
+        skip_processing=args.skip_processing
+    )
 

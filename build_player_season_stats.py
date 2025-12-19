@@ -32,30 +32,117 @@ def _now_iso() -> str:
 
 
 def fetch_all_player_game_stats(db: SupabaseRest, season: int) -> List[dict]:
-  # naive full pull (MVP); can be paginated later
-  return db.select("player_game_stats", select="*", filters=[("season", "eq", season)])
+  # Paginated pull to get all rows
+  all_rows = []
+  offset = 0
+  page_size = 1000
+  while True:
+    page = db.select("player_game_stats", select="*", filters=[("season", "eq", season)], limit=page_size, offset=offset)
+    if not page:
+      break
+    all_rows.extend(page)
+    if len(page) < page_size:
+      break
+    offset += page_size
+    if offset % 5000 == 0:
+      print(f"[build_player_season_stats] Fetched {len(all_rows)} rows so far...")
+  return all_rows
 
 
 def try_fetch_xg_totals(db: SupabaseRest, season: int) -> Dict[int, Dict[str, float]]:
   """
   Returns player_id -> {x_goals, x_assists}
-  Best-effort: if raw_shots schema differs or unavailable, return empty.
+  Best-effort: handles multiple column name variations in raw_shots with pagination.
+  Uses shooting_talent_adjusted_xg if available (preferred), otherwise falls back to xg_value.
   """
+  import time
   try:
-    # raw_shots has player_id and xg; xA might be xa or expected_assists depending on schema.
-    rows = db.select("raw_shots", select="player_id,xg,xa")
     out: Dict[int, Dict[str, float]] = {}
-    for r in rows:
-      pid = r.get("player_id")
-      if pid is None:
-        continue
-      pid = int(pid)
-      if pid not in out:
-        out[pid] = {"x_goals": 0.0, "x_assists": 0.0}
-      out[pid]["x_goals"] += float(r.get("xg") or 0.0)
-      out[pid]["x_assists"] += float(r.get("xa") or 0.0)
+    batch_size = 1000  # PostgREST max limit
+    offset = 0
+    shot_count = 0
+    last_progress_time = time.time()
+    use_talent_adjusted = False
+    
+    print("[build_player_season_stats] Fetching xG/xA from raw_shots (with pagination)...")
+    
+    # Try to determine which columns are available by testing first batch
+    try:
+      test_batch = db.select("raw_shots", select="player_id,shooting_talent_adjusted_xg,xg_value,xa_value", limit=1, offset=0)
+      if test_batch and len(test_batch) > 0:
+        if "shooting_talent_adjusted_xg" in test_batch[0]:
+          use_talent_adjusted = True
+          select_cols = "player_id,shooting_talent_adjusted_xg,xg_value,xa_value"
+        else:
+          select_cols = "player_id,xg_value,xa_value"
+      else:
+        select_cols = "player_id,xg_value,xa_value"
+    except:
+      # Fallback to basic columns
+      try:
+        test_batch = db.select("raw_shots", select="player_id,xg_value,xa_value", limit=1, offset=0)
+        select_cols = "player_id,xg_value,xa_value"
+      except:
+        # Last resort: try old column names
+        select_cols = "player_id,xg,xa"
+    
+    # Fetch all rows with pagination
+    while True:
+      try:
+        rows = db.select("raw_shots", select=select_cols, limit=batch_size, offset=offset)
+      except Exception as e:
+        print(f"[build_player_season_stats] Warning: Could not fetch xG/xA batch at offset {offset}: {e}")
+        break
+      
+      if not rows:
+        break
+      
+      for r in rows:
+        shot_count += 1
+        pid = r.get("player_id")
+        if pid is None:
+          continue
+        pid = int(pid)
+        if pid not in out:
+          out[pid] = {"x_goals": 0.0, "x_assists": 0.0}
+        
+        # Prefer shooting_talent_adjusted_xg if available, otherwise use xg_value or xg
+        xg_val = 0.0
+        if use_talent_adjusted and r.get("shooting_talent_adjusted_xg") is not None:
+          xg_val = float(r.get("shooting_talent_adjusted_xg") or 0.0)
+        elif r.get("xg_value") is not None:
+          xg_val = float(r.get("xg_value") or 0.0)
+        elif r.get("xg") is not None:
+          xg_val = float(r.get("xg") or 0.0)
+        
+        # xA: prefer xa_value, fallback to xa
+        xa_val = 0.0
+        if r.get("xa_value") is not None:
+          xa_val = float(r.get("xa_value") or 0.0)
+        elif r.get("xa") is not None:
+          xa_val = float(r.get("xa") or 0.0)
+        
+        out[pid]["x_goals"] += xg_val
+        out[pid]["x_assists"] += xa_val
+      
+      # Progress every 15 seconds
+      current_time = time.time()
+      if current_time - last_progress_time >= 15:
+        print(f"  [PROGRESS] Scanned {shot_count:,} shots, enriched {len(out)} players...")
+        last_progress_time = current_time
+      
+      # Check if we got fewer rows than batch_size (last page)
+      if len(rows) < batch_size:
+        break
+      
+      offset += batch_size
+    
+    print(f"[build_player_season_stats] Enriched xG/xA for {len(out)} players from {shot_count:,} shots")
     return out
-  except Exception:
+  except Exception as e:
+    print(f"[build_player_season_stats] Warning: Error enriching xG/xA: {e}")
+    import traceback
+    traceback.print_exc()
     return {}
 
 
@@ -68,18 +155,37 @@ def upsert_player_season_stats(db: SupabaseRest, season_rows: List[dict]) -> Non
 
 
 def main() -> int:
-  db = supabase_client()
+  import time
+  print("=" * 80)
+  print("[build_player_season_stats] STARTING")
+  print("=" * 80)
+  print(f"Season: {DEFAULT_SEASON}")
+  print(f"Timestamp: {_now_iso()}")
+  print()
+  
+  try:
+    db = supabase_client()
+    print("[build_player_season_stats] Connected to Supabase")
+  except Exception as e:
+    print(f"[build_player_season_stats] ERROR: Failed to connect to Supabase: {e}")
+    return 1
+  
   season = DEFAULT_SEASON
 
+  print("[build_player_season_stats] Fetching player_game_stats...")
   rows = fetch_all_player_game_stats(db, season)
   if not rows:
     print("[build_player_season_stats] No player_game_stats rows found.")
     return 0
+  
+  print(f"[build_player_season_stats] Fetched {len(rows):,} player_game_stats rows")
+  print("[build_player_season_stats] Aggregating season stats...")
 
   # Pure-Python rollup (no pandas) for Windows friendliness
   acc: Dict[tuple, dict] = {}
+  last_progress_time = time.time()
 
-  for r in rows:
+  for idx, r in enumerate(rows, 1):
     pid = int(r.get("player_id"))
     key = (season, pid)
 
@@ -147,7 +253,15 @@ def main() -> int:
     out["shots_faced"] += int(r.get("shots_faced") or 0)
     out["goals_against"] += int(r.get("goals_against") or 0)
     out["shutouts"] += int(r.get("shutouts") or 0)
+    
+    # Progress every 15 seconds
+    current_time = time.time()
+    if current_time - last_progress_time >= 15:
+      print(f"  [PROGRESS] Processed {idx:,}/{len(rows):,} game stats rows ({len(acc)} unique players)...")
+      last_progress_time = current_time
 
+  print(f"[build_player_season_stats] Aggregated stats for {len(acc)} unique players")
+  
   # Save pct
   for out in acc.values():
     sf = float(out.get("shots_faced") or 0)
@@ -155,17 +269,53 @@ def main() -> int:
     out["save_pct"] = (sv / sf) if sf > 0 else None
 
   # xG enrich (optional)
+  print()
+  print("[build_player_season_stats] Enriching with xG/xA from raw_shots...")
   xg = try_fetch_xg_totals(db, season)
   if xg:
+    enriched_count = 0
     for out in acc.values():
       pid = int(out["player_id"])
-      out["x_goals"] = float(xg.get(pid, {}).get("x_goals", 0.0))
-      out["x_assists"] = float(xg.get(pid, {}).get("x_assists", 0.0))
+      if pid in xg:
+        out["x_goals"] = float(xg[pid].get("x_goals", 0.0))
+        out["x_assists"] = float(xg[pid].get("x_assists", 0.0))
+        enriched_count += 1
+    print(f"[build_player_season_stats] Enriched xG/xA for {enriched_count} players")
+  else:
+    print("[build_player_season_stats] No xG/xA data available (will use 0.0)")
 
+  # Plus/minus computation (integrated)
+  print()
+  print("[build_player_season_stats] Computing plus/minus from shifts and goals...")
+  try:
+    from compute_player_season_plus_minus import compute_plus_minus
+    pm = compute_plus_minus(season, db)
+    if pm:
+      pm_count = 0
+      for out in acc.values():
+        pid = int(out["player_id"])
+        if pid in pm:
+          out["plus_minus"] = int(pm[pid])
+          pm_count += 1
+      print(f"[build_player_season_stats] Computed plus/minus for {pm_count} players")
+    else:
+      print("[build_player_season_stats] No plus/minus computed (will use 0)")
+  except ImportError:
+    print("[build_player_season_stats] Warning: Could not import compute_plus_minus (plus/minus will remain 0)")
+  except Exception as e:
+    print(f"[build_player_season_stats] Warning: Plus/minus computation failed: {e}")
+    import traceback
+    traceback.print_exc()
+
+  print()
+  print("[build_player_season_stats] Upserting to player_season_stats...")
   season_rows = list(acc.values())
   upsert_player_season_stats(db, season_rows)
 
-  print(f"[build_player_season_stats] upserted player_season_stats rows={len(season_rows)} season={season}")
+  print()
+  print("=" * 80)
+  print(f"[build_player_season_stats] [OK] COMPLETE: upserted {len(season_rows)} player_season_stats rows for season {season}")
+  print("=" * 80)
   return 0
 
 

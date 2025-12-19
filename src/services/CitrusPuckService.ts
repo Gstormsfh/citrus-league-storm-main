@@ -3,75 +3,340 @@
 import { supabase } from "@/integrations/supabase/client";
 import { CitrusPuckPlayerData, AggregatedPlayerData, Situation } from "@/types/citruspuck";
 
+type PlayerSeasonStatsRow = {
+  season: number;
+  player_id: number;
+  team_abbrev: string | null;
+  position_code: string | null;
+  is_goalie: boolean;
+  games_played: number;
+  icetime_seconds: number; // Our calculated TOI (for GAR)
+  nhl_toi_seconds?: number; // NHL.com official TOI (for display) - optional until migration runs
+  plus_minus: number; // Our calculated plus/minus (for internal use)
+  nhl_plus_minus?: number; // NHL.com official plus/minus (for display) - optional until migration runs
+  goals: number;
+  primary_assists: number;
+  secondary_assists: number;
+  points: number;
+  shots_on_goal: number;
+  hits: number;
+  blocks: number;
+  pim: number;
+  ppp: number;
+  shp: number;
+  plus_minus: number;
+  x_goals: number;
+  x_assists: number;
+  goalie_gp: number;
+  wins: number;
+  saves: number;
+  shots_faced: number;
+  goals_against: number;
+  shutouts: number;
+  save_pct: number | null;
+};
+
+type PlayerDirectoryRow = {
+  season: number;
+  player_id: number;
+  full_name: string;
+  team_abbrev: string | null;
+  position_code: string | null;
+  is_goalie: boolean;
+};
+
+/**
+ * Map player_season_stats row to CitrusPuckPlayerData format
+ * Missing fields are set to 0 (we provide minimal subset to unblock UI)
+ */
+function mapStatsToCitrusPuck(
+  stats: PlayerSeasonStatsRow,
+  directory: PlayerDirectoryRow | null,
+  situation: Situation = 'all'
+): CitrusPuckPlayerData {
+  const name = directory?.full_name || '';
+  const team = stats.team_abbrev || directory?.team_abbrev || '';
+  const position = stats.position_code || directory?.position_code || '';
+  
+  // Base CitrusPuckPlayerData with all fields defaulted to 0
+  const citrusData: CitrusPuckPlayerData = {
+    playerId: stats.player_id,
+    season: stats.season,
+    situation,
+    name,
+    team,
+    position,
+    
+    // Basic stats (from player_season_stats)
+    games_played: stats.games_played || 0,
+    // Use NHL.com TOI for display, fallback to our calculated TOI
+    icetime: stats.nhl_toi_seconds || stats.icetime_seconds || 0,
+    shifts: 0, // Not available in season stats
+    gameScore: 0, // Not available
+    
+    // Advanced percentages (not available - set to 0)
+    onIce_xGoalsPercentage: 0,
+    offIce_xGoalsPercentage: 0,
+    onIce_corsiPercentage: 0,
+    offIce_corsiPercentage: 0,
+    onIce_fenwickPercentage: 0,
+    offIce_fenwickPercentage: 0,
+    iceTimeRank: 0,
+    
+    // Individual For (I_F) stats - map from player_season_stats
+    I_F_xOnGoal: 0,
+    I_F_xGoals: Number(stats.x_goals) || 0,
+    I_F_xRebounds: 0,
+    I_F_xFreeze: 0,
+    I_F_xPlayStopped: 0,
+    I_F_xPlayContinuedInZone: 0,
+    I_F_xPlayContinuedOutsideZone: 0,
+    I_F_flurryAdjustedxGoals: 0,
+    I_F_scoreVenueAdjustedxGoals: 0,
+    I_F_flurryScoreVenueAdjustedxGoals: 0,
+    I_F_primaryAssists: stats.primary_assists || 0,
+    I_F_secondaryAssists: stats.secondary_assists || 0,
+    I_F_shotsOnGoal: stats.shots_on_goal || 0,
+    I_F_missedShots: 0,
+    I_F_blockedShotAttempts: 0,
+    I_F_shotAttempts: 0,
+    I_F_points: stats.points || 0,
+    I_F_goals: stats.goals || 0,
+    I_F_rebounds: 0,
+    I_F_reboundGoals: 0,
+    I_F_freeze: 0,
+    I_F_playStopped: 0,
+    I_F_playContinuedInZone: 0,
+    I_F_playContinuedOutsideZone: 0,
+    I_F_savedShotsOnGoal: stats.is_goalie ? (stats.saves || 0) : 0,
+    I_F_savedUnblockedShotAttempts: stats.is_goalie ? (stats.saves || 0) : 0,
+    penalties: 0,
+    I_F_penalityMinutes: stats.pim || 0,
+    I_F_faceOffsWon: 0,
+    I_F_hits: stats.hits || 0,
+    I_F_takeaways: 0,
+    I_F_giveaways: 0,
+    I_F_lowDangerShots: 0,
+    I_F_mediumDangerShots: 0,
+    I_F_highDangerShots: 0,
+    I_F_lowDangerxGoals: 0,
+    I_F_mediumDangerxGoals: 0,
+    I_F_highDangerxGoals: 0,
+    I_F_lowDangerGoals: 0,
+    I_F_mediumDangerGoals: 0,
+    I_F_highDangerGoals: 0,
+    I_F_scoreAdjustedShotsAttempts: 0,
+    I_F_unblockedShotAttempts: 0,
+    I_F_scoreAdjustedUnblockedShotAttempts: 0,
+    I_F_dZoneGiveaways: 0,
+    I_F_xGoalsFromxReboundsOfShots: 0,
+    I_F_xGoalsFromActualReboundsOfShots: 0,
+    I_F_reboundxGoals: 0,
+    I_F_xGoals_with_earned_rebounds: 0,
+    I_F_xGoals_with_earned_rebounds_scoreAdjusted: 0,
+    I_F_xGoals_with_earned_rebounds_scoreFlurryAdjusted: 0,
+    I_F_shifts: 0,
+    I_F_oZoneShiftStarts: 0,
+    I_F_dZoneShiftStarts: 0,
+    I_F_neutralZoneShiftStarts: 0,
+    I_F_flyShiftStarts: 0,
+    I_F_oZoneShiftEnds: 0,
+    I_F_dZoneShiftEnds: 0,
+    I_F_neutralZoneShiftEnds: 0,
+    I_F_flyShiftEnds: 0,
+    faceoffsWon: 0,
+    faceoffsLost: 0,
+    timeOnBench: 0,
+    penalityMinutes: stats.pim || 0,
+    penalityMinutesDrawn: 0,
+    penaltiesDrawn: 0,
+    shotsBlockedByPlayer: stats.blocks || 0,
+    
+    // On-Ice For stats (not available - set to 0)
+    OnIce_F_xOnGoal: 0,
+    OnIce_F_xGoals: 0,
+    OnIce_F_flurryAdjustedxGoals: 0,
+    OnIce_F_scoreVenueAdjustedxGoals: 0,
+    OnIce_F_flurryScoreVenueAdjustedxGoals: 0,
+    OnIce_F_shotsOnGoal: 0,
+    OnIce_F_missedShots: 0,
+    OnIce_F_blockedShotAttempts: 0,
+    OnIce_F_shotAttempts: 0,
+    OnIce_F_goals: 0,
+    OnIce_F_rebounds: 0,
+    OnIce_F_reboundGoals: 0,
+    OnIce_F_lowDangerShots: 0,
+    OnIce_F_mediumDangerShots: 0,
+    OnIce_F_highDangerShots: 0,
+    OnIce_F_lowDangerxGoals: 0,
+    OnIce_F_mediumDangerxGoals: 0,
+    OnIce_F_highDangerxGoals: 0,
+    OnIce_F_lowDangerGoals: 0,
+    OnIce_F_mediumDangerGoals: 0,
+    OnIce_F_highDangerGoals: 0,
+    OnIce_F_scoreAdjustedShotsAttempts: 0,
+    OnIce_F_unblockedShotAttempts: 0,
+    OnIce_F_scoreAdjustedUnblockedShotAttempts: 0,
+    OnIce_F_xGoalsFromxReboundsOfShots: 0,
+    OnIce_F_xGoalsFromActualReboundsOfShots: 0,
+    OnIce_F_reboundxGoals: 0,
+    OnIce_F_xGoals_with_earned_rebounds: 0,
+    OnIce_F_xGoals_with_earned_rebounds_scoreAdjusted: 0,
+    OnIce_F_xGoals_with_earned_rebounds_scoreFlurryAdjusted: 0,
+    
+    // On-Ice Against stats (not available - set to 0)
+    OnIce_A_xOnGoal: 0,
+    OnIce_A_xGoals: 0,
+    OnIce_A_flurryAdjustedxGoals: 0,
+    OnIce_A_scoreVenueAdjustedxGoals: 0,
+    OnIce_A_flurryScoreVenueAdjustedxGoals: 0,
+    OnIce_A_shotsOnGoal: 0,
+    OnIce_A_missedShots: 0,
+    OnIce_A_blockedShotAttempts: 0,
+    OnIce_A_shotAttempts: 0,
+    OnIce_A_goals: 0,
+    OnIce_A_rebounds: 0,
+    OnIce_A_reboundGoals: 0,
+    OnIce_A_lowDangerShots: 0,
+    OnIce_A_mediumDangerShots: 0,
+    OnIce_A_highDangerShots: 0,
+    OnIce_A_lowDangerxGoals: 0,
+    OnIce_A_mediumDangerxGoals: 0,
+    OnIce_A_highDangerxGoals: 0,
+    OnIce_A_lowDangerGoals: 0,
+    OnIce_A_mediumDangerGoals: 0,
+    OnIce_A_highDangerGoals: 0,
+    OnIce_A_scoreAdjustedShotsAttempts: 0,
+    OnIce_A_unblockedShotAttempts: 0,
+    OnIce_A_scoreAdjustedUnblockedShotAttempts: 0,
+    OnIce_A_xGoalsFromxReboundsOfShots: 0,
+    OnIce_A_xGoalsFromActualReboundsOfShots: 0,
+    OnIce_A_reboundxGoals: 0,
+    OnIce_A_xGoals_with_earned_rebounds: 0,
+    OnIce_A_xGoals_with_earned_rebounds_scoreAdjusted: 0,
+    OnIce_A_xGoals_with_earned_rebounds_scoreFlurryAdjusted: 0,
+    
+    // Off-Ice stats (not available - set to 0)
+    OffIce_F_xGoals: 0,
+    OffIce_A_xGoals: 0,
+    OffIce_F_shotAttempts: 0,
+    OffIce_A_shotAttempts: 0,
+    
+    // Shift-based stats (not available - set to 0)
+    xGoalsForAfterShifts: 0,
+    xGoalsAgainstAfterShifts: 0,
+    corsiForAfterShifts: 0,
+    corsiAgainstAfterShifts: 0,
+    fenwickForAfterShifts: 0,
+    fenwickAgainstAfterShifts: 0,
+  };
+  
+  return citrusData;
+}
+
 export const CitrusPuckService = {
   /**
    * Get analytics for all players for a specific season
-   * Useful for bulk loading the roster
+   * Now uses player_season_stats + player_directory instead of staging tables
    */
   async getAllAnalytics(season: number): Promise<Map<number, AggregatedPlayerData>> {
-      // Fetch both skaters and goalies
-      const [skaters, goalies] = await Promise.all([
-          supabase.from(this.getTableName(season, 'skater')).select('*').eq('situation', 'all'),
-          supabase.from(this.getTableName(season, 'goalie')).select('*').eq('situation', 'all')
+      // Fetch stats and directory data
+      const [statsResponse, directoryResponse] = await Promise.all([
+          (supabase as any)
+            .from("player_season_stats")
+            .select("*")
+            .eq("season", season),
+          (supabase as any)
+            .from("player_directory")
+            .select("season, player_id, full_name, team_abbrev, position_code, is_goalie")
+            .eq("season", season)
       ]);
 
-      if (skaters.error) console.error(`Error fetching skaters for ${season}:`, skaters.error);
-      if (goalies.error) console.error(`Error fetching goalies for ${season}:`, goalies.error);
+      if (statsResponse.error) {
+        console.error(`Error fetching player_season_stats for ${season}:`, statsResponse.error);
+        return new Map();
+      }
+      if (directoryResponse.error) {
+        console.error(`Error fetching player_directory for ${season}:`, directoryResponse.error);
+        return new Map();
+      }
+
+      const statsRows = (statsResponse.data || []) as PlayerSeasonStatsRow[];
+      const directoryRows = (directoryResponse.data || []) as PlayerDirectoryRow[];
+
+      // Create directory lookup map
+      const directoryMap = new Map<number, PlayerDirectoryRow>();
+      directoryRows.forEach(d => {
+        directoryMap.set(d.player_id, d);
+      });
 
       const map = new Map<number, AggregatedPlayerData>();
 
-      const processData = (data: any[], type: 'skater' | 'goalie') => {
-          if (!data) return;
-          data.forEach(d => {
-              // Create a simplified aggregated object (only 'all' situation for now for bulk load efficiency)
-              const agg: AggregatedPlayerData = {
-                  playerId: d.playerId,
-                  name: d.name,
-                  team: d.team,
-                  position: d.position,
-                  season: season,
-                  allSituation: d as CitrusPuckPlayerData
-              };
-              map.set(d.playerId, agg);
-          });
-      };
-
-      processData(skaters.data || [], 'skater');
-      processData(goalies.data || [], 'goalie');
+      // Process each player's stats
+      statsRows.forEach(stats => {
+        const directory = directoryMap.get(stats.player_id) || null;
+        const allSituation = mapStatsToCitrusPuck(stats, directory, 'all');
+        
+        const agg: AggregatedPlayerData = {
+          playerId: stats.player_id,
+          name: directory?.full_name || '',
+          team: stats.team_abbrev || directory?.team_abbrev || '',
+          position: stats.position_code || directory?.position_code || '',
+          season: season,
+          allSituation
+        };
+        
+        map.set(stats.player_id, agg);
+      });
 
       return map;
   },
 
   /**
    * Get all analytics data for a player in a specific season
+   * Now uses player_season_stats (only 'all' situation available)
    */
   async getPlayerAnalytics(
     playerId: number, 
     season: number,
     position?: string // 'G' for goalie, others for skater
   ): Promise<CitrusPuckPlayerData[]> {
-    // Determine table type based on position if provided, otherwise try both or assume skater
-    const isGoalie = position === 'G' || position === 'Goalie';
-    const tableName = this.getTableName(season, isGoalie ? 'goalie' : 'skater');
+    // Fetch stats and directory
+    const [statsResponse, directoryResponse] = await Promise.all([
+      (supabase as any)
+        .from("player_season_stats")
+        .select("*")
+        .eq("season", season)
+        .eq("player_id", playerId)
+        .single(),
+      (supabase as any)
+        .from("player_directory")
+        .select("season, player_id, full_name, team_abbrev, position_code, is_goalie")
+        .eq("season", season)
+        .eq("player_id", playerId)
+        .single()
+    ]);
     
-    // console.log(`Fetching analytics for player ${playerId} from ${tableName}`);
-
-    const { data, error } = await supabase
-      .from(tableName)
-      .select('*')
-      .eq('playerId', playerId)
-      .eq('season', season);
-    
-    if (error) {
-        console.error(`Error fetching analytics from ${tableName}:`, error);
-        return [];
+    if (statsResponse.error) {
+      console.error(`Error fetching player_season_stats for player ${playerId}:`, statsResponse.error);
+      return [];
     }
     
-    return data as unknown as CitrusPuckPlayerData[];
+    const stats = statsResponse.data as PlayerSeasonStatsRow | null;
+    const directory = directoryResponse.data as PlayerDirectoryRow | null;
+    
+    if (!stats) {
+      return [];
+    }
+    
+    // Return only 'all' situation (player_season_stats is season rollup, no situation breakdown)
+    const allSituation = mapStatsToCitrusPuck(stats, directory, 'all');
+    return [allSituation];
   },
 
   /**
    * Get aggregated data for a player (all situations combined)
+   * Now uses player_season_stats (only 'all' situation available)
    */
   async getAggregatedPlayerData(
     playerId: number,
@@ -83,12 +348,10 @@ export const CitrusPuckService = {
     if (!allData || allData.length === 0) return null;
     
     const allSituation = allData.find(d => d.situation === 'all');
-    const situation5on5 = allData.find(d => d.situation === '5on5');
-    const situation5on4 = allData.find(d => d.situation === '5on4');
-    const situation4on5 = allData.find(d => d.situation === '4on5');
     
     if (!allSituation) return null;
     
+    // Note: player_season_stats only has 'all' situation, so situation-specific data is not available
     return {
       playerId,
       name: allSituation.name || '',
@@ -96,9 +359,7 @@ export const CitrusPuckService = {
       position: allSituation.position || '',
       season,
       allSituation,
-      situation5on5,
-      situation5on4,
-      situation4on5
+      // situation5on5, situation5on4, situation4on5 not available from season rollup
     };
   },
 
@@ -138,11 +399,14 @@ export const CitrusPuckService = {
   },
 
   /**
-   * Helper to get table name
+   * Helper to get table name (DEPRECATED - kept for backward compatibility)
+   * Now uses player_season_stats instead of staging tables
    */
   getTableName(season: number, type: 'skater' | 'goalie'): string {
-    // Using staging tables as verified from user screenshot
-    return `staging_${season}_${type}s`;
+    // DEPRECATED: This method is no longer used
+    // All data now comes from player_season_stats + player_directory
+    console.warn('getTableName() is deprecated - using player_season_stats instead');
+    return `player_season_stats`;
   },
 
   /**
