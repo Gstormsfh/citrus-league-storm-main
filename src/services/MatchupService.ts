@@ -1001,7 +1001,8 @@ export const MatchupService = {
         otl: p.ot_losses || 0,
         gaa: p.goals_against_average || 0,
         savePct: p.save_percentage || 0,
-        shutouts: (p as any).shutouts || 0
+        shutouts: (p as any).shutouts || 0,
+        goalsSavedAboveExpected: p.goalsSavedAboveExpected || 0
       },
       team: p.team,
       teamAbbreviation: p.team,
@@ -1190,63 +1191,121 @@ export const MatchupService = {
         }
       }
 
-      return {
+      // Check if player is goalie
+      const isGoalie = player.position === 'G' || player.position === 'Goalie';
+      
+      // Base player object
+      const basePlayer: MatchupPlayer = {
         id: typeof player.id === 'string' ? parseInt(player.id) || 0 : player.id || 0,
         name: player.name,
         position: player.position,
         team: teamAbbrev,
-        points: fantasyPoints || 0, // Fantasy points calculated from matchup stats (matchup week only), default to 0
-        total_points: fantasyPoints || 0, // CRITICAL: Always set total_points to matchup week points, never season points
-        gamesRemaining, // This is calculated from week games only (already filtered above)
-        games_remaining_total: gamesRemaining, // Set default for week games
-        games_remaining_active: isStarter ? gamesRemaining : 0, // Only active if starter
-        status: gameStatus, // Will be null for scheduled games, 'In Game' or 'Final' for active/completed
+        points: fantasyPoints || 0,
+        total_points: fantasyPoints || 0,
+        gamesRemaining,
+        games_remaining_total: gamesRemaining,
+        games_remaining_active: isStarter ? gamesRemaining : 0,
+        status: gameStatus,
         isStarter,
-        // CRITICAL: Use weekly matchupStats for display, not season stats
-        stats: matchupStats ? {
-          goals: matchupStats.goals || 0,
-          assists: matchupStats.assists || 0,
-          sog: matchupStats.sog || 0,
-          blk: matchupStats.blocks || 0,
-          gamesPlayed: 0, // Will be set from matchupLine if available
-          xGoals: matchupStats.xGoals || 0
-        } : {
-          // No weekly stats - player didn't play this week, show zeros
+        isGoalie,
+        garPercentage: garPercentage,
+        isToday: hasGameToday,
+        gameInfo,
+        games: weekGames
+      };
+      
+      // Handle goalies separately
+      if (isGoalie) {
+        // Goalie stats from player.stats (season-long)
+        basePlayer.goalieStats = {
+          gamesPlayed: player.stats.gamesPlayed || 0,
+          wins: player.stats.wins || 0,
+          saves: player.stats.saves || 0,
+          shutouts: player.stats.shutouts || 0,
+          goalsAgainst: player.stats.goalsAgainst || 0,
+          gaa: player.stats.goalsAgainstAverage || 0,
+          savePct: player.stats.savePercentage || 0,
+          goalsSavedAboveExpected: player.stats.goalsSavedAboveExpected
+        };
+        
+        // Goalie matchup stats (if available from matchupStats - would need to be extended)
+        // For now, leave undefined as matchupStats is skater-focused
+        
+        // Goalie projection from dailyProjection
+        if (dailyProjection && dailyProjection.is_goalie) {
+          basePlayer.goalieProjection = {
+            total_projected_points: Number(dailyProjection.total_projected_points || 0),
+            projected_wins: Number(dailyProjection.projected_wins || 0),
+            projected_saves: Number(dailyProjection.projected_saves || 0),
+            projected_shutouts: Number(dailyProjection.projected_shutouts || 0),
+            projected_goals_against: Number(dailyProjection.projected_goals_against || 0),
+            projected_gaa: Number(dailyProjection.projected_gaa || 0),
+            projected_save_pct: Number(dailyProjection.projected_save_pct || 0),
+            projected_gp: Number(dailyProjection.projected_gp || 0),
+            starter_confirmed: Boolean(dailyProjection.starter_confirmed),
+            confidence_score: Number(dailyProjection.confidence_score || 0),
+            calculation_method: dailyProjection.calculation_method || 'probability_based_volume'
+          };
+        }
+        
+        // Skater stats should be empty/zero for goalies (but keep structure for compatibility)
+        basePlayer.stats = {
           goals: 0,
           assists: 0,
           sog: 0,
           blk: 0,
           gamesPlayed: 0,
           xGoals: 0
-        },
-        matchupStats: matchupStats ? {
+        };
+      } else {
+        // Skater stats
+        basePlayer.stats = matchupStats ? {
+          goals: matchupStats.goals || 0,
+          assists: matchupStats.assists || 0,
+          sog: matchupStats.sog || 0,
+          blk: matchupStats.blocks || 0,
+          gamesPlayed: 0,
+          xGoals: matchupStats.xGoals || 0
+        } : {
+          goals: 0,
+          assists: 0,
+          sog: 0,
+          blk: 0,
+          gamesPlayed: 0,
+          xGoals: 0
+        };
+        
+        basePlayer.matchupStats = matchupStats ? {
           goals: matchupStats.goals,
           assists: matchupStats.assists,
           sog: matchupStats.sog,
           blocks: matchupStats.blocks || 0,
           xGoals: matchupStats.xGoals
-        } : undefined,
-        garPercentage: garPercentage,
-        isToday: hasGameToday, // Only true if game_date === todayStr (December 8, 2025)
-        gameInfo, // Only set if there's a game (today's game or next game in week)
-        // Daily projection from Citrus Projections 2.0
-        daily_projection: dailyProjection ? {
-          total_projected_points: Number(dailyProjection.total_projected_points || 0),
-          projected_goals: Number(dailyProjection.projected_goals || 0),
-          projected_assists: Number(dailyProjection.projected_assists || 0),
-          projected_sog: Number(dailyProjection.projected_sog || 0),
-          projected_blocks: Number(dailyProjection.projected_blocks || 0),
-          projected_xg: Number(dailyProjection.projected_xg || 0),
-          base_ppg: Number(dailyProjection.base_ppg || 0),
-          shrinkage_weight: Number(dailyProjection.shrinkage_weight || 0),
-          finishing_multiplier: Number(dailyProjection.finishing_multiplier || 1),
-          opponent_adjustment: Number(dailyProjection.opponent_adjustment || 1),
-          b2b_penalty: Number(dailyProjection.b2b_penalty || 1),
-          home_away_adjustment: Number(dailyProjection.home_away_adjustment || 1),
-          confidence_score: Number(dailyProjection.confidence_score || 0),
-          calculation_method: dailyProjection.calculation_method || 'hybrid_bayesian'
-        } : undefined
-      };
+        } : undefined;
+        
+        // Skater projection
+        if (dailyProjection && !dailyProjection.is_goalie) {
+          basePlayer.daily_projection = {
+            total_projected_points: Number(dailyProjection.total_projected_points || 0),
+            projected_goals: Number(dailyProjection.projected_goals || 0),
+            projected_assists: Number(dailyProjection.projected_assists || 0),
+            projected_sog: Number(dailyProjection.projected_sog || 0),
+            projected_blocks: Number(dailyProjection.projected_blocks || 0),
+            projected_xg: Number(dailyProjection.projected_xg || 0),
+            base_ppg: Number(dailyProjection.base_ppg || 0),
+            shrinkage_weight: Number(dailyProjection.shrinkage_weight || 0),
+            finishing_multiplier: Number(dailyProjection.finishing_multiplier || 1),
+            opponent_adjustment: Number(dailyProjection.opponent_adjustment || 1),
+            b2b_penalty: Number(dailyProjection.b2b_penalty || 1),
+            home_away_adjustment: Number(dailyProjection.home_away_adjustment || 1),
+            confidence_score: Number(dailyProjection.confidence_score || 0),
+            calculation_method: dailyProjection.calculation_method || 'hybrid_bayesian',
+            is_goalie: false
+          };
+        }
+      }
+      
+      return basePlayer;
     } catch (error) {
       console.error(`Error transforming player ${player.name} to matchup player:`, error);
       // Return basic player info if schedule lookup fails

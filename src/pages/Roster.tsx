@@ -513,7 +513,8 @@ const Roster = () => {
             otl: p.ot_losses || 0,
             gaa: p.goals_against_average || 0,
             savePct: p.save_percentage || 0,
-            shutouts: (p as any).shutouts || 0
+            shutouts: (p as any).shutouts || 0,
+            goalsSavedAboveExpected: p.goalsSavedAboveExpected || 0
           },
           team: p.team,
           teamAbbreviation: p.team, // DB has 'EDM' etc

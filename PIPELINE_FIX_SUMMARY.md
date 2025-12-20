@@ -60,3 +60,4 @@ Updated `_validate_game_has_shifts()` to:
 - Official shifts (`player_shifts_official`) come from NHL API
 - Extractor now uses computed shifts first (covers more games)
 - All 537 games with computed shifts can now be processed
+

@@ -20,6 +20,7 @@ export type MatchupPlayer = {
   gamesRemaining: number;
   status: MatchupPlayerStatus;
   isStarter: boolean;
+  // Skater stats (for skaters only)
   stats: {
     goals: number;
     assists: number;
@@ -51,7 +52,7 @@ export type MatchupPlayer = {
   live_game_locked?: boolean; // From fantasy_matchup_lines.live_game_locked
   stats_breakdown?: StatBreakdown; // Transformed from fantasy_matchup_lines.stats_breakdown JSONB
   games?: NHLGame[]; // Games for the matchup week (for GameLogosBar)
-  // NEW: Daily projection from Citrus Projections 2.0
+  // NEW: Daily projection from Citrus Projections 2.0 (skater)
   daily_projection?: {
     total_projected_points: number;
     projected_goals: number;
@@ -65,6 +66,38 @@ export type MatchupPlayer = {
     opponent_adjustment: number;
     b2b_penalty: number;
     home_away_adjustment: number;
+    confidence_score: number;
+    calculation_method: string;
+    is_goalie?: boolean; // Flag to distinguish goalie vs skater
+  };
+  // NEW: Goalie-specific fields
+  isGoalie?: boolean; // Flag to identify goalies
+  goalieStats?: {
+    gamesPlayed: number; // GP
+    wins: number;
+    saves: number;
+    shutouts: number; // SOs
+    goalsAgainst: number;
+    gaa: number; // GAA
+    savePct: number; // SV%
+    goalsSavedAboveExpected?: number; // GSAx
+  };
+  goalieMatchupStats?: {
+    wins: number;
+    saves: number;
+    shutouts: number;
+    goalsAgainst: number;
+  };
+  goalieProjection?: {
+    total_projected_points: number;
+    projected_wins: number;
+    projected_saves: number;
+    projected_shutouts: number;
+    projected_goals_against: number;
+    projected_gaa: number;
+    projected_save_pct: number;
+    projected_gp: number;
+    starter_confirmed: boolean;
     confidence_score: number;
     calculation_method: string;
   };

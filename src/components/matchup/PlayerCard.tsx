@@ -4,6 +4,7 @@ import { getTeamColor } from "@/utils/teamColors";
 import { PointsTooltip } from "./PointsTooltip";
 import { GameLogosBar } from "./GameLogosBar";
 import { ProjectionTooltip } from "./ProjectionTooltip";
+import { GoalieProjectionTooltip } from "./GoalieProjectionTooltip";
 import { getTodayMST } from "@/utils/timezoneUtils";
 
 interface PlayerCardProps {
@@ -84,8 +85,11 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick 
   const positionColors = getPositionColorClasses(player.position);
   const { shotPct, pointRate } = calculatePercentages(player);
   
-  // Use daily projection from Citrus Projections 2.0 (database-driven)
-  const dailyProjection = player.daily_projection;
+  // Check if player is goalie
+  const isGoalie = player.isGoalie || player.position === 'G' || player.position === 'Goalie';
+  
+  // Use appropriate projection based on player type
+  const dailyProjection = isGoalie ? player.goalieProjection : player.daily_projection;
   const projectedPoints = dailyProjection?.total_projected_points || 0;
   
   // Check if player has a game today - use MST date to match projection date
@@ -97,14 +101,16 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick 
   const hasGameToday = todayGames.length > 0;
   
   // Zero Projection Logic: If projectedPoints === 0 but hasGameToday is true, show "TBD" or "Calculating"
+  // For goalies, also check starter_confirmed flag
   const hasProjection = dailyProjection && projectedPoints > 0;
-  const showTBD = hasGameToday && !hasProjection; // Game today but no projection yet
+  const isStarterConfirmed = isGoalie ? (player.goalieProjection?.starter_confirmed ?? false) : true;
+  const showTBD = hasGameToday && (!hasProjection || (isGoalie && !isStarterConfirmed)); // Game today but no projection yet or starter not confirmed
   
-  // Normalize to 0-100 for bar display (max ~8 points for a single game)
-  const maxProjection = 8;
+  // Normalize to 0-100 for bar display (max ~8 points for skaters, ~20 for goalies)
+  const maxProjection = isGoalie ? 20 : 8;
   const projectionPercentage = Math.min((projectedPoints / maxProjection) * 100, 100);
   
-  // Get unique stats for top right corner: F Pts, xG, GAR %
+  // Get unique stats for top right corner
   const getUniqueStats = () => {
     const stats: Array<{ label: string; value: string }> = [];
     
@@ -114,20 +120,38 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick 
       value: (player.total_points ?? 0).toFixed(1)  // Matchup week total
     });
     
-    // xG - Expected Goals (SEASON total only)
-    const xG = player.stats?.xGoals ?? 0;
-    stats.push({ 
-      label: 'xG', 
-      value: xG.toFixed(1) 
-    });
-    
-    // Season GAR % - Goals Above Replacement as percentage (season total)
-    if (player.garPercentage !== undefined) {
-      const garSign = player.garPercentage >= 0 ? '+' : '';
+    if (isGoalie) {
+      // Goalie stats: SV%, GSAx
+      const savePct = player.goalieStats?.savePct ?? 0;
       stats.push({ 
-        label: 'Season GAR', 
-        value: `${garSign}${player.garPercentage.toFixed(1)}%` 
+        label: 'SV%', 
+        value: (savePct * 100).toFixed(1) + '%'
       });
+      
+      const gsax = player.goalieStats?.goalsSavedAboveExpected;
+      if (gsax !== undefined && gsax !== null) {
+        const gsaxSign = gsax >= 0 ? '+' : '';
+        stats.push({ 
+          label: 'GSAx', 
+          value: `${gsaxSign}${gsax.toFixed(1)}`
+        });
+      }
+    } else {
+      // Skater stats: xG, GAR %
+      const xG = player.stats?.xGoals ?? 0;
+      stats.push({ 
+        label: 'xG', 
+        value: xG.toFixed(1) 
+      });
+      
+      // Season GAR % - Goals Above Replacement as percentage (season total)
+      if (player.garPercentage !== undefined) {
+        const garSign = player.garPercentage >= 0 ? '+' : '';
+        stats.push({ 
+          label: 'Season GAR', 
+          value: `${garSign}${player.garPercentage.toFixed(1)}%` 
+        });
+      }
     }
     
     return stats;
@@ -171,9 +195,21 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick 
                 {player.team}
               </div>
             )}
-            {/* Key Stats Below Name - Use matchup stats if available, otherwise season stats */}
+            {/* Key Stats Below Name - Show goalie stats for goalies, skater stats for skaters */}
             <div className="player-key-stats">
-              {(player.matchupStats?.goals ?? player.stats?.goals) || 0} G, {(player.matchupStats?.assists ?? player.stats?.assists) || 0} A, {(player.matchupStats?.sog ?? player.stats?.sog) || 0} SOG
+              {isGoalie ? (
+                <>
+                  GP: {player.goalieStats?.gamesPlayed || 0}, 
+                  W: {player.goalieStats?.wins || 0}, 
+                  SV%: {((player.goalieStats?.savePct || 0) * 100).toFixed(1)}%, 
+                  GAA: {(player.goalieStats?.gaa || 0).toFixed(2)}, 
+                  SO: {player.goalieStats?.shutouts || 0}
+                </>
+              ) : (
+                <>
+                  {(player.matchupStats?.goals ?? player.stats?.goals) || 0} G, {(player.matchupStats?.assists ?? player.stats?.assists) || 0} A, {(player.matchupStats?.sog ?? player.stats?.sog) || 0} SOG
+                </>
+              )}
             </div>
           </div>
           {/* Unique Stats Box - Top Right Corner */}
@@ -226,19 +262,23 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick 
             <span className="text-xs text-gray-400 mb-1">Proj. Tonight</span>
             <div className="flex items-center gap-2">
               <span className="text-xl font-bold text-fantasy-secondary">
-                {hasProjection 
+                {hasProjection && isStarterConfirmed
                   ? projectedPoints.toFixed(1)
                   : showTBD 
-                    ? 'TBD'
+                    ? (isGoalie && !isStarterConfirmed ? 'Probable' : 'TBD')
                     : '0.0'
                 }
               </span>
               {hasProjection && dailyProjection && (
-                <ProjectionTooltip projection={dailyProjection} />
+                isGoalie ? (
+                  <GoalieProjectionTooltip projection={player.goalieProjection} />
+                ) : (
+                  <ProjectionTooltip projection={player.daily_projection} />
+                )
               )}
             </div>
           </div>
-          {hasProjection ? (
+          {hasProjection && isStarterConfirmed ? (
             <>
               <div className="player-projection-bar-wrapper">
                 <div 
@@ -252,7 +292,7 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick 
             </>
           ) : showTBD ? (
             <div className="player-projection-text text-muted-foreground">
-              Calculating...
+              {isGoalie && !isStarterConfirmed ? 'Starter not confirmed' : 'Calculating...'}
             </div>
           ) : (
             <div className="player-projection-text text-muted-foreground">

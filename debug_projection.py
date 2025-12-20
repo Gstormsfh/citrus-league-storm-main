@@ -39,6 +39,10 @@ from calculate_daily_projections import (
     check_back_to_back,
     get_home_away_adjustment,
     calculate_fantasy_points,
+    calculate_goalie_projection,
+    get_opponent_shots_for_per_60,
+    get_vegas_win_probability,
+    get_goalie_gsax,
     DEFAULT_SEASON
 )
 
@@ -179,6 +183,7 @@ def print_traceability_log(
     player_name = player_info.get("full_name", f"Player {player_id}")
     position = player_info.get("position_code", "C")
     player_team = player_info.get("team_abbrev", "")
+    is_goalie = position == "G" or position == "Goalie"
     
     # Get game info
     game_info = db.select(
@@ -198,7 +203,12 @@ def print_traceability_log(
     opponent_team = away_team if home_team == player_team else home_team
     is_home = home_team == player_team
     
-    # Get player season stats
+    # Route to goalie projection if goalie
+    if is_goalie:
+        print_goalie_traceability_log(db, player_id, game_id, game_date, season, scoring_settings, player_name, player_team, opponent_team, is_home)
+        return
+    
+    # Get player season stats (skater)
     season_stats = get_player_season_stats(db, player_id, season)
     if not season_stats:
         print(f"❌ No season stats found for player {player_id}")
@@ -373,7 +383,7 @@ def print_traceability_log(
     LEAGUE_AVG_XGA_PER_60 = 2.5
     LEAGUE_AVG_SV_PCT = 0.905
     
-    opponent_xga_per_60 = get_team_xga_per_60(db, opponent_team, season, last_n_games=10, debug=True)
+    opponent_xga_per_60 = get_team_xga_per_60(db, opponent_team, season, last_n_games=10)
     goalie_sv_pct = get_opposing_goalie_save_pct(db, opponent_team, game_id, game_date, season, debug=True)
     
     print(f"\nDDR Components:")
@@ -439,6 +449,133 @@ def print_traceability_log(
     print()
     print(f"Confidence Score: {confidence_score:.3f} ({gp} games played)")
     print(f"Calculation Method: hybrid_bayesian")
+    print("=" * 80)
+
+
+def print_goalie_traceability_log(
+    db: SupabaseRest,
+    player_id: int,
+    game_id: int,
+    game_date: date,
+    season: int,
+    scoring_settings: Dict[str, Any],
+    player_name: str,
+    player_team: str,
+    opponent_team: str,
+    is_home: bool
+) -> None:
+    """Print comprehensive traceability log for a goalie projection."""
+    
+    print("=" * 80)
+    print("CITRUS PROJECTIONS 2.0 - GOALIE TRACEABILITY LOG")
+    print("=" * 80)
+    print(f"Player: {player_name} ({player_id})")
+    print(f"Position: G (Goalie)")
+    print(f"Team: {player_team}")
+    print(f"Game: {'vs' if is_home else '@'} {opponent_team} (Game ID: {game_id})")
+    print(f"Date: {game_date}")
+    print(f"Season: {season}")
+    print()
+    
+    # Get goalie season stats
+    season_stats = get_player_season_stats(db, player_id, season)
+    if not season_stats:
+        print(f"❌ No season stats found for goalie {player_id}")
+        return
+    
+    gp = int(season_stats.get("goalie_gp", 0))
+    wins = int(season_stats.get("wins", 0))
+    saves = int(season_stats.get("saves", 0))
+    shots_faced = int(season_stats.get("shots_faced", 0))
+    goals_against = int(season_stats.get("goals_against", 0))
+    shutouts = int(season_stats.get("shutouts", 0))
+    
+    # Calculate raw goalie averages
+    if gp > 0:
+        raw_wins_per_game = wins / gp
+        raw_saves_per_game = saves / gp
+        raw_shutouts_per_game = shutouts / gp
+        raw_ga_per_game = goals_against / gp
+        raw_sv_pct = saves / shots_faced if shots_faced > 0 else 0.905
+    else:
+        raw_wins_per_game = 0.0
+        raw_saves_per_game = 0.0
+        raw_shutouts_per_game = 0.0
+        raw_ga_per_game = 0.0
+        raw_sv_pct = 0.905  # League average
+    
+    print("-" * 80)
+    print("STEP 1: GOALIE HISTORY")
+    print("-" * 80)
+    print(f"Games Played: {gp}")
+    print("Raw Goalie Averages (per game):")
+    if gp > 0:
+        print(f"  Wins:         {raw_wins_per_game:.3f} ({wins} wins / {gp} games)")
+        print(f"  Saves:        {raw_saves_per_game:.2f} ({saves} saves / {gp} games)")
+        print(f"  Shutouts:     {raw_shutouts_per_game:.3f} ({shutouts} shutouts / {gp} games)")
+        print(f"  Goals Against: {raw_ga_per_game:.2f} ({goals_against} GA / {gp} games)")
+        print(f"  Save %:       {raw_sv_pct:.3f} ({saves} saves / {shots_faced} shots)")
+    else:
+        print("  No games played - using league averages")
+    print()
+    
+    # Get GSAx
+    print("-" * 80)
+    print("STEP 2: GOALIE ADVANCED METRICS")
+    print("-" * 80)
+    gsax = get_goalie_gsax(db, player_id, debug=True)
+    if gsax is not None:
+        print(f"GSAx (Goals Saved Above Expected): {gsax:.2f}")
+        if gsax > 2.0:
+            print("  → Elite goalie (GSAx > 2.0) - higher shutout probability")
+        elif gsax > 0.0:
+            print("  → Above-average goalie")
+        elif gsax > -1.0:
+            print("  → Average goalie")
+        else:
+            print("  → Below-average goalie")
+    else:
+        print("GSAx: N/A (no data available)")
+    print()
+    
+    # Calculate projection using the goalie projection function
+    print("-" * 80)
+    print("STEP 3: PROBABILITY-BASED PROJECTION")
+    print("-" * 80)
+    
+    goalie_projection = calculate_goalie_projection(
+        db, player_id, game_id, game_date, season, scoring_settings, debug=True
+    )
+    
+    if not goalie_projection:
+        print("❌ Failed to calculate goalie projection")
+        return
+    
+    print()
+    print("-" * 80)
+    print("STEP 4: FINAL GOALIE PROJECTION")
+    print("-" * 80)
+    print(f"Projected GP:        {goalie_projection['projected_gp']:.2f}")
+    print(f"Projected Wins:      {goalie_projection['projected_wins']:.3f} (probability)")
+    print(f"Projected Saves:     {goalie_projection['projected_saves']:.2f}")
+    print(f"Projected Shutouts:  {goalie_projection['projected_shutouts']:.3f} (probability)")
+    print(f"Projected GA:        {goalie_projection['projected_goals_against']:.2f}")
+    print(f"Projected GAA:       {goalie_projection['projected_gaa']:.2f}")
+    print(f"Projected SV%:       {goalie_projection['projected_save_pct']:.3f}")
+    print()
+    
+    goalie_scoring = scoring_settings.get("goalie", {})
+    print("Fantasy Points Calculation:")
+    print(f"  Wins:        {goalie_projection['projected_wins']:.3f} × {goalie_scoring.get('wins', 4)} = {goalie_projection['projected_wins'] * goalie_scoring.get('wins', 4):.3f}")
+    print(f"  Saves:       {goalie_projection['projected_saves']:.2f} × {goalie_scoring.get('saves', 0.2)} = {goalie_projection['projected_saves'] * goalie_scoring.get('saves', 0.2):.3f}")
+    print(f"  Shutouts:    {goalie_projection['projected_shutouts']:.3f} × {goalie_scoring.get('shutouts', 3)} = {goalie_projection['projected_shutouts'] * goalie_scoring.get('shutouts', 3):.3f}")
+    print(f"  Goals Against: {goalie_projection['projected_goals_against']:.2f} × {goalie_scoring.get('goals_against', -1)} = {goalie_projection['projected_goals_against'] * goalie_scoring.get('goals_against', -1):.3f}")
+    print()
+    print(f"Total Projected Points: {goalie_projection['total_projected_points']:.3f}")
+    print()
+    print(f"Starter Confirmed: {goalie_projection['starter_confirmed']}")
+    print(f"Confidence Score: {goalie_projection['confidence_score']:.3f}")
+    print(f"Calculation Method: {goalie_projection['calculation_method']}")
     print("=" * 80)
 
 

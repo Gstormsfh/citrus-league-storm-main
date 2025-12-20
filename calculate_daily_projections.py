@@ -323,7 +323,8 @@ def get_team_xga_per_60(
     db: SupabaseRest,
     team: str,
     season: int,
-    last_n_games: int = 10
+    last_n_games: int = 10,
+    debug: bool = False
 ) -> Optional[float]:
     """
     Calculate team xGA/60 (Expected Goals Against per 60 minutes) over last N games.
@@ -431,6 +432,225 @@ def get_team_xga_per_60(
         
     except Exception as e:
         print(f"⚠️  Warning: Could not calculate team xGA/60 for {team}: {e}")
+        return None
+
+
+def get_opponent_shots_for_per_60(
+    db: SupabaseRest,
+    opponent_team: str,
+    season: int,
+    last_n_games: int = 10,
+    debug: bool = False
+) -> Optional[float]:
+    """
+    Calculate opponent team's shots for per 60 minutes over last N games.
+    
+    This is used for goalie save volume projection:
+    Projected Saves = Opponent Shots For/60 × Goalie SV% × (Expected TOI / 60)
+    
+    Returns:
+        Shots for per 60 minutes (e.g., 32.5) or None if unavailable
+    """
+    try:
+        if debug:
+            print(f"  [Goalie Projection] Calculating shots for/60 for opponent: {opponent_team}")
+        
+        # Get opponent team's last N games
+        recent_games = db.select(
+            "nhl_games",
+            select="game_id,game_date,home_team,away_team",
+            filters=[("season", "eq", season)],
+            order="game_date.desc",
+            limit=100
+        )
+        
+        team_game_ids = []
+        for game in recent_games:
+            if game.get("home_team") == opponent_team or game.get("away_team") == opponent_team:
+                team_game_ids.append(int(game.get("game_id")))
+                if len(team_game_ids) >= last_n_games:
+                    break
+        
+        if not team_game_ids:
+            if debug:
+                print(f"  [Goalie Projection] No games found for {opponent_team}")
+            return None
+        
+        # Get shots on goal from player_game_stats for the opponent team
+        total_shots = 0
+        total_toi = 0
+        
+        for game_id in team_game_ids:
+            # Get shots on goal for opponent team (skaters only, not goalies)
+            team_stats = db.select(
+                "player_game_stats",
+                select="shots_on_goal,icetime_seconds,is_goalie",
+                filters=[
+                    ("game_id", "eq", game_id),
+                    ("team_abbrev", "eq", opponent_team),
+                    ("is_goalie", "eq", False)  # Only skaters
+                ],
+                limit=1000
+            )
+            
+            game_shots = sum(int(s.get("shots_on_goal", 0)) for s in team_stats)
+            game_toi = sum(int(s.get("icetime_seconds", 0)) for s in team_stats)
+            
+            total_shots += game_shots
+            total_toi += game_toi
+        
+        # Calculate shots for per 60
+        if total_toi > 0:
+            shots_for_per_60 = (total_shots / total_toi) * 3600
+            if debug:
+                print(f"  [Goalie Projection] {opponent_team} shots for/60: {shots_for_per_60:.2f} (Total shots: {total_shots}, Total TOI: {total_toi/60:.1f} min)")
+            return shots_for_per_60
+        
+        if debug:
+            print(f"  [Goalie Projection] No TOI data for {opponent_team}")
+        return None
+        
+    except Exception as e:
+        print(f"⚠️  Warning: Could not calculate shots for/60 for {opponent_team}: {e}")
+        return None
+
+
+def get_vegas_win_probability(
+    db: SupabaseRest,
+    game_id: int,
+    goalie_team: str,
+    season: int,
+    debug: bool = False
+) -> Optional[float]:
+    """
+    Get Vegas implied win probability for goalie's team.
+    
+    Uses moneyline odds from nhl_games table if available.
+    Falls back to team's recent win rate (last 10 games) if odds unavailable.
+    
+    Returns:
+        Win probability (0.0 to 1.0) or None if unavailable
+    """
+    try:
+        if debug:
+            print(f"  [Goalie Projection] Getting win probability for {goalie_team}")
+        
+        # Try to get Vegas odds first
+        game_info = db.select(
+            "nhl_games",
+            select="home_team,away_team,implied_win_probability_home,implied_win_probability_away,moneyline_home,moneyline_away",
+            filters=[("game_id", "eq", game_id)],
+            limit=1
+        )
+        
+        if game_info and len(game_info) > 0:
+            game = game_info[0]
+            is_home = game.get("home_team") == goalie_team
+            
+            # Use implied probability if available (auto-calculated by trigger)
+            if is_home:
+                implied_prob = game.get("implied_win_probability_home")
+                moneyline = game.get("moneyline_home")
+            else:
+                implied_prob = game.get("implied_win_probability_away")
+                moneyline = game.get("moneyline_away")
+            
+            if implied_prob is not None:
+                if debug:
+                    print(f"  [Goalie Projection] Using Vegas implied probability: {implied_prob:.3f} (moneyline: {moneyline})")
+                return float(implied_prob)
+        
+        # Fallback: Calculate from team's recent win rate
+        if debug:
+            print(f"  [Goalie Projection] No Vegas odds, calculating from recent win rate")
+        
+        recent_games = db.select(
+            "nhl_games",
+            select="game_id,game_date,home_team,away_team,home_score,away_score,status",
+            filters=[("season", "eq", season)],
+            order="game_date.desc",
+            limit=100
+        )
+        
+        team_games = []
+        for game in recent_games:
+            if game.get("home_team") == goalie_team or game.get("away_team") == goalie_team:
+                if game.get("status") == "final":
+                    team_games.append(game)
+                    if len(team_games) >= 10:
+                        break
+        
+        if not team_games:
+            if debug:
+                print(f"  [Goalie Projection] No recent games found for {goalie_team}")
+            return None
+        
+        wins = 0
+        for game in team_games:
+            is_home = game.get("home_team") == goalie_team
+            home_score = int(game.get("home_score", 0))
+            away_score = int(game.get("away_score", 0))
+            
+            if (is_home and home_score > away_score) or (not is_home and away_score > home_score):
+                wins += 1
+        
+        win_rate = wins / len(team_games) if team_games else 0.5
+        if debug:
+            print(f"  [Goalie Projection] Recent win rate: {win_rate:.3f} ({wins} wins in {len(team_games)} games)")
+        return win_rate
+        
+    except Exception as e:
+        print(f"⚠️  Warning: Could not get win probability for {goalie_team}: {e}")
+        return None
+
+
+def get_goalie_gsax(
+    db: SupabaseRest,
+    player_id: int,
+    debug: bool = False
+) -> Optional[float]:
+    """
+    Get goalie's regressed GSAx (Goals Saved Above Expected) from goalie_gsax_primary table.
+    
+    Used for shutout probability calculation.
+    
+    Returns:
+        Regressed GSAx value or None if unavailable
+    """
+    try:
+        gsax_data = db.select(
+            "goalie_gsax_primary",
+            select="regressed_gsax",
+            filters=[("goalie_id", "eq", player_id)],
+            limit=1
+        )
+        
+        if gsax_data and len(gsax_data) > 0:
+            gsax = float(gsax_data[0].get("regressed_gsax", 0))
+            if debug:
+                print(f"  [Goalie Projection] GSAx: {gsax:.2f}")
+            return gsax
+        
+        # Fallback to goalie_gsax if primary not available
+        gsax_data = db.select(
+            "goalie_gsax",
+            select="regressed_gsax",
+            filters=[("goalie_id", "eq", player_id)],
+            limit=1
+        )
+        
+        if gsax_data and len(gsax_data) > 0:
+            gsax = float(gsax_data[0].get("regressed_gsax", 0))
+            if debug:
+                print(f"  [Goalie Projection] GSAx (from goalie_gsax): {gsax:.2f}")
+            return gsax
+        
+        if debug:
+            print(f"  [Goalie Projection] No GSAx data found for goalie {player_id}")
+        return None
+        
+    except Exception as e:
+        print(f"⚠️  Warning: Could not get GSAx for goalie {player_id}: {e}")
         return None
 
 
@@ -589,28 +809,250 @@ def get_home_away_adjustment(player_team: str, game: Dict[str, Any]) -> float:
 
 def calculate_fantasy_points(
     projected_stats: Dict[str, float],
-    scoring_settings: Dict[str, Any]
+    scoring_settings: Dict[str, Any],
+    is_goalie: bool = False
 ) -> float:
     """
     Calculate total fantasy points from projected stats using league scoring settings.
     
     Args:
-        projected_stats: Dict with goals, assists, sog, blocks
+        projected_stats: Dict with goals, assists, sog, blocks (skaters) or wins, saves, shutouts, goals_against (goalies)
         scoring_settings: League scoring settings JSONB
+        is_goalie: True if calculating for goalie, False for skater
     
     Returns:
         Total projected fantasy points
     """
-    skater_scoring = scoring_settings.get("skater", {})
-    
-    total_points = (
-        projected_stats["goals"] * float(skater_scoring.get("goals", 3)) +
-        projected_stats["assists"] * float(skater_scoring.get("assists", 2)) +
-        projected_stats["sog"] * float(skater_scoring.get("shots_on_goal", 0.4)) +
-        projected_stats["blocks"] * float(skater_scoring.get("blocks", 0.5))
-    )
+    if is_goalie:
+        goalie_scoring = scoring_settings.get("goalie", {})
+        total_points = (
+            projected_stats.get("wins", 0) * float(goalie_scoring.get("wins", 4)) +
+            projected_stats.get("saves", 0) * float(goalie_scoring.get("saves", 0.2)) +
+            projected_stats.get("shutouts", 0) * float(goalie_scoring.get("shutouts", 3)) +
+            projected_stats.get("goals_against", 0) * float(goalie_scoring.get("goals_against", -1))
+        )
+    else:
+        skater_scoring = scoring_settings.get("skater", {})
+        total_points = (
+            projected_stats["goals"] * float(skater_scoring.get("goals", 3)) +
+            projected_stats["assists"] * float(skater_scoring.get("assists", 2)) +
+            projected_stats["sog"] * float(skater_scoring.get("shots_on_goal", 0.4)) +
+            projected_stats["blocks"] * float(skater_scoring.get("blocks", 0.5))
+        )
     
     return total_points
+
+
+def calculate_goalie_projection(
+    db: SupabaseRest,
+    player_id: int,
+    game_id: int,
+    game_date: date,
+    season: int,
+    scoring_settings: Dict[str, Any],
+    debug: bool = False
+) -> Optional[Dict[str, Any]]:
+    """
+    Calculate probability-based goalie projection using volume modeling.
+    
+    Methodology:
+    1. Saves: Opponent Shots For/60 × Goalie SV% × Expected TOI
+    2. Wins: Vegas implied probability (or team win rate fallback)
+    3. Shutouts: GSAx-based probability with opponent offense factor
+    4. Goals Against: Opponent Shots × (1 - SV%)
+    5. GAA: Goals Against / (Expected TOI / 60)
+    
+    Returns:
+        Projection dict with all goalie stats and model components, or None if error
+    """
+    try:
+        if debug:
+            print(f"\n[Goalie Projection] Calculating for goalie {player_id}, game {game_id}")
+        
+        # Get goalie info
+        player_dir = db.select(
+            "player_directory",
+            select="position_code,team_abbrev",
+            filters=[("player_id", "eq", player_id), ("season", "eq", season)],
+            limit=1
+        )
+        
+        if not player_dir or len(player_dir) == 0:
+            print(f"⚠️  Goalie {player_id} not found in player_directory")
+            return None
+        
+        goalie_team = player_dir[0].get("team_abbrev", "")
+        
+        # Get game info
+        game_info = db.select(
+            "nhl_games",
+            select="home_team,away_team",
+            filters=[("game_id", "eq", game_id)],
+            limit=1
+        )
+        
+        if not game_info or len(game_info) == 0:
+            print(f"⚠️  Game {game_id} not found")
+            return None
+        
+        game = game_info[0]
+        opponent_team = game.get("away_team") if game.get("home_team") == goalie_team else game.get("home_team")
+        is_home = game.get("home_team") == goalie_team
+        
+        # Get goalie's season stats
+        goalie_stats = db.select(
+            "player_season_stats",
+            select="goalie_gp,wins,saves,shots_faced,goals_against,shutouts",
+            filters=[("player_id", "eq", player_id), ("season", "eq", season)],
+            limit=1
+        )
+        
+        if not goalie_stats or len(goalie_stats) == 0:
+            print(f"⚠️  No season stats found for goalie {player_id}")
+            return None
+        
+        stats = goalie_stats[0]
+        games_played = int(stats.get("goalie_gp", 0))
+        total_saves = int(stats.get("saves", 0))
+        total_shots_faced = int(stats.get("shots_faced", 0))
+        total_goals_against = int(stats.get("goals_against", 0))
+        
+        # Calculate goalie SV% with Bayesian shrinkage
+        LEAGUE_AVG_SV_PCT = 0.905
+        SHRINKAGE_CONSTANT = 500  # Shots needed for full weight
+        
+        if total_shots_faced > 0:
+            raw_sv_pct = total_saves / total_shots_faced
+        else:
+            raw_sv_pct = LEAGUE_AVG_SV_PCT
+        
+        # Bayesian shrinkage for SV%
+        shrinkage_weight_sv = min(total_shots_faced / SHRINKAGE_CONSTANT, 1.0)
+        projected_sv_pct = (shrinkage_weight_sv * raw_sv_pct) + ((1 - shrinkage_weight_sv) * LEAGUE_AVG_SV_PCT)
+        
+        if debug:
+            print(f"  [Goalie Projection] SV%: {projected_sv_pct:.3f} (raw: {raw_sv_pct:.3f}, weight: {shrinkage_weight_sv:.3f})")
+        
+        # 1. Projected Saves (Shot Funnel)
+        opponent_shots_for_per_60 = get_opponent_shots_for_per_60(db, opponent_team, season, last_n_games=10, debug=debug)
+        if not opponent_shots_for_per_60:
+            opponent_shots_for_per_60 = 30.0  # League average fallback
+        
+        # Expected TOI: 60 minutes for confirmed starter, 0 for backup
+        # For now, assume starter if games_played > 0 (can be enhanced with starter confirmation)
+        expected_toi_minutes = 60.0 if games_played > 0 else 0.0
+        
+        projected_saves = (opponent_shots_for_per_60 / 60) * projected_sv_pct * expected_toi_minutes
+        
+        if debug:
+            print(f"  [Goalie Projection] Projected Saves: {projected_saves:.2f} = ({opponent_shots_for_per_60:.2f} shots/60 × {projected_sv_pct:.3f} SV% × {expected_toi_minutes:.1f} min)")
+        
+        # 2. Projected Wins (Vegas Pivot)
+        win_probability = get_vegas_win_probability(db, game_id, goalie_team, season, debug=debug)
+        if not win_probability:
+            win_probability = 0.5  # Default to 50% if unavailable
+        
+        # Apply B2B penalty to win probability
+        b2b_penalty = check_back_to_back(db, goalie_team, game_date)
+        if b2b_penalty < 1.0:
+            # If B2B, previous night's starter is unlikely to start → reduce win prob
+            win_probability *= 0.85  # 15% reduction for B2B
+            if debug:
+                print(f"  [Goalie Projection] B2B detected, reducing win probability by 15%")
+        
+        projected_wins = win_probability
+        
+        if debug:
+            print(f"  [Goalie Projection] Projected Wins: {projected_wins:.3f} (win probability)")
+        
+        # 3. Projected Shutouts (Ceiling Variable)
+        goalie_gsax = get_goalie_gsax(db, player_id, debug=debug)
+        if not goalie_gsax:
+            goalie_gsax = 0.0  # League average
+        
+        # Base shutout rate: ~5% (1 shutout per 20 games)
+        base_shutout_rate = 0.05
+        
+        # GSAx factor: Elite goalie (GSAx > 2.0) → +50% to base rate
+        gsax_factor = 1.0
+        if goalie_gsax > 2.0:
+            gsax_factor = 1.5
+        elif goalie_gsax > 0.0:
+            gsax_factor = 1.0 + (goalie_gsax / 4.0)  # Linear scaling
+        elif goalie_gsax < -1.0:
+            gsax_factor = 0.7  # Below-average goalie
+        
+        # Opponent offense factor: Weak offense (< 2.5 GF/60) → +30% to base rate
+        # Get opponent goals for/60 (simplified - can enhance with actual GF/60 calculation)
+        opponent_offense_factor = 1.0  # Default neutral
+        
+        projected_shutouts = base_shutout_rate * gsax_factor * opponent_offense_factor
+        projected_shutouts = min(projected_shutouts, 0.25)  # Cap at 25% (very rare)
+        
+        if debug:
+            print(f"  [Goalie Projection] Projected Shutouts: {projected_shutouts:.3f} (base: {base_shutout_rate:.3f}, GSAx factor: {gsax_factor:.2f})")
+        
+        # 4. Projected Goals Against
+        projected_goals_against = (opponent_shots_for_per_60 / 60) * (1 - projected_sv_pct) * expected_toi_minutes
+        
+        if debug:
+            print(f"  [Goalie Projection] Projected GA: {projected_goals_against:.2f}")
+        
+        # 5. Projected GAA
+        if expected_toi_minutes > 0:
+            projected_gaa = projected_goals_against / (expected_toi_minutes / 60)
+        else:
+            projected_gaa = 0.0
+        
+        if debug:
+            print(f"  [Goalie Projection] Projected GAA: {projected_gaa:.2f}")
+        
+        # 6. Projected GP (typically 1.0 for starter, 0.0 for backup)
+        projected_gp = 1.0 if expected_toi_minutes > 0 else 0.0
+        
+        # Starter confirmation (for now, assume confirmed if games_played > 0)
+        # In production, this should check actual starter confirmation from morning skate
+        starter_confirmed = games_played > 0
+        
+        # Calculate fantasy points
+        goalie_projection = {
+            "wins": projected_wins,
+            "saves": projected_saves,
+            "shutouts": projected_shutouts,
+            "goals_against": projected_goals_against,
+        }
+        
+        total_projected_points = calculate_fantasy_points(goalie_projection, scoring_settings, is_goalie=True)
+        
+        # Calculate confidence score
+        confidence_score = min(games_played / 20.0, 1.0) if games_played > 0 else 0.1
+        if not starter_confirmed:
+            confidence_score *= 0.7  # Reduce confidence if starter not confirmed
+        
+        return {
+            "player_id": player_id,
+            "game_id": game_id,
+            "projection_date": game_date.isoformat(),
+            "projected_wins": round(projected_wins, 3),
+            "projected_saves": round(projected_saves, 2),
+            "projected_shutouts": round(projected_shutouts, 3),
+            "projected_goals_against": round(projected_goals_against, 3),
+            "projected_gaa": round(projected_gaa, 2),
+            "projected_save_pct": round(projected_sv_pct, 3),
+            "projected_gp": round(projected_gp, 2),
+            "total_projected_points": round(total_projected_points, 3),
+            "starter_confirmed": starter_confirmed,
+            "confidence_score": round(confidence_score, 2),
+            "calculation_method": "probability_based_volume",
+            "is_goalie": True,
+            "season": season,
+        }
+        
+    except Exception as e:
+        print(f"❌ Error calculating goalie projection for player {player_id}, game {game_id}: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
 
 
 def calculate_daily_projection(
@@ -647,6 +1089,12 @@ def calculate_daily_projection(
         
         position = player_dir[0].get("position_code", "C")
         player_team = player_dir[0].get("team_abbrev", "")
+        
+        # Check if player is goalie - route to goalie projection function
+        is_goalie = position == "G" or position == "Goalie"
+        if is_goalie:
+            debug_goalie = os.getenv("DEBUG_GOALIE", "false").lower() == "true"
+            return calculate_goalie_projection(db, player_id, game_id, game_date, season, scoring_settings, debug=debug_goalie)
         
         # Get player's games played
         player_stats = db.select(
@@ -708,7 +1156,7 @@ def calculate_daily_projection(
         final_projection["xg"] = base_projection["goals"] / finishing_multiplier if finishing_multiplier > 0 else base_projection["goals"]
         
         # Calculate fantasy points
-        total_projected_points = calculate_fantasy_points(final_projection, scoring_settings)
+        total_projected_points = calculate_fantasy_points(final_projection, scoring_settings, is_goalie=False)
         
         # Calculate confidence score (simplified: based on games played)
         confidence_score = min(games_played / 30.0, 1.0) if games_played > 0 else 0.1
@@ -731,6 +1179,7 @@ def calculate_daily_projection(
             "home_away_adjustment": round(home_away_adjustment, 3),
             "confidence_score": round(confidence_score, 2),
             "calculation_method": "hybrid_bayesian",
+            "is_goalie": False,
             "season": season,
         }
         

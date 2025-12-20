@@ -72,3 +72,4 @@ for i in range(0, len(missing_list), CHUNK):
 print(f"\n[OK] Reset {reset_count} games. Extractor can now process them.")
 print("=" * 70)
 
+

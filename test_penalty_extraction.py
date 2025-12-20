@@ -63,3 +63,4 @@ print(f"\nPlayers with PIM > 0: {len(players_with_pim)}")
 if players_with_pim:
   print(f"  Sample: {list(players_with_pim.items())[:5]}")
 
+

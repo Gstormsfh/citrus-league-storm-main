@@ -280,10 +280,12 @@ def detect_outliers(
     Detect outlier projections using both flat threshold and Z-score approach.
     Separates into "rejected" (impossible) and "review" (unusually high) categories.
     
+    Goalies have higher thresholds since they can legitimately score 15+ points.
+    
     Args:
         projections: List of projection dicts
-        threshold: Warning threshold (default 25.0 points) - flags for review
-        rejection_threshold: Rejection threshold (default 35.0 points) - rejects from upsert
+        threshold: Warning threshold (default 25.0 points for skaters, 20.0 for goalies) - flags for review
+        rejection_threshold: Rejection threshold (default 35.0 points for skaters, 30.0 for goalies) - rejects from upsert
         z_score_threshold: Z-score threshold (default 3.0 standard deviations)
     
     Returns:
@@ -344,8 +346,18 @@ def detect_outliers(
     for proj in projections:
         key = (proj.get('player_id'), proj.get('game_id'))
         points_val = proj.get('total_projected_points', 0)
+        is_goalie = proj.get('is_goalie', False)
         
-        if points_val > rejection_threshold:
+        # Goalies have different thresholds
+        goalie_rejection = 30.0
+        goalie_threshold = 20.0
+        skater_rejection = rejection_threshold
+        skater_threshold = threshold
+        
+        effective_rejection = goalie_rejection if is_goalie else skater_rejection
+        effective_threshold = goalie_threshold if is_goalie else skater_threshold
+        
+        if points_val > effective_rejection:
             # Rejected: Impossible projection
             outlier_info = next((o for o in all_outliers if (o.get('player_id'), o.get('game_id')) == key), {})
             rejected.append({**proj, **outlier_info, 'rejection_reason': 'exceeds_rejection_threshold'})

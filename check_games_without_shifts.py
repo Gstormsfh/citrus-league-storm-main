@@ -83,3 +83,4 @@ if no_shifts:
   print("This is normal - some games (preseason, cancelled, etc.) may not have shifts.")
   print("The script should continue processing games that DO have shifts.")
 
+

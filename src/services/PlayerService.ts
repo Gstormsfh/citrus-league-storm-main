@@ -190,10 +190,11 @@ export const PlayerService = {
           shutouts: d.is_goalie ? Number(s?.shutouts ?? 0) : null,
           shots_faced: d.is_goalie ? Number(s?.shots_faced ?? 0) : null,
           goals_against: d.is_goalie ? Number(s?.goals_against ?? 0) : null,
-          goals_against_average: null,
+          goals_against_average: d.is_goalie && s?.goals_against && s?.goalie_gp && s.goalie_gp > 0
+            ? (s.goals_against / s.goalie_gp) : null,
           save_percentage: d.is_goalie ? (s?.save_pct ?? null) : null,
           highDangerSavePct: 0,
-          goalsSavedAboveExpected: 0,
+          goalsSavedAboveExpected: d.is_goalie ? (gsaxMap.get(pid) ?? 0) : 0,
         };
       });
 
@@ -239,6 +240,7 @@ export const PlayerService = {
       const DEFAULT_SEASON = 2025;
       const intIds = playerIds.map((id) => Number(id)).filter((n) => !Number.isNaN(n));
 
+      // Get goalie IDs for GSAx lookup
       const [{ data: dirRowsRaw, error: dirErr }, { data: statRowsRaw, error: statErr }] = await Promise.all([
         (supabase as any)
           .from("player_directory")
@@ -251,6 +253,48 @@ export const PlayerService = {
           .eq("season", DEFAULT_SEASON)
           .in("player_id", intIds),
       ]);
+      
+      // Fetch GSAx for goalies
+      const goalieIds = (dirRowsRaw || []).filter((d: PlayerDirectoryRow) => d.is_goalie).map((d: PlayerDirectoryRow) => Number(d.player_id));
+      const gsaxMap = new Map<number, number>();
+      
+      if (goalieIds.length > 0) {
+        try {
+          // Try goalie_gsax_primary first (preferred)
+          const { data: gsaxData } = await (supabase as any)
+            .from("goalie_gsax_primary")
+            .select("goalie_id, regressed_gsax")
+            .in("goalie_id", goalieIds);
+          
+          if (gsaxData) {
+            gsaxData.forEach((g: any) => {
+              if (g.goalie_id && g.regressed_gsax != null) {
+                gsaxMap.set(Number(g.goalie_id), Number(g.regressed_gsax));
+              }
+            });
+          }
+          
+          // Fill in missing goalies from goalie_gsax (fallback)
+          const missingGoalieIds = goalieIds.filter(id => !gsaxMap.has(id));
+          if (missingGoalieIds.length > 0) {
+            const { data: gsaxFallbackData } = await (supabase as any)
+              .from("goalie_gsax")
+              .select("goalie_id, regressed_gsax")
+              .in("goalie_id", missingGoalieIds);
+            
+            if (gsaxFallbackData) {
+              gsaxFallbackData.forEach((g: any) => {
+                if (g.goalie_id && g.regressed_gsax != null && !gsaxMap.has(Number(g.goalie_id))) {
+                  gsaxMap.set(Number(g.goalie_id), Number(g.regressed_gsax));
+                }
+              });
+            }
+          }
+        } catch (gsaxError) {
+          console.warn('[PlayerService] Error fetching GSAx data:', gsaxError);
+          // Continue without GSAx - not critical
+        }
+      }
 
       if (dirErr) throw dirErr;
       if (statErr) throw statErr;
@@ -308,10 +352,11 @@ export const PlayerService = {
           shutouts: d.is_goalie ? Number(s?.shutouts ?? 0) : null,
           shots_faced: d.is_goalie ? Number(s?.shots_faced ?? 0) : null,
           goals_against: d.is_goalie ? Number(s?.goals_against ?? 0) : null,
-          goals_against_average: null,
+          goals_against_average: d.is_goalie && s?.goals_against && s?.goalie_gp && s.goalie_gp > 0
+            ? (s.goals_against / s.goalie_gp) : null,
           save_percentage: d.is_goalie ? (s?.save_pct ?? null) : null,
           highDangerSavePct: 0,
-          goalsSavedAboveExpected: 0,
+          goalsSavedAboveExpected: d.is_goalie ? (gsaxMap.get(pid) ?? 0) : 0,
         };
       });
 
