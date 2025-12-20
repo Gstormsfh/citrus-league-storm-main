@@ -3,6 +3,8 @@ import { cn } from "@/lib/utils";
 import { getTeamColor } from "@/utils/teamColors";
 import { PointsTooltip } from "./PointsTooltip";
 import { GameLogosBar } from "./GameLogosBar";
+import { ProjectionTooltip } from "./ProjectionTooltip";
+import { getTodayMST } from "@/utils/timezoneUtils";
 
 interface PlayerCardProps {
   player: MatchupPlayer | null;
@@ -82,21 +84,21 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick 
   const positionColors = getPositionColorClasses(player.position);
   const { shotPct, pointRate } = calculatePercentages(player);
   
-  // Calculate projection for TODAY'S GAMES ONLY
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayStr = today.toISOString().split('T')[0];
+  // Use daily projection from Citrus Projections 2.0 (database-driven)
+  const dailyProjection = player.daily_projection;
+  const projectedPoints = dailyProjection?.total_projected_points || 0;
   
-  // Check if player has a game today - with defensive checks
+  // Check if player has a game today - use MST date to match projection date
+  // This ensures consistency with how projections are fetched (using getTodayMST())
+  const todayMST = getTodayMST();
   const todayGames = (player.games && Array.isArray(player.games) && player.games.length > 0)
-    ? player.games.filter(g => g && typeof g === 'object' && g.game_date === todayStr) 
+    ? player.games.filter(g => g && typeof g === 'object' && g.game_date === todayMST) 
     : [];
   const hasGameToday = todayGames.length > 0;
   
-  // Calculate projection: average points per game * 1 game (today only)
-  const gamesPlayed = player.stats?.gamesPlayed || player.games_played || 1;
-  const avgPointsPerGame = gamesPlayed > 0 ? (player.points / gamesPlayed) : 0;
-  const projectedPoints = hasGameToday ? avgPointsPerGame * 1 : 0; // Only today's game(s)
+  // Zero Projection Logic: If projectedPoints === 0 but hasGameToday is true, show "TBD" or "Calculating"
+  const hasProjection = dailyProjection && projectedPoints > 0;
+  const showTBD = hasGameToday && !hasProjection; // Game today but no projection yet
   
   // Normalize to 0-100 for bar display (max ~8 points for a single game)
   const maxProjection = 8;
@@ -112,18 +114,18 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick 
       value: (player.total_points ?? 0).toFixed(1)  // Matchup week total
     });
     
-    // xG - Expected Goals (use matchup stats if available, otherwise season stats)
-    const xG = player.matchupStats?.xGoals ?? player.stats?.xGoals ?? 0;
+    // xG - Expected Goals (SEASON total only)
+    const xG = player.stats?.xGoals ?? 0;
     stats.push({ 
       label: 'xG', 
       value: xG.toFixed(1) 
     });
     
-    // GAR % - Goals Above Replacement as percentage
+    // Season GAR % - Goals Above Replacement as percentage (season total)
     if (player.garPercentage !== undefined) {
       const garSign = player.garPercentage >= 0 ? '+' : '';
       stats.push({ 
-        label: 'GAR', 
+        label: 'Season GAR', 
         value: `${garSign}${player.garPercentage.toFixed(1)}%` 
       });
     }
@@ -163,6 +165,12 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick 
             <div className="player-name" title={player.name}>
               {displayName}
             </div>
+            {/* Team Name - Below player name */}
+            {player.team && (
+              <div className="player-team-name" title={player.team}>
+                {player.team}
+              </div>
+            )}
             {/* Key Stats Below Name - Use matchup stats if available, otherwise season stats */}
             <div className="player-key-stats">
               {(player.matchupStats?.goals ?? player.stats?.goals) || 0} G, {(player.matchupStats?.assists ?? player.stats?.assists) || 0} A, {(player.matchupStats?.sog ?? player.stats?.sog) || 0} SOG
@@ -204,7 +212,7 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick 
 
         {/* Game Logos Bar - Show opponent logos for each game */}
         {player.games && Array.isArray(player.games) && player.games.length > 0 && player.team && (
-          <div className="mt-2 mb-2">
+          <div className="mt-1 mb-1">
             <GameLogosBar 
               games={player.games} 
               playerTeam={player.team}
@@ -212,20 +220,45 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick 
           </div>
         )}
 
-        {/* Projection Bar */}
+        {/* Projection Bar - Daily Projection from Citrus Projections 2.0 */}
         <div className="player-projection-bar-container">
-          <div className="player-projection-bar-wrapper">
-            <div 
-              className="player-projection-bar" 
-              style={{ width: `${projectionPercentage}%` }}
-            />
+          <div className="flex flex-col items-end">
+            <span className="text-xs text-gray-400 mb-1">Proj. Tonight</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xl font-bold text-fantasy-secondary">
+                {hasProjection 
+                  ? projectedPoints.toFixed(1)
+                  : showTBD 
+                    ? 'TBD'
+                    : '0.0'
+                }
+              </span>
+              {hasProjection && dailyProjection && (
+                <ProjectionTooltip projection={dailyProjection} />
+              )}
+            </div>
           </div>
-          <div className="player-projection-text">
-            {hasGameToday 
-              ? `${projectedPoints.toFixed(1)} pts projected`
-              : 'No game today'
-            }
-          </div>
+          {hasProjection ? (
+            <>
+              <div className="player-projection-bar-wrapper">
+                <div 
+                  className="player-projection-bar" 
+                  style={{ width: `${projectionPercentage}%` }}
+                />
+              </div>
+              <div className="player-projection-text">
+                {projectedPoints.toFixed(1)} pts projected
+              </div>
+            </>
+          ) : showTBD ? (
+            <div className="player-projection-text text-muted-foreground">
+              Calculating...
+            </div>
+          ) : (
+            <div className="player-projection-text text-muted-foreground">
+              No game today
+            </div>
+          )}
         </div>
       </div>
 

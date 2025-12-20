@@ -34,18 +34,19 @@ export const GameLogosBar = ({ games, playerTeam }: GameLogosBarProps) => {
   }
   
   return (
-    <div className="flex gap-1.5 items-center flex-wrap">
+    <div className="flex gap-2 items-center flex-wrap">
       {sortedGames.map((game, idx) => {
         try {
           const gameDateStr = game.game_date.split('T')[0];
-          const gameDate = new Date(`${gameDateStr}T00:00:00`);
           
           // Determine game state - check live FIRST to prevent live games from being marked as played
           // CRITICAL: Only mark as live if status is 'live' AND it's today (prevent stale live status)
           const isToday = isTodayMST(gameDateStr); // Use MST comparison
           const isLive = game.status === 'live' && isToday; // Must be today AND live
-          // Only mark as played if it's final AND not live, or if date is in the past (MST) AND not live
-          const isPlayed = !isLive && (game.status === 'final' || (gameDate < todayMST && game.status !== 'live'));
+          
+          // Check if game is in the past by comparing date strings (MST)
+          // This avoids timezone issues with Date object comparisons
+          const isPlayed = !isLive && (game.status === 'final' || (gameDateStr < todayStr));
           const isTodayScheduled = isToday && game.status === 'scheduled' && !isLive; // Today but not started
           const isUpcoming = !isPlayed && !isToday && !isLive; // Future games
           
@@ -152,9 +153,8 @@ export const GameLogosBar = ({ games, playerTeam }: GameLogosBarProps) => {
               boxShadow: `0 0 8px ${teamColor}40, 0 0 12px ${teamColor}20` 
             };
           } else if (isUpcoming) {
-            // 4. Upcoming games - NO border, just colored logo (no border class)
-            containerClasses += ' opacity-100';
-            // No border for upcoming games - just the colored logo
+            // 4. Upcoming games - normal border (gray)
+            containerClasses += ' border-2 opacity-100 border-gray-300';
           } else {
             // Fallback
             containerClasses += ' border-2 opacity-100 border-gray-300';
@@ -173,47 +173,104 @@ export const GameLogosBar = ({ games, playerTeam }: GameLogosBarProps) => {
             tooltipText += formattedTime ? ` (${formattedTime} MST)` : ' (Upcoming)';
           }
           
+          // Format date for display - use MST for all comparisons
+          let displayDate = '';
+          if (isToday || isTodayScheduled || isLive) {
+            displayDate = 'Today';
+          } else {
+            // Format date as "Mon Dec 19" or similar in MST
+            try {
+              // Parse the game date and format it in MST
+              // gameDateStr is already YYYY-MM-DD format
+              const [year, month, day] = gameDateStr.split('-').map(Number);
+              // Create a date object and format it in MST
+              const dateObj = new Date(Date.UTC(year, month - 1, day));
+              displayDate = dateObj.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                timeZone: 'America/Denver'
+              });
+            } catch {
+              displayDate = gameDateStr;
+            }
+          }
+          
+          // Format game score if available (for live or final games)
+          let gameScore = '';
+          if ((isLive || isPlayed) && game.home_score !== undefined && game.away_score !== undefined) {
+            const homeScore = game.home_score || 0;
+            const awayScore = game.away_score || 0;
+            // Determine if player's team is home or away
+            const isPlayerHome = game.home_team === playerTeam;
+            if (isPlayerHome) {
+              // Player's team is home: "EDM 3-2 TOR"
+              gameScore = `${game.home_team} ${homeScore}-${awayScore} ${game.away_team}`;
+            } else {
+              // Player's team is away: "TOR 2-3 EDM"
+              gameScore = `${game.away_team} ${awayScore}-${homeScore} ${game.home_team}`;
+            }
+          }
+          
           return (
-            <div
-              key={idx}
-              className={`${containerClasses} ${glowEffect}`}
-              style={borderStyle}
-              title={tooltipText}
-            >
-              {/* Team Logo */}
-              <img
-                src={logoUrl}
-                alt={opponent}
-                className={`w-6 h-6 object-contain ${isLive ? 'brightness-110' : ''}`}
-                onError={(e) => {
-                  // Fallback to text abbreviation if logo fails to load
-                  const target = e.target as HTMLImageElement;
-                  target.style.display = 'none';
-                  const parent = target.parentElement;
-                  if (parent && !parent.querySelector('.fallback-text')) {
-                    const fallback = document.createElement('span');
-                    fallback.className = 'fallback-text text-xs font-bold';
-                    fallback.textContent = opponent;
-                    fallback.style.color = isPlayed ? '#9CA3AF' : teamColor;
-                    parent.appendChild(fallback);
-                  }
-                }}
-              />
+            <div key={idx} className="flex flex-col items-center gap-1">
+              <div
+                className={`${containerClasses} ${glowEffect}`}
+                style={borderStyle}
+                title={tooltipText}
+              >
+                {/* Team Logo */}
+                <img
+                  src={logoUrl}
+                  alt={opponent}
+                  className={`w-6 h-6 object-contain ${isLive ? 'brightness-110' : ''}`}
+                  onError={(e) => {
+                    // Fallback to text abbreviation if logo fails to load
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    const parent = target.parentElement;
+                    if (parent && !parent.querySelector('.fallback-text')) {
+                      const fallback = document.createElement('span');
+                      fallback.className = 'fallback-text text-xs font-bold';
+                      fallback.textContent = opponent;
+                      fallback.style.color = isPlayed ? '#9CA3AF' : teamColor;
+                      parent.appendChild(fallback);
+                    }
+                  }}
+                />
+                
+                {/* Live Badge - Enhanced */}
+                {isLive && (
+                  <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-gradient-to-br from-orange-500 to-red-500 rounded-full border-2 border-white shadow-lg animate-pulse">
+                    <div className="absolute inset-0 bg-red-500 rounded-full animate-ping opacity-75"></div>
+                    <span className="sr-only">Live</span>
+                  </div>
+                )}
+                
+                {/* Today Badge - for scheduled games today (small dot) */}
+                {isTodayScheduled && (
+                  <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full border border-white shadow-sm" style={{ backgroundColor: teamColor }}>
+                    <span className="sr-only">Today</span>
+                  </div>
+                )}
+              </div>
               
-              {/* Live Badge - Enhanced */}
-              {isLive && (
-                <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-gradient-to-br from-orange-500 to-red-500 rounded-full border-2 border-white shadow-lg animate-pulse">
-                  <div className="absolute inset-0 bg-red-500 rounded-full animate-ping opacity-75"></div>
-                  <span className="sr-only">Live</span>
-                </div>
+              {/* Game Score Display - Show for live or final games */}
+              {gameScore && (
+                <span className="game-score-display text-[8px] leading-tight whitespace-nowrap text-muted-foreground font-medium">
+                  {gameScore}
+                </span>
               )}
               
-              {/* Today Badge - for scheduled games today (small dot) */}
-              {isTodayScheduled && (
-                <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full border border-white shadow-sm" style={{ backgroundColor: teamColor }}>
-                  <span className="sr-only">Today</span>
-                </div>
-              )}
+              {/* Date Display */}
+              <span className={`text-[9px] leading-tight whitespace-nowrap ${
+                isPlayed 
+                  ? 'text-gray-400' 
+                  : isToday || isTodayScheduled || isLive 
+                    ? 'text-foreground font-medium' 
+                    : 'text-muted-foreground'
+              }`}>
+                {displayDate}
+              </span>
             </div>
           );
         } catch (error) {

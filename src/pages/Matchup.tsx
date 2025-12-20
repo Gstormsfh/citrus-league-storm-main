@@ -205,37 +205,141 @@ const Matchup = () => {
     loadDemoMatchup();
   }, [userLeagueState, urlLeagueId, leagueContextLoading]);
 
-  const toHockeyPlayer = (p: MatchupPlayer): HockeyPlayer => ({
-    id: p.id.toString(),
-    name: p.name,
-    position: p.position,
-    number: 0,
-    starter: p.isStarter,
-    stats: {
-      goals: p.stats.goals,
-      assists: p.stats.assists,
-      points: p.points,
-      plusMinus: 0,
-      shots: p.stats.sog,
-      gamesPlayed: p.stats.gamesPlayed || 0,
-      hits: 0,
-      blockedShots: p.stats.blk,
-      wins: 0,
-      losses: 0,
-      otl: 0,
-      gaa: 0,
-      savePct: 0,
-      shutouts: 0
-    },
-    team: p.team,
-    teamAbbreviation: p.team,
-    status: p.status === 'Yet to Play' ? null : (p.status === 'In Game' ? 'Active' : null),
-    image: undefined,
-    projectedPoints: 0
-  });
+  const toHockeyPlayer = (p: MatchupPlayer, seasonStats?: any): HockeyPlayer => {
+    // Use season-long stats if provided, otherwise fall back to matchup stats (shouldn't happen)
+    const stats = seasonStats || p.stats;
+    
+    return {
+      id: p.id.toString(),
+      name: p.name,
+      position: p.position,
+      number: 0,
+      starter: p.isStarter,
+      stats: {
+        goals: stats.goals ?? 0,
+        assists: stats.assists ?? 0,
+        points: stats.points ?? (stats.goals ?? 0) + (stats.assists ?? 0),
+        plusMinus: stats.plusMinus ?? stats.plus_minus ?? 0,
+        shots: stats.shots ?? stats.shotsOnGoal ?? stats.sog ?? 0,
+        gamesPlayed: stats.gamesPlayed ?? stats.games_played ?? 0,
+        hits: stats.hits ?? 0,
+        blockedShots: stats.blockedShots ?? stats.blocks ?? stats.blk ?? 0,
+        wins: stats.wins ?? 0,
+        losses: stats.losses ?? 0,
+        otl: stats.otl ?? 0,
+        gaa: stats.gaa ?? 0,
+        savePct: stats.savePct ?? stats.save_pct ?? 0,
+        shutouts: stats.shutouts ?? 0,
+        xGoals: stats.xGoals ?? stats.x_goals ?? 0,
+        powerPlayPoints: stats.powerPlayPoints ?? stats.ppp ?? 0,
+        shortHandedPoints: stats.shortHandedPoints ?? stats.shp ?? 0,
+        pim: stats.pim ?? 0,
+        toi: stats.toi ?? (stats.icetime_seconds && (stats.gamesPlayed ?? stats.games_played) ? formatTOIPerGame(stats.icetime_seconds, stats.gamesPlayed ?? stats.games_played ?? 1) : (stats.icetime_seconds ? formatTOI(stats.icetime_seconds) : '0:00'))
+      },
+      team: p.team,
+      teamAbbreviation: p.team,
+      status: p.status === 'Yet to Play' ? null : (p.status === 'In Game' ? 'Active' : null),
+      image: undefined,
+      projectedPoints: 0
+    };
+  };
 
-  const handlePlayerClick = (player: MatchupPlayer) => {
-    setSelectedPlayer(toHockeyPlayer(player));
+  // Helper to format TOI from seconds
+  const formatTOI = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Helper to calculate and format TOI per game
+  const formatTOIPerGame = (totalSeconds: number, gamesPlayed: number): string => {
+    if (!gamesPlayed || gamesPlayed === 0) return '0:00';
+    const secondsPerGame = totalSeconds / gamesPlayed;
+    return formatTOI(secondsPerGame);
+  };
+
+  const handlePlayerClick = async (player: MatchupPlayer) => {
+    try {
+      // Fetch season-long stats for this player
+      const seasonPlayers = await PlayerService.getPlayersByIds([player.id.toString()]);
+      const seasonPlayer = seasonPlayers.find(p => Number(p.id) === player.id);
+      
+      if (seasonPlayer) {
+        // Map Player type to stats format for toHockeyPlayer
+        const seasonStats = {
+          goals: seasonPlayer.goals ?? 0,
+          assists: seasonPlayer.assists ?? 0,
+          points: seasonPlayer.points ?? 0,
+          plusMinus: seasonPlayer.plus_minus ?? 0,
+          shots: seasonPlayer.shots ?? 0,
+          gamesPlayed: seasonPlayer.games_played ?? 0,
+          hits: seasonPlayer.hits ?? 0,
+          blockedShots: seasonPlayer.blocks ?? 0,
+          xGoals: seasonPlayer.xGoals ?? 0,
+          powerPlayPoints: seasonPlayer.ppp ?? 0,
+          shortHandedPoints: seasonPlayer.shp ?? 0,
+          pim: seasonPlayer.pim ?? 0,
+          icetime_seconds: seasonPlayer.icetime_seconds ?? 0,
+          gamesPlayed: seasonPlayer.games_played ?? 0,
+          wins: seasonPlayer.wins ?? 0,
+          saves: seasonPlayer.saves ?? 0,
+          shots_faced: seasonPlayer.shots_faced ?? 0,
+          goals_against: seasonPlayer.goals_against ?? 0,
+          shutouts: seasonPlayer.shutouts ?? 0,
+          save_pct: seasonPlayer.save_percentage ?? 0,
+          gaa: seasonPlayer.goals_against_average ?? 0
+        };
+        setSelectedPlayer(toHockeyPlayer(player, seasonStats));
+      } else {
+        // Fallback: try to fetch directly from player_season_stats
+        const DEFAULT_SEASON = 2025;
+        const { data: seasonStatsData, error } = await supabase
+          .from('player_season_stats')
+          .select('*')
+          .eq('player_id', player.id)
+          .eq('season', DEFAULT_SEASON)
+          .single();
+        
+        if (!error && seasonStatsData) {
+          // Map player_season_stats to stats format
+          const mappedStats = {
+            goals: seasonStatsData.goals ?? 0,
+            assists: (seasonStatsData.primary_assists ?? 0) + (seasonStatsData.secondary_assists ?? 0),
+            points: seasonStatsData.points ?? 0,
+            plusMinus: seasonStatsData.plus_minus ?? seasonStatsData.nhl_plus_minus ?? 0,
+            shots: seasonStatsData.shots_on_goal ?? 0,
+            gamesPlayed: seasonStatsData.games_played ?? 0,
+            hits: seasonStatsData.hits ?? 0,
+            blockedShots: seasonStatsData.blocks ?? 0,
+            xGoals: seasonStatsData.x_goals ?? 0,
+            powerPlayPoints: seasonStatsData.ppp ?? 0,
+            shortHandedPoints: seasonStatsData.shp ?? 0,
+            pim: seasonStatsData.pim ?? 0,
+            icetime_seconds: seasonStatsData.icetime_seconds ?? seasonStatsData.nhl_toi_seconds ?? 0,
+            gamesPlayed: seasonStatsData.games_played ?? 0,
+            wins: seasonStatsData.wins ?? 0,
+            saves: seasonStatsData.saves ?? 0,
+            shots_faced: seasonStatsData.shots_faced ?? 0,
+            goals_against: seasonStatsData.goals_against ?? 0,
+            shutouts: seasonStatsData.shutouts ?? 0,
+            save_pct: seasonStatsData.save_pct ?? 0,
+            gaa: seasonStatsData.goals_against && seasonStatsData.goalie_gp 
+              ? seasonStatsData.goals_against / seasonStatsData.goalie_gp 
+              : 0
+          };
+          setSelectedPlayer(toHockeyPlayer(player, mappedStats));
+        } else {
+          // Last resort: use matchup stats (shouldn't happen in production)
+          console.warn(`[Matchup] Could not fetch season stats for player ${player.id}, using matchup stats`);
+          setSelectedPlayer(toHockeyPlayer(player));
+        }
+      }
+    } catch (error) {
+      console.error(`[Matchup] Error fetching season stats for player ${player.id}:`, error);
+      // Fallback to matchup stats on error
+      setSelectedPlayer(toHockeyPlayer(player));
+    }
+    
     setIsPlayerDialogOpen(true);
   };
 

@@ -385,7 +385,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                        { label: 'PPP', value: stats.powerPlayPoints ?? 0 },
                        { label: 'SHP', value: stats.shortHandedPoints ?? 0 },
                        { label: 'Games', value: stats.gamesPlayed ?? 0 },
-                       { label: 'TOI', value: stats.toi ?? '0:00' },
+                       { label: 'TOI/G', value: stats.toi ?? '0:00' },
                      ].map((item, i) => (
                        <div key={i} className="bg-card p-3 flex flex-col items-center justify-center text-center">
                          <span className="text-xs text-muted-foreground uppercase tracking-wider mb-1">{item.label}</span>

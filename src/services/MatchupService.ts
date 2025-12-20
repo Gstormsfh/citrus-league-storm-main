@@ -1014,6 +1014,45 @@ export const MatchupService = {
 
 
   /**
+   * Fetch daily projections for players from player_projected_stats table
+   */
+  async getDailyProjectionsForMatchup(
+    playerIds: number[],
+    targetDate: string
+  ): Promise<Map<number, any>> {
+    try {
+      if (!playerIds || playerIds.length === 0) {
+        return new Map();
+      }
+
+      const { data, error } = await supabase.rpc('get_daily_projections', {
+        p_player_ids: playerIds,
+        p_target_date: targetDate
+      });
+      
+      if (error) {
+        console.warn('[MatchupService] Failed to fetch daily projections:', error);
+        return new Map(); // Return empty map on error (graceful degradation)
+      }
+      
+      // Create a map for O(1) lookup during player transformation
+      const projectionMap = new Map<number, any>();
+      if (data && Array.isArray(data)) {
+        data.forEach((p: any) => {
+          if (p.player_id) {
+            projectionMap.set(Number(p.player_id), p);
+          }
+        });
+      }
+      
+      return projectionMap;
+    } catch (error) {
+      console.error('[MatchupService] Error fetching daily projections:', error);
+      return new Map(); // Return empty map on error
+    }
+  },
+
+  /**
    * Transform HockeyPlayer to MatchupPlayer format with pre-fetched schedule data (optimized)
    */
   transformToMatchupPlayerWithGames(
@@ -1024,7 +1063,8 @@ export const MatchupService = {
     timezone: string = 'America/Denver',
     games: NHLGame[],
     matchupStats?: { goals: number; assists: number; sog: number; blocks: number; xGoals: number },
-    garPercentage?: number
+    garPercentage?: number,
+    dailyProjection?: any
   ): MatchupPlayer {
     const teamAbbrev = player.teamAbbreviation || player.team || '';
     
@@ -1188,7 +1228,24 @@ export const MatchupService = {
         } : undefined,
         garPercentage: garPercentage,
         isToday: hasGameToday, // Only true if game_date === todayStr (December 8, 2025)
-        gameInfo // Only set if there's a game (today's game or next game in week)
+        gameInfo, // Only set if there's a game (today's game or next game in week)
+        // Daily projection from Citrus Projections 2.0
+        daily_projection: dailyProjection ? {
+          total_projected_points: Number(dailyProjection.total_projected_points || 0),
+          projected_goals: Number(dailyProjection.projected_goals || 0),
+          projected_assists: Number(dailyProjection.projected_assists || 0),
+          projected_sog: Number(dailyProjection.projected_sog || 0),
+          projected_blocks: Number(dailyProjection.projected_blocks || 0),
+          projected_xg: Number(dailyProjection.projected_xg || 0),
+          base_ppg: Number(dailyProjection.base_ppg || 0),
+          shrinkage_weight: Number(dailyProjection.shrinkage_weight || 0),
+          finishing_multiplier: Number(dailyProjection.finishing_multiplier || 1),
+          opponent_adjustment: Number(dailyProjection.opponent_adjustment || 1),
+          b2b_penalty: Number(dailyProjection.b2b_penalty || 1),
+          home_away_adjustment: Number(dailyProjection.home_away_adjustment || 1),
+          confidence_score: Number(dailyProjection.confidence_score || 0),
+          calculation_method: dailyProjection.calculation_method || 'hybrid_bayesian'
+        } : undefined
       };
     } catch (error) {
       console.error(`Error transforming player ${player.name} to matchup player:`, error);
@@ -1512,13 +1569,35 @@ export const MatchupService = {
         console.error('[MatchupService] ❌ Failed to fetch matchup stats:', error);
         // Continue with empty Map - page should still load
       }
+      
+      // Fetch daily projections for today's games
+      const todayMST = getTodayMST();
+      let dailyProjectionsMap = new Map<number, any>();
+      try {
+        dailyProjectionsMap = await this.getDailyProjectionsForMatchup(allPlayerIds, todayMST);
+        console.log(`[MatchupService] Fetched ${dailyProjectionsMap.size} daily projections for ${todayMST}`);
+        console.log(`[MatchupService] Projection coverage: Team1 players: ${team1Roster.length}, Team2 players: ${team2Roster.length}, Total projections: ${dailyProjectionsMap.size}`);
+        
+        // Debug: Log sample projections for both teams
+        const team1SampleIds = team1Roster.slice(0, 3).map(p => typeof p.id === 'string' ? parseInt(p.id) || 0 : p.id || 0);
+        const team2SampleIds = team2Roster.slice(0, 3).map(p => typeof p.id === 'string' ? parseInt(p.id) || 0 : p.id || 0);
+        console.log(`[MatchupService] Team1 sample projections:`, team1SampleIds.map(id => ({ id, hasProjection: dailyProjectionsMap.has(id), projection: dailyProjectionsMap.get(id) })));
+        console.log(`[MatchupService] Team2 sample projections:`, team2SampleIds.map(id => ({ id, hasProjection: dailyProjectionsMap.has(id), projection: dailyProjectionsMap.get(id) })));
+      } catch (error) {
+        console.warn('[MatchupService] Failed to fetch daily projections, continuing without them:', error);
+      }
+      
       const garMap = new Map<number, number>();
 
-      // Transform players with pre-fetched schedule data, matchup stats, and GAR
+      // Transform players with pre-fetched schedule data, matchup stats, GAR, and daily projections
       const team1MatchupPlayers = await Promise.all(
         team1Roster.map(p => {
           const playerId = typeof p.id === 'string' ? parseInt(p.id) || 0 : p.id || 0;
           const playerGames = gamesByTeam.get(p.teamAbbreviation || p.team || '') || [];
+          const dailyProjection = dailyProjectionsMap.get(playerId);
+          if (!dailyProjection && playerId > 0) {
+            console.warn(`[MatchupService] Team1 player ${p.name} (ID: ${playerId}) missing daily projection`);
+          }
           const transformed = this.transformToMatchupPlayerWithGames(
             p,
             team1Starters.has(String(p.id)),
@@ -1527,7 +1606,8 @@ export const MatchupService = {
             timezone,
             playerGames,
             matchupStatsMap.get(playerId),
-            garMap.get(playerId)
+            garMap.get(playerId),
+            dailyProjection
           );
           
           // Get calculated games remaining from transformed player (already filtered to week)
@@ -1740,6 +1820,10 @@ export const MatchupService = {
         team2Roster.map(p => {
           const playerId = typeof p.id === 'string' ? parseInt(p.id) || 0 : p.id || 0;
           const playerGames = gamesByTeam.get(p.teamAbbreviation || p.team || '') || [];
+          const dailyProjection = dailyProjectionsMap.get(playerId);
+          if (!dailyProjection && playerId > 0) {
+            console.warn(`[MatchupService] Team2 player ${p.name} (ID: ${playerId}) missing daily projection`);
+          }
           const transformed = this.transformToMatchupPlayerWithGames(
             p,
             team2Starters.has(String(p.id)),
@@ -1748,7 +1832,8 @@ export const MatchupService = {
             timezone,
             playerGames,
             matchupStatsMap.get(playerId),
-            garMap.get(playerId)
+            garMap.get(playerId),
+            dailyProjection
           );
           
           // Get calculated games remaining from transformed player (already filtered to week)

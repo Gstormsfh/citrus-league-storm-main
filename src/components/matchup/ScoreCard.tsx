@@ -43,14 +43,14 @@ export const ScoreCard = ({
           {/* Score Display - Center (Focal Point) */}
           <div className="flex items-baseline gap-3 md:gap-5 px-4 md:px-8 flex-shrink-0 order-3 md:order-2 w-full md:w-auto justify-center">
             <div className="text-center">
-              <div className={`text-3xl md:text-4xl lg:text-5xl font-extrabold leading-none tracking-tight ${isWinning ? 'text-fantasy-secondary' : 'text-foreground/80'}`}>
+              <div className="text-3xl md:text-4xl lg:text-5xl font-extrabold leading-none tracking-tight text-[hsl(var(--vibrant-green))]">
                 {myTeamPoints}
               </div>
               <div className="text-[9px] md:text-[10px] text-muted-foreground/60 mt-0.5 md:mt-1 font-medium uppercase tracking-wider">Pts</div>
             </div>
             <div className="text-muted-foreground/25 text-lg md:text-xl font-light pb-1">—</div>
             <div className="text-center">
-              <div className={`text-3xl md:text-4xl lg:text-5xl font-extrabold leading-none tracking-tight ${!isWinning && oppPointsNum > myPointsNum ? 'text-[hsl(var(--vibrant-orange))]' : 'text-foreground/80'}`}>
+              <div className="text-3xl md:text-4xl lg:text-5xl font-extrabold leading-none tracking-tight text-foreground/80">
                 {opponentTeamPoints}
               </div>
               <div className="text-[9px] md:text-[10px] text-muted-foreground/60 mt-0.5 md:mt-1 font-medium uppercase tracking-wider">Pts</div>

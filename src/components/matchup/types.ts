@@ -51,4 +51,21 @@ export type MatchupPlayer = {
   live_game_locked?: boolean; // From fantasy_matchup_lines.live_game_locked
   stats_breakdown?: StatBreakdown; // Transformed from fantasy_matchup_lines.stats_breakdown JSONB
   games?: NHLGame[]; // Games for the matchup week (for GameLogosBar)
+  // NEW: Daily projection from Citrus Projections 2.0
+  daily_projection?: {
+    total_projected_points: number;
+    projected_goals: number;
+    projected_assists: number;
+    projected_sog: number;
+    projected_blocks: number;
+    projected_xg: number;
+    base_ppg: number;
+    shrinkage_weight: number;
+    finishing_multiplier: number;
+    opponent_adjustment: number;
+    b2b_penalty: number;
+    home_away_adjustment: number;
+    confidence_score: number;
+    calculation_method: string;
+  };
 };

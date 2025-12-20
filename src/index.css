@@ -497,7 +497,7 @@
 
 .player-card {
   width: 100%; /* Ensures the card takes full width of its grid column */
-  padding: 6px 8px; /* Compact padding */
+  padding: 3px 4px; /* Compact padding */
   border-bottom: 1px solid hsl(var(--border) / 0.2);
   /* Use flex inside the card for internal text arrangement */
   display: flex; 
@@ -505,7 +505,7 @@
   justify-content: center;
   overflow: hidden; /* Guards against internal overflow breaking the container */
   background-color: hsl(var(--card));
-  min-height: 48px; /* Consistent compact height */
+  min-height: 40px; /* Consistent compact height */
 }
 
 /* 🔒 World-Class Alignment Fix: Text Overflow/Ellipsis */
@@ -708,9 +708,10 @@
   .player-card {
     position: relative;
     width: auto;
+    max-width: 100%;
     border-bottom: none;
-    padding: 6px 8px;
-    min-height: 48px;
+    padding: 3px 4px;
+    min-height: 40px;
     border-radius: 4px;
     border: 1px solid hsl(var(--border) / 0.4);
     background: hsl(var(--card));
@@ -753,7 +754,7 @@
     z-index: 1;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 2px;
     height: 100%;
   }
   
@@ -761,7 +762,7 @@
   .player-card-header {
     display: grid;
     grid-template-columns: 1fr auto;
-    gap: 8px;
+    gap: 4px;
     align-items: start;
   }
   
@@ -783,9 +784,20 @@
     max-width: 100%;
   }
   
+  /* Team Name Display - Below player name */
+  .player-team-name {
+    font-size: 0.5625rem; /* 9px */
+    font-weight: 500;
+    color: hsl(var(--muted-foreground));
+    line-height: 1.1;
+    margin-top: 1px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
   /* Key Stats Below Name - Italicized Gray - Directly under name */
   .player-key-stats {
-    font-size: 0.625rem; /* 10px - smaller for compact cards */
+    font-size: 0.5625rem; /* 9px - reduced from 10px */
     font-style: italic;
     color: hsl(var(--muted-foreground));
     line-height: 1.1;
@@ -798,11 +810,11 @@
     background: hsl(var(--muted) / 0.3);
     border: 1px solid hsl(var(--border) / 0.4);
     border-radius: 3px;
-    padding: 4px 6px;
+    padding: 2px 4px;
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    min-width: 70px;
+    gap: 1px;
+    min-width: 60px;
     flex-shrink: 0;
   }
   
@@ -810,19 +822,21 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 4px;
-    font-size: 0.625rem; /* 10px */
-    line-height: 1.2;
+    gap: 3px;
+    font-size: 0.5625rem; /* 9px - reduced from 10px */
+    line-height: 1.1;
   }
   
   .unique-stat-label {
     color: hsl(var(--muted-foreground));
     font-weight: 600;
+    font-size: 0.5rem; /* 8px - smaller label */
   }
   
   .unique-stat-value {
     color: hsl(var(--foreground));
     font-weight: 700;
+    font-size: 0.5625rem; /* 9px - slightly larger for values */
   }
   
   /* Projection Bar - Smaller but More Obvious - Compact */
@@ -836,22 +850,22 @@
   
   .player-projection-bar-wrapper {
     width: 75%; /* Centered and only 75% of card width */
-    height: 3px; /* Even smaller height for compact cards */
+    height: 8px; /* Larger height for better visibility */
     background: hsl(var(--muted) / 0.2);
-    border-radius: 2px;
+    border-radius: 4px;
     overflow: hidden;
     position: relative;
     border: 1px solid hsl(var(--border) / 0.3); /* Border for more visibility */
     margin: 0 auto; /* Center the bar */
   }
-  
+
   .player-projection-bar {
     height: 100%;
-    background: linear-gradient(to right, #22c55e, #16a34a); /* Bright green gradient */
-    border-radius: 2px;
+    background: linear-gradient(to right, #459345, rgba(69, 147, 69, 0.85)); /* Pastel citrus green */
+    border-radius: 4px;
     transition: width 0.3s ease;
     min-width: 1px;
-    box-shadow: 0 0 2px rgba(34, 197, 94, 0.5); /* Subtle glow for visibility */
+    box-shadow: 0 0 2px rgba(69, 147, 69, 0.5); /* Subtle glow for visibility */
   }
   
   .player-projection-text {
@@ -860,6 +874,18 @@
     color: hsl(var(--muted-foreground));
     font-weight: 600;
     line-height: 1;
+  }
+
+  /* Game Score Display - Below game logos */
+  .game-score-display {
+    font-size: 0.5rem; /* 8px */
+    color: hsl(var(--muted-foreground));
+    font-weight: 600;
+    line-height: 1.2;
+    text-align: center;
+    max-width: 60px;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   
   /* Hide mobile score on desktop - scores are in center column */
@@ -963,7 +989,7 @@
   }
   
   .matchup-total-user .matchup-total-score {
-    color: hsl(var(--primary));
+    color: hsl(var(--vibrant-green));
   }
   
   .matchup-total-opponent .matchup-total-score {
