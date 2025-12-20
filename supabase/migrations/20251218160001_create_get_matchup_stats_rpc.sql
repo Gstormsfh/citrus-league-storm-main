@@ -23,7 +23,8 @@ returns table (
   saves bigint,
   goals_against bigint,
   shots_faced bigint,
-  shutouts bigint
+  shutouts bigint,
+  x_goals numeric
 )
 language sql
 stable
@@ -47,7 +48,15 @@ as $$
     sum(pgs.saves)::bigint as saves,
     sum(pgs.goals_against)::bigint as goals_against,
     sum(pgs.shots_faced)::bigint as shots_faced,
-    sum(pgs.shutouts)::bigint as shutouts
+    sum(pgs.shutouts)::bigint as shutouts,
+    coalesce((
+      select sum(coalesce(rs.shooting_talent_adjusted_xg, rs.flurry_adjusted_xg, rs.xg_value, 0))
+      from public.raw_shots rs
+      inner join public.player_game_stats pgs2 on rs.game_id = pgs2.game_id
+      where rs.player_id = pgs.player_id
+        and pgs2.game_date >= p_start_date
+        and pgs2.game_date <= p_end_date
+    ), 0)::numeric as x_goals
   from public.player_game_stats pgs
   where
     pgs.player_id = any(p_player_ids)

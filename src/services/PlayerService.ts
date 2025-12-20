@@ -317,10 +317,10 @@ export const PlayerService = {
 
       return players.sort((a, b) => (b.points || 0) - (a.points || 0));
     } catch (error) {
-      console.error('Error fetching players by IDs:', error);
-      // Fallback to getAllPlayers and filter
-      const all = await this.getAllPlayers();
-      return all.filter(p => playerIds.includes(p.id));
+      console.error('[PlayerService] Error fetching players by IDs:', error);
+      // DO NOT fallback to getAllPlayers - it causes 504 timeouts
+      // Return empty array and let caller handle the error
+      return [];
     }
   }
 };

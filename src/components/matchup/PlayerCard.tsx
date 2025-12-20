@@ -1,6 +1,8 @@
 import { MatchupPlayer } from "./types";
 import { cn } from "@/lib/utils";
 import { getTeamColor } from "@/utils/teamColors";
+import { PointsTooltip } from "./PointsTooltip";
+import { GameLogosBar } from "./GameLogosBar";
 
 interface PlayerCardProps {
   player: MatchupPlayer | null;
@@ -80,28 +82,51 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick 
   const positionColors = getPositionColorClasses(player.position);
   const { shotPct, pointRate } = calculatePercentages(player);
   
-  // Calculate projection percentage (normalize to 0-100 for bar display)
-  // Assuming max projection of ~25 points for a single game
-  const maxProjection = 25;
-  const projectedPoints = player.projectedPoints || (player.points / 20);
+  // Calculate projection for TODAY'S GAMES ONLY
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = today.toISOString().split('T')[0];
+  
+  // Check if player has a game today - with defensive checks
+  const todayGames = (player.games && Array.isArray(player.games) && player.games.length > 0)
+    ? player.games.filter(g => g && typeof g === 'object' && g.game_date === todayStr) 
+    : [];
+  const hasGameToday = todayGames.length > 0;
+  
+  // Calculate projection: average points per game * 1 game (today only)
+  const gamesPlayed = player.stats?.gamesPlayed || player.games_played || 1;
+  const avgPointsPerGame = gamesPlayed > 0 ? (player.points / gamesPlayed) : 0;
+  const projectedPoints = hasGameToday ? avgPointsPerGame * 1 : 0; // Only today's game(s)
+  
+  // Normalize to 0-100 for bar display (max ~8 points for a single game)
+  const maxProjection = 8;
   const projectionPercentage = Math.min((projectedPoints / maxProjection) * 100, 100);
   
-  // Get unique stats for top right corner: F Pts, xG
+  // Get unique stats for top right corner: F Pts, xG, GAR %
   const getUniqueStats = () => {
     const stats: Array<{ label: string; value: string }> = [];
     
-    // F Pts - Fantasy Points (current matchup points)
+    // F Pts - Fantasy Points (MATCHUP WEEK total for mini stats box)
     stats.push({ 
       label: 'F Pts', 
-      value: player.points.toFixed(1) 
+      value: (player.total_points ?? 0).toFixed(1)  // Matchup week total
     });
     
-    // xG - Expected Goals
-    const xG = player.stats?.xGoals || 0;
+    // xG - Expected Goals (use matchup stats if available, otherwise season stats)
+    const xG = player.matchupStats?.xGoals ?? player.stats?.xGoals ?? 0;
     stats.push({ 
       label: 'xG', 
       value: xG.toFixed(1) 
     });
+    
+    // GAR % - Goals Above Replacement as percentage
+    if (player.garPercentage !== undefined) {
+      const garSign = player.garPercentage >= 0 ? '+' : '';
+      stats.push({ 
+        label: 'GAR', 
+        value: `${garSign}${player.garPercentage.toFixed(1)}%` 
+      });
+    }
     
     return stats;
   };
@@ -128,9 +153,8 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick 
       )}
       onClick={() => onPlayerClick?.(player)}
     >
-      {/* Background Position/Number */}
+      {/* Background Position */}
       <div className="player-card-bg-text">{player.position}</div>
-      <div className="player-card-bg-number">{Math.round(player.points)}</div>
       
       <div className="player-card-content">
         {/* Header Section with Unique Stats in Top Right */}
@@ -139,23 +163,54 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick 
             <div className="player-name" title={player.name}>
               {displayName}
             </div>
-            {/* Key Stats Below Name */}
+            {/* Key Stats Below Name - Use matchup stats if available, otherwise season stats */}
             <div className="player-key-stats">
-              {player.stats?.goals || 0} G, {player.stats?.assists || 0} A, {player.stats?.sog || 0} SOG
+              {(player.matchupStats?.goals ?? player.stats?.goals) || 0} G, {(player.matchupStats?.assists ?? player.stats?.assists) || 0} A, {(player.matchupStats?.sog ?? player.stats?.sog) || 0} SOG
             </div>
           </div>
           {/* Unique Stats Box - Top Right Corner */}
           {uniqueStats.length > 0 && (
             <div className="player-unique-stats-box">
-              {uniqueStats.map((stat, idx) => (
-                <div key={idx} className="unique-stat-item">
-                  <span className="unique-stat-label">{stat.label}:</span>
-                  <span className="unique-stat-value">{stat.value}</span>
-                </div>
-              ))}
+              {uniqueStats.map((stat, idx) => {
+                // Use PointsTooltip for F Pts if stats_breakdown is available
+                if (stat.label === 'F Pts' && player.stats_breakdown && typeof player.stats_breakdown === 'object') {
+                  const totalPoints = typeof player.total_points === 'number' ? player.total_points : 0;
+                  return (
+                    <div key={idx} className="unique-stat-item">
+                      <span className="unique-stat-label">{stat.label}:</span>
+                      <span className="unique-stat-value">
+                        <PointsTooltip 
+                          breakdown={player.stats_breakdown} 
+                          totalPoints={totalPoints}
+                        />
+                      </span>
+                    </div>
+                  );
+                }
+                // Use high-contrast color for F Pts (season total in mini stats)
+                const isFpts = stat.label === 'F Pts';
+                return (
+                  <div key={idx} className="unique-stat-item">
+                    <span className="unique-stat-label">{stat.label}:</span>
+                    <span className={`unique-stat-value ${isFpts ? 'text-orange-500 font-bold' : ''}`}>
+                      {stat.value}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
+
+        {/* Game Logos Bar - Show opponent logos for each game */}
+        {player.games && Array.isArray(player.games) && player.games.length > 0 && player.team && (
+          <div className="mt-2 mb-2">
+            <GameLogosBar 
+              games={player.games} 
+              playerTeam={player.team}
+            />
+          </div>
+        )}
 
         {/* Projection Bar */}
         <div className="player-projection-bar-container">
@@ -166,14 +221,26 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick 
             />
           </div>
           <div className="player-projection-text">
-            {projectedPoints.toFixed(1)} pts projected
+            {hasGameToday 
+              ? `${projectedPoints.toFixed(1)} pts projected`
+              : 'No game today'
+            }
           </div>
         </div>
       </div>
 
-      {/* Mobile-only score display */}
+      {/* Mobile-only score display with tooltip - Show matchup total with high contrast */}
       <div className="player-mobile-score md:hidden">
-        {player.points.toFixed(1)}
+        {player.stats_breakdown && typeof player.stats_breakdown === 'object' ? (
+          <PointsTooltip 
+            breakdown={player.stats_breakdown} 
+            totalPoints={typeof player.total_points === 'number' ? player.total_points : 0}
+          />
+        ) : (
+          <span className="text-orange-500 font-bold">
+            {(typeof player.total_points === 'number' ? player.total_points : 0).toFixed(1)}
+          </span>
+        )}
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
@@ -26,21 +26,49 @@ import { PlayerService } from '@/services/PlayerService';
 import { supabase } from '@/integrations/supabase/client';
 import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekLabel, getWeekDateLabel, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
 import { Loader2 } from 'lucide-react';
-import LoadingScreen from '@/components/LoadingScreen';
 
 const Matchup = () => {
   const { user, profile } = useAuth();
-  const { userLeagueState } = useLeague();
+  const { userLeagueState, loading: leagueContextLoading } = useLeague();
   const { leagueId: urlLeagueId, weekId: urlWeekId } = useParams<{ leagueId?: string; weekId?: string }>();
   const navigate = useNavigate();
   
   // Debug: Log URL parameters
-  console.log('[Matchup] URL parameters:', { urlLeagueId, urlWeekId });
+  console.log('[Matchup] URL parameters:', { urlLeagueId, urlWeekId, userLeagueState, leagueContextLoading });
   const [activeTab, setActiveTab] = useState("lineup");
-  const [loading, setLoading] = useState(true);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const loadingRef = useRef(false); // Prevent concurrent loads
+  const hasProcessedNoLeague = useRef(false); // Track if we've processed "no league" state
+  
+  // Cache tracking to prevent unnecessary reloads
+  const prevLeagueIdRef = useRef<string | undefined>(undefined);
+  const prevWeekIdRef = useRef<string | undefined>(undefined);
+  const loadedMatchupDataRef = useRef<{ leagueId: string; weekId: string; timestamp: number } | null>(null);
+  const CACHE_TTL = 30000; // 30 seconds cache
+  
+  // CRITICAL: Unified loading state manager - handles all loading state logic in one place
+  // This prevents conflicting state updates from multiple useEffects
+  useEffect(() => {
+    // Wait for LeagueContext to finish loading before making decisions
+    if (leagueContextLoading) {
+      return;
+    }
+    
+    // Handle "no league" state once (prevent re-processing)
+    if (userLeagueState === 'logged-in-no-league' && !hasProcessedNoLeague.current) {
+      hasProcessedNoLeague.current = true;
+      console.log('[MATCHUP] User has no league - stopping all loading');
+      setLoading(false);
+      loadingRef.current = false; // Release any locks
+      return;
+    }
+    
+    // Reset the flag if user state changes back to active-user
+    if (userLeagueState === 'active-user' && hasProcessedNoLeague.current) {
+      hasProcessedNoLeague.current = false;
+    }
+  }, [leagueContextLoading, userLeagueState]);
 
   const [selectedPlayer, setSelectedPlayer] = useState<HockeyPlayer | null>(null);
   const [isPlayerDialogOpen, setIsPlayerDialogOpen] = useState(false);
@@ -71,18 +99,32 @@ const Matchup = () => {
   
   // Load demo matchup data from actual rosters
   useEffect(() => {
+    // Don't run if there's a URL leagueId (user accessing specific league)
+    if (urlLeagueId) {
+      return;
+    }
+    
+    // Don't run if LeagueContext is still loading
+    if (leagueContextLoading) {
+      return;
+    }
+    
+    // Only run for guests or users with no league
     if (userLeagueState === 'active-user') {
       setDemoMyTeam([]);
       setDemoOpponentTeam([]);
       setDemoMyTeamSlotAssignments({});
       setDemoOpponentTeamSlotAssignments({});
-      setLoading(false);
+      // Don't touch loading state for active users
       return;
     }
     
     const loadDemoMatchup = async () => {
       try {
-        setLoading(true);
+        // Only set loading for demo/guest users
+        if (userLeagueState !== 'active-user') {
+          setLoading(true);
+        }
         console.log('[Matchup] Loading demo matchup data...');
         console.log('[Matchup] userLeagueState:', userLeagueState);
         
@@ -101,7 +143,10 @@ const Matchup = () => {
         setDemoOpponentTeam(matchupData.opponentTeam);
         setDemoMyTeamSlotAssignments(matchupData.myTeamSlotAssignments);
         setDemoOpponentTeamSlotAssignments(matchupData.opponentTeamSlotAssignments);
-        setLoading(false);
+        // Only set loading=false for demo/guest users
+        if (userLeagueState !== 'active-user') {
+          setLoading(false);
+        }
       } catch (error) {
         console.error('[Matchup] Error loading demo matchup data:', error);
         console.error('[Matchup] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
@@ -156,9 +201,9 @@ const Matchup = () => {
         setLoading(false);
       }
     };
-    
+
     loadDemoMatchup();
-  }, [userLeagueState]);
+  }, [userLeagueState, urlLeagueId, leagueContextLoading]);
 
   const toHockeyPlayer = (p: MatchupPlayer): HockeyPlayer => ({
     id: p.id.toString(),
@@ -201,37 +246,79 @@ const Matchup = () => {
     "Adam Fox with a power play assist! +4 points."
   ]);
 
-  const getTeamPoints = (team: MatchupPlayer[]) => {
-    return team.reduce((sum, player) => sum + player.points, 0).toFixed(1);
-  };
-
   // Use real data if active user, otherwise demo data
   // CRITICAL: Ensure myTeam is always the user's team (left side)
   // and opponentTeamPlayers is always the opponent (right side)
-  const displayMyTeam = userLeagueState === 'active-user' ? myTeam : demoMyTeam;
-  const displayOpponentTeam = userLeagueState === 'active-user' ? opponentTeamPlayers : demoOpponentTeam;
-  const displayMyTeamSlotAssignments = userLeagueState === 'active-user' ? myTeamSlotAssignments : demoMyTeamSlotAssignments;
-  const displayOpponentTeamSlotAssignments = userLeagueState === 'active-user' ? opponentTeamSlotAssignments : demoOpponentTeamSlotAssignments;
+  const displayMyTeam = useMemo(() => 
+    userLeagueState === 'active-user' ? myTeam : demoMyTeam,
+    [userLeagueState, myTeam, demoMyTeam]
+  );
+  const displayOpponentTeam = useMemo(() => 
+    userLeagueState === 'active-user' ? opponentTeamPlayers : demoOpponentTeam,
+    [userLeagueState, opponentTeamPlayers, demoOpponentTeam]
+  );
+  const displayMyTeamSlotAssignments = useMemo(() => 
+    userLeagueState === 'active-user' ? myTeamSlotAssignments : demoMyTeamSlotAssignments,
+    [userLeagueState, myTeamSlotAssignments, demoMyTeamSlotAssignments]
+  );
+  const displayOpponentTeamSlotAssignments = useMemo(() => 
+    userLeagueState === 'active-user' ? opponentTeamSlotAssignments : demoOpponentTeamSlotAssignments,
+    [userLeagueState, opponentTeamSlotAssignments, demoOpponentTeamSlotAssignments]
+  );
 
-  // DEBUG: Log team data for verification
-  if (user && myTeam.length > 0 && opponentTeamPlayers.length > 0) {
-    console.log('Display teams:', {
-      myTeamName: userTeam?.team_name,
-      myTeamPlayerCount: displayMyTeam.length,
-      opponentTeamName: opponentTeam?.team_name,
-      opponentTeamPlayerCount: displayOpponentTeam.length,
-      myStartersCount: displayMyTeam.filter(p => p.isStarter).length,
-      opponentStartersCount: displayOpponentTeam.filter(p => p.isStarter).length
-    });
-  }
+  // Memoize expensive computations
+  const getTeamPoints = useMemo(() => {
+    return (team: MatchupPlayer[]) => {
+      // Sum total_points from fantasy_matchup_lines (matchup week only), never use season points
+      const total = team.reduce((sum, player) => {
+        const weekPoints = player.total_points ?? 0;
+        const seasonPoints = player.points ?? 0;
+        
+        // Debug: Log if we detect a mismatch (week points should be <= season points)
+        if (weekPoints > seasonPoints && weekPoints > 100) {
+          console.warn(`[Matchup.getTeamPoints] ⚠️ Player ${player.name} has weekPoints (${weekPoints}) > seasonPoints (${seasonPoints}) - possible season total in total_points`);
+        }
+        
+        return sum + weekPoints;
+      }, 0);
+      
+      // Log detailed breakdown for debugging
+      const playersWithPoints = team.map(p => ({
+        name: p.name,
+        total_points: p.total_points ?? 0,
+        points: p.points ?? 0,
+        hasSeasonTotal: (p.total_points ?? 0) > 100
+      }));
+      
+      const seasonTotalCount = playersWithPoints.filter(p => p.hasSeasonTotal).length;
+      const weekTotalSum = playersWithPoints.reduce((sum, p) => sum + p.total_points, 0);
+      const seasonTotalSum = playersWithPoints.reduce((sum, p) => sum + p.points, 0);
+      
+      console.log('[Matchup.getTeamPoints] Team total calculated:', {
+        teamSize: team.length,
+        totalWeekPoints: total,
+        weekTotalSum: weekTotalSum.toFixed(1),
+        seasonTotalSum: seasonTotalSum.toFixed(1),
+        seasonTotalCount: seasonTotalCount,
+        playersWithHighPoints: playersWithPoints.filter(p => p.total_points > 100).map(p => ({
+          name: p.name,
+          total_points: p.total_points,
+          points: p.points
+        })),
+        samplePlayers: playersWithPoints.slice(0, 5)
+      });
+      
+      return total.toFixed(1);
+    };
+  }, []);
 
-  const myTeamPoints = getTeamPoints(displayMyTeam);
-  const opponentTeamPoints = getTeamPoints(displayOpponentTeam);
+  const myTeamPoints = useMemo(() => getTeamPoints(displayMyTeam), [getTeamPoints, displayMyTeam]);
+  const opponentTeamPoints = useMemo(() => getTeamPoints(displayOpponentTeam), [getTeamPoints, displayOpponentTeam]);
 
-  const myStarters = displayMyTeam.filter(p => p.isStarter);
-  const myBench = displayMyTeam.filter(p => !p.isStarter);
-  const opponentStarters = displayOpponentTeam.filter(p => p.isStarter);
-  const opponentBench = displayOpponentTeam.filter(p => !p.isStarter);
+  const myStarters = useMemo(() => displayMyTeam.filter(p => p.isStarter), [displayMyTeam]);
+  const myBench = useMemo(() => displayMyTeam.filter(p => !p.isStarter), [displayMyTeam]);
+  const opponentStarters = useMemo(() => displayOpponentTeam.filter(p => p.isStarter), [displayOpponentTeam]);
+  const opponentBench = useMemo(() => displayOpponentTeam.filter(p => !p.isStarter), [displayOpponentTeam]);
 
   const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   
@@ -247,20 +334,114 @@ const Matchup = () => {
 
   // Load real matchup data for logged-in users with leagues
   useEffect(() => {
-    if (!user || userLeagueState !== 'active-user') {
+    // CRITICAL: Early exit guards to prevent infinite loops
+    
+    // Wait for LeagueContext to finish loading before making decisions
+    // Note: leagueContextLoading is NOT in dependency array to prevent re-runs
+    if (leagueContextLoading) {
+      return;
+    }
+    
+    if (!user?.id) {
+      console.log('[MATCHUP] No user ID, skipping');
       setLoading(false);
       return;
     }
+    
+    // If userLeagueState says no league, don't try to load matchup data
+    // But also don't freeze - just show the appropriate UI
+    if (userLeagueState === 'logged-in-no-league') {
+      console.log('[MATCHUP] User has no league, showing league creation CTA - EXITING EARLY');
+      setLoading(false);
+      loadingRef.current = false; // Release lock
+      return;
+    }
+    
+    if (userLeagueState === 'guest') {
+      console.log('[MATCHUP] Guest user, skipping matchup load');
+      setLoading(false);
+      return;
+    }
+    
+    // Only proceed if we're an active user
+    if (userLeagueState !== 'active-user') {
+      console.log('[MATCHUP] Not active user state:', userLeagueState, '- skipping load');
+      setLoading(false);
+      return;
+    }
+    
+    // Guard: Don't run if we don't have a league ID and haven't determined one yet
+    if (!urlLeagueId && loadingRef.current) {
+      console.log('[MATCHUP] No league ID and load in progress, skipping');
+      return;
+    }
+    
+    // Check if values actually changed to prevent unnecessary reloads
+    const leagueIdChanged = prevLeagueIdRef.current !== urlLeagueId;
+    const weekIdChanged = prevWeekIdRef.current !== urlWeekId;
+    
+    // If values haven't changed, check cache
+    if (!leagueIdChanged && !weekIdChanged && urlLeagueId && urlWeekId) {
+      if (loadedMatchupDataRef.current && 
+          loadedMatchupDataRef.current.leagueId === urlLeagueId &&
+          loadedMatchupDataRef.current.weekId === urlWeekId) {
+        const age = Date.now() - loadedMatchupDataRef.current.timestamp;
+        if (age < CACHE_TTL && !loadingRef.current) {
+          console.log('[MATCHUP] Using cached data, skipping reload');
+          setLoading(false);
+          return;
+        }
+      }
+    }
+    
+    // Update refs to track current values
+    prevLeagueIdRef.current = urlLeagueId;
+    prevWeekIdRef.current = urlWeekId;
+    
+    console.log('[MATCHUP] useEffect triggered - starting load', {
+      hasUser: !!user,
+      userId: user?.id,
+      userLeagueState,
+      urlLeagueId,
+      urlWeekId,
+      leagueIdChanged,
+      weekIdChanged,
+      loadingRefCurrent: loadingRef.current
+    });
 
     const loadMatchupData = async () => {
-      // Prevent concurrent loads
+      // CRITICAL: Prevent concurrent loads AND infinite loops
       if (loadingRef.current) {
-        console.log('[Matchup] Load already in progress, skipping duplicate call...');
+        console.log('[MATCHUP] Load already in progress, skipping duplicate call...');
         return;
       }
       
+      // Additional guard: If we've already tried loading and failed, don't retry immediately
+      // This prevents infinite retry loops
+      if (error && !loading) {
+        console.log('[MATCHUP] Previous load failed, not retrying automatically');
+        return;
+      }
+      
+      // Guard: Prevent running if we've already processed "no league" state
+      if (hasProcessedNoLeague.current && userLeagueState === 'logged-in-no-league') {
+        console.log('[MATCHUP] Already processed no-league state, skipping');
+        return;
+      }
+      
+      // Set loading state immediately to prevent duplicate calls
+      loadingRef.current = true;
+      
+      // Set up timeout to ensure loading completes within 15 seconds (more aggressive)
+      let timeoutId: NodeJS.Timeout | null = null;
+      timeoutId = setTimeout(() => {
+        console.error('[MATCHUP] Load timeout after 15s - FORCING STOP');
+        setError('Loading took too long. Please refresh the page or try again later.');
+        setLoading(false);
+        loadingRef.current = false; // Force release lock
+      }, 15000);
+      
       try {
-        loadingRef.current = true;
         setLoading(true);
         setError(null);
 
@@ -268,53 +449,73 @@ const Matchup = () => {
         let targetLeagueId = urlLeagueId;
         
         if (!targetLeagueId) {
+          console.log('[MATCHUP] No leagueId in URL, fetching user leagues...');
           // Get user's leagues if no leagueId in URL
           const { leagues: userLeagues, error: leaguesError } = await LeagueService.getUserLeagues(user.id);
-          if (leaguesError) throw leaguesError;
+          if (leaguesError) {
+            console.error('[MATCHUP] Error fetching user leagues:', leaguesError);
+            throw leaguesError;
+          }
 
           if (userLeagues.length === 0) {
+            console.error('[MATCHUP] User has no leagues');
             setError('You are not in any leagues');
             setLoading(false);
+            loadingRef.current = false;
             return;
           }
 
           // Use first league and redirect to URL with leagueId
           const currentLeague = userLeagues[0];
           targetLeagueId = currentLeague.id;
+          console.log('[MATCHUP] Redirecting to league:', targetLeagueId);
           
-          // Redirect to URL with leagueId (and weekId if available)
+          // Redirect to URL with leagueId (and weekId if available) - use window.location to avoid loops
           const weekParam = urlWeekId ? `/${urlWeekId}` : '';
-          navigate(`/matchup/${targetLeagueId}${weekParam}`, { replace: true });
+          window.location.href = `/matchup/${targetLeagueId}${weekParam}`;
           return;
         }
 
+        console.log('[MATCHUP] LeagueId from URL:', targetLeagueId);
         // Get league data
         const { leagues: userLeagues, error: leagueError } = await LeagueService.getUserLeagues(user.id);
-        if (leagueError) throw leagueError;
+        if (leagueError) {
+          console.error('[MATCHUP] Error fetching leagues for validation:', leagueError);
+          throw leagueError;
+        }
         
         const currentLeague = userLeagues.find((l: League) => l.id === targetLeagueId);
         if (!currentLeague) {
+          console.error('[MATCHUP] League not found in user leagues:', targetLeagueId);
           setError('League not found');
           setLoading(false);
+          loadingRef.current = false;
           return;
         }
 
+        console.log('[MATCHUP] Found league:', currentLeague.id, 'draft_status:', currentLeague.draft_status);
         setLeague(currentLeague);
 
         // Check if draft is completed
         if (currentLeague.draft_status !== 'completed') {
+          console.log('[MATCHUP] Draft not completed, cannot view matchups');
           setError('Draft must be completed before viewing matchups');
           setLoading(false);
+          loadingRef.current = false;
           return;
         }
 
+        console.log('[MATCHUP] Getting user team for league:', currentLeague.id);
         // Get user's team
         const { team: userTeamData } = await LeagueService.getUserTeam(currentLeague.id, user.id);
         if (!userTeamData) {
+          console.error('[MATCHUP] User team not found');
           setError('You do not have a team in this league');
           setLoading(false);
+          loadingRef.current = false;
           return;
         }
+        console.log('[MATCHUP] Found user team:', userTeamData.id);
         setUserTeam(userTeamData);
 
         // Calculate first week start date
@@ -342,13 +543,15 @@ const Matchup = () => {
             // Invalid week in URL, use current week
             const currentWeek = getCurrentWeekNumber(firstWeek);
             weekToShow = weeks.includes(currentWeek) ? currentWeek : weeks[0] || 1;
-            navigate(`/matchup/${targetLeagueId}/${weekToShow}`, { replace: true });
+            window.location.href = `/matchup/${targetLeagueId}/${weekToShow}`;
+            return; // Exit early to prevent further execution
           }
         } else {
           // No week in URL, use current week
           const currentWeek = getCurrentWeekNumber(firstWeek);
           weekToShow = weeks.includes(currentWeek) ? currentWeek : weeks[0] || 1;
-          navigate(`/matchup/${targetLeagueId}/${weekToShow}`, { replace: true });
+          window.location.href = `/matchup/${targetLeagueId}/${weekToShow}`;
+          return; // Exit early to prevent further execution
         }
 
         setSelectedWeek(weekToShow);
@@ -431,7 +634,6 @@ const Matchup = () => {
             console.error('[Matchup] Error generating matchups:', genError);
             setError(`Failed to generate matchups: ${genError.message || 'Unknown error'}`);
             setLoading(false);
-            setIsInitialLoad(false);
             return;
           }
           
@@ -515,7 +717,6 @@ const Matchup = () => {
                   console.error('[Matchup] CRITICAL: User team is not in the league teams list!');
                   setError(`Your team (${userTeamData.id}) is not found in the league teams. This is a data integrity issue.`);
                   setLoading(false);
-                  setIsInitialLoad(false);
                   return;
                 }
                 
@@ -531,7 +732,6 @@ const Matchup = () => {
                   console.error('[Matchup] Error during forced regeneration:', regenError);
                   setError(`Failed to regenerate matchups: ${regenError.message || 'Unknown error'}`);
                   setLoading(false);
-                  setIsInitialLoad(false);
                   return;
                 }
                 
@@ -549,7 +749,6 @@ const Matchup = () => {
                   console.error('[Matchup] Still no matchup after forced regeneration!');
                   setError(`Failed to generate matchup for week ${weekToShow} after forced regeneration. Please refresh and try again.`);
                   setLoading(false);
-                  setIsInitialLoad(false);
                   return;
                 }
                 
@@ -558,13 +757,11 @@ const Matchup = () => {
               } else {
                 setError(`No matchup found for week ${weekToShow}. The matchup generation may have failed. Please try refreshing the page.`);
                 setLoading(false);
-                setIsInitialLoad(false);
                 return;
               }
             } else {
               setError(`No matchup found for week ${weekToShow}. The matchup generation may have failed. Please try refreshing the page.`);
               setLoading(false);
-              setIsInitialLoad(false);
               return;
             }
             
@@ -580,7 +777,6 @@ const Matchup = () => {
               console.error('[Matchup] Matchup still not found after forced regeneration!');
               setError(`Failed to generate matchup for week ${weekToShow} after forced regeneration. Please refresh and try again.`);
               setLoading(false);
-              setIsInitialLoad(false);
               return;
             }
             
@@ -593,40 +789,71 @@ const Matchup = () => {
         }
 
         // Load matchup data using unified method
-        const userTimezone = profile?.timezone || 'America/Denver';
-        console.log('[Matchup] Calling getMatchupData with:', {
+        // Pass existingMatchup to avoid redundant query in getMatchupData()
+        // Get timezone from profile if available, but don't depend on profile object
+        const userTimezone = (profile as any)?.timezone || 'America/Denver';
+        console.log('[MATCHUP] STEP 10: Calling getMatchupData', {
           leagueId: targetLeagueId,
           userId: user.id,
           weekNumber: weekToShow,
-          timezone: userTimezone
+          timezone: userTimezone,
+          hasExistingMatchup: !!existingMatchup
         });
-        const { data: matchupData, error: matchupError } = await MatchupService.getMatchupData(
+        
+        // Wrap in Promise.race with timeout to prevent indefinite hang
+        const matchupDataPromise = MatchupService.getMatchupData(
           targetLeagueId,
           user.id,
           weekToShow,
-          userTimezone
+          userTimezone,
+          existingMatchup // Pass pre-fetched matchup to eliminate redundant query
         );
+        
+        const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) => {
+          setTimeout(() => {
+            resolve({ data: null, error: new Error('getMatchupData timed out after 20 seconds') });
+          }, 20000);
+        });
+        
+        const { data: matchupData, error: matchupError } = await Promise.race([
+          matchupDataPromise,
+          timeoutPromise
+        ]);
 
         if (matchupError) {
-          console.error('[Matchup] Error getting matchup data:', matchupError);
+          console.error('[MATCHUP] Error getting matchup data:', matchupError);
           // If it's a "no matchup found" error, the matchups may not have been generated yet
-          if (matchupError.message?.includes('No matchup found')) {
-            console.log('[Matchup] No matchup found for week', weekToShow, '- matchups may need to be generated');
-            setError(`No matchup found for week ${weekToShow}. Please try refreshing the page.`);
+          if (matchupError.message?.includes('No matchup found') || matchupError.message?.includes('timed out')) {
+            console.log('[MATCHUP] No matchup found or timeout for week', weekToShow);
+            setError(`Failed to load matchup for week ${weekToShow}. ${matchupError.message?.includes('timed out') ? 'Request timed out.' : 'Matchup may need to be generated.'} Please try refreshing the page.`);
             setLoading(false);
+            loadingRef.current = false;
             return;
           }
           throw matchupError;
         }
         if (!matchupData) {
+          console.error('[MATCHUP] No matchup data returned');
           setError(`No matchup found for week ${weekToShow}`);
           setLoading(false);
+          loadingRef.current = false;
           return;
+        }
+        
+        console.log('[MATCHUP] STEP 11: Matchup data loaded successfully');
+        
+        // Update cache with loaded data
+        if (targetLeagueId && weekToShow) {
+          loadedMatchupDataRef.current = {
+            leagueId: targetLeagueId,
+            weekId: String(weekToShow),
+            timestamp: Date.now()
+          };
         }
 
         // Check if this is a playoff week and redirect
         if (matchupData.isPlayoffWeek) {
-          navigate(`/league/${targetLeagueId}/playoffs`);
+          window.location.href = `/league/${targetLeagueId}/playoffs`;
           return;
         }
 
@@ -651,72 +878,90 @@ const Matchup = () => {
         }
 
       } catch (err: any) {
-        console.error('[Matchup] Error loading matchup data:', err);
-        console.error('[Matchup] Error details:', {
+        console.error('[MATCHUP] CRITICAL ERROR loading matchup data:', err);
+        console.error('[MATCHUP] Error details:', {
           message: err.message,
           stack: err.stack,
           name: err.name
         });
         
-        // Only set error if it's not a transient/network error that might resolve on retry
+        // Always set error so user sees something - don't hide errors
         const errorMessage = err.message || 'Failed to load matchup data';
-        const isTransientError = errorMessage.includes('network') || 
-                                 errorMessage.includes('timeout') ||
-                                 errorMessage.includes('fetch');
+        setError(errorMessage);
         
-        if (!isTransientError) {
-          setError(errorMessage);
-        } else {
-          console.log('[Matchup] Transient error detected, will retry on next load');
+        // Log if it's a timeout for debugging
+        if (errorMessage.includes('timeout')) {
+          console.error('[MATCHUP] TIMEOUT ERROR - Query took too long');
         }
       } finally {
-        setLoading(false);
-        setIsInitialLoad(false); // Mark that initial load is complete
-        loadingRef.current = false; // Release lock
+        // CRITICAL: Always clear timeout and reset state, even if error occurred
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+        console.log('[MATCHUP] Finally block - clearing loading state');
+        setLoading(false); // Always complete loading
+ // Mark that initial load is complete
+        loadingRef.current = false; // Release lock - CRITICAL to prevent freeze
       }
     };
 
     loadMatchupData();
-  }, [user, userLeagueState, urlLeagueId, urlWeekId, navigate, profile]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, userLeagueState, urlLeagueId, urlWeekId]);
 
   // Refresh matchup when page becomes visible (e.g., navigating back from roster page)
   useEffect(() => {
-    if (!user || !league || !userTeam || !urlLeagueId || !urlWeekId) return;
+    if (!user?.id || !league?.id || !userTeam?.id || !urlLeagueId || !urlWeekId) return;
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === 'visible' && !loadingRef.current) {
         // Page became visible - clear cache and reload by triggering URL change
         console.log('[Matchup] Page visible, refreshing matchup data...');
         MatchupService.clearRosterCache(userTeam.id, league.id);
-        // Trigger reload by navigating to same URL
-        navigate(`/matchup/${urlLeagueId}/${urlWeekId}`, { replace: true });
+        // Use window.location to avoid React Router navigation loops
+        window.location.href = `/matchup/${urlLeagueId}/${urlWeekId}`;
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [user, league, userTeam, urlLeagueId, urlWeekId, navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, league?.id, userTeam?.id, urlLeagueId, urlWeekId]);
 
 
   // Handle week selection - updates URL which triggers data reload
   const handleWeekChange = (weekNumber: number) => {
-    if (!league) {
+    if (!league?.id) {
       console.warn('[Matchup] handleWeekChange called but league is not set');
       return;
     }
     console.log('[Matchup] handleWeekChange called, navigating to week:', weekNumber, 'for league:', league.id);
-    // Update URL, which will trigger useEffect to reload data
-    navigate(`/matchup/${league.id}/${weekNumber}`);
+    // Use window.location to avoid React Router navigation loops
+    window.location.href = `/matchup/${league.id}/${weekNumber}`;
   };
   
   // Refresh matchup data (useful after making lineup changes on roster page)
   const refreshMatchup = () => {
-    if (!league || !userTeam || !urlLeagueId || !urlWeekId) return;
+    if (!league?.id || !userTeam?.id || !urlLeagueId || !urlWeekId) return;
     // Clear all caches to force fresh data
     MatchupService.clearRosterCache();
-    // Reload by navigating to same URL
-    navigate(`/matchup/${urlLeagueId}/${urlWeekId}`, { replace: true });
+    // Use window.location to avoid React Router navigation loops
+    window.location.href = `/matchup/${urlLeagueId}/${urlWeekId}`;
   };
+
+  // Debug: Log render state (using ref counter to prevent spam)
+  const renderCountRef = useRef(0);
+  renderCountRef.current += 1;
+  if (renderCountRef.current <= 3) { // Only log first 3 renders
+    console.log('[MATCHUP] Component rendering', {
+      renderCount: renderCountRef.current,
+      loading,
+      error,
+      userLeagueState,
+      hasMyTeam: myTeam.length > 0,
+      hasOpponentTeam: opponentTeamPlayers.length > 0
+    });
+  }
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden w-full">
@@ -754,29 +999,26 @@ const Matchup = () => {
                 </div>
               </div>
           
-          {/* Show LoadingScreen on initial load (route navigation) - Suspense handles the transition */}
-          {loading && isInitialLoad && (
-            <LoadingScreen
-              character="citrus"
-              message="Loading NHL Matchups..."
-            />
-          )}
-          
-          {loading && !isInitialLoad && (
+          {/* Single, consistent loading state */}
+          {loading && userLeagueState !== 'logged-in-no-league' && (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
               <p className="ml-3 text-muted-foreground">Loading matchup...</p>
             </div>
           )}
           
-          {!loading && error && userLeagueState === 'active-user' && (
+          {/* Error State - Always show if there's an error */}
+          {!loading && error && (
             <div className="text-center py-20">
-              <p className="text-destructive text-lg">{error}</p>
+              <p className="text-destructive text-lg mb-4">{error}</p>
+              <Button onClick={() => window.location.reload()}>Retry</Button>
             </div>
           )}
           
-          {userLeagueState === 'logged-in-no-league' && !loading && (
-            <div className="py-12">
+          {/* No League State - Show immediately when detected, don't wait for loading */}
+          {/* CRITICAL: Show this even if loading is true, to prevent frozen UI */}
+          {userLeagueState === 'logged-in-no-league' && (
+            <div className="py-12" style={{ pointerEvents: 'auto' }}>
               <LeagueCreationCTA 
                 title="Your Matchup Awaits"
                 description="Create your league to start competing in weekly matchups, track your team's performance, and climb the standings."
@@ -784,9 +1026,10 @@ const Matchup = () => {
             </div>
           )}
 
-          {!loading && (
+          {/* Main Content - Show if no error and data is available */}
+          {!loading && !error && (
             (userLeagueState === 'guest' && (demoMyTeam.length > 0 || demoOpponentTeam.length > 0)) ||
-            (userLeagueState === 'active-user' && !error) ||
+            (userLeagueState === 'active-user' && (myTeam.length > 0 || opponentTeamPlayers.length > 0)) ||
             (userLeagueState === 'logged-in-no-league' && (demoMyTeam.length > 0 || demoOpponentTeam.length > 0))
           ) && (
             <>
@@ -872,6 +1115,48 @@ const Matchup = () => {
           
           <LiveUpdates updates={updates} />
             </>
+          )}
+          
+          {/* Fallback: If nothing else rendered, show a message */}
+          {!loading && !error && 
+           !(userLeagueState === 'guest' && (demoMyTeam.length > 0 || demoOpponentTeam.length > 0)) &&
+           !(userLeagueState === 'active-user' && (myTeam.length > 0 || opponentTeamPlayers.length > 0)) &&
+           !(userLeagueState === 'logged-in-no-league' && (demoMyTeam.length > 0 || demoOpponentTeam.length > 0)) &&
+           userLeagueState !== 'logged-in-no-league' && (
+            <div className="text-center py-20">
+              <p className="text-muted-foreground mb-4">No matchup data available.</p>
+              <p className="text-sm text-muted-foreground mb-4">This may be because:</p>
+              <ul className="text-sm text-muted-foreground mb-4 text-left max-w-md mx-auto">
+                <li>• The matchup hasn't been generated yet</li>
+                <li>• You don't have a team in this league</li>
+                <li>• The draft hasn't been completed</li>
+              </ul>
+              <div className="space-x-2">
+                <Button 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window.location.href = '/';
+                  }}
+                  variant="outline"
+                >
+                  Go Home
+                </Button>
+                <Button 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (urlLeagueId) {
+                      window.location.href = `/league/${urlLeagueId}`;
+                    } else {
+                      window.location.reload();
+                    }
+                  }}
+                >
+                  {urlLeagueId ? 'View League' : 'Refresh'}
+                </Button>
+              </div>
+            </div>
           )}
             </div>
 

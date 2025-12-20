@@ -1,4 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
+import { withTimeout } from '@/utils/promiseUtils';
+import { getTodayMST, getTodayMSTDate } from '@/utils/timezoneUtils';
 
 // Test mode: Controlled via VITE_TEST_MODE environment variable
 // Set VITE_TEST_MODE=true in .env to use test date for development
@@ -6,21 +8,21 @@ import { supabase } from '@/integrations/supabase/client';
 const TEST_MODE = import.meta.env.VITE_TEST_MODE === 'true';
 const TEST_DATE = import.meta.env.VITE_TEST_DATE || '2025-12-08';
 
-// Helper to get "today" - uses test date if in test mode
+// Helper to get "today" in Mountain Time - uses test date if in test mode
 function getTodayString(): string {
   if (TEST_MODE) {
     return TEST_DATE;
   }
-  return new Date().toISOString().split('T')[0];
+  return getTodayMST(); // Use MST instead of UTC
 }
 
-// Helper to get "today" as Date object
+// Helper to get "today" as Date object in Mountain Time
 function getTodayDate(): Date {
   if (TEST_MODE) {
     const date = new Date(TEST_DATE + 'T00:00:00');
     return date;
   }
-  return new Date();
+  return getTodayMSTDate(); // Use MST instead of local time
 }
 
 export interface NHLGame {
@@ -117,11 +119,25 @@ export const ScheduleService = {
         query = query.lte('game_date', endDate.toISOString().split('T')[0]);
       }
 
-      const { data, error } = await query;
+      let data: any = null;
+      let error: any = null;
+      try {
+        const result = await withTimeout(query, 10000, 'getGamesForTeams query timeout');
+        data = result.data;
+        error = result.error;
+      } catch (timeoutError: any) {
+        console.error('[ScheduleService.getGamesForTeams] Query timeout:', timeoutError);
+        error = timeoutError;
+      }
+      
       if (error) {
         if (error.message?.includes('does not exist') || error.message?.includes('relation')) {
           console.warn('nhl_games table does not exist yet. Run the migration and fetch script.');
           return { gamesByTeam: new Map(), error: null };
+        }
+        if (error.message?.includes('timeout')) {
+          console.error('[ScheduleService.getGamesForTeams] Query timed out after 10s');
+          return { gamesByTeam: new Map(), error };
         }
         throw error;
       }

@@ -381,7 +381,9 @@ export const DemoDataService = {
           weekStart,
           weekEnd,
           'America/Denver',
-          games
+          games,
+          undefined,
+          undefined
         );
       });
       
@@ -399,7 +401,9 @@ export const DemoDataService = {
           weekStart,
           weekEnd,
           'America/Denver',
-          games
+          games,
+          undefined,
+          undefined
         );
       });
       

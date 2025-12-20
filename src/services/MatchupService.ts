@@ -2,10 +2,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { League, Team, LeagueService } from './LeagueService';
 import { DraftService } from './DraftService';
 import { PlayerService, Player } from './PlayerService';
-import { MatchupPlayer } from '@/components/matchup/types';
+import { MatchupPlayer, StatBreakdown } from '@/components/matchup/types';
 import { getFirstWeekStartDate, getWeekStartDate, getWeekEndDate, getAvailableWeeks, getScheduleLength } from '@/utils/weekCalculator';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { ScheduleService, NHLGame, GameInfo } from './ScheduleService';
+import { withTimeout } from '@/utils/promiseUtils';
+import { getTodayMST, getTodayMSTDate } from '@/utils/timezoneUtils';
 
 // Roster cache for performance optimization
 interface RosterCacheEntry {
@@ -20,6 +22,8 @@ const rosterCache = new Map<string, RosterCacheEntry>();
 const getRosterCacheKey = (teamId: string, leagueId: string): string => {
   return `${leagueId}:${teamId}`;
 };
+
+// Note: withTimeout is now imported from @/utils/promiseUtils
 
 export interface Matchup {
   id: string;
@@ -491,12 +495,20 @@ export const MatchupService = {
       });
       
       // First, get user's team
-      const { data: userTeam, error: teamError } = await supabase
-        .from('teams')
-        .select('id')
-        .eq('league_id', leagueId)
-        .eq('owner_id', userId)
-        .maybeSingle();
+      let userTeam: any = null;
+      let teamError: any = null;
+      try {
+        const result = await withTimeout(
+          supabase.from('teams').select('id').eq('league_id', leagueId).eq('owner_id', userId).maybeSingle(),
+          5000,
+          'getUserTeam timeout in getUserMatchup'
+        );
+        userTeam = result.data;
+        teamError = result.error;
+      } catch (timeoutError: any) {
+        console.error('[MatchupService.getUserMatchup] User team query timeout:', timeoutError);
+        teamError = timeoutError;
+      }
 
       if (teamError) throw teamError;
       if (!userTeam) {
@@ -524,7 +536,16 @@ export const MatchupService = {
         .limit(1);
       
       console.log('[MatchupService.getUserMatchup] Supabase query constructed, executing...');
-      const { data: matchups, error } = await query;
+      let matchups: any = null;
+      let error: any = null;
+      try {
+        const result = await withTimeout(query, 5000, 'getUserMatchup query timeout');
+        matchups = result.data;
+        error = result.error;
+      } catch (timeoutError: any) {
+        console.error('[MatchupService.getUserMatchup] Matchup query timeout:', timeoutError);
+        error = timeoutError;
+      }
       
       if (error) {
         console.error('[MatchupService.getUserMatchup] Database query error:', error);
@@ -594,12 +615,14 @@ export const MatchupService = {
   /**
    * Get unified matchup data with all necessary information for the matchup page
    * This is the primary API contract for matchup data
+   * @param existingMatchup Optional pre-fetched matchup object to avoid redundant query
    */
   async getMatchupData(
     leagueId: string,
     userId: string,
     weekNumber: number,
-    timezone: string = 'America/Denver'
+    timezone: string = 'America/Denver',
+    existingMatchup?: Matchup | null
   ): Promise<{ data: MatchupDataResponse | null; error: any }> {
     try {
       console.log('[MatchupService.getMatchupData] Received parameters:', {
@@ -610,11 +633,20 @@ export const MatchupService = {
       });
       
       // Get league to determine first week start
-      const { data: league, error: leagueError } = await supabase
-        .from('leagues')
-        .select('*')
-        .eq('id', leagueId)
-        .maybeSingle();
+      let league: any = null;
+      let leagueError: any = null;
+      try {
+        const result = await withTimeout(
+          supabase.from('leagues').select('*').eq('id', leagueId).maybeSingle(),
+          5000,
+          'getLeague timeout in getMatchupData'
+        );
+        league = result.data;
+        leagueError = result.error;
+      } catch (timeoutError: any) {
+        console.error('[MatchupService.getMatchupData] League query timeout:', timeoutError);
+        leagueError = timeoutError;
+      }
 
       if (leagueError) throw leagueError;
       if (!league) {
@@ -629,22 +661,37 @@ export const MatchupService = {
       const isPlayoffWeek = weekNumber > scheduleLength;
 
       // Get user's team
-      const { data: userTeam, error: teamError } = await supabase
-        .from('teams')
-        .select('*')
-        .eq('league_id', leagueId)
-        .eq('owner_id', userId)
-        .maybeSingle();
+      let userTeam: any = null;
+      let teamError: any = null;
+      try {
+        const result = await withTimeout(
+          supabase.from('teams').select('*').eq('league_id', leagueId).eq('owner_id', userId).maybeSingle(),
+          5000,
+          'getUserTeam timeout in getMatchupData'
+        );
+        userTeam = result.data;
+        teamError = result.error;
+      } catch (timeoutError: any) {
+        console.error('[MatchupService.getMatchupData] User team query timeout:', timeoutError);
+        teamError = timeoutError;
+      }
 
       if (teamError) throw teamError;
       if (!userTeam) {
         return { data: null, error: new Error('User team not found') };
       }
 
-      // Get matchup for this week
-      console.log('[MatchupService.getMatchupData] Calling getUserMatchup with weekNumber:', weekNumber);
-      const { matchup, error: matchupError } = await this.getUserMatchup(leagueId, userId, weekNumber);
-      if (matchupError) throw matchupError;
+      // Use existingMatchup if provided, otherwise query
+      let matchup: Matchup | null = null;
+      if (existingMatchup) {
+        console.log('[MatchupService.getMatchupData] Using pre-fetched matchup (avoiding redundant query)');
+        matchup = existingMatchup;
+      } else {
+        console.log('[MatchupService.getMatchupData] Querying matchup from DB...');
+        const { matchup: queriedMatchup, error: matchupError } = await this.getUserMatchup(leagueId, userId, weekNumber);
+        if (matchupError) throw matchupError;
+        matchup = queriedMatchup;
+      }
 
       if (!matchup) {
         console.warn('[MatchupService.getMatchupData] No matchup found for week:', weekNumber);
@@ -675,9 +722,9 @@ export const MatchupService = {
       let rosterPlayers: Player[];
       try {
         const [team1PlayerIds, team2PlayerIds] = await Promise.all([
-          this.getRosterPlayerIds(matchup.team1_id, matchup.league_id),
+          withTimeout(this.getRosterPlayerIds(matchup.team1_id, matchup.league_id), 5000, 'getRosterPlayerIds timeout for team1'),
           matchup.team2_id 
-            ? this.getRosterPlayerIds(matchup.team2_id, matchup.league_id)
+            ? withTimeout(this.getRosterPlayerIds(matchup.team2_id, matchup.league_id), 5000, 'getRosterPlayerIds timeout for team2')
             : Promise.resolve([])
         ]);
         
@@ -685,21 +732,30 @@ export const MatchupService = {
         const allRosterPlayerIds = [...new Set([...team1PlayerIds, ...team2PlayerIds])];
         
         if (allRosterPlayerIds.length === 0) {
-          console.warn('[MatchupService] No roster player IDs found, falling back to loading all players');
-          rosterPlayers = await PlayerService.getAllPlayers();
+          console.warn('[MatchupService] No roster player IDs found. Roster may be empty.');
+          rosterPlayers = []; // Return empty array instead of loading all players
         } else {
           // Load only roster players (much faster than loading all players)
-          rosterPlayers = await PlayerService.getPlayersByIds(allRosterPlayerIds);
+          rosterPlayers = await withTimeout(
+            PlayerService.getPlayersByIds(allRosterPlayerIds.map(String)),
+            10000,
+            'getPlayersByIds timeout'
+          );
           
-          // If optimized loading returned fewer players than expected, fallback
+          // If optimized loading returned fewer players than expected, log warning but don't fallback
           if (rosterPlayers.length < allRosterPlayerIds.length * 0.8) {
-            console.warn('[MatchupService] Optimized loading returned fewer players than expected, falling back to loading all players');
-            rosterPlayers = await PlayerService.getAllPlayers();
+            console.warn('[MatchupService] Optimized loading returned fewer players than expected:', {
+              expected: allRosterPlayerIds.length,
+              received: rosterPlayers.length
+            });
+            // Continue with partial roster rather than loading all players
           }
         }
       } catch (error) {
-        console.error('[MatchupService] Error in optimized roster loading, falling back to loading all players:', error);
-        rosterPlayers = await PlayerService.getAllPlayers();
+        console.error('[MatchupService] Error in optimized roster loading:', error);
+        // DO NOT fallback to getAllPlayers - it causes 504 timeouts
+        // Return empty array and let UI show error
+        rosterPlayers = [];
       }
 
       // Get rosters for both teams
@@ -956,6 +1012,7 @@ export const MatchupService = {
     };
   },
 
+
   /**
    * Transform HockeyPlayer to MatchupPlayer format with pre-fetched schedule data (optimized)
    */
@@ -965,7 +1022,9 @@ export const MatchupService = {
     weekStart: Date,
     weekEnd: Date,
     timezone: string = 'America/Denver',
-    games: NHLGame[]
+    games: NHLGame[],
+    matchupStats?: { goals: number; assists: number; sog: number; blocks: number; xGoals: number },
+    garPercentage?: number
   ): MatchupPlayer {
     const teamAbbrev = player.teamAbbreviation || player.team || '';
     
@@ -975,24 +1034,40 @@ export const MatchupService = {
       // Test mode controlled via VITE_TEST_MODE environment variable (defaults to false)
       const TEST_MODE = import.meta.env.VITE_TEST_MODE === 'true';
       const TEST_DATE = import.meta.env.VITE_TEST_DATE || '2025-12-08';
-      const getTodayString = () => TEST_MODE ? TEST_DATE : new Date().toISOString().split('T')[0];
+      const getTodayString = () => TEST_MODE ? TEST_DATE : getTodayMST(); // Use MST instead of UTC
       const getTodayDate = () => {
         if (TEST_MODE) {
           const date = new Date(TEST_DATE + 'T00:00:00');
           date.setHours(0, 0, 0, 0);
           return date;
         }
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        return today;
+        return getTodayMSTDate(); // Use MST instead of local time
       };
       
       const today = getTodayDate();
-      const gamesRemaining = games.filter(g => {
+      
+      // CRITICAL: Filter games to ONLY matchup week (weekStart to weekEnd)
+      // This prevents showing season totals instead of week totals
+      const weekGames = games.filter(g => {
+        if (!g || !g.game_date) return false;
+        const gameDate = new Date(g.game_date);
+        gameDate.setHours(0, 0, 0, 0);
+        const weekStartDate = new Date(weekStart);
+        weekStartDate.setHours(0, 0, 0, 0);
+        const weekEndDate = new Date(weekEnd);
+        weekEndDate.setHours(23, 59, 59, 999);
+        return gameDate >= weekStartDate && gameDate <= weekEndDate;
+      });
+      
+      // Calculate games remaining from week games only
+      const gamesRemaining = weekGames.filter(g => {
         const gameDate = new Date(g.game_date);
         gameDate.setHours(0, 0, 0, 0);
         return gameDate >= today && (g.status === 'scheduled' || g.status === 'live');
       }).length;
+      
+      // Also calculate total games in week for validation
+      const totalWeekGames = weekGames.length;
 
       // Check if team has a game today
       const todayStr = getTodayString();
@@ -1026,23 +1101,92 @@ export const MatchupService = {
       // Only mark as "today" if there's actually a game scheduled for today (December 8, 2025)
       // hasGameToday is already correctly set based on todayStr comparison
       
+      // Calculate fantasy points from matchup stats if available, otherwise use 0
+      let fantasyPoints = 0;
+      let blocks = 0; // Define blocks outside the if block to avoid ReferenceError
+      if (matchupStats) {
+        // CRITICAL: Validate that stats are for a week, not season
+        // For a single week, max should be: ~7 goals, ~10 assists, ~30 SOG (very high week)
+        const MAX_REASONABLE_WEEK_GOALS = 10;
+        const MAX_REASONABLE_WEEK_ASSISTS = 15;
+        const MAX_REASONABLE_WEEK_SOG = 40;
+        
+        if (matchupStats.goals > MAX_REASONABLE_WEEK_GOALS || 
+            matchupStats.assists > MAX_REASONABLE_WEEK_ASSISTS || 
+            matchupStats.sog > MAX_REASONABLE_WEEK_SOG) {
+          console.error(`[MatchupService.transformToMatchupPlayerWithGames] ❌ RPC returned season totals for ${player.name}: G=${matchupStats.goals}, A=${matchupStats.assists}, SOG=${matchupStats.sog} - REJECTING and using 0 points`);
+          fantasyPoints = 0; // Reject season totals from RPC
+          blocks = 0;
+        } else {
+          // Fantasy scoring: Goals=3, Assists=2, SOG=0.4, Blocks=0.4
+          // CRITICAL: Use blocks from matchup week stats, NOT season stats
+          blocks = matchupStats.blocks || 0; // Get from matchup week stats
+          fantasyPoints = (matchupStats.goals * 3) + 
+                          (matchupStats.assists * 2) + 
+                          (matchupStats.sog * 0.4) + 
+                          (blocks * 0.4);
+        }
+        
+        // Debug logging for first few players
+        if (Math.random() < 0.1) { // Log ~10% of players to avoid spam
+          console.log(`[MatchupService.transformToMatchupPlayerWithGames] Calculated points for ${player.name}:`, {
+            matchupStats: matchupStats ? {
+              goals: matchupStats.goals,
+              assists: matchupStats.assists,
+              sog: matchupStats.sog,
+              blocks: matchupStats.blocks || 0
+            } : null,
+            blocksFromWeek: blocks,
+            blocksFromSeason: player.stats.blockedShots || 0,
+            calculatedPoints: fantasyPoints,
+            weekStart: weekStart.toISOString().split('T')[0],
+            weekEnd: weekEnd.toISOString().split('T')[0]
+          });
+        }
+      } else {
+        // Log when matchupStats is missing
+        if (Math.random() < 0.1) {
+          console.warn(`[MatchupService.transformToMatchupPlayerWithGames] No matchupStats for ${player.name}, using 0 points`);
+        }
+      }
+
       return {
         id: typeof player.id === 'string' ? parseInt(player.id) || 0 : player.id || 0,
         name: player.name,
         position: player.position,
         team: teamAbbrev,
-        points: 0, // Matchup points start at 0 (will be calculated from week's games when available)
-        gamesRemaining,
+        points: fantasyPoints || 0, // Fantasy points calculated from matchup stats (matchup week only), default to 0
+        total_points: fantasyPoints || 0, // CRITICAL: Always set total_points to matchup week points, never season points
+        gamesRemaining, // This is calculated from week games only (already filtered above)
+        games_remaining_total: gamesRemaining, // Set default for week games
+        games_remaining_active: isStarter ? gamesRemaining : 0, // Only active if starter
         status: gameStatus, // Will be null for scheduled games, 'In Game' or 'Final' for active/completed
         isStarter,
-        stats: {
-          goals: player.stats.goals || 0,
-          assists: player.stats.assists || 0,
-          sog: player.stats.shots || 0,
-          blk: player.stats.blockedShots || 0,
-          gamesPlayed: player.stats.gamesPlayed || 0,
-          xGoals: player.stats.xGoals || 0
+        // CRITICAL: Use weekly matchupStats for display, not season stats
+        stats: matchupStats ? {
+          goals: matchupStats.goals || 0,
+          assists: matchupStats.assists || 0,
+          sog: matchupStats.sog || 0,
+          blk: matchupStats.blocks || 0,
+          gamesPlayed: 0, // Will be set from matchupLine if available
+          xGoals: matchupStats.xGoals || 0
+        } : {
+          // No weekly stats - player didn't play this week, show zeros
+          goals: 0,
+          assists: 0,
+          sog: 0,
+          blk: 0,
+          gamesPlayed: 0,
+          xGoals: 0
         },
+        matchupStats: matchupStats ? {
+          goals: matchupStats.goals,
+          assists: matchupStats.assists,
+          sog: matchupStats.sog,
+          blocks: matchupStats.blocks || 0,
+          xGoals: matchupStats.xGoals
+        } : undefined,
+        garPercentage: garPercentage,
         isToday: hasGameToday, // Only true if game_date === todayStr (December 8, 2025)
         gameInfo // Only set if there's a game (today's game or next game in week)
       };
@@ -1066,6 +1210,8 @@ export const MatchupService = {
           gamesPlayed: player.stats.gamesPlayed || 0,
           xGoals: player.stats.xGoals || 0
         },
+        matchupStats: undefined,
+        garPercentage: undefined,
         isToday: false,
         gameInfo: undefined
       };
@@ -1093,10 +1239,10 @@ export const MatchupService = {
         console.warn(`Error fetching games for ${teamAbbrev}:`, gamesError);
       }
       
-      return this.transformToMatchupPlayerWithGames(player, isStarter, weekStart, weekEnd, timezone, games || []);
+      return this.transformToMatchupPlayerWithGames(player, isStarter, weekStart, weekEnd, timezone, games || [], undefined, undefined);
     } catch (error) {
       console.error(`Error transforming player ${player.name} to matchup player:`, error);
-      return this.transformToMatchupPlayerWithGames(player, isStarter, weekStart, weekEnd, timezone, []);
+      return this.transformToMatchupPlayerWithGames(player, isStarter, weekStart, weekEnd, timezone, [], undefined, undefined);
     }
   },
 
@@ -1139,14 +1285,15 @@ export const MatchupService = {
         this.clearRosterCache(matchup.team2_id, matchup.league_id);
       }
       
+      // Wrap each query in timeout to prevent one slow query from hanging the entire Promise.all()
       const [team1Roster, team2Roster, team1LineupResult, team2LineupResult] = await Promise.all([
-        this.getTeamRoster(matchup.team1_id, matchup.league_id, allPlayers),
+        withTimeout(this.getTeamRoster(matchup.team1_id, matchup.league_id, allPlayers), 5000, 'getTeamRoster timeout for team1'),
         matchup.team2_id
-          ? this.getTeamRoster(matchup.team2_id, matchup.league_id, allPlayers)
+          ? withTimeout(this.getTeamRoster(matchup.team2_id, matchup.league_id, allPlayers), 5000, 'getTeamRoster timeout for team2')
           : Promise.resolve([]),
-        LeagueService.getLineup(matchup.team1_id, matchup.league_id),
+        withTimeout(LeagueService.getLineup(matchup.team1_id, matchup.league_id), 5000, 'getLineup timeout for team1'),
         matchup.team2_id
-          ? LeagueService.getLineup(matchup.team2_id, matchup.league_id)
+          ? withTimeout(LeagueService.getLineup(matchup.team2_id, matchup.league_id), 5000, 'getLineup timeout for team2')
           : Promise.resolve(null)
       ]);
 
@@ -1292,34 +1439,489 @@ export const MatchupService = {
         ...team2Roster.map(p => p.teamAbbreviation || p.team || '')
       ].filter(team => team !== '')));
 
-      // Fetch all games for all teams in one batch query
-      const { gamesByTeam } = await ScheduleService.getGamesForTeams(allTeams, weekStart, weekEnd);
+      // Fetch all games for all teams in one batch query (with timeout to prevent hang)
+      const { gamesByTeam } = await withTimeout(
+        ScheduleService.getGamesForTeams(allTeams, weekStart, weekEnd),
+        10000,
+        'getGamesForTeams timeout'
+      );
 
-      // Transform players with pre-fetched schedule data
+      // Collect all player IDs from both rosters
+      const allPlayerIds = [
+        ...team1Roster.map(p => typeof p.id === 'string' ? parseInt(p.id) || 0 : p.id || 0),
+        ...team2Roster.map(p => typeof p.id === 'string' ? parseInt(p.id) || 0 : p.id || 0)
+      ].filter(id => id > 0);
+
+      // NEW: Fetch pre-calculated matchup lines (with graceful degradation)
+      let matchupLines = new Map<number, any>();
+      try {
+        matchupLines = await this.getMatchupLines(matchup.id);
+      } catch (error) {
+        console.warn('[MatchupService] Failed to fetch matchup lines, continuing with empty data:', error);
+        // Continue with empty Map - page should still load
+      }
+
+      // Fetch matchup stats for the week (with graceful degradation)
+      let matchupStatsMap = new Map<number, { goals: number; assists: number; sog: number; blocks: number; xGoals: number }>();
+      try {
+        const weekStartStr = weekStart.toISOString().split('T')[0];
+        const weekEndStr = weekEnd.toISOString().split('T')[0];
+        
+        console.log('[MatchupService.getMatchupRosters] 📊 Fetching matchup stats for week:', {
+          weekStart: weekStartStr,
+          weekEnd: weekEndStr,
+          playerCount: allPlayerIds.length,
+          matchupId: matchup.id
+        });
+        
+        matchupStatsMap = await this.fetchMatchupStatsForPlayers(allPlayerIds, weekStart, weekEnd);
+        
+        if (matchupStatsMap.size > 0) {
+          const sampleEntry = Array.from(matchupStatsMap.entries())[0];
+          const playersWithStats = Array.from(matchupStatsMap.entries()).slice(0, 3);
+          
+          // Check if sample players have season-total-like numbers
+          const highValuePlayers = playersWithStats.filter(([id, stats]) => 
+            stats.goals > 20 || stats.assists > 30 || stats.sog > 100
+          );
+          
+          console.log('[MatchupService.getMatchupRosters] ✅ Matchup stats fetched successfully:');
+          console.log(`  Stats Map Size: ${matchupStatsMap.size}, Expected: ${allPlayerIds.length}, Coverage: ${((matchupStatsMap.size / allPlayerIds.length) * 100).toFixed(1)}%`);
+          console.log(`  Week: ${weekStartStr} to ${weekEndStr}`);
+          console.log(`  Sample Players:`);
+          playersWithStats.forEach(([id, stats]) => {
+            const looksLikeSeason = stats.goals > 20 || stats.assists > 30 || stats.sog > 100;
+            console.log(`    Player ${id}: G=${stats.goals}, A=${stats.assists}, SOG=${stats.sog}, Blocks=${stats.blocks || 0} ${looksLikeSeason ? '❌ SEASON TOTAL' : '✅ Week'}`);
+          });
+          
+          if (highValuePlayers.length > 0) {
+            console.error(`  ❌ ${highValuePlayers.length} sample players have season-total-like numbers! RPC may be broken!`);
+          } else {
+            console.log(`  ✅ All sample players look like week totals`);
+          }
+        } else {
+          console.error('[MatchupService.getMatchupRosters] ❌ CRITICAL: Matchup stats map is EMPTY - no week data found!', {
+            weekStart: weekStartStr,
+            weekEnd: weekEndStr,
+            playerCount: allPlayerIds.length,
+            matchupId: matchup.id,
+            samplePlayerIds: allPlayerIds.slice(0, 5)
+          });
+        }
+      } catch (error) {
+        console.error('[MatchupService] ❌ Failed to fetch matchup stats:', error);
+        // Continue with empty Map - page should still load
+      }
+      const garMap = new Map<number, number>();
+
+      // Transform players with pre-fetched schedule data, matchup stats, and GAR
       const team1MatchupPlayers = await Promise.all(
-        team1Roster.map(p =>
-          this.transformToMatchupPlayerWithGames(
+        team1Roster.map(p => {
+          const playerId = typeof p.id === 'string' ? parseInt(p.id) || 0 : p.id || 0;
+          const playerGames = gamesByTeam.get(p.teamAbbreviation || p.team || '') || [];
+          const transformed = this.transformToMatchupPlayerWithGames(
             p,
             team1Starters.has(String(p.id)),
             weekStart,
             weekEnd,
             timezone,
-            gamesByTeam.get(p.teamAbbreviation || p.team || '') || []
-          )
-        )
+            playerGames,
+            matchupStatsMap.get(playerId),
+            garMap.get(playerId)
+          );
+          
+          // Get calculated games remaining from transformed player (already filtered to week)
+          const gamesRemaining = transformed.games_remaining_total || 0;
+          
+          // Merge matchup line data if available
+          const matchupLine = matchupLines.get(playerId);
+          const matchupStats = matchupStatsMap.get(playerId);
+          
+          // Helper function to calculate matchup week points from stats
+          const calculateMatchupWeekPoints = (stats: { goals: number; assists: number; sog: number; blocks?: number } | undefined): number => {
+            if (!stats) return 0;
+            
+            // CRITICAL: Validate that stats are for a week, not season
+            // For a single week, max should be: ~7 goals, ~10 assists, ~30 SOG (very high week)
+            // If stats are too high, RPC returned season totals - reject them
+            const MAX_REASONABLE_WEEK_GOALS = 10;
+            const MAX_REASONABLE_WEEK_ASSISTS = 15;
+            const MAX_REASONABLE_WEEK_SOG = 40;
+            
+            if (stats.goals > MAX_REASONABLE_WEEK_GOALS || 
+                stats.assists > MAX_REASONABLE_WEEK_ASSISTS || 
+                stats.sog > MAX_REASONABLE_WEEK_SOG) {
+              console.error(`[MatchupService] ❌ RPC returned season totals for ${p.name}: G=${stats.goals}, A=${stats.assists}, SOG=${stats.sog} - REJECTING and using 0 points`);
+              return 0; // Reject season totals from RPC
+            }
+            
+            // CRITICAL: Use blocks from matchup week stats, NOT season stats
+            const blocks = stats.blocks || 0; // Get from matchup week stats
+            return (stats.goals * 3) + 
+                   (stats.assists * 2) + 
+                   (stats.sog * 0.4) + 
+                   (blocks * 0.4);
+          };
+          
+          if (matchupLine) {
+            // CRITICAL: Always prefer matchupStats (from RPC) over database value
+            // The database may have season totals, but RPC has correct weekly stats
+            const MAX_REASONABLE_WEEK_POINTS = 100;
+            let matchupWeekPoints: number;
+            
+            if (matchupStats) {
+              // RPC returned weekly stats - always use them (they're the source of truth)
+              matchupWeekPoints = calculateMatchupWeekPoints(matchupStats);
+              
+              // Validate that RPC stats look reasonable for a week
+              const isLikelySeasonTotal = matchupStats.goals > 20 || matchupStats.assists > 30 || matchupStats.sog > 100;
+              if (isLikelySeasonTotal) {
+                console.error(`[MatchupService] ❌ RPC RETURNED SEASON TOTALS for ${p.name} (${playerId}): G=${matchupStats.goals}, A=${matchupStats.assists}, SOG=${matchupStats.sog} - REJECTING and using 0`);
+                matchupWeekPoints = 0; // Reject season totals from RPC
+              }
+              
+              // Log if database value was suspicious (for debugging)
+              if (matchupLine.total_points > MAX_REASONABLE_WEEK_POINTS) {
+                console.warn(`[MatchupService] ⚠️ Database had season totals (${matchupLine.total_points}) for ${p.name} (${playerId}), using RPC value (${matchupWeekPoints})`);
+              }
+            } else {
+              // No RPC stats - player didn't play this week (injured, scratched, etc.)
+              // Always set to 0, regardless of database value (database may have old/incorrect data)
+              matchupWeekPoints = 0;
+              
+              // Log if database had suspicious values (for debugging)
+              if (matchupLine.total_points > MAX_REASONABLE_WEEK_POINTS) {
+                console.warn(`[MatchupService] ⚠️ No matchupStats for ${p.name} (${playerId}) - player didn't play this week. Database had ${matchupLine.total_points} (likely season totals), setting to 0.`, {
+                  databaseValue: matchupLine.total_points,
+                  playerId,
+                  weekStart: weekStart.toISOString().split('T')[0],
+                  weekEnd: weekEnd.toISOString().split('T')[0]
+                });
+              }
+            }
+            
+            // CRITICAL: Set total_points to the validated/recalculated matchup week points
+            transformed.total_points = matchupWeekPoints;
+            transformed.points = matchupWeekPoints; // CRITICAL: Override season points with matchup week points
+            transformed.games_played = matchupLine.games_played;
+            
+            // CRITICAL: Update stats.gamesPlayed to use weekly games_played
+            if (transformed.stats) {
+              transformed.stats.gamesPlayed = matchupLine.games_played || 0;
+            }
+            
+            // Debug: Log final value being set (for ALL players with season totals to verify fix)
+            if (matchupLine.total_points > MAX_REASONABLE_WEEK_POINTS) {
+              const statsBreakdown = matchupStats ? {
+                goals: matchupStats.goals,
+                assists: matchupStats.assists,
+                sog: matchupStats.sog,
+                blocks: matchupStats.blocks || 0,
+                calculated: (matchupStats.goals * 3) + (matchupStats.assists * 2) + (matchupStats.sog * 0.4) + ((matchupStats.blocks || 0) * 0.4)
+              } : null;
+              
+              console.log(`[MatchupService] ✅ FINAL SET: ${p.name} (${playerId})`, {
+                databaseValue: matchupLine.total_points,
+                finalValue: matchupWeekPoints,
+                matchupStatsExists: !!matchupStats,
+                matchupStats: statsBreakdown,
+                // Verify: If matchupStats has high numbers, RPC is broken
+                rpcMayBeBroken: statsBreakdown ? (statsBreakdown.goals > 20 || statsBreakdown.assists > 30 || statsBreakdown.sog > 100) : false
+              });
+            }
+            
+            // CRITICAL: Validate games_remaining values are reasonable (max 7 games per week)
+            // If database has invalid data (e.g., season total), use calculated value
+            const maxGamesPerWeek = 7;
+            if (matchupLine.games_remaining_total > maxGamesPerWeek) {
+              // Silently use calculated value - database has season totals, which is expected
+              // Use calculated value from week games
+              transformed.games_remaining_total = gamesRemaining;
+              transformed.games_remaining_active = team1Starters.has(String(p.id)) ? gamesRemaining : 0;
+            } else {
+              transformed.games_remaining_total = matchupLine.games_remaining_total;
+              transformed.games_remaining_active = matchupLine.games_remaining_active;
+            }
+            
+            transformed.has_live_game = matchupLine.has_live_game;
+            transformed.live_game_locked = matchupLine.live_game_locked;
+            
+            // CRITICAL: Calculate stats_breakdown from weekly matchupStats, not database (which may have season totals)
+            if (matchupStats) {
+              // Calculate breakdown from weekly stats using scoring: Goals=3, Assists=2, SOG=0.4, Blocks=0.4
+              const goalsPoints = (matchupStats.goals || 0) * 3;
+              const assistsPoints = (matchupStats.assists || 0) * 2;
+              const sogPoints = (matchupStats.sog || 0) * 0.4;
+              const blocksPoints = (matchupStats.blocks || 0) * 0.4;
+              
+              transformed.stats_breakdown = {
+                'Goals': {
+                  count: matchupStats.goals || 0,
+                  points: goalsPoints,
+                  logic: `${matchupStats.goals || 0} goals * 3.0 points`
+                },
+                'Assists': {
+                  count: matchupStats.assists || 0,
+                  points: assistsPoints,
+                  logic: `${matchupStats.assists || 0} assists * 2.0 points`
+                },
+                'Shots on Goal': {
+                  count: matchupStats.sog || 0,
+                  points: sogPoints,
+                  logic: `${matchupStats.sog || 0} shots * 0.4 points`
+                },
+                'Blocks': {
+                  count: matchupStats.blocks || 0,
+                  points: blocksPoints,
+                  logic: `${matchupStats.blocks || 0} blocks * 0.4 points`
+                }
+              };
+            } else {
+              // No weekly stats - player didn't play, breakdown should be empty/undefined
+              transformed.stats_breakdown = undefined;
+            }
+            
+            // Points already set above - matchupWeekPoints
+          } else {
+            // No matchup line data - calculate from matchup stats (matchup week only)
+            const calculatedPoints = calculateMatchupWeekPoints(matchupStats);
+            transformed.total_points = calculatedPoints;
+            transformed.points = calculatedPoints; // Use matchup week points, not season
+            
+            // Calculate stats_breakdown from weekly matchupStats
+            if (matchupStats) {
+              const goalsPoints = (matchupStats.goals || 0) * 3;
+              const assistsPoints = (matchupStats.assists || 0) * 2;
+              const sogPoints = (matchupStats.sog || 0) * 0.4;
+              const blocksPoints = (matchupStats.blocks || 0) * 0.4;
+              
+              transformed.stats_breakdown = {
+                'Goals': {
+                  count: matchupStats.goals || 0,
+                  points: goalsPoints,
+                  logic: `${matchupStats.goals || 0} goals * 3.0 points`
+                },
+                'Assists': {
+                  count: matchupStats.assists || 0,
+                  points: assistsPoints,
+                  logic: `${matchupStats.assists || 0} assists * 2.0 points`
+                },
+                'Shots on Goal': {
+                  count: matchupStats.sog || 0,
+                  points: sogPoints,
+                  logic: `${matchupStats.sog || 0} shots * 0.4 points`
+                },
+                'Blocks': {
+                  count: matchupStats.blocks || 0,
+                  points: blocksPoints,
+                  logic: `${matchupStats.blocks || 0} blocks * 0.4 points`
+                }
+              };
+            } else {
+              transformed.stats_breakdown = undefined;
+            }
+            
+            // Debug: Log when no matchup line exists
+            if (Math.random() < 0.1) {
+              console.log(`[MatchupService] No matchupLine for ${p.name} (${playerId}), calculated: ${calculatedPoints} from matchupStats:`, matchupStats);
+            }
+            transformed.games_remaining_total = gamesRemaining;
+            transformed.games_remaining_active = team1Starters.has(String(p.id)) ? gamesRemaining : 0;
+          }
+          
+          // Add games array for GameLogosBar
+          transformed.games = playerGames;
+          
+          return transformed;
+        })
       );
 
       const team2MatchupPlayers = await Promise.all(
-        team2Roster.map(p =>
-          this.transformToMatchupPlayerWithGames(
+        team2Roster.map(p => {
+          const playerId = typeof p.id === 'string' ? parseInt(p.id) || 0 : p.id || 0;
+          const playerGames = gamesByTeam.get(p.teamAbbreviation || p.team || '') || [];
+          const transformed = this.transformToMatchupPlayerWithGames(
             p,
             team2Starters.has(String(p.id)),
             weekStart,
             weekEnd,
             timezone,
-            gamesByTeam.get(p.teamAbbreviation || p.team || '') || []
-          )
-        )
+            playerGames,
+            matchupStatsMap.get(playerId),
+            garMap.get(playerId)
+          );
+          
+          // Get calculated games remaining from transformed player (already filtered to week)
+          const gamesRemaining = transformed.games_remaining_total || 0;
+          
+          // Merge matchup line data if available
+          const matchupLine = matchupLines.get(playerId);
+          const matchupStats = matchupStatsMap.get(playerId);
+          
+          // Helper function to calculate matchup week points from stats
+          const calculateMatchupWeekPoints = (stats: { goals: number; assists: number; sog: number; blocks?: number } | undefined): number => {
+            if (!stats) return 0;
+            
+            // CRITICAL: Validate that stats are for a week, not season
+            // For a single week, max should be: ~7 goals, ~10 assists, ~30 SOG (very high week)
+            // If stats are too high, RPC returned season totals - reject them
+            const MAX_REASONABLE_WEEK_GOALS = 10;
+            const MAX_REASONABLE_WEEK_ASSISTS = 15;
+            const MAX_REASONABLE_WEEK_SOG = 40;
+            
+            if (stats.goals > MAX_REASONABLE_WEEK_GOALS || 
+                stats.assists > MAX_REASONABLE_WEEK_ASSISTS || 
+                stats.sog > MAX_REASONABLE_WEEK_SOG) {
+              console.error(`[MatchupService] ❌ RPC returned season totals for ${p.name}: G=${stats.goals}, A=${stats.assists}, SOG=${stats.sog} - REJECTING and using 0 points`);
+              return 0; // Reject season totals from RPC
+            }
+            
+            // CRITICAL: Use blocks from matchup week stats, NOT season stats
+            const blocks = stats.blocks || 0; // Get from matchup week stats
+            return (stats.goals * 3) + 
+                   (stats.assists * 2) + 
+                   (stats.sog * 0.4) + 
+                   (blocks * 0.4);
+          };
+          
+          if (matchupLine) {
+            // CRITICAL: Always prefer matchupStats (from RPC) over database value
+            // The database may have season totals, but RPC has correct weekly stats
+            const MAX_REASONABLE_WEEK_POINTS = 100;
+            let matchupWeekPoints: number;
+            
+            if (matchupStats) {
+              // RPC returned weekly stats - always use them (they're the source of truth)
+              matchupWeekPoints = calculateMatchupWeekPoints(matchupStats);
+              
+              // Validate that RPC stats look reasonable for a week
+              const isLikelySeasonTotal = matchupStats.goals > 20 || matchupStats.assists > 30 || matchupStats.sog > 100;
+              if (isLikelySeasonTotal) {
+                console.error(`[MatchupService] ❌ RPC RETURNED SEASON TOTALS for ${p.name} (${playerId}): G=${matchupStats.goals}, A=${matchupStats.assists}, SOG=${matchupStats.sog} - REJECTING and using 0`);
+                matchupWeekPoints = 0; // Reject season totals from RPC
+              }
+              
+              // Log if database value was suspicious (for debugging)
+              if (matchupLine.total_points > MAX_REASONABLE_WEEK_POINTS) {
+                console.warn(`[MatchupService] ⚠️ Database had season totals (${matchupLine.total_points}) for ${p.name} (${playerId}), using RPC value (${matchupWeekPoints})`);
+              }
+            } else {
+              // No RPC stats - player didn't play this week (injured, scratched, etc.)
+              // Always set to 0, regardless of database value (database may have old/incorrect data)
+              matchupWeekPoints = 0;
+              
+              // Log if database had suspicious values (for debugging)
+              if (matchupLine.total_points > MAX_REASONABLE_WEEK_POINTS) {
+                console.warn(`[MatchupService] ⚠️ No matchupStats for ${p.name} (${playerId}) - player didn't play this week. Database had ${matchupLine.total_points} (likely season totals), setting to 0.`, {
+                  databaseValue: matchupLine.total_points,
+                  playerId,
+                  weekStart: weekStart.toISOString().split('T')[0],
+                  weekEnd: weekEnd.toISOString().split('T')[0]
+                });
+              }
+            }
+            
+            // CRITICAL: Set total_points to the validated/recalculated matchup week points
+            transformed.total_points = matchupWeekPoints;
+            transformed.points = matchupWeekPoints; // CRITICAL: Override season points with matchup week points
+            transformed.games_played = matchupLine.games_played;
+            
+            // CRITICAL: Update stats.gamesPlayed to use weekly games_played
+            if (transformed.stats) {
+              transformed.stats.gamesPlayed = matchupLine.games_played || 0;
+            }
+            
+            // Debug: Log final value being set (for ALL players with season totals to verify fix)
+            if (matchupLine.total_points > MAX_REASONABLE_WEEK_POINTS) {
+              const statsBreakdown = matchupStats ? {
+                goals: matchupStats.goals,
+                assists: matchupStats.assists,
+                sog: matchupStats.sog,
+                blocks: matchupStats.blocks || 0,
+                calculated: (matchupStats.goals * 3) + (matchupStats.assists * 2) + (matchupStats.sog * 0.4) + ((matchupStats.blocks || 0) * 0.4)
+              } : null;
+              
+              console.log(`[MatchupService] ✅ FINAL SET: ${p.name} (${playerId})`, {
+                databaseValue: matchupLine.total_points,
+                finalValue: matchupWeekPoints,
+                matchupStatsExists: !!matchupStats,
+                matchupStats: statsBreakdown,
+                // Verify: If matchupStats has high numbers, RPC is broken
+                rpcMayBeBroken: statsBreakdown ? (statsBreakdown.goals > 20 || statsBreakdown.assists > 30 || statsBreakdown.sog > 100) : false
+              });
+            }
+            
+            // CRITICAL: Validate games_remaining values are reasonable (max 7 games per week)
+            // If database has invalid data (e.g., season total), use calculated value
+            const maxGamesPerWeek = 7;
+            if (matchupLine.games_remaining_total > maxGamesPerWeek) {
+              // Silently use calculated value - database has season totals, which is expected
+              // Use calculated value from week games
+              transformed.games_remaining_total = gamesRemaining;
+              transformed.games_remaining_active = team2Starters.has(String(p.id)) ? gamesRemaining : 0;
+            } else {
+              transformed.games_remaining_total = matchupLine.games_remaining_total;
+              transformed.games_remaining_active = matchupLine.games_remaining_active;
+            }
+            
+            transformed.has_live_game = matchupLine.has_live_game;
+            transformed.live_game_locked = matchupLine.live_game_locked;
+            
+            // CRITICAL: Calculate stats_breakdown from weekly matchupStats, not database (which may have season totals)
+            if (matchupStats) {
+              // Calculate breakdown from weekly stats using scoring: Goals=3, Assists=2, SOG=0.4, Blocks=0.4
+              const goalsPoints = (matchupStats.goals || 0) * 3;
+              const assistsPoints = (matchupStats.assists || 0) * 2;
+              const sogPoints = (matchupStats.sog || 0) * 0.4;
+              const blocksPoints = (matchupStats.blocks || 0) * 0.4;
+              
+              transformed.stats_breakdown = {
+                'Goals': {
+                  count: matchupStats.goals || 0,
+                  points: goalsPoints,
+                  logic: `${matchupStats.goals || 0} goals * 3.0 points`
+                },
+                'Assists': {
+                  count: matchupStats.assists || 0,
+                  points: assistsPoints,
+                  logic: `${matchupStats.assists || 0} assists * 2.0 points`
+                },
+                'Shots on Goal': {
+                  count: matchupStats.sog || 0,
+                  points: sogPoints,
+                  logic: `${matchupStats.sog || 0} shots * 0.4 points`
+                },
+                'Blocks': {
+                  count: matchupStats.blocks || 0,
+                  points: blocksPoints,
+                  logic: `${matchupStats.blocks || 0} blocks * 0.4 points`
+                }
+              };
+            } else {
+              // No weekly stats - player didn't play, breakdown should be empty/undefined
+              transformed.stats_breakdown = undefined;
+            }
+            
+            // Points already set above - matchupWeekPoints
+          } else {
+            // No matchup line data - calculate from matchup stats (matchup week only)
+            const calculatedPoints = calculateMatchupWeekPoints(matchupStats);
+            transformed.total_points = calculatedPoints;
+            transformed.points = calculatedPoints; // Use matchup week points, not season
+            
+            // Debug: Log when no matchup line exists
+            if (Math.random() < 0.1) {
+              console.log(`[MatchupService] No matchupLine for ${p.name} (${playerId}), calculated: ${calculatedPoints} from matchupStats:`, matchupStats);
+            }
+            transformed.games_remaining_total = gamesRemaining;
+            transformed.games_remaining_active = team2Starters.has(String(p.id)) ? gamesRemaining : 0;
+          }
+          
+          // Add games array for GameLogosBar
+          transformed.games = playerGames;
+          
+          return transformed;
+        })
       );
 
       return {
@@ -1572,5 +2174,218 @@ export const MatchupService = {
       console.error('Error getting playoff bracket:', error);
       return { rounds: [], bracketSize: 0, error };
     }
+  },
+
+  /**
+   * Fetch pre-calculated matchup lines from fantasy_matchup_lines table
+   */
+  async getMatchupLines(matchupId: string): Promise<Map<number, any>> {
+    try {
+      const queryPromise = supabase
+        .from('fantasy_matchup_lines')
+        .select('*')
+        .eq('matchup_id', matchupId);
+      
+      let data: any = null;
+      let error: any = null;
+      try {
+        const result = await withTimeout(queryPromise, 5000, 'getMatchupLines timeout');
+        data = result.data;
+        error = result.error;
+      } catch (timeoutError: any) {
+        console.error('[MatchupService.getMatchupLines] Query timeout:', timeoutError);
+        error = timeoutError;
+      }
+      
+      if (error) throw error;
+      
+      // Convert array to Map keyed by player_id for O(1) lookup
+      const linesMap = new Map<number, any>();
+      (data || []).forEach(line => {
+        linesMap.set(line.player_id, line);
+      });
+      
+      return linesMap;
+    } catch (error) {
+      console.warn('[MatchupService] getMatchupLines timeout or error:', error);
+      return new Map(); // Graceful degradation
+    }
+  },
+
+  /**
+   * Fetch matchup stats for players in the matchup week
+   */
+  async fetchMatchupStatsForPlayers(
+    playerIds: number[],
+    startDate: Date,
+    endDate: Date
+  ): Promise<Map<number, { goals: number; assists: number; sog: number; blocks: number; xGoals: number }>> {
+    try {
+      const startDateStr = startDate.toISOString().split('T')[0];
+      const endDateStr = endDate.toISOString().split('T')[0];
+      
+      console.log('[MatchupService.fetchMatchupStatsForPlayers] 📞 Calling RPC with:', {
+        playerCount: playerIds.length,
+        startDate: startDateStr,
+        endDate: endDateStr,
+        dateRange: `${startDateStr} to ${endDateStr}`,
+        samplePlayerIds: playerIds.slice(0, 5),
+        // CRITICAL: Verify dates are correct format (YYYY-MM-DD)
+        dateFormatCheck: {
+          startDateValid: /^\d{4}-\d{2}-\d{2}$/.test(startDateStr),
+          endDateValid: /^\d{4}-\d{2}-\d{2}$/.test(endDateStr),
+          startDateObj: startDate.toISOString(),
+          endDateObj: endDate.toISOString()
+        }
+      });
+      
+      const rpcPromise = supabase.rpc('get_matchup_stats', {
+        p_player_ids: playerIds,
+        p_start_date: startDateStr,
+        p_end_date: endDateStr
+      });
+      
+      let data: any = null;
+      let error: any = null;
+      try {
+        const result = await withTimeout(rpcPromise, 5000, 'fetchMatchupStatsForPlayers timeout');
+        data = result.data;
+        error = result.error;
+      } catch (timeoutError: any) {
+        console.error('[MatchupService.fetchMatchupStatsForPlayers] RPC timeout:', timeoutError);
+        error = timeoutError;
+      }
+      
+      if (error) throw error;
+      
+      const statsMap = new Map<number, { goals: number; assists: number; sog: number; blocks: number; xGoals: number }>();
+      (data || []).forEach((row: any) => {
+        statsMap.set(row.player_id, {
+          goals: row.goals || 0,
+          assists: row.assists || 0,
+          sog: row.shots_on_goal || 0,
+          blocks: row.blocks || 0, // CRITICAL: Get blocks from matchup week stats, not season stats
+          xGoals: parseFloat(row.x_goals || 0)
+        });
+      });
+      
+      if (statsMap.size > 0) {
+        const sampleEntry = Array.from(statsMap.entries())[0];
+        const sampleStats = sampleEntry[1];
+        // Check if sample looks like season totals (high numbers)
+        // For a week, max should be: ~7 goals, ~10 assists, ~30 SOG (very high week)
+        const looksLikeSeasonTotal = sampleStats.goals > 20 || sampleStats.assists > 30 || sampleStats.sog > 100;
+        
+        // Calculate expected points for sample to verify
+        const samplePoints = (sampleStats.goals * 3) + (sampleStats.assists * 2) + (sampleStats.sog * 0.4) + ((sampleStats.blocks || 0) * 0.4);
+        
+        // CRITICAL: Log explicitly to see actual values
+        console.log('[MatchupService.fetchMatchupStatsForPlayers] RPC returned:');
+        console.log(`  Total Rows: ${(data || []).length}, Stats Map Size: ${statsMap.size}`);
+        console.log(`  Date Range: ${startDateStr} to ${endDateStr}`);
+        console.log(`  Sample Player ID: ${sampleEntry[0]}`);
+        console.log(`  Sample Stats:`, {
+          goals: sampleStats.goals,
+          assists: sampleStats.assists,
+          sog: sampleStats.sog,
+          blocks: sampleStats.blocks || 0,
+          xGoals: sampleStats.xGoals,
+          calculatedPoints: samplePoints
+        });
+        
+        if (looksLikeSeasonTotal) {
+          console.error(`  ❌ RPC IS RETURNING SEASON TOTALS! Sample has Goals: ${sampleStats.goals}, Assists: ${sampleStats.assists}, SOG: ${sampleStats.sog} - These are season numbers!`);
+        } else {
+          console.log(`  ✅ Sample stats look reasonable for a week`);
+        }
+        
+        // Show additional samples
+        const additionalSamples = Array.from(statsMap.entries()).slice(1, 4);
+        if (additionalSamples.length > 0) {
+          console.log(`  Additional Samples:`);
+          additionalSamples.forEach(([id, stats]) => {
+            const looksLikeSeason = stats.goals > 20 || stats.assists > 30 || stats.sog > 100;
+            console.log(`    Player ${id}: G=${stats.goals}, A=${stats.assists}, SOG=${stats.sog} ${looksLikeSeason ? '❌ SEASON TOTAL' : '✅ Week'}`);
+          });
+        }
+      } else {
+        console.warn('[MatchupService.fetchMatchupStatsForPlayers] ⚠️ RPC returned NO DATA:', {
+          totalRows: (data || []).length,
+          playerCount: playerIds.length,
+          dateRange: `${startDateStr} to ${endDateStr}`
+        });
+      }
+      
+      return statsMap;
+    } catch (error) {
+      console.warn('[MatchupService] fetchMatchupStatsForPlayers timeout or error:', error);
+      return new Map(); // Graceful degradation
+    }
+  },
+
+  /**
+   * Transform raw stats_breakdown JSONB to StatBreakdown interface
+   */
+  transformStatsBreakdown(rawBreakdown: any): StatBreakdown | undefined {
+    if (!rawBreakdown || typeof rawBreakdown !== 'object') {
+      return undefined;
+    }
+    
+    const breakdown: StatBreakdown = {};
+    
+    // Parse the backend format: { "goals": 2, "points_from_goals": 6.0, ... }
+    const categoryMap: Record<string, string> = {
+      'goals': 'Goals',
+      'assists': 'Assists',
+      'power_play_points': 'Power Play Points',
+      'short_handed_points': 'Short Handed Points',
+      'shots_on_goal': 'Shots on Goal',
+      'blocks': 'Blocks',
+      'hits': 'Hits',
+      'penalty_minutes': 'Penalty Minutes',
+      'wins': 'Wins',
+      'shutouts': 'Shutouts',
+      'saves': 'Saves',
+      'goals_against': 'Goals Against'
+    };
+    
+    // Extract stat counts and points
+    const processedCategories = new Set<string>();
+    
+    for (const [key, value] of Object.entries(rawBreakdown)) {
+      if (key.startsWith('points_from_')) {
+        const statKey = key.replace('points_from_', '');
+        const count = rawBreakdown[statKey] || 0;
+        const points = value as number;
+        
+        if (count > 0 || points > 0) {
+          const categoryName = categoryMap[statKey] || statKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+          const scoringValue = count > 0 ? (points / count) : 0;
+          const logic = count > 0 
+            ? `${count} ${statKey.replace(/_/g, ' ')} * ${scoringValue.toFixed(1)} points`
+            : `${points.toFixed(3)} points`;
+          
+          breakdown[categoryName] = {
+            count: count,
+            points: points,
+            logic: logic
+          };
+          processedCategories.add(statKey);
+        }
+      } else if (!key.includes('_') && !processedCategories.has(key) && categoryMap[key]) {
+        // Handle standalone stat counts without points_from_ prefix
+        const count = value as number;
+        if (count > 0) {
+          const categoryName = categoryMap[key];
+          breakdown[categoryName] = {
+            count: count,
+            points: 0,
+            logic: `${count} ${key.replace(/_/g, ' ')}`
+          };
+        }
+      }
+    }
+    
+    return Object.keys(breakdown).length > 0 ? breakdown : undefined;
   }
 };

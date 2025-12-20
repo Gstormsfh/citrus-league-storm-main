@@ -26,13 +26,25 @@ interface LeagueContextType {
   isDemoLeague: (leagueId: string | null | undefined) => boolean;
 }
 
-const LeagueContext = createContext<LeagueContextType | undefined>(undefined);
+// Default context value to prevent errors during initialization
+const defaultContextValue: LeagueContextType = {
+  activeLeagueId: null,
+  activeLeague: null,
+  userLeagues: [],
+  setActiveLeagueId: () => {},
+  loading: true,
+  error: null,
+  refreshLeagues: async () => {},
+  userLeagueState: 'guest',
+  demoLeagueId: DEMO_LEAGUE_ID,
+  isDemoLeague,
+};
+
+const LeagueContext = createContext<LeagueContextType>(defaultContextValue);
 
 export const useLeague = () => {
   const context = useContext(LeagueContext);
-  if (context === undefined) {
-    throw new Error('useLeague must be used within a LeagueProvider');
-  }
+  // Context should always be defined now (has default value)
   return context;
 };
 
