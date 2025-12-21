@@ -48,6 +48,7 @@ export interface Player {
   save_percentage: number | null;
   highDangerSavePct: number;
   goalsSavedAboveExpected: number;
+  goalie_gp?: number; // Goalie games played (separate from skater games_played)
 }
 
 type PlayerDirectoryRow = {
@@ -68,10 +69,11 @@ type PlayerSeasonStatsRow = {
   position_code: string | null;
   is_goalie: boolean;
   games_played: number;
-  icetime_seconds: number; // Our calculated TOI (for GAR)
-  nhl_toi_seconds?: number; // NHL.com official TOI (for display) - optional until migration runs
+  icetime_seconds: number; // Our calculated TOI (for GAR/internal use)
+  nhl_toi_seconds?: number; // NHL.com official TOI (for display)
   plus_minus: number; // Our calculated plus/minus (for internal use)
-  nhl_plus_minus?: number; // NHL.com official plus/minus (for display) - optional until migration runs
+  nhl_plus_minus?: number; // NHL.com official plus/minus (for display)
+  // PBP-calculated stats (for internal model use)
   goals: number;
   primary_assists: number;
   secondary_assists: number;
@@ -80,8 +82,22 @@ type PlayerSeasonStatsRow = {
   hits: number;
   blocks: number;
   pim: number;
+  ppp: number;
+  shp: number;
+  // NHL.com official stats (for display and fantasy scoring)
+  nhl_goals?: number;
+  nhl_assists?: number;
+  nhl_points?: number;
+  nhl_shots_on_goal?: number;
+  nhl_hits?: number;
+  nhl_blocks?: number;
+  nhl_pim?: number;
+  nhl_ppp?: number;
+  nhl_shp?: number;
+  // Advanced metrics (from PBP - for internal use)
   x_goals: number;
   x_assists: number;
+  // Goalie stats (PBP-calculated for internal use)
   goalie_gp: number;
   wins: number;
   saves: number;
@@ -89,6 +105,16 @@ type PlayerSeasonStatsRow = {
   goals_against: number;
   shutouts: number;
   save_pct: number | null;
+  // Goalie stats (NHL.com official for display)
+  nhl_wins?: number;
+  nhl_losses?: number;
+  nhl_ot_losses?: number;
+  nhl_saves?: number;
+  nhl_shots_faced?: number;
+  nhl_goals_against?: number;
+  nhl_shutouts?: number;
+  nhl_save_pct?: number | null;
+  nhl_gaa?: number;
 };
 
 // In-memory cache for player data
@@ -129,7 +155,7 @@ export const PlayerService = {
           .eq("season", DEFAULT_SEASON),
         (supabase as any)
           .from("player_season_stats")
-          .select("season, player_id, team_abbrev, position_code, is_goalie, games_played, icetime_seconds, nhl_toi_seconds, goals, primary_assists, secondary_assists, points, shots_on_goal, hits, blocks, pim, ppp, shp, plus_minus, nhl_plus_minus, x_goals, x_assists, goalie_gp, wins, saves, shots_faced, goals_against, shutouts, save_pct")
+          .select("season, player_id, team_abbrev, position_code, is_goalie, games_played, icetime_seconds, nhl_toi_seconds, goals, primary_assists, secondary_assists, points, shots_on_goal, hits, blocks, pim, ppp, shp, plus_minus, nhl_plus_minus, nhl_goals, nhl_assists, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_ppp, nhl_shp, x_goals, x_assists, goalie_gp, wins, saves, shots_faced, goals_against, shutouts, save_pct, nhl_wins, nhl_losses, nhl_ot_losses, nhl_saves, nhl_shots_faced, nhl_goals_against, nhl_shutouts, nhl_save_pct, nhl_gaa")
           .eq("season", DEFAULT_SEASON),
       ]);
 
@@ -143,6 +169,48 @@ export const PlayerService = {
       statRows.forEach((r) => {
         if (r?.player_id != null) statsByPlayerId.set(Number(r.player_id), r);
       });
+
+      // Fetch GSAx for goalies
+      const goalieIds = dirRows.filter((d: PlayerDirectoryRow) => d.is_goalie).map((d: PlayerDirectoryRow) => Number(d.player_id));
+      const gsaxMap = new Map<number, number>();
+      
+      if (goalieIds.length > 0) {
+        try {
+          // Try goalie_gsax_primary first (preferred)
+          const { data: gsaxData } = await (supabase as any)
+            .from("goalie_gsax_primary")
+            .select("goalie_id, regressed_gsax")
+            .in("goalie_id", goalieIds);
+          
+          if (gsaxData) {
+            gsaxData.forEach((g: any) => {
+              if (g.goalie_id && g.regressed_gsax != null) {
+                gsaxMap.set(Number(g.goalie_id), Number(g.regressed_gsax));
+              }
+            });
+          }
+          
+          // Fill in missing goalies from goalie_gsax (fallback)
+          const missingGoalieIds = goalieIds.filter(id => !gsaxMap.has(id));
+          if (missingGoalieIds.length > 0) {
+            const { data: gsaxFallbackData } = await (supabase as any)
+              .from("goalie_gsax")
+              .select("goalie_id, regressed_gsax")
+              .in("goalie_id", missingGoalieIds);
+            
+            if (gsaxFallbackData) {
+              gsaxFallbackData.forEach((g: any) => {
+                if (g.goalie_id && g.regressed_gsax != null && !gsaxMap.has(Number(g.goalie_id))) {
+                  gsaxMap.set(Number(g.goalie_id), Number(g.regressed_gsax));
+                }
+              });
+            }
+          }
+        } catch (gsaxError) {
+          console.warn('[PlayerService] Error fetching GSAx data:', gsaxError);
+          // Continue without GSAx - not critical
+        }
+      }
 
       const players: Player[] = dirRows.map((d) => {
         const pid = Number(d.player_id);
@@ -166,35 +234,38 @@ export const PlayerService = {
           last_updated: new Date().toISOString(),
           games_played: Number(s?.games_played ?? 0),
 
-          goals: Number(s?.goals ?? 0),
-          assists,
-          points: Number(s?.points ?? 0),
-          plus_minus: Number(s?.plus_minus ?? 0),
-          shots: Number(s?.shots_on_goal ?? 0),
-          hits: Number(s?.hits ?? 0),
-          blocks: Number(s?.blocks ?? 0),
-          pim: Number(s?.pim ?? 0),
-          ppp: Number(s?.ppp ?? 0),
-          shp: Number(s?.shp ?? 0),
+          // Use NHL.com official stats for display, fallback to PBP-calculated for backwards compatibility
+          goals: Number(s?.nhl_goals ?? s?.goals ?? 0),
+          assists: Number(s?.nhl_assists ?? assists ?? 0),
+          points: Number(s?.nhl_points ?? s?.points ?? 0),
+          plus_minus: Number(s?.nhl_plus_minus ?? s?.plus_minus ?? 0),
+          shots: Number(s?.nhl_shots_on_goal ?? s?.shots_on_goal ?? 0),
+          hits: Number(s?.nhl_hits ?? s?.hits ?? 0),
+          blocks: Number(s?.nhl_blocks ?? s?.blocks ?? 0),
+          pim: Number(s?.nhl_pim ?? s?.pim ?? 0),
+          ppp: Number(s?.nhl_ppp ?? s?.ppp ?? 0),
+          shp: Number(s?.nhl_shp ?? s?.shp ?? 0),
           // Use NHL.com TOI for display, fallback to our calculated TOI
           icetime_seconds: Number(s?.nhl_toi_seconds ?? s?.icetime_seconds ?? 0),
-          // Use NHL.com plus/minus for display, fallback to our calculated plus/minus
-          plus_minus: Number(s?.nhl_plus_minus ?? s?.plus_minus ?? 0),
 
           xGoals: Number(s?.x_goals ?? 0),
 
-          wins: d.is_goalie ? Number(s?.wins ?? 0) : null,
-          losses: null,
-          ot_losses: null,
-          saves: d.is_goalie ? Number(s?.saves ?? 0) : null,
-          shutouts: d.is_goalie ? Number(s?.shutouts ?? 0) : null,
-          shots_faced: d.is_goalie ? Number(s?.shots_faced ?? 0) : null,
-          goals_against: d.is_goalie ? Number(s?.goals_against ?? 0) : null,
-          goals_against_average: d.is_goalie && s?.goals_against && s?.goalie_gp && s.goalie_gp > 0
-            ? (s.goals_against / s.goalie_gp) : null,
-          save_percentage: d.is_goalie ? (s?.save_pct ?? null) : null,
+          // Goalie stats: Use NHL.com official stats for display, fallback to PBP-calculated
+          wins: d.is_goalie ? Number(s?.nhl_wins ?? s?.wins ?? 0) : null,
+          losses: d.is_goalie ? Number(s?.nhl_losses ?? null) : null,
+          ot_losses: d.is_goalie ? Number(s?.nhl_ot_losses ?? null) : null,
+          saves: d.is_goalie ? Number(s?.nhl_saves ?? s?.saves ?? 0) : null,
+          shutouts: d.is_goalie ? Number(s?.nhl_shutouts ?? s?.shutouts ?? 0) : null,
+          shots_faced: d.is_goalie ? Number(s?.nhl_shots_faced ?? s?.shots_faced ?? 0) : null,
+          goals_against: d.is_goalie ? Number(s?.nhl_goals_against ?? s?.goals_against ?? 0) : null,
+          goals_against_average: d.is_goalie 
+            ? (s?.nhl_gaa ?? (s?.goals_against && s?.goalie_gp && s.goalie_gp > 0
+                ? (s.goals_against / s.goalie_gp) : null))
+            : null,
+          save_percentage: d.is_goalie ? (s?.nhl_save_pct ?? s?.save_pct ?? null) : null,
           highDangerSavePct: 0,
           goalsSavedAboveExpected: d.is_goalie ? (gsaxMap.get(pid) ?? 0) : 0,
+          goalie_gp: d.is_goalie ? Number(s?.goalie_gp ?? 0) : undefined,
         };
       });
 
@@ -249,7 +320,7 @@ export const PlayerService = {
           .in("player_id", intIds),
         (supabase as any)
           .from("player_season_stats")
-          .select("season, player_id, team_abbrev, position_code, is_goalie, games_played, icetime_seconds, nhl_toi_seconds, goals, primary_assists, secondary_assists, points, shots_on_goal, hits, blocks, pim, ppp, shp, plus_minus, nhl_plus_minus, x_goals, x_assists, goalie_gp, wins, saves, shots_faced, goals_against, shutouts, save_pct")
+          .select("season, player_id, team_abbrev, position_code, is_goalie, games_played, icetime_seconds, nhl_toi_seconds, goals, primary_assists, secondary_assists, points, shots_on_goal, hits, blocks, pim, ppp, shp, plus_minus, nhl_plus_minus, nhl_goals, nhl_assists, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_ppp, nhl_shp, x_goals, x_assists, goalie_gp, wins, saves, shots_faced, goals_against, shutouts, save_pct, nhl_wins, nhl_losses, nhl_ot_losses, nhl_saves, nhl_shots_faced, nhl_goals_against, nhl_shutouts, nhl_save_pct, nhl_gaa")
           .eq("season", DEFAULT_SEASON)
           .in("player_id", intIds),
       ]);
@@ -328,35 +399,38 @@ export const PlayerService = {
           last_updated: new Date().toISOString(),
           games_played: Number(s?.games_played ?? 0),
 
-          goals: Number(s?.goals ?? 0),
-          assists,
-          points: Number(s?.points ?? 0),
-          plus_minus: Number(s?.plus_minus ?? 0),
-          shots: Number(s?.shots_on_goal ?? 0),
-          hits: Number(s?.hits ?? 0),
-          blocks: Number(s?.blocks ?? 0),
-          pim: Number(s?.pim ?? 0),
-          ppp: Number(s?.ppp ?? 0),
-          shp: Number(s?.shp ?? 0),
+          // Use NHL.com official stats for display, fallback to PBP-calculated for backwards compatibility
+          goals: Number(s?.nhl_goals ?? s?.goals ?? 0),
+          assists: Number(s?.nhl_assists ?? assists ?? 0),
+          points: Number(s?.nhl_points ?? s?.points ?? 0),
+          plus_minus: Number(s?.nhl_plus_minus ?? s?.plus_minus ?? 0),
+          shots: Number(s?.nhl_shots_on_goal ?? s?.shots_on_goal ?? 0),
+          hits: Number(s?.nhl_hits ?? s?.hits ?? 0),
+          blocks: Number(s?.nhl_blocks ?? s?.blocks ?? 0),
+          pim: Number(s?.nhl_pim ?? s?.pim ?? 0),
+          ppp: Number(s?.nhl_ppp ?? s?.ppp ?? 0),
+          shp: Number(s?.nhl_shp ?? s?.shp ?? 0),
           // Use NHL.com TOI for display, fallback to our calculated TOI
           icetime_seconds: Number(s?.nhl_toi_seconds ?? s?.icetime_seconds ?? 0),
-          // Use NHL.com plus/minus for display, fallback to our calculated plus/minus
-          plus_minus: Number(s?.nhl_plus_minus ?? s?.plus_minus ?? 0),
 
           xGoals: Number(s?.x_goals ?? 0),
 
-          wins: d.is_goalie ? Number(s?.wins ?? 0) : null,
-          losses: null,
-          ot_losses: null,
-          saves: d.is_goalie ? Number(s?.saves ?? 0) : null,
-          shutouts: d.is_goalie ? Number(s?.shutouts ?? 0) : null,
-          shots_faced: d.is_goalie ? Number(s?.shots_faced ?? 0) : null,
-          goals_against: d.is_goalie ? Number(s?.goals_against ?? 0) : null,
-          goals_against_average: d.is_goalie && s?.goals_against && s?.goalie_gp && s.goalie_gp > 0
-            ? (s.goals_against / s.goalie_gp) : null,
-          save_percentage: d.is_goalie ? (s?.save_pct ?? null) : null,
+          // Goalie stats: Use NHL.com official stats for display, fallback to PBP-calculated
+          wins: d.is_goalie ? Number(s?.nhl_wins ?? s?.wins ?? 0) : null,
+          losses: d.is_goalie ? Number(s?.nhl_losses ?? null) : null,
+          ot_losses: d.is_goalie ? Number(s?.nhl_ot_losses ?? null) : null,
+          saves: d.is_goalie ? Number(s?.nhl_saves ?? s?.saves ?? 0) : null,
+          shutouts: d.is_goalie ? Number(s?.nhl_shutouts ?? s?.shutouts ?? 0) : null,
+          shots_faced: d.is_goalie ? Number(s?.nhl_shots_faced ?? s?.shots_faced ?? 0) : null,
+          goals_against: d.is_goalie ? Number(s?.nhl_goals_against ?? s?.goals_against ?? 0) : null,
+          goals_against_average: d.is_goalie 
+            ? (s?.nhl_gaa ?? (s?.goals_against && s?.goalie_gp && s.goalie_gp > 0
+                ? (s.goals_against / s.goalie_gp) : null))
+            : null,
+          save_percentage: d.is_goalie ? (s?.nhl_save_pct ?? s?.save_pct ?? null) : null,
           highDangerSavePct: 0,
           goalsSavedAboveExpected: d.is_goalie ? (gsaxMap.get(pid) ?? 0) : 0,
+          goalie_gp: d.is_goalie ? Number(s?.goalie_gp ?? 0) : undefined,
         };
       });
 

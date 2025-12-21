@@ -309,6 +309,7 @@ def main() -> int:
 
   print()
   print("[build_player_season_stats] Upserting to player_season_stats...")
+  print("[build_player_season_stats] Note: NHL.com official stats are preserved (not overwritten by PBP aggregation)")
   season_rows = list(acc.values())
   upsert_player_season_stats(db, season_rows)
 

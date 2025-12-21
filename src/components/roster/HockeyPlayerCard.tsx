@@ -36,6 +36,8 @@ export interface HockeyPlayer {
     gaa?: number;
     savePct?: number;
     shutouts?: number;
+    saves?: number;
+    goalsAgainst?: number;
     highDangerSavePct?: number;
     goalsSavedAboveExpected?: number;
     

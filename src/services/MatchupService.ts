@@ -984,7 +984,10 @@ export const MatchupService = {
       number: parseInt(p.jersey_number || '0'),
       starter: false, // Will be determined by lineup
       stats: {
-        gamesPlayed: p.games_played || 0,
+        // For goalies, use goalie_gp instead of games_played
+        gamesPlayed: (p.position === 'G' || p.position === 'Goalie') && (p as any).goalie_gp 
+          ? (p as any).goalie_gp 
+          : (p.games_played || 0),
         goals: p.goals || 0,
         assists: p.assists || 0,
         points: p.points || 0,
@@ -1002,6 +1005,8 @@ export const MatchupService = {
         gaa: p.goals_against_average || 0,
         savePct: p.save_percentage || 0,
         shutouts: (p as any).shutouts || 0,
+        saves: p.saves || 0,
+        goalsAgainst: p.goals_against || 0,
         goalsSavedAboveExpected: p.goalsSavedAboveExpected || 0
       },
       team: p.team,
@@ -1217,16 +1222,40 @@ export const MatchupService = {
       // Handle goalies separately
       if (isGoalie) {
         // Goalie stats from player.stats (season-long)
-        basePlayer.goalieStats = {
-          gamesPlayed: player.stats.gamesPlayed || 0,
+        // Note: HockeyPlayer.stats uses gaa and savePct (not goalsAgainstAverage/savePercentage)
+        // For goalies, gamesPlayed should use goalie_gp (which is already set correctly in transformToHockeyPlayer)
+        const goalieStats = {
+          gamesPlayed: player.stats.gamesPlayed || 0, // This is already goalie_gp for goalies
           wins: player.stats.wins || 0,
           saves: player.stats.saves || 0,
           shutouts: player.stats.shutouts || 0,
           goalsAgainst: player.stats.goalsAgainst || 0,
-          gaa: player.stats.goalsAgainstAverage || 0,
-          savePct: player.stats.savePercentage || 0,
-          goalsSavedAboveExpected: player.stats.goalsSavedAboveExpected
+          gaa: player.stats.gaa || 0,
+          savePct: player.stats.savePct || 0,
+          goalsSavedAboveExpected: player.stats.goalsSavedAboveExpected || 0
         };
+        
+        // Debug logging for goalie stats
+        if (Math.random() < 0.1) { // Log ~10% of goalies to avoid spam
+          console.log(`[MatchupService] Goalie stats for ${player.name}:`, {
+            gamesPlayed: goalieStats.gamesPlayed,
+            wins: goalieStats.wins,
+            saves: goalieStats.saves,
+            shutouts: goalieStats.shutouts,
+            gaa: goalieStats.gaa,
+            savePct: goalieStats.savePct,
+            rawPlayerStats: {
+              gamesPlayed: player.stats.gamesPlayed,
+              wins: player.stats.wins,
+              saves: player.stats.saves,
+              shutouts: player.stats.shutouts,
+              gaa: player.stats.gaa,
+              savePct: player.stats.savePct
+            }
+          });
+        }
+        
+        basePlayer.goalieStats = goalieStats;
         
         // Goalie matchup stats (if available from matchupStats - would need to be extended)
         // For now, leave undefined as matchupStats is skater-focused
