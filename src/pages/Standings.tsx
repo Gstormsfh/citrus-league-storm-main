@@ -13,9 +13,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { LeagueService, League, Team } from '@/services/LeagueService';
 import { DraftService } from '@/services/DraftService';
 import { PlayerService } from '@/services/PlayerService';
-import { Loader2 } from 'lucide-react';
+import { MatchupService } from '@/services/MatchupService';
+import { Loader2, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import LoadingScreen from '@/components/LoadingScreen';
+import { supabase } from '@/integrations/supabase/client';
 
 interface StandingsTeam {
   id: string;
@@ -27,6 +29,8 @@ interface StandingsTeam {
   pointsFor: number;
   pointsAgainst: number;
   streak: string;
+  winPercentage: number;
+  last5: { wins: number; losses: number };
 }
 
 const Standings = () => {
@@ -41,9 +45,32 @@ const Standings = () => {
   const [leagueTeams, setLeagueTeams] = useState<(Team & { owner_name?: string })[]>([]);
   const navigate = useNavigate();
   
-  // Load user's leagues and teams
+  // Auto-complete matchups and load standings
   useEffect(() => {
     const loadStandings = async () => {
+      // Auto-complete matchups and update scores when page loads (for active users)
+      if (userLeagueState === 'active-user' && selectedLeagueId) {
+        try {
+          // First, auto-complete matchups (this also updates scores for completed weeks)
+          const { error: autoCompleteError } = await supabase.rpc('auto_complete_matchups');
+          if (autoCompleteError) {
+            console.warn('[Standings] Error auto-completing matchups:', autoCompleteError);
+            // Don't block standings load if auto-complete fails
+          }
+          
+          // Then, update all matchup scores for this league to ensure they're current
+          // This uses the EXACT same calculation as the matchup tab
+          const { error: updateScoresError } = await MatchupService.updateMatchupScores(selectedLeagueId);
+          if (updateScoresError) {
+            console.warn('[Standings] Error updating matchup scores:', updateScoresError);
+            // Don't block standings load if score update fails
+          }
+        } catch (error) {
+          console.warn('[Standings] Exception in auto-update process:', error);
+          // Don't block standings load if update fails
+        }
+      }
+      
       // State 1: Guest - show demo data
       // State 2: Logged in, no league - show demo data (will show CTAs in UI)
       if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
@@ -118,17 +145,20 @@ const Standings = () => {
 
         // Convert database teams to standings format with calculated stats
         const standingsTeams: StandingsTeam[] = leagueTeamsData.map((team, index) => {
-          const stats = teamStats[team.id] || { pointsFor: 0, pointsAgainst: 0, wins: 0, losses: 0 };
+          const stats = teamStats[team.id] || { 
+            pointsFor: 0, 
+            pointsAgainst: 0, 
+            wins: 0, 
+            losses: 0,
+            streak: '-',
+            last5: { wins: 0, losses: 0 }
+          };
           
-          // Calculate streak (simple: based on recent performance)
-          let streak = '-';
-          if (stats.wins > stats.losses) {
-            const winDiff = stats.wins - stats.losses;
-            streak = `W${Math.min(winDiff, 10)}`;
-          } else if (stats.losses > stats.wins) {
-            const lossDiff = stats.losses - stats.wins;
-            streak = `L${Math.min(lossDiff, 10)}`;
-          }
+          // Calculate win percentage
+          const totalGames = (stats.wins || 0) + (stats.losses || 0);
+          const winPercentage = totalGames > 0 
+            ? ((stats.wins || 0) / totalGames) * 100 
+            : 0;
 
           return {
             id: team.id,
@@ -137,9 +167,11 @@ const Standings = () => {
             logo: team.team_name.substring(0, 2).toUpperCase(),
             record: { wins: stats.wins, losses: stats.losses },
             points: stats.pointsFor, // Total points for ranking
-            pointsFor: Math.round(stats.pointsFor),
-            pointsAgainst: Math.round(stats.pointsAgainst),
-            streak: streak,
+            pointsFor: Math.round(stats.pointsFor || 0),
+            pointsAgainst: Math.round(stats.pointsAgainst || 0),
+            streak: stats.streak || '-',
+            winPercentage: winPercentage !== undefined && !isNaN(winPercentage) ? parseFloat(winPercentage.toFixed(1)) : 0,
+            last5: stats.last5 || { wins: 0, losses: 0 },
           };
         });
 
@@ -266,6 +298,36 @@ const Standings = () => {
                 </Select>
               </div>
               
+              {userLeagueState === 'active-user' && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="rounded-full border-primary/20 hover:bg-primary/5 hover:text-primary"
+                  onClick={async () => {
+                    setLoading(true);
+                    try {
+                      // Auto-complete matchups
+                      if (selectedLeagueId) {
+                        await supabase.rpc('auto_complete_matchups');
+                      }
+                      // Reload standings
+                      window.location.reload();
+                    } catch (error) {
+                      console.error('[Standings] Error refreshing:', error);
+                      toast({
+                        title: 'Error',
+                        description: 'Failed to refresh standings',
+                        variant: 'destructive',
+                      });
+                      setLoading(false);
+                    }
+                  }}
+                  disabled={loading}
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              )}
               <Button variant="outline" size="sm" className="rounded-full border-primary/20 hover:bg-primary/5 hover:text-primary">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 mr-2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
@@ -287,12 +349,13 @@ const Standings = () => {
                     <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-right">PF</th>
                     <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-right">PA</th>
                     <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Streak</th>
+                    <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Last 5</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40">
                   {loading ? (
                     <tr>
-                      <td colSpan={7} className="p-0">
+                      <td colSpan={8} className="p-0">
                         <LoadingScreen
                           character="narwhal"
                           message="Loading Standings..."
@@ -309,7 +372,6 @@ const Standings = () => {
                     sortedTeams.map((team, index) => {
                       // Check if it's user's team by comparing with user's ID from teams data
                       const isUserTeam = user && leagueTeams.some(t => t.id === team.id && t.owner_id === user.id);
-                    const winPercentage = ((team.record.wins / (team.record.wins + team.record.losses)) * 100).toFixed(1);
                     
                     return (
                       <tr 
@@ -345,7 +407,7 @@ const Standings = () => {
                           {team.record.wins}-{team.record.losses}
                         </td>
                         <td className="px-6 py-4 text-center text-muted-foreground">
-                          {winPercentage}%
+                          {(team.winPercentage ?? 0).toFixed(1)}%
                         </td>
                         <td className="px-6 py-4 text-right font-bold tabular-nums">
                           {team.pointsFor.toLocaleString()}
@@ -357,10 +419,15 @@ const Standings = () => {
                           <span className={`inline-flex px-2.5 py-1 text-[10px] font-bold rounded-full border ${
                             team.streak.startsWith('W') 
                               ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' 
-                              : 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800'
+                              : team.streak.startsWith('L')
+                              ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800'
+                              : 'bg-muted text-muted-foreground border-border'
                           }`}>
                             {team.streak}
                           </span>
+                        </td>
+                        <td className="px-6 py-4 text-center text-muted-foreground font-medium">
+                          {team.last5.wins}-{team.last5.losses}
                         </td>
                       </tr>
                     );

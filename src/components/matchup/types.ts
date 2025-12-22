@@ -73,7 +73,8 @@ export type MatchupPlayer = {
   // NEW: Goalie-specific fields
   isGoalie?: boolean;
   // NEW: Daily stats fields
-  daily_total_points?: number; // Total fantasy points for a specific day; // Flag to identify goalies
+  daily_total_points?: number; // Total fantasy points for a specific day
+  daily_stats_breakdown?: StatBreakdown; // Breakdown of daily scoring (for tooltip hover)
   goalieStats?: {
     gamesPlayed: number; // GP
     wins: number;

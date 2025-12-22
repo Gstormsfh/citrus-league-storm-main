@@ -613,6 +613,187 @@ export const MatchupService = {
   },
 
   /**
+   * Get matchup data by matchup ID (for viewing other matchups in the league)
+   * This allows viewing any matchup, not just the user's matchup
+   */
+  async getMatchupDataById(
+    matchupId: string,
+    userId: string,
+    timezone: string = 'America/Denver'
+  ): Promise<{ data: MatchupDataResponse | null; error: any }> {
+    try {
+      // Get the matchup
+      const { data: matchup, error: matchupError } = await supabase
+        .from('matchups')
+        .select('*')
+        .eq('id', matchupId)
+        .single();
+
+      if (matchupError) throw matchupError;
+      if (!matchup) {
+        return { data: null, error: new Error('Matchup not found') };
+      }
+
+      // Get league
+      const { league, error: leagueError } = await LeagueService.getLeague(matchup.league_id);
+      if (leagueError || !league) {
+        return { data: null, error: leagueError || new Error('League not found') };
+      }
+
+      // Get first week start date
+      const draftCompletionDate = league.updated_at ? new Date(league.updated_at) : new Date();
+      const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
+      const currentYear = new Date().getFullYear();
+      const scheduleLength = getScheduleLength(firstWeekStart, currentYear);
+      const isPlayoffWeek = matchup.week_number > scheduleLength;
+
+      // Get user's team to determine which side they're on (if they're in this matchup)
+      const { team: userTeam } = await LeagueService.getUserTeam(matchup.league_id, userId);
+      const isUserInMatchup = userTeam && (matchup.team1_id === userTeam.id || matchup.team2_id === userTeam.id);
+      
+      // Determine which team is "user" team (if user is in matchup) or team1 (if viewing other matchup)
+      const viewingTeamId = isUserInMatchup && userTeam 
+        ? (matchup.team1_id === userTeam.id ? matchup.team1_id : matchup.team2_id)
+        : matchup.team1_id;
+      
+      const opponentTeamId = viewingTeamId === matchup.team1_id ? matchup.team2_id : matchup.team1_id;
+
+      // Get both teams
+      const { teams } = await LeagueService.getLeagueTeams(matchup.league_id);
+      const viewingTeam = teams.find(t => t.id === viewingTeamId);
+      const opponentTeamObj = opponentTeamId ? teams.find(t => t.id === opponentTeamId) : null;
+
+      if (!viewingTeam) {
+        return { data: null, error: new Error('Viewing team not found') };
+      }
+
+      // Get roster player IDs for both teams
+      const [viewingPlayerIds, opponentPlayerIds] = await Promise.all([
+        this.getRosterPlayerIds(viewingTeam.id, matchup.league_id),
+        opponentTeamObj ? this.getRosterPlayerIds(opponentTeamObj.id, matchup.league_id) : Promise.resolve([])
+      ]);
+
+      // Load all players for both teams
+      const allPlayerIds = [...new Set([...viewingPlayerIds, ...opponentPlayerIds])];
+      const allPlayers = allPlayerIds.length > 0 
+        ? await PlayerService.getPlayersByIds(allPlayerIds.map(String))
+        : [];
+
+      // Get matchup rosters using existing function
+      const { team1Roster, team2Roster, team1SlotAssignments, team2SlotAssignments, error: rostersError } = 
+        await this.getMatchupRosters(matchup, allPlayers, timezone);
+
+      if (rostersError) {
+        return { data: null, error: rostersError };
+      }
+
+      // Determine which roster is viewing team and which is opponent
+      const isViewingTeam1 = viewingTeam.id === matchup.team1_id;
+      const viewingRoster = isViewingTeam1 ? team1Roster : team2Roster;
+      const opponentRoster = isViewingTeam1 ? team2Roster : team1Roster;
+      const viewingSlotAssignments = isViewingTeam1 ? team1SlotAssignments : team2SlotAssignments;
+      const opponentSlotAssignments = isViewingTeam1 ? team2SlotAssignments : team1SlotAssignments;
+
+      // Get records
+      const viewingRecord = await this.getTeamRecord(viewingTeam.id, matchup.league_id);
+      const opponentRecord = opponentTeamObj 
+        ? await this.getTeamRecord(opponentTeamObj.id, matchup.league_id)
+        : { wins: 0, losses: 0 };
+
+      // Calculate daily scores
+      const weekStartStr = matchup.week_start_date;
+      const weekEndStr = matchup.week_end_date;
+      
+      let viewingDailyPoints: number[] = [];
+      let opponentDailyPoints: number[] = [];
+
+      try {
+        const { data: viewingDailyScores, error: viewingError } = await supabase.rpc(
+          'calculate_daily_matchup_scores',
+          {
+            p_matchup_id: matchup.id,
+            p_team_id: viewingTeam.id,
+            p_week_start: weekStartStr,
+            p_week_end: weekEndStr
+          }
+        );
+
+        if (!viewingError && viewingDailyScores) {
+          const sorted = (viewingDailyScores as any[]).sort((a, b) =>
+            new Date(a.roster_date).getTime() - new Date(b.roster_date).getTime()
+          );
+          viewingDailyPoints = sorted.map(d => parseFloat(d.daily_score) || 0);
+        } else {
+          viewingDailyPoints = Array(7).fill(0);
+        }
+      } catch (error) {
+        viewingDailyPoints = Array(7).fill(0);
+      }
+
+      if (opponentTeamObj) {
+        try {
+          const { data: oppDailyScores, error: oppError } = await supabase.rpc(
+            'calculate_daily_matchup_scores',
+            {
+              p_matchup_id: matchup.id,
+              p_team_id: opponentTeamObj.id,
+              p_week_start: weekStartStr,
+              p_week_end: weekEndStr
+            }
+          );
+
+          if (!oppError && oppDailyScores) {
+            const sorted = (oppDailyScores as any[]).sort((a, b) =>
+              new Date(a.roster_date).getTime() - new Date(b.roster_date).getTime()
+            );
+            opponentDailyPoints = sorted.map(d => parseFloat(d.daily_score) || 0);
+          } else {
+            opponentDailyPoints = Array(7).fill(0);
+          }
+        } catch (error) {
+          opponentDailyPoints = Array(7).fill(0);
+        }
+      }
+
+      // Build response
+      const response: MatchupDataResponse = {
+        matchupId: matchup.id,
+        matchup,
+        currentWeek: matchup.week_number,
+        scheduleLength,
+        isPlayoffWeek,
+        userTeam: {
+          id: viewingTeam.id,
+          name: viewingTeam.team_name,
+          roster: viewingRoster,
+          slotAssignments: viewingSlotAssignments,
+          record: viewingRecord,
+          dailyPoints: viewingDailyPoints
+        },
+        opponentTeam: opponentTeamObj ? {
+          id: opponentTeamObj.id,
+          name: opponentTeamObj.team_name,
+          roster: opponentRoster,
+          slotAssignments: opponentSlotAssignments,
+          record: opponentRecord,
+          dailyPoints: opponentDailyPoints
+        } : null,
+        navigation: {
+          previousWeek: matchup.week_number > 1 ? matchup.week_number - 1 : null,
+          nextWeek: matchup.week_number < scheduleLength ? matchup.week_number + 1 : null,
+          previousMatchupId: null, // Could be calculated if needed
+          nextMatchupId: null // Could be calculated if needed
+        }
+      };
+
+      return { data: response, error: null };
+    } catch (error) {
+      console.error('[MatchupService.getMatchupDataById] Error:', error);
+      return { data: null, error };
+    }
+  },
+
+  /**
    * Get unified matchup data with all necessary information for the matchup page
    * This is the primary API contract for matchup data
    * @param existingMatchup Optional pre-fetched matchup object to avoid redundant query
@@ -2615,5 +2796,48 @@ export const MatchupService = {
     }
     
     return Object.keys(breakdown).length > 0 ? breakdown : undefined;
+  },
+
+  /**
+   * Update matchup scores for all matchups in a league using unified calculation
+   * Uses the EXACT same logic as the matchup tab: sum of 7 daily scores
+   * This ensures all matchups (user teams AND AI teams) use identical calculation
+   * 
+   * @param leagueId - Optional league ID to update scores for. If not provided, updates all leagues.
+   * @returns Object with error (if any) and updatedCount (number of matchups updated)
+   */
+  async updateMatchupScores(
+    leagueId?: string
+  ): Promise<{ error: any; updatedCount?: number; results?: Array<{ matchup_id: string; team1_score: number; team2_score: number; updated: boolean }> }> {
+    try {
+      // Input validation
+      if (leagueId && typeof leagueId !== 'string') {
+        throw new Error('leagueId must be a string');
+      }
+
+      const { data, error } = await supabase.rpc('update_all_matchup_scores', {
+        p_league_id: leagueId || null
+      });
+      
+      if (error) {
+        console.error('[MatchupService] RPC error updating matchup scores:', error);
+        throw error;
+      }
+      
+      // Filter out failed updates (where updated = false) for count
+      const successfulUpdates = (data || []).filter((r: any) => r.updated === true);
+      
+      return { 
+        error: null, 
+        updatedCount: successfulUpdates.length,
+        results: data || []
+      };
+    } catch (error) {
+      console.error('[MatchupService] Error updating matchup scores:', error);
+      return { 
+        error,
+        updatedCount: 0
+      };
+    }
   }
 };

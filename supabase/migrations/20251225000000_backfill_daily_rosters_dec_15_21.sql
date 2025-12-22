@@ -2,6 +2,12 @@
 -- Uses CROSS JOIN LATERAL with generate_series for efficient row generation
 -- All rosters are locked since games are completed
 -- This establishes the "Record of Truth" for the first matchup week
+--
+-- DEFENSIVE CHECKS:
+-- - Only processes matchups with valid week dates
+-- - Skips teams without lineups
+-- - Handles NULL arrays gracefully
+-- - Uses ON CONFLICT to prevent duplicates
 
 -- 1. Insert active players (starters)
 INSERT INTO public.fantasy_daily_rosters (
@@ -18,7 +24,7 @@ SELECT
   true AS is_locked
 FROM matchups m
 JOIN teams t ON (t.id = m.team1_id OR t.id = m.team2_id)
-JOIN team_lineups tl ON tl.team_id = t.id::text AND tl.league_id = m.league_id
+JOIN team_lineups tl ON tl.team_id = t.id AND tl.league_id = m.league_id
 CROSS JOIN LATERAL generate_series('2025-12-15'::date, '2025-12-21'::date, '1 day'::interval) AS d(roster_date)
 WHERE m.week_start_date = '2025-12-15' 
   AND m.week_end_date = '2025-12-21'
@@ -42,7 +48,7 @@ SELECT
   true AS is_locked
 FROM matchups m
 JOIN teams t ON (t.id = m.team1_id OR t.id = m.team2_id)
-JOIN team_lineups tl ON tl.team_id = t.id::text AND tl.league_id = m.league_id
+JOIN team_lineups tl ON tl.team_id = t.id AND tl.league_id = m.league_id
 CROSS JOIN LATERAL generate_series('2025-12-15'::date, '2025-12-21'::date, '1 day'::interval) AS d(roster_date)
 WHERE m.week_start_date = '2025-12-15' 
   AND m.week_end_date = '2025-12-21'
@@ -66,7 +72,7 @@ SELECT
   true AS is_locked
 FROM matchups m
 JOIN teams t ON (t.id = m.team1_id OR t.id = m.team2_id)
-JOIN team_lineups tl ON tl.team_id = t.id::text AND tl.league_id = m.league_id
+JOIN team_lineups tl ON tl.team_id = t.id AND tl.league_id = m.league_id
 CROSS JOIN LATERAL generate_series('2025-12-15'::date, '2025-12-21'::date, '1 day'::interval) AS d(roster_date)
 WHERE m.week_start_date = '2025-12-15' 
   AND m.week_end_date = '2025-12-21'

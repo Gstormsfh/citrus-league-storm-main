@@ -5,22 +5,27 @@ import { cn } from '@/lib/utils';
 import { Lock, CheckCircle2 } from 'lucide-react';
 import { getTodayMST } from '@/utils/timezoneUtils';
 
+import { MatchupPlayer } from './types';
+
 interface WeeklyScheduleProps {
   weekStart: string; // Monday date (YYYY-MM-DD)
   weekEnd: string; // Sunday date (YYYY-MM-DD)
-  myDailyPoints: number[];
-  opponentDailyPoints: number[];
-  onDayClick: (date: string) => void;
+  myStarters: MatchupPlayer[]; // Starting lineup players for my team
+  opponentStarters: MatchupPlayer[]; // Starting lineup players for opponent team
+  onDayClick: (date: string | null) => void; // null clears selection (returns to full week view)
   selectedDate: string | null;
+  // Daily stats map: date -> player_id -> daily stats (including daily_total_points)
+  dailyStatsByDate: Map<string, Map<number, { daily_total_points: number }>>;
 }
 
 export const WeeklySchedule = ({
   weekStart,
   weekEnd,
-  myDailyPoints,
-  opponentDailyPoints,
+  myStarters,
+  opponentStarters,
   onDayClick,
   selectedDate,
+  dailyStatsByDate,
 }: WeeklyScheduleProps) => {
   const todayStr = getTodayMST(); // Get today's date string in MST (YYYY-MM-DD)
 
@@ -113,20 +118,52 @@ export const WeeklySchedule = ({
 
   return (
     <div className="w-full">
+      {/* Header row with view indicator and Full Week button */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-sm font-semibold text-muted-foreground">
+          {selectedDate ? (
+            <span className="flex items-center gap-2">
+              <span className="text-xs uppercase tracking-wider">Viewing:</span>
+              <span className="text-foreground">{formatDateLabel(selectedDate)}</span>
+            </span>
+          ) : (
+            <span className="text-xs uppercase tracking-wider">Week Overview</span>
+          )}
+        </div>
+        {selectedDate && (
+          <button
+            onClick={() => onDayClick(null)}
+            className="px-3 py-1.5 text-xs font-medium rounded-md 
+              bg-muted hover:bg-muted/80 
+              text-foreground border border-border
+              transition-colors flex items-center gap-1"
+          >
+            <span>←</span>
+            <span>Full Week</span>
+          </button>
+        )}
+      </div>
       <div className="grid grid-cols-7 gap-2 md:gap-3">
         {dates.map((date, index) => {
           const isTodayDate = isToday(date);
           const isPastDate = isPast(date);
           const isSelectedDate = isSelected(date);
           
-          // Calculate cumulative week-to-date points (Monday + Tuesday + ... + this day)
-          const myCumulativePoints = myDailyPoints.slice(0, index + 1).reduce((sum, pts) => sum + pts, 0);
-          const oppCumulativePoints = opponentDailyPoints.slice(0, index + 1).reduce((sum, pts) => sum + pts, 0);
-          const totalCumulativePoints = myCumulativePoints + oppCumulativePoints;
-          
-          // Also get just this day's points for reference
-          const myDailyPointsForDay = myDailyPoints[index] || 0;
-          const oppDailyPointsForDay = opponentDailyPoints[index] || 0;
+          // Calculate daily total from starting lineup players for this day
+          // This matches the "Daily Total" calculation in MatchupComparison
+          const dayStats = dailyStatsByDate.get(date);
+          const myDailyPointsForDay = dayStats 
+            ? myStarters.reduce((sum, player) => {
+                const playerStats = dayStats.get(player.id);
+                return sum + (playerStats?.daily_total_points ?? 0);
+              }, 0)
+            : 0;
+          const oppDailyPointsForDay = dayStats
+            ? opponentStarters.reduce((sum, player) => {
+                const playerStats = dayStats.get(player.id);
+                return sum + (playerStats?.daily_total_points ?? 0);
+              }, 0)
+            : 0;
 
           return (
             <Card
@@ -164,36 +201,26 @@ export const WeeklySchedule = ({
                     </Badge>
                   )}
 
-                  {/* Points Display - Cumulative Week-to-Date */}
+                  {/* Points Display - Daily Totals (My and Opp only) */}
                   <div className="w-full mt-2 space-y-1">
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-muted-foreground">My</span>
                       <span className={cn(
                         "font-bold",
-                        myCumulativePoints > 0 ? "text-[hsl(var(--vibrant-green))]" : "text-muted-foreground"
+                        myDailyPointsForDay > 0 ? "text-[hsl(var(--vibrant-green))]" : "text-muted-foreground"
                       )}>
-                        {myCumulativePoints.toFixed(1)}
+                        {myDailyPointsForDay.toFixed(1)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-muted-foreground">Opp</span>
                       <span className={cn(
                         "font-bold",
-                        oppCumulativePoints > 0 ? "text-foreground/80" : "text-muted-foreground"
+                        oppDailyPointsForDay > 0 ? "text-foreground/80" : "text-muted-foreground"
                       )}>
-                        {oppCumulativePoints.toFixed(1)}
+                        {oppDailyPointsForDay.toFixed(1)}
                       </span>
                     </div>
-                    {totalCumulativePoints > 0 && (
-                      <div className="pt-1 border-t border-border/50">
-                        <div className="text-center text-xs font-semibold text-foreground">
-                          {totalCumulativePoints.toFixed(1)} total
-                        </div>
-                        <div className="text-center text-[10px] text-muted-foreground mt-0.5">
-                          Week-to-date
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               </CardContent>

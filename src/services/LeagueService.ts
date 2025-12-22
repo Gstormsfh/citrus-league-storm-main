@@ -1557,31 +1557,189 @@ export const LeagueService = {
   },
 
   /**
-   * Calculate team standings stats from their drafted players
-   * Note: Points for/against are only calculated from actual matchup results.
-   * Since matchup system isn't implemented yet, these return 0.
+   * Calculate team standings stats from completed matchup results.
+   * Points for/against come from actual matchup scores (team1_score, team2_score).
+   * Wins/losses determined by higher score in each matchup.
+   * Also calculates streak and last 5 games.
    */
   async calculateTeamStandings(
     leagueId: string,
     teams: Team[],
     draftPicks: Array<{ team_id: string; player_id: string }>,
     allPlayers: Array<{ id: string; points: number }>
-  ): Promise<Record<string, { pointsFor: number; pointsAgainst: number; wins: number; losses: number }>> {
+  ): Promise<Record<string, { 
+    pointsFor: number; 
+    pointsAgainst: number; 
+    wins: number; 
+    losses: number;
+    streak: string;
+    last5: { wins: number; losses: number };
+  }>> {
     // Initialize all teams with 0 stats
-    // Points for/against should only come from actual matchup results, not player season totals
-    const teamStats: Record<string, { pointsFor: number; pointsAgainst: number; wins: number; losses: number }> = {};
+    const teamStats: Record<string, { 
+      pointsFor: number; 
+      pointsAgainst: number; 
+      wins: number; 
+      losses: number;
+      streak: string;
+      last5: { wins: number; losses: number };
+      matchupHistory: Array<{ week: number; won: boolean }>; // Track matchup history for streak/last5
+    }> = {};
     
     teams.forEach(team => {
       teamStats[team.id] = {
-        pointsFor: 0,      // Only calculated from matchup results
-        pointsAgainst: 0,   // Only calculated from matchup results
+        pointsFor: 0,
+        pointsAgainst: 0,
         wins: 0,
-        losses: 0
+        losses: 0,
+        streak: '-',
+        last5: { wins: 0, losses: 0 },
+        matchupHistory: []
       };
     });
 
-    // TODO: When matchup system is implemented, calculate pointsFor/pointsAgainst from actual matchup results
-    // For now, since there are no matchups, all values remain 0
+    try {
+      // Query all completed matchups for this league, ordered by week (for streak/last5 calculation)
+      const { data: matchups, error } = await supabase
+        .from('matchups')
+        .select('team1_id, team2_id, team1_score, team2_score, week_number')
+        .eq('league_id', leagueId)
+        .eq('status', 'completed')
+        .order('week_number', { ascending: true });
+
+      if (error) {
+        console.error('[LeagueService] Error fetching completed matchups:', error);
+        return teamStats; // Return empty stats if query fails
+      }
+
+      if (!matchups || matchups.length === 0) {
+        // No completed matchups yet - return empty stats
+        return teamStats;
+      }
+
+      // Calculate stats from each completed matchup
+      // CRITICAL: Only use scores from matchups table - these are matchup totals (sum of 7 daily scores)
+      // NOT season totals or player totals
+      matchups.forEach(matchup => {
+        // Parse scores - ensure we're getting matchup scores, not season totals
+        const team1Score = parseFloat(String(matchup.team1_score)) || 0;
+        const team2Score = matchup.team2_id ? (parseFloat(String(matchup.team2_score)) || 0) : 0;
+        
+        // Debug logging for score validation
+        if (team1Score > 500 || team2Score > 500) {
+          console.warn('[LeagueService] Suspiciously high matchup score detected:', {
+            matchup_id: matchup.id || 'unknown',
+            week_number: matchup.week_number,
+            team1_score: team1Score,
+            team2_score: team2Score,
+            note: 'Matchup scores should typically be 0-200 range. Values >500 suggest season totals instead of matchup scores.'
+          });
+        }
+
+        // Handle bye weeks (team2_id is null)
+        if (!matchup.team2_id) {
+          // Team1 gets a win and their points, no points against
+          if (teamStats[matchup.team1_id]) {
+            teamStats[matchup.team1_id].wins++;
+            teamStats[matchup.team1_id].pointsFor += team1Score;
+            // Track matchup history for streak/last5
+            teamStats[matchup.team1_id].matchupHistory.push({
+              week: matchup.week_number,
+              won: true
+            });
+          }
+        } else {
+          // Both teams participated - calculate points and win/loss
+          if (teamStats[matchup.team1_id]) {
+            teamStats[matchup.team1_id].pointsFor += team1Score;
+            teamStats[matchup.team1_id].pointsAgainst += team2Score;
+          }
+          
+          if (teamStats[matchup.team2_id]) {
+            teamStats[matchup.team2_id].pointsFor += team2Score;
+            teamStats[matchup.team2_id].pointsAgainst += team1Score;
+          }
+
+          // Determine winner (higher score wins)
+          const team1Won = team1Score > team2Score;
+          const team2Won = team2Score > team1Score;
+          
+          if (team1Won) {
+            if (teamStats[matchup.team1_id]) {
+              teamStats[matchup.team1_id].wins++;
+              teamStats[matchup.team1_id].matchupHistory.push({
+                week: matchup.week_number,
+                won: true
+              });
+            }
+            if (teamStats[matchup.team2_id]) {
+              teamStats[matchup.team2_id].losses++;
+              teamStats[matchup.team2_id].matchupHistory.push({
+                week: matchup.week_number,
+                won: false
+              });
+            }
+          } else if (team2Won) {
+            if (teamStats[matchup.team2_id]) {
+              teamStats[matchup.team2_id].wins++;
+              teamStats[matchup.team2_id].matchupHistory.push({
+                week: matchup.week_number,
+                won: true
+              });
+            }
+            if (teamStats[matchup.team1_id]) {
+              teamStats[matchup.team1_id].losses++;
+              teamStats[matchup.team1_id].matchupHistory.push({
+                week: matchup.week_number,
+                won: false
+              });
+            }
+          }
+          // Note: Ties are not currently handled (both teams would get 0 wins/losses)
+          // This matches the current system where ties don't exist
+        }
+      });
+
+      // Calculate streak and last 5 for each team
+      Object.keys(teamStats).forEach(teamId => {
+        const stats = teamStats[teamId];
+        const history = stats.matchupHistory;
+        
+        // Sort by week descending (most recent first)
+        history.sort((a, b) => b.week - a.week);
+        
+        // Calculate streak (from most recent game backwards)
+        if (history.length > 0) {
+          const mostRecent = history[0];
+          let streakCount = 1;
+          
+          for (let i = 1; i < history.length; i++) {
+            if (history[i].won === mostRecent.won) {
+              streakCount++;
+            } else {
+              break;
+            }
+          }
+          
+          stats.streak = mostRecent.won ? `W${streakCount}` : `L${streakCount}`;
+        }
+        
+        // Calculate last 5 games
+        const last5Games = history.slice(0, 5);
+        stats.last5 = {
+          wins: last5Games.filter(g => g.won).length,
+          losses: last5Games.filter(g => !g.won).length
+        };
+        
+        // Remove matchupHistory from final result (it was just for calculation)
+        delete (stats as any).matchupHistory;
+      });
+
+      console.log('[LeagueService] Calculated standings from', matchups.length, 'completed matchups');
+    } catch (error) {
+      console.error('[LeagueService] Exception calculating team standings:', error);
+      // Return empty stats on error
+    }
 
     return teamStats;
   },
