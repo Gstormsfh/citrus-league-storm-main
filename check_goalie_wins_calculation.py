@@ -240,3 +240,4 @@ def check_goalie_wins_calculation():
 
 if __name__ == "__main__":
     check_goalie_wins_calculation()
+

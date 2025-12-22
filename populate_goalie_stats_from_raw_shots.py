@@ -170,11 +170,16 @@ def populate_goalie_stats_from_raw_shots(season: int = SEASON, auto_aggregate: b
     all_shots = []
     batch_size = 1000
     
-    # Use the unique game IDs we found from shots
+    # Get unique game IDs from df_games
+    game_ids = df_games['game_id'].tolist()
+    unique_game_ids = game_ids  # Already unique from df_games query
+    
+    print(f"  Found {len(unique_game_ids)} unique game IDs to process")
+    
     # Process games in batches using 'in' filter for efficiency
     batch_game_count = 50
     for i in range(0, len(unique_game_ids), batch_game_count):
-        batch_game_ids = [int(gid) for gid in game_ids[i:i+batch_game_count]]
+        batch_game_ids = [int(gid) for gid in unique_game_ids[i:i+batch_game_count]]
         
         offset = 0
         while True:
@@ -401,3 +406,4 @@ if __name__ == "__main__":
         season=args.season,
         auto_aggregate=not args.no_aggregate
     )
+

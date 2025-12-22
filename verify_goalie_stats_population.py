@@ -204,3 +204,4 @@ def verify_goalie_stats_population():
 
 if __name__ == "__main__":
     verify_goalie_stats_population()
+

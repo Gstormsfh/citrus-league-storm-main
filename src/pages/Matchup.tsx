@@ -366,11 +366,38 @@ const Matchup = () => {
           }
 
           // Create map of player_id -> daily stats for this date
+          // CRITICAL: Aggregate across multiple games per day (goalies can't play multiple games per day, but skaters can)
           const dayStatsMap = new Map<number, any>();
           (data || []).forEach((row: any) => {
             const player = myTeam.find(p => p.id === row.player_id) || 
                            opponentTeamPlayers.find(p => p.id === row.player_id);
             const isGoalie = player?.position === 'G' || player?.position === 'Goalie' || player?.isGoalie || row.is_goalie;
+            
+            // Get or initialize player's daily stats (aggregate across multiple games)
+            const existing = dayStatsMap.get(row.player_id) || {
+              goals: 0,
+              assists: 0,
+              points: 0,
+              shots_on_goal: 0,
+              blocks: 0,
+              wins: 0,
+              saves: 0,
+              shutouts: 0,
+              goals_against: 0,
+            };
+            
+            // Aggregate stats across multiple games (if player has multiple games on same day)
+            const aggregated = {
+              goals: existing.goals + (row.goals || 0),
+              assists: existing.assists + (row.assists || 0),
+              points: existing.points + (row.points || 0),
+              shots_on_goal: existing.shots_on_goal + (row.shots_on_goal || 0),
+              blocks: existing.blocks + (row.blocks || 0),
+              wins: existing.wins + (row.wins || 0),
+              saves: existing.saves + (row.saves || 0),
+              shutouts: existing.shutouts + (row.shutouts || 0),
+              goals_against: existing.goals_against + (row.goals_against || 0),
+            };
             
             // Calculate daily total points using league scoring settings
             const goalieScoring = scoringSettings?.goalie || {
@@ -390,34 +417,36 @@ const Matchup = () => {
             if (isGoalie) {
               // Goalie Formula: Use league settings (defaults: W=4, SV=0.2, SO=3, GA=-1)
               dailyTotalPoints = 
-                (row.wins || 0) * goalieScoring.wins + 
-                (row.saves || 0) * goalieScoring.saves + 
-                (row.shutouts || 0) * goalieScoring.shutouts + 
-                (row.goals_against || 0) * goalieScoring.goals_against;  // Already negative, so add
+                aggregated.wins * goalieScoring.wins + 
+                aggregated.saves * goalieScoring.saves + 
+                aggregated.shutouts * goalieScoring.shutouts + 
+                aggregated.goals_against * goalieScoring.goals_against;  // Already negative, so add
               
               // Debug logging for goalies with stats
-              if (row.wins > 0 || row.saves > 0 || row.shutouts > 0 || row.goals_against > 0) {
-                console.log('[Matchup.fetchAllDailyStats] Goalie daily points:', {
+              if (aggregated.wins > 0 || aggregated.saves > 0 || aggregated.shutouts > 0 || aggregated.goals_against > 0) {
+                console.log('[Matchup.fetchAllDailyStats] Goalie daily points (aggregated):', {
                   date,
                   player_id: row.player_id,
-                  wins: row.wins,
-                  saves: row.saves,
-                  shutouts: row.shutouts,
-                  goals_against: row.goals_against,
+                  wins: aggregated.wins,
+                  saves: aggregated.saves,
+                  shutouts: aggregated.shutouts,
+                  goals_against: aggregated.goals_against,
                   weights: goalieScoring,
-                  calculated_points: dailyTotalPoints
+                  calculated_points: dailyTotalPoints,
+                  games_count: (data || []).filter((r: any) => r.player_id === row.player_id).length
                 });
               }
             } else {
               // Skater Formula: Use league settings (defaults: G=3, A=2, SOG=0.4, BLK=0.4)
               dailyTotalPoints = 
-                (row.goals || 0) * skaterScoring.goals + 
-                (row.assists || 0) * skaterScoring.assists + 
-                (row.shots_on_goal || 0) * skaterScoring.shots_on_goal + 
-                (row.blocks || 0) * skaterScoring.blocks;
+                aggregated.goals * skaterScoring.goals + 
+                aggregated.assists * skaterScoring.assists + 
+                aggregated.shots_on_goal * skaterScoring.shots_on_goal + 
+                aggregated.blocks * skaterScoring.blocks;
             }
             
             dayStatsMap.set(row.player_id, {
+              ...aggregated,
               daily_total_points: dailyTotalPoints,
             });
           });
@@ -711,131 +740,137 @@ const Matchup = () => {
   // Use real data if active user, otherwise demo data
   // CRITICAL: Ensure myTeam is always the user's team (left side)
   // and opponentTeamPlayers is always the opponent (right side)
-  // Enrich players with daily stats when a date is selected (or default to today)
-  // Always enrich if dailyStatsMap has data (even if selectedDate is null, it might be today's stats)
+  // CRITICAL FIX: Only use daily stats when a date is EXPLICITLY selected
+  // When viewing weekly totals (no date selected), use weekly matchupStats from RPC (aggregated across all games)
   const displayMyTeam = useMemo(() => {
     const baseTeam = userLeagueState === 'active-user' ? myTeam : demoMyTeam;
-    if (dailyStatsMap.size === 0) {
-      return baseTeam;
+    
+    // CRITICAL: Only enrich with daily stats if a date is explicitly selected
+    // If no date selected, use weekly stats from RPC (which aggregates all games in the week)
+    if (!selectedDate || dailyStatsMap.size === 0) {
+      return baseTeam; // Use weekly stats from RPC
     }
-    // Enrich with daily stats (from selected date or today)
+    
+    // Date is selected = show that day's stats
     return baseTeam.map(player => {
       const dailyStats = dailyStatsMap.get(player.id);
       if (!dailyStats) return player;
       
-      // Keep weekly total_points unchanged - it's the matchup week total
       const isGoalie = player.isGoalie || player.position === 'G' || player.position === 'Goalie';
       
       return {
         ...player,
         matchupStats: isGoalie ? {
-          // Goalie daily stats
+          // Goalie daily stats (for selected date only)
           wins: dailyStats.wins || 0,
           saves: dailyStats.saves || 0,
           shutouts: dailyStats.shutouts || 0,
           goals_against: dailyStats.goals_against || 0,
         } : {
-          // Skater daily stats
+          // Skater daily stats (for selected date only)
           goals: dailyStats.goals || 0,
           assists: dailyStats.assists || 0,
           sog: dailyStats.sog || 0,
           xGoals: dailyStats.xGoals || 0,
         },
-        // Update stats for display in statline
+        // Update stats for display in statline (only when date is selected)
         stats: isGoalie ? {
           ...player.stats,
-          // Goalie stats
+          // Goalie daily stats (for selected date only)
           wins: dailyStats.wins || 0,
           saves: dailyStats.saves || 0,
           shutouts: dailyStats.shutouts || 0,
           goals_against: dailyStats.goals_against || 0,
         } : {
           ...player.stats,
-          // Skater stats
+          // Skater daily stats (for selected date only)
           goals: dailyStats.goals || 0,
           assists: dailyStats.assists || 0,
           sog: dailyStats.sog || 0,
           blk: dailyStats.blocks || 0,
           xGoals: dailyStats.xGoals || 0,
         },
-        // Add goalie matchup stats for goalies
+        // Add goalie matchup stats for goalies (only when date is selected)
+        // CRITICAL: In weekly view, use player.goalieMatchupStats from RPC (weekly aggregated)
         goalieMatchupStats: isGoalie ? {
           wins: dailyStats.wins || 0,
           saves: dailyStats.saves || 0,
           shutouts: dailyStats.shutouts || 0,
           goalsAgainst: dailyStats.goals_against || 0,
-        } : undefined,
+        } : player.goalieMatchupStats,
         // Add daily total points for the projection bar replacement
         daily_total_points: dailyStats.daily_total_points || 0,
         // Add daily stats breakdown for tooltip hover
         daily_stats_breakdown: dailyStats.daily_stats_breakdown || null,
-        // Keep weekly total_points unchanged
-        // total_points remains as weekly total
+        // Keep weekly total_points unchanged - it's the matchup week total
       };
     });
-  }, [userLeagueState, myTeam, demoMyTeam, dailyStatsMap]);
+  }, [userLeagueState, myTeam, demoMyTeam, dailyStatsMap, selectedDate]);
 
   const displayOpponentTeam = useMemo(() => {
     const baseTeam = userLeagueState === 'active-user' ? opponentTeamPlayers : demoOpponentTeam;
-    if (dailyStatsMap.size === 0) {
-      return baseTeam;
+    
+    // CRITICAL: Only enrich with daily stats if a date is explicitly selected
+    // If no date selected, use weekly stats from RPC (which aggregates all games in the week)
+    if (!selectedDate || dailyStatsMap.size === 0) {
+      return baseTeam; // Use weekly stats from RPC
     }
-    // Enrich with daily stats (from selected date or today)
+    
+    // Date is selected = show that day's stats
     return baseTeam.map(player => {
       const dailyStats = dailyStatsMap.get(player.id);
       if (!dailyStats) return player;
       
-      // Keep weekly total_points unchanged - it's the matchup week total
       const isGoalie = player.isGoalie || player.position === 'G' || player.position === 'Goalie';
       
       return {
         ...player,
         matchupStats: isGoalie ? {
-          // Goalie daily stats
+          // Goalie daily stats (for selected date only)
           wins: dailyStats.wins || 0,
           saves: dailyStats.saves || 0,
           shutouts: dailyStats.shutouts || 0,
           goals_against: dailyStats.goals_against || 0,
         } : {
-          // Skater daily stats
+          // Skater daily stats (for selected date only)
           goals: dailyStats.goals || 0,
           assists: dailyStats.assists || 0,
           sog: dailyStats.sog || 0,
           xGoals: dailyStats.xGoals || 0,
         },
-        // Update stats for display in statline
+        // Update stats for display in statline (only when date is selected)
         stats: isGoalie ? {
           ...player.stats,
-          // Goalie stats
+          // Goalie daily stats (for selected date only)
           wins: dailyStats.wins || 0,
           saves: dailyStats.saves || 0,
           shutouts: dailyStats.shutouts || 0,
           goals_against: dailyStats.goals_against || 0,
         } : {
           ...player.stats,
-          // Skater stats
+          // Skater daily stats (for selected date only)
           goals: dailyStats.goals || 0,
           assists: dailyStats.assists || 0,
           sog: dailyStats.sog || 0,
           blk: dailyStats.blocks || 0,
           xGoals: dailyStats.xGoals || 0,
         },
-        // Add goalie matchup stats for goalies
+        // Add goalie matchup stats for goalies (only when date is selected)
+        // CRITICAL: In weekly view, use player.goalieMatchupStats from RPC (weekly aggregated)
         goalieMatchupStats: isGoalie ? {
           wins: dailyStats.wins || 0,
           saves: dailyStats.saves || 0,
           shutouts: dailyStats.shutouts || 0,
           goalsAgainst: dailyStats.goals_against || 0,
-        } : undefined,
+        } : player.goalieMatchupStats,
         // Add daily total points for the projection bar replacement
         daily_total_points: dailyStats.daily_total_points || 0,
         // Add daily stats breakdown for tooltip hover
         daily_stats_breakdown: dailyStats.daily_stats_breakdown || null,
-        // Keep weekly total_points unchanged
-        // total_points remains as weekly total
+        // Keep weekly total_points unchanged - it's the matchup week total
       };
     });
-  }, [userLeagueState, opponentTeamPlayers, demoOpponentTeam, dailyStatsMap]);
+  }, [userLeagueState, opponentTeamPlayers, demoOpponentTeam, dailyStatsMap, selectedDate]);
   const displayMyTeamSlotAssignments = useMemo(() =>
     userLeagueState === 'active-user' ? myTeamSlotAssignments : demoMyTeamSlotAssignments,
     [userLeagueState, myTeamSlotAssignments, demoMyTeamSlotAssignments]

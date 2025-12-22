@@ -124,3 +124,4 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.calculate_daily_matchup_scores IS 'Calculates daily fantasy scores for a matchup using league scoring_settings. Uses fantasy_daily_rosters to determine active players each day, then sums NHL official stats (nhl_* columns) for those players. Uses HARD CHECK (player_directory.position_code) for goalie detection. Supports per-league customization via leagues.scoring_settings JSONB. Returns 7 daily scores (Mon-Sun).';
+

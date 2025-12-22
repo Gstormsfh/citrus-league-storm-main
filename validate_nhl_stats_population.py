@@ -206,3 +206,4 @@ def validate_nhl_stats_population():
 
 if __name__ == "__main__":
     validate_nhl_stats_population()
+

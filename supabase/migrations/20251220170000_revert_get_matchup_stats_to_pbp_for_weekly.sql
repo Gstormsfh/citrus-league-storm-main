@@ -71,3 +71,4 @@ REVOKE ALL ON FUNCTION public.get_matchup_stats(int[], date, date) FROM public;
 GRANT EXECUTE ON FUNCTION public.get_matchup_stats(int[], date, date) TO anon, authenticated;
 
 COMMENT ON FUNCTION public.get_matchup_stats IS 'Returns pre-aggregated weekly stats from player_weekly_stats table using PBP-calculated stats for matchup weeks. NHL stats are used for season totals only. Per-game NHL stats are a future enhancement.';
+

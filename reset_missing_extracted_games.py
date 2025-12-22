@@ -73,3 +73,4 @@ print(f"\n[OK] Reset {reset_count} games. Extractor can now process them.")
 print("=" * 70)
 
 
+

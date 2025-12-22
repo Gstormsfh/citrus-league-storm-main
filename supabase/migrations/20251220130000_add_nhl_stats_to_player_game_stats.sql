@@ -46,3 +46,4 @@ COMMENT ON COLUMN public.player_game_stats.nhl_saves IS 'Official NHL.com goalie
 COMMENT ON COLUMN public.player_game_stats.nhl_shots_faced IS 'Official NHL.com shots faced for this game.';
 COMMENT ON COLUMN public.player_game_stats.nhl_goals_against IS 'Official NHL.com goals against for this game.';
 COMMENT ON COLUMN public.player_game_stats.nhl_shutouts IS 'Official NHL.com shutout for this game (1 if shutout, 0 otherwise).';
+

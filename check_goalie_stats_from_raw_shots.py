@@ -224,3 +224,4 @@ def check_goalie_stats_from_raw_shots():
 
 if __name__ == "__main__":
     check_goalie_stats_from_raw_shots()
+

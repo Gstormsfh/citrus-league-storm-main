@@ -161,3 +161,4 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.populate_player_weekly_stats IS 'Populates weekly stats for a specific week from player_game_stats, using PBP-calculated stats for matchup weeks. NHL stats columns exist but will remain 0 until per-game NHL stats are populated (future enhancement).';
+

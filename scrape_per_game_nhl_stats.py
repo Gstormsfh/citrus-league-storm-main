@@ -94,6 +94,12 @@ def extract_player_stats_from_boxscore(boxscore: Dict) -> Dict[int, Dict[str, An
     
     Returns dict: player_id -> stats dict
     
+    Each stats dict includes:
+    - All nhl_* fantasy stats
+    - is_goalie: bool - whether this player is a goalie
+    - team_abbrev: str - the team abbreviation (for creating new records)
+    - position_code: str - position from boxscore ('G', 'C', 'L', 'R', 'D')
+    
     Captures ALL fantasy-relevant stats including:
     - Core stats: G, A, P, SOG, PIM, +/-
     - Physical: Hits, Blocks
@@ -112,6 +118,13 @@ def extract_player_stats_from_boxscore(boxscore: Dict) -> Dict[int, Dict[str, An
     
     player_stats = boxscore["playerByGameStats"]
     
+    # Extract team abbreviations from boxscore root (for creating new records)
+    team_abbrevs = {}
+    if "homeTeam" in boxscore and isinstance(boxscore["homeTeam"], dict):
+        team_abbrevs["homeTeam"] = boxscore["homeTeam"].get("abbrev", "")
+    if "awayTeam" in boxscore and isinstance(boxscore["awayTeam"], dict):
+        team_abbrevs["awayTeam"] = boxscore["awayTeam"].get("abbrev", "")
+    
     # Check both teams
     for team_key in ["homeTeam", "awayTeam"]:
         if team_key not in player_stats:
@@ -120,6 +133,9 @@ def extract_player_stats_from_boxscore(boxscore: Dict) -> Dict[int, Dict[str, An
         team_data = player_stats[team_key]
         if not isinstance(team_data, dict):
             continue
+        
+        # Get team abbreviation for this team
+        team_abbrev = team_abbrevs.get(team_key, "")
         
         # Check forwards, defensemen, goalies
         for position_group in ["forwards", "defensemen", "goalies"]:
@@ -140,6 +156,10 @@ def extract_player_stats_from_boxscore(boxscore: Dict) -> Dict[int, Dict[str, An
                 
                 is_goalie = position_group == "goalies"
                 
+                # Extract position code from player data
+                # Goalies are 'G', skaters could be 'C', 'L', 'R', 'D'
+                position_code = "G" if is_goalie else player_stat.get("position", "F")
+                
                 # ===================
                 # CORE SKATER STATS
                 # ===================
@@ -148,6 +168,10 @@ def extract_player_stats_from_boxscore(boxscore: Dict) -> Dict[int, Dict[str, An
                 sog = _safe_int(player_stat.get("shots", 0))
                 
                 stats = {
+                    # Metadata for record creation (not stored in nhl_* columns)
+                    "_is_goalie": is_goalie,
+                    "_team_abbrev": team_abbrev,
+                    "_position_code": position_code,
                     "nhl_goals": goals,
                     "nhl_assists": assists,
                     "nhl_points": _safe_int(player_stat.get("points", 0)) or (goals + assists),
@@ -313,15 +337,85 @@ def get_week_dates(week_start: date, week_end: date) -> List[date]:
 
 def get_games_for_week(db: SupabaseRest, week_start: date, week_end: date) -> List[Dict]:
     """Get all games for the week from nhl_games table."""
+    # Note: supabase_rest has a bug where multiple filters on same column overwrite
+    # So we fetch more games and filter in Python
+    all_games = db.select(
+        "nhl_games",
+        select="game_id,game_date,home_team,away_team,status",
+        filters=[
+            ("game_date", "gte", week_start.isoformat())
+        ],
+        order="game_date.asc,game_id.asc",
+        limit=2000
+    )
+    
+    # Filter by end date in Python
+    week_end_str = week_end.isoformat()
+    games = [g for g in (all_games or []) if g.get("game_date", "") <= week_end_str]
+    
+    return games
+
+
+def get_games_missing_goalies(db: SupabaseRest, week_start: date, week_end: date, season: int) -> List[Dict]:
+    """
+    Get games that have skater data but NO goalie data in player_game_stats.
+    This is the smart approach - only process games that need goalie records created.
+    """
+    # Get games that have player_game_stats records in our date range
+    week_start_str = week_start.isoformat()
+    week_end_str = week_end.isoformat()
+    
+    # Get distinct game_ids that have skater data
+    skater_games = db.select(
+        "player_game_stats",
+        select="game_id,game_date",
+        filters=[
+            ("season", "eq", season),
+            ("is_goalie", "eq", False),
+            ("game_date", "gte", week_start_str)
+        ],
+        limit=5000
+    )
+    
+    # Filter by end date and get unique game_ids
+    game_ids_with_skaters = set()
+    game_dates = {}
+    for g in (skater_games or []):
+        gdate = g.get("game_date", "")
+        if gdate <= week_end_str:
+            gid = g.get("game_id")
+            game_ids_with_skaters.add(gid)
+            game_dates[gid] = gdate
+    
+    # Get game_ids that have goalie data
+    goalie_games = db.select(
+        "player_game_stats",
+        select="game_id",
+        filters=[
+            ("season", "eq", season),
+            ("is_goalie", "eq", True),
+            ("game_date", "gte", week_start_str)
+        ],
+        limit=5000
+    )
+    game_ids_with_goalies = set(g.get("game_id") for g in (goalie_games or []) if g.get("game_date", "") <= week_end_str)
+    
+    # Find games missing goalies
+    missing_goalie_game_ids = game_ids_with_skaters - game_ids_with_goalies
+    
+    if not missing_goalie_game_ids:
+        return []
+    
+    # Get full game info from nhl_games
     games = db.select(
         "nhl_games",
         select="game_id,game_date,home_team,away_team,status",
         filters=[
-            ("game_date", "gte", week_start.isoformat()),
-            ("game_date", "lte", week_end.isoformat())
+            ("game_id", "in", list(missing_goalie_game_ids))
         ],
-        order="game_date.asc,game_id.asc"
+        limit=500
     )
+    
     return games or []
 
 
@@ -331,18 +425,28 @@ def update_player_game_stats_nhl_columns(
     game_date: date,
     player_stats: Dict[int, Dict[str, Any]],
     season: int
-) -> int:
+) -> Dict[str, int]:
     """
     Update player_game_stats.nhl_* columns for all players in the game.
-    Returns number of players updated.
     
-    Note: This only updates existing records. If player_game_stats doesn't exist,
-    it will be created by extractor_job.py first, then this script populates nhl_* columns.
+    For GOALIES: Creates new records if they don't exist (same source as skaters).
+    For SKATERS: Updates existing records (created by extractor_job.py from PBP).
+    
+    This ensures goalies and skaters both use official NHL boxscore data for
+    public-facing stats (matchups, player cards, fantasy scoring).
+    
+    Returns dict with counts: {updated, created, skipped}
     """
     updated_count = 0
-    missing_count = 0
+    created_count = 0
+    skipped_count = 0
     
     for player_id, stats in player_stats.items():
+        # Extract metadata (these are NOT stored as columns, just used for logic)
+        is_goalie = stats.pop("_is_goalie", False)
+        team_abbrev = stats.pop("_team_abbrev", "")
+        position_code = stats.pop("_position_code", "F")
+        
         # Check if player_game_stats record exists
         existing = db.select(
             "player_game_stats",
@@ -356,7 +460,9 @@ def update_player_game_stats_nhl_columns(
         )
         
         if existing and len(existing) > 0:
-            # Update existing record - only update nhl_* columns
+            # =============================================
+            # UPDATE existing record (skaters and goalies)
+            # =============================================
             update_data = {
                 **stats,
                 "updated_at": datetime.now().isoformat()
@@ -375,15 +481,80 @@ def update_player_game_stats_nhl_columns(
                 updated_count += 1
             except Exception as e:
                 print(f"    [ERROR] Failed to update player {player_id}: {e}")
+        
+        elif is_goalie:
+            # =============================================
+            # CREATE new record for GOALIES
+            # This is the key fix: goalies get their records
+            # from the same NHL boxscore source as skaters
+            # =============================================
+            
+            # Build the complete goalie record
+            goalie_record = {
+                # Primary keys
+                "season": season,
+                "game_id": game_id,
+                "player_id": player_id,
+                
+                # Game context
+                "game_date": game_date.isoformat() if isinstance(game_date, date) else game_date,
+                "team_abbrev": team_abbrev,
+                
+                # Position identifiers
+                "position_code": "G",
+                "is_goalie": True,
+                
+                # =============================================
+                # NHL official stats (nhl_* columns)
+                # These are the source of truth for fantasy
+                # =============================================
+                **stats,
+                
+                # =============================================
+                # Legacy columns (for compatibility/fallback)
+                # Mirror the nhl_* values to original columns
+                # =============================================
+                "goalie_gp": 1,
+                "wins": stats.get("nhl_wins", 0),
+                "saves": stats.get("nhl_saves", 0),
+                "shots_faced": stats.get("nhl_shots_faced", 0),
+                "goals_against": stats.get("nhl_goals_against", 0),
+                "shutouts": stats.get("nhl_shutouts", 0),
+                
+                # Zero out skater stats for goalies
+                "goals": 0,
+                "primary_assists": 0,
+                "secondary_assists": 0,
+                "points": 0,
+                "shots_on_goal": 0,
+                "hits": 0,
+                "blocks": 0,
+                "pim": 0,
+                "ppp": 0,
+                "shp": 0,
+                "plus_minus": 0,
+                "icetime_seconds": stats.get("nhl_toi_seconds", 0),
+                
+                # Timestamps
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat()
+            }
+            
+            try:
+                db.upsert("player_game_stats", goalie_record, on_conflict="season,game_id,player_id")
+                created_count += 1
+            except Exception as e:
+                print(f"    [ERROR] Failed to create goalie record for {player_id}: {e}")
+        
         else:
-            missing_count += 1
-            # Record doesn't exist - this is expected if extractor_job hasn't run yet
-            # We'll populate nhl_* columns after extractor_job creates the base records
+            # Skater without existing record - will be created by extractor_job
+            skipped_count += 1
     
-    if missing_count > 0:
-        print(f"    [INFO] {missing_count} players don't have player_game_stats records yet (will be created by extractor_job)")
-    
-    return updated_count
+    return {
+        "updated": updated_count,
+        "created": created_count,
+        "skipped": skipped_count
+    }
 
 
 def main():
@@ -424,10 +595,18 @@ def main():
         print(f"[scrape_nhl_stats] ERROR: Failed to connect: {e}")
         return 1
     
+    # Check for --missing-goalies flag
+    missing_goalies_only = "--missing-goalies" in sys.argv
+    
     # Get games for this week
-    print(f"[scrape_nhl_stats] Fetching games for week {week_start} to {week_end}...")
-    games = get_games_for_week(db, week_start, week_end)
-    print(f"[scrape_nhl_stats] Found {len(games)} games this week")
+    if missing_goalies_only:
+        print(f"[scrape_nhl_stats] Finding games MISSING GOALIE DATA for {week_start} to {week_end}...")
+        games = get_games_missing_goalies(db, week_start, week_end, DEFAULT_SEASON)
+        print(f"[scrape_nhl_stats] Found {len(games)} games missing goalie records")
+    else:
+        print(f"[scrape_nhl_stats] Fetching ALL games for {week_start} to {week_end}...")
+        games = get_games_for_week(db, week_start, week_end)
+        print(f"[scrape_nhl_stats] Found {len(games)} games")
     print()
     
     if not games:
@@ -436,6 +615,8 @@ def main():
     
     # Process each game
     total_updated = 0
+    total_created = 0
+    total_skipped = 0
     total_players = 0
     errors = 0
     
@@ -461,11 +642,14 @@ def main():
             time.sleep(0.5)
             continue
         
-        print(f"  Found stats for {len(player_stats)} players")
+        # Count goalies and skaters
+        goalie_count = sum(1 for s in player_stats.values() if s.get("_is_goalie", False))
+        skater_count = len(player_stats) - goalie_count
+        print(f"  Found {len(player_stats)} players ({skater_count} skaters, {goalie_count} goalies)")
         
         # Update database
         game_date_obj = datetime.strptime(game_date, "%Y-%m-%d").date() if isinstance(game_date, str) else game_date
-        updated = update_player_game_stats_nhl_columns(
+        result = update_player_game_stats_nhl_columns(
             db,
             game_id,
             game_date_obj,
@@ -473,10 +657,21 @@ def main():
             DEFAULT_SEASON
         )
         
-        total_updated += updated
+        total_updated += result["updated"]
+        total_created += result["created"]
+        total_skipped += result["skipped"]
         total_players += len(player_stats)
         
-        print(f"  Updated {updated} player records")
+        # Detailed output per game
+        parts = []
+        if result["updated"] > 0:
+            parts.append(f"updated {result['updated']}")
+        if result["created"] > 0:
+            parts.append(f"created {result['created']} goalies")
+        if result["skipped"] > 0:
+            parts.append(f"skipped {result['skipped']} skaters (no base record)")
+        
+        print(f"  -> {', '.join(parts) if parts else 'no changes'}")
         print()
         
         time.sleep(0.5)  # Rate limiting (500ms between requests)
@@ -487,10 +682,17 @@ def main():
     print(f"Games processed: {len(games)}")
     print(f"Players found: {total_players}")
     print(f"Players updated: {total_updated}")
+    print(f"Goalies created: {total_created}")
+    print(f"Skaters skipped (no base record): {total_skipped}")
     print(f"Errors: {errors}")
     print()
-    print("✅ Per-game NHL stats populated in player_game_stats.nhl_* columns")
-    print("   These are now the source of truth for fantasy scoring!")
+    print("ARCHITECTURE:")
+    print("  - Skaters: Records created by extractor_job (PBP), updated here with NHL official stats")
+    print("  - Goalies: Records created HERE from NHL boxscore (same official source as skaters)")
+    print("  - Public-facing stats (matchups, fantasy) now use unified NHL official data")
+    print()
+    print("GOALIE STATS NOW AVAILABLE:")
+    print("  nhl_wins, nhl_saves, nhl_shots_faced, nhl_goals_against, nhl_shutouts, nhl_save_pct")
     print()
     
     return 0

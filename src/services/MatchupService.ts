@@ -1346,6 +1346,17 @@ export const MatchupService = {
     garPercentage?: number,
     dailyProjection?: any
   ): MatchupPlayer {
+    // CRITICAL: Debug goalie detection and stats
+    const isGoalie = player.position === 'G' || player.position === 'Goalie';
+    if (isGoalie) {
+      console.log(`[MatchupService.transformToMatchupPlayerWithGames] 🥅 GOALIE DETECTED: ${player.name} (ID: ${player.id})`);
+      console.log(`  Position: ${player.position}, matchupStats:`, matchupStats);
+      if (matchupStats) {
+        console.log(`  Goalie Stats from RPC: W=${matchupStats.wins || 0}, SV=${matchupStats.saves || 0}, SO=${matchupStats.shutouts || 0}, GA=${matchupStats.goals_against || 0}`);
+      } else {
+        console.warn(`  ⚠️ NO MATCHUP STATS for goalie ${player.name}!`);
+      }
+    }
     const teamAbbrev = player.teamAbbreviation || player.team || '';
     
     try {
@@ -1428,20 +1439,43 @@ export const MatchupService = {
         // CRITICAL: Check if player is a goalie and use appropriate scoring
         if (isGoalie && (matchupStats.wins !== undefined || matchupStats.saves !== undefined)) {
           // Goalie scoring: Wins=4, Saves=0.2, Shutouts=3, GA=-1
-          // Validate that stats are for a week, not season
+          // CRITICAL: Validate that stats are for a week, not season
+          // For a single week, max should be: ~7 wins, ~300 saves (very high week)
           const MAX_REASONABLE_WEEK_WINS = 7;
           const MAX_REASONABLE_WEEK_SAVES = 300;
+          const MAX_REASONABLE_WEEK_SHUTOUTS = 3;
           
-          if ((matchupStats.wins || 0) > MAX_REASONABLE_WEEK_WINS || 
-              (matchupStats.saves || 0) > MAX_REASONABLE_WEEK_SAVES) {
-            console.error(`[MatchupService.transformToMatchupPlayerWithGames] ❌ RPC returned season totals for goalie ${player.name}: W=${matchupStats.wins || 0}, SV=${matchupStats.saves || 0} - REJECTING and using 0 points`);
+          const wins = matchupStats.wins || 0;
+          const saves = matchupStats.saves || 0;
+          const shutouts = matchupStats.shutouts || 0;
+          const goals_against = matchupStats.goals_against || 0;
+          
+          // CRITICAL: Reject season totals - if stats are too high, they're season totals, not weekly
+          if (wins > MAX_REASONABLE_WEEK_WINS || 
+              saves > MAX_REASONABLE_WEEK_SAVES ||
+              shutouts > MAX_REASONABLE_WEEK_SHUTOUTS) {
+            console.error(`[MatchupService.transformToMatchupPlayerWithGames] ❌ RPC returned SEASON TOTALS for goalie ${player.name} (ID: ${player.id}): W=${wins}, SV=${saves}, SO=${shutouts} - REJECTING and using 0 points`);
+            console.error(`  Week: ${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`);
             fantasyPoints = 0; // Reject season totals from RPC
           } else {
             // Goalie fantasy scoring using default weights (Wins=4, Saves=0.2, Shutouts=3, GA=-1)
-            fantasyPoints = ((matchupStats.wins || 0) * 4) + 
-                            ((matchupStats.saves || 0) * 0.2) + 
-                            ((matchupStats.shutouts || 0) * 3) + 
-                            ((matchupStats.goals_against || 0) * -1);
+            fantasyPoints = (wins * 4) + 
+                            (saves * 0.2) + 
+                            (shutouts * 3) + 
+                            (goals_against * -1);
+            
+            // Debug: Log goalie point calculation
+            if (wins > 0 || saves > 0 || shutouts > 0) {
+              console.log(`[MatchupService.transformToMatchupPlayerWithGames] ✅ Goalie ${player.name} weekly points:`, {
+                wins,
+                saves,
+                shutouts,
+                goals_against,
+                calculation: `(${wins} * 4) + (${saves} * 0.2) + (${shutouts} * 3) + (${goals_against} * -1)`,
+                totalPoints: fantasyPoints,
+                week: `${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`
+              });
+            }
           }
         } else {
           // Skater scoring: Goals=3, Assists=2, SOG=0.4, Blocks=0.4
@@ -1946,10 +1980,14 @@ export const MatchupService = {
           const sampleEntry = Array.from(matchupStatsMap.entries())[0];
           const playersWithStats = Array.from(matchupStatsMap.entries()).slice(0, 3);
           
-          // Check if sample players have season-total-like numbers
-          const highValuePlayers = playersWithStats.filter(([id, stats]) => 
-            stats.goals > 20 || stats.assists > 30 || stats.sog > 100
-          );
+          // Check if sample players have season-total-like numbers (for both skaters and goalies)
+          const highValuePlayers = playersWithStats.filter(([id, stats]) => {
+            // Check skater stats
+            const highSkaterStats = stats.goals > 20 || stats.assists > 30 || stats.sog > 100;
+            // Check goalie stats (wins > 7 or saves > 300 for a week is unreasonable)
+            const highGoalieStats = (stats.wins || 0) > 7 || (stats.saves || 0) > 300;
+            return highSkaterStats || highGoalieStats;
+          });
           
           console.log('[MatchupService.getMatchupRosters] ✅ Matchup stats fetched successfully:');
           console.log(`  Stats Map Size: ${matchupStatsMap.size}, Expected: ${allPlayerIds.length}, Coverage: ${((matchupStatsMap.size / allPlayerIds.length) * 100).toFixed(1)}%`);
@@ -1957,7 +1995,13 @@ export const MatchupService = {
           console.log(`  Sample Players:`);
           playersWithStats.forEach(([id, stats]) => {
             const looksLikeSeason = stats.goals > 20 || stats.assists > 30 || stats.sog > 100;
-            console.log(`    Player ${id}: G=${stats.goals}, A=${stats.assists}, SOG=${stats.sog}, Blocks=${stats.blocks || 0} ${looksLikeSeason ? '❌ SEASON TOTAL' : '✅ Week'}`);
+            const looksLikeSeasonGoalie = (stats.wins || 0) > 7 || (stats.saves || 0) > 300;
+            const isGoalie = (stats.wins !== undefined || stats.saves !== undefined) && (stats.goals === 0 || stats.goals === undefined);
+            if (isGoalie) {
+              console.log(`    🥅 Goalie ${id}: W=${stats.wins || 0}, SV=${stats.saves || 0}, SO=${stats.shutouts || 0}, GA=${stats.goals_against || 0} ${looksLikeSeasonGoalie ? '❌ SEASON TOTAL' : '✅ Week'}`);
+            } else {
+              console.log(`    Player ${id}: G=${stats.goals}, A=${stats.assists}, SOG=${stats.sog}, Blocks=${stats.blocks || 0} ${looksLikeSeason ? '❌ SEASON TOTAL' : '✅ Week'}`);
+            }
           });
           
           if (highValuePlayers.length > 0) {
@@ -2007,6 +2051,23 @@ export const MatchupService = {
           if (!dailyProjection && playerId > 0) {
             console.warn(`[MatchupService] Team1 player ${p.name} (ID: ${playerId}) missing daily projection`);
           }
+          const matchupStats = matchupStatsMap.get(playerId);
+          
+          // CRITICAL: Log goalie stats before transformation
+          const isGoalieBeforeTransform = p.position === 'G' || p.position === 'Goalie';
+          if (isGoalieBeforeTransform) {
+            console.log(`[MatchupService.getMatchupRosters] 🥅 BEFORE TRANSFORM - Goalie ${p.name} (${playerId}):`, {
+              hasMatchupStats: !!matchupStats,
+              matchupStats: matchupStats ? {
+                wins: matchupStats.wins || 0,
+                saves: matchupStats.saves || 0,
+                shutouts: matchupStats.shutouts || 0,
+                goals_against: matchupStats.goals_against || 0
+              } : null,
+              week: `${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`
+            });
+          }
+          
           const transformed = this.transformToMatchupPlayerWithGames(
             p,
             team1Starters.has(String(p.id)),
@@ -2014,17 +2075,26 @@ export const MatchupService = {
             weekEnd,
             timezone,
             playerGames,
-            matchupStatsMap.get(playerId),
+            matchupStats,
             garMap.get(playerId),
             dailyProjection
           );
+          
+          // CRITICAL: Log what transformToMatchupPlayerWithGames calculated
+          if (isGoalieBeforeTransform) {
+            console.log(`[MatchupService.getMatchupRosters] 🥅 AFTER TRANSFORM - Goalie ${p.name} (${playerId}):`, {
+              total_points_from_transform: transformed.total_points,
+              points_from_transform: transformed.points,
+              hasGoalieMatchupStats: !!transformed.goalieMatchupStats,
+              goalieMatchupStats: transformed.goalieMatchupStats
+            });
+          }
           
           // Get calculated games remaining from transformed player (already filtered to week)
           const gamesRemaining = transformed.games_remaining_total || 0;
           
           // Merge matchup line data if available
           const matchupLine = matchupLines.get(playerId);
-          const matchupStats = matchupStatsMap.get(playerId);
           
           // Helper function to calculate matchup week points from stats
           const calculateMatchupWeekPoints = (stats: any, isGoalie: boolean = false): number => {
@@ -2081,7 +2151,30 @@ export const MatchupService = {
             if (matchupStats) {
               // RPC returned weekly stats - always use them (they're the source of truth)
               const isGoaliePlayer = p.position === 'G' || p.position === 'Goalie';
+              
+              // CRITICAL: Log what we received from RPC for goalies
+              if (isGoaliePlayer) {
+                console.log(`[MatchupService.getMatchupRosters] 🥅 GOALIE ${p.name} (${playerId}) RPC stats:`, {
+                  wins: matchupStats.wins || 0,
+                  saves: matchupStats.saves || 0,
+                  shutouts: matchupStats.shutouts || 0,
+                  goals_against: matchupStats.goals_against || 0,
+                  week: `${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`
+                });
+              }
+              
               matchupWeekPoints = calculateMatchupWeekPoints(matchupStats, isGoaliePlayer);
+              
+              // CRITICAL: Log calculated points for goalies
+              if (isGoaliePlayer && matchupWeekPoints > 0) {
+                console.log(`[MatchupService.getMatchupRosters] ✅ GOALIE ${p.name} calculated ${matchupWeekPoints} points from:`, {
+                  wins: (matchupStats.wins || 0) * 4,
+                  saves: (matchupStats.saves || 0) * 0.2,
+                  shutouts: (matchupStats.shutouts || 0) * 3,
+                  goals_against: (matchupStats.goals_against || 0) * -1,
+                  total: matchupWeekPoints
+                });
+              }
               
               // Validate that RPC stats look reasonable for a week
               const isLikelySeasonTotal = isGoaliePlayer 
@@ -2100,6 +2193,17 @@ export const MatchupService = {
               // No RPC stats - player didn't play this week (injured, scratched, etc.)
               // Always set to 0, regardless of database value (database may have old/incorrect data)
               matchupWeekPoints = 0;
+              
+              // CRITICAL: Log when goalies have no matchupStats
+              const isGoaliePlayer = p.position === 'G' || p.position === 'Goalie';
+              if (isGoaliePlayer) {
+                console.warn(`[MatchupService.getMatchupRosters] ⚠️ GOALIE ${p.name} (${playerId}) has NO matchupStats from RPC!`, {
+                  playerId,
+                  weekStart: weekStart.toISOString().split('T')[0],
+                  weekEnd: weekEnd.toISOString().split('T')[0],
+                  databaseValue: matchupLine?.total_points || 'N/A'
+                });
+              }
               
               // Log if database had suspicious values (for debugging)
               if (matchupLine.total_points > MAX_REASONABLE_WEEK_POINTS) {
@@ -2329,6 +2433,23 @@ export const MatchupService = {
           if (!dailyProjection && playerId > 0) {
             console.warn(`[MatchupService] Team2 player ${p.name} (ID: ${playerId}) missing daily projection`);
           }
+          const matchupStats = matchupStatsMap.get(playerId);
+          
+          // CRITICAL: Log goalie stats before transformation
+          const isGoalieBeforeTransform = p.position === 'G' || p.position === 'Goalie';
+          if (isGoalieBeforeTransform) {
+            console.log(`[MatchupService.getMatchupRosters] 🥅 BEFORE TRANSFORM - Goalie ${p.name} (${playerId}):`, {
+              hasMatchupStats: !!matchupStats,
+              matchupStats: matchupStats ? {
+                wins: matchupStats.wins || 0,
+                saves: matchupStats.saves || 0,
+                shutouts: matchupStats.shutouts || 0,
+                goals_against: matchupStats.goals_against || 0
+              } : null,
+              week: `${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`
+            });
+          }
+          
           const transformed = this.transformToMatchupPlayerWithGames(
             p,
             team2Starters.has(String(p.id)),
@@ -2336,17 +2457,26 @@ export const MatchupService = {
             weekEnd,
             timezone,
             playerGames,
-            matchupStatsMap.get(playerId),
+            matchupStats,
             garMap.get(playerId),
             dailyProjection
           );
+          
+          // CRITICAL: Log what transformToMatchupPlayerWithGames calculated
+          if (isGoalieBeforeTransform) {
+            console.log(`[MatchupService.getMatchupRosters] 🥅 AFTER TRANSFORM - Goalie ${p.name} (${playerId}):`, {
+              total_points_from_transform: transformed.total_points,
+              points_from_transform: transformed.points,
+              hasGoalieMatchupStats: !!transformed.goalieMatchupStats,
+              goalieMatchupStats: transformed.goalieMatchupStats
+            });
+          }
           
           // Get calculated games remaining from transformed player (already filtered to week)
           const gamesRemaining = transformed.games_remaining_total || 0;
           
           // Merge matchup line data if available
           const matchupLine = matchupLines.get(playerId);
-          const matchupStats = matchupStatsMap.get(playerId);
           
           // Helper function to calculate matchup week points from stats
           const calculateMatchupWeekPoints = (stats: any, isGoalie: boolean = false): number => {
@@ -2403,7 +2533,30 @@ export const MatchupService = {
             if (matchupStats) {
               // RPC returned weekly stats - always use them (they're the source of truth)
               const isGoaliePlayer = p.position === 'G' || p.position === 'Goalie';
+              
+              // CRITICAL: Log what we received from RPC for goalies
+              if (isGoaliePlayer) {
+                console.log(`[MatchupService.getMatchupRosters] 🥅 GOALIE ${p.name} (${playerId}) RPC stats:`, {
+                  wins: matchupStats.wins || 0,
+                  saves: matchupStats.saves || 0,
+                  shutouts: matchupStats.shutouts || 0,
+                  goals_against: matchupStats.goals_against || 0,
+                  week: `${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`
+                });
+              }
+              
               matchupWeekPoints = calculateMatchupWeekPoints(matchupStats, isGoaliePlayer);
+              
+              // CRITICAL: Log calculated points for goalies
+              if (isGoaliePlayer && matchupWeekPoints > 0) {
+                console.log(`[MatchupService.getMatchupRosters] ✅ GOALIE ${p.name} calculated ${matchupWeekPoints} points from:`, {
+                  wins: (matchupStats.wins || 0) * 4,
+                  saves: (matchupStats.saves || 0) * 0.2,
+                  shutouts: (matchupStats.shutouts || 0) * 3,
+                  goals_against: (matchupStats.goals_against || 0) * -1,
+                  total: matchupWeekPoints
+                });
+              }
               
               // Validate that RPC stats look reasonable for a week
               const isLikelySeasonTotal = isGoaliePlayer 
@@ -2422,6 +2575,17 @@ export const MatchupService = {
               // No RPC stats - player didn't play this week (injured, scratched, etc.)
               // Always set to 0, regardless of database value (database may have old/incorrect data)
               matchupWeekPoints = 0;
+              
+              // CRITICAL: Log when goalies have no matchupStats
+              const isGoaliePlayer = p.position === 'G' || p.position === 'Goalie';
+              if (isGoaliePlayer) {
+                console.warn(`[MatchupService.getMatchupRosters] ⚠️ GOALIE ${p.name} (${playerId}) has NO matchupStats from RPC!`, {
+                  playerId,
+                  weekStart: weekStart.toISOString().split('T')[0],
+                  weekEnd: weekEnd.toISOString().split('T')[0],
+                  databaseValue: matchupLine?.total_points || 'N/A'
+                });
+              }
               
               // Log if database had suspicious values (for debugging)
               if (matchupLine.total_points > MAX_REASONABLE_WEEK_POINTS) {
@@ -2990,17 +3154,62 @@ export const MatchupService = {
         goals_against?: number;
       }>();
       (data || []).forEach((row: any) => {
+        const goalieStats = {
+          wins: Number(row.wins) || 0,
+          saves: Number(row.saves) || 0,
+          shutouts: Number(row.shutouts) || 0,
+          goals_against: Number(row.goals_against) || 0,
+        };
+        
+        // CRITICAL: Validate goalie stats are for a week, not season
+        // If stats are too high, they're season totals - reject them
+        const MAX_REASONABLE_WEEK_WINS = 7;
+        const MAX_REASONABLE_WEEK_SAVES = 300;
+        const MAX_REASONABLE_WEEK_SHUTOUTS = 3;
+        
+        const isGoalie = goalieStats.wins > 0 || goalieStats.saves > 0 || goalieStats.shutouts > 0;
+        const looksLikeSeasonTotal = isGoalie && (
+          goalieStats.wins > MAX_REASONABLE_WEEK_WINS || 
+          goalieStats.saves > MAX_REASONABLE_WEEK_SAVES ||
+          goalieStats.shutouts > MAX_REASONABLE_WEEK_SHUTOUTS
+        );
+        
+        if (looksLikeSeasonTotal) {
+          console.error(`[MatchupService.fetchMatchupStatsForPlayers] ❌ REJECTING SEASON TOTALS for goalie player ${row.player_id}:`, {
+            wins: goalieStats.wins,
+            saves: goalieStats.saves,
+            shutouts: goalieStats.shutouts,
+            goals_against: goalieStats.goals_against,
+            dateRange: `${startDateStr} to ${endDateStr}`,
+            reason: 'Stats exceed weekly maximums (W>7, SV>300, SO>3)'
+          });
+          // Set goalie stats to 0 if they look like season totals
+          goalieStats.wins = 0;
+          goalieStats.saves = 0;
+          goalieStats.shutouts = 0;
+          goalieStats.goals_against = 0;
+        }
+        
+        // Debug: Log goalie stats if they exist and are valid
+        if (isGoalie && !looksLikeSeasonTotal) {
+          console.log(`[MatchupService.fetchMatchupStatsForPlayers] 🥅 GOALIE STATS for player ${row.player_id}:`, {
+            ...goalieStats,
+            dateRange: `${startDateStr} to ${endDateStr}`,
+            validated: '✅ Weekly totals'
+          });
+        }
+        
         statsMap.set(row.player_id, {
           goals: row.goals || 0,
           assists: row.assists || 0,
           sog: row.shots_on_goal || 0,
           blocks: row.blocks || 0, // CRITICAL: Get blocks from matchup week stats, not season stats
           xGoals: parseFloat(row.x_goals || 0),
-          // Extract goalie stats from RPC response
-          wins: row.wins || 0,
-          saves: row.saves || 0,
-          shutouts: row.shutouts || 0,
-          goals_against: row.goals_against || 0,
+          // Extract goalie stats from RPC response (validated to be weekly, not season)
+          wins: goalieStats.wins,
+          saves: goalieStats.saves,
+          shutouts: goalieStats.shutouts,
+          goals_against: goalieStats.goals_against,
         });
       });
       
@@ -3009,17 +3218,38 @@ export const MatchupService = {
         const sampleStats = sampleEntry[1];
         // Check if sample looks like season totals (high numbers)
         // For a week, max should be: ~7 goals, ~10 assists, ~30 SOG (very high week)
-        const looksLikeSeasonTotal = sampleStats.goals > 20 || sampleStats.assists > 30 || sampleStats.sog > 100;
+        // For goalies: max ~7 wins, ~300 saves per week
+        const isGoalieSample = (sampleStats.wins !== undefined || sampleStats.saves !== undefined) && (sampleStats.goals === 0 || sampleStats.goals === undefined);
+        const looksLikeSeasonTotal = isGoalieSample
+          ? ((sampleStats.wins || 0) > 7 || (sampleStats.saves || 0) > 300)
+          : (sampleStats.goals > 20 || sampleStats.assists > 30 || sampleStats.sog > 100);
         
         // Calculate expected points for sample to verify
-        const samplePoints = (sampleStats.goals * 3) + (sampleStats.assists * 2) + (sampleStats.sog * 0.4) + ((sampleStats.blocks || 0) * 0.4);
+        const samplePoints = isGoalieSample
+          ? ((sampleStats.wins || 0) * 4) + ((sampleStats.saves || 0) * 0.2) + ((sampleStats.shutouts || 0) * 3) + ((sampleStats.goals_against || 0) * -1)
+          : (sampleStats.goals * 3) + (sampleStats.assists * 2) + (sampleStats.sog * 0.4) + ((sampleStats.blocks || 0) * 0.4);
         
         // CRITICAL: Log explicitly to see actual values
         console.log('[MatchupService.fetchMatchupStatsForPlayers] RPC returned:');
-        console.log(`  Total Rows: ${(data || []).length}, Stats Map Size: ${statsMap.size}`);
+        console.log(`  Total Rows: ${(data || []).length}, Stats Map Size: ${statsMap.size}, Requested Players: ${playerIds.length}`);
         console.log(`  Date Range: ${startDateStr} to ${endDateStr}`);
-        console.log(`  Sample Player ID: ${sampleEntry[0]}`);
-        console.log(`  Sample Stats:`, {
+        
+        // CRITICAL: Check if all requested players are in the response
+        const missingPlayers = playerIds.filter(id => !statsMap.has(id));
+        if (missingPlayers.length > 0) {
+          console.warn(`  ⚠️ MISSING PLAYERS in RPC response (${missingPlayers.length}):`, missingPlayers.slice(0, 10));
+        } else {
+          console.log(`  ✅ All ${playerIds.length} requested players found in RPC response`);
+        }
+        
+        console.log(`  Sample Player ID: ${sampleEntry[0]} (${isGoalieSample ? '🥅 GOALIE' : 'Skater'})`);
+        console.log(`  Sample Stats:`, isGoalieSample ? {
+          wins: sampleStats.wins || 0,
+          saves: sampleStats.saves || 0,
+          shutouts: sampleStats.shutouts || 0,
+          goals_against: sampleStats.goals_against || 0,
+          calculatedPoints: samplePoints
+        } : {
           goals: sampleStats.goals,
           assists: sampleStats.assists,
           sog: sampleStats.sog,
@@ -3028,8 +3258,41 @@ export const MatchupService = {
           calculatedPoints: samplePoints
         });
         
+        // CRITICAL: Log raw RPC data to see what's actually being returned
+        const rawSampleRow = (data || []).find((r: any) => r.player_id === sampleEntry[0]);
+        if (rawSampleRow) {
+          console.log(`  🔍 RAW RPC DATA for sample player:`, {
+            player_id: rawSampleRow.player_id,
+            goals: rawSampleRow.goals,
+            assists: rawSampleRow.assists,
+            wins: rawSampleRow.wins,
+            saves: rawSampleRow.saves,
+            shutouts: rawSampleRow.shutouts,
+            goals_against: rawSampleRow.goals_against,
+            goalie_gp: rawSampleRow.goalie_gp,
+            allFields: Object.keys(rawSampleRow)
+          });
+        }
+        
+        // CRITICAL: Log all goalies in the response
+        const goalieRows = (data || []).filter((r: any) => (r.goalie_gp || 0) > 0 || (r.wins || 0) > 0 || (r.saves || 0) > 0);
+        if (goalieRows.length > 0) {
+          console.log(`  🥅 GOALIES in RPC response (${goalieRows.length}):`, goalieRows.map((r: any) => ({
+            player_id: r.player_id,
+            wins: r.wins || 0,
+            saves: r.saves || 0,
+            shutouts: r.shutouts || 0,
+            goals_against: r.goals_against || 0,
+            goalie_gp: r.goalie_gp || 0
+          })));
+        }
+        
         if (looksLikeSeasonTotal) {
-          console.error(`  ❌ RPC IS RETURNING SEASON TOTALS! Sample has Goals: ${sampleStats.goals}, Assists: ${sampleStats.assists}, SOG: ${sampleStats.sog} - These are season numbers!`);
+          if (isGoalieSample) {
+            console.error(`  ❌ RPC IS RETURNING SEASON TOTALS FOR GOALIE! Sample has W: ${sampleStats.wins || 0}, SV: ${sampleStats.saves || 0} - These are season numbers!`);
+          } else {
+            console.error(`  ❌ RPC IS RETURNING SEASON TOTALS! Sample has Goals: ${sampleStats.goals}, Assists: ${sampleStats.assists}, SOG: ${sampleStats.sog} - These are season numbers!`);
+          }
         } else {
           console.log(`  ✅ Sample stats look reasonable for a week`);
         }
@@ -3039,8 +3302,14 @@ export const MatchupService = {
         if (additionalSamples.length > 0) {
           console.log(`  Additional Samples:`);
           additionalSamples.forEach(([id, stats]) => {
-            const looksLikeSeason = stats.goals > 20 || stats.assists > 30 || stats.sog > 100;
-            console.log(`    Player ${id}: G=${stats.goals}, A=${stats.assists}, SOG=${stats.sog} ${looksLikeSeason ? '❌ SEASON TOTAL' : '✅ Week'}`);
+            const isGoalie = (stats.wins !== undefined || stats.saves !== undefined) && (stats.goals === 0 || stats.goals === undefined);
+            if (isGoalie) {
+              const looksLikeSeason = (stats.wins || 0) > 7 || (stats.saves || 0) > 300;
+              console.log(`    🥅 Goalie ${id}: W=${stats.wins || 0}, SV=${stats.saves || 0}, SO=${stats.shutouts || 0}, GA=${stats.goals_against || 0} ${looksLikeSeason ? '❌ SEASON TOTAL' : '✅ Week'}`);
+            } else {
+              const looksLikeSeason = stats.goals > 20 || stats.assists > 30 || stats.sog > 100;
+              console.log(`    Player ${id}: G=${stats.goals}, A=${stats.assists}, SOG=${stats.sog} ${looksLikeSeason ? '❌ SEASON TOTAL' : '✅ Week'}`);
+            }
           });
         }
       } else {

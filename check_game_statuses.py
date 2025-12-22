@@ -17,3 +17,4 @@ for g in games[:10]:
 print("\nStatus counts:")
 statuses = Counter(g['status'] for g in games if g.get('status'))
 print(statuses)
+

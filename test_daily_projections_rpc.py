@@ -160,3 +160,4 @@ def test_daily_projections_rpc():
 
 if __name__ == "__main__":
     test_daily_projections_rpc()
+

@@ -189,3 +189,4 @@ MatchupService.ts (calculates fantasy points from NHL stats)
 - Some stats (hits/blocks) require StatsAPI fallback - implement with retry logic
 - Per-game NHL stats are a future enhancement (season totals work for now)
 - The dual-column approach ensures we can always fall back to PBP if NHL stats are missing
+

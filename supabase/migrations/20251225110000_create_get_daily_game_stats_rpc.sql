@@ -132,14 +132,14 @@ AS $$
     COALESCE(pgs.nhl_otg, 0) as otg,
     COALESCE(pgs.nhl_shifts, 0) as shifts,
     
-    -- Goalie core
-    COALESCE(pgs.nhl_wins, 0) as wins,
+    -- Goalie core - USE FALLBACK: nhl_* columns may not be populated for all goalie games
+    COALESCE(NULLIF(pgs.nhl_wins, 0), pgs.wins, 0) as wins,
     COALESCE(pgs.nhl_losses, 0) as losses,
     COALESCE(pgs.nhl_ot_losses, 0) as ot_losses,
-    COALESCE(pgs.nhl_saves, 0) as saves,
-    COALESCE(pgs.nhl_shots_faced, 0) as shots_faced,
-    COALESCE(pgs.nhl_goals_against, 0) as goals_against,
-    COALESCE(pgs.nhl_shutouts, 0) as shutouts,
+    COALESCE(NULLIF(pgs.nhl_saves, 0), pgs.saves, 0) as saves,
+    COALESCE(NULLIF(pgs.nhl_shots_faced, 0), pgs.shots_faced, 0) as shots_faced,
+    COALESCE(NULLIF(pgs.nhl_goals_against, 0), pgs.goals_against, 0) as goals_against,
+    COALESCE(NULLIF(pgs.nhl_shutouts, 0), pgs.shutouts, 0) as shutouts,
     COALESCE(pgs.nhl_save_pct, 0.000) as save_pct,
     
     -- Goalie situation splits
