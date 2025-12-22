@@ -94,7 +94,7 @@ def validate_nhl_stats_population():
     # Get sample players with both NHL and PBP stats
     sample_skaters = db.select(
         "player_season_stats",
-        select="player_id, goals, nhl_goals, assists, nhl_assists, points, nhl_points, shots_on_goal, nhl_shots_on_goal",
+        select="player_id, goals, nhl_goals, primary_assists, secondary_assists, nhl_assists, points, nhl_points, shots_on_goal, nhl_shots_on_goal",
         filters=[
             ("season", "eq", SEASON),
             ("is_goalie", "eq", False),
@@ -105,20 +105,24 @@ def validate_nhl_stats_population():
     
     if sample_skaters:
         print("Sample skater comparison (NHL vs PBP):")
-        print("-" * 100)
-        print(f"{'Player ID':<12} {'NHL Goals':<12} {'PBP Goals':<12} {'Diff':<10} {'NHL Points':<12} {'PBP Points':<12} {'Diff':<10}")
-        print("-" * 100)
+        print("-" * 120)
+        print(f"{'Player ID':<12} {'NHL G':<8} {'PBP G':<8} {'Diff':<8} {'NHL A':<8} {'PBP A':<8} {'Diff':<8} {'NHL Pts':<10} {'PBP Pts':<10} {'Diff':<8}")
+        print("-" * 120)
         
         for p in sample_skaters[:10]:
             nhl_goals = int(p.get("nhl_goals", 0))
             pbp_goals = int(p.get("goals", 0))
             nhl_points = int(p.get("nhl_points", 0))
             pbp_points = int(p.get("points", 0))
+            # Calculate PBP assists (primary + secondary)
+            pbp_assists = int(p.get("primary_assists", 0)) + int(p.get("secondary_assists", 0))
+            nhl_assists = int(p.get("nhl_assists", 0))
             
             goals_diff = nhl_goals - pbp_goals
             points_diff = nhl_points - pbp_points
+            assists_diff = nhl_assists - pbp_assists
             
-            print(f"{p['player_id']:<12} {nhl_goals:<12} {pbp_goals:<12} {goals_diff:<10} {nhl_points:<12} {pbp_points:<12} {points_diff:<10}")
+            print(f"{p['player_id']:<12} {nhl_goals:<8} {pbp_goals:<8} {goals_diff:<8} {nhl_assists:<8} {pbp_assists:<8} {assists_diff:<8} {nhl_points:<10} {pbp_points:<10} {points_diff:<8}")
         
         print("-" * 100)
         print()

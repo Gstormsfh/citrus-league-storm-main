@@ -12,6 +12,7 @@ interface PlayerCardProps {
   isUserTeam: boolean;
   isBench?: boolean;
   onPlayerClick?: (player: MatchupPlayer) => void;
+  selectedDate?: string | null; // Optional: to determine if showing daily stats
 }
 
 // Get position color classes for border - Citrus Pastel Theme (Distinct Colors)
@@ -65,7 +66,7 @@ const calculatePercentages = (player: MatchupPlayer) => {
   return { shotPct, pointRate };
 };
 
-export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick }: PlayerCardProps) => {
+export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick, selectedDate }: PlayerCardProps) => {
   if (!player) {
     return (
       <div className={cn(`player-card player-card-empty ${isUserTeam ? 'user-team' : 'opponent-team'} opacity-50`)}>
@@ -92,19 +93,47 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick 
   const dailyProjection = isGoalie ? player.goalieProjection : player.daily_projection;
   const projectedPoints = dailyProjection?.total_projected_points || 0;
   
-  // Check if player has a game today - use MST date to match projection date
-  // This ensures consistency with how projections are fetched (using getTodayMST())
-  const todayMST = getTodayMST();
-  const todayGames = (player.games && Array.isArray(player.games) && player.games.length > 0)
-    ? player.games.filter(g => g && typeof g === 'object' && g.game_date === todayMST) 
-    : [];
-  const hasGameToday = todayGames.length > 0;
+  // Determine if we're showing daily stats (when a date is selected or defaulting to today)
+  const hasDailyStats = player.daily_total_points !== undefined;
+  const dailyTotalPoints = player.daily_total_points || 0;
   
-  // Zero Projection Logic: If projectedPoints === 0 but hasGameToday is true, show "TBD" or "Calculating"
+  // Check if a specific date was selected (vs defaulting to today)
+  const isDateExplicitlySelected = selectedDate !== null;
+  
+  // Get today's date string for comparison
+  const todayStr = getTodayMST();
+  
+  // Check if viewing a past date (Historical Record)
+  // Past dates should ALWAYS show actual points, not projections
+  const isViewingPastDate = selectedDate ? selectedDate < todayStr : false;
+  
+  // Check if player has a game on the selected date (or today if no date selected)
+  const dateToCheck = selectedDate || todayStr;
+  const dateGames = (player.games && Array.isArray(player.games) && player.games.length > 0)
+    ? player.games.filter(g => g && typeof g === 'object' && g.game_date === dateToCheck) 
+    : [];
+  const hasGameOnDate = dateGames.length > 0;
+  
+  // Check if game has started/finished (for determining projection vs daily points)
+  const gameStatus = dateGames[0]?.status || 'scheduled';
+  const gameHasStarted = gameStatus === 'live' || gameStatus === 'final' || gameStatus === 'FINAL';
+  
+  // LOGIC GATE for what to show in projection/daily points area:
+  // 1. If it's a past date (Dec 15-21), ALWAYS show Daily Points (Actuals).
+  // 2. If it's a selected date (current/future), show Daily Points (Actuals).
+  // 3. If it's the default view (today), show Actuals if game started, else Projections.
+  const shouldShowDailyPoints = hasDailyStats && (
+    isViewingPastDate ||        // Past dates always show actual points
+    isDateExplicitlySelected || // Explicitly selected dates show daily points
+    gameHasStarted              // Today's games show daily points once started
+  );
+  
+  // Zero Projection Logic: If projectedPoints === 0 but hasGameOnDate is true, show "TBD" or "Calculating"
   // For goalies, also check starter_confirmed flag
+  // Only applies when NOT viewing past dates (past dates always show actuals)
   const hasProjection = dailyProjection && projectedPoints > 0;
   const isStarterConfirmed = isGoalie ? (player.goalieProjection?.starter_confirmed ?? false) : true;
-  const showTBD = hasGameToday && (!hasProjection || (isGoalie && !isStarterConfirmed)); // Game today but no projection yet or starter not confirmed
+  const showTBD = !isViewingPastDate && hasGameOnDate && !gameHasStarted && !isDateExplicitlySelected && (!hasProjection || (isGoalie && !isStarterConfirmed));
   
   // Normalize to 0-100 for bar display (max ~8 points for skaters, ~20 for goalies)
   const maxProjection = isGoalie ? 20 : 8;
@@ -172,7 +201,7 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick 
   return (
     <div 
       className={cn(
-        `player-card ${isUserTeam ? 'user-team' : 'opponent-team'} cursor-pointer`,
+        `player-card ${isUserTeam ? 'user-team' : 'opponent-team'} cursor-pointer relative`,
         !isBench && positionColors,
         player.isToday && !isBench && 'ring-2 ring-primary/30',
         isBench && 'opacity-40 grayscale bg-muted/50 border-muted'
@@ -252,55 +281,95 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick 
             <GameLogosBar 
               games={player.games} 
               playerTeam={player.team}
+              selectedDate={selectedDate}
             />
           </div>
         )}
 
-        {/* Projection Bar - Daily Projection from Citrus Projections 2.0 */}
-        <div className="player-projection-bar-container">
-          <div className="flex flex-col items-end">
-            <span className="text-xs text-gray-400 mb-1">Proj. Tonight</span>
-            <div className="flex items-center gap-2">
-              <span className="text-xl font-bold text-fantasy-secondary">
-                {hasProjection && isStarterConfirmed
-                  ? projectedPoints.toFixed(1)
-                  : showTBD 
-                    ? (isGoalie && !isStarterConfirmed ? 'Probable' : 'TBD')
-                    : '0.0'
-                }
-              </span>
-              {hasProjection && dailyProjection && (
-                isGoalie ? (
-                  <GoalieProjectionTooltip projection={player.goalieProjection} />
-                ) : (
-                  <ProjectionTooltip projection={player.daily_projection} />
-                )
-              )}
+        {/* Daily Points Bar (when date selected or game has started) OR Projection Bar (when defaulting to today and game hasn't started) */}
+        {shouldShowDailyPoints ? (
+          // Show daily total points when game has started/finished
+          <div className="player-projection-bar-container">
+            <div className="flex flex-col items-end">
+              <span className="text-xs text-gray-400 mb-1">Daily Points</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xl font-bold text-fantasy-secondary">
+                  {dailyTotalPoints.toFixed(1)}
+                </span>
+              </div>
+            </div>
+            <div className="player-projection-bar-wrapper">
+              <div 
+                className="player-projection-bar" 
+                style={{ width: `${Math.min((dailyTotalPoints / maxProjection) * 100, 100)}%` }}
+              />
+            </div>
+            <div className="player-projection-text">
+              {dailyTotalPoints.toFixed(1)} pts today
             </div>
           </div>
-          {hasProjection && isStarterConfirmed ? (
-            <>
-              <div className="player-projection-bar-wrapper">
-                <div 
-                  className="player-projection-bar" 
-                  style={{ width: `${projectionPercentage}%` }}
-                />
+        ) : (
+          // Show projection bar when game hasn't started
+          <div className="player-projection-bar-container">
+            <div className="flex flex-col items-end">
+              <span className="text-xs text-gray-400 mb-1">Proj. Tonight</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xl font-bold text-fantasy-secondary">
+                  {hasProjection && isStarterConfirmed
+                    ? projectedPoints.toFixed(1)
+                    : showTBD 
+                      ? (isGoalie && !isStarterConfirmed ? 'Probable' : 'TBD')
+                      : '0.0'
+                  }
+                </span>
+                {hasProjection && dailyProjection && (
+                  isGoalie ? (
+                    <GoalieProjectionTooltip projection={player.goalieProjection} />
+                  ) : (
+                    <ProjectionTooltip projection={player.daily_projection} />
+                  )
+                )}
               </div>
-              <div className="player-projection-text">
-                {projectedPoints.toFixed(1)} pts projected
+            </div>
+            {hasProjection && isStarterConfirmed ? (
+              <>
+                <div className="player-projection-bar-wrapper">
+                  <div 
+                    className="player-projection-bar" 
+                    style={{ width: `${projectionPercentage}%` }}
+                  />
+                </div>
+                <div className="player-projection-text">
+                  {projectedPoints.toFixed(1)} pts projected
+                </div>
+              </>
+            ) : showTBD ? (
+              <div className="player-projection-text text-muted-foreground">
+                {isGoalie && !isStarterConfirmed ? 'Starter not confirmed' : 'Calculating...'}
               </div>
-            </>
-          ) : showTBD ? (
-            <div className="player-projection-text text-muted-foreground">
-              {isGoalie && !isStarterConfirmed ? 'Starter not confirmed' : 'Calculating...'}
-            </div>
-          ) : (
-            <div className="player-projection-text text-muted-foreground">
-              No game today
-            </div>
-          )}
-        </div>
+            ) : (
+              <div className="player-projection-text text-muted-foreground">
+                No game today
+              </div>
+            )}
+          </div>
+        )}
       </div>
+      
+      {/* Benched Overlay - Show if player is on bench and has daily stats */}
+      {isBench && hasDailyStats && dailyTotalPoints > 0 && (
+        <div className="absolute inset-0 bg-muted/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg pointer-events-none">
+          <div className="text-center p-4">
+            <div className="text-sm font-bold text-muted-foreground mb-1">BENCHED</div>
+            <div className="text-xs text-muted-foreground">
+              {dailyTotalPoints.toFixed(1)} pts today
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Points don't count toward total
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mobile-only score display with tooltip - Show matchup total with high contrast */}
       <div className="player-mobile-score md:hidden">

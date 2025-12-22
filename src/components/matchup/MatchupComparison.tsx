@@ -10,6 +10,7 @@ interface MatchupComparisonProps {
   userSlotAssignments: Record<string, string>;
   opponentSlotAssignments: Record<string, string>;
   onPlayerClick?: (player: MatchupPlayer) => void;
+  selectedDate?: string | null; // Optional: show stats for specific date
 }
 
 export const MatchupComparison = ({
@@ -19,7 +20,8 @@ export const MatchupComparison = ({
   opponentBench = [],
   userSlotAssignments,
   opponentSlotAssignments,
-  onPlayerClick
+  onPlayerClick,
+  selectedDate
 }: MatchupComparisonProps) => {
   // Organize players by slot order (flattened, no position grouping)
   const positionGroups = organizeMatchupData(
@@ -56,6 +58,7 @@ export const MatchupComparison = ({
           opponentPlayers={allOpponentPlayers}
           isUtilSlot={isUtilSlot}
           onPlayerClick={onPlayerClick}
+          selectedDate={selectedDate}
         />
       </div>
       
@@ -89,6 +92,7 @@ export const MatchupComparison = ({
               isUtilSlot={[]}
               isBench={true}
               onPlayerClick={onPlayerClick}
+              selectedDate={selectedDate}
             />
           </div>
         </>

@@ -6,13 +6,13 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import { DemoDataService } from '@/services/DemoDataService';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TeamCard } from "@/components/matchup/TeamCard";
 import { MatchupComparison } from "@/components/matchup/MatchupComparison";
 import { MatchupScheduleSelector } from "@/components/matchup/MatchupScheduleSelector";
 import { ScoreCard } from "@/components/matchup/ScoreCard";
-import { DailyPointsChart } from "@/components/matchup/DailyPointsChart";
-import { MatchupHistory } from "@/components/matchup/MatchupHistory";
+import { WeeklySchedule } from "@/components/matchup/WeeklySchedule";
+import { DailyRosters } from "@/components/matchup/DailyRosters";
+import { getTodayMST, getTodayMSTDate } from '@/utils/timezoneUtils';
 import { LiveUpdates } from "@/components/matchup/LiveUpdates";
 import LeagueNotifications from "@/components/matchup/LeagueNotifications";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,7 @@ import { MatchupService, Matchup } from '@/services/MatchupService';
 import { PlayerService } from '@/services/PlayerService';
 import { supabase } from '@/integrations/supabase/client';
 import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekLabel, getWeekDateLabel, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
-import { Loader2 } from 'lucide-react';
+import LoadingScreen from '@/components/LoadingScreen';
 
 const Matchup = () => {
   const { user, profile } = useAuth();
@@ -35,11 +35,14 @@ const Matchup = () => {
   
   // Debug: Log URL parameters
   console.log('[Matchup] URL parameters:', { urlLeagueId, urlWeekId, userLeagueState, leagueContextLoading });
-  const [activeTab, setActiveTab] = useState("lineup");
-  const [loading, setLoading] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [dailyStatsMap, setDailyStatsMap] = useState<Map<number, any>>(new Map());
+  // Start loading as true to prevent initial flash of content
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const loadingRef = useRef(false); // Prevent concurrent loads
   const hasProcessedNoLeague = useRef(false); // Track if we've processed "no league" state
+  const hasInitializedRef = useRef(false); // Track if we've completed initial load
   
   // Cache tracking to prevent unnecessary reloads
   const prevLeagueIdRef = useRef<string | undefined>(undefined);
@@ -60,6 +63,7 @@ const Matchup = () => {
       hasProcessedNoLeague.current = true;
       console.log('[MATCHUP] User has no league - stopping all loading');
       setLoading(false);
+      hasInitializedRef.current = true; // Mark initialization complete
       loadingRef.current = false; // Release any locks
       return;
     }
@@ -146,6 +150,7 @@ const Matchup = () => {
         // Only set loading=false for demo/guest users
         if (userLeagueState !== 'active-user') {
           setLoading(false);
+          hasInitializedRef.current = true; // Mark initialization complete
         }
       } catch (error) {
         console.error('[Matchup] Error loading demo matchup data:', error);
@@ -199,6 +204,7 @@ const Matchup = () => {
         setDemoMyTeamSlotAssignments(calculateSlotAssignments(myStarters));
         setDemoOpponentTeamSlotAssignments(calculateSlotAssignments(oppStarters));
         setLoading(false);
+        hasInitializedRef.current = true; // Mark initialization complete
       }
     };
 
@@ -257,6 +263,147 @@ const Matchup = () => {
     const secondsPerGame = totalSeconds / gamesPlayed;
     return formatTOI(secondsPerGame);
   };
+
+  // Fetch daily stats when a date is selected, or default to today if in matchup week
+  useEffect(() => {
+    const fetchDailyStats = async () => {
+      if (!currentMatchup || userLeagueState !== 'active-user') {
+        setDailyStatsMap(new Map());
+        return;
+      }
+
+      // Determine which date to fetch stats for
+      let dateToFetch = selectedDate;
+      
+      // If no date selected, default to today if today is in the matchup week
+      if (!dateToFetch) {
+        const todayStr = getTodayMST();
+        const weekStart = currentMatchup.week_start_date;
+        const weekEnd = currentMatchup.week_end_date;
+        
+        if (todayStr >= weekStart && todayStr <= weekEnd) {
+          dateToFetch = todayStr;
+        } else {
+          // Today is not in the matchup week, don't fetch daily stats
+          setDailyStatsMap(new Map());
+          return;
+        }
+      }
+
+      try {
+        // Get all player IDs from both teams
+        const allPlayerIds = [
+          ...myTeam.map(p => p.id),
+          ...opponentTeamPlayers.map(p => p.id)
+        ];
+
+        if (allPlayerIds.length === 0) return;
+
+        // Fetch comprehensive daily game stats using new RPC
+        const { data, error } = await supabase.rpc('get_daily_game_stats', {
+          p_player_ids: allPlayerIds,
+          p_game_date: dateToFetch
+        });
+
+        if (error) throw error;
+
+        // Create map of player_id -> comprehensive daily stats
+        const statsMap = new Map<number, any>();
+        (data || []).forEach((row: any) => {
+          // HARD CHECK: Use player position from team arrays for goalie detection
+          // This ensures accurate math for "Blowout" games where goalies earn negative points
+          const player = myTeam.find(p => p.id === row.player_id) || 
+                         opponentTeamPlayers.find(p => p.id === row.player_id);
+          const isGoalie = player?.position === 'G' || player?.position === 'Goalie' || player?.isGoalie || row.is_goalie;
+          
+          // Calculate daily total points using league-standard formula
+          // TODO: In future, pull weights from league settings for custom scoring
+          let dailyTotalPoints = 0;
+          if (isGoalie) {
+            // Goalie Formula: W(5), SV(0.2), SO(3), GA(-1)
+            dailyTotalPoints = 
+              (row.wins || 0) * 5 + 
+              (row.saves || 0) * 0.2 + 
+              (row.shutouts || 0) * 3 - 
+              (row.goals_against || 0) * 1;
+          } else {
+            // Skater Formula: G(3), A(2), SOG(0.4), BLK(0.4)
+            dailyTotalPoints = 
+              (row.goals || 0) * 3 + 
+              (row.assists || 0) * 2 + 
+              (row.shots_on_goal || 0) * 0.4 + 
+              (row.blocks || 0) * 0.4;
+          }
+          
+          // Store ALL available stats for comprehensive display
+          statsMap.set(row.player_id, {
+            // Core stats
+            goals: row.goals || 0,
+            assists: row.assists || 0,
+            points: row.points || 0,
+            sog: row.shots_on_goal || 0,
+            pim: row.pim || 0,
+            plus_minus: row.plus_minus || 0,
+            toi_seconds: row.toi_seconds || 0,
+            
+            // Physical stats
+            hits: row.hits || 0,
+            blocks: row.blocks || 0,
+            
+            // Faceoffs
+            faceoff_wins: row.faceoff_wins || 0,
+            faceoff_losses: row.faceoff_losses || 0,
+            faceoff_taken: row.faceoff_taken || 0,
+            
+            // Possession
+            takeaways: row.takeaways || 0,
+            giveaways: row.giveaways || 0,
+            
+            // Power Play breakdown
+            ppp: row.ppp || 0,
+            ppg: row.ppg || 0,
+            ppa: row.ppa || 0,
+            
+            // Shorthanded breakdown
+            shp: row.shp || 0,
+            shg: row.shg || 0,
+            sha: row.sha || 0,
+            
+            // Shot metrics (Corsi components)
+            shots_missed: row.shots_missed || 0,
+            shots_blocked: row.shots_blocked || 0,
+            shot_attempts: row.shot_attempts || 0,
+            
+            // Game context
+            gwg: row.gwg || 0,
+            otg: row.otg || 0,
+            shifts: row.shifts || 0,
+            
+            // Goalie stats
+            wins: row.wins || 0,
+            losses: row.losses || 0,
+            ot_losses: row.ot_losses || 0,
+            saves: row.saves || 0,
+            shots_faced: row.shots_faced || 0,
+            goals_against: row.goals_against || 0,
+            shutouts: row.shutouts || 0,
+            save_pct: row.save_pct || 0,
+            
+            // Calculated values
+            daily_total_points: dailyTotalPoints,
+            is_goalie: isGoalie,
+          });
+        });
+
+        setDailyStatsMap(statsMap);
+      } catch (error) {
+        console.error('[Matchup] Error fetching daily stats:', error);
+        setDailyStatsMap(new Map());
+      }
+    };
+
+    fetchDailyStats();
+  }, [selectedDate, currentMatchup, myTeam, opponentTeamPlayers, userLeagueState]);
 
   const handlePlayerClick = async (player: MatchupPlayer) => {
     try {
@@ -353,14 +500,79 @@ const Matchup = () => {
   // Use real data if active user, otherwise demo data
   // CRITICAL: Ensure myTeam is always the user's team (left side)
   // and opponentTeamPlayers is always the opponent (right side)
-  const displayMyTeam = useMemo(() => 
-    userLeagueState === 'active-user' ? myTeam : demoMyTeam,
-    [userLeagueState, myTeam, demoMyTeam]
-  );
-  const displayOpponentTeam = useMemo(() => 
-    userLeagueState === 'active-user' ? opponentTeamPlayers : demoOpponentTeam,
-    [userLeagueState, opponentTeamPlayers, demoOpponentTeam]
-  );
+  // Enrich players with daily stats when a date is selected (or default to today)
+  // Always enrich if dailyStatsMap has data (even if selectedDate is null, it might be today's stats)
+  const displayMyTeam = useMemo(() => {
+    const baseTeam = userLeagueState === 'active-user' ? myTeam : demoMyTeam;
+    if (dailyStatsMap.size === 0) {
+      return baseTeam;
+    }
+    // Enrich with daily stats (from selected date or today)
+    return baseTeam.map(player => {
+      const dailyStats = dailyStatsMap.get(player.id);
+      if (!dailyStats) return player;
+      
+      // Keep weekly total_points unchanged - it's the matchup week total
+      return {
+        ...player,
+        matchupStats: {
+          goals: dailyStats.goals || 0,
+          assists: dailyStats.assists || 0,
+          sog: dailyStats.sog || 0,
+          xGoals: dailyStats.xGoals || 0,
+        },
+        // Update stats for display in statline (G, A, SOG)
+        stats: {
+          ...player.stats,
+          goals: dailyStats.goals || 0,
+          assists: dailyStats.assists || 0,
+          sog: dailyStats.sog || 0,
+          blk: dailyStats.blocks || 0,
+          xGoals: dailyStats.xGoals || 0,
+        },
+        // Add daily total points for the projection bar replacement
+        daily_total_points: dailyStats.daily_total_points || 0,
+        // Keep weekly total_points unchanged
+        // total_points remains as weekly total
+      };
+    });
+  }, [userLeagueState, myTeam, demoMyTeam, dailyStatsMap]);
+
+  const displayOpponentTeam = useMemo(() => {
+    const baseTeam = userLeagueState === 'active-user' ? opponentTeamPlayers : demoOpponentTeam;
+    if (dailyStatsMap.size === 0) {
+      return baseTeam;
+    }
+    // Enrich with daily stats (from selected date or today)
+    return baseTeam.map(player => {
+      const dailyStats = dailyStatsMap.get(player.id);
+      if (!dailyStats) return player;
+      
+      // Keep weekly total_points unchanged - it's the matchup week total
+      return {
+        ...player,
+        matchupStats: {
+          goals: dailyStats.goals || 0,
+          assists: dailyStats.assists || 0,
+          sog: dailyStats.sog || 0,
+          xGoals: dailyStats.xGoals || 0,
+        },
+        // Update stats for display in statline (G, A, SOG)
+        stats: {
+          ...player.stats,
+          goals: dailyStats.goals || 0,
+          assists: dailyStats.assists || 0,
+          sog: dailyStats.sog || 0,
+          blk: dailyStats.blocks || 0,
+          xGoals: dailyStats.xGoals || 0,
+        },
+        // Add daily total points for the projection bar replacement
+        daily_total_points: dailyStats.daily_total_points || 0,
+        // Keep weekly total_points unchanged
+        // total_points remains as weekly total
+      };
+    });
+  }, [userLeagueState, opponentTeamPlayers, demoOpponentTeam, dailyStatsMap]);
   const displayMyTeamSlotAssignments = useMemo(() => 
     userLeagueState === 'active-user' ? myTeamSlotAssignments : demoMyTeamSlotAssignments,
     [userLeagueState, myTeamSlotAssignments, demoMyTeamSlotAssignments]
@@ -370,54 +582,28 @@ const Matchup = () => {
     [userLeagueState, opponentTeamSlotAssignments, demoOpponentTeamSlotAssignments]
   );
 
-  // Memoize expensive computations
-  const getTeamPoints = useMemo(() => {
-    return (team: MatchupPlayer[]) => {
-      // Sum total_points from fantasy_matchup_lines (matchup week only), never use season points
-      const total = team.reduce((sum, player) => {
-        const weekPoints = player.total_points ?? 0;
-        const seasonPoints = player.points ?? 0;
-        
-        // Debug: Log if we detect a mismatch (week points should be <= season points)
-        if (weekPoints > seasonPoints && weekPoints > 100) {
-          console.warn(`[Matchup.getTeamPoints] ⚠️ Player ${player.name} has weekPoints (${weekPoints}) > seasonPoints (${seasonPoints}) - possible season total in total_points`);
-        }
-        
-        return sum + weekPoints;
-      }, 0);
-      
-      // Log detailed breakdown for debugging
-      const playersWithPoints = team.map(p => ({
-        name: p.name,
-        total_points: p.total_points ?? 0,
-        points: p.points ?? 0,
-        hasSeasonTotal: (p.total_points ?? 0) > 100
-      }));
-      
-      const seasonTotalCount = playersWithPoints.filter(p => p.hasSeasonTotal).length;
-      const weekTotalSum = playersWithPoints.reduce((sum, p) => sum + p.total_points, 0);
-      const seasonTotalSum = playersWithPoints.reduce((sum, p) => sum + p.points, 0);
-      
-      console.log('[Matchup.getTeamPoints] Team total calculated:', {
-        teamSize: team.length,
-        totalWeekPoints: total,
-        weekTotalSum: weekTotalSum.toFixed(1),
-        seasonTotalSum: seasonTotalSum.toFixed(1),
-        seasonTotalCount: seasonTotalCount,
-        playersWithHighPoints: playersWithPoints.filter(p => p.total_points > 100).map(p => ({
-          name: p.name,
-          total_points: p.total_points,
-          points: p.points
-        })),
-        samplePlayers: playersWithPoints.slice(0, 5)
-      });
-      
+  // Calculate team totals from daily scores (sum of 7 daily scores)
+  // This is the new source of truth - daily scores are calculated from NHL official stats
+  // and only include players who were ACTIVE on each specific day
+  const myTeamPoints = useMemo(() => {
+    if (userLeagueState === 'active-user' && myDailyPoints.length === 7) {
+      const total = myDailyPoints.reduce((sum, score) => sum + score, 0);
       return total.toFixed(1);
-    };
-  }, []);
+    }
+    // Fallback: sum player points if daily scores not available
+    const total = displayMyTeam.reduce((sum, player) => sum + (player.total_points ?? 0), 0);
+    return total.toFixed(1);
+  }, [userLeagueState, myDailyPoints, displayMyTeam]);
 
-  const myTeamPoints = useMemo(() => getTeamPoints(displayMyTeam), [getTeamPoints, displayMyTeam]);
-  const opponentTeamPoints = useMemo(() => getTeamPoints(displayOpponentTeam), [getTeamPoints, displayOpponentTeam]);
+  const opponentTeamPoints = useMemo(() => {
+    if (userLeagueState === 'active-user' && opponentDailyPoints.length === 7) {
+      const total = opponentDailyPoints.reduce((sum, score) => sum + score, 0);
+      return total.toFixed(1);
+    }
+    // Fallback: sum player points if daily scores not available
+    const total = displayOpponentTeam.reduce((sum, player) => sum + (player.total_points ?? 0), 0);
+    return total.toFixed(1);
+  }, [userLeagueState, opponentDailyPoints, displayOpponentTeam]);
 
   const myStarters = useMemo(() => displayMyTeam.filter(p => p.isStarter), [displayMyTeam]);
   const myBench = useMemo(() => displayMyTeam.filter(p => !p.isStarter), [displayMyTeam]);
@@ -449,6 +635,7 @@ const Matchup = () => {
     if (!user?.id) {
       console.log('[MATCHUP] No user ID, skipping');
       setLoading(false);
+      hasInitializedRef.current = true; // Mark initialization complete
       return;
     }
     
@@ -457,6 +644,7 @@ const Matchup = () => {
     if (userLeagueState === 'logged-in-no-league') {
       console.log('[MATCHUP] User has no league, showing league creation CTA - EXITING EARLY');
       setLoading(false);
+      hasInitializedRef.current = true; // Mark initialization complete
       loadingRef.current = false; // Release lock
       return;
     }
@@ -464,6 +652,7 @@ const Matchup = () => {
     if (userLeagueState === 'guest') {
       console.log('[MATCHUP] Guest user, skipping matchup load');
       setLoading(false);
+      hasInitializedRef.current = true; // Mark initialization complete
       return;
     }
     
@@ -471,6 +660,7 @@ const Matchup = () => {
     if (userLeagueState !== 'active-user') {
       console.log('[MATCHUP] Not active user state:', userLeagueState, '- skipping load');
       setLoading(false);
+      hasInitializedRef.current = true; // Mark initialization complete
       return;
     }
     
@@ -971,6 +1161,10 @@ const Matchup = () => {
         setOpponentTeamRecord(matchupData.opponentTeam?.record || { wins: 0, losses: 0 });
         setMyDailyPoints(matchupData.userTeam.dailyPoints);
         setOpponentDailyPoints(matchupData.opponentTeam?.dailyPoints || []);
+        
+        // Default to null (full lineup view) - user can click a day to see daily stats
+        setSelectedDate(null);
+        setDailyStatsMap(new Map());
 
         // Get opponent team object for display
         if (matchupData.opponentTeam) {
@@ -1004,7 +1198,7 @@ const Matchup = () => {
         }
         console.log('[MATCHUP] Finally block - clearing loading state');
         setLoading(false); // Always complete loading
- // Mark that initial load is complete
+        hasInitializedRef.current = true; // Mark that initial load is complete
         loadingRef.current = false; // Release lock - CRITICAL to prevent freeze
       }
     };
@@ -1054,6 +1248,7 @@ const Matchup = () => {
   };
 
   // Debug: Log render state (using ref counter to prevent spam)
+  // MUST be declared before early return to maintain hook order
   const renderCountRef = useRef(0);
   renderCountRef.current += 1;
   if (renderCountRef.current <= 3) { // Only log first 3 renders
@@ -1065,6 +1260,48 @@ const Matchup = () => {
       hasMyTeam: myTeam.length > 0,
       hasOpponentTeam: opponentTeamPlayers.length > 0
     });
+  }
+
+  // Show full-page loading screen IMMEDIATELY - before any other logic
+  // This prevents any flash between Suspense fallback and component loading state
+  // Use useMemo to compute synchronously on every render
+  // Be very conservative - show loading if:
+  // 1. LeagueContext is still loading, OR
+  // 2. Component loading state is true (and not in "no league" state), OR
+  // 3. We haven't initialized yet AND we're not in "no league" state (prevents initial flash)
+  // 4. User state is undefined/null (still determining)
+  const shouldShowLoading = useMemo(() => {
+    // If userLeagueState is undefined, we're still determining state - show loading
+    if (userLeagueState === undefined || userLeagueState === null) {
+      return true;
+    }
+    
+    // If leagueContext is loading, show loading
+    if (leagueContextLoading) {
+      return true;
+    }
+    
+    // If we haven't initialized and not in "no league" state, show loading
+    if (!hasInitializedRef.current && userLeagueState !== 'logged-in-no-league') {
+      return true;
+    }
+    
+    // If component is loading and not in "no league" state, show loading
+    if (loading && userLeagueState !== 'logged-in-no-league') {
+      return true;
+    }
+    
+    return false;
+  }, [leagueContextLoading, loading, userLeagueState]);
+  
+  // Early return for loading - must be after all hooks are declared
+  if (shouldShowLoading) {
+    return (
+      <LoadingScreen
+        character="citrus"
+        message="Loading matchup..."
+      />
+    );
   }
 
   return (
@@ -1103,14 +1340,6 @@ const Matchup = () => {
                 </div>
               </div>
           
-          {/* Single, consistent loading state */}
-          {loading && userLeagueState !== 'logged-in-no-league' && (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="ml-3 text-muted-foreground">Loading matchup...</p>
-            </div>
-          )}
-          
           {/* Error State - Always show if there's an error */}
           {!loading && error && (
             <div className="text-center py-20">
@@ -1147,43 +1376,38 @@ const Matchup = () => {
             opponentTeamPoints={opponentTeamPoints}
           />
           
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-            <TabsList className="w-full justify-start border-b-2 border-primary/20 bg-transparent p-0 rounded-none h-auto gap-1">
-              <TabsTrigger 
-                value="lineup" 
-                className="rounded-t-md border-b-3 border-transparent px-4 py-2.5 text-sm font-medium text-muted-foreground data-[state=active]:border-fantasy-primary data-[state=active]:text-fantasy-primary data-[state=active]:bg-transparent transition-all hover:text-fantasy-primary/80"
-              >
-                Lineup
-              </TabsTrigger>
-              <TabsTrigger 
-                value="dailyPoints" 
-                className="rounded-t-md border-b-3 border-transparent px-4 py-2.5 text-sm font-medium text-muted-foreground data-[state=active]:border-fantasy-secondary data-[state=active]:text-fantasy-secondary data-[state=active]:bg-transparent transition-all hover:text-fantasy-secondary/80"
-              >
-                Daily Points
-              </TabsTrigger>
-              <TabsTrigger 
-                value="matchupHistory" 
-                className="rounded-t-md border-b-3 border-transparent px-4 py-2.5 text-sm font-medium text-muted-foreground data-[state=active]:border-fantasy-tertiary data-[state=active]:text-fantasy-tertiary data-[state=active]:bg-transparent transition-all hover:text-fantasy-tertiary/80"
-              >
-                History
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="lineup" className="mt-6 matchup-wrapper" style={{ boxSizing: 'border-box', padding: 0, margin: 0 }}>
-              {userLeagueState === 'logged-in-no-league' ? (
-                <div className="grid gap-6 lg:gap-8 matchup-grid" style={{ gridTemplateColumns: '1fr 1fr', width: '100%', display: 'grid', boxSizing: 'border-box', margin: 0, padding: 0 }}>
-                  <LeagueCreationCTA 
-                    title="Your Team Here"
-                    description="Create your league to start building your roster and competing in matchups."
-                    variant="compact"
-                  />
-                  <LeagueCreationCTA 
-                    title="Opponent Team"
-                    description="Create your league to see your matchups and compete against other teams."
-                    variant="compact"
-                  />
-                </div>
-              ) : (
+          {/* Weekly Schedule */}
+          {userLeagueState === 'active-user' && currentMatchup && (
+            <div className="mb-6">
+              <WeeklySchedule
+                weekStart={currentMatchup.week_start_date}
+                weekEnd={currentMatchup.week_end_date}
+                myDailyPoints={myDailyPoints}
+                opponentDailyPoints={opponentDailyPoints}
+                onDayClick={setSelectedDate}
+                selectedDate={selectedDate}
+              />
+            </div>
+          )}
+
+          {/* Main Lineup View */}
+          <div className="mt-6 matchup-wrapper" style={{ boxSizing: 'border-box', padding: 0, margin: 0 }}>
+            {userLeagueState === 'logged-in-no-league' ? (
+              <div className="grid gap-6 lg:gap-8 matchup-grid" style={{ gridTemplateColumns: '1fr 1fr', width: '100%', display: 'grid', boxSizing: 'border-box', margin: 0, padding: 0 }}>
+                <LeagueCreationCTA 
+                  title="Your Team Here"
+                  description="Create your league to start building your roster and competing in matchups."
+                  variant="compact"
+                />
+                <LeagueCreationCTA 
+                  title="Opponent Team"
+                  description="Create your league to see your matchups and compete against other teams."
+                  variant="compact"
+                />
+              </div>
+            ) : (
+              <>
+                {/* Always show full lineup, with daily stats when a day is selected */}
                 <MatchupComparison
                   userStarters={myStarters}
                   opponentStarters={opponentStarters}
@@ -1192,30 +1416,11 @@ const Matchup = () => {
                   userSlotAssignments={displayMyTeamSlotAssignments}
                   opponentSlotAssignments={displayOpponentTeamSlotAssignments}
                   onPlayerClick={handlePlayerClick}
+                  selectedDate={selectedDate}
                 />
-              )}
-            </TabsContent>
-            
-            <TabsContent value="dailyPoints" className="mt-8">
-              <DailyPointsChart
-                dayLabels={dayLabels}
-                myDailyPoints={displayMyDailyPoints}
-                opponentDailyPoints={displayOpponentDailyPoints}
-                hasData={hasMatchupData}
-              />
-            </TabsContent>
-            
-            <TabsContent value="matchupHistory" className="mt-8">
-              <MatchupHistory
-                leagueId={league?.id}
-                userTeamId={userTeam?.id}
-                opponentTeamId={opponentTeam?.id}
-                userTeamName={userTeam?.team_name}
-                opponentTeamName={opponentTeam?.team_name}
-                firstWeekStart={firstWeekStart}
-              />
-            </TabsContent>
-          </Tabs>
+              </>
+            )}
+          </div>
           
           <LiveUpdates updates={updates} />
             </>

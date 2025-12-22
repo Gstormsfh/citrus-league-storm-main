@@ -5,9 +5,10 @@ import { getTodayMST, getTodayMSTDate, isTodayMST, formatTimeMST } from "@/utils
 interface GameLogosBarProps {
   games: NHLGame[]; // Games for the matchup week
   playerTeam: string; // Player's team abbreviation
+  selectedDate?: string | null; // Optional: date being viewed (YYYY-MM-DD), defaults to today
 }
 
-export const GameLogosBar = ({ games, playerTeam }: GameLogosBarProps) => {
+export const GameLogosBar = ({ games, playerTeam, selectedDate }: GameLogosBarProps) => {
   if (!games || games.length === 0 || !playerTeam) {
     return null;
   }
@@ -15,6 +16,9 @@ export const GameLogosBar = ({ games, playerTeam }: GameLogosBarProps) => {
   // Use Mountain Time for all date comparisons
   const todayMST = getTodayMSTDate();
   const todayStr = getTodayMST();
+  
+  // Use selectedDate if provided, otherwise default to today
+  const viewDateStr = selectedDate || todayStr;
   
   // Sort games by date, with error handling
   const sortedGames = [...games]
@@ -39,16 +43,20 @@ export const GameLogosBar = ({ games, playerTeam }: GameLogosBarProps) => {
         try {
           const gameDateStr = game.game_date.split('T')[0];
           
-          // Determine game state - check live FIRST to prevent live games from being marked as played
-          // CRITICAL: Only mark as live if status is 'live' AND it's today (prevent stale live status)
-          const isToday = isTodayMST(gameDateStr); // Use MST comparison
-          const isLive = game.status === 'live' && isToday; // Must be today AND live
+          // Determine game state based on the selected/viewing date
+          // If selectedDate is provided, use that date; otherwise use today
+          const isSelectedDate = gameDateStr === viewDateStr; // Game is on the date being viewed
+          const isToday = isTodayMST(gameDateStr); // Also check if it's actually today (for "Today" label)
           
-          // Check if game is in the past by comparing date strings (MST)
-          // This avoids timezone issues with Date object comparisons
-          const isPlayed = !isLive && (game.status === 'final' || (gameDateStr < todayStr));
-          const isTodayScheduled = isToday && game.status === 'scheduled' && !isLive; // Today but not started
-          const isUpcoming = !isPlayed && !isToday && !isLive; // Future games
+          // Determine if game is live - only if it's on the selected date AND status is live
+          // If viewing a past date, don't show games as live (they're final)
+          const isLive = game.status === 'live' && isSelectedDate && isToday; // Must be selected date AND actually today AND live
+          
+          // Check if game is in the past relative to the viewing date
+          // If viewing a specific date, compare to that date; otherwise compare to today
+          const isPlayed = !isLive && (game.status === 'final' || (gameDateStr < viewDateStr));
+          const isSelectedDateScheduled = isSelectedDate && game.status === 'scheduled' && !isLive; // Selected date but not started
+          const isUpcoming = !isPlayed && !isSelectedDate && !isLive; // Future games relative to viewing date
           
           // Determine opponent - handle cases where playerTeam might not match
           const playerTeamUpper = (playerTeam || '').toUpperCase();
@@ -143,17 +151,17 @@ export const GameLogosBar = ({ games, playerTeam }: GameLogosBarProps) => {
             glowEffect = 'animate-pulse';
             borderStyle = { borderColor: '#f97316', boxShadow: '0 0 12px rgba(249, 115, 22, 0.6), 0 0 20px rgba(249, 115, 22, 0.4)' };
           } else if (isPlayed) {
-            // 1. Past games - greyed out (perfect as is)
+            // 1. Past games (relative to viewing date) - greyed out
             containerClasses += ' border-2 opacity-30 grayscale border-gray-400';
-          } else if (isTodayScheduled) {
-            // 2. Today's games (scheduled) - colored ring/border around logo
+          } else if (isSelectedDateScheduled) {
+            // 2. Selected date's games (scheduled) - colored ring/border around logo
             containerClasses += ' border-2 opacity-100 shadow-md';
             borderStyle = { 
               borderColor: teamColor, 
               boxShadow: `0 0 8px ${teamColor}40, 0 0 12px ${teamColor}20` 
             };
           } else if (isUpcoming) {
-            // 4. Upcoming games - normal border (gray)
+            // 4. Upcoming games (relative to viewing date) - normal border (gray)
             containerClasses += ' border-2 opacity-100 border-gray-300';
           } else {
             // Fallback
@@ -165,30 +173,32 @@ export const GameLogosBar = ({ games, playerTeam }: GameLogosBarProps) => {
           let tooltipText = `${opponentPrefix} ${opponent} - ${gameDateStr}`;
           if (isLive) {
             tooltipText += ' (LIVE)';
-          } else if (isTodayScheduled) {
-            tooltipText += formattedTime ? ` (Today at ${formattedTime} MST)` : ' (Today)';
+          } else if (isSelectedDateScheduled) {
+            // Show "Today" if it's actually today, otherwise show the date
+            if (isToday) {
+              tooltipText += formattedTime ? ` (Today at ${formattedTime} MST)` : ' (Today)';
+            } else {
+              tooltipText += formattedTime ? ` (${formattedTime} MST)` : ` (${gameDateStr})`;
+            }
           } else if (isPlayed) {
             tooltipText += ' (Final)';
           } else if (isUpcoming) {
             tooltipText += formattedTime ? ` (${formattedTime} MST)` : ' (Upcoming)';
           }
           
-          // Format date for display - use MST for all comparisons
+          // Format date for display - show "Today" only if it's actually today
+          // Use the same date parsing method as WeeklySchedule to ensure consistency
           let displayDate = '';
-          if (isToday || isTodayScheduled || isLive) {
+          if (isToday && (isSelectedDateScheduled || isLive)) {
             displayDate = 'Today';
           } else {
-            // Format date as "Mon Dec 19" or similar in MST
+            // Parse date string (YYYY-MM-DD) to avoid timezone issues - same method as WeeklySchedule
             try {
-              // Parse the game date and format it in MST
-              // gameDateStr is already YYYY-MM-DD format
               const [year, month, day] = gameDateStr.split('-').map(Number);
-              // Create a date object and format it in MST
-              const dateObj = new Date(Date.UTC(year, month - 1, day));
-              displayDate = dateObj.toLocaleDateString('en-US', {
+              const date = new Date(year, month - 1, day); // Month is 0-indexed, local timezone
+              displayDate = date.toLocaleDateString('en-US', {
                 month: 'short',
-                day: 'numeric',
-                timeZone: 'America/Denver'
+                day: 'numeric'
               });
             } catch {
               displayDate = gameDateStr;
@@ -246,10 +256,10 @@ export const GameLogosBar = ({ games, playerTeam }: GameLogosBarProps) => {
                   </div>
                 )}
                 
-                {/* Today Badge - for scheduled games today (small dot) */}
-                {isTodayScheduled && (
+                {/* Selected Date Badge - for scheduled games on the selected date (small dot) */}
+                {isSelectedDateScheduled && (
                   <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full border border-white shadow-sm" style={{ backgroundColor: teamColor }}>
-                    <span className="sr-only">Today</span>
+                    <span className="sr-only">{isToday ? 'Today' : 'Scheduled'}</span>
                   </div>
                 )}
               </div>
@@ -265,7 +275,7 @@ export const GameLogosBar = ({ games, playerTeam }: GameLogosBarProps) => {
               <span className={`text-[9px] leading-tight whitespace-nowrap ${
                 isPlayed 
                   ? 'text-gray-400' 
-                  : isToday || isTodayScheduled || isLive 
+                  : isSelectedDate && (isSelectedDateScheduled || isLive)
                     ? 'text-foreground font-medium' 
                     : 'text-muted-foreground'
               }`}>

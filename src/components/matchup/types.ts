@@ -71,7 +71,9 @@ export type MatchupPlayer = {
     is_goalie?: boolean; // Flag to distinguish goalie vs skater
   };
   // NEW: Goalie-specific fields
-  isGoalie?: boolean; // Flag to identify goalies
+  isGoalie?: boolean;
+  // NEW: Daily stats fields
+  daily_total_points?: number; // Total fantasy points for a specific day; // Flag to identify goalies
   goalieStats?: {
     gamesPlayed: number; // GP
     wins: number;

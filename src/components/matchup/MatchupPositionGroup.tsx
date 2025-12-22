@@ -7,6 +7,7 @@ interface MatchupPositionGroupProps {
   isUtilSlot?: boolean[];
   isBench?: boolean;
   onPlayerClick?: (player: MatchupPlayer) => void;
+  selectedDate?: string | null;
 }
 
 export const MatchupPositionGroup = ({
@@ -14,7 +15,8 @@ export const MatchupPositionGroup = ({
   opponentPlayers,
   isUtilSlot = [],
   isBench = false,
-  onPlayerClick
+  onPlayerClick,
+  selectedDate
 }: MatchupPositionGroupProps) => {
   // Ensure both arrays have the same length
   const maxLength = Math.max(userPlayers.length, opponentPlayers.length);
@@ -42,6 +44,7 @@ export const MatchupPositionGroup = ({
             position={position}
             isBench={isBench}
             onPlayerClick={onPlayerClick}
+            selectedDate={selectedDate}
           />
         );
       })}

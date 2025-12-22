@@ -355,11 +355,11 @@ def get_team_xga_per_60(
         if not team_game_ids:
             return None
         
-        # Get all shots against this team (shots where team != the team we're analyzing)
-        # We need to get shots from opposing teams in these games
+        # Get all shots in these games
+        # raw_shots doesn't have team_abbrev, but has team_code, is_home_team, home_team_abbrev, away_team_abbrev
         all_shots = db.select(
             "raw_shots",
-            select="game_id,team_abbrev,xg_value,shooting_talent_adjusted_xg,flurry_adjusted_xg",
+            select="game_id,team_code,is_home_team,home_team_abbrev,away_team_abbrev,xg_value,shooting_talent_adjusted_xg,flurry_adjusted_xg",
             filters=[("game_id", "in", team_game_ids)],
             limit=50000  # Large limit for all shots in these games
         )
@@ -408,7 +408,24 @@ def get_team_xga_per_60(
             # Sum xG for shots from opposing team (shots AGAINST this team)
             for shot in all_shots:
                 if int(shot.get("game_id", 0)) == game_id:
-                    shot_team = shot.get("team_abbrev", "")
+                    # Determine shot team from raw_shots columns
+                    shot_team = None
+                    is_home = shot.get("is_home_team")
+                    if is_home is not None:
+                        # Use is_home_team to determine team
+                        shot_team = game_info["home_team"] if is_home else game_info["away_team"]
+                    elif shot.get("team_code"):
+                        # Fallback: try to match team_code (less reliable)
+                        # team_code might be numeric, so we'd need to map it
+                        # For now, skip if we can't determine from is_home_team
+                        continue
+                    else:
+                        # Try home_team_abbrev/away_team_abbrev as last resort
+                        if shot.get("home_team_abbrev") == opponent_team or shot.get("away_team_abbrev") == opponent_team:
+                            shot_team = opponent_team
+                        else:
+                            continue
+                    
                     if shot_team == opponent_team:
                         # Use best available xG value
                         xg_val = (

@@ -795,18 +795,73 @@ export const MatchupService = {
       const team1Score = parseFloat(String(matchup.team1_score)) || 0;
       const team2Score = parseFloat(String(matchup.team2_score)) || 0;
       const hasScores = team1Score > 0 || team2Score > 0;
-      const shouldCalculatePoints = (matchupStatus === 'in_progress' || matchupStatus === 'completed') && hasScores;
-
+      // Calculate daily scores using fantasy_daily_rosters and NHL official stats
       let userDailyPoints: number[] = [];
       let opponentDailyPoints: number[] = [];
 
-      if (shouldCalculatePoints) {
-        const userTotalPoints = isTeam1 ? team1Score : team2Score;
-        const oppTotalPoints = isTeam1 ? team2Score : team1Score;
-        
-        // Simple distribution: divide by 7 days
-        userDailyPoints = Array(7).fill(userTotalPoints / 7);
-        opponentDailyPoints = Array(7).fill(oppTotalPoints / 7);
+      // Get week dates
+      const weekStart = new Date(matchup.week_start_date);
+      const weekEnd = new Date(matchup.week_end_date);
+      const weekStartStr = weekStart.toISOString().split('T')[0];
+      const weekEndStr = weekEnd.toISOString().split('T')[0];
+
+      // Calculate daily scores for user team
+      try {
+        const { data: userDailyScores, error: userError } = await supabase.rpc(
+          'calculate_daily_matchup_scores',
+          {
+            p_matchup_id: matchup.id,
+            p_team_id: userTeam.id,
+            p_week_start: weekStartStr,
+            p_week_end: weekEndStr
+          }
+        );
+
+        if (!userError && userDailyScores) {
+          // Sort by date and extract scores
+          const sorted = (userDailyScores as any[]).sort((a, b) => 
+            new Date(a.roster_date).getTime() - new Date(b.roster_date).getTime()
+          );
+          userDailyPoints = sorted.map(d => parseFloat(d.daily_score) || 0);
+        } else {
+          console.warn('[getMatchupData] Error calculating user daily scores:', userError);
+          // Fallback: use placeholder if calculation fails
+          userDailyPoints = Array(7).fill(0);
+        }
+      } catch (error) {
+        console.error('[getMatchupData] Exception calculating user daily scores:', error);
+        userDailyPoints = Array(7).fill(0);
+      }
+
+      // Calculate daily scores for opponent team (if exists)
+      if (opponentTeamObj) {
+        try {
+          const { data: oppDailyScores, error: oppError } = await supabase.rpc(
+            'calculate_daily_matchup_scores',
+            {
+              p_matchup_id: matchup.id,
+              p_team_id: opponentTeamObj.id,
+              p_week_start: weekStartStr,
+              p_week_end: weekEndStr
+            }
+          );
+
+          if (!oppError && oppDailyScores) {
+            // Sort by date and extract scores
+            const sorted = (oppDailyScores as any[]).sort((a, b) => 
+              new Date(a.roster_date).getTime() - new Date(b.roster_date).getTime()
+            );
+            opponentDailyPoints = sorted.map(d => parseFloat(d.daily_score) || 0);
+          } else {
+            console.warn('[getMatchupData] Error calculating opponent daily scores:', oppError);
+            opponentDailyPoints = Array(7).fill(0);
+          }
+        } catch (error) {
+          console.error('[getMatchupData] Exception calculating opponent daily scores:', error);
+          opponentDailyPoints = Array(7).fill(0);
+        }
+      } else {
+        opponentDailyPoints = Array(7).fill(0);
       }
 
       // Calculate navigation metadata
