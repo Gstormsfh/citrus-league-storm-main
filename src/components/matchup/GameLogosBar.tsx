@@ -176,7 +176,7 @@ export const GameLogosBar = ({ games, playerTeam, selectedDate }: GameLogosBarPr
           } else if (isSelectedDateScheduled) {
             // Show "Today" if it's actually today, otherwise show the date
             if (isToday) {
-              tooltipText += formattedTime ? ` (Today at ${formattedTime} MST)` : ' (Today)';
+            tooltipText += formattedTime ? ` (Today at ${formattedTime} MST)` : ' (Today)';
             } else {
               tooltipText += formattedTime ? ` (${formattedTime} MST)` : ` (${gameDateStr})`;
             }

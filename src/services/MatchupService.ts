@@ -648,8 +648,24 @@ export const MatchupService = {
       const isPlayoffWeek = matchup.week_number > scheduleLength;
 
       // Get user's team to determine which side they're on (if they're in this matchup)
-      const { team: userTeam } = await LeagueService.getUserTeam(matchup.league_id, userId);
-      const isUserInMatchup = userTeam && (matchup.team1_id === userTeam.id || matchup.team2_id === userTeam.id);
+      // CRITICAL: Make this optional - if user isn't in matchup, that's fine, we'll use team1
+      let userTeam = null;
+      let isUserInMatchup = false;
+      
+      try {
+        const { team } = await LeagueService.getUserTeam(matchup.league_id, userId);
+        userTeam = team || null;
+        isUserInMatchup = userTeam && (matchup.team1_id === userTeam.id || matchup.team2_id === userTeam.id);
+      } catch (error) {
+        // User might not be in this league/matchup - that's okay, we'll view as team1
+        console.log('[MatchupService.getMatchupDataById] User not in matchup or league, viewing as team1:', {
+          matchupId,
+          userId,
+          error: error?.message || 'User team lookup failed'
+        });
+        userTeam = null;
+        isUserInMatchup = false;
+      }
       
       // Determine which team is "user" team (if user is in matchup) or team1 (if viewing other matchup)
       const viewingTeamId = isUserInMatchup && userTeam 
@@ -787,9 +803,20 @@ export const MatchupService = {
       };
 
       return { data: response, error: null };
-    } catch (error) {
-      console.error('[MatchupService.getMatchupDataById] Error:', error);
-      return { data: null, error };
+    } catch (error: any) {
+      console.error('[MatchupService.getMatchupDataById] Error loading matchup:', {
+        matchupId,
+        userId,
+        error: error?.message || error,
+        errorDetails: error
+      });
+      
+      // Provide more detailed error message
+      const errorMessage = error?.message || 'Unknown error loading matchup';
+      return { 
+        data: null, 
+        error: new Error(`Failed to load matchup: ${errorMessage}`) 
+      };
     }
   },
 

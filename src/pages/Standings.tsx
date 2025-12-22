@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
@@ -43,170 +43,196 @@ const Standings = () => {
   const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(null);
   const [teams, setTeams] = useState<StandingsTeam[]>([]);
   const [leagueTeams, setLeagueTeams] = useState<(Team & { owner_name?: string })[]>([]);
+  const hasInitializedRef = useRef(false);
   const navigate = useNavigate();
   
   // Auto-complete matchups and load standings
   useEffect(() => {
     const loadStandings = async () => {
-      // Auto-complete matchups and update scores when page loads (for active users)
-      if (userLeagueState === 'active-user' && selectedLeagueId) {
-        try {
-          // First, auto-complete matchups (this also updates scores for completed weeks)
-          const { error: autoCompleteError } = await supabase.rpc('auto_complete_matchups');
-          if (autoCompleteError) {
-            console.warn('[Standings] Error auto-completing matchups:', autoCompleteError);
-            // Don't block standings load if auto-complete fails
-          }
-          
-          // Then, update all matchup scores for this league to ensure they're current
-          // This uses the EXACT same calculation as the matchup tab
-          const { error: updateScoresError } = await MatchupService.updateMatchupScores(selectedLeagueId);
-          if (updateScoresError) {
-            console.warn('[Standings] Error updating matchup scores:', updateScoresError);
-            // Don't block standings load if score update fails
-          }
-        } catch (error) {
-          console.warn('[Standings] Exception in auto-update process:', error);
-          // Don't block standings load if update fails
-        }
-      }
+      // Initialize loading state
+      setLoading(true);
       
-      // State 1: Guest - show demo data
-      // State 2: Logged in, no league - show demo data (will show CTAs in UI)
-      if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
-        const demoTeams = DemoDataService.getDemoTeams();
-        const standingsTeams: StandingsTeam[] = demoTeams.map(t => ({
-          id: String(t.id),
-          name: t.name,
-          owner: t.owner,
-          logo: t.logo,
-          record: t.record,
-          points: t.points,
-          pointsFor: t.points, // Using points as pointsFor for demo
-          pointsAgainst: Math.floor(t.points * 0.85), // Demo calculation
-          streak: t.streak,
-        }));
-        setTeams(standingsTeams);
-        setLoading(false);
-        return;
-      }
-
-      // State 3: Active user - load real data
-      if (userLeagueState === 'active-user' && user) {
       try {
-        setLoading(true);
-        
-        // Get user's leagues
-        const { leagues: userLeagues, error: leaguesError } = await LeagueService.getUserLeagues(user.id);
-        if (leaguesError) throw leaguesError;
-
-        if (userLeagues.length === 0) {
-            // This shouldn't happen if userLeagueState is 'active-user', but handle gracefully
-            setTeams([]);
+        // State 1: Guest - show demo data
+        // State 2: Logged in, no league - show demo data (will show CTAs in UI)
+        if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
+          const demoTeams = DemoDataService.getDemoTeams();
+          const standingsTeams: StandingsTeam[] = demoTeams.map(t => ({
+            id: String(t.id),
+            name: t.name,
+            owner: t.owner,
+            logo: t.logo,
+            record: t.record,
+            points: t.points,
+            pointsFor: t.points, // Using points as pointsFor for demo
+            pointsAgainst: Math.floor(t.points * 0.85), // Demo calculation
+            streak: t.streak,
+            winPercentage: 0,
+            last5: { wins: 0, losses: 0 },
+          }));
+          setTeams(standingsTeams);
           setLoading(false);
           return;
         }
 
-        setLeagues(userLeagues);
-        const leagueToUse = selectedLeagueId || userLeagues[0].id;
-        setSelectedLeagueId(leagueToUse);
+        // State 3: Active user - load real data
+        if (userLeagueState === 'active-user' && user) {
+          // Get user's leagues first
+          const { leagues: userLeagues, error: leaguesError } = await LeagueService.getUserLeagues(user.id);
+          if (leaguesError) throw leaguesError;
 
-        // Get league to check draft status
-        const { league: leagueData, error: leagueError } = await LeagueService.getLeague(leagueToUse);
-        if (leagueError) throw leagueError;
-
-        // Get teams for selected league with owner information
-        const { teams: leagueTeamsData, error: teamsError } = await LeagueService.getLeagueTeamsWithOwners(leagueToUse);
-        if (teamsError) throw teamsError;
-
-        // Store league teams for user team checking
-        setLeagueTeams(leagueTeamsData);
-
-        // Only calculate stats if draft is completed
-        let teamStats: Record<string, { pointsFor: number; pointsAgainst: number; wins: number; losses: number }> = {};
-        
-        if (leagueData && leagueData.draft_status === 'completed') {
-          // Get draft picks for this league to calculate team stats
-          const { picks: draftPicks } = await DraftService.getDraftPicks(leagueToUse);
-          
-          if (draftPicks && draftPicks.length > 0) {
-            // Get all players to calculate points
-            const allPlayers = await PlayerService.getAllPlayers();
-
-            // Calculate team standings from drafted players
-            teamStats = await LeagueService.calculateTeamStandings(
-              leagueToUse,
-              leagueTeamsData,
-              draftPicks,
-              allPlayers
-            );
+          if (userLeagues.length === 0) {
+            // This shouldn't happen if userLeagueState is 'active-user', but handle gracefully
+            setTeams([]);
+            setLeagues([]);
+            setLoading(false);
+            return;
           }
-        }
 
-        // Convert database teams to standings format with calculated stats
-        const standingsTeams: StandingsTeam[] = leagueTeamsData.map((team, index) => {
-          const stats = teamStats[team.id] || { 
-            pointsFor: 0, 
-            pointsAgainst: 0, 
-            wins: 0, 
-            losses: 0,
-            streak: '-',
-            last5: { wins: 0, losses: 0 }
-          };
+          setLeagues(userLeagues);
+          const leagueToUse = selectedLeagueId || userLeagues[0].id;
           
-          // Calculate win percentage
-          const totalGames = (stats.wins || 0) + (stats.losses || 0);
-          const winPercentage = totalGames > 0 
-            ? ((stats.wins || 0) / totalGames) * 100 
-            : 0;
+          // Only set selectedLeagueId on first initialization to avoid infinite loops
+          if (!hasInitializedRef.current && !selectedLeagueId && userLeagues.length > 0) {
+            setSelectedLeagueId(userLeagues[0].id);
+            hasInitializedRef.current = true;
+          }
 
-          return {
-            id: team.id,
-            name: team.team_name,
-            owner: (team as any).owner_name || (team.owner_id ? 'User' : 'AI Team'),
-            logo: team.team_name.substring(0, 2).toUpperCase(),
-            record: { wins: stats.wins, losses: stats.losses },
-            points: stats.pointsFor, // Total points for ranking
-            pointsFor: Math.round(stats.pointsFor || 0),
-            pointsAgainst: Math.round(stats.pointsAgainst || 0),
-            streak: stats.streak || '-',
-            winPercentage: winPercentage !== undefined && !isNaN(winPercentage) ? parseFloat(winPercentage.toFixed(1)) : 0,
-            last5: stats.last5 || { wins: 0, losses: 0 },
-          };
-        });
+          // CRITICAL: Auto-complete matchups and update scores BEFORE calculating standings
+          // We MUST wait for scores to be updated before calculating standings
+          // Otherwise standings will use old/wrong scores from the database
+          // NOTE: If auto_complete_matchups fails, we still proceed with standings calculation
+          // to ensure the page renders even if the RPC has issues
+          try {
+            // First, auto-complete matchups (this also updates scores for completed weeks)
+            const { error: autoCompleteError } = await supabase.rpc('auto_complete_matchups');
+            if (autoCompleteError) {
+              console.warn('[Standings] Error auto-completing matchups (non-blocking):', autoCompleteError);
+              // Don't block standings load if auto-complete fails - continue with score updates and standings calculation
+            }
+            
+            // CRITICAL: Update all matchup scores and WAIT for completion
+            // This uses the EXACT same calculation as the matchup tab (sum of 7 daily scores)
+            // We MUST wait for this to complete before calculating standings
+            const { error: updateScoresError, updatedCount } = await MatchupService.updateMatchupScores(leagueToUse);
+            if (updateScoresError) {
+              console.error('[Standings] Failed to update matchup scores:', updateScoresError);
+              // Still show standings, but they may be outdated
+            } else {
+              console.log('[Standings] Score update completed:', {
+                updatedCount: updatedCount || 0,
+                leagueId: leagueToUse
+              });
+            }
+          } catch (error) {
+            console.error('[Standings] Exception updating scores:', error);
+            // Still show standings, but they may be outdated
+          }
 
-        setTeams(standingsTeams);
+          // Get league to check draft status
+          const { league: leagueData, error: leagueError } = await LeagueService.getLeague(leagueToUse);
+          if (leagueError) throw leagueError;
+
+          // Get teams for selected league with owner information
+          const { teams: leagueTeamsData, error: teamsError } = await LeagueService.getLeagueTeamsWithOwners(leagueToUse);
+          if (teamsError) throw teamsError;
+
+          // Store league teams for user team checking
+          setLeagueTeams(leagueTeamsData);
+
+          // Only calculate stats if draft is completed
+          let teamStats: Record<string, { pointsFor: number; pointsAgainst: number; wins: number; losses: number }> = {};
+          
+          if (leagueData && leagueData.draft_status === 'completed') {
+            // Get draft picks for this league to calculate team stats
+            const { picks: draftPicks } = await DraftService.getDraftPicks(leagueToUse);
+            
+            if (draftPicks && draftPicks.length > 0) {
+              // Get all players to calculate points
+              const allPlayers = await PlayerService.getAllPlayers();
+
+              // Calculate team standings from drafted players
+              teamStats = await LeagueService.calculateTeamStandings(
+                leagueToUse,
+                leagueTeamsData,
+                draftPicks,
+                allPlayers
+              );
+            }
+          }
+
+          // Convert database teams to standings format with calculated stats
+          const standingsTeams: StandingsTeam[] = leagueTeamsData.map((team, index) => {
+            const stats = teamStats[team.id] || { 
+              pointsFor: 0, 
+              pointsAgainst: 0, 
+              wins: 0, 
+              losses: 0,
+              streak: '-',
+              last5: { wins: 0, losses: 0 }
+            };
+            
+            // Calculate win percentage
+            const totalGames = (stats.wins || 0) + (stats.losses || 0);
+            const winPercentage = totalGames > 0 
+              ? ((stats.wins || 0) / totalGames) * 100 
+              : 0;
+
+            return {
+              id: team.id,
+              name: team.team_name,
+              owner: (team as any).owner_name || (team.owner_id ? 'User' : 'AI Team'),
+              logo: team.team_name.substring(0, 2).toUpperCase(),
+              record: { wins: stats.wins, losses: stats.losses },
+              points: stats.pointsFor, // Total points for ranking
+              pointsFor: parseFloat((stats.pointsFor || 0).toFixed(1)),
+              pointsAgainst: parseFloat((stats.pointsAgainst || 0).toFixed(1)),
+              streak: stats.streak || '-',
+              winPercentage: winPercentage !== undefined && !isNaN(winPercentage) ? parseFloat(winPercentage.toFixed(1)) : 0,
+              last5: stats.last5 || { wins: 0, losses: 0 },
+            };
+          });
+
+          setTeams(standingsTeams);
+          console.log('[Standings] Successfully set teams data:', {
+            teamCount: standingsTeams.length,
+            sampleTeam: standingsTeams[0]?.name || 'none'
+          });
+        } else {
+          // No user or wrong state - set loading to false and show empty teams
+          setTeams([]);
+          setLeagues([]);
+          console.log('[Standings] No active user or wrong state, showing empty teams');
+        }
       } catch (err: any) {
-        console.error('Error loading standings:', err);
+        console.error('[Standings] Error loading standings:', err);
         toast({
           title: 'Error',
           description: err.message || 'Failed to load standings',
           variant: 'destructive',
         });
-        // Fallback to demo data
-        const demoTeams = LeagueService.getAllTeams();
-        const standingsTeams: StandingsTeam[] = demoTeams.map(t => ({
-          id: String(t.id),
-          name: t.name,
-          owner: t.owner,
-          logo: t.logo,
-          record: t.record,
-          points: t.points,
-          pointsFor: t.points, // Using points as pointsFor for demo
-          pointsAgainst: Math.floor(t.points * 0.85), // Demo calculation
-          streak: t.streak,
-        }));
-        setTeams(standingsTeams);
+        // Fallback to empty teams on error - ensure component still renders
+        setTeams([]);
+        setLeagues([]);
       } finally {
+        // CRITICAL: Always set loading to false to ensure component renders
+        // Even if there were errors, we want to show the standings (or empty state)
+        console.log('[Standings] Setting loading to false, component should render now');
         setLoading(false);
-        }
       }
     };
 
-    loadStandings();
-  }, [user, selectedLeagueId, toast, userLeagueState]);
+    // Only run if userLeagueState is defined (not loading)
+    if (userLeagueState !== undefined) {
+      loadStandings();
+    } else {
+      // If userLeagueState is still loading, keep loading state
+      setLoading(true);
+    }
+  }, [user?.id, selectedLeagueId, toast, userLeagueState]);
 
   // Animation observer setup
+  // CRITICAL: Force animate class immediately for standings content to ensure visibility
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -220,12 +246,20 @@ const Standings = () => {
     );
 
     const animatedElements = document.querySelectorAll('.animated-element');
-    animatedElements.forEach(el => observer.observe(el));
+    animatedElements.forEach(el => {
+      observer.observe(el);
+      // CRITICAL FIX: Immediately add animate class to ensure visibility
+      // The IntersectionObserver might not trigger if elements are already in viewport
+      // This prevents the opacity-0 issue that makes content invisible
+      setTimeout(() => {
+        el.classList.add('animate');
+      }, 50);
+    });
 
     return () => {
       animatedElements.forEach(el => observer.unobserve(el));
     };
-  }, []);
+  }, [teams.length]); // Re-run when teams change to ensure new elements get animated
   
   // Sort teams by winning record
   const sortedTeams = [...teams].sort((a, b) => {
@@ -239,18 +273,56 @@ const Standings = () => {
 
   const selectedLeague = leagues.find(l => l.id === selectedLeagueId);
   
+  // CRITICAL: Debug logging to diagnose visibility issue
+  console.log('[Standings] Render decision:', {
+    loading,
+    teamsLength: teams.length,
+    leaguesLength: leagues.length,
+    shouldShowLoading: loading && teams.length === 0 && leagues.length === 0,
+    shouldShowContent: !loading || teams.length > 0 || leagues.length > 0
+  });
+  
+  // Early return for loading - must be after all hooks are declared
+  // CRITICAL: If teams exist, NEVER show LoadingScreen - content must render
+  // This prevents the component from being stuck in loading state
+  // UPDATED: More explicit check - only show LoadingScreen if we truly have no data
+  // ABSOLUTE RULE: If teams.length > 0, NEVER show LoadingScreen, always render content
+  const shouldShowLoadingScreen = teams.length === 0 && leagues.length === 0 && loading;
+  
+  if (shouldShowLoadingScreen) {
+    console.log('[Standings] Showing LoadingScreen - no data yet');
+    return (
+      <LoadingScreen
+        character="narwhal"
+        message="Loading Standings..."
+      />
+    );
+  }
+  
+  // CRITICAL: If we reach here, we MUST render content (even if loading is still true but we have data)
+  // This ensures content is always visible when data exists
+  // Force render content if we have teams, regardless of loading state
+  if (teams.length > 0) {
+    console.log('[Standings] FORCING content render - teams exist, ignoring loading state');
+  }
+  
+  // Log render state for debugging
+  if (teams.length > 0) {
+    console.log('[Standings] Rendering content with', teams.length, 'teams, loading:', loading);
+  }
+  
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
+    <div className="min-h-screen bg-background relative overflow-hidden" style={{ visibility: 'visible', opacity: 1 }}>
       {/* Decorative elements to match Home page */}
       <div className="absolute top-0 right-0 w-96 h-96 bg-[hsl(var(--vibrant-yellow))] rounded-full opacity-10 blur-3xl -z-10"></div>
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-[hsl(var(--vibrant-green))] rounded-full opacity-10 blur-3xl -z-10"></div>
 
       <Navbar />
-      <main className="pt-28 pb-16">
-        <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto text-center mb-10 animated-element">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4 citrus-gradient-text">League Standings</h1>
-            <p className="text-lg text-muted-foreground">Track your team's position in the league rankings.</p>
+      <main className="pt-28 pb-16" style={{ visibility: 'visible', opacity: 1, zIndex: 1 }}>
+        <div className="container mx-auto px-4" style={{ visibility: 'visible', opacity: 1 }}>
+          <div className="max-w-3xl mx-auto text-center mb-10 animated-element animate" style={{ visibility: 'visible', opacity: 1 }}>
+            <h1 className="text-4xl md:text-5xl font-bold mb-4 citrus-gradient-text" style={{ visibility: 'visible', opacity: 1 }}>League Standings</h1>
+            <p className="text-lg text-muted-foreground" style={{ visibility: 'visible', opacity: 1 }}>Track your team's position in the league rankings.</p>
           </div>
           
           {userLeagueState === 'logged-in-no-league' && (
@@ -263,7 +335,7 @@ const Standings = () => {
           )}
           
           <div className="flex flex-col md:flex-row items-center justify-between max-w-5xl mx-auto mb-8">
-            <div className="mb-4 md:mb-0 animated-element">
+            <div className="mb-4 md:mb-0 animated-element animate">
               <h2 className="text-2xl font-bold text-foreground">
                 {userLeagueState === 'active-user' && selectedLeague ? selectedLeague.name : 'CitrusSports League'}
               </h2>
@@ -284,7 +356,7 @@ const Standings = () => {
               )}
             </div>
             
-            <div className="flex items-center space-x-4 animated-element">
+            <div className="flex items-center space-x-4 animated-element animate">
               <div className="w-40">
                 <Select defaultValue={season} onValueChange={setSeason}>
                   <SelectTrigger className="w-full bg-background rounded-full border-primary/20 hover:border-primary/50 transition-colors">
@@ -337,9 +409,9 @@ const Standings = () => {
             </div>
           </div>
           
-          <Card className="max-w-5xl mx-auto overflow-hidden animated-element card-citrus p-0 border-none shadow-lg">
-            <div className="overflow-x-auto">
-              <Table>
+          <Card className="max-w-5xl mx-auto overflow-hidden animated-element animate card-citrus p-0 border-none shadow-lg" style={{ visibility: 'visible', opacity: 1 }}>
+            <div className="overflow-x-auto" style={{ visibility: 'visible', opacity: 1 }}>
+              <Table style={{ visibility: 'visible', opacity: 1 }}>
                 <thead className="bg-muted/30 border-b border-border/50">
                   <tr className="text-left">
                     <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Rank</th>
@@ -352,19 +424,10 @@ const Standings = () => {
                     <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Last 5</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border/40">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={8} className="p-0">
-                        <LoadingScreen
-                          character="narwhal"
-                          message="Loading Standings..."
-                        />
-                      </td>
-                    </tr>
-                  ) : sortedTeams.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
+                <tbody className="divide-y divide-border/40" style={{ visibility: 'visible', opacity: 1 }}>
+                  {sortedTeams.length === 0 ? (
+                    <tr style={{ visibility: 'visible', opacity: 1 }}>
+                      <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground" style={{ visibility: 'visible', opacity: 1 }}>
                         No teams found in this league.
                       </td>
                     </tr>
@@ -377,6 +440,7 @@ const Standings = () => {
                       <tr 
                         key={team.id} 
                         className={`${isUserTeam ? 'bg-primary/5' : 'hover:bg-muted/30 cursor-pointer'} transition-colors`}
+                        style={{ visibility: 'visible', opacity: 1 }}
                         onClick={() => navigate(`/team/${team.id}`)}
                       >
                         <td className="px-6 py-4 font-medium">
@@ -389,44 +453,44 @@ const Standings = () => {
                             )}
                           </div>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center text-xs font-bold text-muted-foreground border border-white/20 shadow-sm">
+                        <td className="px-6 py-4" style={{ visibility: 'visible', opacity: 1 }}>
+                          <div className="flex items-center gap-3" style={{ visibility: 'visible', opacity: 1 }}>
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center text-xs font-bold text-muted-foreground border border-white/20 shadow-sm" style={{ visibility: 'visible', opacity: 1 }}>
                               {team.logo}
                             </div>
-                            <div>
-                              <div className={`font-semibold ${isUserTeam ? 'text-primary' : 'text-foreground'}`}>
+                            <div style={{ visibility: 'visible', opacity: 1 }}>
+                              <div className={`font-semibold ${isUserTeam ? 'text-primary' : 'text-foreground'}`} style={{ visibility: 'visible', opacity: 1, color: isUserTeam ? undefined : 'inherit' }}>
                                 {team.name}
                                 {isUserTeam && <span className="ml-2 text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-bold">YOU</span>}
                               </div>
-                              <div className="text-xs text-muted-foreground">{team.owner}</div>
+                              <div className="text-xs text-muted-foreground" style={{ visibility: 'visible', opacity: 1 }}>{team.owner}</div>
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-center font-medium">
+                        <td className="px-6 py-4 text-center font-medium" style={{ visibility: 'visible', opacity: 1 }}>
                           {team.record.wins}-{team.record.losses}
                         </td>
-                        <td className="px-6 py-4 text-center text-muted-foreground">
+                        <td className="px-6 py-4 text-center text-muted-foreground" style={{ visibility: 'visible', opacity: 1 }}>
                           {(team.winPercentage ?? 0).toFixed(1)}%
                         </td>
-                        <td className="px-6 py-4 text-right font-bold tabular-nums">
-                          {team.pointsFor.toLocaleString()}
+                        <td className="px-6 py-4 text-right font-bold tabular-nums" style={{ visibility: 'visible', opacity: 1 }}>
+                          {team.pointsFor.toFixed(1)}
                         </td>
-                        <td className="px-6 py-4 text-right font-medium tabular-nums text-muted-foreground">
-                          {team.pointsAgainst.toLocaleString()}
+                        <td className="px-6 py-4 text-right font-medium tabular-nums text-muted-foreground" style={{ visibility: 'visible', opacity: 1 }}>
+                          {team.pointsAgainst.toFixed(1)}
                         </td>
-                        <td className="px-6 py-4 text-center">
+                        <td className="px-6 py-4 text-center" style={{ visibility: 'visible', opacity: 1 }}>
                           <span className={`inline-flex px-2.5 py-1 text-[10px] font-bold rounded-full border ${
                             team.streak.startsWith('W') 
                               ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' 
                               : team.streak.startsWith('L')
                               ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800'
                               : 'bg-muted text-muted-foreground border-border'
-                          }`}>
+                          }`} style={{ visibility: 'visible', opacity: 1 }}>
                             {team.streak}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-center text-muted-foreground font-medium">
+                        <td className="px-6 py-4 text-center text-muted-foreground font-medium" style={{ visibility: 'visible', opacity: 1 }}>
                           {team.last5.wins}-{team.last5.losses}
                         </td>
                       </tr>
@@ -439,7 +503,7 @@ const Standings = () => {
           </Card>
           
           <div className="max-w-5xl mx-auto mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="animated-element card-citrus p-0 border-none shadow-md overflow-hidden h-full">
+            <Card className="animated-element animate card-citrus p-0 border-none shadow-md overflow-hidden h-full">
               <CardHeader className="bg-primary/5 pb-4 border-b border-border/40">
                 <CardTitle className="text-lg font-bold flex items-center gap-2">
                   <span className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">🏆</span>
@@ -471,7 +535,7 @@ const Standings = () => {
               </CardContent>
             </Card>
             
-            <Card className="animated-element card-citrus p-0 border-none shadow-md overflow-hidden h-full">
+            <Card className="animated-element animate card-citrus p-0 border-none shadow-md overflow-hidden h-full">
               <CardHeader className="bg-[hsl(var(--vibrant-orange))]/5 pb-4 border-b border-border/40">
                 <CardTitle className="text-lg font-bold flex items-center gap-2">
                   <span className="w-8 h-8 rounded-full bg-[hsl(var(--vibrant-orange))]/10 flex items-center justify-center text-[hsl(var(--vibrant-orange))]">🔥</span>
@@ -495,7 +559,7 @@ const Standings = () => {
               </CardContent>
             </Card>
             
-            <Card className="animated-element card-citrus p-0 border-none shadow-md overflow-hidden h-full">
+            <Card className="animated-element animate card-citrus p-0 border-none shadow-md overflow-hidden h-full">
               <CardHeader className="bg-[hsl(var(--vibrant-purple))]/5 pb-4 border-b border-border/40">
                 <CardTitle className="text-lg font-bold flex items-center gap-2">
                   <span className="w-8 h-8 rounded-full bg-[hsl(var(--vibrant-purple))]/10 flex items-center justify-center text-[hsl(var(--vibrant-purple))]">📊</span>
@@ -512,18 +576,18 @@ const Standings = () => {
                   <div className="p-3 bg-muted/20 rounded-xl border border-border/40">
                     <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2">Avg Points For</div>
                     <div className="text-2xl font-bold">
-                      {teams.length > 0 
-                        ? Math.round(teams.reduce((sum, t) => sum + t.pointsFor, 0) / teams.length).toLocaleString()
-                        : '0'}
+                      {teams.length > 0
+                        ? (teams.reduce((sum, t) => sum + t.pointsFor, 0) / teams.length).toFixed(1)
+                        : '0.0'}
                     </div>
                   </div>
                   
                   <div className="p-3 bg-muted/20 rounded-xl border border-border/40">
                     <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2">Avg Points Against</div>
                     <div className="text-2xl font-bold">
-                      {teams.length > 0 
-                        ? Math.round(teams.reduce((sum, t) => sum + t.pointsAgainst, 0) / teams.length).toLocaleString()
-                        : '0'}
+                      {teams.length > 0
+                        ? (teams.reduce((sum, t) => sum + t.pointsAgainst, 0) / teams.length).toFixed(1)
+                        : '0.0'}
                     </div>
                   </div>
                 </div>

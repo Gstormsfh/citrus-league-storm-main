@@ -34,3 +34,4 @@ COMMENT ON INDEX idx_matchups_league_week_end IS 'Optimizes update_all_matchup_s
 COMMENT ON INDEX idx_player_game_stats_player_game IS 'Optimizes player_game_stats lookups in calculate_daily_matchup_scores';
 COMMENT ON INDEX idx_nhl_games_date_game_id IS 'Optimizes nhl_games date lookups in calculate_daily_matchup_scores';
 COMMENT ON INDEX idx_player_directory_season_position IS 'Optimizes player_directory position lookups for goalie detection';
+

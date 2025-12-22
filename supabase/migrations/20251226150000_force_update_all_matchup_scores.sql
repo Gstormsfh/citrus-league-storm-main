@@ -1,7 +1,9 @@
--- Create RPC to update all matchup scores using unified calculation
--- Updates team1_score and team2_score for ALL matchups (user teams AND AI teams)
--- Uses the EXACT same calculation logic as the matchup tab
+-- Force update all matchup scores for all leagues
+-- This uses the EXACT same calculation as the matchup tab (sum of 7 daily scores)
+-- This will fix all existing wrong scores (2000+ season totals -> correct matchup totals)
+-- CRITICAL: This is a one-time fix to correct all existing wrong data in the database
 
+-- First, ensure the RPC function is updated with the fix for ambiguous column references
 CREATE OR REPLACE FUNCTION public.update_all_matchup_scores(
   p_league_id UUID DEFAULT NULL
 )
@@ -30,6 +32,7 @@ BEGIN
 
   -- Loop through all matchups (filtered by league if provided)
   -- Update both completed and in-progress weeks (week_end_date <= CURRENT_DATE ensures we don't update future weeks)
+  -- FIX: Use table alias 'm' to avoid ambiguous column references
   FOR v_matchup IN
     SELECT m.id, m.league_id, m.team1_id, m.team2_id, m.week_start_date, m.week_end_date
     FROM matchups m
@@ -111,5 +114,28 @@ $$;
 REVOKE ALL ON FUNCTION public.update_all_matchup_scores(UUID) FROM public;
 GRANT EXECUTE ON FUNCTION public.update_all_matchup_scores(UUID) TO anon, authenticated;
 
-COMMENT ON FUNCTION public.update_all_matchup_scores IS 'Updates team1_score and team2_score for all matchups using unified calculation (sum of 7 daily scores). Works for ALL matchups - user teams AND AI teams. Uses EXACT same logic as matchup tab. Part of fluid, automatic score update system.';
+-- Now run the force update
+DO $$
+DECLARE
+  v_result RECORD;
+  v_updated_count INTEGER := 0;
+BEGIN
+  RAISE NOTICE 'Starting force update of all matchup scores...';
+  
+  -- Call update_all_matchup_scores for all leagues (NULL = all leagues)
+  -- This will update all matchups (completed and in-progress) with correct scores
+  FOR v_result IN 
+    SELECT * FROM update_all_matchup_scores(NULL)
+  LOOP
+    v_updated_count := v_updated_count + 1;
+    
+    -- Log each update for verification (only log first 10 to avoid spam)
+    IF v_updated_count <= 10 THEN
+      RAISE NOTICE 'Updated matchup %: team1=%, team2=%', 
+        v_result.matchup_id, v_result.team1_score, v_result.team2_score;
+    END IF;
+  END LOOP;
+  
+  RAISE NOTICE 'Force update completed: % matchups updated', v_updated_count;
+END $$;
 

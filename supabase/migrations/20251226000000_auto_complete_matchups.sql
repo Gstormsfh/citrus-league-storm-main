@@ -40,3 +40,4 @@ REVOKE ALL ON FUNCTION public.auto_complete_matchups() FROM public;
 GRANT EXECUTE ON FUNCTION public.auto_complete_matchups() TO anon, authenticated;
 
 COMMENT ON FUNCTION public.auto_complete_matchups IS 'Automatically marks matchups as completed when the week has ended and scores are present. Returns the number of matchups updated.';
+

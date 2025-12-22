@@ -1599,13 +1599,54 @@ export const LeagueService = {
     });
 
     try {
-      // Query all completed matchups for this league, ordered by week (for streak/last5 calculation)
-      const { data: matchups, error } = await supabase
-        .from('matchups')
-        .select('team1_id, team2_id, team1_score, team2_score, week_number')
-        .eq('league_id', leagueId)
-        .eq('status', 'completed')
-        .order('week_number', { ascending: true });
+      // Query all completed matchups OR past matchups (week_end_date < CURRENT_DATE) for this league
+      // This ensures Week 1 and Week 2 are both included even if Week 1 wasn't marked as completed
+      // CRITICAL: Include past weeks regardless of status to ensure all historical data is included
+      const todayStr = new Date().toISOString().split('T')[0];
+      
+      // Use two separate queries and combine: completed matchups OR past matchups
+      // This is more reliable than complex .or() syntax
+      const [completedResult, pastResult] = await Promise.all([
+        supabase
+          .from('matchups')
+          .select('team1_id, team2_id, team1_score, team2_score, week_number, status, week_end_date, id')
+          .eq('league_id', leagueId)
+          .eq('status', 'completed'),
+        supabase
+          .from('matchups')
+          .select('team1_id, team2_id, team1_score, team2_score, week_number, status, week_end_date, id')
+          .eq('league_id', leagueId)
+          .lt('week_end_date', todayStr)
+          .neq('status', 'completed') // Exclude already completed ones to avoid duplicates
+      ]);
+      
+      if (completedResult.error) {
+        console.error('[LeagueService] Error fetching completed matchups:', completedResult.error);
+      }
+      if (pastResult.error) {
+        console.error('[LeagueService] Error fetching past matchups:', pastResult.error);
+      }
+      
+      // Combine results and deduplicate by matchup ID
+      const completedMatchups = completedResult.data || [];
+      const pastMatchups = pastResult.data || [];
+      const matchupMap = new Map();
+      
+      // Add completed matchups first
+      completedMatchups.forEach(m => {
+        if (m.id) matchupMap.set(m.id, m);
+      });
+      
+      // Add past matchups (will overwrite if already in map, but that's fine - completed takes precedence)
+      pastMatchups.forEach(m => {
+        if (m.id && !matchupMap.has(m.id)) {
+          matchupMap.set(m.id, m);
+        }
+      });
+      
+      // Convert to array and sort by week_number
+      const matchups = Array.from(matchupMap.values()).sort((a, b) => a.week_number - b.week_number);
+      const error = completedResult.error || pastResult.error;
 
       if (error) {
         console.error('[LeagueService] Error fetching completed matchups:', error);
@@ -1614,19 +1655,58 @@ export const LeagueService = {
 
       if (!matchups || matchups.length === 0) {
         // No completed matchups yet - return empty stats
+        console.log('[LeagueService] No completed matchups found for league:', leagueId);
         return teamStats;
       }
+      
+      console.log('[LeagueService] Found', matchups.length, 'matchups (completed or past weeks) for league:', leagueId);
+      
+      // Log week distribution for verification
+      const weekDistribution = matchups.reduce((acc, m) => {
+        acc[m.week_number] = (acc[m.week_number] || 0) + 1;
+        return acc;
+      }, {} as Record<number, number>);
+      console.log('[LeagueService] Matchup distribution by week:', weekDistribution);
+      console.log('[LeagueService] Processing matchups for weeks:', Object.keys(weekDistribution).sort((a, b) => Number(a) - Number(b)));
 
-      // Calculate stats from each completed matchup
+      // Calculate stats from each matchup
       // CRITICAL: Only use scores from matchups table - these are matchup totals (sum of 7 daily scores)
       // NOT season totals or player totals
+      // This logic applies to ALL weeks (Week 1, Week 2, etc.) - same calculation for all
+      // All matchups returned are already past (week_end_date < CURRENT_DATE) or completed, so process all
+      console.log('[LeagueService] Processing', matchups.length, 'matchups (completed or past weeks)');
+      
       matchups.forEach(matchup => {
         // Parse scores - ensure we're getting matchup scores, not season totals
         const team1Score = parseFloat(String(matchup.team1_score)) || 0;
         const team2Score = matchup.team2_id ? (parseFloat(String(matchup.team2_score)) || 0) : 0;
         
-        // Debug logging for score validation
-        if (team1Score > 500 || team2Score > 500) {
+        // Debug logging for score validation and tracking
+        const isSuspicious = team1Score > 500 || team2Score > 500;
+        const isZero = team1Score === 0 && team2Score === 0;
+        
+        console.log('[LeagueService] Reading matchup scores:', {
+          matchup_id: matchup.id || 'unknown',
+          week: matchup.week_number,
+          week_label: `Week ${matchup.week_number}`,
+          team1_score: team1Score,
+          team2_score: team2Score,
+          suspicious: isSuspicious,
+          is_zero: isZero,
+          note: 'Same calculation logic applies to all weeks (Week 1, Week 2, etc.)'
+        });
+        
+        if (isZero) {
+          console.warn('[LeagueService] ⚠️ Matchup has zero scores - this may indicate missing fantasy_daily_rosters data:', {
+            matchup_id: matchup.id || 'unknown',
+            week_number: matchup.week_number,
+            team1_id: matchup.team1_id,
+            team2_id: matchup.team2_id,
+            note: 'If fantasy_daily_rosters has no data for this matchup, calculate_daily_matchup_scores will return 0. Check if daily rosters were populated for this matchup week.'
+          });
+        }
+        
+        if (isSuspicious) {
           console.warn('[LeagueService] Suspiciously high matchup score detected:', {
             matchup_id: matchup.id || 'unknown',
             week_number: matchup.week_number,
@@ -1647,9 +1727,16 @@ export const LeagueService = {
               week: matchup.week_number,
               won: true
             });
+            console.log('[LeagueService] Bye week - Team1 win:', {
+              team_id: matchup.team1_id,
+              week: matchup.week_number,
+              score: team1Score,
+              new_record: `${teamStats[matchup.team1_id].wins}-${teamStats[matchup.team1_id].losses}`
+            });
           }
         } else {
           // Both teams participated - calculate points and win/loss
+          // CRITICAL: Always add points, even if scores are zero
           if (teamStats[matchup.team1_id]) {
             teamStats[matchup.team1_id].pointsFor += team1Score;
             teamStats[matchup.team1_id].pointsAgainst += team2Score;
@@ -1661,8 +1748,11 @@ export const LeagueService = {
           }
 
           // Determine winner (higher score wins)
+          // CRITICAL: Handle ties - if scores are equal, both teams get a loss (no wins)
+          // This ensures the matchup is counted toward their record
           const team1Won = team1Score > team2Score;
           const team2Won = team2Score > team1Score;
+          const isTie = team1Score === team2Score && team1Score > 0; // Only count as tie if both have scores > 0
           
           if (team1Won) {
             if (teamStats[matchup.team1_id]) {
@@ -1679,6 +1769,15 @@ export const LeagueService = {
                 won: false
               });
             }
+            console.log('[LeagueService] Team1 won:', {
+              week: matchup.week_number,
+              team1_id: matchup.team1_id,
+              team2_id: matchup.team2_id,
+              team1_score: team1Score,
+              team2_score: team2Score,
+              team1_record: teamStats[matchup.team1_id] ? `${teamStats[matchup.team1_id].wins}-${teamStats[matchup.team1_id].losses}` : 'N/A',
+              team2_record: teamStats[matchup.team2_id] ? `${teamStats[matchup.team2_id].wins}-${teamStats[matchup.team2_id].losses}` : 'N/A'
+            });
           } else if (team2Won) {
             if (teamStats[matchup.team2_id]) {
               teamStats[matchup.team2_id].wins++;
@@ -1694,9 +1793,62 @@ export const LeagueService = {
                 won: false
               });
             }
+            console.log('[LeagueService] Team2 won:', {
+              week: matchup.week_number,
+              team1_id: matchup.team1_id,
+              team2_id: matchup.team2_id,
+              team1_score: team1Score,
+              team2_score: team2Score,
+              team1_record: teamStats[matchup.team1_id] ? `${teamStats[matchup.team1_id].wins}-${teamStats[matchup.team1_id].losses}` : 'N/A',
+              team2_record: teamStats[matchup.team2_id] ? `${teamStats[matchup.team2_id].wins}-${teamStats[matchup.team2_id].losses}` : 'N/A'
+            });
+          } else if (isTie) {
+            // Tie game - both teams get a loss (no wins)
+            // This ensures the matchup is counted in their record
+            if (teamStats[matchup.team1_id]) {
+              teamStats[matchup.team1_id].losses++;
+              teamStats[matchup.team1_id].matchupHistory.push({
+                week: matchup.week_number,
+                won: false
+              });
+            }
+            if (teamStats[matchup.team2_id]) {
+              teamStats[matchup.team2_id].losses++;
+              teamStats[matchup.team2_id].matchupHistory.push({
+                week: matchup.week_number,
+                won: false
+              });
+            }
+            console.log('[LeagueService] Tie game:', {
+              week: matchup.week_number,
+              team1_id: matchup.team1_id,
+              team2_id: matchup.team2_id,
+              score: team1Score
+            });
+          } else {
+            // Both teams have zero scores - still count as a game (both get losses)
+            // This ensures Week 1 matchups with zero scores are still counted in records
+            if (teamStats[matchup.team1_id]) {
+              teamStats[matchup.team1_id].losses++;
+              teamStats[matchup.team1_id].matchupHistory.push({
+                week: matchup.week_number,
+                won: false
+              });
+            }
+            if (teamStats[matchup.team2_id]) {
+              teamStats[matchup.team2_id].losses++;
+              teamStats[matchup.team2_id].matchupHistory.push({
+                week: matchup.week_number,
+                won: false
+              });
+            }
+            console.log('[LeagueService] Zero-score matchup (both teams get loss):', {
+              week: matchup.week_number,
+              team1_id: matchup.team1_id,
+              team2_id: matchup.team2_id,
+              note: 'Week 1 matchups with zero scores will still count toward record'
+            });
           }
-          // Note: Ties are not currently handled (both teams would get 0 wins/losses)
-          // This matches the current system where ties don't exist
         }
       });
 
@@ -1736,6 +1888,20 @@ export const LeagueService = {
       });
 
       console.log('[LeagueService] Calculated standings from', matchups.length, 'completed matchups');
+      
+      // Final validation: Log each team's final record to verify all weeks are counted
+      Object.keys(teamStats).forEach(teamId => {
+        const stats = teamStats[teamId];
+        console.log('[LeagueService] Final team record:', {
+          team_id: teamId,
+          wins: stats.wins,
+          losses: stats.losses,
+          total_games: stats.wins + stats.losses,
+          pointsFor: stats.pointsFor,
+          pointsAgainst: stats.pointsAgainst,
+          matchup_count: stats.matchupHistory?.length || 0
+        });
+      });
     } catch (error) {
       console.error('[LeagueService] Exception calculating team standings:', error);
       // Return empty stats on error

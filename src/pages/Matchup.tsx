@@ -1285,27 +1285,15 @@ const Matchup = () => {
         const userTimezone = (profile as any)?.timezone || 'America/Denver';
         let matchupDataPromise: Promise<{ data: any; error: any }>;
 
-        if (selectedMatchupId && allWeekMatchups.length > 0) {
-          const selectedMatchup = allWeekMatchups.find(m => m.id === selectedMatchupId);
-          if (selectedMatchup) {
-            console.log('[MATCHUP] Loading selected matchup from dropdown:', selectedMatchupId);
-            // Use getMatchupDataById to load the selected matchup
-            matchupDataPromise = MatchupService.getMatchupDataById(
-              selectedMatchupId,
-              user.id,
-              userTimezone
-            );
-          } else {
-            // Fallback to user's matchup if selected matchup not found
-            console.log('[MATCHUP] Selected matchup not found, falling back to user matchup');
-            matchupDataPromise = MatchupService.getMatchupData(
-              targetLeagueId,
-              user.id,
-              weekToShow,
-              userTimezone,
-              existingMatchup
-            );
-          }
+        if (selectedMatchupId) {
+          // Always try to load the selected matchup, even if not in allWeekMatchups
+          // This handles cases where the dropdown was changed but allWeekMatchups hasn't updated yet
+          console.log('[MATCHUP] Loading selected matchup from dropdown:', selectedMatchupId);
+          matchupDataPromise = MatchupService.getMatchupDataById(
+            selectedMatchupId,
+            user.id,
+            userTimezone
+          );
         } else {
           console.log('[MATCHUP] STEP 10: Calling getMatchupData for user matchup', {
             leagueId: targetLeagueId,
@@ -1330,29 +1318,73 @@ const Matchup = () => {
           }, 20000);
         });
         
-        const { data: matchupData, error: matchupError } = await Promise.race([
+        let { data: matchupData, error: matchupError } = await Promise.race([
           matchupDataPromise,
           timeoutPromise
         ]);
 
         if (matchupError) {
           console.error('[MATCHUP] Error getting matchup data:', matchupError);
-          // If it's a "no matchup found" error, the matchups may not have been generated yet
-          if (matchupError.message?.includes('No matchup found') || matchupError.message?.includes('timed out')) {
-            console.log('[MATCHUP] No matchup found or timeout for week', weekToShow);
-            setError(`Failed to load matchup for week ${weekToShow}. ${matchupError.message?.includes('timed out') ? 'Request timed out.' : 'Matchup may need to be generated.'} Please try refreshing the page.`);
+          
+          // Enhanced error handling for dropdown selections
+          if (selectedMatchupId) {
+            console.error('[MATCHUP] Failed to load selected matchup from dropdown:', {
+              matchupId: selectedMatchupId,
+              error: matchupError,
+              errorMessage: matchupError?.message || String(matchupError),
+              errorDetails: matchupError
+            });
+            
+            // Don't immediately clear selectedMatchupId - try to get more info first
+            const errorMessage = matchupError?.message || String(matchupError) || 'Unknown error';
+            
+            // Check if it's a specific error we can handle
+            if (errorMessage.includes('not found') || errorMessage.includes('Matchup not found')) {
+              setError(`Matchup not found. The matchup may have been deleted or doesn't exist.`);
+            } else if (errorMessage.includes('Viewing team not found')) {
+              setError(`Team data not found for this matchup. The matchup may be incomplete.`);
+            } else if (errorMessage.includes('League not found')) {
+              setError(`League not found. You may not have access to this league.`);
+            } else {
+              setError(`Failed to load matchup: ${errorMessage}. Please try refreshing the page.`);
+            }
+            
+            setLoading(false);
+            loadingRef.current = false;
+            return;
+          } else {
+            // Original error handling for user's matchup
+            if (matchupError?.message?.includes('No matchup found') || matchupError?.message?.includes('timed out')) {
+              console.log('[MATCHUP] No matchup found or timeout for week', weekToShow);
+              setError(`Failed to load matchup for week ${weekToShow}. ${matchupError.message?.includes('timed out') ? 'Request timed out.' : 'Matchup may need to be generated.'} Please try refreshing the page.`);
+              setLoading(false);
+              loadingRef.current = false;
+              return;
+            }
+            throw matchupError;
+          }
+        }
+        
+        if (!matchupData) {
+          console.error('[MATCHUP] No matchup data returned', {
+            selectedMatchupId,
+            weekToShow,
+            targetLeagueId,
+            error: matchupError
+          });
+          
+          if (selectedMatchupId) {
+            // Don't clear selectedMatchupId - show specific error
+            setError(`No matchup data available for the selected matchup. This may be because the matchup data is incomplete or the matchup hasn't been fully generated yet.`);
+            setLoading(false);
+            loadingRef.current = false;
+            return;
+          } else {
+            setError(`No matchup found for week ${weekToShow}`);
             setLoading(false);
             loadingRef.current = false;
             return;
           }
-          throw matchupError;
-        }
-        if (!matchupData) {
-          console.error('[MATCHUP] No matchup data returned');
-          setError(`No matchup found for week ${weekToShow}`);
-          setLoading(false);
-          loadingRef.current = false;
-          return;
         }
         
         console.log('[MATCHUP] STEP 11: Matchup data loaded successfully');
@@ -1598,10 +1630,17 @@ const Matchup = () => {
                       <label className="text-sm font-medium text-muted-foreground">View Matchup:</label>
                       <Select
                         value={selectedMatchupId || currentMatchup?.id || ''}
-                        onValueChange={(value) => {
+                        onValueChange={async (value) => {
+                          console.log('[Matchup] Dropdown changed to:', value);
                           setSelectedMatchupId(value);
                           // Reset selected date when switching matchups
                           setSelectedDate(null);
+                          // Force reload by clearing current matchup state
+                          setCurrentMatchup(null);
+                          setMyTeam([]);
+                          setOpponentTeamPlayers([]);
+                          setLoading(true);
+                          // The useEffect will pick up the selectedMatchupId change and reload
                         }}
                       >
                         <SelectTrigger className="w-[280px]">
@@ -1615,6 +1654,32 @@ const Matchup = () => {
                             const team2Score = matchup.team2_id ? (parseFloat(String(matchup.team2_score)) || 0) : 0;
                             const isBye = !matchup.team2_id;
                             const isUserMatchup = matchup.id === currentMatchup?.id;
+                            
+                            // Debug logging: Compare dropdown scores vs matchup tab scores
+                            if (isUserMatchup && currentMatchup) {
+                              const tabTeam1Score = parseFloat(myTeamPoints) || 0;
+                              const tabTeam2Score = parseFloat(opponentTeamPoints) || 0;
+                              const scoresMatch = Math.abs(tabTeam1Score - team1Score) < 0.1 && 
+                                                  Math.abs(tabTeam2Score - team2Score) < 0.1;
+                              
+                              if (!scoresMatch) {
+                                console.warn('[Matchup] Dropdown score vs Tab score mismatch:', {
+                                  matchup_id: matchup.id,
+                                  dropdown_team1: team1Score,
+                                  dropdown_team2: team2Score,
+                                  tab_team1: tabTeam1Score,
+                                  tab_team2: tabTeam2Score,
+                                  match: scoresMatch,
+                                  note: 'Dropdown reads from database, tab calculates on frontend. They should match after score update.'
+                                });
+                              } else {
+                                console.log('[Matchup] Dropdown score vs Tab score match:', {
+                                  matchup_id: matchup.id,
+                                  team1: team1Score,
+                                  team2: team2Score
+                                });
+                              }
+                            }
                             
                             return (
                               <SelectItem key={matchup.id} value={matchup.id}>

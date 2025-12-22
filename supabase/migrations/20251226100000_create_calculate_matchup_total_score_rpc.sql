@@ -59,3 +59,4 @@ REVOKE ALL ON FUNCTION public.calculate_matchup_total_score(UUID, UUID, DATE, DA
 GRANT EXECUTE ON FUNCTION public.calculate_matchup_total_score(UUID, UUID, DATE, DATE) TO anon, authenticated;
 
 COMMENT ON FUNCTION public.calculate_matchup_total_score IS 'Calculates total matchup score for a team by summing 7 daily scores from calculate_daily_matchup_scores RPC. Uses EXACT same logic as matchup tab. Ensures all matchups (user teams AND AI teams) use identical calculation.';
+

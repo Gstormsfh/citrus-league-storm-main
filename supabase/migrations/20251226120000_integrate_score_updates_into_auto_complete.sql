@@ -19,15 +19,16 @@ DECLARE
 BEGIN
   -- Get all unique league IDs for matchups that need to be completed
   -- Only get leagues where matchups have valid scores
-  SELECT ARRAY_AGG(DISTINCT league_id) INTO v_league_ids
-  FROM public.matchups
-  WHERE status IN ('scheduled', 'in_progress')
-    AND week_end_date < CURRENT_DATE
+  -- FIX: Use table alias 'm' to avoid ambiguous column reference with variable 'league_id'
+  SELECT ARRAY_AGG(DISTINCT m.league_id) INTO v_league_ids
+  FROM public.matchups m
+  WHERE m.status IN ('scheduled', 'in_progress')
+    AND m.week_end_date < CURRENT_DATE
     AND (
-      (team2_id IS NULL AND team1_score > 0) OR
-      (team2_id IS NOT NULL AND team1_score > 0 AND team2_score > 0)
+      (m.team2_id IS NULL AND m.team1_score > 0) OR
+      (m.team2_id IS NOT NULL AND m.team1_score > 0 AND m.team2_score > 0)
     )
-    AND league_id IS NOT NULL;  -- Ensure league_id is not null
+    AND m.league_id IS NOT NULL;  -- Ensure league_id is not null
   
   -- Update matchups to 'completed' status
   UPDATE public.matchups
@@ -74,3 +75,4 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.auto_complete_matchups IS 'Automatically marks matchups as completed when the week has ended and scores are present. Also updates scores for affected leagues to ensure they are current. Returns the number of matchups updated.';
+
