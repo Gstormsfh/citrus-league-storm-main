@@ -502,7 +502,7 @@ const Standings = () => {
             </div>
           </Card>
           
-          <div className="max-w-5xl mx-auto mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="max-w-5xl mx-auto mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card className="animated-element animate card-citrus p-0 border-none shadow-md overflow-hidden h-full">
               <CardHeader className="bg-primary/5 pb-4 border-b border-border/40">
                 <CardTitle className="text-lg font-bold flex items-center gap-2">
@@ -555,41 +555,6 @@ const Standings = () => {
                       <div className="font-bold text-[hsl(var(--vibrant-orange))]">{team.points.toLocaleString()}</div>
                     </div>
                   ))}
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="animated-element animate card-citrus p-0 border-none shadow-md overflow-hidden h-full">
-              <CardHeader className="bg-[hsl(var(--vibrant-purple))]/5 pb-4 border-b border-border/40">
-                <CardTitle className="text-lg font-bold flex items-center gap-2">
-                  <span className="w-8 h-8 rounded-full bg-[hsl(var(--vibrant-purple))]/10 flex items-center justify-center text-[hsl(var(--vibrant-purple))]">📊</span>
-                  League Stats
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-6">
-                <div className="space-y-4">
-                  <div className="p-3 bg-muted/20 rounded-xl border border-border/40">
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2">Total Teams</div>
-                    <div className="text-2xl font-bold">{teams.length}</div>
-                  </div>
-                  
-                  <div className="p-3 bg-muted/20 rounded-xl border border-border/40">
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2">Avg Points For</div>
-                    <div className="text-2xl font-bold">
-                      {teams.length > 0
-                        ? (teams.reduce((sum, t) => sum + t.pointsFor, 0) / teams.length).toFixed(1)
-                        : '0.0'}
-                    </div>
-                  </div>
-                  
-                  <div className="p-3 bg-muted/20 rounded-xl border border-border/40">
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2">Avg Points Against</div>
-                    <div className="text-2xl font-bold">
-                      {teams.length > 0
-                        ? (teams.reduce((sum, t) => sum + t.pointsAgainst, 0) / teams.length).toFixed(1)
-                        : '0.0'}
-                    </div>
-                  </div>
                 </div>
               </CardContent>
             </Card>

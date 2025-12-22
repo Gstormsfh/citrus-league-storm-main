@@ -48,7 +48,8 @@ const Matchup = () => {
   // Cache tracking to prevent unnecessary reloads
   const prevLeagueIdRef = useRef<string | undefined>(undefined);
   const prevWeekIdRef = useRef<string | undefined>(undefined);
-  const loadedMatchupDataRef = useRef<{ leagueId: string; weekId: string; timestamp: number } | null>(null);
+  const prevSelectedMatchupIdRef = useRef<string | null>(null);
+  const loadedMatchupDataRef = useRef<{ leagueId: string; weekId: string; matchupId: string | null; timestamp: number } | null>(null);
   const CACHE_TTL = 30000; // 30 seconds cache
   
   // CRITICAL: Unified loading state manager - handles all loading state logic in one place
@@ -84,6 +85,11 @@ const Matchup = () => {
   const [opponentTeam, setOpponentTeam] = useState<Team | null>(null);
   const [selectedWeek, setSelectedWeek] = useState<number>(1);
   const [availableWeeks, setAvailableWeeks] = useState<number[]>([]);
+  // Track viewing team names from matchup data (for viewing other matchups)
+  const [viewingTeamName, setViewingTeamName] = useState<string>('');
+  const [viewingOpponentTeamName, setViewingOpponentTeamName] = useState<string>('');
+  // Track user's actual matchup ID (for "(Your Matchup)" label)
+  const [userMatchupId, setUserMatchupId] = useState<string | null>(null);
   const [firstWeekStart, setFirstWeekStart] = useState<Date | null>(null);
   const [myTeam, setMyTeam] = useState<MatchupPlayer[]>([]);
   const [opponentTeamPlayers, setOpponentTeamPlayers] = useState<MatchupPlayer[]>([]);
@@ -96,6 +102,11 @@ const Matchup = () => {
   const [opponentDailyPoints, setOpponentDailyPoints] = useState<number[]>([]);
   const [selectedMatchupId, setSelectedMatchupId] = useState<string | null>(null);
   const [allWeekMatchups, setAllWeekMatchups] = useState<Array<Matchup & { team1_name?: string; team2_name?: string }>>([]);
+  // League scoring settings for dynamic goalie/skater scoring
+  const [scoringSettings, setScoringSettings] = useState<{
+    goalie: { wins: number; saves: number; shutouts: number; goals_against: number };
+    skater: { goals: number; assists: number; shots_on_goal: number; blocks: number };
+  } | null>(null);
 
   // Demo data - shown to guests and logged-in users without leagues
   // Load from actual demo rosters instead of static data
@@ -361,20 +372,49 @@ const Matchup = () => {
                            opponentTeamPlayers.find(p => p.id === row.player_id);
             const isGoalie = player?.position === 'G' || player?.position === 'Goalie' || player?.isGoalie || row.is_goalie;
             
-            // Calculate daily total points using league-standard formula
+            // Calculate daily total points using league scoring settings
+            const goalieScoring = scoringSettings?.goalie || {
+              wins: 4,
+              saves: 0.2,
+              shutouts: 3,
+              goals_against: -1
+            };
+            const skaterScoring = scoringSettings?.skater || {
+              goals: 3,
+              assists: 2,
+              shots_on_goal: 0.4,
+              blocks: 0.4
+            };
+            
             let dailyTotalPoints = 0;
             if (isGoalie) {
+              // Goalie Formula: Use league settings (defaults: W=4, SV=0.2, SO=3, GA=-1)
               dailyTotalPoints = 
-                (row.wins || 0) * 5 + 
-                (row.saves || 0) * 0.2 + 
-                (row.shutouts || 0) * 3 - 
-                (row.goals_against || 0) * 1;
+                (row.wins || 0) * goalieScoring.wins + 
+                (row.saves || 0) * goalieScoring.saves + 
+                (row.shutouts || 0) * goalieScoring.shutouts + 
+                (row.goals_against || 0) * goalieScoring.goals_against;  // Already negative, so add
+              
+              // Debug logging for goalies with stats
+              if (row.wins > 0 || row.saves > 0 || row.shutouts > 0 || row.goals_against > 0) {
+                console.log('[Matchup.fetchAllDailyStats] Goalie daily points:', {
+                  date,
+                  player_id: row.player_id,
+                  wins: row.wins,
+                  saves: row.saves,
+                  shutouts: row.shutouts,
+                  goals_against: row.goals_against,
+                  weights: goalieScoring,
+                  calculated_points: dailyTotalPoints
+                });
+              }
             } else {
+              // Skater Formula: Use league settings (defaults: G=3, A=2, SOG=0.4, BLK=0.4)
               dailyTotalPoints = 
-                (row.goals || 0) * 3 + 
-                (row.assists || 0) * 2 + 
-                (row.shots_on_goal || 0) * 0.4 + 
-                (row.blocks || 0) * 0.4;
+                (row.goals || 0) * skaterScoring.goals + 
+                (row.assists || 0) * skaterScoring.assists + 
+                (row.shots_on_goal || 0) * skaterScoring.shots_on_goal + 
+                (row.blocks || 0) * skaterScoring.blocks;
             }
             
             dayStatsMap.set(row.player_id, {
@@ -393,7 +433,7 @@ const Matchup = () => {
     };
 
     fetchAllDailyStats();
-  }, [currentMatchup, myTeam, opponentTeamPlayers, userLeagueState]);
+  }, [currentMatchup, myTeam, opponentTeamPlayers, userLeagueState, scoringSettings]);
 
   // Fetch detailed stats for selected date (or today) - for PlayerCard display
   useEffect(() => {
@@ -447,23 +487,49 @@ const Matchup = () => {
                          opponentTeamPlayers.find(p => p.id === row.player_id);
           const isGoalie = player?.position === 'G' || player?.position === 'Goalie' || player?.isGoalie || row.is_goalie;
           
-          // Calculate daily total points using league-standard formula
-          // TODO: In future, pull weights from league settings for custom scoring
+          // Calculate daily total points using league scoring settings
+          // Use scoringSettings from league.scoring_settings (dynamic, per-league)
+          const goalieScoring = scoringSettings?.goalie || {
+            wins: 4,
+            saves: 0.2,
+            shutouts: 3,
+            goals_against: -1
+          };
+          const skaterScoring = scoringSettings?.skater || {
+            goals: 3,
+            assists: 2,
+            shots_on_goal: 0.4,
+            blocks: 0.4
+          };
+          
           let dailyTotalPoints = 0;
           if (isGoalie) {
-            // Goalie Formula: W(5), SV(0.2), SO(3), GA(-1)
+            // Goalie Formula: Use league settings (defaults: W=4, SV=0.2, SO=3, GA=-1)
             dailyTotalPoints = 
-              (row.wins || 0) * 5 + 
-              (row.saves || 0) * 0.2 + 
-              (row.shutouts || 0) * 3 - 
-              (row.goals_against || 0) * 1;
+              (row.wins || 0) * goalieScoring.wins + 
+              (row.saves || 0) * goalieScoring.saves + 
+              (row.shutouts || 0) * goalieScoring.shutouts + 
+              (row.goals_against || 0) * goalieScoring.goals_against;  // Already negative, so add
+            
+            // Debug logging for goalies
+            if (row.wins > 0 || row.saves > 0 || row.shutouts > 0 || row.goals_against > 0) {
+              console.log('[Matchup] Goalie daily points calculation:', {
+                player_id: row.player_id,
+                wins: row.wins,
+                saves: row.saves,
+                shutouts: row.shutouts,
+                goals_against: row.goals_against,
+                weights: goalieScoring,
+                calculated_points: dailyTotalPoints
+              });
+            }
           } else {
-            // Skater Formula: G(3), A(2), SOG(0.4), BLK(0.4)
+            // Skater Formula: Use league settings (defaults: G=3, A=2, SOG=0.4, BLK=0.4)
             dailyTotalPoints = 
-              (row.goals || 0) * 3 + 
-              (row.assists || 0) * 2 + 
-              (row.shots_on_goal || 0) * 0.4 + 
-              (row.blocks || 0) * 0.4;
+              (row.goals || 0) * skaterScoring.goals + 
+              (row.assists || 0) * skaterScoring.assists + 
+              (row.shots_on_goal || 0) * skaterScoring.shots_on_goal + 
+              (row.blocks || 0) * skaterScoring.blocks;
           }
           
           // Store ALL available stats for comprehensive display
@@ -525,16 +591,17 @@ const Matchup = () => {
             is_goalie: isGoalie,
             
             // Build scoring breakdown for tooltip (same format as stats_breakdown)
+            // Use league scoring settings for accurate point calculations
             daily_stats_breakdown: isGoalie ? {
-              ...(row.wins > 0 ? { wins: { count: row.wins, points: row.wins * 5 } } : {}),
-              ...(row.saves > 0 ? { saves: { count: row.saves, points: row.saves * 0.2 } } : {}),
-              ...(row.shutouts > 0 ? { shutouts: { count: row.shutouts, points: row.shutouts * 3 } } : {}),
-              ...(row.goals_against > 0 ? { goals_against: { count: row.goals_against, points: -(row.goals_against * 1) } } : {}),
+              ...(row.wins > 0 ? { wins: { count: row.wins, points: row.wins * goalieScoring.wins } } : {}),
+              ...(row.saves > 0 ? { saves: { count: row.saves, points: row.saves * goalieScoring.saves } } : {}),
+              ...(row.shutouts > 0 ? { shutouts: { count: row.shutouts, points: row.shutouts * goalieScoring.shutouts } } : {}),
+              ...(row.goals_against > 0 ? { goals_against: { count: row.goals_against, points: row.goals_against * goalieScoring.goals_against } } : {}),
             } : {
-              ...(row.goals > 0 ? { goals: { count: row.goals, points: row.goals * 3 } } : {}),
-              ...(row.assists > 0 ? { assists: { count: row.assists, points: row.assists * 2 } } : {}),
-              ...(row.shots_on_goal > 0 ? { shots_on_goal: { count: row.shots_on_goal, points: row.shots_on_goal * 0.4 } } : {}),
-              ...(row.blocks > 0 ? { blocks: { count: row.blocks, points: row.blocks * 0.4 } } : {}),
+              ...(row.goals > 0 ? { goals: { count: row.goals, points: row.goals * skaterScoring.goals } } : {}),
+              ...(row.assists > 0 ? { assists: { count: row.assists, points: row.assists * skaterScoring.assists } } : {}),
+              ...(row.shots_on_goal > 0 ? { shots_on_goal: { count: row.shots_on_goal, points: row.shots_on_goal * skaterScoring.shots_on_goal } } : {}),
+              ...(row.blocks > 0 ? { blocks: { count: row.blocks, points: row.blocks * skaterScoring.blocks } } : {}),
             },
           });
         });
@@ -547,7 +614,7 @@ const Matchup = () => {
     };
 
     fetchDailyStats();
-  }, [selectedDate, currentMatchup, myTeam, opponentTeamPlayers, userLeagueState]);
+  }, [selectedDate, currentMatchup, myTeam, opponentTeamPlayers, userLeagueState, scoringSettings]);
 
   const handlePlayerClick = async (player: MatchupPlayer) => {
     try {
@@ -657,23 +724,47 @@ const Matchup = () => {
       if (!dailyStats) return player;
       
       // Keep weekly total_points unchanged - it's the matchup week total
+      const isGoalie = player.isGoalie || player.position === 'G' || player.position === 'Goalie';
+      
       return {
         ...player,
-        matchupStats: {
+        matchupStats: isGoalie ? {
+          // Goalie daily stats
+          wins: dailyStats.wins || 0,
+          saves: dailyStats.saves || 0,
+          shutouts: dailyStats.shutouts || 0,
+          goals_against: dailyStats.goals_against || 0,
+        } : {
+          // Skater daily stats
           goals: dailyStats.goals || 0,
           assists: dailyStats.assists || 0,
           sog: dailyStats.sog || 0,
           xGoals: dailyStats.xGoals || 0,
         },
-        // Update stats for display in statline (G, A, SOG)
-        stats: {
+        // Update stats for display in statline
+        stats: isGoalie ? {
           ...player.stats,
+          // Goalie stats
+          wins: dailyStats.wins || 0,
+          saves: dailyStats.saves || 0,
+          shutouts: dailyStats.shutouts || 0,
+          goals_against: dailyStats.goals_against || 0,
+        } : {
+          ...player.stats,
+          // Skater stats
           goals: dailyStats.goals || 0,
           assists: dailyStats.assists || 0,
           sog: dailyStats.sog || 0,
           blk: dailyStats.blocks || 0,
           xGoals: dailyStats.xGoals || 0,
         },
+        // Add goalie matchup stats for goalies
+        goalieMatchupStats: isGoalie ? {
+          wins: dailyStats.wins || 0,
+          saves: dailyStats.saves || 0,
+          shutouts: dailyStats.shutouts || 0,
+          goalsAgainst: dailyStats.goals_against || 0,
+        } : undefined,
         // Add daily total points for the projection bar replacement
         daily_total_points: dailyStats.daily_total_points || 0,
         // Add daily stats breakdown for tooltip hover
@@ -695,23 +786,47 @@ const Matchup = () => {
       if (!dailyStats) return player;
       
       // Keep weekly total_points unchanged - it's the matchup week total
+      const isGoalie = player.isGoalie || player.position === 'G' || player.position === 'Goalie';
+      
       return {
         ...player,
-        matchupStats: {
+        matchupStats: isGoalie ? {
+          // Goalie daily stats
+          wins: dailyStats.wins || 0,
+          saves: dailyStats.saves || 0,
+          shutouts: dailyStats.shutouts || 0,
+          goals_against: dailyStats.goals_against || 0,
+        } : {
+          // Skater daily stats
           goals: dailyStats.goals || 0,
           assists: dailyStats.assists || 0,
           sog: dailyStats.sog || 0,
           xGoals: dailyStats.xGoals || 0,
         },
-        // Update stats for display in statline (G, A, SOG)
-        stats: {
+        // Update stats for display in statline
+        stats: isGoalie ? {
           ...player.stats,
+          // Goalie stats
+          wins: dailyStats.wins || 0,
+          saves: dailyStats.saves || 0,
+          shutouts: dailyStats.shutouts || 0,
+          goals_against: dailyStats.goals_against || 0,
+        } : {
+          ...player.stats,
+          // Skater stats
           goals: dailyStats.goals || 0,
           assists: dailyStats.assists || 0,
           sog: dailyStats.sog || 0,
           blk: dailyStats.blocks || 0,
           xGoals: dailyStats.xGoals || 0,
         },
+        // Add goalie matchup stats for goalies
+        goalieMatchupStats: isGoalie ? {
+          wins: dailyStats.wins || 0,
+          saves: dailyStats.saves || 0,
+          shutouts: dailyStats.shutouts || 0,
+          goalsAgainst: dailyStats.goals_against || 0,
+        } : undefined,
         // Add daily total points for the projection bar replacement
         daily_total_points: dailyStats.daily_total_points || 0,
         // Add daily stats breakdown for tooltip hover
@@ -856,12 +971,23 @@ const Matchup = () => {
     // Check if values actually changed to prevent unnecessary reloads
     const leagueIdChanged = prevLeagueIdRef.current !== urlLeagueId;
     const weekIdChanged = prevWeekIdRef.current !== urlWeekId;
+    const selectedMatchupIdChanged = prevSelectedMatchupIdRef.current !== selectedMatchupId;
     
-    // If values haven't changed, check cache
-    if (!leagueIdChanged && !weekIdChanged && urlLeagueId && urlWeekId) {
+    // CRITICAL: If selectedMatchupId changed, ALWAYS bypass cache and reload
+    // This ensures dropdown selections always trigger a fresh data load
+    if (selectedMatchupIdChanged) {
+      console.log('[MATCHUP] Selected matchup changed, bypassing cache:', {
+        previous: prevSelectedMatchupIdRef.current,
+        current: selectedMatchupId
+      });
+    }
+    
+    // If values haven't changed AND selectedMatchupId hasn't changed, check cache
+    if (!leagueIdChanged && !weekIdChanged && !selectedMatchupIdChanged && urlLeagueId && urlWeekId) {
       if (loadedMatchupDataRef.current && 
           loadedMatchupDataRef.current.leagueId === urlLeagueId &&
-          loadedMatchupDataRef.current.weekId === urlWeekId) {
+          loadedMatchupDataRef.current.weekId === urlWeekId &&
+          loadedMatchupDataRef.current.matchupId === selectedMatchupId) {
         const age = Date.now() - loadedMatchupDataRef.current.timestamp;
         if (age < CACHE_TTL && !loadingRef.current) {
           console.log('[MATCHUP] Using cached data, skipping reload');
@@ -874,15 +1000,18 @@ const Matchup = () => {
     // Update refs to track current values
     prevLeagueIdRef.current = urlLeagueId;
     prevWeekIdRef.current = urlWeekId;
+    prevSelectedMatchupIdRef.current = selectedMatchupId;
     
-    console.log('[MATCHUP] useEffect triggered - starting load', {
+        console.log('[MATCHUP] useEffect triggered - starting load', {
       hasUser: !!user,
       userId: user?.id,
       userLeagueState,
       urlLeagueId,
       urlWeekId,
+      selectedMatchupId,
       leagueIdChanged,
       weekIdChanged,
+      selectedMatchupIdChanged,
       loadingRefCurrent: loadingRef.current
     });
 
@@ -1009,6 +1138,38 @@ const Matchup = () => {
         console.log('[MATCHUP] Found user team:', userTeamData.id);
         setUserTeam(userTeamData);
 
+        // Extract and store league scoring settings
+        const goalieScoring = currentLeague.scoring_settings?.goalie || {
+          wins: 4,
+          saves: 0.2,
+          shutouts: 3,
+          goals_against: -1
+        };
+        const skaterScoring = currentLeague.scoring_settings?.skater || {
+          goals: 3,
+          assists: 2,
+          shots_on_goal: 0.4,
+          blocks: 0.4
+        };
+        setScoringSettings({
+          goalie: {
+            wins: goalieScoring.wins ?? 4,
+            saves: goalieScoring.saves ?? 0.2,
+            shutouts: goalieScoring.shutouts ?? 3,
+            goals_against: goalieScoring.goals_against ?? -1
+          },
+          skater: {
+            goals: skaterScoring.goals ?? 3,
+            assists: skaterScoring.assists ?? 2,
+            shots_on_goal: skaterScoring.shots_on_goal ?? 0.4,
+            blocks: skaterScoring.blocks ?? 0.4
+          }
+        });
+        console.log('[MATCHUP] Loaded scoring settings:', {
+          goalie: goalieScoring,
+          skater: skaterScoring
+        });
+
         // Calculate first week start date
         const draftCompletionDate = getDraftCompletionDate(currentLeague);
         if (!draftCompletionDate) {
@@ -1073,6 +1234,11 @@ const Matchup = () => {
           user.id,
           weekToShow
         );
+        
+        // Set user's matchup ID for "(Your Matchup)" label
+        if (existingMatchup) {
+          setUserMatchupId(existingMatchup.id);
+        }
         
         console.log('[Matchup] Existing matchup check result:', {
           found: !!existingMatchup,
@@ -1389,11 +1555,12 @@ const Matchup = () => {
         
         console.log('[MATCHUP] STEP 11: Matchup data loaded successfully');
         
-        // Update cache with loaded data
+        // Update cache with loaded data (include selectedMatchupId in cache key)
         if (targetLeagueId && weekToShow) {
           loadedMatchupDataRef.current = {
             leagueId: targetLeagueId,
             weekId: String(weekToShow),
+            matchupId: selectedMatchupId,
             timestamp: Date.now()
           };
         }
@@ -1414,6 +1581,11 @@ const Matchup = () => {
         setOpponentTeamRecord(matchupData.opponentTeam?.record || { wins: 0, losses: 0 });
         setMyDailyPoints(matchupData.userTeam.dailyPoints);
         setOpponentDailyPoints(matchupData.opponentTeam?.dailyPoints || []);
+        
+        // CRITICAL: Set viewing team names from matchup data (not userTeam state)
+        // This ensures correct names are shown when viewing other matchups
+        setViewingTeamName(matchupData.userTeam.name);
+        setViewingOpponentTeamName(matchupData.opponentTeam?.name || 'Bye Week');
 
         // Default to null (full lineup view) - user can click a day to see daily stats
         setSelectedDate(null);
@@ -1422,6 +1594,12 @@ const Matchup = () => {
         // Set selected matchup ID if not already set
         if (!selectedMatchupId && matchupData.matchup) {
           setSelectedMatchupId(matchupData.matchup.id);
+        }
+        
+        // Track user's actual matchup ID for "(Your Matchup)" label
+        // Only set this if user is in this matchup (check if viewing team is user's team)
+        if (userTeam && (matchupData.userTeam.id === userTeam.id || matchupData.opponentTeam?.id === userTeam.id)) {
+          setUserMatchupId(matchupData.matchup.id);
         }
 
         // Get opponent team object for display
@@ -1632,6 +1810,8 @@ const Matchup = () => {
                         value={selectedMatchupId || currentMatchup?.id || ''}
                         onValueChange={async (value) => {
                           console.log('[Matchup] Dropdown changed to:', value);
+                          // CRITICAL: Clear cache when dropdown changes to force fresh load
+                          loadedMatchupDataRef.current = null;
                           setSelectedMatchupId(value);
                           // Reset selected date when switching matchups
                           setSelectedDate(null);
@@ -1653,7 +1833,9 @@ const Matchup = () => {
                             const team1Score = parseFloat(String(matchup.team1_score)) || 0;
                             const team2Score = matchup.team2_id ? (parseFloat(String(matchup.team2_score)) || 0) : 0;
                             const isBye = !matchup.team2_id;
-                            const isUserMatchup = matchup.id === currentMatchup?.id;
+                            // CRITICAL: Compare against user's actual matchup ID, not currentMatchup
+                            // This ensures "(Your Matchup)" only shows for the user's actual matchup
+                            const isUserMatchup = matchup.id === userMatchupId;
                             
                             // Debug logging: Compare dropdown scores vs matchup tab scores
                             if (isUserMatchup && currentMatchup) {
@@ -1739,9 +1921,9 @@ const Matchup = () => {
             <>
           
           <ScoreCard
-            myTeamName={userLeagueState === 'active-user' ? (userTeam?.team_name || 'My Team') : 'Citrus Crushers'}
+            myTeamName={userLeagueState === 'active-user' ? (viewingTeamName || userTeam?.team_name || 'My Team') : 'Citrus Crushers'}
             myTeamRecord={userLeagueState === 'active-user' ? myTeamRecord : { wins: 7, losses: 3 }}
-            opponentTeamName={userLeagueState === 'active-user' ? (opponentTeam?.team_name || 'Bye Week') : 'Thunder Titans'}
+            opponentTeamName={userLeagueState === 'active-user' ? (viewingOpponentTeamName || opponentTeam?.team_name || 'Bye Week') : 'Thunder Titans'}
             opponentTeamRecord={userLeagueState === 'active-user' ? opponentTeamRecord : { wins: 9, losses: 1 }}
             myTeamPoints={myTeamPoints}
             opponentTeamPoints={opponentTeamPoints}
@@ -1758,6 +1940,8 @@ const Matchup = () => {
                 onDayClick={setSelectedDate}
                 selectedDate={selectedDate}
                 dailyStatsByDate={dailyStatsByDate}
+                team1Name={viewingTeamName || undefined}
+                team2Name={viewingOpponentTeamName || undefined}
               />
             </div>
           )}

@@ -1331,7 +1331,18 @@ export const MatchupService = {
     weekEnd: Date,
     timezone: string = 'America/Denver',
     games: NHLGame[],
-    matchupStats?: { goals: number; assists: number; sog: number; blocks: number; xGoals: number },
+    matchupStats?: { 
+      goals: number; 
+      assists: number; 
+      sog: number; 
+      blocks: number; 
+      xGoals: number;
+      // Goalie stats (optional, only present for goalies)
+      wins?: number;
+      saves?: number;
+      shutouts?: number;
+      goals_against?: number;
+    },
     garPercentage?: number,
     dailyProjection?: any
   ): MatchupPlayer {
@@ -1414,39 +1425,62 @@ export const MatchupService = {
       let fantasyPoints = 0;
       let blocks = 0; // Define blocks outside the if block to avoid ReferenceError
       if (matchupStats) {
-        // CRITICAL: Validate that stats are for a week, not season
-        // For a single week, max should be: ~7 goals, ~10 assists, ~30 SOG (very high week)
-        const MAX_REASONABLE_WEEK_GOALS = 10;
-        const MAX_REASONABLE_WEEK_ASSISTS = 15;
-        const MAX_REASONABLE_WEEK_SOG = 40;
-        
-        if (matchupStats.goals > MAX_REASONABLE_WEEK_GOALS || 
-            matchupStats.assists > MAX_REASONABLE_WEEK_ASSISTS || 
-            matchupStats.sog > MAX_REASONABLE_WEEK_SOG) {
-          console.error(`[MatchupService.transformToMatchupPlayerWithGames] ❌ RPC returned season totals for ${player.name}: G=${matchupStats.goals}, A=${matchupStats.assists}, SOG=${matchupStats.sog} - REJECTING and using 0 points`);
-          fantasyPoints = 0; // Reject season totals from RPC
-          blocks = 0;
+        // CRITICAL: Check if player is a goalie and use appropriate scoring
+        if (isGoalie && (matchupStats.wins !== undefined || matchupStats.saves !== undefined)) {
+          // Goalie scoring: Wins=4, Saves=0.2, Shutouts=3, GA=-1
+          // Validate that stats are for a week, not season
+          const MAX_REASONABLE_WEEK_WINS = 7;
+          const MAX_REASONABLE_WEEK_SAVES = 300;
+          
+          if ((matchupStats.wins || 0) > MAX_REASONABLE_WEEK_WINS || 
+              (matchupStats.saves || 0) > MAX_REASONABLE_WEEK_SAVES) {
+            console.error(`[MatchupService.transformToMatchupPlayerWithGames] ❌ RPC returned season totals for goalie ${player.name}: W=${matchupStats.wins || 0}, SV=${matchupStats.saves || 0} - REJECTING and using 0 points`);
+            fantasyPoints = 0; // Reject season totals from RPC
+          } else {
+            // Goalie fantasy scoring using default weights (Wins=4, Saves=0.2, Shutouts=3, GA=-1)
+            fantasyPoints = ((matchupStats.wins || 0) * 4) + 
+                            ((matchupStats.saves || 0) * 0.2) + 
+                            ((matchupStats.shutouts || 0) * 3) + 
+                            ((matchupStats.goals_against || 0) * -1);
+          }
         } else {
-          // Fantasy scoring: Goals=3, Assists=2, SOG=0.4, Blocks=0.4
-          // CRITICAL: Use blocks from matchup week stats, NOT season stats
-          blocks = matchupStats.blocks || 0; // Get from matchup week stats
-          fantasyPoints = (matchupStats.goals * 3) + 
-                          (matchupStats.assists * 2) + 
-                          (matchupStats.sog * 0.4) + 
-                          (blocks * 0.4);
+          // Skater scoring: Goals=3, Assists=2, SOG=0.4, Blocks=0.4
+          // CRITICAL: Validate that stats are for a week, not season
+          // For a single week, max should be: ~7 goals, ~10 assists, ~30 SOG (very high week)
+          const MAX_REASONABLE_WEEK_GOALS = 10;
+          const MAX_REASONABLE_WEEK_ASSISTS = 15;
+          const MAX_REASONABLE_WEEK_SOG = 40;
+          
+          if (matchupStats.goals > MAX_REASONABLE_WEEK_GOALS || 
+              matchupStats.assists > MAX_REASONABLE_WEEK_ASSISTS || 
+              matchupStats.sog > MAX_REASONABLE_WEEK_SOG) {
+            console.error(`[MatchupService.transformToMatchupPlayerWithGames] ❌ RPC returned season totals for ${player.name}: G=${matchupStats.goals}, A=${matchupStats.assists}, SOG=${matchupStats.sog} - REJECTING and using 0 points`);
+            fantasyPoints = 0; // Reject season totals from RPC
+            blocks = 0;
+          } else {
+            // CRITICAL: Use blocks from matchup week stats, NOT season stats
+            blocks = matchupStats.blocks || 0; // Get from matchup week stats
+            fantasyPoints = (matchupStats.goals * 3) + 
+                            (matchupStats.assists * 2) + 
+                            (matchupStats.sog * 0.4) + 
+                            (blocks * 0.4);
+          }
         }
         
         // Debug logging for first few players
         if (Math.random() < 0.1) { // Log ~10% of players to avoid spam
-          console.log(`[MatchupService.transformToMatchupPlayerWithGames] Calculated points for ${player.name}:`, {
-            matchupStats: matchupStats ? {
+          console.log(`[MatchupService.transformToMatchupPlayerWithGames] Calculated points for ${player.name} (${isGoalie ? 'Goalie' : 'Skater'}):`, {
+            matchupStats: matchupStats ? (isGoalie ? {
+              wins: matchupStats.wins || 0,
+              saves: matchupStats.saves || 0,
+              shutouts: matchupStats.shutouts || 0,
+              goals_against: matchupStats.goals_against || 0
+            } : {
               goals: matchupStats.goals,
               assists: matchupStats.assists,
               sog: matchupStats.sog,
               blocks: matchupStats.blocks || 0
-            } : null,
-            blocksFromWeek: blocks,
-            blocksFromSeason: player.stats.blockedShots || 0,
+            }) : null,
             calculatedPoints: fantasyPoints,
             weekStart: weekStart.toISOString().split('T')[0],
             weekEnd: weekEnd.toISOString().split('T')[0]
@@ -1459,8 +1493,7 @@ export const MatchupService = {
         }
       }
 
-      // Check if player is goalie
-      const isGoalie = player.position === 'G' || player.position === 'Goalie';
+      // isGoalie already checked above
       
       // Base player object
       const basePlayer: MatchupPlayer = {
@@ -1520,8 +1553,15 @@ export const MatchupService = {
         
         basePlayer.goalieStats = goalieStats;
         
-        // Goalie matchup stats (if available from matchupStats - would need to be extended)
-        // For now, leave undefined as matchupStats is skater-focused
+        // Goalie matchup stats from matchupStats (weekly stats)
+        if (matchupStats && (matchupStats.wins !== undefined || matchupStats.saves !== undefined)) {
+          basePlayer.goalieMatchupStats = {
+            wins: matchupStats.wins || 0,
+            saves: matchupStats.saves || 0,
+            shutouts: matchupStats.shutouts || 0,
+            goalsAgainst: matchupStats.goals_against || 0,
+          };
+        }
         
         // Goalie projection from dailyProjection
         if (dailyProjection && dailyProjection.is_goalie) {
@@ -1567,13 +1607,20 @@ export const MatchupService = {
           xGoals: 0
         };
         
-        basePlayer.matchupStats = matchupStats ? {
+        basePlayer.matchupStats = matchupStats ? (isGoalie ? {
+          // Goalie matchup stats
+          wins: matchupStats.wins || 0,
+          saves: matchupStats.saves || 0,
+          shutouts: matchupStats.shutouts || 0,
+          goals_against: matchupStats.goals_against || 0,
+        } : {
+          // Skater matchup stats
           goals: matchupStats.goals,
           assists: matchupStats.assists,
           sog: matchupStats.sog,
           blocks: matchupStats.blocks || 0,
           xGoals: matchupStats.xGoals
-        } : undefined;
+        }) : undefined;
         
         // Skater projection
         if (dailyProjection && !dailyProjection.is_goalie) {
@@ -1870,7 +1917,18 @@ export const MatchupService = {
       }
 
       // Fetch matchup stats for the week (with graceful degradation)
-      let matchupStatsMap = new Map<number, { goals: number; assists: number; sog: number; blocks: number; xGoals: number }>();
+      let matchupStatsMap = new Map<number, { 
+        goals: number; 
+        assists: number; 
+        sog: number; 
+        blocks: number; 
+        xGoals: number;
+        // Goalie stats
+        wins?: number;
+        saves?: number;
+        shutouts?: number;
+        goals_against?: number;
+      }>();
       try {
         const weekStartStr = weekStart.toISOString().split('T')[0];
         const weekEndStr = weekEnd.toISOString().split('T')[0];
@@ -1969,29 +2027,49 @@ export const MatchupService = {
           const matchupStats = matchupStatsMap.get(playerId);
           
           // Helper function to calculate matchup week points from stats
-          const calculateMatchupWeekPoints = (stats: { goals: number; assists: number; sog: number; blocks?: number } | undefined): number => {
+          const calculateMatchupWeekPoints = (stats: any, isGoalie: boolean = false): number => {
             if (!stats) return 0;
             
-            // CRITICAL: Validate that stats are for a week, not season
-            // For a single week, max should be: ~7 goals, ~10 assists, ~30 SOG (very high week)
-            // If stats are too high, RPC returned season totals - reject them
-            const MAX_REASONABLE_WEEK_GOALS = 10;
-            const MAX_REASONABLE_WEEK_ASSISTS = 15;
-            const MAX_REASONABLE_WEEK_SOG = 40;
-            
-            if (stats.goals > MAX_REASONABLE_WEEK_GOALS || 
-                stats.assists > MAX_REASONABLE_WEEK_ASSISTS || 
-                stats.sog > MAX_REASONABLE_WEEK_SOG) {
-              console.error(`[MatchupService] ❌ RPC returned season totals for ${p.name}: G=${stats.goals}, A=${stats.assists}, SOG=${stats.sog} - REJECTING and using 0 points`);
-              return 0; // Reject season totals from RPC
+            if (isGoalie && (stats.wins !== undefined || stats.saves !== undefined)) {
+              // Goalie scoring: Wins=4, Saves=0.2, Shutouts=3, GA=-1
+              // Validate that stats are for a week, not season
+              const MAX_REASONABLE_WEEK_WINS = 7;
+              const MAX_REASONABLE_WEEK_SAVES = 300;
+              
+              if ((stats.wins || 0) > MAX_REASONABLE_WEEK_WINS || 
+                  (stats.saves || 0) > MAX_REASONABLE_WEEK_SAVES) {
+                console.error(`[MatchupService] ❌ RPC returned season totals for goalie ${p.name}: W=${stats.wins || 0}, SV=${stats.saves || 0} - REJECTING and using 0 points`);
+                return 0; // Reject season totals from RPC
+              }
+              
+              // Goalie fantasy scoring using default weights (Wins=4, Saves=0.2, Shutouts=3, GA=-1)
+              return ((stats.wins || 0) * 4) + 
+                      ((stats.saves || 0) * 0.2) + 
+                      ((stats.shutouts || 0) * 3) + 
+                      ((stats.goals_against || 0) * -1);
+            } else {
+              // Skater scoring: Goals=3, Assists=2, SOG=0.4, Blocks=0.4
+              // CRITICAL: Validate that stats are for a week, not season
+              // For a single week, max should be: ~7 goals, ~10 assists, ~30 SOG (very high week)
+              // If stats are too high, RPC returned season totals - reject them
+              const MAX_REASONABLE_WEEK_GOALS = 10;
+              const MAX_REASONABLE_WEEK_ASSISTS = 15;
+              const MAX_REASONABLE_WEEK_SOG = 40;
+              
+              if (stats.goals > MAX_REASONABLE_WEEK_GOALS || 
+                  stats.assists > MAX_REASONABLE_WEEK_ASSISTS || 
+                  stats.sog > MAX_REASONABLE_WEEK_SOG) {
+                console.error(`[MatchupService] ❌ RPC returned season totals for ${p.name}: G=${stats.goals}, A=${stats.assists}, SOG=${stats.sog} - REJECTING and using 0 points`);
+                return 0; // Reject season totals from RPC
+              }
+              
+              // CRITICAL: Use blocks from matchup week stats, NOT season stats
+              const blocks = stats.blocks || 0; // Get from matchup week stats
+              return (stats.goals * 3) + 
+                     (stats.assists * 2) + 
+                     (stats.sog * 0.4) + 
+                     (blocks * 0.4);
             }
-            
-            // CRITICAL: Use blocks from matchup week stats, NOT season stats
-            const blocks = stats.blocks || 0; // Get from matchup week stats
-            return (stats.goals * 3) + 
-                   (stats.assists * 2) + 
-                   (stats.sog * 0.4) + 
-                   (blocks * 0.4);
           };
           
           if (matchupLine) {
@@ -2002,12 +2080,15 @@ export const MatchupService = {
             
             if (matchupStats) {
               // RPC returned weekly stats - always use them (they're the source of truth)
-              matchupWeekPoints = calculateMatchupWeekPoints(matchupStats);
+              const isGoaliePlayer = p.position === 'G' || p.position === 'Goalie';
+              matchupWeekPoints = calculateMatchupWeekPoints(matchupStats, isGoaliePlayer);
               
               // Validate that RPC stats look reasonable for a week
-              const isLikelySeasonTotal = matchupStats.goals > 20 || matchupStats.assists > 30 || matchupStats.sog > 100;
+              const isLikelySeasonTotal = isGoaliePlayer 
+                ? ((matchupStats.wins || 0) > 7 || (matchupStats.saves || 0) > 300)
+                : ((matchupStats.goals || 0) > 20 || (matchupStats.assists || 0) > 30 || (matchupStats.sog || 0) > 100);
               if (isLikelySeasonTotal) {
-                console.error(`[MatchupService] ❌ RPC RETURNED SEASON TOTALS for ${p.name} (${playerId}): G=${matchupStats.goals}, A=${matchupStats.assists}, SOG=${matchupStats.sog} - REJECTING and using 0`);
+                console.error(`[MatchupService] ❌ RPC RETURNED SEASON TOTALS for ${p.name} (${playerId}): ${isGoaliePlayer ? `W=${matchupStats.wins || 0}, SV=${matchupStats.saves || 0}` : `G=${matchupStats.goals || 0}, A=${matchupStats.assists || 0}, SOG=${matchupStats.sog || 0}`} - REJECTING and using 0`);
                 matchupWeekPoints = 0; // Reject season totals from RPC
               }
               
@@ -2043,13 +2124,20 @@ export const MatchupService = {
             
             // Debug: Log final value being set (for ALL players with season totals to verify fix)
             if (matchupLine.total_points > MAX_REASONABLE_WEEK_POINTS) {
-              const statsBreakdown = matchupStats ? {
-                goals: matchupStats.goals,
-                assists: matchupStats.assists,
-                sog: matchupStats.sog,
+              const isGoaliePlayer = p.position === 'G' || p.position === 'Goalie';
+              const statsBreakdown = matchupStats ? (isGoaliePlayer ? {
+                wins: matchupStats.wins || 0,
+                saves: matchupStats.saves || 0,
+                shutouts: matchupStats.shutouts || 0,
+                goals_against: matchupStats.goals_against || 0,
+                calculated: (matchupStats.wins || 0) * 4 + (matchupStats.saves || 0) * 0.2 + (matchupStats.shutouts || 0) * 3 + (matchupStats.goals_against || 0) * -1
+              } : {
+                goals: matchupStats.goals || 0,
+                assists: matchupStats.assists || 0,
+                sog: matchupStats.sog || 0,
                 blocks: matchupStats.blocks || 0,
-                calculated: (matchupStats.goals * 3) + (matchupStats.assists * 2) + (matchupStats.sog * 0.4) + ((matchupStats.blocks || 0) * 0.4)
-              } : null;
+                calculated: (matchupStats.goals || 0) * 3 + (matchupStats.assists || 0) * 2 + (matchupStats.sog || 0) * 0.4 + ((matchupStats.blocks || 0) * 0.4)
+              }) : null;
               
               console.log(`[MatchupService] ✅ FINAL SET: ${p.name} (${playerId})`, {
                 databaseValue: matchupLine.total_points,
@@ -2079,34 +2167,67 @@ export const MatchupService = {
             
             // CRITICAL: Calculate stats_breakdown from weekly matchupStats, not database (which may have season totals)
             if (matchupStats) {
-              // Calculate breakdown from weekly stats using scoring: Goals=3, Assists=2, SOG=0.4, Blocks=0.4
-              const goalsPoints = (matchupStats.goals || 0) * 3;
-              const assistsPoints = (matchupStats.assists || 0) * 2;
-              const sogPoints = (matchupStats.sog || 0) * 0.4;
-              const blocksPoints = (matchupStats.blocks || 0) * 0.4;
+              const isGoaliePlayer = p.position === 'G' || p.position === 'Goalie';
               
-              transformed.stats_breakdown = {
-                'Goals': {
-                  count: matchupStats.goals || 0,
-                  points: goalsPoints,
-                  logic: `${matchupStats.goals || 0} goals * 3.0 points`
-                },
-                'Assists': {
-                  count: matchupStats.assists || 0,
-                  points: assistsPoints,
-                  logic: `${matchupStats.assists || 0} assists * 2.0 points`
-                },
-                'Shots on Goal': {
-                  count: matchupStats.sog || 0,
-                  points: sogPoints,
-                  logic: `${matchupStats.sog || 0} shots * 0.4 points`
-                },
-                'Blocks': {
-                  count: matchupStats.blocks || 0,
-                  points: blocksPoints,
-                  logic: `${matchupStats.blocks || 0} blocks * 0.4 points`
-                }
-              };
+              if (isGoaliePlayer && (matchupStats.wins !== undefined || matchupStats.saves !== undefined)) {
+                // Goalie breakdown
+                const winsPoints = (matchupStats.wins || 0) * 4;
+                const savesPoints = (matchupStats.saves || 0) * 0.2;
+                const shutoutsPoints = (matchupStats.shutouts || 0) * 3;
+                const gaPoints = (matchupStats.goals_against || 0) * -1;
+                
+                transformed.stats_breakdown = {
+                  'Wins': {
+                    count: matchupStats.wins || 0,
+                    points: winsPoints,
+                    logic: `${matchupStats.wins || 0} wins * 4.0 points`
+                  },
+                  'Saves': {
+                    count: matchupStats.saves || 0,
+                    points: savesPoints,
+                    logic: `${matchupStats.saves || 0} saves * 0.2 points`
+                  },
+                  'Shutouts': {
+                    count: matchupStats.shutouts || 0,
+                    points: shutoutsPoints,
+                    logic: `${matchupStats.shutouts || 0} shutouts * 3.0 points`
+                  },
+                  'Goals Against': {
+                    count: matchupStats.goals_against || 0,
+                    points: gaPoints,
+                    logic: `${matchupStats.goals_against || 0} GA * -1.0 points`
+                  }
+                };
+              } else {
+                // Skater breakdown
+                const goalsPoints = (matchupStats.goals || 0) * 3;
+                const assistsPoints = (matchupStats.assists || 0) * 2;
+                const sogPoints = (matchupStats.sog || 0) * 0.4;
+                const blocksPoints = (matchupStats.blocks || 0) * 0.4;
+                
+                transformed.stats_breakdown = {
+                  'Goals': {
+                    count: matchupStats.goals || 0,
+                    points: goalsPoints,
+                    logic: `${matchupStats.goals || 0} goals * 3.0 points`
+                  },
+                  'Assists': {
+                    count: matchupStats.assists || 0,
+                    points: assistsPoints,
+                    logic: `${matchupStats.assists || 0} assists * 2.0 points`
+                  },
+                  'Shots on Goal': {
+                    count: matchupStats.sog || 0,
+                    points: sogPoints,
+                    logic: `${matchupStats.sog || 0} shots * 0.4 points`
+                  },
+                  'Blocks': {
+                    count: matchupStats.blocks || 0,
+                    points: blocksPoints,
+                    logic: `${matchupStats.blocks || 0} blocks * 0.4 points`
+                  }
+                };
+              }
             } else {
               // No weekly stats - player didn't play, breakdown should be empty/undefined
               transformed.stats_breakdown = undefined;
@@ -2115,39 +2236,72 @@ export const MatchupService = {
             // Points already set above - matchupWeekPoints
           } else {
             // No matchup line data - calculate from matchup stats (matchup week only)
-            const calculatedPoints = calculateMatchupWeekPoints(matchupStats);
+            const isGoaliePlayer = p.position === 'G' || p.position === 'Goalie';
+            const calculatedPoints = calculateMatchupWeekPoints(matchupStats, isGoaliePlayer);
             transformed.total_points = calculatedPoints;
             transformed.points = calculatedPoints; // Use matchup week points, not season
             
             // Calculate stats_breakdown from weekly matchupStats
             if (matchupStats) {
-              const goalsPoints = (matchupStats.goals || 0) * 3;
-              const assistsPoints = (matchupStats.assists || 0) * 2;
-              const sogPoints = (matchupStats.sog || 0) * 0.4;
-              const blocksPoints = (matchupStats.blocks || 0) * 0.4;
-              
-              transformed.stats_breakdown = {
-                'Goals': {
-                  count: matchupStats.goals || 0,
-                  points: goalsPoints,
-                  logic: `${matchupStats.goals || 0} goals * 3.0 points`
-                },
-                'Assists': {
-                  count: matchupStats.assists || 0,
-                  points: assistsPoints,
-                  logic: `${matchupStats.assists || 0} assists * 2.0 points`
-                },
-                'Shots on Goal': {
-                  count: matchupStats.sog || 0,
-                  points: sogPoints,
-                  logic: `${matchupStats.sog || 0} shots * 0.4 points`
-                },
-                'Blocks': {
-                  count: matchupStats.blocks || 0,
-                  points: blocksPoints,
-                  logic: `${matchupStats.blocks || 0} blocks * 0.4 points`
-                }
-              };
+              if (isGoaliePlayer && (matchupStats.wins !== undefined || matchupStats.saves !== undefined)) {
+                // Goalie breakdown
+                const winsPoints = (matchupStats.wins || 0) * 4;
+                const savesPoints = (matchupStats.saves || 0) * 0.2;
+                const shutoutsPoints = (matchupStats.shutouts || 0) * 3;
+                const gaPoints = (matchupStats.goals_against || 0) * -1;
+                
+                transformed.stats_breakdown = {
+                  'Wins': {
+                    count: matchupStats.wins || 0,
+                    points: winsPoints,
+                    logic: `${matchupStats.wins || 0} wins * 4.0 points`
+                  },
+                  'Saves': {
+                    count: matchupStats.saves || 0,
+                    points: savesPoints,
+                    logic: `${matchupStats.saves || 0} saves * 0.2 points`
+                  },
+                  'Shutouts': {
+                    count: matchupStats.shutouts || 0,
+                    points: shutoutsPoints,
+                    logic: `${matchupStats.shutouts || 0} shutouts * 3.0 points`
+                  },
+                  'Goals Against': {
+                    count: matchupStats.goals_against || 0,
+                    points: gaPoints,
+                    logic: `${matchupStats.goals_against || 0} GA * -1.0 points`
+                  }
+                };
+              } else {
+                // Skater breakdown
+                const goalsPoints = (matchupStats.goals || 0) * 3;
+                const assistsPoints = (matchupStats.assists || 0) * 2;
+                const sogPoints = (matchupStats.sog || 0) * 0.4;
+                const blocksPoints = (matchupStats.blocks || 0) * 0.4;
+                
+                transformed.stats_breakdown = {
+                  'Goals': {
+                    count: matchupStats.goals || 0,
+                    points: goalsPoints,
+                    logic: `${matchupStats.goals || 0} goals * 3.0 points`
+                  },
+                  'Assists': {
+                    count: matchupStats.assists || 0,
+                    points: assistsPoints,
+                    logic: `${matchupStats.assists || 0} assists * 2.0 points`
+                  },
+                  'Shots on Goal': {
+                    count: matchupStats.sog || 0,
+                    points: sogPoints,
+                    logic: `${matchupStats.sog || 0} shots * 0.4 points`
+                  },
+                  'Blocks': {
+                    count: matchupStats.blocks || 0,
+                    points: blocksPoints,
+                    logic: `${matchupStats.blocks || 0} blocks * 0.4 points`
+                  }
+                };
+              }
             } else {
               transformed.stats_breakdown = undefined;
             }
@@ -2195,29 +2349,49 @@ export const MatchupService = {
           const matchupStats = matchupStatsMap.get(playerId);
           
           // Helper function to calculate matchup week points from stats
-          const calculateMatchupWeekPoints = (stats: { goals: number; assists: number; sog: number; blocks?: number } | undefined): number => {
+          const calculateMatchupWeekPoints = (stats: any, isGoalie: boolean = false): number => {
             if (!stats) return 0;
             
-            // CRITICAL: Validate that stats are for a week, not season
-            // For a single week, max should be: ~7 goals, ~10 assists, ~30 SOG (very high week)
-            // If stats are too high, RPC returned season totals - reject them
-            const MAX_REASONABLE_WEEK_GOALS = 10;
-            const MAX_REASONABLE_WEEK_ASSISTS = 15;
-            const MAX_REASONABLE_WEEK_SOG = 40;
-            
-            if (stats.goals > MAX_REASONABLE_WEEK_GOALS || 
-                stats.assists > MAX_REASONABLE_WEEK_ASSISTS || 
-                stats.sog > MAX_REASONABLE_WEEK_SOG) {
-              console.error(`[MatchupService] ❌ RPC returned season totals for ${p.name}: G=${stats.goals}, A=${stats.assists}, SOG=${stats.sog} - REJECTING and using 0 points`);
-              return 0; // Reject season totals from RPC
+            if (isGoalie && (stats.wins !== undefined || stats.saves !== undefined)) {
+              // Goalie scoring: Wins=4, Saves=0.2, Shutouts=3, GA=-1
+              // Validate that stats are for a week, not season
+              const MAX_REASONABLE_WEEK_WINS = 7;
+              const MAX_REASONABLE_WEEK_SAVES = 300;
+              
+              if ((stats.wins || 0) > MAX_REASONABLE_WEEK_WINS || 
+                  (stats.saves || 0) > MAX_REASONABLE_WEEK_SAVES) {
+                console.error(`[MatchupService] ❌ RPC returned season totals for goalie ${p.name}: W=${stats.wins || 0}, SV=${stats.saves || 0} - REJECTING and using 0 points`);
+                return 0; // Reject season totals from RPC
+              }
+              
+              // Goalie fantasy scoring using default weights (Wins=4, Saves=0.2, Shutouts=3, GA=-1)
+              return ((stats.wins || 0) * 4) + 
+                      ((stats.saves || 0) * 0.2) + 
+                      ((stats.shutouts || 0) * 3) + 
+                      ((stats.goals_against || 0) * -1);
+            } else {
+              // Skater scoring: Goals=3, Assists=2, SOG=0.4, Blocks=0.4
+              // CRITICAL: Validate that stats are for a week, not season
+              // For a single week, max should be: ~7 goals, ~10 assists, ~30 SOG (very high week)
+              // If stats are too high, RPC returned season totals - reject them
+              const MAX_REASONABLE_WEEK_GOALS = 10;
+              const MAX_REASONABLE_WEEK_ASSISTS = 15;
+              const MAX_REASONABLE_WEEK_SOG = 40;
+              
+              if (stats.goals > MAX_REASONABLE_WEEK_GOALS || 
+                  stats.assists > MAX_REASONABLE_WEEK_ASSISTS || 
+                  stats.sog > MAX_REASONABLE_WEEK_SOG) {
+                console.error(`[MatchupService] ❌ RPC returned season totals for ${p.name}: G=${stats.goals}, A=${stats.assists}, SOG=${stats.sog} - REJECTING and using 0 points`);
+                return 0; // Reject season totals from RPC
+              }
+              
+              // CRITICAL: Use blocks from matchup week stats, NOT season stats
+              const blocks = stats.blocks || 0; // Get from matchup week stats
+              return (stats.goals * 3) + 
+                     (stats.assists * 2) + 
+                     (stats.sog * 0.4) + 
+                     (blocks * 0.4);
             }
-            
-            // CRITICAL: Use blocks from matchup week stats, NOT season stats
-            const blocks = stats.blocks || 0; // Get from matchup week stats
-            return (stats.goals * 3) + 
-                   (stats.assists * 2) + 
-                   (stats.sog * 0.4) + 
-                   (blocks * 0.4);
           };
           
           if (matchupLine) {
@@ -2228,12 +2402,15 @@ export const MatchupService = {
             
             if (matchupStats) {
               // RPC returned weekly stats - always use them (they're the source of truth)
-              matchupWeekPoints = calculateMatchupWeekPoints(matchupStats);
+              const isGoaliePlayer = p.position === 'G' || p.position === 'Goalie';
+              matchupWeekPoints = calculateMatchupWeekPoints(matchupStats, isGoaliePlayer);
               
               // Validate that RPC stats look reasonable for a week
-              const isLikelySeasonTotal = matchupStats.goals > 20 || matchupStats.assists > 30 || matchupStats.sog > 100;
+              const isLikelySeasonTotal = isGoaliePlayer 
+                ? ((matchupStats.wins || 0) > 7 || (matchupStats.saves || 0) > 300)
+                : ((matchupStats.goals || 0) > 20 || (matchupStats.assists || 0) > 30 || (matchupStats.sog || 0) > 100);
               if (isLikelySeasonTotal) {
-                console.error(`[MatchupService] ❌ RPC RETURNED SEASON TOTALS for ${p.name} (${playerId}): G=${matchupStats.goals}, A=${matchupStats.assists}, SOG=${matchupStats.sog} - REJECTING and using 0`);
+                console.error(`[MatchupService] ❌ RPC RETURNED SEASON TOTALS for ${p.name} (${playerId}): ${isGoaliePlayer ? `W=${matchupStats.wins || 0}, SV=${matchupStats.saves || 0}` : `G=${matchupStats.goals || 0}, A=${matchupStats.assists || 0}, SOG=${matchupStats.sog || 0}`} - REJECTING and using 0`);
                 matchupWeekPoints = 0; // Reject season totals from RPC
               }
               
@@ -2269,13 +2446,20 @@ export const MatchupService = {
             
             // Debug: Log final value being set (for ALL players with season totals to verify fix)
             if (matchupLine.total_points > MAX_REASONABLE_WEEK_POINTS) {
-              const statsBreakdown = matchupStats ? {
-                goals: matchupStats.goals,
-                assists: matchupStats.assists,
-                sog: matchupStats.sog,
+              const isGoaliePlayer = p.position === 'G' || p.position === 'Goalie';
+              const statsBreakdown = matchupStats ? (isGoaliePlayer ? {
+                wins: matchupStats.wins || 0,
+                saves: matchupStats.saves || 0,
+                shutouts: matchupStats.shutouts || 0,
+                goals_against: matchupStats.goals_against || 0,
+                calculated: (matchupStats.wins || 0) * 4 + (matchupStats.saves || 0) * 0.2 + (matchupStats.shutouts || 0) * 3 + (matchupStats.goals_against || 0) * -1
+              } : {
+                goals: matchupStats.goals || 0,
+                assists: matchupStats.assists || 0,
+                sog: matchupStats.sog || 0,
                 blocks: matchupStats.blocks || 0,
-                calculated: (matchupStats.goals * 3) + (matchupStats.assists * 2) + (matchupStats.sog * 0.4) + ((matchupStats.blocks || 0) * 0.4)
-              } : null;
+                calculated: (matchupStats.goals || 0) * 3 + (matchupStats.assists || 0) * 2 + (matchupStats.sog || 0) * 0.4 + ((matchupStats.blocks || 0) * 0.4)
+              }) : null;
               
               console.log(`[MatchupService] ✅ FINAL SET: ${p.name} (${playerId})`, {
                 databaseValue: matchupLine.total_points,
@@ -2305,34 +2489,67 @@ export const MatchupService = {
             
             // CRITICAL: Calculate stats_breakdown from weekly matchupStats, not database (which may have season totals)
             if (matchupStats) {
-              // Calculate breakdown from weekly stats using scoring: Goals=3, Assists=2, SOG=0.4, Blocks=0.4
-              const goalsPoints = (matchupStats.goals || 0) * 3;
-              const assistsPoints = (matchupStats.assists || 0) * 2;
-              const sogPoints = (matchupStats.sog || 0) * 0.4;
-              const blocksPoints = (matchupStats.blocks || 0) * 0.4;
+              const isGoaliePlayer = p.position === 'G' || p.position === 'Goalie';
               
-              transformed.stats_breakdown = {
-                'Goals': {
-                  count: matchupStats.goals || 0,
-                  points: goalsPoints,
-                  logic: `${matchupStats.goals || 0} goals * 3.0 points`
-                },
-                'Assists': {
-                  count: matchupStats.assists || 0,
-                  points: assistsPoints,
-                  logic: `${matchupStats.assists || 0} assists * 2.0 points`
-                },
-                'Shots on Goal': {
-                  count: matchupStats.sog || 0,
-                  points: sogPoints,
-                  logic: `${matchupStats.sog || 0} shots * 0.4 points`
-                },
-                'Blocks': {
-                  count: matchupStats.blocks || 0,
-                  points: blocksPoints,
-                  logic: `${matchupStats.blocks || 0} blocks * 0.4 points`
-                }
-              };
+              if (isGoaliePlayer && (matchupStats.wins !== undefined || matchupStats.saves !== undefined)) {
+                // Goalie breakdown
+                const winsPoints = (matchupStats.wins || 0) * 4;
+                const savesPoints = (matchupStats.saves || 0) * 0.2;
+                const shutoutsPoints = (matchupStats.shutouts || 0) * 3;
+                const gaPoints = (matchupStats.goals_against || 0) * -1;
+                
+                transformed.stats_breakdown = {
+                  'Wins': {
+                    count: matchupStats.wins || 0,
+                    points: winsPoints,
+                    logic: `${matchupStats.wins || 0} wins * 4.0 points`
+                  },
+                  'Saves': {
+                    count: matchupStats.saves || 0,
+                    points: savesPoints,
+                    logic: `${matchupStats.saves || 0} saves * 0.2 points`
+                  },
+                  'Shutouts': {
+                    count: matchupStats.shutouts || 0,
+                    points: shutoutsPoints,
+                    logic: `${matchupStats.shutouts || 0} shutouts * 3.0 points`
+                  },
+                  'Goals Against': {
+                    count: matchupStats.goals_against || 0,
+                    points: gaPoints,
+                    logic: `${matchupStats.goals_against || 0} GA * -1.0 points`
+                  }
+                };
+              } else {
+                // Skater breakdown
+                const goalsPoints = (matchupStats.goals || 0) * 3;
+                const assistsPoints = (matchupStats.assists || 0) * 2;
+                const sogPoints = (matchupStats.sog || 0) * 0.4;
+                const blocksPoints = (matchupStats.blocks || 0) * 0.4;
+                
+                transformed.stats_breakdown = {
+                  'Goals': {
+                    count: matchupStats.goals || 0,
+                    points: goalsPoints,
+                    logic: `${matchupStats.goals || 0} goals * 3.0 points`
+                  },
+                  'Assists': {
+                    count: matchupStats.assists || 0,
+                    points: assistsPoints,
+                    logic: `${matchupStats.assists || 0} assists * 2.0 points`
+                  },
+                  'Shots on Goal': {
+                    count: matchupStats.sog || 0,
+                    points: sogPoints,
+                    logic: `${matchupStats.sog || 0} shots * 0.4 points`
+                  },
+                  'Blocks': {
+                    count: matchupStats.blocks || 0,
+                    points: blocksPoints,
+                    logic: `${matchupStats.blocks || 0} blocks * 0.4 points`
+                  }
+                };
+              }
             } else {
               // No weekly stats - player didn't play, breakdown should be empty/undefined
               transformed.stats_breakdown = undefined;
@@ -2341,9 +2558,75 @@ export const MatchupService = {
             // Points already set above - matchupWeekPoints
           } else {
             // No matchup line data - calculate from matchup stats (matchup week only)
-            const calculatedPoints = calculateMatchupWeekPoints(matchupStats);
+            const isGoaliePlayer = p.position === 'G' || p.position === 'Goalie';
+            const calculatedPoints = calculateMatchupWeekPoints(matchupStats, isGoaliePlayer);
             transformed.total_points = calculatedPoints;
             transformed.points = calculatedPoints; // Use matchup week points, not season
+            
+            // Calculate stats_breakdown from weekly matchupStats
+            if (matchupStats) {
+              if (isGoaliePlayer && (matchupStats.wins !== undefined || matchupStats.saves !== undefined)) {
+                // Goalie breakdown
+                const winsPoints = (matchupStats.wins || 0) * 4;
+                const savesPoints = (matchupStats.saves || 0) * 0.2;
+                const shutoutsPoints = (matchupStats.shutouts || 0) * 3;
+                const gaPoints = (matchupStats.goals_against || 0) * -1;
+                
+                transformed.stats_breakdown = {
+                  'Wins': {
+                    count: matchupStats.wins || 0,
+                    points: winsPoints,
+                    logic: `${matchupStats.wins || 0} wins * 4.0 points`
+                  },
+                  'Saves': {
+                    count: matchupStats.saves || 0,
+                    points: savesPoints,
+                    logic: `${matchupStats.saves || 0} saves * 0.2 points`
+                  },
+                  'Shutouts': {
+                    count: matchupStats.shutouts || 0,
+                    points: shutoutsPoints,
+                    logic: `${matchupStats.shutouts || 0} shutouts * 3.0 points`
+                  },
+                  'Goals Against': {
+                    count: matchupStats.goals_against || 0,
+                    points: gaPoints,
+                    logic: `${matchupStats.goals_against || 0} GA * -1.0 points`
+                  }
+                };
+              } else {
+                // Skater breakdown
+                const goalsPoints = (matchupStats.goals || 0) * 3;
+                const assistsPoints = (matchupStats.assists || 0) * 2;
+                const sogPoints = (matchupStats.sog || 0) * 0.4;
+                const blocksPoints = (matchupStats.blocks || 0) * 0.4;
+                
+                transformed.stats_breakdown = {
+                  'Goals': {
+                    count: matchupStats.goals || 0,
+                    points: goalsPoints,
+                    logic: `${matchupStats.goals || 0} goals * 3.0 points`
+                  },
+                  'Assists': {
+                    count: matchupStats.assists || 0,
+                    points: assistsPoints,
+                    logic: `${matchupStats.assists || 0} assists * 2.0 points`
+                  },
+                  'Shots on Goal': {
+                    count: matchupStats.sog || 0,
+                    points: sogPoints,
+                    logic: `${matchupStats.sog || 0} shots * 0.4 points`
+                  },
+                  'Blocks': {
+                    count: matchupStats.blocks || 0,
+                    points: blocksPoints,
+                    logic: `${matchupStats.blocks || 0} blocks * 0.4 points`
+                  }
+                };
+              }
+            } else {
+              transformed.stats_breakdown = undefined;
+            }
             
             // Debug: Log when no matchup line exists
             if (Math.random() < 0.1) {
@@ -2694,14 +2977,30 @@ export const MatchupService = {
       
       if (error) throw error;
       
-      const statsMap = new Map<number, { goals: number; assists: number; sog: number; blocks: number; xGoals: number }>();
+      const statsMap = new Map<number, { 
+        goals: number; 
+        assists: number; 
+        sog: number; 
+        blocks: number; 
+        xGoals: number;
+        // Goalie stats
+        wins?: number;
+        saves?: number;
+        shutouts?: number;
+        goals_against?: number;
+      }>();
       (data || []).forEach((row: any) => {
         statsMap.set(row.player_id, {
           goals: row.goals || 0,
           assists: row.assists || 0,
           sog: row.shots_on_goal || 0,
           blocks: row.blocks || 0, // CRITICAL: Get blocks from matchup week stats, not season stats
-          xGoals: parseFloat(row.x_goals || 0)
+          xGoals: parseFloat(row.x_goals || 0),
+          // Extract goalie stats from RPC response
+          wins: row.wins || 0,
+          saves: row.saves || 0,
+          shutouts: row.shutouts || 0,
+          goals_against: row.goals_against || 0,
         });
       });
       

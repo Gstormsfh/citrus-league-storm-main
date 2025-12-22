@@ -236,17 +236,33 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
                 {player.team}
               </div>
             )}
-            {/* Key Stats Below Name - Show DAILY stats when date selected, goalie season stats for goalies */}
+            {/* Key Stats Below Name - Show DAILY stats when date selected, season stats otherwise */}
             <div className="player-key-stats">
               {isGoalie ? (
-                // Goalie: show season stats (always)
-                <>
-                  GP: {player.goalieStats?.gamesPlayed || 0}, 
-                  W: {player.goalieStats?.wins || 0}, 
-                  SV%: {((player.goalieStats?.savePct || 0) * 100).toFixed(1)}%, 
-                  GAA: {(player.goalieStats?.gaa || 0).toFixed(2)}, 
-                  SO: {player.goalieStats?.shutouts || 0}
-                </>
+                // Goalie: Show daily stats in daily view mode, season stats otherwise
+                isInDailyViewMode ? (
+                  // DAILY VIEW MODE: Show that day's goalie stats
+                  hasGameOnDate && hasDailyStats ? (
+                    <>
+                      W: {player.goalieMatchupStats?.wins || player.matchupStats?.wins || 0}, 
+                      SV: {player.goalieMatchupStats?.saves || player.matchupStats?.saves || 0}, 
+                      SO: {player.goalieMatchupStats?.shutouts || player.matchupStats?.shutouts || 0}, 
+                      GA: {player.goalieMatchupStats?.goalsAgainst || player.matchupStats?.goals_against || 0}
+                    </>
+                  ) : (
+                    // No game on this date = 0, 0, 0, 0
+                    <>W: 0, SV: 0, SO: 0, GA: 0</>
+                  )
+                ) : (
+                  // DEFAULT VIEW (no date selected): Show season stats
+                  <>
+                    GP: {player.goalieStats?.gamesPlayed || 0}, 
+                    W: {player.goalieStats?.wins || 0}, 
+                    SV%: {((player.goalieStats?.savePct || 0) * 100).toFixed(1)}%, 
+                    GAA: {(player.goalieStats?.gaa || 0).toFixed(2)}, 
+                    SO: {player.goalieStats?.shutouts || 0}
+                  </>
+                )
               ) : isInDailyViewMode ? (
                 // DAILY VIEW MODE: Show that day's stats
                 // If player has daily stats from RPC, use them
@@ -303,7 +319,7 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
 
         {/* Game Logos Bar - Show opponent logos for each game */}
         {player.games && Array.isArray(player.games) && player.games.length > 0 && player.team && (
-          <div className="mt-1 mb-1">
+          <div className="mt-0.5 mb-0.5">
             <GameLogosBar 
               games={player.games} 
               playerTeam={player.team}
@@ -326,16 +342,16 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
             return (
               <div className="player-projection-bar-container">
                 {/* Label */}
-                <div className="text-[10px] text-gray-400 mb-0.5">Daily Points</div>
+                <div className="text-[9px] text-gray-400 mb-0.5">Daily Points</div>
                 {/* Centered total above bar */}
-                <div className="flex justify-center mb-1">
+                <div className="flex justify-center mb-0.5">
                   {player.daily_stats_breakdown && Object.keys(player.daily_stats_breakdown).length > 0 ? (
                     <PointsTooltip 
                       breakdown={player.daily_stats_breakdown} 
                       totalPoints={dailyTotalPoints}
                     />
                   ) : (
-                    <span className="text-lg font-bold text-fantasy-secondary">
+                    <span className="text-base font-bold text-fantasy-secondary">
                       {dailyTotalPoints.toFixed(1)} pts
                     </span>
                   )}
@@ -351,7 +367,7 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
                     return (
                       <div 
                         key={i}
-                        className={`flex-1 h-3 rounded-[2px] overflow-hidden relative
+                        className={`flex-1 h-2.5 rounded-[2px] overflow-hidden relative
                           ${!isFilled && !isPartialFilled 
                             ? 'border border-muted-foreground/20 bg-muted/20' 
                             : 'bg-muted/30'
@@ -394,17 +410,17 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
           // CASE 3: PAST/SELECTED DATE - Game was scheduled but no stats (player scratched or data missing)
           <div className="player-projection-bar-container">
             {/* Label */}
-            <div className="text-[10px] text-gray-400 mb-0.5">Daily Points</div>
+            <div className="text-[9px] text-gray-400 mb-0.5">Daily Points</div>
             {/* Centered total above bar */}
-            <div className="flex justify-center mb-1">
-              <span className="text-lg font-bold text-muted-foreground">0.0 pts</span>
+            <div className="flex justify-center mb-0.5">
+              <span className="text-base font-bold text-muted-foreground">0.0 pts</span>
             </div>
             {/* Empty battery-style bar with clear visibility */}
-            <div className="flex gap-[2px] w-full">
+            <div className="flex gap-[1px] w-full">
               {Array.from({ length: maxBarPoints }, (_, i) => (
                 <div 
                   key={i}
-                  className="flex-1 h-3 rounded-[2px] border border-muted-foreground/20 bg-muted/20"
+                  className="flex-1 h-2.5 rounded-[2px] border border-muted-foreground/20 bg-muted/20"
                 />
               ))}
             </div>
@@ -413,10 +429,10 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
           // CASE 4: TODAY/FUTURE - Show projection bar (game hasn't started)
           <div className="player-projection-bar-container">
             {/* Label */}
-            <div className="text-[10px] text-gray-400 mb-0.5">Projected Tonight</div>
+            <div className="text-[9px] text-gray-400 mb-0.5">Projected Tonight</div>
             {/* Centered total above bar */}
-            <div className="flex justify-center items-center gap-1 mb-1">
-              <span className="text-lg font-bold text-fantasy-primary">
+            <div className="flex justify-center items-center gap-1 mb-0.5">
+              <span className="text-base font-bold text-fantasy-primary">
                 {hasProjection && isStarterConfirmed
                   ? `${projectedPoints.toFixed(1)} pts`
                   : showTBD 
@@ -434,14 +450,14 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
             </div>
             {/* Battery-style projection bar */}
             {hasProjection && isStarterConfirmed ? (
-              <div className="flex gap-[2px] w-full">
+              <div className="flex gap-[1px] w-full">
                 {Array.from({ length: maxBarPoints }, (_, i) => {
                   const isFilled = i < projectionFilledChunks;
                   const isPartial = i === projectionFilledChunks && projectionPartialChunk > 0;
                   return (
                     <div 
                       key={i}
-                      className={`flex-1 h-3 rounded-[2px] overflow-hidden
+                      className={`flex-1 h-2.5 rounded-[2px] overflow-hidden
                         ${!isFilled && !isPartial 
                           ? 'border border-muted-foreground/20 bg-muted/20' 
                           : 'bg-muted/30'
@@ -461,20 +477,20 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
                 })}
               </div>
             ) : showTBD ? (
-              <div className="flex gap-[2px] w-full">
+              <div className="flex gap-[1px] w-full">
                 {Array.from({ length: maxBarPoints }, (_, i) => (
                   <div 
                     key={i}
-                    className="flex-1 h-3 rounded-[2px] border border-muted-foreground/20 bg-muted/20 animate-pulse"
+                    className="flex-1 h-2.5 rounded-[2px] border border-muted-foreground/20 bg-muted/20 animate-pulse"
                   />
                 ))}
               </div>
             ) : (
-              <div className="flex gap-[2px] w-full">
+              <div className="flex gap-[1px] w-full">
                 {Array.from({ length: maxBarPoints }, (_, i) => (
                   <div 
                     key={i}
-                    className="flex-1 h-3 rounded-[2px] border border-muted-foreground/20 bg-muted/20"
+                    className="flex-1 h-2.5 rounded-[2px] border border-muted-foreground/20 bg-muted/20"
                   />
                 ))}
               </div>

@@ -12,6 +12,23 @@ export interface League {
   roster_size: number;
   draft_rounds: number;
   settings: Record<string, any>;
+  scoring_settings?: {
+    skater?: {
+      goals?: number;
+      assists?: number;
+      shots_on_goal?: number;
+      blocks?: number;
+      [key: string]: any;
+    };
+    goalie?: {
+      wins?: number;
+      saves?: number;
+      shutouts?: number;
+      goals_against?: number;
+      [key: string]: any;
+    };
+    [key: string]: any;
+  };
   created_at: string;
   updated_at: string;
 }
