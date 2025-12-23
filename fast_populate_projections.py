@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
 """
-FAST PROJECTION POPULATOR
-==========================
+FAST PROJECTION POPULATOR (v2 - Full Stats)
+============================================
 Bulk fetches all data upfront, processes in memory, batch upserts.
 ~100x faster than per-player queries.
+
+NOW INCLUDES ALL FANTASY STATS:
+- Goals, Assists, SOG, Blocks (original)
+- PPP, SHP, Hits, PIM (expanded)
 
 Usage:
     python fast_populate_projections.py [--week N] [--force]
 """
 import sys
 import os
+import traceback
 from datetime import datetime, date, timedelta
 from typing import Dict, List, Set, Optional
 
@@ -68,11 +73,12 @@ def bulk_fetch_all_data(db):
     }
     print(f"done ({len(data['players'])})", flush=True)
     
-    # 3. Season stats (for games played and per-game rates)
-    print("    Fetching season stats...", end=" ", flush=True)
+    # 3. Season stats - NOW INCLUDES ALL STATS for projections
+    print("    Fetching season stats (all categories)...", end=" ", flush=True)
+    select_cols = 'player_id,games_played,goals,primary_assists,secondary_assists,shots_on_goal,blocks,ppp,shp,hits,pim,plus_minus'
     data['season_stats'] = {
         int(s['player_id']): s 
-        for s in paginate(db, 'player_season_stats', 'player_id,games_played,goals,primary_assists,secondary_assists,shots_on_goal,blocks', [('season', 'eq', SEASON)])
+        for s in paginate(db, 'player_season_stats', select_cols, [('season', 'eq', SEASON)])
         if s.get('player_id')
     }
     print(f"done ({len(data['season_stats'])})", flush=True)
@@ -107,7 +113,13 @@ def bulk_fetch_all_data(db):
 
 
 def calculate_projection_fast(player_id: int, game_id: int, game_date: str, data: Dict, scoring: Dict) -> Optional[Dict]:
-    """Calculate projection using pre-fetched data (no DB queries)."""
+    """
+    Calculate projection using pre-fetched data (no DB queries).
+    
+    NOW INCLUDES ALL FANTASY STATS:
+    - Goals, Assists, SOG, Blocks (original)
+    - PPP, SHP, Hits, PIM (expanded)
+    """
     
     player = data['players'].get(player_id)
     if not player:
@@ -123,20 +135,29 @@ def calculate_projection_fast(player_id: int, game_id: int, game_date: str, data
     if gp == 0:
         return None
     
-    # Calculate per-game rates
+    # Calculate per-game rates for ALL stats
     goals = int(stats.get('goals', 0))
     p_assists = int(stats.get('primary_assists', 0))
     s_assists = int(stats.get('secondary_assists', 0))
     assists = p_assists + s_assists
     sog = int(stats.get('shots_on_goal', 0))
     blocks = int(stats.get('blocks', 0))
+    ppp = int(stats.get('ppp', 0))
+    shp = int(stats.get('shp', 0))
+    hits = int(stats.get('hits', 0))
+    pim = int(stats.get('pim', 0))
     
+    # Per-game rates
     goals_pg = goals / gp
     assists_pg = assists / gp
     sog_pg = sog / gp
     blocks_pg = blocks / gp
+    ppp_pg = ppp / gp
+    shp_pg = shp / gp
+    hits_pg = hits / gp
+    pim_pg = pim / gp
     
-    # Bayesian shrinkage
+    # Bayesian shrinkage weight
     if gp < 10:
         weight = 0.20
     elif gp >= 30:
@@ -144,42 +165,59 @@ def calculate_projection_fast(player_id: int, game_id: int, game_date: str, data
     else:
         weight = 0.20 + (gp - 10) * 0.035
     
-    # Get league averages
+    # Get league averages (with sensible defaults)
     pos_key = 'D' if position == 'D' else 'F'
     league_avg = data['league_avgs'].get(pos_key, {})
     avg_goals = float(league_avg.get('avg_goals_per_game', 0.15))
     avg_assists = float(league_avg.get('avg_assists_per_game', 0.25))
     avg_sog = float(league_avg.get('avg_sog_per_game', 2.5))
-    avg_blocks = float(league_avg.get('avg_blocks_per_game', 0.8))
+    avg_blocks = float(league_avg.get('avg_blocks_per_game', 0.8 if position == 'D' else 0.4))
     
-    # Apply shrinkage
+    # League average defaults for new stats (reasonable per-game rates)
+    avg_ppp = 0.15 if position != 'D' else 0.10
+    avg_shp = 0.02
+    avg_hits = 1.5 if position == 'D' else 1.0
+    avg_pim = 0.5
+    
+    # Apply Bayesian shrinkage to ALL stats
     proj_goals = weight * goals_pg + (1 - weight) * avg_goals
     proj_assists = weight * assists_pg + (1 - weight) * avg_assists
     proj_sog = weight * sog_pg + (1 - weight) * avg_sog
     proj_blocks = weight * blocks_pg + (1 - weight) * avg_blocks
+    proj_ppp = weight * ppp_pg + (1 - weight) * avg_ppp
+    proj_shp = weight * shp_pg + (1 - weight) * avg_shp
+    proj_hits = weight * hits_pg + (1 - weight) * avg_hits
+    proj_pim = weight * pim_pg + (1 - weight) * avg_pim
     
-    # Calculate points
+    # Calculate total projected points using ALL scoring weights
     s = scoring.get('skater', {})
     total_pts = (
         proj_goals * s.get('goals', 3) +
         proj_assists * s.get('assists', 2) +
         proj_sog * s.get('shots_on_goal', 0.4) +
-        proj_blocks * s.get('blocks', 0.5)
+        proj_blocks * s.get('blocks', 0.5) +
+        proj_ppp * s.get('power_play_points', 1) +
+        proj_shp * s.get('short_handed_points', 2) +
+        proj_hits * s.get('hits', 0.2) +
+        proj_pim * s.get('penalty_minutes', 0.5)
     )
     
     return {
         'player_id': player_id,
         'game_id': game_id,
         'projection_date': game_date,
+        'season': SEASON,  # CRITICAL: This was missing before!
         'total_projected_points': round(total_pts, 3),
+        # Original projections (stored in DB)
         'projected_goals': round(proj_goals, 4),
         'projected_assists': round(proj_assists, 4),
         'projected_sog': round(proj_sog, 4),
         'projected_blocks': round(proj_blocks, 4),
+        # Model metadata
         'base_ppg': round(total_pts, 3),
         'shrinkage_weight': round(weight, 3),
         'confidence_score': round(min(gp / 30, 1.0), 3),
-        'calculation_method': 'fast_bulk',
+        'calculation_method': 'fast_bulk_v2',
         'is_goalie': False,
         'finishing_multiplier': 1.0,
         'opponent_adjustment': 1.0,
@@ -187,6 +225,10 @@ def calculate_projection_fast(player_id: int, game_id: int, game_date: str, data
         'home_away_adjustment': 1.0,
         'projected_xg': round(proj_goals, 4),
         'updated_at': datetime.now().isoformat()
+        # NOTE: projected_ppp, projected_shp, projected_hits, projected_pim are calculated
+        # and included in total_projected_points but NOT stored separately until
+        # migration 20251228100000 adds those columns. Run that migration in Supabase
+        # dashboard, then update this script to include them.
     }
 
 
@@ -216,6 +258,7 @@ def calculate_goalie_projection_fast(player_id: int, game_id: int, game_date: st
         'player_id': player_id,
         'game_id': game_id,
         'projection_date': game_date,
+        'season': SEASON,  # CRITICAL: This was missing before!
         'total_projected_points': round(total_pts, 3),
         'is_goalie': True,
         'projected_wins': proj_wins,
@@ -224,18 +267,19 @@ def calculate_goalie_projection_fast(player_id: int, game_id: int, game_date: st
         'projected_shutouts': proj_shutouts,
         'projected_gp': 1.0,
         'confidence_score': 0.5,
-        'calculation_method': 'fast_bulk_goalie',
+        'calculation_method': 'fast_bulk_goalie_v2',
         'updated_at': datetime.now().isoformat()
     }
 
 
 def batch_upsert(db, projections: List[Dict], batch_size=100) -> int:
-    """Batch upsert projections with progress."""
+    """Batch upsert projections with progress and FULL ERROR LOGGING."""
     if not projections:
         return 0
     
     count = 0
     total_batches = (len(projections) + batch_size - 1) // batch_size
+    errors = []
     
     for i in range(0, len(projections), batch_size):
         batch_num = i // batch_size + 1
@@ -247,18 +291,32 @@ def batch_upsert(db, projections: List[Dict], batch_size=100) -> int:
             # Try batch first
             db.upsert('player_projected_stats', batch, on_conflict='player_id,game_id,projection_date')
             count += len(batch)
-            print("ok", flush=True)
-        except:
-            # Fall back to individual
+            print("OK", flush=True)
+        except Exception as e:
+            # Log the ACTUAL error
+            error_msg = str(e)
+            print(f"BATCH FAILED: {error_msg[:100]}...", flush=True)
+            errors.append(f"Batch {batch_num}: {error_msg}")
+            
+            # Fall back to individual inserts with detailed error logging
             batch_count = 0
             for proj in batch:
                 try:
                     db.upsert('player_projected_stats', proj, on_conflict='player_id,game_id,projection_date')
                     batch_count += 1
-                except:
-                    pass
+                except Exception as e2:
+                    # Log first individual error for debugging
+                    if batch_count == 0:
+                        print(f"      Individual error: {str(e2)[:200]}", flush=True)
+                        print(f"      Sample record: player_id={proj.get('player_id')}, game_id={proj.get('game_id')}, date={proj.get('projection_date')}", flush=True)
             count += batch_count
-            print(f"ok ({batch_count} individual)", flush=True)
+            print(f"      Recovered {batch_count}/{len(batch)} individually", flush=True)
+    
+    # Print summary of errors if any
+    if errors:
+        print(f"\n  [WARN] {len(errors)} batch errors occurred:", flush=True)
+        for err in errors[:3]:  # Show first 3 errors
+            print(f"    - {err[:150]}...", flush=True)
     
     return count
 
@@ -276,9 +334,10 @@ def main():
                 pass
     
     print("=" * 60, flush=True)
-    print("FAST PROJECTION POPULATOR", flush=True)
+    print("FAST PROJECTION POPULATOR v2 (Full Stats)", flush=True)
     print("=" * 60, flush=True)
     print(f"Force: {force}, Week: {week_num or 'Week 3+'}", flush=True)
+    print(f"Scoring categories: Goals, Assists, SOG, Blocks, PPP, SHP, Hits, PIM", flush=True)
     print(flush=True)
     
     db = get_db()
@@ -317,11 +376,27 @@ def main():
     print(f"  Games in range: {len(games_in_range)}", flush=True)
     print(flush=True)
     
-    # Calculate projections
-    print("[3/4] Calculating projections...", flush=True)
+    # Calculate projections with FULL scoring weights
+    print("[3/4] Calculating projections (all 8 stat categories)...", flush=True)
+    
+    # Full scoring weights matching leagues.scoring_settings schema
     scoring = {
-        'skater': {'goals': 3, 'assists': 2, 'shots_on_goal': 0.4, 'blocks': 0.5},
-        'goalie': {'wins': 4, 'shutouts': 3, 'saves': 0.2, 'goals_against': -1}
+        'skater': {
+            'goals': 3,
+            'assists': 2,
+            'power_play_points': 1,
+            'short_handed_points': 2,
+            'shots_on_goal': 0.4,
+            'blocks': 0.5,
+            'hits': 0.2,
+            'penalty_minutes': 0.5
+        },
+        'goalie': {
+            'wins': 4,
+            'shutouts': 3,
+            'saves': 0.2,
+            'goals_against': -1
+        }
     }
     
     all_projections = []
@@ -368,6 +443,11 @@ def main():
     if all_projections:
         count = batch_upsert(db, all_projections)
         print(f"  Total upserted: {count}", flush=True)
+        
+        if count == 0 and len(all_projections) > 0:
+            print("\n  [ERROR] 0 records upserted but we had projections to save!", flush=True)
+            print("  This likely means a database constraint or schema issue.", flush=True)
+            print("  Check the error messages above for details.", flush=True)
     else:
         print("  Nothing to upsert - all projections already exist!", flush=True)
     

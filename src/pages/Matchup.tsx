@@ -102,10 +102,19 @@ const Matchup = () => {
   const [opponentDailyPoints, setOpponentDailyPoints] = useState<number[]>([]);
   const [selectedMatchupId, setSelectedMatchupId] = useState<string | null>(null);
   const [allWeekMatchups, setAllWeekMatchups] = useState<Array<Matchup & { team1_name?: string; team2_name?: string }>>([]);
-  // League scoring settings for dynamic goalie/skater scoring
+  // League scoring settings for dynamic goalie/skater scoring (ALL 8 categories)
   const [scoringSettings, setScoringSettings] = useState<{
     goalie: { wins: number; saves: number; shutouts: number; goals_against: number };
-    skater: { goals: number; assists: number; shots_on_goal: number; blocks: number };
+    skater: { 
+      goals: number; 
+      assists: number; 
+      power_play_points: number;      // PPP
+      short_handed_points: number;    // SHP
+      shots_on_goal: number; 
+      blocks: number;
+      hits: number;                   // Hits
+      penalty_minutes: number;        // PIM
+    };
   } | null>(null);
 
   // Demo data - shown to guests and logged-in users without leagues
@@ -380,6 +389,10 @@ const Matchup = () => {
               points: 0,
               shots_on_goal: 0,
               blocks: 0,
+              ppp: 0,
+              shp: 0,
+              hits: 0,
+              pim: 0,
               wins: 0,
               saves: 0,
               shutouts: 0,
@@ -393,6 +406,10 @@ const Matchup = () => {
               points: existing.points + (row.points || 0),
               shots_on_goal: existing.shots_on_goal + (row.shots_on_goal || 0),
               blocks: existing.blocks + (row.blocks || 0),
+              ppp: existing.ppp + (row.ppp || 0),
+              shp: existing.shp + (row.shp || 0),
+              hits: existing.hits + (row.hits || 0),
+              pim: existing.pim + (row.pim || 0),
               wins: existing.wins + (row.wins || 0),
               saves: existing.saves + (row.saves || 0),
               shutouts: existing.shutouts + (row.shutouts || 0),
@@ -409,8 +426,12 @@ const Matchup = () => {
             const skaterScoring = scoringSettings?.skater || {
               goals: 3,
               assists: 2,
+              power_play_points: 1,
+              short_handed_points: 2,
               shots_on_goal: 0.4,
-              blocks: 0.4
+              blocks: 0.5,
+              hits: 0.2,
+              penalty_minutes: 0.5
             };
             
             let dailyTotalPoints = 0;
@@ -437,12 +458,16 @@ const Matchup = () => {
                 });
               }
             } else {
-              // Skater Formula: Use league settings (defaults: G=3, A=2, SOG=0.4, BLK=0.4)
+              // Skater Formula: Use ALL 8 league settings
               dailyTotalPoints = 
                 aggregated.goals * skaterScoring.goals + 
                 aggregated.assists * skaterScoring.assists + 
+                (aggregated.ppp || 0) * skaterScoring.power_play_points +
+                (aggregated.shp || 0) * skaterScoring.short_handed_points +
                 aggregated.shots_on_goal * skaterScoring.shots_on_goal + 
-                aggregated.blocks * skaterScoring.blocks;
+                aggregated.blocks * skaterScoring.blocks +
+                (aggregated.hits || 0) * skaterScoring.hits +
+                (aggregated.pim || 0) * skaterScoring.penalty_minutes;
             }
             
             dayStatsMap.set(row.player_id, {
@@ -527,8 +552,12 @@ const Matchup = () => {
           const skaterScoring = scoringSettings?.skater || {
             goals: 3,
             assists: 2,
+            power_play_points: 1,
+            short_handed_points: 2,
             shots_on_goal: 0.4,
-            blocks: 0.4
+            blocks: 0.5,
+            hits: 0.2,
+            penalty_minutes: 0.5
           };
           
           let dailyTotalPoints = 0;
@@ -553,12 +582,16 @@ const Matchup = () => {
               });
             }
           } else {
-            // Skater Formula: Use league settings (defaults: G=3, A=2, SOG=0.4, BLK=0.4)
+            // Skater Formula: Use ALL 8 league settings
             dailyTotalPoints = 
               (row.goals || 0) * skaterScoring.goals + 
               (row.assists || 0) * skaterScoring.assists + 
+              (row.ppp || 0) * skaterScoring.power_play_points +
+              (row.shp || 0) * skaterScoring.short_handed_points +
               (row.shots_on_goal || 0) * skaterScoring.shots_on_goal + 
-              (row.blocks || 0) * skaterScoring.blocks;
+              (row.blocks || 0) * skaterScoring.blocks +
+              (row.hits || 0) * skaterScoring.hits +
+              (row.pim || 0) * skaterScoring.penalty_minutes;
           }
           
           // Store ALL available stats for comprehensive display
@@ -629,8 +662,12 @@ const Matchup = () => {
             } : {
               ...(row.goals > 0 ? { goals: { count: row.goals, points: row.goals * skaterScoring.goals } } : {}),
               ...(row.assists > 0 ? { assists: { count: row.assists, points: row.assists * skaterScoring.assists } } : {}),
+              ...(row.ppp > 0 ? { ppp: { count: row.ppp, points: row.ppp * skaterScoring.power_play_points } } : {}),
+              ...(row.shp > 0 ? { shp: { count: row.shp, points: row.shp * skaterScoring.short_handed_points } } : {}),
               ...(row.shots_on_goal > 0 ? { shots_on_goal: { count: row.shots_on_goal, points: row.shots_on_goal * skaterScoring.shots_on_goal } } : {}),
               ...(row.blocks > 0 ? { blocks: { count: row.blocks, points: row.blocks * skaterScoring.blocks } } : {}),
+              ...(row.hits > 0 ? { hits: { count: row.hits, points: row.hits * skaterScoring.hits } } : {}),
+              ...(row.pim > 0 ? { pim: { count: row.pim, points: row.pim * skaterScoring.penalty_minutes } } : {}),
             },
           });
         });
@@ -1183,8 +1220,12 @@ const Matchup = () => {
         const skaterScoring = currentLeague.scoring_settings?.skater || {
           goals: 3,
           assists: 2,
+          power_play_points: 1,
+          short_handed_points: 2,
           shots_on_goal: 0.4,
-          blocks: 0.4
+          blocks: 0.5,
+          hits: 0.2,
+          penalty_minutes: 0.5
         };
         setScoringSettings({
           goalie: {
@@ -1196,11 +1237,15 @@ const Matchup = () => {
           skater: {
             goals: skaterScoring.goals ?? 3,
             assists: skaterScoring.assists ?? 2,
+            power_play_points: skaterScoring.power_play_points ?? 1,
+            short_handed_points: skaterScoring.short_handed_points ?? 2,
             shots_on_goal: skaterScoring.shots_on_goal ?? 0.4,
-            blocks: skaterScoring.blocks ?? 0.4
+            blocks: skaterScoring.blocks ?? 0.5,
+            hits: skaterScoring.hits ?? 0.2,
+            penalty_minutes: skaterScoring.penalty_minutes ?? 0.5
           }
         });
-        console.log('[MATCHUP] Loaded scoring settings:', {
+        console.log('[MATCHUP] Loaded scoring settings (all 8 categories):', {
           goalie: goalieScoring,
           skater: skaterScoring
         });
