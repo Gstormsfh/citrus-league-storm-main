@@ -336,17 +336,17 @@ def get_week_dates(week_start: date, week_end: date) -> List[date]:
 
 
 def get_games_for_week(db: SupabaseRest, week_start: date, week_end: date) -> List[Dict]:
-    """Get all games for the week from nhl_games table."""
+    """Get all games for the week from nhl_games table with pagination."""
     # Note: supabase_rest has a bug where multiple filters on same column overwrite
     # So we fetch more games and filter in Python
-    all_games = db.select(
+    # Use pagination to ensure we get all games
+    all_games = _paginate_select(
+        db,
         "nhl_games",
         select="game_id,game_date,home_team,away_team,status",
         filters=[
             ("game_date", "gte", week_start.isoformat())
-        ],
-        order="game_date.asc,game_id.asc",
-        limit=2000
+        ]
     )
     
     # Filter by end date in Python
@@ -356,25 +356,48 @@ def get_games_for_week(db: SupabaseRest, week_start: date, week_end: date) -> Li
     return games
 
 
+def _paginate_select(db: SupabaseRest, table: str, select: str, filters: list, max_records: int = 50000) -> list:
+    """Paginate through all records to bypass the 1000 record API limit."""
+    all_records = []
+    offset = 0
+    batch_size = 1000
+    
+    while len(all_records) < max_records:
+        try:
+            batch = db.select(table, select=select, filters=filters, limit=batch_size, offset=offset)
+            if not batch:
+                break
+            all_records.extend(batch)
+            if len(batch) < batch_size:
+                break
+            offset += batch_size
+        except Exception as e:
+            print(f"  [WARN] Pagination error: {e}")
+            break
+    
+    return all_records
+
+
 def get_games_missing_goalies(db: SupabaseRest, week_start: date, week_end: date, season: int) -> List[Dict]:
     """
     Get games that have skater data but NO goalie data in player_game_stats.
     This is the smart approach - only process games that need goalie records created.
+    Uses pagination to handle large datasets.
     """
     # Get games that have player_game_stats records in our date range
     week_start_str = week_start.isoformat()
     week_end_str = week_end.isoformat()
     
-    # Get distinct game_ids that have skater data
-    skater_games = db.select(
+    # Get distinct game_ids that have skater data (with pagination)
+    skater_games = _paginate_select(
+        db,
         "player_game_stats",
         select="game_id,game_date",
         filters=[
             ("season", "eq", season),
             ("is_goalie", "eq", False),
             ("game_date", "gte", week_start_str)
-        ],
-        limit=5000
+        ]
     )
     
     # Filter by end date and get unique game_ids
@@ -387,16 +410,16 @@ def get_games_missing_goalies(db: SupabaseRest, week_start: date, week_end: date
             game_ids_with_skaters.add(gid)
             game_dates[gid] = gdate
     
-    # Get game_ids that have goalie data
-    goalie_games = db.select(
+    # Get game_ids that have goalie data (with pagination)
+    goalie_games = _paginate_select(
+        db,
         "player_game_stats",
         select="game_id",
         filters=[
             ("season", "eq", season),
             ("is_goalie", "eq", True),
             ("game_date", "gte", week_start_str)
-        ],
-        limit=5000
+        ]
     )
     game_ids_with_goalies = set(g.get("game_id") for g in (goalie_games or []) if g.get("game_date", "") <= week_end_str)
     
