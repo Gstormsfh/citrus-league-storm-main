@@ -59,6 +59,11 @@ export type MatchupPlayer = {
     projected_assists: number;
     projected_sog: number;
     projected_blocks: number;
+    // NEW: All 8 stat categories
+    projected_ppp?: number;      // Power Play Points
+    projected_shp?: number;        // Shorthanded Points
+    projected_hits?: number;       // Hits
+    projected_pim?: number;        // Penalty Minutes
     projected_xg: number;
     base_ppg: number;
     shrinkage_weight: number;

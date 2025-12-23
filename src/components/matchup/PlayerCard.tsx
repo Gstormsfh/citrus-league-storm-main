@@ -107,6 +107,9 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
   // Past dates should ALWAYS show actual points, not projections
   const isViewingPastDate = selectedDate ? selectedDate < todayStr : false;
   
+  // Check if viewing a future date (beyond today)
+  const isViewingFutureDate = selectedDate ? selectedDate > todayStr : false;
+  
   // Are we in "daily view mode"? (Either a date is explicitly selected OR viewing past dates)
   const isInDailyViewMode = isDateExplicitlySelected || isViewingPastDate;
   
@@ -127,21 +130,23 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
   const gameHasStarted = gameStatus === 'live' || gameStatus === 'final' || gameStatus === 'FINAL';
   
   // LOGIC GATE for what to show in projection/daily points area:
-  // 1. If it's a past date (Dec 15-21), ALWAYS show Daily Points (Actuals).
-  // 2. If it's a selected date (current/future), show Daily Points (Actuals).
-  // 3. If it's the default view (today), show Actuals if game started, else Projections.
+  // 1. If it's a past date, ALWAYS show Daily Points (Actuals).
+  // 2. If it's a future date, ALWAYS show Projections (even if daily_total_points exists, it's 0).
+  // 3. If it's today, show Actuals if game started, else Projections.
+  // 4. If it's a selected date (today or past), show Daily Points if stats exist.
   const shouldShowDailyPoints = hasDailyStats && (
     isViewingPastDate ||        // Past dates always show actual points
-    isDateExplicitlySelected || // Explicitly selected dates show daily points
-    gameHasStarted              // Today's games show daily points once started
+    (isDateExplicitlySelected && !isViewingFutureDate && (dailyTotalPoints > 0 || gameHasStarted)) || // Selected today/past dates with stats
+    (!isDateExplicitlySelected && gameHasStarted)  // Today's games show daily points once started
   );
   
   // Zero Projection Logic: If projectedPoints === 0 but hasGameOnDate is true, show "TBD" or "Calculating"
   // For goalies, also check starter_confirmed flag
   // Only applies when NOT viewing past dates (past dates always show actuals)
+  // For future dates, always show projections (even if 0, show TBD)
   const hasProjection = dailyProjection && projectedPoints > 0;
   const isStarterConfirmed = isGoalie ? (player.goalieProjection?.starter_confirmed ?? false) : true;
-  const showTBD = !isViewingPastDate && hasGameOnDate && !gameHasStarted && !isDateExplicitlySelected && (!hasProjection || (isGoalie && !isStarterConfirmed));
+  const showTBD = !isViewingPastDate && hasGameOnDate && !gameHasStarted && (!hasProjection || (isGoalie && !isStarterConfirmed));
   
   // Max points for bar display - 15 for all players (skaters and goalies)
   const maxBarPoints = 15;
@@ -406,8 +411,8 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
               No game {isInDailyViewMode ? 'this day' : 'today'}
             </div>
           </div>
-        ) : isInDailyViewMode && !hasDailyStats ? (
-          // CASE 3: PAST/SELECTED DATE - Game was scheduled but no stats (player scratched or data missing)
+        ) : isInDailyViewMode && !hasDailyStats && !isViewingFutureDate ? (
+          // CASE 3: PAST/SELECTED DATE (not future) - Game was scheduled but no stats (player scratched or data missing)
           <div className="player-projection-bar-container">
             {/* Label */}
             <div className="text-[9px] text-gray-400 mb-0.5">Daily Points</div>
@@ -429,7 +434,9 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
           // CASE 4: TODAY/FUTURE - Show projection bar (game hasn't started)
           <div className="player-projection-bar-container">
             {/* Label */}
-            <div className="text-[9px] text-gray-400 mb-0.5">Projected Tonight</div>
+            <div className="text-[9px] text-gray-400 mb-0.5">
+              {isViewingFutureDate ? 'Projected' : 'Projected Tonight'}
+            </div>
             {/* Centered total above bar */}
             <div className="flex justify-center items-center gap-1 mb-0.5">
               <span className="text-base font-bold text-fantasy-primary">

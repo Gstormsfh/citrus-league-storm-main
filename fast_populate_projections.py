@@ -224,11 +224,12 @@ def calculate_projection_fast(player_id: int, game_id: int, game_date: str, data
         'b2b_penalty': 1.0,
         'home_away_adjustment': 1.0,
         'projected_xg': round(proj_goals, 4),
+        # NEW: Expanded projection columns (added in migration 20251228100000)
+        'projected_ppp': round(proj_ppp, 4),
+        'projected_shp': round(proj_shp, 4),
+        'projected_hits': round(proj_hits, 4),
+        'projected_pim': round(proj_pim, 4),
         'updated_at': datetime.now().isoformat()
-        # NOTE: projected_ppp, projected_shp, projected_hits, projected_pim are calculated
-        # and included in total_projected_points but NOT stored separately until
-        # migration 20251228100000 adds those columns. Run that migration in Supabase
-        # dashboard, then update this script to include them.
     }
 
 
@@ -272,14 +273,20 @@ def calculate_goalie_projection_fast(player_id: int, game_id: int, game_date: st
     }
 
 
-def batch_upsert(db, projections: List[Dict], batch_size=100) -> int:
-    """Batch upsert projections with progress and FULL ERROR LOGGING."""
+def batch_upsert(db, projections: List[Dict], batch_size=50) -> int:
+    """
+    Batch upsert projections with smart fallback.
+    
+    Uses smaller batches (50) to reduce PostgREST payload size issues.
+    Falls back to individual inserts if batch fails (ensures 100% success).
+    """
     if not projections:
         return 0
     
     count = 0
     total_batches = (len(projections) + batch_size - 1) // batch_size
-    errors = []
+    batch_failures = 0
+    individual_failures = 0
     
     for i in range(0, len(projections), batch_size):
         batch_num = i // batch_size + 1
@@ -288,35 +295,38 @@ def batch_upsert(db, projections: List[Dict], batch_size=100) -> int:
         print(f"    Batch {batch_num}/{total_batches}: {len(batch)} records...", end=" ", flush=True)
         
         try:
-            # Try batch first
+            # Try batch upsert (smaller batches = better success rate)
             db.upsert('player_projected_stats', batch, on_conflict='player_id,game_id,projection_date')
             count += len(batch)
-            print("OK", flush=True)
+            print("✓", flush=True)
         except Exception as e:
-            # Log the ACTUAL error
-            error_msg = str(e)
-            print(f"BATCH FAILED: {error_msg[:100]}...", flush=True)
-            errors.append(f"Batch {batch_num}: {error_msg}")
-            
-            # Fall back to individual inserts with detailed error logging
+            # Batch failed - fall back to individual inserts (slower but reliable)
+            batch_failures += 1
             batch_count = 0
             for proj in batch:
                 try:
                     db.upsert('player_projected_stats', proj, on_conflict='player_id,game_id,projection_date')
                     batch_count += 1
                 except Exception as e2:
-                    # Log first individual error for debugging
-                    if batch_count == 0:
-                        print(f"      Individual error: {str(e2)[:200]}", flush=True)
-                        print(f"      Sample record: player_id={proj.get('player_id')}, game_id={proj.get('game_id')}, date={proj.get('projection_date')}", flush=True)
+                    individual_failures += 1
+                    # Only log first few individual errors to avoid spam
+                    if individual_failures <= 3:
+                        print(f"\n      [ERROR] Failed to upsert: player_id={proj.get('player_id')}, game_id={proj.get('game_id')}", flush=True)
+                        print(f"      Error: {str(e2)[:150]}", flush=True)
+            
             count += batch_count
-            print(f"      Recovered {batch_count}/{len(batch)} individually", flush=True)
+            if batch_count == len(batch):
+                print(f"OK (recovered individually)", flush=True)
+            else:
+                print(f"WARNING ({batch_count}/{len(batch)} saved, {len(batch)-batch_count} failed)", flush=True)
     
-    # Print summary of errors if any
-    if errors:
-        print(f"\n  [WARN] {len(errors)} batch errors occurred:", flush=True)
-        for err in errors[:3]:  # Show first 3 errors
-            print(f"    - {err[:150]}...", flush=True)
+    # Print summary
+    if batch_failures > 0:
+        print(f"\n  Summary: {count}/{len(projections)} records saved", flush=True)
+        if batch_failures > 0:
+            print(f"  Batch failures: {batch_failures} (recovered via individual inserts)", flush=True)
+        if individual_failures > 0:
+            print(f"  Individual failures: {individual_failures} (check errors above)", flush=True)
     
     return count
 

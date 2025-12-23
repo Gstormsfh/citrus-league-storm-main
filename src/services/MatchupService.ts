@@ -2118,7 +2118,7 @@ export const MatchupService = {
                       ((stats.shutouts || 0) * 3) + 
                       ((stats.goals_against || 0) * -1);
             } else {
-              // Skater scoring: Goals=3, Assists=2, SOG=0.4, Blocks=0.4
+              // Skater scoring: ALL 8 categories (Goals=3, Assists=2, PPP=1, SHP=2, SOG=0.4, Blocks=0.5, Hits=0.2, PIM=0.5)
               // CRITICAL: Validate that stats are for a week, not season
               // For a single week, max should be: ~7 goals, ~10 assists, ~30 SOG (very high week)
               // If stats are too high, RPC returned season totals - reject them
@@ -2134,11 +2134,16 @@ export const MatchupService = {
               }
               
               // CRITICAL: Use blocks from matchup week stats, NOT season stats
+              // Skater scoring: ALL 8 categories (default weights match leagues.scoring_settings)
               const blocks = stats.blocks || 0; // Get from matchup week stats
               return (stats.goals * 3) + 
                      (stats.assists * 2) + 
+                     ((stats.ppp || 0) * 1) +        // Power Play Points
+                     ((stats.shp || 0) * 2) +        // Shorthanded Points
                      (stats.sog * 0.4) + 
-                     (blocks * 0.4);
+                     (blocks * 0.5) +                // Updated default to 0.5 to match migration
+                     ((stats.hits || 0) * 0.2) +     // Hits
+                     ((stats.pim || 0) * 0.5);       // Penalty Minutes
             }
           };
           
@@ -2240,7 +2245,14 @@ export const MatchupService = {
                 assists: matchupStats.assists || 0,
                 sog: matchupStats.sog || 0,
                 blocks: matchupStats.blocks || 0,
-                calculated: (matchupStats.goals || 0) * 3 + (matchupStats.assists || 0) * 2 + (matchupStats.sog || 0) * 0.4 + ((matchupStats.blocks || 0) * 0.4)
+                calculated: (matchupStats.goals || 0) * 3 + 
+                           (matchupStats.assists || 0) * 2 + 
+                           ((matchupStats.ppp || 0) * 1) +
+                           ((matchupStats.shp || 0) * 2) +
+                           (matchupStats.sog || 0) * 0.4 + 
+                           ((matchupStats.blocks || 0) * 0.5) +
+                           ((matchupStats.hits || 0) * 0.2) +
+                           ((matchupStats.pim || 0) * 0.5)
               }) : null;
               
               console.log(`[MatchupService] ✅ FINAL SET: ${p.name} (${playerId})`, {
@@ -2304,10 +2316,15 @@ export const MatchupService = {
                 };
               } else {
                 // Skater breakdown
+                // Calculate points for ALL 8 stat categories
                 const goalsPoints = (matchupStats.goals || 0) * 3;
                 const assistsPoints = (matchupStats.assists || 0) * 2;
+                const pppPoints = ((matchupStats.ppp || 0) * 1);
+                const shpPoints = ((matchupStats.shp || 0) * 2);
                 const sogPoints = (matchupStats.sog || 0) * 0.4;
-                const blocksPoints = (matchupStats.blocks || 0) * 0.4;
+                const blocksPoints = (matchupStats.blocks || 0) * 0.5;
+                const hitsPoints = ((matchupStats.hits || 0) * 0.2);
+                const pimPoints = ((matchupStats.pim || 0) * 0.5);
                 
                 transformed.stats_breakdown = {
                   'Goals': {
@@ -2320,6 +2337,20 @@ export const MatchupService = {
                     points: assistsPoints,
                     logic: `${matchupStats.assists || 0} assists * 2.0 points`
                   },
+                  ...((matchupStats.ppp || 0) > 0 ? {
+                    'Power Play Points': {
+                      count: matchupStats.ppp || 0,
+                      points: pppPoints,
+                      logic: `${matchupStats.ppp || 0} PPP * 1.0 points`
+                    }
+                  } : {}),
+                  ...((matchupStats.shp || 0) > 0 ? {
+                    'Shorthanded Points': {
+                      count: matchupStats.shp || 0,
+                      points: shpPoints,
+                      logic: `${matchupStats.shp || 0} SHP * 2.0 points`
+                    }
+                  } : {}),
                   'Shots on Goal': {
                     count: matchupStats.sog || 0,
                     points: sogPoints,
@@ -2328,8 +2359,22 @@ export const MatchupService = {
                   'Blocks': {
                     count: matchupStats.blocks || 0,
                     points: blocksPoints,
-                    logic: `${matchupStats.blocks || 0} blocks * 0.4 points`
-                  }
+                    logic: `${matchupStats.blocks || 0} blocks * 0.5 points`
+                  },
+                  ...((matchupStats.hits || 0) > 0 ? {
+                    'Hits': {
+                      count: matchupStats.hits || 0,
+                      points: hitsPoints,
+                      logic: `${matchupStats.hits || 0} hits * 0.2 points`
+                    }
+                  } : {}),
+                  ...((matchupStats.pim || 0) > 0 ? {
+                    'Penalty Minutes': {
+                      count: matchupStats.pim || 0,
+                      points: pimPoints,
+                      logic: `${matchupStats.pim || 0} PIM * 0.5 points`
+                    }
+                  } : {})
                 };
               }
             } else {
@@ -2378,10 +2423,15 @@ export const MatchupService = {
                 };
               } else {
                 // Skater breakdown
+                // Calculate points for ALL 8 stat categories
                 const goalsPoints = (matchupStats.goals || 0) * 3;
                 const assistsPoints = (matchupStats.assists || 0) * 2;
+                const pppPoints = ((matchupStats.ppp || 0) * 1);
+                const shpPoints = ((matchupStats.shp || 0) * 2);
                 const sogPoints = (matchupStats.sog || 0) * 0.4;
-                const blocksPoints = (matchupStats.blocks || 0) * 0.4;
+                const blocksPoints = (matchupStats.blocks || 0) * 0.5;
+                const hitsPoints = ((matchupStats.hits || 0) * 0.2);
+                const pimPoints = ((matchupStats.pim || 0) * 0.5);
                 
                 transformed.stats_breakdown = {
                   'Goals': {
@@ -2394,6 +2444,20 @@ export const MatchupService = {
                     points: assistsPoints,
                     logic: `${matchupStats.assists || 0} assists * 2.0 points`
                   },
+                  ...((matchupStats.ppp || 0) > 0 ? {
+                    'Power Play Points': {
+                      count: matchupStats.ppp || 0,
+                      points: pppPoints,
+                      logic: `${matchupStats.ppp || 0} PPP * 1.0 points`
+                    }
+                  } : {}),
+                  ...((matchupStats.shp || 0) > 0 ? {
+                    'Shorthanded Points': {
+                      count: matchupStats.shp || 0,
+                      points: shpPoints,
+                      logic: `${matchupStats.shp || 0} SHP * 2.0 points`
+                    }
+                  } : {}),
                   'Shots on Goal': {
                     count: matchupStats.sog || 0,
                     points: sogPoints,
@@ -2402,8 +2466,22 @@ export const MatchupService = {
                   'Blocks': {
                     count: matchupStats.blocks || 0,
                     points: blocksPoints,
-                    logic: `${matchupStats.blocks || 0} blocks * 0.4 points`
-                  }
+                    logic: `${matchupStats.blocks || 0} blocks * 0.5 points`
+                  },
+                  ...((matchupStats.hits || 0) > 0 ? {
+                    'Hits': {
+                      count: matchupStats.hits || 0,
+                      points: hitsPoints,
+                      logic: `${matchupStats.hits || 0} hits * 0.2 points`
+                    }
+                  } : {}),
+                  ...((matchupStats.pim || 0) > 0 ? {
+                    'Penalty Minutes': {
+                      count: matchupStats.pim || 0,
+                      points: pimPoints,
+                      logic: `${matchupStats.pim || 0} PIM * 0.5 points`
+                    }
+                  } : {})
                 };
               }
             } else {
@@ -2500,7 +2578,7 @@ export const MatchupService = {
                       ((stats.shutouts || 0) * 3) + 
                       ((stats.goals_against || 0) * -1);
             } else {
-              // Skater scoring: Goals=3, Assists=2, SOG=0.4, Blocks=0.4
+              // Skater scoring: ALL 8 categories (Goals=3, Assists=2, PPP=1, SHP=2, SOG=0.4, Blocks=0.5, Hits=0.2, PIM=0.5)
               // CRITICAL: Validate that stats are for a week, not season
               // For a single week, max should be: ~7 goals, ~10 assists, ~30 SOG (very high week)
               // If stats are too high, RPC returned season totals - reject them
@@ -2516,11 +2594,16 @@ export const MatchupService = {
               }
               
               // CRITICAL: Use blocks from matchup week stats, NOT season stats
+              // Skater scoring: ALL 8 categories (default weights match leagues.scoring_settings)
               const blocks = stats.blocks || 0; // Get from matchup week stats
               return (stats.goals * 3) + 
                      (stats.assists * 2) + 
+                     ((stats.ppp || 0) * 1) +        // Power Play Points
+                     ((stats.shp || 0) * 2) +        // Shorthanded Points
                      (stats.sog * 0.4) + 
-                     (blocks * 0.4);
+                     (blocks * 0.5) +                // Updated default to 0.5 to match migration
+                     ((stats.hits || 0) * 0.2) +     // Hits
+                     ((stats.pim || 0) * 0.5);       // Penalty Minutes
             }
           };
           
@@ -2622,7 +2705,14 @@ export const MatchupService = {
                 assists: matchupStats.assists || 0,
                 sog: matchupStats.sog || 0,
                 blocks: matchupStats.blocks || 0,
-                calculated: (matchupStats.goals || 0) * 3 + (matchupStats.assists || 0) * 2 + (matchupStats.sog || 0) * 0.4 + ((matchupStats.blocks || 0) * 0.4)
+                calculated: (matchupStats.goals || 0) * 3 + 
+                           (matchupStats.assists || 0) * 2 + 
+                           ((matchupStats.ppp || 0) * 1) +
+                           ((matchupStats.shp || 0) * 2) +
+                           (matchupStats.sog || 0) * 0.4 + 
+                           ((matchupStats.blocks || 0) * 0.5) +
+                           ((matchupStats.hits || 0) * 0.2) +
+                           ((matchupStats.pim || 0) * 0.5)
               }) : null;
               
               console.log(`[MatchupService] ✅ FINAL SET: ${p.name} (${playerId})`, {
@@ -2686,10 +2776,15 @@ export const MatchupService = {
                 };
               } else {
                 // Skater breakdown
+                // Calculate points for ALL 8 stat categories
                 const goalsPoints = (matchupStats.goals || 0) * 3;
                 const assistsPoints = (matchupStats.assists || 0) * 2;
+                const pppPoints = ((matchupStats.ppp || 0) * 1);
+                const shpPoints = ((matchupStats.shp || 0) * 2);
                 const sogPoints = (matchupStats.sog || 0) * 0.4;
-                const blocksPoints = (matchupStats.blocks || 0) * 0.4;
+                const blocksPoints = (matchupStats.blocks || 0) * 0.5;
+                const hitsPoints = ((matchupStats.hits || 0) * 0.2);
+                const pimPoints = ((matchupStats.pim || 0) * 0.5);
                 
                 transformed.stats_breakdown = {
                   'Goals': {
@@ -2702,6 +2797,20 @@ export const MatchupService = {
                     points: assistsPoints,
                     logic: `${matchupStats.assists || 0} assists * 2.0 points`
                   },
+                  ...((matchupStats.ppp || 0) > 0 ? {
+                    'Power Play Points': {
+                      count: matchupStats.ppp || 0,
+                      points: pppPoints,
+                      logic: `${matchupStats.ppp || 0} PPP * 1.0 points`
+                    }
+                  } : {}),
+                  ...((matchupStats.shp || 0) > 0 ? {
+                    'Shorthanded Points': {
+                      count: matchupStats.shp || 0,
+                      points: shpPoints,
+                      logic: `${matchupStats.shp || 0} SHP * 2.0 points`
+                    }
+                  } : {}),
                   'Shots on Goal': {
                     count: matchupStats.sog || 0,
                     points: sogPoints,
@@ -2710,8 +2819,22 @@ export const MatchupService = {
                   'Blocks': {
                     count: matchupStats.blocks || 0,
                     points: blocksPoints,
-                    logic: `${matchupStats.blocks || 0} blocks * 0.4 points`
-                  }
+                    logic: `${matchupStats.blocks || 0} blocks * 0.5 points`
+                  },
+                  ...((matchupStats.hits || 0) > 0 ? {
+                    'Hits': {
+                      count: matchupStats.hits || 0,
+                      points: hitsPoints,
+                      logic: `${matchupStats.hits || 0} hits * 0.2 points`
+                    }
+                  } : {}),
+                  ...((matchupStats.pim || 0) > 0 ? {
+                    'Penalty Minutes': {
+                      count: matchupStats.pim || 0,
+                      points: pimPoints,
+                      logic: `${matchupStats.pim || 0} PIM * 0.5 points`
+                    }
+                  } : {})
                 };
               }
             } else {
@@ -2760,10 +2883,15 @@ export const MatchupService = {
                 };
               } else {
                 // Skater breakdown
+                // Calculate points for ALL 8 stat categories
                 const goalsPoints = (matchupStats.goals || 0) * 3;
                 const assistsPoints = (matchupStats.assists || 0) * 2;
+                const pppPoints = ((matchupStats.ppp || 0) * 1);
+                const shpPoints = ((matchupStats.shp || 0) * 2);
                 const sogPoints = (matchupStats.sog || 0) * 0.4;
-                const blocksPoints = (matchupStats.blocks || 0) * 0.4;
+                const blocksPoints = (matchupStats.blocks || 0) * 0.5;
+                const hitsPoints = ((matchupStats.hits || 0) * 0.2);
+                const pimPoints = ((matchupStats.pim || 0) * 0.5);
                 
                 transformed.stats_breakdown = {
                   'Goals': {
@@ -2776,6 +2904,20 @@ export const MatchupService = {
                     points: assistsPoints,
                     logic: `${matchupStats.assists || 0} assists * 2.0 points`
                   },
+                  ...((matchupStats.ppp || 0) > 0 ? {
+                    'Power Play Points': {
+                      count: matchupStats.ppp || 0,
+                      points: pppPoints,
+                      logic: `${matchupStats.ppp || 0} PPP * 1.0 points`
+                    }
+                  } : {}),
+                  ...((matchupStats.shp || 0) > 0 ? {
+                    'Shorthanded Points': {
+                      count: matchupStats.shp || 0,
+                      points: shpPoints,
+                      logic: `${matchupStats.shp || 0} SHP * 2.0 points`
+                    }
+                  } : {}),
                   'Shots on Goal': {
                     count: matchupStats.sog || 0,
                     points: sogPoints,
@@ -2784,8 +2926,22 @@ export const MatchupService = {
                   'Blocks': {
                     count: matchupStats.blocks || 0,
                     points: blocksPoints,
-                    logic: `${matchupStats.blocks || 0} blocks * 0.4 points`
-                  }
+                    logic: `${matchupStats.blocks || 0} blocks * 0.5 points`
+                  },
+                  ...((matchupStats.hits || 0) > 0 ? {
+                    'Hits': {
+                      count: matchupStats.hits || 0,
+                      points: hitsPoints,
+                      logic: `${matchupStats.hits || 0} hits * 0.2 points`
+                    }
+                  } : {}),
+                  ...((matchupStats.pim || 0) > 0 ? {
+                    'Penalty Minutes': {
+                      count: matchupStats.pim || 0,
+                      points: pimPoints,
+                      logic: `${matchupStats.pim || 0} PIM * 0.5 points`
+                    }
+                  } : {})
                 };
               }
             } else {
@@ -3102,7 +3258,7 @@ export const MatchupService = {
     playerIds: number[],
     startDate: Date,
     endDate: Date
-  ): Promise<Map<number, { goals: number; assists: number; sog: number; blocks: number; xGoals: number }>> {
+  ): Promise<Map<number, { goals: number; assists: number; sog: number; blocks: number; ppp: number; shp: number; hits: number; pim: number; plus_minus: number; xGoals: number; wins?: number; saves?: number; shutouts?: number; goals_against?: number }>> {
     try {
       const startDateStr = startDate.toISOString().split('T')[0];
       const endDateStr = endDate.toISOString().split('T')[0];
@@ -3145,7 +3301,13 @@ export const MatchupService = {
         goals: number; 
         assists: number; 
         sog: number; 
-        blocks: number; 
+        blocks: number;
+        // NEW: All 8 stat categories
+        ppp: number;           // Power Play Points
+        shp: number;           // Shorthanded Points
+        hits: number;          // Hits
+        pim: number;          // Penalty Minutes
+        plus_minus: number;    // Plus/Minus
         xGoals: number;
         // Goalie stats
         wins?: number;
@@ -3204,6 +3366,12 @@ export const MatchupService = {
           assists: row.assists || 0,
           sog: row.shots_on_goal || 0,
           blocks: row.blocks || 0, // CRITICAL: Get blocks from matchup week stats, not season stats
+          // NEW: Extract all 8 stat categories from RPC
+          ppp: row.ppp || 0,
+          shp: row.shp || 0,
+          hits: row.hits || 0,
+          pim: row.pim || 0,
+          plus_minus: row.plus_minus || 0,
           xGoals: parseFloat(row.x_goals || 0),
           // Extract goalie stats from RPC response (validated to be weekly, not season)
           wins: goalieStats.wins,
@@ -3224,10 +3392,17 @@ export const MatchupService = {
           ? ((sampleStats.wins || 0) > 7 || (sampleStats.saves || 0) > 300)
           : (sampleStats.goals > 20 || sampleStats.assists > 30 || sampleStats.sog > 100);
         
-        // Calculate expected points for sample to verify
+        // Calculate expected points for sample to verify (ALL 8 categories)
         const samplePoints = isGoalieSample
           ? ((sampleStats.wins || 0) * 4) + ((sampleStats.saves || 0) * 0.2) + ((sampleStats.shutouts || 0) * 3) + ((sampleStats.goals_against || 0) * -1)
-          : (sampleStats.goals * 3) + (sampleStats.assists * 2) + (sampleStats.sog * 0.4) + ((sampleStats.blocks || 0) * 0.4);
+          : (sampleStats.goals * 3) + 
+            (sampleStats.assists * 2) + 
+            ((sampleStats.ppp || 0) * 1) +
+            ((sampleStats.shp || 0) * 2) +
+            (sampleStats.sog * 0.4) + 
+            ((sampleStats.blocks || 0) * 0.5) +
+            ((sampleStats.hits || 0) * 0.2) +
+            ((sampleStats.pim || 0) * 0.5);
         
         // CRITICAL: Log explicitly to see actual values
         console.log('[MatchupService.fetchMatchupStatsForPlayers] RPC returned:');
