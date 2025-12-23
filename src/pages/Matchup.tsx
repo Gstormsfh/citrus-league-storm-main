@@ -938,8 +938,24 @@ const Matchup = () => {
         ...(player.daily_projection ? { daily_projection: player.daily_projection } : {})
       };
       
-      // If no daily stats, just return player with updated projections
+      // CRITICAL: For past dates, always set daily_total_points (even if 0) so hasDailyStats works
+      // For future/today dates, only set if dailyStats exists
+      const todayStr = getTodayMST();
+      const isPastDate = selectedDate ? selectedDate < todayStr : false;
+      
+      // If no daily stats from RPC, check if we should still set daily_total_points
       if (!dailyStats) {
+        // For past dates, set daily_total_points to 0 (player didn't play or no data)
+        // This ensures hasDailyStats is true so we can show "0.0 pts" instead of projections
+        if (isPastDate) {
+          return {
+            ...player,
+            ...mergedProjection,
+            daily_total_points: 0,
+            daily_stats_breakdown: null
+          };
+        }
+        // For future/today dates without stats, just return player with projections
         return {
           ...player,
           ...mergedProjection
@@ -1062,8 +1078,24 @@ const Matchup = () => {
         ...(player.daily_projection ? { daily_projection: player.daily_projection } : {})
       };
       
-      // If no daily stats, just return player with updated projections
+      // CRITICAL: For past dates, always set daily_total_points (even if 0) so hasDailyStats works
+      // For future/today dates, only set if dailyStats exists
+      const todayStr = getTodayMST();
+      const isPastDate = selectedDate ? selectedDate < todayStr : false;
+      
+      // If no daily stats from RPC, check if we should still set daily_total_points
       if (!dailyStats) {
+        // For past dates, set daily_total_points to 0 (player didn't play or no data)
+        // This ensures hasDailyStats is true so we can show "0.0 pts" instead of projections
+        if (isPastDate) {
+          return {
+            ...player,
+            ...mergedProjection,
+            daily_total_points: 0,
+            daily_stats_breakdown: null
+          };
+        }
+        // For future/today dates without stats, just return player with projections
         return {
           ...player,
           ...mergedProjection
@@ -1116,7 +1148,6 @@ const Matchup = () => {
         // Add daily stats breakdown for tooltip hover
         daily_stats_breakdown: dailyStats.daily_stats_breakdown || null,
         // Keep weekly total_points unchanged - it's the matchup week total
-        ...mergedProjection
       };
     });
   }, [userLeagueState, opponentTeamPlayers, demoOpponentTeam, dailyStatsMap, selectedDate, projectionsByDate]);

@@ -129,8 +129,10 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
   const gameStatus = dateGames[0]?.status || 'scheduled';
   const isGameFinal = gameStatus === 'final' || gameStatus === 'FINAL';
   
-  // Simplified logic: Only show Daily Points when game is FINAL and data exists
-  const shouldShowDailyPoints = isGameFinal && hasDailyStats;
+  // Simplified logic: Show Daily Points when:
+  // 1. Past dates with data (past games are always final)
+  // 2. OR game is FINAL and data exists
+  const shouldShowDailyPoints = ((isViewingPastDate || isGameFinal) && hasDailyStats);
   
   // Zero Projection Logic: If projectedPoints === 0 but hasGameOnDate is true, show "TBD" or "Calculating"
   // For goalies, also check starter_confirmed flag
