@@ -125,28 +125,19 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
     : [];
   const hasGameOnDate = dateGames.length > 0;
   
-  // Check if game has started/finished (for determining projection vs daily points)
+  // Check if game is final (for determining projection vs daily points)
   const gameStatus = dateGames[0]?.status || 'scheduled';
-  const gameHasStarted = gameStatus === 'live' || gameStatus === 'final' || gameStatus === 'FINAL';
+  const isGameFinal = gameStatus === 'final' || gameStatus === 'FINAL';
   
-  // LOGIC GATE for what to show in projection/daily points area:
-  // 1. If it's a past date, ALWAYS show Daily Points (Actuals).
-  // 2. If it's a future date, ALWAYS show Projections (even if daily_total_points exists, it's 0).
-  // 3. If it's today, show Actuals if game started, else Projections.
-  // 4. If it's a selected date (today or past), show Daily Points if stats exist.
-  const shouldShowDailyPoints = hasDailyStats && (
-    isViewingPastDate ||        // Past dates always show actual points
-    (isDateExplicitlySelected && !isViewingFutureDate && (dailyTotalPoints > 0 || gameHasStarted)) || // Selected today/past dates with stats
-    (!isDateExplicitlySelected && gameHasStarted)  // Today's games show daily points once started
-  );
+  // Simplified logic: Only show Daily Points when game is FINAL and data exists
+  const shouldShowDailyPoints = isGameFinal && hasDailyStats;
   
   // Zero Projection Logic: If projectedPoints === 0 but hasGameOnDate is true, show "TBD" or "Calculating"
   // For goalies, also check starter_confirmed flag
-  // Only applies when NOT viewing past dates (past dates always show actuals)
-  // For future dates, always show projections (even if 0, show TBD)
+  // Only applies when game is not final (show projections until final)
   const hasProjection = dailyProjection && projectedPoints > 0;
   const isStarterConfirmed = isGoalie ? (player.goalieProjection?.starter_confirmed ?? false) : true;
-  const showTBD = !isViewingPastDate && hasGameOnDate && !gameHasStarted && (!hasProjection || (isGoalie && !isStarterConfirmed));
+  const showTBD = hasGameOnDate && !isGameFinal && (!hasProjection || (isGoalie && !isStarterConfirmed));
   
   // Max points for bar display - 15 for all players (skaters and goalies)
   const maxBarPoints = 15;
@@ -333,77 +324,55 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
           </div>
         )}
 
-        {/* Daily Points Bar OR Projection Bar - Logic depends on view mode and game status */}
+        {/* Daily Points Bar OR Projection Bar - Logic depends on game status */}
         {shouldShowDailyPoints ? (
-          // CASE 1: Show daily total points (game finished, have stats)
-          (() => {
-            // Get projection for underlay comparison
-            const projectedForDay = isGoalie 
-              ? (player.goalieProjection?.total_projected_points || 0)
-              : (player.daily_projection?.total_projected_points || 0);
-            const projectedChunks = Math.min(Math.floor(projectedForDay), maxBarPoints);
-            const projectedPartial = projectedForDay % 1;
-            
-            return (
-              <div className="player-projection-bar-container">
-                {/* Label */}
-                <div className="text-[9px] text-gray-400 mb-0.5">Daily Points</div>
-                {/* Centered total above bar */}
-                <div className="flex justify-center mb-0.5">
-                  {player.daily_stats_breakdown && Object.keys(player.daily_stats_breakdown).length > 0 ? (
-                    <PointsTooltip 
-                      breakdown={player.daily_stats_breakdown} 
-                      totalPoints={dailyTotalPoints}
-                    />
-                  ) : (
-                    <span className="text-base font-bold text-fantasy-secondary">
-                      {dailyTotalPoints.toFixed(1)} pts
-                    </span>
-                  )}
-                </div>
-                {/* Battery-style bar with 15 chunks + projection underlay */}
-                <div className="flex gap-[2px] w-full">
-                  {Array.from({ length: maxBarPoints }, (_, i) => {
-                    const isFilled = i < dailyFilledChunks;
-                    const isPartialFilled = i === dailyFilledChunks && dailyPartialChunk > 0;
-                    const isWithinProjection = i < projectedChunks;
-                    const isPartialProjection = i === projectedChunks && projectedPartial > 0;
-                    
-                    return (
+          // CASE 1: Show daily total points (game is FINAL and data exists)
+          <div className="player-projection-bar-container">
+            {/* Label */}
+            <div className="text-[9px] text-gray-400 mb-0.5">Daily Points</div>
+            {/* Centered total above bar */}
+            <div className="flex justify-center mb-0.5">
+              {player.daily_stats_breakdown && Object.keys(player.daily_stats_breakdown).length > 0 ? (
+                <PointsTooltip 
+                  breakdown={player.daily_stats_breakdown} 
+                  totalPoints={dailyTotalPoints}
+                />
+              ) : (
+                <span className="text-base font-bold text-fantasy-secondary">
+                  {dailyTotalPoints.toFixed(1)} pts
+                </span>
+              )}
+            </div>
+            {/* Battery-style bar with 15 chunks (no projection underlay) */}
+            <div className="flex gap-[1px] w-full">
+              {Array.from({ length: maxBarPoints }, (_, i) => {
+                const isFilled = i < dailyFilledChunks;
+                const isPartialFilled = i === dailyFilledChunks && dailyPartialChunk > 0;
+                
+                return (
+                  <div 
+                    key={i}
+                    className={`flex-1 h-2.5 rounded-[2px] overflow-hidden
+                      ${!isFilled && !isPartialFilled 
+                        ? 'border border-muted-foreground/20 bg-muted/20' 
+                        : 'bg-muted/30'
+                      }`}
+                  >
+                    {/* Actual points fill (green) */}
+                    {isFilled && (
+                      <div className="w-full h-full bg-fantasy-secondary" />
+                    )}
+                    {isPartialFilled && (
                       <div 
-                        key={i}
-                        className={`flex-1 h-2.5 rounded-[2px] overflow-hidden relative
-                          ${!isFilled && !isPartialFilled 
-                            ? 'border border-muted-foreground/20 bg-muted/20' 
-                            : 'bg-muted/30'
-                          }`}
-                      >
-                        {/* Projection underlay (yellow) - shows where projection was */}
-                        {projectedForDay > 0 && (isWithinProjection || isPartialProjection) && !isFilled && !isPartialFilled && (
-                          <div 
-                            className="absolute inset-0 bg-fantasy-primary/25"
-                            style={{ 
-                              width: isPartialProjection ? `${projectedPartial * 100}%` : '100%' 
-                            }}
-                          />
-                        )}
-                        {/* Actual points fill (green) */}
-                        {isFilled && (
-                          <div className="w-full h-full bg-fantasy-secondary" />
-                        )}
-                        {isPartialFilled && (
-                          <div 
-                            className="h-full bg-fantasy-secondary/70" 
-                            style={{ width: `${dailyPartialChunk * 100}%` }}
-                          />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })()
+                        className="h-full bg-fantasy-secondary/70" 
+                        style={{ width: `${dailyPartialChunk * 100}%` }}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         ) : !hasGameOnDate ? (
           // CASE 2: NO GAME scheduled for this date - clean message
           <div className="player-projection-bar-container">
@@ -411,32 +380,11 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
               No game {isInDailyViewMode ? 'this day' : 'today'}
             </div>
           </div>
-        ) : isInDailyViewMode && !hasDailyStats && !isViewingFutureDate ? (
-          // CASE 3: PAST/SELECTED DATE (not future) - Game was scheduled but no stats (player scratched or data missing)
-          <div className="player-projection-bar-container">
-            {/* Label */}
-            <div className="text-[9px] text-gray-400 mb-0.5">Daily Points</div>
-            {/* Centered total above bar */}
-            <div className="flex justify-center mb-0.5">
-              <span className="text-base font-bold text-muted-foreground">0.0 pts</span>
-            </div>
-            {/* Empty battery-style bar with clear visibility */}
-            <div className="flex gap-[1px] w-full">
-              {Array.from({ length: maxBarPoints }, (_, i) => (
-                <div 
-                  key={i}
-                  className="flex-1 h-2.5 rounded-[2px] border border-muted-foreground/20 bg-muted/20"
-                />
-              ))}
-            </div>
-          </div>
         ) : (
-          // CASE 4: TODAY/FUTURE - Show projection bar (game hasn't started)
+          // CASE 3: Show projection bar (game not final yet)
           <div className="player-projection-bar-container">
             {/* Label */}
-            <div className="text-[9px] text-gray-400 mb-0.5">
-              {isViewingFutureDate ? 'Projected' : 'Projected Tonight'}
-            </div>
+            <div className="text-[9px] text-gray-400 mb-0.5">Projected</div>
             {/* Centered total above bar */}
             <div className="flex justify-center items-center gap-1 mb-0.5">
               <span className="text-base font-bold text-fantasy-primary">
