@@ -47,6 +47,12 @@ const Matchup = () => {
   const hasProcessedNoLeague = useRef(false); // Track if we've processed "no league" state
   const hasInitializedRef = useRef(false); // Track if we've completed initial load
   
+  // Stable refs for player IDs to break dependency on team arrays (prevents death loop)
+  const myTeamPlayerIdsRef = useRef<number[]>([]);
+  const opponentTeamPlayerIdsRef = useRef<number[]>([]);
+  // State to track when player IDs change (for dependency arrays, since refs don't trigger re-renders)
+  const [playerIdsVersion, setPlayerIdsVersion] = useState(0);
+  
   // Cache tracking to prevent unnecessary reloads
   const prevLeagueIdRef = useRef<string | undefined>(undefined);
   const prevWeekIdRef = useRef<string | undefined>(undefined);
@@ -336,6 +342,25 @@ const Matchup = () => {
     fetchAllWeekMatchups();
   }, [league?.id, selectedWeek, userLeagueState, currentMatchup?.id]);
 
+  // Update player ID refs when teams change (stable references to break death loop)
+  // This effect only updates refs and a version counter - it doesn't trigger other effects directly
+  useEffect(() => {
+    const myIds = myTeam.map(p => p.id);
+    const oppIds = opponentTeamPlayers.map(p => p.id);
+    // Only update if IDs actually changed (avoid unnecessary updates)
+    const myIdsStr = myIds.sort().join(',');
+    const oppIdsStr = oppIds.sort().join(',');
+    const currentMyIdsStr = myTeamPlayerIdsRef.current.sort().join(',');
+    const currentOppIdsStr = opponentTeamPlayerIdsRef.current.sort().join(',');
+    
+    if (myIdsStr !== currentMyIdsStr || oppIdsStr !== currentOppIdsStr) {
+      myTeamPlayerIdsRef.current = myIds;
+      opponentTeamPlayerIdsRef.current = oppIds;
+      // Increment version to trigger dependent effects
+      setPlayerIdsVersion(prev => prev + 1);
+    }
+  }, [myTeam, opponentTeamPlayers]);
+
   // Fetch stats for all 7 days of the matchup week (for WeeklySchedule day boxes)
   useEffect(() => {
     const fetchAllDailyStats = async () => {
@@ -345,10 +370,10 @@ const Matchup = () => {
       }
 
       try {
-        // Get all player IDs from both teams
+        // Get all player IDs from refs (stable references, no dependency on team arrays)
         const allPlayerIds = [
-          ...myTeam.map(p => p.id),
-          ...opponentTeamPlayers.map(p => p.id)
+          ...myTeamPlayerIdsRef.current,
+          ...opponentTeamPlayerIdsRef.current
         ];
 
         if (allPlayerIds.length === 0) return;
@@ -380,9 +405,12 @@ const Matchup = () => {
           // CRITICAL: Aggregate across multiple games per day (goalies can't play multiple games per day, but skaters can)
           const dayStatsMap = new Map<number, any>();
           (data || []).forEach((row: any) => {
-            const player = myTeam.find(p => p.id === row.player_id) || 
-                           opponentTeamPlayers.find(p => p.id === row.player_id);
-            const isGoalie = player?.position === 'G' || player?.position === 'Goalie' || player?.isGoalie || row.is_goalie;
+            // Use refs to find player (avoid dependency on team arrays)
+            const allPlayerIds = [...myTeamPlayerIdsRef.current, ...opponentTeamPlayerIdsRef.current];
+            const isMyTeam = myTeamPlayerIdsRef.current.includes(row.player_id);
+            // For goalie detection, we can use the row data or check position from a lookup
+            // Since we don't have direct access to player objects, use row.is_goalie as primary indicator
+            const isGoalie = row.is_goalie || false;
             
             // Get or initialize player's daily stats (aggregate across multiple games)
             const existing = dayStatsMap.get(row.player_id) || {
@@ -489,7 +517,7 @@ const Matchup = () => {
     };
 
     fetchAllDailyStats();
-  }, [currentMatchup, myTeam, opponentTeamPlayers, userLeagueState, scoringSettings]);
+  }, [currentMatchup, userLeagueState, scoringSettings, playerIdsVersion]);
 
   // Fetch projections for a specific date
   const fetchProjectionsForDate = async (date: string) => {
@@ -510,10 +538,10 @@ const Matchup = () => {
       return;
     }
 
-    // Get player IDs from teams
+    // Get player IDs from refs (stable references, no dependency on team arrays)
     const allPlayerIds = [
-      ...(myTeam || []).map(p => p.id),
-      ...(opponentTeamPlayers || []).map(p => p.id)
+      ...myTeamPlayerIdsRef.current,
+      ...opponentTeamPlayerIdsRef.current
     ];
 
     if (allPlayerIds.length === 0) {
@@ -585,10 +613,10 @@ const Matchup = () => {
       loadingRef.current = true;
 
       try {
-        // Get all player IDs from both teams
+        // Get all player IDs from refs (stable references, no dependency on team arrays)
         const allPlayerIds = [
-          ...myTeam.map(p => p.id),
-          ...opponentTeamPlayers.map(p => p.id)
+          ...myTeamPlayerIdsRef.current,
+          ...opponentTeamPlayerIdsRef.current
         ];
 
         if (allPlayerIds.length === 0) return;
@@ -604,11 +632,9 @@ const Matchup = () => {
         // Create map of player_id -> comprehensive daily stats
         const statsMap = new Map<number, any>();
         (data || []).forEach((row: any) => {
-          // HARD CHECK: Use player position from team arrays for goalie detection
+          // HARD CHECK: Use row.is_goalie for goalie detection (stable, no dependency on team arrays)
           // This ensures accurate math for "Blowout" games where goalies earn negative points
-          const player = myTeam.find(p => p.id === row.player_id) || 
-                         opponentTeamPlayers.find(p => p.id === row.player_id);
-          const isGoalie = player?.position === 'G' || player?.position === 'Goalie' || player?.isGoalie || row.is_goalie;
+          const isGoalie = row.is_goalie || false;
           
           // Calculate daily total points using league scoring settings
           // Use scoringSettings from league.scoring_settings (dynamic, per-league)
@@ -773,7 +799,7 @@ const Matchup = () => {
     };
 
     fetchData();
-  }, [selectedDate, currentMatchup, userLeagueState, scoringSettings]); // Removed myTeam and opponentTeamPlayers to prevent Death Loop
+  }, [selectedDate, currentMatchup, userLeagueState, scoringSettings, playerIdsVersion]); // Use playerIdsVersion instead of team arrays to prevent Death Loop
 
   const handlePlayerClick = async (player: MatchupPlayer) => {
     try {
@@ -1010,7 +1036,7 @@ const Matchup = () => {
         // Keep weekly total_points unchanged - it's the matchup week total
       };
     });
-  }, [userLeagueState, myTeam, demoMyTeam, dailyStatsMap, selectedDate, projectionsByDate]);
+  }, [userLeagueState, playerIdsVersion, demoMyTeam.length, dailyStatsMap, selectedDate, projectionsByDate]);
 
   const displayOpponentTeam = useMemo(() => {
     const baseTeam = userLeagueState === 'active-user' ? opponentTeamPlayers : demoOpponentTeam;
@@ -1150,7 +1176,7 @@ const Matchup = () => {
         // Keep weekly total_points unchanged - it's the matchup week total
       };
     });
-  }, [userLeagueState, opponentTeamPlayers, demoOpponentTeam, dailyStatsMap, selectedDate, projectionsByDate]);
+  }, [userLeagueState, playerIdsVersion, demoOpponentTeam.length, dailyStatsMap, selectedDate, projectionsByDate]);
   const displayMyTeamSlotAssignments = useMemo(() =>
     userLeagueState === 'active-user' ? myTeamSlotAssignments : demoMyTeamSlotAssignments,
     [userLeagueState, myTeamSlotAssignments, demoMyTeamSlotAssignments]
