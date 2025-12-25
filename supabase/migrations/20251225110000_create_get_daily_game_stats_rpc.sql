@@ -90,18 +90,20 @@ AS $$
     pgs.game_id,
     pgs.is_goalie,
     
-    -- Core stats (use nhl_* columns - official NHL stats)
+    -- Core stats (use nhl_* columns with fallback to regular columns - like goalies)
     COALESCE(pgs.nhl_goals, 0) as goals,
     COALESCE(pgs.nhl_assists, 0) as assists,
     COALESCE(pgs.nhl_points, 0) as points,
-    COALESCE(pgs.nhl_shots_on_goal, 0) as shots_on_goal,
-    COALESCE(pgs.nhl_pim, 0) as pim,
+    -- SOG: fallback to regular shots_on_goal if nhl_* is NULL or 0
+    COALESCE(NULLIF(pgs.nhl_shots_on_goal, 0), pgs.shots_on_goal, 0) as shots_on_goal,
+    -- PIM: fallback to regular pim if nhl_* is NULL or 0
+    COALESCE(NULLIF(pgs.nhl_pim, 0), pgs.pim, 0) as pim,
     COALESCE(pgs.nhl_plus_minus, 0) as plus_minus,
     COALESCE(pgs.nhl_toi_seconds, 0) as toi_seconds,
     
-    -- Physical
-    COALESCE(pgs.nhl_hits, 0) as hits,
-    COALESCE(pgs.nhl_blocks, 0) as blocks,
+    -- Physical stats: fallback to regular columns if nhl_* is NULL or 0
+    COALESCE(NULLIF(pgs.nhl_hits, 0), pgs.hits, 0) as hits,
+    COALESCE(NULLIF(pgs.nhl_blocks, 0), pgs.blocks, 0) as blocks,
     
     -- Faceoffs
     COALESCE(pgs.nhl_faceoff_wins, 0) as faceoff_wins,
@@ -112,13 +114,15 @@ AS $$
     COALESCE(pgs.nhl_takeaways, 0) as takeaways,
     COALESCE(pgs.nhl_giveaways, 0) as giveaways,
     
-    -- Power Play
-    COALESCE(pgs.nhl_ppp, 0) as ppp,
+    -- Power Play: fallback to regular columns if nhl_* is NULL or 0
+    -- Note: Only ppp has a regular column; ppg/ppa are nhl_* only
+    COALESCE(NULLIF(pgs.nhl_ppp, 0), pgs.ppp, 0) as ppp,
     COALESCE(pgs.nhl_ppg, 0) as ppg,
     COALESCE(pgs.nhl_ppa, 0) as ppa,
     
-    -- Shorthanded
-    COALESCE(pgs.nhl_shp, 0) as shp,
+    -- Shorthanded: fallback to regular columns if nhl_* is NULL or 0
+    -- Note: Only shp has a regular column; shg/sha are nhl_* only
+    COALESCE(NULLIF(pgs.nhl_shp, 0), pgs.shp, 0) as shp,
     COALESCE(pgs.nhl_shg, 0) as shg,
     COALESCE(pgs.nhl_sha, 0) as sha,
     

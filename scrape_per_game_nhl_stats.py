@@ -165,6 +165,8 @@ def extract_player_stats_from_boxscore(boxscore: Dict) -> Dict[int, Dict[str, An
                 # ===================
                 goals = _safe_int(player_stat.get("goals", 0))
                 assists = _safe_int(player_stat.get("assists", 0))
+                # Note: NHL boxscore API uses "shots" field (not "shotsOnGoal" or "shots_on_goal")
+                # This represents official Shots on Goal (SOG) used by the league
                 sog = _safe_int(player_stat.get("shots", 0))
                 
                 stats = {
@@ -207,16 +209,20 @@ def extract_player_stats_from_boxscore(boxscore: Dict) -> Dict[int, Dict[str, An
                     # ===================
                     # POWER PLAY BREAKDOWN
                     # ===================
-                    "nhl_ppp": _safe_int(player_stat.get("powerPlayPoints", 0)),
+                    # Extract components first, then calculate totals
+                    # Note: powerPlayPoints field doesn't exist in boxscore, so we calculate from components
                     "nhl_ppg": _safe_int(player_stat.get("powerPlayGoals", 0)),
                     "nhl_ppa": _safe_int(player_stat.get("powerPlayAssists", 0)),
+                    "nhl_ppp": _safe_int(player_stat.get("powerPlayGoals", 0)) + _safe_int(player_stat.get("powerPlayAssists", 0)),
                     
                     # ===================
                     # SHORTHANDED BREAKDOWN
                     # ===================
-                    "nhl_shp": _safe_int(player_stat.get("shorthandedPoints", 0)),
+                    # Extract components first, then calculate totals
+                    # Note: shorthandedPoints field doesn't exist in boxscore, so we calculate from components
                     "nhl_shg": _safe_int(player_stat.get("shorthandedGoals", 0)),
                     "nhl_sha": _safe_int(player_stat.get("shorthandedAssists", 0)),
+                    "nhl_shp": _safe_int(player_stat.get("shorthandedGoals", 0)) + _safe_int(player_stat.get("shorthandedAssists", 0)),
                     
                     # ===================
                     # SHOT METRICS (CORSI COMPONENTS)

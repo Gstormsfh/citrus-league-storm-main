@@ -202,9 +202,19 @@ def main():
     
     db = get_db()
     
-    # Default scoring settings
+    # Default scoring settings (ALL 8 STATS)
+    # Note: In production, these should come from leagues.scoring_settings JSONB
     scoring_settings = {
-        "skater": {"goals": 3, "assists": 2, "shots_on_goal": 0.4, "blocks": 0.5},
+        "skater": {
+            "goals": 3,
+            "assists": 2,
+            "shots_on_goal": 0.4,
+            "blocks": 0.5,
+            "power_play_points": 1,
+            "short_handed_points": 2,
+            "hits": 0.2,
+            "penalty_minutes": 0.5
+        },
         "goalie": {"wins": 4, "shutouts": 3, "saves": 0.2, "goals_against": -1}
     }
     

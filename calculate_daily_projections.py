@@ -103,59 +103,96 @@ def calculate_hybrid_base(
     Formula: Projected Base = (W × Player History) + ((1 - W) × League Average)
     
     Returns:
-        Dict with base projections: goals, assists, sog, blocks, ppg
+        Dict with base projections: goals, assists, sog, blocks, ppp, shp, hits, pim, ppg
     """
-    # Get player's season stats
+    # Get player's season stats (ALL 8 categories)
     player_stats = db.select(
         "player_season_stats",
-        select="goals,primary_assists,secondary_assists,shots_on_goal,blocks,games_played",
+        select="goals,primary_assists,secondary_assists,shots_on_goal,blocks,ppp,shp,hits,pim,games_played",
         filters=[("player_id", "eq", player_id), ("season", "eq", season)],
         limit=1
     )
     
     if not player_stats or len(player_stats) == 0:
         print(f"⚠️  No season stats found for player {player_id}")
-        return {"goals": 0.0, "assists": 0.0, "sog": 0.0, "blocks": 0.0, "ppg": 0.0}
+        return {
+            "goals": 0.0, "assists": 0.0, "sog": 0.0, "blocks": 0.0,
+            "ppp": 0.0, "shp": 0.0, "hits": 0.0, "pim": 0.0, "ppg": 0.0
+        }
     
     stats = player_stats[0]
     gp = int(stats.get("games_played", 0))
     
     if gp == 0:
         # No games played, use league average only
-        player_history = {"goals": 0.0, "assists": 0.0, "sog": 0.0, "blocks": 0.0}
+        player_history = {
+            "goals": 0.0, "assists": 0.0, "sog": 0.0, "blocks": 0.0,
+            "ppp": 0.0, "shp": 0.0, "hits": 0.0, "pim": 0.0
+        }
     else:
-        # Calculate per-game rates
+        # Calculate per-game rates for ALL 8 stats
         player_history = {
             "goals": float(stats.get("goals", 0)) / gp,
             "assists": (float(stats.get("primary_assists", 0)) + float(stats.get("secondary_assists", 0))) / gp,
             "sog": float(stats.get("shots_on_goal", 0)) / gp,
             "blocks": float(stats.get("blocks", 0)) / gp,
+            "ppp": float(stats.get("ppp", 0)) / gp,
+            "shp": float(stats.get("shp", 0)) / gp,
+            "hits": float(stats.get("hits", 0)) / gp,
+            "pim": float(stats.get("pim", 0)) / gp,
         }
     
     # Get league averages
     league_avg = get_league_averages(db, position, season)
     if not league_avg:
-        print(f"⚠️  No league averages found for position {position}, using player history only")
-        league_avg = {"avg_goals_per_game": 0.0, "avg_assists_per_game": 0.0, "avg_sog_per_game": 0.0, "avg_blocks_per_game": 0.0}
+        print(f"⚠️  No league averages found for position {position}, using defaults")
+        league_avg = {
+            "avg_goals_per_game": 0.0,
+            "avg_assists_per_game": 0.0,
+            "avg_sog_per_game": 0.0,
+            "avg_blocks_per_game": 0.0
+        }
     
-    # Calculate weight
+    # Set defaults for new stats if not in league_averages table
+    # Position-specific defaults for PPP and Hits
+    if position == "D":
+        default_ppp = 0.10
+        default_hits = 1.5
+    else:
+        default_ppp = 0.15
+        default_hits = 1.0
+    
+    league_avg.setdefault("avg_ppp_per_game", default_ppp)
+    league_avg.setdefault("avg_shp_per_game", 0.02)
+    league_avg.setdefault("avg_hits_per_game", default_hits)
+    league_avg.setdefault("avg_pim_per_game", 0.5)
+    
+    # Calculate weight (same for all stats)
     weight = calculate_bayesian_weight(games_played)
     
-    # Apply Bayesian shrinkage
+    # Apply Bayesian shrinkage to ALL 8 stats
     base_projection = {
-        "goals": (weight * player_history["goals"]) + ((1 - weight) * league_avg["avg_goals_per_game"]),
-        "assists": (weight * player_history["assists"]) + ((1 - weight) * league_avg["avg_assists_per_game"]),
-        "sog": (weight * player_history["sog"]) + ((1 - weight) * league_avg["avg_sog_per_game"]),
-        "blocks": (weight * player_history["blocks"]) + ((1 - weight) * league_avg["avg_blocks_per_game"]),
+        "goals": (weight * player_history["goals"]) + ((1 - weight) * league_avg.get("avg_goals_per_game", 0.0)),
+        "assists": (weight * player_history["assists"]) + ((1 - weight) * league_avg.get("avg_assists_per_game", 0.0)),
+        "sog": (weight * player_history["sog"]) + ((1 - weight) * league_avg.get("avg_sog_per_game", 0.0)),
+        "blocks": (weight * player_history["blocks"]) + ((1 - weight) * league_avg.get("avg_blocks_per_game", 0.0)),
+        "ppp": (weight * player_history["ppp"]) + ((1 - weight) * league_avg.get("avg_ppp_per_game", default_ppp)),
+        "shp": (weight * player_history["shp"]) + ((1 - weight) * league_avg.get("avg_shp_per_game", 0.02)),
+        "hits": (weight * player_history["hits"]) + ((1 - weight) * league_avg.get("avg_hits_per_game", default_hits)),
+        "pim": (weight * player_history["pim"]) + ((1 - weight) * league_avg.get("avg_pim_per_game", 0.5)),
     }
     
-    # Calculate base PPG
+    # Calculate base PPG using ALL 8 scoring weights
     skater_scoring = scoring_settings.get("skater", {})
     base_projection["ppg"] = (
         base_projection["goals"] * float(skater_scoring.get("goals", 3)) +
         base_projection["assists"] * float(skater_scoring.get("assists", 2)) +
         base_projection["sog"] * float(skater_scoring.get("shots_on_goal", 0.4)) +
-        base_projection["blocks"] * float(skater_scoring.get("blocks", 0.5))
+        base_projection["blocks"] * float(skater_scoring.get("blocks", 0.5)) +
+        base_projection["ppp"] * float(skater_scoring.get("power_play_points", 1)) +
+        base_projection["shp"] * float(skater_scoring.get("short_handed_points", 2)) +
+        base_projection["hits"] * float(skater_scoring.get("hits", 0.2)) +
+        base_projection["pim"] * float(skater_scoring.get("penalty_minutes", 0.5))
     )
     
     return base_projection
@@ -833,7 +870,8 @@ def calculate_fantasy_points(
     Calculate total fantasy points from projected stats using league scoring settings.
     
     Args:
-        projected_stats: Dict with goals, assists, sog, blocks (skaters) or wins, saves, shutouts, goals_against (goalies)
+        projected_stats: Dict with goals, assists, sog, blocks, ppp, shp, hits, pim (skaters) 
+                         or wins, saves, shutouts, goals_against (goalies)
         scoring_settings: League scoring settings JSONB
         is_goalie: True if calculating for goalie, False for skater
     
@@ -850,11 +888,16 @@ def calculate_fantasy_points(
         )
     else:
         skater_scoring = scoring_settings.get("skater", {})
+        # Calculate total points using ALL 8 skater stats
         total_points = (
-            projected_stats["goals"] * float(skater_scoring.get("goals", 3)) +
-            projected_stats["assists"] * float(skater_scoring.get("assists", 2)) +
-            projected_stats["sog"] * float(skater_scoring.get("shots_on_goal", 0.4)) +
-            projected_stats["blocks"] * float(skater_scoring.get("blocks", 0.5))
+            projected_stats.get("goals", 0) * float(skater_scoring.get("goals", 3)) +
+            projected_stats.get("assists", 0) * float(skater_scoring.get("assists", 2)) +
+            projected_stats.get("sog", 0) * float(skater_scoring.get("shots_on_goal", 0.4)) +
+            projected_stats.get("blocks", 0) * float(skater_scoring.get("blocks", 0.5)) +
+            projected_stats.get("ppp", 0) * float(skater_scoring.get("power_play_points", 1)) +
+            projected_stats.get("shp", 0) * float(skater_scoring.get("short_handed_points", 2)) +
+            projected_stats.get("hits", 0) * float(skater_scoring.get("hits", 0.2)) +
+            projected_stats.get("pim", 0) * float(skater_scoring.get("penalty_minutes", 0.5))
         )
     
     return total_points
@@ -1162,17 +1205,23 @@ def calculate_daily_projection(
         
         # Apply adjustments in correct order
         # Base → Talent (goals only) → Environmental
+        # Note: finishing_multiplier applies ONLY to goals
         final_projection = {
             "goals": base_projection["goals"] * finishing_multiplier * opponent_adjustment * b2b_penalty * home_away_adjustment,
             "assists": base_projection["assists"] * opponent_adjustment * b2b_penalty * home_away_adjustment,
             "sog": base_projection["sog"] * opponent_adjustment * b2b_penalty * home_away_adjustment,
             "blocks": base_projection["blocks"] * opponent_adjustment * b2b_penalty * home_away_adjustment,
+            # New stats: apply environmental adjustments but NOT finishing_multiplier
+            "ppp": base_projection["ppp"] * opponent_adjustment * b2b_penalty * home_away_adjustment,
+            "shp": base_projection["shp"] * opponent_adjustment * b2b_penalty * home_away_adjustment,
+            "hits": base_projection["hits"] * opponent_adjustment * b2b_penalty * home_away_adjustment,
+            "pim": base_projection["pim"] * opponent_adjustment * b2b_penalty * home_away_adjustment,
         }
         
         # Calculate xG projection (base xG from finishing talent)
         final_projection["xg"] = base_projection["goals"] / finishing_multiplier if finishing_multiplier > 0 else base_projection["goals"]
         
-        # Calculate fantasy points
+        # Calculate fantasy points (includes all 8 stats)
         total_projected_points = calculate_fantasy_points(final_projection, scoring_settings, is_goalie=False)
         
         # Calculate confidence score (simplified: based on games played)
@@ -1186,6 +1235,10 @@ def calculate_daily_projection(
             "projected_assists": round(final_projection["assists"], 3),
             "projected_sog": round(final_projection["sog"], 3),
             "projected_blocks": round(final_projection["blocks"], 3),
+            "projected_ppp": round(final_projection["ppp"], 3),
+            "projected_shp": round(final_projection["shp"], 3),
+            "projected_hits": round(final_projection["hits"], 3),
+            "projected_pim": round(final_projection["pim"], 3),
             "projected_xg": round(final_projection["xg"], 3),
             "total_projected_points": round(total_projected_points, 3),
             "base_ppg": round(base_projection["ppg"], 3),
@@ -1246,12 +1299,17 @@ def main():
     print()
     
     # Get default scoring settings (for now, use defaults - can be enhanced to use league-specific)
+    # Note: In production, scoring settings come from leagues.scoring_settings JSONB
     default_scoring = {
         "skater": {
             "goals": 3,
             "assists": 2,
             "shots_on_goal": 0.4,
             "blocks": 0.5,
+            "power_play_points": 1,
+            "short_handed_points": 2,
+            "hits": 0.2,
+            "penalty_minutes": 0.5,
         },
         "goalie": {
             "wins": 4,

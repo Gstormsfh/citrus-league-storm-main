@@ -44,3 +44,4 @@ COMMENT ON COLUMN public.player_weekly_stats.nhl_shots_faced IS 'Aggregated NHL.
 COMMENT ON COLUMN public.player_weekly_stats.nhl_goals_against IS 'Aggregated NHL.com goals against for this week.';
 COMMENT ON COLUMN public.player_weekly_stats.nhl_shutouts IS 'Aggregated NHL.com shutouts for this week.';
 
+

@@ -367,10 +367,18 @@ def main():
         start_date = week_info['start']
         end_date = week_info['end']
     else:
-        # Default: Week 3+ (Dec 22 onwards)
-        start_date = DEFAULT_START_DATE
-        ends = [w['end'] for w in data['weeks'].values() if w.get('end')]
-        end_date = max(ends) if ends else "2026-04-19"
+        # If --force, process entire season; otherwise default to Week 3+
+        if force:
+            # Process entire season - use earliest week start
+            starts = [w['start'] for w in data['weeks'].values() if w.get('start')]
+            ends = [w['end'] for w in data['weeks'].values() if w.get('end')]
+            start_date = min(starts) if starts else "2025-10-07"  # Season start
+            end_date = max(ends) if ends else "2026-04-19"
+        else:
+            # Default: Week 3+ (Dec 22 onwards)
+            start_date = DEFAULT_START_DATE
+            ends = [w['end'] for w in data['weeks'].values() if w.get('end')]
+            end_date = max(ends) if ends else "2026-04-19"
     
     if not start_date or not end_date:
         print("  No date range found!", flush=True)

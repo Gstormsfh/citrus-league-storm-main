@@ -159,3 +159,4 @@ $$;
 
 COMMENT ON FUNCTION public.populate_player_weekly_stats IS 'Populates weekly stats for a specific week from player_game_stats, aggregating both PBP-calculated stats (for internal use) and NHL.com official stats (for display and fantasy scoring).';
 
+

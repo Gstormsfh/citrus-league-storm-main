@@ -52,3 +52,4 @@ CREATE INDEX IF NOT EXISTS idx_player_season_stats_nhl_goals ON public.player_se
 CREATE INDEX IF NOT EXISTS idx_player_season_stats_nhl_points ON public.player_season_stats(nhl_points) WHERE nhl_points > 0;
 CREATE INDEX IF NOT EXISTS idx_player_season_stats_nhl_wins ON public.player_season_stats(nhl_wins) WHERE is_goalie = true AND nhl_wins > 0;
 
+

@@ -68,3 +68,4 @@ GRANT EXECUTE ON FUNCTION public.get_matchup_stats(int[], date, date) TO anon, a
 
 COMMENT ON FUNCTION public.get_matchup_stats IS 'Returns pre-aggregated weekly stats from player_weekly_stats table using NHL.com official statistics for fantasy scoring. x_goals comes from our model (raw_shots).';
 
+

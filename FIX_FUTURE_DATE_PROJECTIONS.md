@@ -34,3 +34,4 @@ Updated `PlayerCard.tsx` to:
 - **Today (game started)**: Show "Daily Points" with actual stats
 - **Today (game not started)**: Show "Projected Tonight" with projections
 - **Future dates**: Show "Projected" with projections (not "Daily Points: 0.0")
+

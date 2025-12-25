@@ -262,16 +262,21 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
                   </>
                 )
               ) : isInDailyViewMode ? (
-                // DAILY VIEW MODE: Show that day's stats
+                // DAILY VIEW MODE: Show that day's stats - ALL 8 STATS
                 // If player has daily stats from RPC, use them
-                // If player had NO GAME that day, show 0, 0, 0
+                // If player had NO GAME that day, show zeros
                 hasGameOnDate && hasDailyStats ? (
                   <>
                     {player.matchupStats?.goals || 0} G, {player.matchupStats?.assists || 0} A, {player.matchupStats?.sog || 0} SOG
+                    {(player.matchupStats?.blocks || 0) > 0 && `, ${player.matchupStats.blocks} BLK`}
+                    {(player.matchupStats?.ppp || 0) > 0 && `, ${player.matchupStats.ppp} PPP`}
+                    {(player.matchupStats?.shp || 0) > 0 && `, ${player.matchupStats.shp} SHP`}
+                    {(player.matchupStats?.hits || 0) > 0 && `, ${player.matchupStats.hits} HIT`}
+                    {(player.matchupStats?.pim || 0) > 0 && `, ${player.matchupStats.pim} PIM`}
                   </>
                 ) : (
-                  // No game on this date = 0, 0, 0
-                  <>0 G, 0 A, 0 SOG</>
+                  // No game on this date = show zeros for all stats
+                  <>0 G, 0 A, 0 SOG, 0 BLK, 0 PPP, 0 SHP, 0 HIT, 0 PIM</>
                 )
               ) : (
                 // DEFAULT VIEW (no date selected): Show weekly totals

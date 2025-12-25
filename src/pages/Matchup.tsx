@@ -996,10 +996,15 @@ const Matchup = () => {
           shutouts: dailyStats.shutouts || 0,
           goals_against: dailyStats.goals_against || 0,
         } : {
-          // Skater daily stats (for selected date only)
+          // Skater daily stats (for selected date only) - ALL 8 STATS
           goals: dailyStats.goals || 0,
           assists: dailyStats.assists || 0,
           sog: dailyStats.sog || 0,
+          blocks: dailyStats.blocks || 0,
+          ppp: dailyStats.ppp || 0,
+          shp: dailyStats.shp || 0,
+          hits: dailyStats.hits || 0,
+          pim: dailyStats.pim || 0,
           xGoals: dailyStats.xGoals || 0,
         },
         // Update stats for display in statline (only when date is selected)
@@ -1012,11 +1017,15 @@ const Matchup = () => {
           goals_against: dailyStats.goals_against || 0,
         } : {
           ...player.stats,
-          // Skater daily stats (for selected date only)
+          // Skater daily stats (for selected date only) - ALL 8 STATS
           goals: dailyStats.goals || 0,
           assists: dailyStats.assists || 0,
           sog: dailyStats.sog || 0,
           blk: dailyStats.blocks || 0,
+          ppp: dailyStats.ppp || 0,
+          shp: dailyStats.shp || 0,
+          hits: dailyStats.hits || 0,
+          pim: dailyStats.pim || 0,
           xGoals: dailyStats.xGoals || 0,
         },
         // Add goalie matchup stats for goalies (only when date is selected)
@@ -1136,10 +1145,15 @@ const Matchup = () => {
           shutouts: dailyStats.shutouts || 0,
           goals_against: dailyStats.goals_against || 0,
         } : {
-          // Skater daily stats (for selected date only)
+          // Skater daily stats (for selected date only) - ALL 8 STATS
           goals: dailyStats.goals || 0,
           assists: dailyStats.assists || 0,
           sog: dailyStats.sog || 0,
+          blocks: dailyStats.blocks || 0,
+          ppp: dailyStats.ppp || 0,
+          shp: dailyStats.shp || 0,
+          hits: dailyStats.hits || 0,
+          pim: dailyStats.pim || 0,
           xGoals: dailyStats.xGoals || 0,
         },
         // Update stats for display in statline (only when date is selected)
@@ -1152,11 +1166,15 @@ const Matchup = () => {
           goals_against: dailyStats.goals_against || 0,
         } : {
           ...player.stats,
-          // Skater daily stats (for selected date only)
+          // Skater daily stats (for selected date only) - ALL 8 STATS
           goals: dailyStats.goals || 0,
           assists: dailyStats.assists || 0,
           sog: dailyStats.sog || 0,
           blk: dailyStats.blocks || 0,
+          ppp: dailyStats.ppp || 0,
+          shp: dailyStats.shp || 0,
+          hits: dailyStats.hits || 0,
+          pim: dailyStats.pim || 0,
           xGoals: dailyStats.xGoals || 0,
         },
         // Add goalie matchup stats for goalies (only when date is selected)
