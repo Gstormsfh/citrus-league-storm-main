@@ -138,7 +138,7 @@ def extract_player_stats_from_boxscore(boxscore: Dict) -> Dict[int, Dict[str, An
         team_abbrev = team_abbrevs.get(team_key, "")
         
         # Check forwards, defensemen, goalies
-        for position_group in ["forwards", "defensemen", "goalies"]:
+        for position_group in ["forwards", "defense", "goalies"]:
             if position_group not in team_data:
                 continue
             
@@ -167,7 +167,7 @@ def extract_player_stats_from_boxscore(boxscore: Dict) -> Dict[int, Dict[str, An
                 assists = _safe_int(player_stat.get("assists", 0))
                 # Note: NHL boxscore API uses "shots" field (not "shotsOnGoal" or "shots_on_goal")
                 # This represents official Shots on Goal (SOG) used by the league
-                sog = _safe_int(player_stat.get("shots", 0))
+                sog = _safe_int(player_stat.get("sog", 0))  # ALWAYS use "sog" - confirmed via API test, NOT "shots"
                 
                 stats = {
                     # Metadata for record creation (not stored in nhl_* columns)
