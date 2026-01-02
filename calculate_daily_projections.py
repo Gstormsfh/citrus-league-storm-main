@@ -22,6 +22,13 @@ from datetime import datetime, date, timedelta
 from typing import Dict, List, Optional, Tuple, Any
 from decimal import Decimal, ROUND_HALF_UP
 
+# Configure UTF-8 encoding for Windows
+if sys.platform == "win32":
+    if sys.stdout.encoding != "utf-8":
+        sys.stdout.reconfigure(encoding="utf-8")
+    if sys.stderr.encoding != "utf-8":
+        sys.stderr.reconfigure(encoding="utf-8")
+
 from supabase_rest import SupabaseRest
 
 load_dotenv()
@@ -68,6 +75,183 @@ def get_league_averages(db: SupabaseRest, position: str, season: int) -> Optiona
     return None
 
 
+def get_positional_avg_fantasy_pts_per_60(
+    db: SupabaseRest, 
+    position: str, 
+    season: int, 
+    scoring_settings: Dict[str, Any]
+) -> float:
+    """
+    Calculate positional average fantasy points per 60 minutes.
+    
+    Uses actual TOI data from league_averages or validated NHL standards to ensure
+    the "Per 60" baseline is mathematically sound, not based on flat estimates.
+    
+    Returns:
+        Positional average fantasy points per 60 minutes (e.g., 2.5)
+    """
+    # Fetch the positional row (C, D, LW, RW)
+    pos_data = get_league_averages(db, position, season)
+    
+    if not pos_data:
+        return 0.0
+
+    # 1. Calculate the average fantasy points per game for this position
+    # using your league's specific scoring settings
+    skater_scoring = scoring_settings.get("skater", {})
+    avg_fpts_per_game = (
+        (pos_data.get("avg_goals_per_game", 0) * float(skater_scoring.get("goals", 3))) +
+        (pos_data.get("avg_assists_per_game", 0) * float(skater_scoring.get("assists", 2))) +
+        (pos_data.get("avg_sog_per_game", 0) * float(skater_scoring.get("shots_on_goal", 0.4))) +
+        (pos_data.get("avg_blocks_per_game", 0) * float(skater_scoring.get("blocks", 0.5)))
+        # Note: PPP, SHP, Hits, PIM could be added if available in pos_data
+    )
+
+    # 2. Get the actual average TOI for this position from your data
+    # If not in league_averages, use these validated NHL standards:
+    toi_map = {"C": 17.5, "LW": 16.5, "RW": 16.5, "D": 21.0}
+    avg_toi_min = pos_data.get("avg_toi_per_game", toi_map.get(position, 18.0))
+
+    # 3. Convert to Per-60 Rate
+    # (FPts / TOI_min) * 60
+    if avg_toi_min > 0:
+        fpts_per_60 = (avg_fpts_per_game / avg_toi_min) * 60
+        return round(fpts_per_60, 3)
+    
+    return 0.0
+
+
+# Module-level cache to prevent redundant database queries
+# Note: @lru_cache cannot be used because db (SupabaseRest) is not hashable
+_baseline_cache: Dict[int, Dict[str, float]] = {}
+
+def get_latest_baselines(db: SupabaseRest, season: int) -> Dict[str, float]:
+    """
+    Fetch league-wide baselines from league_averages table (LEAGUE row).
+    
+    Uses module-level cache (_baseline_cache) to prevent redundant database queries
+    when called multiple times during projection calculations (hundreds of players).
+    
+    Early Season Handling:
+    - If current season has < 500 shots faced (tiny sample), blends with previous season
+    - Prevents wild swings in GSAA early in the year
+    
+    Returns:
+        Dict with league_avg_sv_pct and league_avg_xga_per_60
+        Falls back to hardcoded values if LEAGUE row not found
+    """
+    # Check cache first
+    if season in _baseline_cache:
+        return _baseline_cache[season]
+    
+    try:
+        # Get current season baseline
+        results = db.select(
+            "league_averages",
+            select="league_avg_sv_pct,league_avg_xga_per_60",
+            filters=[("position", "eq", "LEAGUE"), ("season", "eq", season)],
+            limit=1
+        )
+        
+        current_sv_pct = None
+        current_xga_per_60 = None
+        
+        if results and len(results) > 0:
+            baseline = results[0]
+            sv_pct = baseline.get("league_avg_sv_pct")
+            xga_per_60 = baseline.get("league_avg_xga_per_60")
+            
+            # Validate values are reasonable
+            if sv_pct and 0.85 <= float(sv_pct) <= 0.95:
+                current_sv_pct = float(sv_pct)
+            else:
+                print(f"⚠️  Warning: Invalid league_avg_sv_pct ({sv_pct}), will use fallback")
+            
+            if xga_per_60 and 1.5 <= float(xga_per_60) <= 4.0:
+                current_xga_per_60 = float(xga_per_60)
+            else:
+                print(f"⚠️  Warning: Invalid league_avg_xga_per_60 ({xga_per_60}), will use fallback")
+        
+        # Early season check: if sample size is too small, blend with previous season
+        # Check total shots faced from player_season_stats to estimate sample size
+        if current_sv_pct is not None:
+            goalie_stats = db.select(
+                "player_season_stats",
+                select="nhl_shots_faced",
+                filters=[("season", "eq", season), ("is_goalie", "eq", True)],
+                limit=1000
+            )
+            total_shots = sum(int(g.get("nhl_shots_faced", 0)) for g in goalie_stats)
+            
+            # If sample size is small (< 500 shots), blend with previous season
+            if total_shots < 500 and season > 2020:  # Don't go back before 2020
+                prev_season = season - 1
+                prev_results = db.select(
+                    "league_averages",
+                    select="league_avg_sv_pct,league_avg_xga_per_60,league_avg_shots_for_per_60",
+                    filters=[("position", "eq", "LEAGUE"), ("season", "eq", prev_season)],
+                    limit=1
+                )
+                
+                if prev_results and len(prev_results) > 0:
+                    prev_baseline = prev_results[0]
+                    prev_sv_pct = prev_baseline.get("league_avg_sv_pct")
+                    prev_xga_per_60 = prev_baseline.get("league_avg_xga_per_60")
+                    
+                    if prev_sv_pct and 0.85 <= float(prev_sv_pct) <= 0.95:
+                        # Blend: weight based on sample size (30% to 100% current)
+                        blend_weight = total_shots / 500.0  # 0.0 to 1.0
+                        blend_weight = max(0.3, min(1.0, blend_weight))  # Cap between 30% and 100%
+                        current_sv_pct = (blend_weight * current_sv_pct) + ((1 - blend_weight) * float(prev_sv_pct))
+                        print(f"⚠️  Early season detected ({total_shots} shots), blending baselines: {blend_weight:.1%} current, {1-blend_weight:.1%} previous")
+                    
+                    if prev_xga_per_60 and 1.5 <= float(prev_xga_per_60) <= 4.0:
+                        blend_weight = total_shots / 500.0
+                        blend_weight = max(0.3, min(1.0, blend_weight))
+                        current_xga_per_60 = (blend_weight * current_xga_per_60) + ((1 - blend_weight) * float(prev_xga_per_60))
+        
+        # Final validation and fallback
+        if current_sv_pct is None:
+            print(f"⚠️  Warning: No valid league_avg_sv_pct found, using fallback: 0.900")
+            current_sv_pct = 0.900
+        
+        if current_xga_per_60 is None:
+            print(f"⚠️  Warning: No valid league_avg_xga_per_60 found, using fallback: 2.5")
+            current_xga_per_60 = 2.5
+        
+        # Get league average shots for/60
+        current_shots_for_per_60 = None
+        if results and len(results) > 0:
+            baseline = results[0]
+            shots_for = baseline.get("league_avg_shots_for_per_60")
+            if shots_for and 20.0 <= float(shots_for) <= 40.0:
+                current_shots_for_per_60 = float(shots_for)
+        
+        if current_shots_for_per_60 is None:
+            # Fallback to typical NHL average
+            current_shots_for_per_60 = 30.0
+        
+        result = {
+            "league_avg_sv_pct": current_sv_pct,
+            "league_avg_xga_per_60": current_xga_per_60,
+            "league_avg_shots_for_per_60": current_shots_for_per_60
+        }
+        # Cache the result
+        _baseline_cache[season] = result
+        return result
+    except Exception as e:
+        print(f"⚠️  Warning: Could not fetch league baselines: {e}")
+    
+    # Fallback to hardcoded values if query fails
+    fallback = {
+        "league_avg_sv_pct": 0.900,
+        "league_avg_xga_per_60": 2.5,
+        "league_avg_shots_for_per_60": 30.0
+    }
+    _baseline_cache[season] = fallback
+    return fallback
+
+
 def calculate_bayesian_weight(games_played: int) -> float:
     """
     Calculate Bayesian shrinkage weight based on games played.
@@ -87,6 +271,51 @@ def calculate_bayesian_weight(games_played: int) -> float:
     else:
         # Linear interpolation: W = 0.20 + (GP - 10) × 0.035
         return 0.20 + (games_played - 10) * 0.035
+
+
+def calculate_xga_shrinkage(
+    player_xga_per_60: float,
+    position_avg_xga_per_60: float,
+    games_played: int,
+    min_games_for_stability: int = 20
+) -> float:
+    """
+    Apply Bayesian shrinkage to xGA/60 for players with small sample sizes.
+    
+    Shrinks toward positional average until player reaches stability threshold.
+    This prevents outlier games from skewing defensive value calculations.
+    
+    Formula:
+    - GP < 5: W = 0.20 (80% positional average)
+    - GP >= 5 && GP < 20: W = 0.20 + (GP - 5) × (0.80 / 15) (linear interpolation)
+    - GP >= 20: W = 1.0 (100% player xGA/60, no shrinkage)
+    
+    Args:
+        player_xga_per_60: Player's raw on-ice xGA/60
+        position_avg_xga_per_60: Positional average xGA/60 (regression target)
+        games_played: Number of games played this season
+        min_games_for_stability: Minimum games for full stability (default 20)
+    
+    Returns:
+        Shrunk xGA/60 value
+    """
+    if games_played >= min_games_for_stability:
+        return player_xga_per_60  # No shrinkage needed
+    
+    # Calculate shrinkage weight (similar to calculate_bayesian_weight)
+    # < 5 games: 20% weight (80% positional average)
+    # 5-20 games: Linear interpolation
+    # >= 20 games: 100% weight (no shrinkage)
+    if games_played < 5:
+        weight = 0.20
+    elif games_played >= min_games_for_stability:
+        weight = 1.0
+    else:
+        # Linear interpolation: W = 0.20 + (GP - 5) × (0.80 / 15)
+        weight = 0.20 + (games_played - 5) * (0.80 / 15)
+    
+    shrunk_xga = (weight * player_xga_per_60) + ((1 - weight) * position_avg_xga_per_60)
+    return shrunk_xga
 
 
 def calculate_hybrid_base(
@@ -489,6 +718,66 @@ def get_team_xga_per_60(
         return None
 
 
+def get_player_on_ice_xga_per_60(
+    db: SupabaseRest,
+    player_id: int,
+    team_abbrev: str,
+    season: int,
+    last_n_games: int = 10,
+    debug: bool = False
+) -> Optional[float]:
+    """
+    Calculate player's on-ice xGA/60 with multi-window averaging.
+    
+    Blends current season (60%) with previous season (40%) for stability.
+    This prevents outlier games from skewing projections and provides more
+    reliable defensive value estimates.
+    
+    For Sprint 3, uses team xGA/60 as proxy (simpler, less accurate).
+    Future enhancement: Calculate true on-ice xGA from raw_shots + shift data for accurate individual player tracking.
+    
+    Returns:
+        On-ice xGA per 60 minutes (e.g., 2.3) or None if unavailable
+    """
+    try:
+        # Get current season team xGA/60 (last N games)
+        current_xga = get_team_xga_per_60(
+            db, team_abbrev, season, last_n_games=last_n_games, debug=debug
+        )
+        
+        # Get previous season team xGA/60 (full season average for stability)
+        prev_season = season - 1
+        prev_xga = None
+        if prev_season >= 2020:  # Don't go back before 2020
+            prev_xga = get_team_xga_per_60(
+                db, team_abbrev, prev_season, last_n_games=82, debug=debug
+            )
+        
+        # Blend: 60% current, 40% previous
+        if current_xga and prev_xga:
+            blended_xga = (current_xga * 0.6) + (prev_xga * 0.4)
+            if debug:
+                print(f"  [VOPA Debug] Player {player_id} on-ice xGA/60 (blended): {blended_xga:.3f} (current: {current_xga:.3f} × 0.6 + prev: {prev_xga:.3f} × 0.4)")
+        elif current_xga:
+            blended_xga = current_xga
+            if debug:
+                print(f"  [VOPA Debug] Player {player_id} on-ice xGA/60 (current only): {blended_xga:.3f} (no previous season data)")
+        elif prev_xga:
+            blended_xga = prev_xga
+            if debug:
+                print(f"  [VOPA Debug] Player {player_id} on-ice xGA/60 (previous only): {blended_xga:.3f} (no current season data)")
+        else:
+            if debug:
+                print(f"  [VOPA Debug] Player {player_id} on-ice xGA/60: No data available")
+            return None
+        
+        return blended_xga
+    except Exception as e:
+        if debug:
+            print(f"  [VOPA Debug] Error calculating on-ice xGA/60 for player {player_id}: {e}")
+        return None
+
+
 def get_opponent_shots_for_per_60(
     db: SupabaseRest,
     opponent_team: str,
@@ -719,16 +1008,21 @@ def get_opponent_strength(
     debug: bool = False
 ) -> float:
     """
-    Calculate Defensive Difficulty Rating (DDR) for opponent.
+    Calculate Defensive Difficulty Rating (DDR) for opponent with offensive strength factor.
     
-    Formula:
-    DDR = (Opponent_xGA_Last10 / League_Avg_xGA) × (League_Avg_SV% / Opposing_Goalie_SV%)
+    Formula (Sprint 4):
+    DDR = Team_Defense × Goalie × Offense
+    - Team_Defense = Opponent_xGA_Last10 / League_Avg_xGA
+    - Goalie = League_Avg_SV% / Opposing_Goalie_SV%
+    - Offense = Opponent_Shots_For/60 / League_Avg_Shots_For/60
     
-    This combines team defense (xGA/60) and goalie strength (SV%) multiplicatively.
+    This combines team defense, goalie strength, and offensive strength multiplicatively.
     - Higher opponent xGA (worse defense) → increases projection
     - Lower opponent xGA (better defense) → reduces projection
     - Higher goalie SV% (better goalie) → reduces projection
     - Lower goalie SV% (worse goalie) → increases projection
+    - Higher opponent offense (more shots) → increases projection (more opportunities)
+    - Lower opponent offense (fewer shots) → reduces projection (fewer opportunities)
     
     Returns:
         Multiplier (typically 0.7 to 1.3)
@@ -779,12 +1073,37 @@ def get_opponent_strength(
                     pct = (goalie_multiplier - 1) * 100
                     print(f"    → {opponent_team} goalie is WEAKER (lower SV% {goalie_sv_pct:.3f} < avg {league_avg_sv_pct:.3f}) → INCREASES projection by {pct:.1f}%")
         
-        # Combined DDR
-        ddr = team_multiplier * goalie_multiplier
+        # NEW: Offensive strength multiplier (Sprint 4)
+        # Higher opponent offense → more shots/opportunities → increases projection
+        opponent_shots_for = get_opponent_shots_for_per_60(db, opponent_team, season, last_n_games=10, debug=debug)
+        
+        # Get league average shots for/60 from baselines
+        baselines = get_latest_baselines(db, season)
+        league_avg_shots_for = baselines.get("league_avg_shots_for_per_60", 30.0)
+        
+        if opponent_shots_for and league_avg_shots_for > 0:
+            offense_multiplier = opponent_shots_for / league_avg_shots_for
+            if debug:
+                print(f"  [DDR Debug] Offense multiplier: {offense_multiplier:.3f} = {opponent_shots_for:.2f} / {league_avg_shots_for:.2f}")
+                if opponent_shots_for > league_avg_shots_for:
+                    pct = (offense_multiplier - 1) * 100
+                    print(f"    → {opponent_team} has STRONGER offense (more shots {opponent_shots_for:.2f} > avg {league_avg_shots_for:.2f}) → INCREASES projection by {pct:.1f}%")
+                elif opponent_shots_for < league_avg_shots_for:
+                    pct = (1 - offense_multiplier) * 100
+                    print(f"    → {opponent_team} has WEAKER offense (fewer shots {opponent_shots_for:.2f} < avg {league_avg_shots_for:.2f}) → REDUCES projection by {pct:.1f}%")
+                else:
+                    print(f"    → {opponent_team} has AVERAGE offense (shots {opponent_shots_for:.2f} = avg {league_avg_shots_for:.2f}) → No adjustment")
+        else:
+            offense_multiplier = 1.0
+            if debug:
+                print(f"  [DDR Debug] No offense data, using offense_multiplier = 1.0")
+        
+        # Combined DDR: Team Defense × Goalie × Offense
+        ddr = team_multiplier * goalie_multiplier * offense_multiplier
         ddr_capped = max(0.7, min(1.3, ddr))
         
         if debug:
-            print(f"  [DDR Debug] Raw DDR: {ddr:.3f} = {team_multiplier:.3f} × {goalie_multiplier:.3f}")
+            print(f"  [DDR Debug] Raw DDR: {ddr:.3f} = {team_multiplier:.3f} × {goalie_multiplier:.3f} × {offense_multiplier:.3f}")
             if ddr != ddr_capped:
                 print(f"  [DDR Debug] DDR capped: {ddr_capped:.3f} (from {ddr:.3f})")
             else:
@@ -978,7 +1297,9 @@ def calculate_goalie_projection(
         total_goals_against = int(stats.get("goals_against", 0))
         
         # Calculate goalie SV% with Bayesian shrinkage
-        LEAGUE_AVG_SV_PCT = 0.905
+        # Fetch dynamic league baseline
+        baselines = get_latest_baselines(db, season)
+        LEAGUE_AVG_SV_PCT = baselines["league_avg_sv_pct"]
         SHRINKAGE_CONSTANT = 500  # Shots needed for full weight
         
         if total_shots_faced > 0:
@@ -991,7 +1312,7 @@ def calculate_goalie_projection(
         projected_sv_pct = (shrinkage_weight_sv * raw_sv_pct) + ((1 - shrinkage_weight_sv) * LEAGUE_AVG_SV_PCT)
         
         if debug:
-            print(f"  [Goalie Projection] SV%: {projected_sv_pct:.3f} (raw: {raw_sv_pct:.3f}, weight: {shrinkage_weight_sv:.3f})")
+            print(f"  [Goalie Projection] SV%: {projected_sv_pct:.3f} (raw: {raw_sv_pct:.3f}, weight: {shrinkage_weight_sv:.3f}, league avg: {LEAGUE_AVG_SV_PCT:.3f})")
         
         # 1. Projected Saves (Shot Funnel)
         opponent_shots_for_per_60 = get_opponent_shots_for_per_60(db, opponent_team, season, last_n_games=10, debug=debug)
@@ -1006,6 +1327,20 @@ def calculate_goalie_projection(
         
         if debug:
             print(f"  [Goalie Projection] Projected Saves: {projected_saves:.2f} = ({opponent_shots_for_per_60:.2f} shots/60 × {projected_sv_pct:.3f} SV% × {expected_toi_minutes:.1f} min)")
+        
+        # Calculate GSAA (Goals Saved Above Average)
+        # Preferred formula: GSAA = Saves - (Shots Faced × League SV%)
+        # This explicitly handles the volume component and answers:
+        # "How many fewer goals did this goalie allow than a league-average goalie would have, given the same workload?"
+        if projected_sv_pct > 0:
+            projected_shots = projected_saves / projected_sv_pct
+            projected_gsaa = projected_saves - (projected_shots * LEAGUE_AVG_SV_PCT)
+        else:
+            projected_gsaa = 0.0
+            projected_shots = 0.0
+        
+        if debug:
+            print(f"  [Goalie Projection] GSAA: {projected_gsaa:.2f} = {projected_saves:.2f} saves - ({projected_shots:.2f} shots × {LEAGUE_AVG_SV_PCT:.3f} league SV%)")
         
         # 2. Projected Wins (Vegas Pivot)
         win_probability = get_vegas_win_probability(db, game_id, goalie_team, season, debug=debug)
@@ -1100,10 +1435,15 @@ def calculate_goalie_projection(
             "projected_gaa": round(projected_gaa, 2),
             "projected_save_pct": round(projected_sv_pct, 3),
             "projected_gp": round(projected_gp, 2),
+            "projected_gsaa": round(projected_gsaa, 2),  # Goals Saved Above Average
             "total_projected_points": round(total_projected_points, 3),
             "starter_confirmed": starter_confirmed,
             "confidence_score": round(confidence_score, 2),
             "calculation_method": "probability_based_volume",
+            "model_baselines": {
+                "league_avg_sv_pct": LEAGUE_AVG_SV_PCT,
+                "league_avg_xga_per_60": baselines["league_avg_xga_per_60"]
+            },
             "is_goalie": True,
             "season": season,
         }
@@ -1188,9 +1528,10 @@ def calculate_daily_projection(
         finishing_multiplier = calculate_finishing_talent(db, player_id, season)
         
         # Step 3: Get environmental adjustments using DDR (Defensive Difficulty Rating)
-        # League averages for DDR calculation
-        LEAGUE_AVG_XGA_PER_60 = 2.5  # Typical NHL team xGA/60
-        LEAGUE_AVG_SV_PCT = 0.905  # Typical NHL goalie SV%
+        # Fetch dynamic league baselines
+        baselines = get_latest_baselines(db, season)
+        LEAGUE_AVG_XGA_PER_60 = baselines["league_avg_xga_per_60"]
+        LEAGUE_AVG_SV_PCT = baselines["league_avg_sv_pct"]
         
         # Calculate DDR (combines team xGA/60 and goalie SV%)
         # Enable debug mode if needed (can be controlled via environment variable or parameter)
@@ -1224,6 +1565,90 @@ def calculate_daily_projection(
         # Calculate fantasy points (includes all 8 stats)
         total_projected_points = calculate_fantasy_points(final_projection, scoring_settings, is_goalie=False)
         
+        # Step 4: Calculate Positional Value Metrics (VOPA)
+        # Get position-specific fantasy points per 60 baseline
+        pos_baseline_fpts_60 = get_positional_avg_fantasy_pts_per_60(
+            db, position, season, scoring_settings
+        )
+        
+        # Get league baselines for defensive value
+        league_baselines = get_latest_baselines(db, season)
+        
+        # Get player's projected TOI for this game (in minutes)
+        # Use season average TOI as projection (can be enhanced with game-specific TOI projection)
+        player_season = db.select(
+            "player_season_stats",
+            select="icetime_seconds,games_played",
+            filters=[("player_id", "eq", player_id), ("season", "eq", season)],
+            limit=1
+        )
+        if player_season and len(player_season) > 0:
+            season_toi_seconds = int(player_season[0].get("icetime_seconds", 0))
+            season_gp = int(player_season[0].get("games_played", 0))
+            if season_gp > 0:
+                projected_toi_minutes = (season_toi_seconds / season_gp) / 60.0
+            else:
+                # Estimate based on position
+                toi_map = {"C": 17.5, "LW": 16.5, "RW": 16.5, "D": 21.0}
+                projected_toi_minutes = toi_map.get(position, 18.0)
+        else:
+            toi_map = {"C": 17.5, "LW": 16.5, "RW": 16.5, "D": 21.0}
+            projected_toi_minutes = toi_map.get(position, 18.0)
+        
+        # Calculate player's projected fantasy points per 60
+        projected_toi_hours = projected_toi_minutes / 60.0
+        player_projected_fpts_60 = (total_projected_points / projected_toi_hours) if projected_toi_hours > 0 else 0.0
+        
+        # 1. Calculate Offensive Value Above Baseline (Per 60)
+        offensive_paa_60 = player_projected_fpts_60 - pos_baseline_fpts_60
+        
+        # 2. Calculate Defensive Value (VOPA_D)
+        # Weight = Fantasy Points for 1 Goal (e.g., 3.0)
+        goal_weight = float(scoring_settings.get("skater", {}).get("goals", 3.0))
+        
+        # Get positional average xGA/60
+        # For now, use league average with position-specific adjustment
+        # TODO: Add positional xGA/60 to league_averages table in future sprint
+        league_avg_xga_per_60 = league_baselines["league_avg_xga_per_60"]
+        if position == "D":
+            pos_avg_xga_per_60 = league_avg_xga_per_60 - 0.25  # Defensemen typically 0.2-0.3 lower
+        else:
+            pos_avg_xga_per_60 = league_avg_xga_per_60
+        
+        # Get player's on-ice xGA/60
+        player_xga_per_60_raw = get_player_on_ice_xga_per_60(
+            db, player_id, player_team, season, last_n_games=10, debug=False
+        )
+        
+        # Apply Bayesian shrinkage to xGA/60 for players with small sample sizes
+        # This prevents outlier games from skewing defensive value
+        if player_xga_per_60_raw is not None:
+            player_xga_per_60 = calculate_xga_shrinkage(
+                player_xga_per_60_raw,
+                pos_avg_xga_per_60,
+                games_played,
+                min_games_for_stability=20
+            )
+        else:
+            player_xga_per_60 = None
+        
+        # Calculate defensive value per 60
+        # Positive value if player_xga < pos_avg_xga (suppressing more than average)
+        if player_xga_per_60 is not None:
+            xga_suppressed = pos_avg_xga_per_60 - player_xga_per_60
+            defensive_value_60 = xga_suppressed * goal_weight
+        else:
+            xga_suppressed = 0.0
+            defensive_value_60 = 0.0
+        
+        # 3. Total VOPA (Projected for the night's TOI)
+        # VOPA = (Offensive PAA/60 + Defensive Value/60) × Projected TOI (in hours)
+        total_vopa = (offensive_paa_60 + defensive_value_60) * projected_toi_hours
+        
+        # Also calculate per-60 metrics for transparency
+        offensive_paa_per_60 = offensive_paa_60
+        defensive_value_per_60 = defensive_value_60
+        
         # Calculate confidence score (simplified: based on games played)
         confidence_score = min(games_played / 30.0, 1.0) if games_played > 0 else 0.1
         
@@ -1249,6 +1674,21 @@ def calculate_daily_projection(
             "home_away_adjustment": round(home_away_adjustment, 3),
             "confidence_score": round(confidence_score, 2),
             "calculation_method": "hybrid_bayesian",
+            "model_baselines": {
+                "league_avg_sv_pct": LEAGUE_AVG_SV_PCT,
+                "league_avg_xga_per_60": LEAGUE_AVG_XGA_PER_60
+            },
+            "projected_paa": round(offensive_paa_60 * projected_toi_hours, 3),  # Points Above Average (fantasy points)
+            "projected_paa_per_60": round(offensive_paa_60, 3),  # PAA per 60 minutes
+            "on_ice_xga_per_60": round(player_xga_per_60, 3) if player_xga_per_60 else None,
+            "on_ice_xga_per_60_raw": round(player_xga_per_60_raw, 3) if player_xga_per_60_raw else None,
+            "xga_suppressed": round(xga_suppressed, 3),  # xGA suppressed vs positional average
+            "defensive_value": round(defensive_value_60 * projected_toi_hours, 3),  # Defensive value in fantasy points
+            "defensive_value_per_60": round(defensive_value_60, 3),  # Defensive value per 60
+            "total_vopa": round(total_vopa, 3),  # Total Value Over Positional Average
+            "position_avg_fpts_per_60": round(pos_baseline_fpts_60, 3),
+            "position_avg_xga_per_60": round(pos_avg_xga_per_60, 3),
+            "projected_toi_minutes": round(projected_toi_minutes, 2),
             "is_goalie": False,
             "season": season,
         }
@@ -1258,6 +1698,58 @@ def calculate_daily_projection(
         import traceback
         traceback.print_exc()
         return None
+
+
+def rank_players_by_vopa(
+    projections: List[Dict[str, Any]],
+    include_goalies: bool = True,
+    goal_weight: float = 3.0
+) -> List[Dict[str, Any]]:
+    """
+    Rank all players by their Total VOPA (Value Over Positional Average).
+    
+    This creates a unified ranking across all positions, identifying the best
+    "bang for your buck" players for daily fantasy.
+    
+    For skaters: Uses total_vopa (combines offensive PAA and defensive value)
+    For goalies: Uses GSAA normalized to approximate VOPA scale
+    
+    Args:
+        projections: List of projection dicts from calculate_daily_projection()
+        include_goalies: If True, include goalies ranked by GSAA (normalized)
+        goal_weight: Fantasy points for 1 goal (default 3.0), used to normalize goalie GSAA
+    
+    Returns:
+        List of projections sorted by total_vopa (descending), with rank added
+    """
+    ranked = []
+    
+    for proj in projections:
+        if proj.get("is_goalie"):
+            if not include_goalies:
+                continue
+            # For goalies, use GSAA normalized to approximate VOPA scale
+            # GSAA is already in "goals saved" units, convert to fantasy points
+            gsaa = proj.get("projected_gsaa", 0.0)
+            # Convert GSAA to approximate VOPA: GSAA × Goal Weight
+            # This makes goalie value comparable to skater value
+            goalie_vopa = gsaa * goal_weight
+            proj["total_vopa"] = goalie_vopa
+        else:
+            # Skaters already have total_vopa from calculate_daily_projection()
+            if "total_vopa" not in proj:
+                proj["total_vopa"] = 0.0
+        
+        ranked.append(proj)
+    
+    # Sort by total_vopa (descending)
+    ranked.sort(key=lambda x: x.get("total_vopa", 0.0), reverse=True)
+    
+    # Add rank
+    for i, proj in enumerate(ranked, 1):
+        proj["vopa_rank"] = i
+    
+    return ranked
 
 
 def main():

@@ -3,8 +3,12 @@
 ingest_raw_nhl.py
 Phase 1: Fast, parallel raw data ingestion from NHL API.
 
-This script scrapes play-by-play JSON from the NHL API and stores it in raw_nhl_data table.
+This script scrapes play-by-play JSON AND boxscore JSON from the NHL API and stores both
+in raw_nhl_data table. The boxscore data properly structures players in ["forwards", "defense", 
+"goalies"] groups, ensuring defencemen stats are captured correctly.
+
 It focuses on speed and reliability - no processing, just fetch and save.
+Boxscore data is used by scrape_per_game_nhl_stats.py for official NHL stat extraction.
 """
 
 import sys
@@ -107,15 +111,71 @@ def scrape_single_game_json(game_id):
     return None
 
 
-def save_raw_json_to_db(game_id, json_data, game_date, db_client):
+def scrape_single_game_boxscore(game_id):
     """
-    Save raw JSON to raw_nhl_data table using UPSERT for idempotency.
+    Fetch boxscore JSON for a single game from NHL API.
+    Boxscore properly structures players in ["forwards", "defense", "goalies"] groups,
+    ensuring defencemen stats are captured correctly.
+    
+    Args:
+        game_id: NHL game ID (e.g., 2025020001)
+    
+    Returns:
+        dict: Boxscore JSON data or None if failed
+    """
+    boxscore_url = f"{NHL_BASE_URL}/gamecenter/{game_id}/boxscore"
+    
+    # Small delay between PBP and boxscore fetch (within same worker)
+    time.sleep(random.uniform(0.1, 0.2))
+    
+    for attempt in range(MAX_429_RETRIES):
+        try:
+            response = requests.get(boxscore_url, timeout=15)
+            
+            if response.status_code == 429:
+                if attempt < MAX_429_RETRIES - 1:
+                    delay = min(BASE_429_DELAY ** (attempt + 1), 60)
+                    print(f"  Game {game_id} boxscore: 429 rate limit. Waiting {delay}s...")
+                    time.sleep(delay)
+                    continue
+                else:
+                    print(f"  Game {game_id} boxscore: 429 after {MAX_429_RETRIES} attempts. Skipping.")
+                    return None
+            
+            response.raise_for_status()
+            return response.json()
+            
+        except requests.exceptions.Timeout:
+            if attempt < MAX_429_RETRIES - 1:
+                delay = min(BASE_429_DELAY ** attempt, 30)
+                print(f"  Game {game_id} boxscore: Timeout (attempt {attempt + 1}/{MAX_429_RETRIES}). Retrying in {delay}s...")
+                time.sleep(delay)
+            else:
+                print(f"  Game {game_id} boxscore: Timeout after {MAX_429_RETRIES} attempts. Skipping.")
+                return None
+                
+        except requests.exceptions.RequestException as e:
+            if attempt < MAX_429_RETRIES - 1:
+                delay = min(BASE_429_DELAY ** attempt, 30)
+                print(f"  Game {game_id} boxscore: Error (attempt {attempt + 1}/{MAX_429_RETRIES}): {e}")
+                time.sleep(delay)
+            else:
+                print(f"  Game {game_id} boxscore: Failed after {MAX_429_RETRIES} attempts: {e}")
+                return None
+    
+    return None
+
+
+def save_raw_json_to_db(game_id, json_data, game_date, db_client, boxscore_json=None):
+    """
+    Save raw JSON and boxscore JSON to raw_nhl_data table using UPSERT for idempotency.
     
     Args:
         game_id: NHL game ID
-        json_data: Raw JSON from API
+        json_data: Raw PBP JSON from API
         game_date: Date of the game (YYYY-MM-DD)
         db_client: Supabase client
+        boxscore_json: Optional boxscore JSON from API
     """
     try:
         # Extract game date from JSON if not provided
@@ -123,13 +183,20 @@ def save_raw_json_to_db(game_id, json_data, game_date, db_client):
             # Try to extract date from JSON structure
             game_date = datetime.date.today().strftime('%Y-%m-%d')
         
-        # UPSERT: Insert or update if game_id already exists
-        db_client.table('raw_nhl_data').upsert({
+        # Build upsert data
+        upsert_data = {
             'game_id': game_id,
             'game_date': game_date,
             'raw_json': json_data,
             'scraped_at': datetime.datetime.now().isoformat()
-        }, on_conflict='game_id').execute()
+        }
+        
+        # Add boxscore if provided
+        if boxscore_json is not None:
+            upsert_data['boxscore_json'] = boxscore_json
+        
+        # UPSERT: Insert or update if game_id already exists
+        db_client.table('raw_nhl_data').upsert(upsert_data, on_conflict='game_id').execute()
         
         return True
     except Exception as e:
@@ -187,11 +254,14 @@ def ingest_single_game(game_id, rate_limit_flag=None):
         time.sleep(cooldown_time)
     
     try:
-        # Scrape JSON
+        # Scrape PBP JSON
         json_data = scrape_single_game_json(game_id)
         
         if json_data is None:
-            return {'success': False, 'game_id': game_id, 'error': 'Failed to fetch JSON'}
+            return {'success': False, 'game_id': game_id, 'error': 'Failed to fetch PBP JSON'}
+        
+        # Scrape boxscore JSON (for proper defencemen handling)
+        boxscore_json = scrape_single_game_boxscore(game_id)
         
         # Extract game date
         game_date = extract_game_date_from_json(json_data, game_id)
@@ -199,11 +269,12 @@ def ingest_single_game(game_id, rate_limit_flag=None):
             # Fallback to today if we can't extract date
             game_date = datetime.date.today().strftime('%Y-%m-%d')
         
-        # Save to database (UPSERT)
-        saved = save_raw_json_to_db(game_id, json_data, game_date, db_client)
+        # Save to database (UPSERT) - boxscore is optional, PBP is required
+        saved = save_raw_json_to_db(game_id, json_data, game_date, db_client, boxscore_json=boxscore_json)
         
         if saved:
-            return {'success': True, 'game_id': game_id}
+            boxscore_status = "with boxscore" if boxscore_json else "without boxscore"
+            return {'success': True, 'game_id': game_id, 'boxscore': boxscore_json is not None}
         else:
             return {'success': False, 'game_id': game_id, 'error': 'Failed to save to database'}
             

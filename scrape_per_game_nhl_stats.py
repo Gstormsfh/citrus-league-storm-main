@@ -2,8 +2,12 @@
 """
 scrape_per_game_nhl_stats.py
 
-Scrape per-game NHL official statistics from gamecenter boxscore endpoint.
+Extract per-game NHL official statistics from stored boxscore data (or fetch from API as fallback).
 Populates player_game_stats.nhl_* columns with official NHL.com game-by-game stats.
+
+This script now reads boxscore JSON from raw_nhl_data.boxscore_json (stored by ingest_raw_nhl.py),
+which ensures defencemen are properly handled via the "defense" position group structure.
+Falls back to API fetch if boxscore not found in database.
 
 This is the source of truth for fantasy scoring - uses NHL official stats, not PBP assumptions.
 """
@@ -76,15 +80,48 @@ def parse_time_to_seconds(time_str: str) -> int:
         return 0
 
 
-def fetch_game_boxscore(game_id: int) -> Optional[Dict]:
-    """Fetch boxscore from gamecenter endpoint."""
+def fetch_game_boxscore(game_id: int, db: Optional[SupabaseRest] = None) -> Optional[Dict]:
+    """
+    Fetch boxscore from stored raw_nhl_data first, fallback to API if not available.
+    This uses the consolidated scraping approach where boxscore is stored alongside PBP data.
+    
+    Args:
+        game_id: NHL game ID
+        db: Optional Supabase client (if None, will create one)
+    
+    Returns:
+        Boxscore dict or None if not found
+    """
+    # Try to read from stored data first
+    if db is None:
+        db = supabase_client()
+    
+    try:
+        stored_data = db.select(
+            "raw_nhl_data",
+            select="boxscore_json",
+            filters=[("game_id", "eq", game_id)],
+            limit=1
+        )
+        
+        if stored_data and len(stored_data) > 0:
+            boxscore_json = stored_data[0].get("boxscore_json")
+            if boxscore_json:
+                # Return stored boxscore
+                return boxscore_json
+    except Exception as e:
+        # If reading from DB fails, fall back to API fetch
+        print(f"  [WARNING] Could not read stored boxscore for game {game_id}: {e}")
+        print(f"  [INFO] Falling back to API fetch...")
+    
+    # Fallback: Fetch from API if not in database
     url = f"{NHL_API_BASE}/gamecenter/{game_id}/boxscore"
     try:
         response = requests.get(url, timeout=10)
         response.raise_for_status()
         return response.json()
     except Exception as e:
-        print(f"  Error fetching game {game_id}: {e}")
+        print(f"  Error fetching game {game_id} boxscore from API: {e}")
         return None
 
 
@@ -656,10 +693,10 @@ def main():
         
         print(f"[{idx}/{len(games)}] Processing game {game_id} ({game_date}, status: {status})...")
         
-        # Fetch boxscore
-        boxscore = fetch_game_boxscore(game_id)
+        # Fetch boxscore (reads from stored data first, falls back to API)
+        boxscore = fetch_game_boxscore(game_id, db)
         if not boxscore:
-            print(f"  [ERROR] Failed to fetch boxscore")
+            print(f"  [ERROR] Failed to fetch boxscore (tried stored data and API)")
             errors += 1
             time.sleep(0.5)  # Rate limiting
             continue

@@ -844,29 +844,50 @@ const Matchup = () => {
         
         if (!error && seasonStatsData) {
           // Map player_season_stats to stats format
+          // Use NHL.com official stats for display, fallback to PBP-calculated for backwards compatibility (matching PlayerService logic)
+          const assists = (seasonStatsData.nhl_assists ?? ((seasonStatsData.primary_assists ?? 0) + (seasonStatsData.secondary_assists ?? 0)));
+          
+          // Calculate goals and assists first (matching PlayerService logic)
+          const calculatedGoals = seasonStatsData.nhl_goals ?? seasonStatsData.goals ?? 0;
+          const calculatedAssists = assists;
+          
+          // ALWAYS calculate points from goals + assists to ensure consistency with PlayerService
+          // This prevents issues where database points don't match goals + assists
+          const calculatedPoints = calculatedGoals + calculatedAssists;
+          
+          // Get database points for validation logging
+          const dbNhlPoints = Number(seasonStatsData.nhl_points ?? 0);
+          const dbPbpPoints = Number(seasonStatsData.points ?? 0);
+          const dbPoints = dbNhlPoints > 0 ? dbNhlPoints : dbPbpPoints;
+          
+          // Log warning if database points don't match calculated points (for debugging)
+          if (dbPoints > 0 && Math.abs(dbPoints - calculatedPoints) > 0.5) {
+            console.warn(`[Matchup] Points mismatch for player ${player.name} (ID: ${player.id}): DB points=${dbPoints}, Calculated=${calculatedPoints} (Goals=${calculatedGoals}, Assists=${calculatedAssists}). Using calculated points.`);
+          }
+          
           const mappedStats = {
-            goals: seasonStatsData.goals ?? 0,
-            assists: (seasonStatsData.primary_assists ?? 0) + (seasonStatsData.secondary_assists ?? 0),
-            points: seasonStatsData.points ?? 0,
-            plusMinus: seasonStatsData.plus_minus ?? seasonStatsData.nhl_plus_minus ?? 0,
-            shots: seasonStatsData.shots_on_goal ?? 0,
+            goals: calculatedGoals,
+            assists: calculatedAssists,
+            points: calculatedPoints,
+            plusMinus: seasonStatsData.nhl_plus_minus ?? seasonStatsData.plus_minus ?? 0,
+            shots: seasonStatsData.nhl_shots_on_goal ?? seasonStatsData.shots_on_goal ?? 0,
             gamesPlayed: seasonStatsData.games_played ?? 0,
-            hits: seasonStatsData.hits ?? 0,
-            blockedShots: seasonStatsData.blocks ?? 0,
+            hits: seasonStatsData.nhl_hits ?? seasonStatsData.hits ?? 0,
+            blockedShots: seasonStatsData.nhl_blocks ?? seasonStatsData.blocks ?? 0,
             xGoals: seasonStatsData.x_goals ?? 0,
-            powerPlayPoints: seasonStatsData.ppp ?? 0,
-            shortHandedPoints: seasonStatsData.shp ?? 0,
-            pim: seasonStatsData.pim ?? 0,
-            icetime_seconds: seasonStatsData.icetime_seconds ?? seasonStatsData.nhl_toi_seconds ?? 0,
-            wins: seasonStatsData.wins ?? 0,
-            saves: seasonStatsData.saves ?? 0,
-            shots_faced: seasonStatsData.shots_faced ?? 0,
-            goals_against: seasonStatsData.goals_against ?? 0,
-            shutouts: seasonStatsData.shutouts ?? 0,
-            save_pct: seasonStatsData.save_pct ?? 0,
-            gaa: seasonStatsData.goals_against && seasonStatsData.goalie_gp 
+            powerPlayPoints: seasonStatsData.nhl_ppp ?? seasonStatsData.ppp ?? 0,
+            shortHandedPoints: seasonStatsData.nhl_shp ?? seasonStatsData.shp ?? 0,
+            pim: seasonStatsData.nhl_pim ?? seasonStatsData.pim ?? 0,
+            icetime_seconds: seasonStatsData.nhl_toi_seconds ?? seasonStatsData.icetime_seconds ?? 0,
+            wins: seasonStatsData.nhl_wins ?? seasonStatsData.wins ?? 0,
+            saves: seasonStatsData.nhl_saves ?? seasonStatsData.saves ?? 0,
+            shots_faced: seasonStatsData.nhl_shots_faced ?? seasonStatsData.shots_faced ?? 0,
+            goals_against: seasonStatsData.nhl_goals_against ?? seasonStatsData.goals_against ?? 0,
+            shutouts: seasonStatsData.nhl_shutouts ?? seasonStatsData.shutouts ?? 0,
+            save_pct: seasonStatsData.nhl_save_pct ?? seasonStatsData.save_pct ?? 0,
+            gaa: seasonStatsData.nhl_gaa ?? (seasonStatsData.goals_against && seasonStatsData.goalie_gp 
               ? seasonStatsData.goals_against / seasonStatsData.goalie_gp 
-              : 0
+              : 0)
           };
           setSelectedPlayer(toHockeyPlayer(player, mappedStats));
         } else {

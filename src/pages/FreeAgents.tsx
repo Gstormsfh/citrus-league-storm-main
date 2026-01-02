@@ -95,7 +95,23 @@ const FreeAgents = () => {
       
       // Get all players from our pipeline tables (player_directory + player_season_stats)
       // PlayerService.getAllPlayers() is the ONLY source for player data
+      // CRITICAL: This now filters to only include players with matching stats records (same as getPlayersByIds)
+      // This ensures Free Agents shows the EXACT same players and stats as Matchup tab and Player Cards
       const allPlayers = await PlayerService.getAllPlayers();
+      
+      console.log(`[FreeAgents] Fetched ${allPlayers.length} players from PlayerService.getAllPlayers()`);
+      
+      // Debug: Log sample players to verify data
+      if (allPlayers.length > 0) {
+        const samplePlayers = allPlayers.slice(0, 3);
+        samplePlayers.forEach(samplePlayer => {
+          const calculatedPoints = samplePlayer.goals + samplePlayer.assists;
+          console.log(`[FreeAgents] Sample: ${samplePlayer.full_name} (ID: ${samplePlayer.id}) - ${samplePlayer.goals}G ${samplePlayer.assists}A ${samplePlayer.points}P (GP: ${samplePlayer.games_played}, Team: ${samplePlayer.team})`);
+          if (Math.abs(samplePlayer.points - calculatedPoints) > 0.5) {
+            console.warn(`[FreeAgents] WARNING: Points mismatch for ${samplePlayer.full_name}: points=${samplePlayer.points}, goals+assists=${calculatedPoints}`);
+          }
+        });
+      }
       
       if (!allPlayers || allPlayers.length === 0) {
         throw new Error('No players found');
@@ -615,6 +631,7 @@ const FreeAgents = () => {
   const filteredPlayers = sortPlayers(getFilteredPlayers(players));
 
   // Helper to convert Player to HockeyPlayer for the modal
+  // Uses the same stat mapping as Matchup tab to ensure consistency
   const toHockeyPlayer = (p: Player): HockeyPlayer => ({
     id: p.id,
     name: p.full_name,
@@ -631,12 +648,18 @@ const FreeAgents = () => {
       hits: p.hits || 0,
       blockedShots: p.blocks || 0,
       xGoals: p.xGoals || 0,
-      // corsi/fenwick intentionally removed
+      powerPlayPoints: p.ppp || 0,
+      shortHandedPoints: p.shp || 0,
+      pim: p.pim || 0,
+      // Goalie stats
       wins: p.wins || 0,
       losses: p.losses || 0,
       otl: p.ot_losses || 0,
       gaa: p.goals_against_average || 0,
-      savePct: p.save_percentage || 0
+      savePct: p.save_percentage || 0,
+      shutouts: p.shutouts || 0,
+      saves: p.saves || 0,
+      goalsAgainst: p.goals_against || 0
     },
     team: p.team,
     teamAbbreviation: p.team,

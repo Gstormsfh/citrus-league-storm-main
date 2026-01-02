@@ -14,6 +14,7 @@ type PlayerSeasonStatsRow = {
   nhl_toi_seconds?: number; // NHL.com official TOI (for display) - optional until migration runs
   plus_minus: number; // Our calculated plus/minus (for internal use)
   nhl_plus_minus?: number; // NHL.com official plus/minus (for display) - optional until migration runs
+  // PBP-calculated stats (for internal model use)
   goals: number;
   primary_assists: number;
   secondary_assists: number;
@@ -24,9 +25,20 @@ type PlayerSeasonStatsRow = {
   pim: number;
   ppp: number;
   shp: number;
-  plus_minus: number;
+  // NHL.com official stats (for display and fantasy scoring)
+  nhl_goals?: number;
+  nhl_assists?: number;
+  nhl_points?: number;
+  nhl_shots_on_goal?: number;
+  nhl_hits?: number;
+  nhl_blocks?: number;
+  nhl_pim?: number;
+  nhl_ppp?: number;
+  nhl_shp?: number;
+  // Advanced metrics (from PBP - for internal use)
   x_goals: number;
   x_assists: number;
+  // Goalie stats (PBP-calculated for internal use)
   goalie_gp: number;
   wins: number;
   saves: number;
@@ -34,6 +46,16 @@ type PlayerSeasonStatsRow = {
   goals_against: number;
   shutouts: number;
   save_pct: number | null;
+  // Goalie stats (NHL.com official for display)
+  nhl_wins?: number;
+  nhl_losses?: number;
+  nhl_ot_losses?: number;
+  nhl_saves?: number;
+  nhl_shots_faced?: number;
+  nhl_goals_against?: number;
+  nhl_shutouts?: number;
+  nhl_save_pct?: number | null;
+  nhl_gaa?: number;
 };
 
 type PlayerDirectoryRow = {
@@ -58,6 +80,20 @@ function mapStatsToCitrusPuck(
   const team = stats.team_abbrev || directory?.team_abbrev || '';
   const position = stats.position_code || directory?.position_code || '';
   
+  // If player hasn't played (games_played === 0), return all zeros
+  const gamesPlayed = stats.games_played || 0;
+  const hasPlayed = gamesPlayed > 0;
+  
+  // Validate stats are reasonable - check for stale NHL stats
+  // If points per game is unreasonably high (> 3 PPG), NHL stats are likely stale
+  const nhlPoints = Number(stats.nhl_points ?? 0);
+  const pointsPerGame = gamesPlayed > 0 ? (nhlPoints / gamesPlayed) : 0;
+  const MAX_REASONABLE_PPG = 3.0; // Even elite players rarely exceed 2 PPG over a season
+  
+  // If NHL stats look stale (unreasonable PPG), prefer PBP stats
+  const nhlStatsLookStale = hasPlayed && nhlPoints > 0 && pointsPerGame > MAX_REASONABLE_PPG;
+  const useNhlStats = hasPlayed && !nhlStatsLookStale;
+  
   // Base CitrusPuckPlayerData with all fields defaulted to 0
   const citrusData: CitrusPuckPlayerData = {
     playerId: stats.player_id,
@@ -68,9 +104,11 @@ function mapStatsToCitrusPuck(
     position,
     
     // Basic stats (from player_season_stats)
-    games_played: stats.games_played || 0,
+    games_played: gamesPlayed,
     // Use NHL.com TOI for display, fallback to our calculated TOI
-    icetime: stats.nhl_toi_seconds || stats.icetime_seconds || 0,
+    // If player hasn't played, TOI should be 0
+    // If NHL stats look stale, use PBP TOI instead
+    icetime: hasPlayed ? (useNhlStats ? (stats.nhl_toi_seconds || stats.icetime_seconds || 0) : (stats.icetime_seconds || 0)) : 0,
     shifts: 0, // Not available in season stats
     gameScore: 0, // Not available
     
@@ -84,8 +122,11 @@ function mapStatsToCitrusPuck(
     iceTimeRank: 0,
     
     // Individual For (I_F) stats - map from player_season_stats
+    // Use NHL.com official stats for display, fallback to PBP-calculated for backwards compatibility
+    // If player hasn't played, all stats should be 0
+    // If NHL stats look stale (unreasonable PPG), use PBP stats instead
     I_F_xOnGoal: 0,
-    I_F_xGoals: Number(stats.x_goals) || 0,
+    I_F_xGoals: hasPlayed ? (Number(stats.x_goals) || 0) : 0,
     I_F_xRebounds: 0,
     I_F_xFreeze: 0,
     I_F_xPlayStopped: 0,
@@ -94,26 +135,29 @@ function mapStatsToCitrusPuck(
     I_F_flurryAdjustedxGoals: 0,
     I_F_scoreVenueAdjustedxGoals: 0,
     I_F_flurryScoreVenueAdjustedxGoals: 0,
-    I_F_primaryAssists: stats.primary_assists || 0,
-    I_F_secondaryAssists: stats.secondary_assists || 0,
-    I_F_shotsOnGoal: stats.shots_on_goal || 0,
+    // For assists, calculate from primary + secondary, but use NHL if available
+    I_F_primaryAssists: hasPlayed ? (stats.primary_assists || 0) : 0,
+    I_F_secondaryAssists: hasPlayed ? (stats.secondary_assists || 0) : 0,
+    // Use NHL stats with PBP fallback (matching PlayerService logic)
+    I_F_shotsOnGoal: hasPlayed ? (useNhlStats ? Number(stats.nhl_shots_on_goal ?? stats.shots_on_goal ?? 0) : Number(stats.shots_on_goal ?? 0)) : 0,
     I_F_missedShots: 0,
     I_F_blockedShotAttempts: 0,
     I_F_shotAttempts: 0,
-    I_F_points: stats.points || 0,
-    I_F_goals: stats.goals || 0,
+    I_F_points: hasPlayed ? (useNhlStats ? Number(stats.nhl_points ?? stats.points ?? 0) : Number(stats.points ?? 0)) : 0,
+    I_F_goals: hasPlayed ? (useNhlStats ? Number(stats.nhl_goals ?? stats.goals ?? 0) : Number(stats.goals ?? 0)) : 0,
     I_F_rebounds: 0,
     I_F_reboundGoals: 0,
     I_F_freeze: 0,
     I_F_playStopped: 0,
     I_F_playContinuedInZone: 0,
     I_F_playContinuedOutsideZone: 0,
-    I_F_savedShotsOnGoal: stats.is_goalie ? (stats.saves || 0) : 0,
-    I_F_savedUnblockedShotAttempts: stats.is_goalie ? (stats.saves || 0) : 0,
+    // Goalie saves: Use NHL stats with PBP fallback
+    I_F_savedShotsOnGoal: hasPlayed && stats.is_goalie ? (useNhlStats ? Number(stats.nhl_saves ?? stats.saves ?? 0) : Number(stats.saves ?? 0)) : 0,
+    I_F_savedUnblockedShotAttempts: hasPlayed && stats.is_goalie ? (useNhlStats ? Number(stats.nhl_saves ?? stats.saves ?? 0) : Number(stats.saves ?? 0)) : 0,
     penalties: 0,
-    I_F_penalityMinutes: stats.pim || 0,
+    I_F_penalityMinutes: hasPlayed ? (useNhlStats ? Number(stats.nhl_pim ?? stats.pim ?? 0) : Number(stats.pim ?? 0)) : 0,
     I_F_faceOffsWon: 0,
-    I_F_hits: stats.hits || 0,
+    I_F_hits: hasPlayed ? (useNhlStats ? Number(stats.nhl_hits ?? stats.hits ?? 0) : Number(stats.hits ?? 0)) : 0,
     I_F_takeaways: 0,
     I_F_giveaways: 0,
     I_F_lowDangerShots: 0,
@@ -147,10 +191,10 @@ function mapStatsToCitrusPuck(
     faceoffsWon: 0,
     faceoffsLost: 0,
     timeOnBench: 0,
-    penalityMinutes: stats.pim || 0,
+    penalityMinutes: hasPlayed ? (useNhlStats ? Number(stats.nhl_pim ?? stats.pim ?? 0) : Number(stats.pim ?? 0)) : 0,
     penalityMinutesDrawn: 0,
     penaltiesDrawn: 0,
-    shotsBlockedByPlayer: stats.blocks || 0,
+    shotsBlockedByPlayer: hasPlayed ? (useNhlStats ? Number(stats.nhl_blocks ?? stats.blocks ?? 0) : Number(stats.blocks ?? 0)) : 0,
     
     // On-Ice For stats (not available - set to 0)
     OnIce_F_xOnGoal: 0,
@@ -241,10 +285,11 @@ export const CitrusPuckService = {
    */
   async getAllAnalytics(season: number): Promise<Map<number, AggregatedPlayerData>> {
       // Fetch stats and directory data
+      // Select all columns including NHL stats for proper mapping
       const [statsResponse, directoryResponse] = await Promise.all([
           (supabase as any)
             .from("player_season_stats")
-            .select("*")
+            .select("season, player_id, team_abbrev, position_code, is_goalie, games_played, icetime_seconds, nhl_toi_seconds, goals, primary_assists, secondary_assists, points, shots_on_goal, hits, blocks, pim, ppp, shp, plus_minus, nhl_plus_minus, nhl_goals, nhl_assists, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_ppp, nhl_shp, x_goals, x_assists, goalie_gp, wins, saves, shots_faced, goals_against, shutouts, save_pct, nhl_wins, nhl_losses, nhl_ot_losses, nhl_saves, nhl_shots_faced, nhl_goals_against, nhl_shutouts, nhl_save_pct, nhl_gaa")
             .eq("season", season),
           (supabase as any)
             .from("player_directory")
@@ -302,10 +347,11 @@ export const CitrusPuckService = {
     position?: string // 'G' for goalie, others for skater
   ): Promise<CitrusPuckPlayerData[]> {
     // Fetch stats and directory
+    // Select all columns including NHL stats for proper mapping
     const [statsResponse, directoryResponse] = await Promise.all([
       (supabase as any)
         .from("player_season_stats")
-        .select("*")
+        .select("season, player_id, team_abbrev, position_code, is_goalie, games_played, icetime_seconds, nhl_toi_seconds, goals, primary_assists, secondary_assists, points, shots_on_goal, hits, blocks, pim, ppp, shp, plus_minus, nhl_plus_minus, nhl_goals, nhl_assists, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_ppp, nhl_shp, x_goals, x_assists, goalie_gp, wins, saves, shots_faced, goals_against, shutouts, save_pct, nhl_wins, nhl_losses, nhl_ot_losses, nhl_saves, nhl_shots_faced, nhl_goals_against, nhl_shutouts, nhl_save_pct, nhl_gaa")
         .eq("season", season)
         .eq("player_id", playerId)
         .single(),

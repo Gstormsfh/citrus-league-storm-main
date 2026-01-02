@@ -143,8 +143,11 @@ export const PlayerService = {
     // Check cache first
     const now = Date.now();
     if (playersCache && (now - playersCache.timestamp) < CACHE_TTL) {
+      const cacheAge = Math.round((now - playersCache.timestamp) / 1000);
+      console.log(`[PlayerService] getAllPlayers(): Returning CACHED data (age: ${cacheAge} seconds)`);
       return playersCache.data;
     }
+    console.log(`[PlayerService] getAllPlayers(): Cache expired or missing, fetching fresh data`);
 
     try {
       const DEFAULT_SEASON = 2025;
@@ -165,13 +168,30 @@ export const PlayerService = {
       const dirRows = (dirRowsRaw || []) as PlayerDirectoryRow[];
       const statRows = (statRowsRaw || []) as PlayerSeasonStatsRow[];
 
+      console.log(`[PlayerService] getAllPlayers(): Fetched ${dirRows.length} directory rows, ${statRows.length} stats rows for season ${DEFAULT_SEASON}`);
+
       const statsByPlayerId = new Map<number, PlayerSeasonStatsRow>();
       statRows.forEach((r) => {
-        if (r?.player_id != null) statsByPlayerId.set(Number(r.player_id), r);
+        if (r?.player_id != null) {
+          const pid = Number(r.player_id);
+          // Validate season matches (defensive check)
+          if (r.season !== DEFAULT_SEASON) {
+            console.warn(`[PlayerService] WARNING: Stats row for player ${pid} has season ${r.season}, expected ${DEFAULT_SEASON}`);
+          }
+          statsByPlayerId.set(pid, r);
+        }
       });
+      
+      // Validate directory rows have correct season
+      const wrongSeasonDir = dirRows.filter(d => d.season !== DEFAULT_SEASON);
+      if (wrongSeasonDir.length > 0) {
+        console.warn(`[PlayerService] WARNING: ${wrongSeasonDir.length} directory rows have wrong season (not ${DEFAULT_SEASON})`);
+      }
 
-      // Fetch GSAx for goalies
-      const goalieIds = dirRows.filter((d: PlayerDirectoryRow) => d.is_goalie).map((d: PlayerDirectoryRow) => Number(d.player_id));
+      // Fetch GSAx for goalies (only for players that have stats)
+      const goalieIds = dirRows
+        .filter((d: PlayerDirectoryRow) => d.is_goalie && statsByPlayerId.has(Number(d.player_id)))
+        .map((d: PlayerDirectoryRow) => Number(d.player_id));
       const gsaxMap = new Map<number, number>();
       
       if (goalieIds.length > 0) {
@@ -212,9 +232,48 @@ export const PlayerService = {
         }
       }
 
-      const players: Player[] = dirRows.map((d) => {
+      // CRITICAL: Only include players that have matching stats records
+      // This ensures we only show players with actual season data, matching what getPlayersByIds() would return
+      // This prevents showing players from wrong seasons or players without stats
+      const players: Player[] = dirRows
+        .filter((d) => {
+          const pid = Number(d.player_id);
+          const hasStats = statsByPlayerId.has(pid);
+          if (!hasStats) {
+            console.warn(`[PlayerService] getAllPlayers(): Skipping player ${d.full_name} (ID: ${pid}) - no stats record found in player_season_stats for season ${DEFAULT_SEASON}`);
+          }
+          return hasStats; // Only include players with matching stats
+        })
+        .map((d) => {
         const pid = Number(d.player_id);
-        const s = statsByPlayerId.get(pid);
+        const sRaw = statsByPlayerId.get(pid);
+        if (!sRaw) {
+          // This shouldn't happen due to filter above, but defensive check
+          throw new Error(`No stats found for player ${pid} despite filter`);
+        }
+        
+        // Validate season matches
+        if (sRaw.season !== DEFAULT_SEASON) {
+          console.warn(`[PlayerService] WARNING: Stats for player ${d.full_name} (ID: ${pid}) has season ${sRaw.season}, expected ${DEFAULT_SEASON}`);
+        }
+        
+        // If player hasn't played (games_played === 0), treat stats as null to show zeros
+        const gamesPlayed = Number(sRaw?.games_played ?? 0);
+        const hasPlayed = gamesPlayed > 0;
+        
+        // Validate stats are reasonable - check for stale NHL stats
+        // If points per game is unreasonably high (> 3 PPG), NHL stats are likely stale
+        const nhlPoints = Number(sRaw?.nhl_points ?? 0);
+        const pbpPoints = Number(sRaw?.points ?? 0);
+        const pointsPerGame = gamesPlayed > 0 ? (nhlPoints / gamesPlayed) : 0;
+        const MAX_REASONABLE_PPG = 3.0; // Even elite players rarely exceed 2 PPG over a season
+        
+        // If NHL stats look stale (unreasonable PPG), prefer PBP stats or use null
+        const nhlStatsLookStale = hasPlayed && nhlPoints > 0 && pointsPerGame > MAX_REASONABLE_PPG;
+        const useNhlStats = hasPlayed && !nhlStatsLookStale;
+        
+        const s = hasPlayed ? sRaw : null;
+        
         const assists = Number(s?.primary_assists ?? 0) + Number(s?.secondary_assists ?? 0);
 
         const team = d.team_abbrev || s?.team_abbrev || "";
@@ -222,6 +281,24 @@ export const PlayerService = {
         const headshot =
           d.headshot_url ||
           (team && pid ? `https://assets.nhle.com/mugs/nhl/20242025/${team}/${pid}.png` : null);
+
+        // Calculate goals and assists first
+        const calculatedGoals = useNhlStats ? Number(s?.nhl_goals ?? s?.goals ?? 0) : Number(s?.goals ?? 0);
+        const calculatedAssists = useNhlStats ? Number(s?.nhl_assists ?? assists ?? 0) : assists;
+        
+        // ALWAYS calculate points from goals + assists to ensure consistency
+        // This prevents issues where database points don't match goals + assists
+        const calculatedPoints = calculatedGoals + calculatedAssists;
+        
+        // Get database points for validation logging
+        const dbNhlPoints = useNhlStats ? Number(s?.nhl_points ?? 0) : 0;
+        const dbPbpPoints = Number(s?.points ?? 0);
+        const dbPoints = useNhlStats ? dbNhlPoints : dbPbpPoints;
+        
+        // Log warning if database points don't match calculated points (for debugging)
+        if (hasPlayed && dbPoints > 0 && Math.abs(dbPoints - calculatedPoints) > 0.5) {
+          console.warn(`[PlayerService] Points mismatch for player ${d.full_name} (ID: ${pid}): DB points=${dbPoints}, Calculated=${calculatedPoints} (Goals=${calculatedGoals}, Assists=${calculatedAssists}). Using calculated points.`);
+        }
 
         return {
           id: String(pid),
@@ -232,12 +309,15 @@ export const PlayerService = {
           status: "active",
           headshot_url: headshot,
           last_updated: new Date().toISOString(),
-          games_played: Number(s?.games_played ?? 0),
+          games_played: gamesPlayed,
 
           // Use NHL.com official stats for display, fallback to PBP-calculated for backwards compatibility
-          goals: Number(s?.nhl_goals ?? s?.goals ?? 0),
-          assists: Number(s?.nhl_assists ?? assists ?? 0),
-          points: Number(s?.nhl_points ?? s?.points ?? 0),
+          // If player hasn't played, all stats will be 0 (s is null)
+          // If NHL stats look stale (unreasonable PPG), use PBP stats instead
+          // ALWAYS calculate points from goals + assists to ensure consistency
+          goals: calculatedGoals,
+          assists: calculatedAssists,
+          points: calculatedPoints,
           plus_minus: Number(s?.nhl_plus_minus ?? s?.plus_minus ?? 0),
           shots: Number(s?.nhl_shots_on_goal ?? s?.shots_on_goal ?? 0),
           hits: Number(s?.nhl_hits ?? s?.hits ?? 0),
@@ -271,10 +351,19 @@ export const PlayerService = {
 
       const sortedPlayers = players.sort((a, b) => (b.points || 0) - (a.points || 0));
 
+      // Log sample of players to verify data
+      if (sortedPlayers.length > 0) {
+        const sample = sortedPlayers.slice(0, 3);
+        console.log(`[PlayerService] getAllPlayers(): Sample players:`, 
+          sample.map(p => `${p.full_name} (${p.id}): ${p.goals}G ${p.assists}A ${p.points}P (GP: ${p.games_played})`).join(', '));
+      }
+
       playersCache = {
         data: sortedPlayers,
         timestamp: Date.now(),
       };
+      
+      console.log(`[PlayerService] getAllPlayers(): Fetched ${sortedPlayers.length} players (filtered to only those with stats), cached for ${CACHE_TTL / 1000} seconds`);
 
       return sortedPlayers;
     } catch (error) {
@@ -306,6 +395,8 @@ export const PlayerService = {
    */
   async getPlayersByIds(playerIds: string[]): Promise<Player[]> {
     if (playerIds.length === 0) return [];
+    
+    console.log(`[PlayerService] getPlayersByIds(): Fetching ${playerIds.length} players (no cache for this method)`);
     
     try {
       const DEFAULT_SEASON = 2025;
@@ -373,20 +464,85 @@ export const PlayerService = {
       const dirRows = (dirRowsRaw || []) as PlayerDirectoryRow[];
       const statRows = (statRowsRaw || []) as PlayerSeasonStatsRow[];
 
+      console.log(`[PlayerService] getPlayersByIds(): Fetched ${dirRows.length} directory rows, ${statRows.length} stats rows for ${intIds.length} requested player IDs`);
+
       const statsByPlayerId = new Map<number, PlayerSeasonStatsRow>();
       statRows.forEach((r) => {
-        if (r?.player_id != null) statsByPlayerId.set(Number(r.player_id), r);
+        if (r?.player_id != null) {
+          const pid = Number(r.player_id);
+          // Validate season matches (defensive check)
+          if (r.season !== DEFAULT_SEASON) {
+            console.warn(`[PlayerService] WARNING: Stats row for player ${pid} has season ${r.season}, expected ${DEFAULT_SEASON}`);
+          }
+          statsByPlayerId.set(pid, r);
+        }
       });
 
-      const players: Player[] = dirRows.map((d) => {
+      // CRITICAL: Only include players that have matching stats records
+      // This ensures consistency with getAllPlayers() - both methods now filter to players with stats
+      const players: Player[] = dirRows
+        .filter((d) => {
+          const pid = Number(d.player_id);
+          const hasStats = statsByPlayerId.has(pid);
+          if (!hasStats) {
+            console.warn(`[PlayerService] getPlayersByIds(): Skipping player ${d.full_name} (ID: ${pid}) - no stats record found`);
+          }
+          return hasStats; // Only include players with matching stats
+        })
+        .map((d) => {
         const pid = Number(d.player_id);
-        const s = statsByPlayerId.get(pid);
+        const sRaw = statsByPlayerId.get(pid);
+        if (!sRaw) {
+          // This shouldn't happen due to filter above, but defensive check
+          throw new Error(`No stats found for player ${pid} despite filter`);
+        }
+        
+        // Validate season matches
+        if (sRaw.season !== DEFAULT_SEASON) {
+          console.warn(`[PlayerService] WARNING: Stats for player ${d.full_name} (ID: ${pid}) has season ${sRaw.season}, expected ${DEFAULT_SEASON}`);
+        }
+        
+        // If player hasn't played (games_played === 0), treat stats as null to show zeros
+        const gamesPlayed = Number(sRaw?.games_played ?? 0);
+        const hasPlayed = gamesPlayed > 0;
+        
+        // Validate stats are reasonable - check for stale NHL stats
+        // If points per game is unreasonably high (> 3 PPG), NHL stats are likely stale
+        const nhlPoints = Number(sRaw?.nhl_points ?? 0);
+        const pbpPoints = Number(sRaw?.points ?? 0);
+        const pointsPerGame = gamesPlayed > 0 ? (nhlPoints / gamesPlayed) : 0;
+        const MAX_REASONABLE_PPG = 3.0; // Even elite players rarely exceed 2 PPG over a season
+        
+        // If NHL stats look stale (unreasonable PPG), prefer PBP stats or use null
+        const nhlStatsLookStale = hasPlayed && nhlPoints > 0 && pointsPerGame > MAX_REASONABLE_PPG;
+        const useNhlStats = hasPlayed && !nhlStatsLookStale;
+        
+        const s = hasPlayed ? sRaw : null;
+        
         const assists = Number(s?.primary_assists ?? 0) + Number(s?.secondary_assists ?? 0);
         const team = d.team_abbrev || s?.team_abbrev || "";
         const pos = d.position_code || s?.position_code || (d.is_goalie ? "G" : "");
         const headshot =
           d.headshot_url ||
           (team && pid ? `https://assets.nhle.com/mugs/nhl/20242025/${team}/${pid}.png` : null);
+
+        // Calculate goals and assists first
+        const calculatedGoals = useNhlStats ? Number(s?.nhl_goals ?? s?.goals ?? 0) : Number(s?.goals ?? 0);
+        const calculatedAssists = useNhlStats ? Number(s?.nhl_assists ?? assists ?? 0) : assists;
+        
+        // ALWAYS calculate points from goals + assists to ensure consistency
+        // This prevents issues where database points don't match goals + assists
+        const calculatedPoints = calculatedGoals + calculatedAssists;
+        
+        // Get database points for validation logging
+        const dbNhlPoints = useNhlStats ? Number(s?.nhl_points ?? 0) : 0;
+        const dbPbpPoints = Number(s?.points ?? 0);
+        const dbPoints = useNhlStats ? dbNhlPoints : dbPbpPoints;
+        
+        // Log warning if database points don't match calculated points (for debugging)
+        if (hasPlayed && dbPoints > 0 && Math.abs(dbPoints - calculatedPoints) > 0.5) {
+          console.warn(`[PlayerService] Points mismatch for player ${d.full_name} (ID: ${pid}): DB points=${dbPoints}, Calculated=${calculatedPoints} (Goals=${calculatedGoals}, Assists=${calculatedAssists}). Using calculated points.`);
+        }
 
         return {
           id: String(pid),
@@ -397,37 +553,43 @@ export const PlayerService = {
           status: "active",
           headshot_url: headshot,
           last_updated: new Date().toISOString(),
-          games_played: Number(s?.games_played ?? 0),
+          games_played: gamesPlayed,
 
           // Use NHL.com official stats for display, fallback to PBP-calculated for backwards compatibility
-          goals: Number(s?.nhl_goals ?? s?.goals ?? 0),
-          assists: Number(s?.nhl_assists ?? assists ?? 0),
-          points: Number(s?.nhl_points ?? s?.points ?? 0),
-          plus_minus: Number(s?.nhl_plus_minus ?? s?.plus_minus ?? 0),
-          shots: Number(s?.nhl_shots_on_goal ?? s?.shots_on_goal ?? 0),
-          hits: Number(s?.nhl_hits ?? s?.hits ?? 0),
-          blocks: Number(s?.nhl_blocks ?? s?.blocks ?? 0),
-          pim: Number(s?.nhl_pim ?? s?.pim ?? 0),
-          ppp: Number(s?.nhl_ppp ?? s?.ppp ?? 0),
-          shp: Number(s?.nhl_shp ?? s?.shp ?? 0),
+          // If player hasn't played, all stats will be 0 (s is null)
+          // If NHL stats look stale (unreasonable PPG), use PBP stats instead
+          // ALWAYS calculate points from goals + assists to ensure consistency
+          goals: calculatedGoals,
+          assists: calculatedAssists,
+          points: calculatedPoints,
+          plus_minus: useNhlStats ? Number(s?.nhl_plus_minus ?? s?.plus_minus ?? 0) : Number(s?.plus_minus ?? 0),
+          shots: useNhlStats ? Number(s?.nhl_shots_on_goal ?? s?.shots_on_goal ?? 0) : Number(s?.shots_on_goal ?? 0),
+          hits: useNhlStats ? Number(s?.nhl_hits ?? s?.hits ?? 0) : Number(s?.hits ?? 0),
+          blocks: useNhlStats ? Number(s?.nhl_blocks ?? s?.blocks ?? 0) : Number(s?.blocks ?? 0),
+          pim: useNhlStats ? Number(s?.nhl_pim ?? s?.pim ?? 0) : Number(s?.pim ?? 0),
+          ppp: useNhlStats ? Number(s?.nhl_ppp ?? s?.ppp ?? 0) : Number(s?.ppp ?? 0),
+          shp: useNhlStats ? Number(s?.nhl_shp ?? s?.shp ?? 0) : Number(s?.shp ?? 0),
           // Use NHL.com TOI for display, fallback to our calculated TOI
-          icetime_seconds: Number(s?.nhl_toi_seconds ?? s?.icetime_seconds ?? 0),
+          icetime_seconds: useNhlStats ? Number(s?.nhl_toi_seconds ?? s?.icetime_seconds ?? 0) : Number(s?.icetime_seconds ?? 0),
 
           xGoals: Number(s?.x_goals ?? 0),
 
           // Goalie stats: Use NHL.com official stats for display, fallback to PBP-calculated
-          wins: d.is_goalie ? Number(s?.nhl_wins ?? s?.wins ?? 0) : null,
-          losses: d.is_goalie ? Number(s?.nhl_losses ?? null) : null,
-          ot_losses: d.is_goalie ? Number(s?.nhl_ot_losses ?? null) : null,
-          saves: d.is_goalie ? Number(s?.nhl_saves ?? s?.saves ?? 0) : null,
-          shutouts: d.is_goalie ? Number(s?.nhl_shutouts ?? s?.shutouts ?? 0) : null,
-          shots_faced: d.is_goalie ? Number(s?.nhl_shots_faced ?? s?.shots_faced ?? 0) : null,
-          goals_against: d.is_goalie ? Number(s?.nhl_goals_against ?? s?.goals_against ?? 0) : null,
+          wins: d.is_goalie ? (useNhlStats ? Number(s?.nhl_wins ?? s?.wins ?? 0) : Number(s?.wins ?? 0)) : null,
+          losses: d.is_goalie ? (useNhlStats ? Number(s?.nhl_losses ?? null) : null) : null,
+          ot_losses: d.is_goalie ? (useNhlStats ? Number(s?.nhl_ot_losses ?? null) : null) : null,
+          saves: d.is_goalie ? (useNhlStats ? Number(s?.nhl_saves ?? s?.saves ?? 0) : Number(s?.saves ?? 0)) : null,
+          shutouts: d.is_goalie ? (useNhlStats ? Number(s?.nhl_shutouts ?? s?.shutouts ?? 0) : Number(s?.shutouts ?? 0)) : null,
+          shots_faced: d.is_goalie ? (useNhlStats ? Number(s?.nhl_shots_faced ?? s?.shots_faced ?? 0) : Number(s?.shots_faced ?? 0)) : null,
+          goals_against: d.is_goalie ? (useNhlStats ? Number(s?.nhl_goals_against ?? s?.goals_against ?? 0) : Number(s?.goals_against ?? 0)) : null,
           goals_against_average: d.is_goalie 
-            ? (s?.nhl_gaa ?? (s?.goals_against && s?.goalie_gp && s.goalie_gp > 0
-                ? (s.goals_against / s.goalie_gp) : null))
+            ? (useNhlStats 
+                ? (s?.nhl_gaa ?? (s?.goals_against && s?.goalie_gp && s.goalie_gp > 0
+                    ? (s.goals_against / s.goalie_gp) : null))
+                : (s?.goals_against && s?.goalie_gp && s.goalie_gp > 0
+                    ? (s.goals_against / s.goalie_gp) : null))
             : null,
-          save_percentage: d.is_goalie ? (s?.nhl_save_pct ?? s?.save_pct ?? null) : null,
+          save_percentage: d.is_goalie ? (useNhlStats ? (s?.nhl_save_pct ?? s?.save_pct ?? null) : (s?.save_pct ?? null)) : null,
           highDangerSavePct: 0,
           goalsSavedAboveExpected: d.is_goalie ? (gsaxMap.get(pid) ?? 0) : 0,
           goalie_gp: d.is_goalie ? Number(s?.goalie_gp ?? 0) : undefined,

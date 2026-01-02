@@ -1708,6 +1708,7 @@ const DraftRoom = () => {
       }
       
       // Convert to HockeyPlayer format
+      // Uses the same stat mapping as Matchup tab to ensure consistency
       const hockeyPlayer: HockeyPlayer = {
         id: player.id,
         name: player.full_name,
@@ -1724,12 +1725,18 @@ const DraftRoom = () => {
           hits: player.hits || 0,
           blockedShots: player.blocks || 0,
           xGoals: player.xGoals || 0,
-          // corsi/fenwick intentionally removed
+          powerPlayPoints: player.ppp || 0,
+          shortHandedPoints: player.shp || 0,
+          pim: player.pim || 0,
+          // Goalie stats
           wins: player.wins || 0,
           losses: player.losses || 0,
           otl: player.ot_losses || 0,
           gaa: player.goals_against_average || 0,
-          savePct: player.save_percentage || 0
+          savePct: player.save_percentage || 0,
+          shutouts: player.shutouts || 0,
+          saves: player.saves || 0,
+          goalsAgainst: player.goals_against || 0
         },
         team: player.team,
         teamAbbreviation: player.team,
