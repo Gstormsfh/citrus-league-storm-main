@@ -202,3 +202,5 @@ print("  2. Run extraction: python scrape_per_game_nhl_stats.py [start_date] [en
 print("  3. The extraction will now read from stored boxscore data!")
 print()
 
+
+

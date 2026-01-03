@@ -17,6 +17,8 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 from urllib.parse import urlencode
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 
 Filter = Tuple[str, str, Any]  # (col, op, value) where op in {"eq","neq","gte","gt","lte","lt","in"}
@@ -30,20 +32,43 @@ class SupabaseRest:
     self.key = supabase_key
     self.schema = schema
     self.timeout_seconds = timeout_seconds
-
-  @property
-  def rest_base(self) -> str:
-    return f"{self.url}/rest/v1"
-
-  def _headers(self, extra: Optional[Dict[str, str]] = None) -> Dict[str, str]:
-    h = {
+    
+    # Create a session with connection pooling to prevent socket exhaustion
+    self.session = requests.Session()
+    self.session.headers.update({
       "apikey": self.key,
       "Authorization": f"Bearer {self.key}",
       "Content-Type": "application/json",
       "Accept": "application/json",
       "Accept-Profile": self.schema,
       "Content-Profile": self.schema,
-    }
+    })
+    
+    # Configure retry strategy for transient errors
+    retry_strategy = Retry(
+      total=5,
+      backoff_factor=1,
+      status_forcelist=[502, 503, 504, 429],  # Bad Gateway, Service Unavailable, Gateway Timeout, Too Many Requests
+      allowed_methods=["GET", "POST", "PATCH", "DELETE"]
+    )
+    
+    # Mount adapter with connection pooling
+    adapter = HTTPAdapter(
+      max_retries=retry_strategy,
+      pool_connections=100,  # Number of connection pools to cache
+      pool_maxsize=100,       # Max connections per pool
+      pool_block=False         # Don't block if pool is full
+    )
+    self.session.mount("https://", adapter)
+    self.session.mount("http://", adapter)
+
+  @property
+  def rest_base(self) -> str:
+    return f"{self.url}/rest/v1"
+
+  def _headers(self, extra: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+    # Headers are now set on the session, but we may need to override for specific requests
+    h = {}
     if extra:
       h.update(extra)
     return h
@@ -83,7 +108,8 @@ class SupabaseRest:
     url = f"{self.rest_base}/{table}"
     if qs:
       url = f"{url}?{qs}"
-    r = requests.get(url, headers=self._headers(), timeout=self.timeout_seconds)
+    # Use session.get() instead of requests.get() for connection pooling
+    r = self.session.get(url, headers=self._headers(), timeout=self.timeout_seconds)
     if r.status_code >= 400:
       raise RuntimeError(f"Supabase select failed ({table}): {r.status_code} {r.text}")
     return r.json() if r.text else []
@@ -107,7 +133,8 @@ class SupabaseRest:
       }
     )
     body = rows if isinstance(rows, list) else [rows]
-    r = requests.post(url, headers=hdr, data=json.dumps(body), timeout=self.timeout_seconds)
+    # Use session.post() instead of requests.post() for connection pooling
+    r = self.session.post(url, headers=hdr, data=json.dumps(body), timeout=self.timeout_seconds)
     if r.status_code >= 400:
       raise RuntimeError(f"Supabase upsert failed ({table}): {r.status_code} {r.text}")
 
@@ -115,7 +142,8 @@ class SupabaseRest:
     qs = self._build_query(filters=filters)
     url = f"{self.rest_base}/{table}?{qs}"
     hdr = self._headers({"Prefer": "return=minimal"})
-    r = requests.patch(url, headers=hdr, data=json.dumps(values), timeout=self.timeout_seconds)
+    # Use session.patch() instead of requests.patch() for connection pooling
+    r = self.session.patch(url, headers=hdr, data=json.dumps(values), timeout=self.timeout_seconds)
     if r.status_code >= 400:
       raise RuntimeError(f"Supabase update failed ({table}): {r.status_code} {r.text}")
 
@@ -123,13 +151,15 @@ class SupabaseRest:
     qs = self._build_query(filters=filters)
     url = f"{self.rest_base}/{table}?{qs}"
     hdr = self._headers({"Prefer": "return=minimal"})
-    r = requests.delete(url, headers=hdr, timeout=self.timeout_seconds)
+    # Use session.delete() instead of requests.delete() for connection pooling
+    r = self.session.delete(url, headers=hdr, timeout=self.timeout_seconds)
     if r.status_code >= 400:
       raise RuntimeError(f"Supabase delete failed ({table}): {r.status_code} {r.text}")
 
   def rpc(self, fn: str, payload: dict) -> Any:
     url = f"{self.rest_base}/rpc/{fn}"
-    r = requests.post(url, headers=self._headers(), data=json.dumps(payload), timeout=self.timeout_seconds)
+    # Use session.post() instead of requests.post() for connection pooling
+    r = self.session.post(url, headers=self._headers(), data=json.dumps(payload), timeout=self.timeout_seconds)
     if r.status_code >= 400:
       raise RuntimeError(f"Supabase rpc failed ({fn}): {r.status_code} {r.text}")
     return r.json() if r.text else None

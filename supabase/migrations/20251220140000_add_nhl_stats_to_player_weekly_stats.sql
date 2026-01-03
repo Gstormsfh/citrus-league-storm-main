@@ -45,3 +45,5 @@ COMMENT ON COLUMN public.player_weekly_stats.nhl_goals_against IS 'Aggregated NH
 COMMENT ON COLUMN public.player_weekly_stats.nhl_shutouts IS 'Aggregated NHL.com shutouts for this week.';
 
 
+
+

@@ -48,3 +48,5 @@ COMMENT ON COLUMN public.player_game_stats.nhl_goals_against IS 'Official NHL.co
 COMMENT ON COLUMN public.player_game_stats.nhl_shutouts IS 'Official NHL.com shutout for this game (1 if shutout, 0 otherwise).';
 
 
+
+

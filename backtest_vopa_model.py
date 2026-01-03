@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 import os
 import sys
 import time
+import random
 from datetime import datetime, date, timedelta
 from typing import Dict, List, Optional, Tuple, Any
 from collections import defaultdict
@@ -557,6 +558,25 @@ def calculate_correlation_confidence_interval(
     upper_bound = bootstrap_correlations_sorted[upper_idx]
     
     return (lower_bound, upper_bound)
+
+
+def calculate_brier_score(predicted_probabilities: List[float], actual_outcomes: List[int]) -> float:
+    """
+    Calculate the Brier Score for binary probabilistic forecasts.
+    
+    Args:
+        predicted_probabilities: List of predicted probabilities (e.g., goalie win probability)
+        actual_outcomes: List of actual binary outcomes (0 or 1, e.g., 1 for win, 0 for loss)
+    
+    Returns:
+        Brier Score (0.0 is perfect, 0.25 is 50/50 guess)
+    """
+    if not predicted_probabilities or not actual_outcomes or len(predicted_probabilities) != len(actual_outcomes):
+        return 0.25  # Default to 50/50 guess if invalid input
+    
+    n = len(predicted_probabilities)
+    brier_score = sum([(p - a)**2 for p, a in zip(predicted_probabilities, actual_outcomes)]) / n
+    return brier_score
 
 
 def main():

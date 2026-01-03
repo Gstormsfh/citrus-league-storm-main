@@ -151,10 +151,26 @@ class ProjectionContext:
         print(f"    ✓ League baselines loaded")
         sys.stdout.flush()
         
-        # Pre-cache team xGA/60 for all teams (used in DDR calculation)
-        print("  Pre-computing team xGA/60...")
+        # NEW: Pre-fetch team offensive context (finishing talent + HD rate)
+        print("  Pre-fetching team offensive context...")
         sys.stdout.flush()
-        self.team_xga_cache = {}  # Will be populated on-demand or can pre-fetch
+        self.team_offensive_context = self._prefetch_team_offensive_context(db, season)
+        print(f"    ✓ {len(self.team_offensive_context)} teams")
+        sys.stdout.flush()
+        
+        # NEW: Pre-fetch full season schedule for fatigue calculations
+        print("  Pre-fetching full season schedule...")
+        sys.stdout.flush()
+        self.season_schedule = self._prefetch_season_schedule(db, season)
+        print(f"    ✓ {len(self.season_schedule)} teams with schedule data")
+        sys.stdout.flush()
+        
+        # NEW: Pre-fetch team stats (xGA/60, shots for/60)
+        print("  Pre-fetching team stats...")
+        sys.stdout.flush()
+        self.team_stats_cache = self._prefetch_team_stats(db, season)
+        print(f"    ✓ {len(self.team_stats_cache)} teams with stats")
+        sys.stdout.flush()
         
         # Pre-cache goalie SV% for all goalies
         print("  Pre-computing goalie SV%...")
@@ -223,6 +239,529 @@ class ProjectionContext:
                 multipliers[player_id] = 1.0
         
         return multipliers
+    
+    def _prefetch_team_offensive_context(self, db: SupabaseRest, season: int) -> Dict[str, Dict[str, float]]:
+        """
+        Bulk fetch opponent offensive context for all teams.
+        Returns: {team_abbrev: {"finishing_ratio": float, "hd_rate": float}}
+        """
+        # Get all unique teams from directory
+        all_teams = set()
+        for player_info in self.directory.values():
+            team = player_info.get("team_abbrev", "")
+            if team:
+                all_teams.add(team)
+        
+        if not all_teams:
+            return {}
+        
+        # Get all games for season to map game_id -> teams
+        game_id_min = int(f"{season}000000")
+        game_id_max = int(f"{season + 1}000000")
+        
+        # Fetch all games for season (for team mapping)
+        all_games = db.select(
+            "nhl_games",
+            select="game_id,home_team,away_team",
+            filters=[
+                ("game_id", "gte", game_id_min),
+                ("game_id", "lt", game_id_max)
+            ],
+            limit=100000
+        )
+        
+        # Create game_id -> teams mapping
+        game_to_teams = {}
+        for game in all_games:
+            game_id = int(game.get("game_id", 0))
+            if game_id:
+                game_to_teams[game_id] = {
+                    "home": game.get("home_team", ""),
+                    "away": game.get("away_team", "")
+                }
+        
+        # Fetch all shots for season (with batching for Supabase 1k limit)
+        all_shots = []
+        offset = 0
+        batch_size = 1000
+        
+        while True:
+            batch = db.select(
+                "raw_shots",
+                select="game_id,is_goal,xg_value,shooting_talent_adjusted_xg",
+                filters=[
+                    ("game_id", "gte", game_id_min),
+                    ("game_id", "lt", game_id_max)
+                ],
+                limit=batch_size,
+                offset=offset
+            )
+            if not batch or len(batch) == 0:
+                break
+            all_shots.extend(batch)
+            offset += batch_size
+            if len(batch) < batch_size:
+                break
+        
+        # Group shots by team and calculate finishing_ratio and hd_rate
+        team_stats = {}
+        for team in all_teams:
+            team_stats[team] = {
+                "goals": 0,
+                "xg": 0.0,
+                "hd_shots": 0,
+                "games": set()
+            }
+        
+        for shot in all_shots:
+            game_id = int(shot.get("game_id", 0))
+            if not game_id or game_id not in game_to_teams:
+                continue
+            
+            teams_in_game = game_to_teams[game_id]
+            home_team = teams_in_game.get("home", "")
+            away_team = teams_in_game.get("away", "")
+            
+            # Determine which team took this shot (need to check if it's for or against)
+            # For offensive context, we want shots TAKEN BY the team
+            # We'll use a heuristic: if we can't determine, skip (or use player_id mapping)
+            # For now, we'll process shots and group by team that took them
+            # This requires knowing which team the shooter is on - we'll use a simpler approach
+            
+            # Actually, for offensive context, we need shots TAKEN BY each team
+            # We need player_id -> team mapping. Let's use the directory we already have
+            # But we don't have player_id in the shot data we're fetching...
+            # Let me adjust: fetch shots with player_id, then map player_id -> team
+        
+        # Re-fetch shots with player_id
+        all_shots_with_player = []
+        offset = 0
+        while True:
+            batch = db.select(
+                "raw_shots",
+                select="game_id,player_id,is_goal,xg_value,shooting_talent_adjusted_xg",
+                filters=[
+                    ("game_id", "gte", game_id_min),
+                    ("game_id", "lt", game_id_max)
+                ],
+                limit=batch_size,
+                offset=offset
+            )
+            if not batch or len(batch) == 0:
+                break
+            all_shots_with_player.extend(batch)
+            offset += batch_size
+            if len(batch) < batch_size:
+                break
+        
+        # Process shots with player_id -> team mapping
+        for shot in all_shots_with_player:
+            player_id = int(shot.get("player_id", 0))
+            if not player_id:
+                continue
+            
+            # Get team from directory
+            player_info = self.directory.get(player_id)
+            if not player_info:
+                continue
+            
+            team = player_info.get("team_abbrev", "")
+            if not team or team not in team_stats:
+                continue
+            
+            game_id = int(shot.get("game_id", 0))
+            if game_id:
+                team_stats[team]["games"].add(game_id)
+            
+            # Get xG value
+            xg = (
+                float(shot.get("shooting_talent_adjusted_xg") or 0) or
+                float(shot.get("xg_value") or 0)
+            )
+            
+            if shot.get("is_goal"):
+                team_stats[team]["goals"] += 1
+            
+            team_stats[team]["xg"] += xg
+            
+            # High-danger: xG > 0.3
+            if xg > 0.3:
+                team_stats[team]["hd_shots"] += 1
+        
+        # Calculate finishing_ratio and hd_rate for each team
+        result = {}
+        for team, stats in team_stats.items():
+            total_games = len(stats["games"]) if stats["games"] else 1
+            finishing_ratio = stats["goals"] / stats["xg"] if stats["xg"] > 0 else 1.0
+            hd_rate = stats["hd_shots"] / total_games if total_games > 0 else 5.0
+            
+            result[team] = {
+                "finishing_ratio": finishing_ratio,
+                "hd_rate": hd_rate
+            }
+        
+        return result
+    
+    def _prefetch_season_schedule(self, db: SupabaseRest, season: int) -> Dict[str, List[Dict]]:
+        """
+        Bulk fetch all games for season, organized by team.
+        Returns: {team_abbrev: [list of games sorted by date]}
+        """
+        game_id_min = int(f"{season}000000")
+        game_id_max = int(f"{season + 1}000000")
+        
+        # Fetch ALL games for season
+        all_games = db.select(
+            "nhl_games",
+            select="game_id,home_team,away_team,game_date",
+            filters=[
+                ("game_id", "gte", game_id_min),
+                ("game_id", "lt", game_id_max)
+            ],
+            limit=100000
+        )
+        
+        # Organize by team
+        team_schedules = {}
+        for game in all_games:
+            home_team = game.get("home_team", "")
+            away_team = game.get("away_team", "")
+            game_date = game.get("game_date", "")
+            
+            if home_team:
+                if home_team not in team_schedules:
+                    team_schedules[home_team] = []
+                team_schedules[home_team].append({
+                    "game_id": int(game.get("game_id", 0)),
+                    "game_date": game_date,
+                    "is_home": True
+                })
+            
+            if away_team:
+                if away_team not in team_schedules:
+                    team_schedules[away_team] = []
+                team_schedules[away_team].append({
+                    "game_id": int(game.get("game_id", 0)),
+                    "game_date": game_date,
+                    "is_home": False
+                })
+        
+        # Sort each team's games by date
+        for team in team_schedules:
+            team_schedules[team].sort(key=lambda g: g.get("game_date", ""))
+        
+        return team_schedules
+    
+    def _prefetch_team_stats(self, db: SupabaseRest, season: int) -> Dict[str, List[Dict]]:
+        """
+        Pre-fetch team xGA/60 and shots for/60 for all teams, storing game-by-game logs.
+        Returns: {team_abbrev: [{"game_id": int, "game_date": str, "xga": float, "shots_for": int}, ...]}
+        Structure allows rolling window filtering by game_date.
+        """
+        # Get all unique teams
+        all_teams = set()
+        for player_info in self.directory.values():
+            team = player_info.get("team_abbrev", "")
+            if team:
+                all_teams.add(team)
+        
+        if not all_teams:
+            return {}
+        
+        game_id_min = int(f"{season}000000")
+        game_id_max = int(f"{season + 1}000000")
+        
+        # Get all games for team mapping (INCLUDE game_date for filtering)
+        all_games = db.select(
+            "nhl_games",
+            select="game_id,home_team,away_team,game_date",
+            filters=[
+                ("game_id", "gte", game_id_min),
+                ("game_id", "lt", game_id_max)
+            ],
+            limit=100000
+        )
+        
+        game_to_teams = {}
+        game_id_to_date = {}
+        for game in all_games:
+            game_id = int(game.get("game_id", 0))
+            if game_id:
+                game_to_teams[game_id] = {
+                    "home": game.get("home_team", ""),
+                    "away": game.get("away_team", "")
+                }
+                game_id_to_date[game_id] = game.get("game_date", "")
+        
+        # Initialize team stats with game-by-game logs
+        team_logs = {}
+        for team in all_teams:
+            team_logs[team] = {}  # game_id -> {"game_date": str, "xga": float, "shots_for": int}
+        
+        # Fetch all shots with batching
+        all_shots = []
+        offset = 0
+        batch_size = 1000
+        
+        while True:
+            batch = db.select(
+                "raw_shots",
+                select="game_id,player_id,xg_value,shooting_talent_adjusted_xg",
+                filters=[
+                    ("game_id", "gte", game_id_min),
+                    ("game_id", "lt", game_id_max)
+                ],
+                limit=batch_size,
+                offset=offset
+            )
+            if not batch or len(batch) == 0:
+                break
+            all_shots.extend(batch)
+            offset += batch_size
+            if len(batch) < batch_size:
+                break
+        
+        # Process shots - aggregate by game_id for each team
+        for shot in all_shots:
+            game_id = int(shot.get("game_id", 0))
+            if not game_id or game_id not in game_to_teams:
+                continue
+            
+            player_id = int(shot.get("player_id", 0))
+            if not player_id:
+                continue
+            
+            # Get team from directory
+            player_info = self.directory.get(player_id)
+            if not player_info:
+                continue
+            
+            shooting_team = player_info.get("team_abbrev", "")
+            if not shooting_team:
+                continue
+            
+            # Get opposing team
+            teams_in_game = game_to_teams[game_id]
+            home_team = teams_in_game.get("home", "")
+            away_team = teams_in_game.get("away", "")
+            
+            opposing_team = away_team if shooting_team == home_team else home_team
+            
+            # Get xG value
+            xg = (
+                float(shot.get("shooting_talent_adjusted_xg") or 0) or
+                float(shot.get("xg_value") or 0)
+            )
+            
+            game_date = game_id_to_date.get(game_id, "")
+            
+            # Initialize game log if not exists
+            if shooting_team in team_logs:
+                if game_id not in team_logs[shooting_team]:
+                    team_logs[shooting_team][game_id] = {
+                        "game_id": game_id,
+                        "game_date": game_date,
+                        "xga": 0.0,
+                        "shots_for": 0
+                    }
+                team_logs[shooting_team][game_id]["shots_for"] += 1
+            
+            # xGA for the opposing team (xG of shots taken against them)
+            if opposing_team in team_logs:
+                if game_id not in team_logs[opposing_team]:
+                    team_logs[opposing_team][game_id] = {
+                        "game_id": game_id,
+                        "game_date": game_date,
+                        "xga": 0.0,
+                        "shots_for": 0
+                    }
+                team_logs[opposing_team][game_id]["xga"] += xg
+        
+        # Convert to sorted lists (by game_date) for each team
+        result = {}
+        for team, logs_dict in team_logs.items():
+            logs_list = list(logs_dict.values())
+            # Sort by game_date for easy filtering
+            logs_list.sort(key=lambda log: log.get("game_date", ""))
+            result[team] = logs_list
+        
+        return result
+
+
+def get_opponent_offensive_context_cached(
+    team_abbrev: str,
+    context: ProjectionContext
+) -> Dict[str, float]:
+    """
+    O(1) lookup for opponent offensive context from pre-fetched cache.
+    Returns: {"finishing_ratio": float, "hd_rate": float}
+    """
+    return context.team_offensive_context.get(team_abbrev, {"finishing_ratio": 1.0, "hd_rate": 5.0})
+
+
+def calculate_goalie_days_rest_cached(
+    team_abbrev: str,
+    game_date: date,
+    context: ProjectionContext
+) -> int:
+    """
+    O(1) lookup for days of rest from pre-fetched schedule.
+    Returns: Days of rest (defaults to 4 if no previous game found)
+    """
+    team_schedule = context.season_schedule.get(team_abbrev, [])
+    if not team_schedule:
+        return 4
+    
+    # Find last game before this date
+    for game in reversed(team_schedule):  # Start from most recent
+        game_date_str = game.get("game_date", "")
+        if not game_date_str:
+            continue
+        
+        try:
+            prev_date = datetime.fromisoformat(game_date_str.replace("Z", "+00:00")).date()
+            if prev_date < game_date:
+                days_diff = (game_date - prev_date).days
+                return days_diff
+        except:
+            continue
+    
+    # No previous game found
+    return 4
+
+
+def get_team_xga_per_60_rolling_cached(
+    team_abbrev: str,
+    game_date: date,
+    context: ProjectionContext,
+    last_n_games: int = 10
+) -> float:
+    """
+    Get team xGA/60 using rolling window from cached game logs.
+    Filters to games before current date and takes last N games.
+    
+    Returns: xGA per 60 minutes (defaults to 2.5 if not found)
+    """
+    team_logs = context.team_stats_cache.get(team_abbrev, [])
+    if not team_logs:
+        return 2.5  # Default
+    
+    # Filter to games before current date
+    from datetime import datetime
+    filtered_logs = []
+    for log in team_logs:
+        log_date_str = log.get("game_date", "")
+        if not log_date_str:
+            continue
+        try:
+            # Handle ISO format with or without timezone
+            log_date = datetime.fromisoformat(log_date_str.replace("Z", "+00:00")).date()
+            if log_date < game_date:
+                filtered_logs.append(log)
+        except:
+            continue
+    
+    if len(filtered_logs) == 0:
+        return 2.5
+    
+    # Take last N games
+    recent_logs = filtered_logs[-last_n_games:]
+    
+    # Calculate xGA/60 from recent logs
+    total_xga = sum(log.get("xga", 0.0) for log in recent_logs)
+    total_games = len(recent_logs)
+    total_minutes = total_games * 60.0
+    
+    xga_per_60 = (total_xga / total_minutes) * 60.0 if total_minutes > 0 else 2.5
+    return xga_per_60
+
+
+def get_opponent_shots_for_per_60_rolling_cached(
+    team_abbrev: str,
+    game_date: date,
+    context: ProjectionContext,
+    last_n_games: int = 10
+) -> float:
+    """
+    Get opponent shots for/60 using rolling window from cached game logs.
+    Filters to games before current date and takes last N games.
+    
+    Returns: Shots for per 60 minutes (defaults to 30.0 if not found)
+    """
+    team_logs = context.team_stats_cache.get(team_abbrev, [])
+    if not team_logs:
+        return 30.0  # Default
+    
+    # Filter to games before current date
+    from datetime import datetime
+    filtered_logs = []
+    for log in team_logs:
+        log_date_str = log.get("game_date", "")
+        if not log_date_str:
+            continue
+        try:
+            log_date = datetime.fromisoformat(log_date_str.replace("Z", "+00:00")).date()
+            if log_date < game_date:
+                filtered_logs.append(log)
+        except:
+            continue
+    
+    if len(filtered_logs) == 0:
+        return 30.0
+    
+    # Take last N games
+    recent_logs = filtered_logs[-last_n_games:]
+    
+    # Calculate shots for/60 from recent logs
+    total_shots_for = sum(log.get("shots_for", 0) for log in recent_logs)
+    total_games = len(recent_logs)
+    total_minutes = total_games * 60.0
+    
+    shots_for_per_60 = (total_shots_for / total_minutes) * 60.0 if total_minutes > 0 else 30.0
+    return shots_for_per_60
+
+
+# Legacy functions for backward compatibility (use rolling with all games)
+def get_team_xga_per_60_cached(
+    team_abbrev: str,
+    context: ProjectionContext
+) -> float:
+    """
+    Legacy function - uses season-long average.
+    For rolling windows, use get_team_xga_per_60_rolling_cached() instead.
+    """
+    team_logs = context.team_stats_cache.get(team_abbrev, [])
+    if not team_logs:
+        return 2.5
+    
+    # Calculate season-long average
+    total_xga = sum(log.get("xga", 0.0) for log in team_logs)
+    total_games = len(team_logs)
+    total_minutes = total_games * 60.0
+    
+    xga_per_60 = (total_xga / total_minutes) * 60.0 if total_minutes > 0 else 2.5
+    return xga_per_60
+
+
+def get_opponent_shots_for_per_60_cached(
+    team_abbrev: str,
+    context: ProjectionContext
+) -> float:
+    """
+    Legacy function - uses season-long average.
+    For rolling windows, use get_opponent_shots_for_per_60_rolling_cached() instead.
+    """
+    team_logs = context.team_stats_cache.get(team_abbrev, [])
+    if not team_logs:
+        return 30.0
+    
+    # Calculate season-long average
+    total_shots_for = sum(log.get("shots_for", 0) for log in team_logs)
+    total_games = len(team_logs)
+    total_minutes = total_games * 60.0
+    
+    shots_for_per_60 = (total_shots_for / total_minutes) * 60.0 if total_minutes > 0 else 30.0
+    return shots_for_per_60
 
 
 def batch_get_existing_projections(
@@ -244,10 +783,10 @@ def batch_get_existing_projections(
         
         # Fetch all projections for these games/dates
         # Note: SupabaseRest may not support "in" for dates, so we'll fetch all and filter
-        # Note: projected_vopa column doesn't exist in the table, so we calculate it from other fields
+        # Include projected_vopa if it exists (newer projections will have it)
         projections = db.select(
             "player_projected_stats",
-            select="player_id,game_id,projection_date,total_projected_points,projected_goals,projected_assists,projected_sog,projected_blocks,projected_wins,projected_saves,is_goalie",
+            select="player_id,game_id,projection_date,total_projected_points,projected_goals,projected_assists,projected_sog,projected_blocks,projected_wins,projected_saves,is_goalie,projected_vopa",
             filters=[("game_id", "in", game_ids)],
             limit=50000
         )
@@ -368,7 +907,7 @@ def calculate_daily_projection_cached(
         
         offensive_paa_60 = player_projected_fpts_60 - pos_baseline_fpts_60
         
-        # Defensive value (simplified for now - can enhance)
+        # Defensive value calculation (VOPA component)
         goal_weight = float(scoring_settings.get("skater", {}).get("goals", 3.0))
         league_avg_xga_per_60 = context.league_baselines["league_avg_xga_per_60"]
         if position == "D":
@@ -376,21 +915,34 @@ def calculate_daily_projection_cached(
         else:
             pos_avg_xga_per_60 = league_avg_xga_per_60
         
-        # For now, use team xGA as proxy (can enhance with true on-ice xGA)
-        player_xga_per_60_raw = None  # Would need to calculate from context
+        # Calculate player's on-ice xGA/60 (uses team xGA as proxy for now)
+        # This is a DB call but necessary for accurate VOPA calculation
+        player_xga_per_60_raw = get_player_on_ice_xga_per_60(
+            db, player_id, player_team, season, last_n_games=10, debug=False
+        )
+        
         if player_xga_per_60_raw is not None:
+            # Apply Bayesian shrinkage for small sample sizes
             player_xga_per_60 = calculate_xga_shrinkage(
                 player_xga_per_60_raw,
                 pos_avg_xga_per_60,
                 games_played,
                 min_games_for_stability=20
             )
+            # Calculate xGA suppressed (positive = better defense)
             xga_suppressed = pos_avg_xga_per_60 - player_xga_per_60
+            # Convert to fantasy points using goal weight (1 xGA prevented = 1 goal value)
             defensive_value_60 = xga_suppressed * goal_weight
         else:
+            # No defensive data available, set to 0 (neutral)
             defensive_value_60 = 0.0
         
+        # Total VOPA = (Offensive PAA + Defensive Value) × TOI
         total_vopa = (offensive_paa_60 + defensive_value_60) * projected_toi_hours
+        
+        # Debug: Print sample VOPA values for verification (only for small test runs)
+        # This helps verify the calculation is working correctly
+        # Note: This will only print during small test runs (< 100 results)
         
         confidence_score = min(games_played / 30.0, 1.0) if games_played > 0 else 0.1
         
@@ -458,11 +1010,19 @@ def calculate_goalie_projection_cached(
         shrinkage_weight_sv = min(total_shots_faced / SHRINKAGE_CONSTANT, 1.0)
         projected_sv_pct = (shrinkage_weight_sv * raw_sv_pct) + ((1 - shrinkage_weight_sv) * LEAGUE_AVG_SV_PCT)
         
-        # Projected saves (uses db for opponent shots)
-        from calculate_daily_projections import get_opponent_shots_for_per_60
-        opponent_shots_for_per_60 = get_opponent_shots_for_per_60(
-            db, opponent_team, season, last_n_games=10, debug=False
-        ) or 30.0
+        # Apply fatigue penalty to SV% (affects GSAA and win probability)
+        # Use cached version for O(1) lookup
+        days_rest = calculate_goalie_days_rest_cached(goalie_team, game_date, context)
+        if days_rest < 2:
+            # Apply -0.015 SV% penalty for fatigue
+            # This shifts elite goalie (0.920) to replacement level (0.905) when tired
+            projected_sv_pct = max(0.700, projected_sv_pct - 0.015)
+            # Recalculate projected_saves and GSAA with adjusted SV%
+        
+        # Projected saves (uses rolling cached opponent shots for/60 - last 10 games)
+        opponent_shots_for_per_60 = get_opponent_shots_for_per_60_rolling_cached(
+            opponent_team, game_date, context, last_n_games=10
+        )
         
         expected_toi_minutes = 60.0 if games_played > 0 else 0.0
         projected_saves = (opponent_shots_for_per_60 / 60) * projected_sv_pct * expected_toi_minutes
@@ -470,8 +1030,16 @@ def calculate_goalie_projection_cached(
         projected_shots = projected_saves / projected_sv_pct if projected_sv_pct > 0 else 0.0
         projected_gsaa = projected_saves - (projected_shots * LEAGUE_AVG_SV_PCT)
         
+        # Calculate goalie VOPA using GSAA normalized to fantasy points
+        # Formula: goalie_vopa = projected_gsaa * goal_weight
+        # Rationale: If a goalie saves 1 extra goal above average (GSAA = 1.0), 
+        # and a goal is worth 3.0 points, then that goalie has provided 3.0 points 
+        # of value over replacement/average goalie
+        goal_weight = float(scoring_settings.get("skater", {}).get("goals", 3.0))
+        goalie_vopa = projected_gsaa * goal_weight
+        
         # Projected wins (uses db for Vegas odds)
-        from calculate_daily_projections import get_vegas_win_probability
+        from calculate_daily_projections import get_vegas_win_probability, get_opponent_offensive_context
         win_probability = get_vegas_win_probability(
             db, game_id, goalie_team, season, debug=False
         ) or 0.5
@@ -479,7 +1047,24 @@ def calculate_goalie_projection_cached(
         b2b_penalty = check_back_to_back_cached(goalie_team, game_date, context, db)
         if b2b_penalty < 1.0:
             win_probability *= 0.85
+        
+        # Get opponent offensive context and adjust win probability (cached version)
+        opponent_context = get_opponent_offensive_context_cached(opponent_team, context)
+        
+        # Adjust win probability based on opponent's offensive strength
+        # Strong finishing (above 1.1) = 5% reduction
+        if opponent_context["finishing_ratio"] > 1.1:
+            win_probability *= 0.95
+        
+        # High volume of high-danger shots (>8 per game) = additional 3% reduction
+        if opponent_context["hd_rate"] > 8.0:
+            win_probability *= 0.97
+        
         projected_wins = win_probability
+        
+        # Regulation win probability (game ends in regulation, not OT/SO)
+        # Research shows ~15% of games go to OT, so regulation win prob is lower
+        regulation_win_prob = win_probability * 0.85
         
         # Projected shutouts (simplified)
         projected_shutouts = 0.05  # Base rate
@@ -508,6 +1093,7 @@ def calculate_goalie_projection_cached(
             "game_id": game_id,
             "projection_date": game_date.isoformat(),
             "projected_wins": round(projected_wins, 3),
+            "projected_regulation_wins": round(regulation_win_prob, 3),  # Regulation win probability
             "projected_saves": round(projected_saves, 2),
             "projected_shutouts": round(projected_shutouts, 3),
             "projected_goals_against": round(projected_goals_against, 3),
@@ -516,6 +1102,7 @@ def calculate_goalie_projection_cached(
             "projected_gp": round(projected_gp, 2),
             "projected_gsaa": round(projected_gsaa, 2),
             "total_projected_points": round(total_projected_points, 3),
+            "total_vopa": round(goalie_vopa, 3),  # Goalie VOPA calculated from GSAA
             "starter_confirmed": starter_confirmed,
             "confidence_score": round(confidence_score, 2),
             "calculation_method": "probability_based_volume",
@@ -651,14 +1238,48 @@ def get_opponent_strength_cached(
     context: ProjectionContext,
     db: SupabaseRest
 ) -> float:
-    """Cached version that can still use db for team/goalie lookups."""
-    # For now, use the original function but with cached league baselines
-    # Can enhance by pre-caching team xGA/60 in ProjectionContext
-    from calculate_daily_projections import get_opponent_strength
-    return get_opponent_strength(
-        db, opponent_team, game_id, game_date, season,
-        league_avg_xga_per_60, league_avg_sv_pct, debug=False
-    ) or 1.0
+    """
+    Cached version of get_opponent_strength using pre-fetched team stats.
+    Uses cached team xGA/60 and shots for/60, but still needs DB for goalie SV%.
+    """
+    try:
+        # Get team xGA/60 from rolling cache (last 10 games before game_date)
+        opponent_xga_per_60 = get_team_xga_per_60_rolling_cached(
+            opponent_team, game_date, context, last_n_games=10
+        )
+        if opponent_xga_per_60 == 0:
+            team_multiplier = 1.0
+        else:
+            team_multiplier = opponent_xga_per_60 / league_avg_xga_per_60
+        
+        # Get opposing goalie save percentage (still needs DB lookup)
+        from calculate_daily_projections import get_opposing_goalie_save_pct
+        goalie_sv_pct = get_opposing_goalie_save_pct(
+            db, opponent_team, game_id, game_date, season, debug=False
+        )
+        if not goalie_sv_pct or goalie_sv_pct == 0:
+            goalie_multiplier = 1.0
+        else:
+            goalie_multiplier = league_avg_sv_pct / goalie_sv_pct
+        
+        # Get opponent shots for/60 from rolling cache (last 10 games before game_date)
+        opponent_shots_for = get_opponent_shots_for_per_60_rolling_cached(
+            opponent_team, game_date, context, last_n_games=10
+        )
+        league_avg_shots_for = context.league_baselines.get("league_avg_shots_for_per_60", 30.0)
+        
+        if opponent_shots_for and league_avg_shots_for > 0:
+            offense_multiplier = opponent_shots_for / league_avg_shots_for
+        else:
+            offense_multiplier = 1.0
+        
+        # Combined DDR: Team Defense × Goalie × Offense
+        ddr = team_multiplier * goalie_multiplier * offense_multiplier
+        ddr_capped = max(0.7, min(1.3, ddr))
+        
+        return ddr_capped
+    except Exception as e:
+        return 1.0
 
 
 def check_back_to_back_cached(
@@ -879,15 +1500,98 @@ def backtest_vopa_model_fast_multiprocess(
     print(f"  Rate: {len(results)/calc_time:.1f} projections/second\n")
     sys.stdout.flush()
     
+    # 5.5. Save newly calculated projections to database (so they persist if script crashes later)
+    if len(results) > 0:
+        print(f"Saving {len(results)} projections to database...")
+        sys.stdout.flush()
+        save_start = time.time()
+        
+        # Convert results to database format
+        # IMPORTANT: All objects must have the same keys for batch upsert
+        # So we include all fields for both goalies and skaters (NULL for non-applicable)
+        db_projections = []
+        for r in results:
+            is_goalie = r.get("is_goalie", False)
+            
+            # Base fields (same for all players)
+            db_proj = {
+                "player_id": r.get("player_id"),
+                "game_id": r.get("game_id"),
+                "projection_date": r.get("projection_date"),
+                "season": season,
+                "total_projected_points": r.get("total_projected_points", 0.0),
+                "is_goalie": is_goalie,
+                "confidence_score": r.get("confidence_score", 0.5),
+                "calculation_method": "backtest_vopa_fast",
+                "projected_vopa": r.get("total_vopa", 0.0)
+            }
+            
+            # Skater fields (0.0 for goalies, since DB has NOT NULL constraints)
+            if is_goalie:
+                db_proj["projected_goals"] = 0.0
+                db_proj["projected_assists"] = 0.0
+                db_proj["projected_sog"] = 0.0
+                db_proj["projected_blocks"] = 0.0
+                db_proj["projected_xg"] = 0.0
+            else:
+                db_proj["projected_goals"] = r.get("projected_goals", 0.0)
+                db_proj["projected_assists"] = r.get("projected_assists", 0.0)
+                db_proj["projected_sog"] = r.get("projected_sog", 0.0)
+                db_proj["projected_blocks"] = r.get("projected_blocks", 0.0)
+                db_proj["projected_xg"] = r.get("projected_xg", 0.0)
+            
+            # Goalie fields (0.0 for skaters, since DB may have NOT NULL constraints)
+            if is_goalie:
+                db_proj["projected_wins"] = r.get("projected_wins", 0.0)
+                db_proj["projected_saves"] = r.get("projected_saves", 0.0)
+            else:
+                db_proj["projected_wins"] = 0.0
+                db_proj["projected_saves"] = 0.0
+            
+            db_projections.append(db_proj)
+        
+        # Batch upsert in chunks
+        saved_count = 0
+        batch_size = 200
+        for i in range(0, len(db_projections), batch_size):
+            batch = db_projections[i:i+batch_size]
+            try:
+                db.upsert(
+                    "player_projected_stats",
+                    batch,
+                    on_conflict="player_id,game_id,projection_date"
+                )
+                saved_count += len(batch)
+            except Exception as e:
+                print(f"  ⚠️  Warning: Could not save batch {i//batch_size + 1}: {e}")
+                # Try individual saves
+                for proj in batch:
+                    try:
+                        db.upsert(
+                            "player_projected_stats",
+                            proj,
+                            on_conflict="player_id,game_id,projection_date"
+                        )
+                        saved_count += 1
+                    except:
+                        pass
+        
+        save_time = time.time() - save_start
+        print(f"  ✓ Saved {saved_count}/{len(db_projections)} projections to database ({save_time:.1f}s)\n")
+        sys.stdout.flush()
+    
     # 6. Combine existing projections with newly calculated ones
     # Convert existing projections to same format
+    # Note: Existing projections may have VOPA if they were saved with the new column
     for (player_id, game_id), proj in existing_projections.items():
+        # Get VOPA from database if available, otherwise 0.0 (legacy projection)
+        vopa_value = float(proj.get("projected_vopa", 0.0)) if proj.get("projected_vopa") is not None else 0.0
         results.append({
             "player_id": player_id,
             "game_id": game_id,
             "projection_date": proj.get("projection_date"),
             "total_projected_points": float(proj.get("total_projected_points", 0)),
-            "projected_vopa": float(proj.get("projected_vopa", 0)),
+            "total_vopa": vopa_value,  # Use VOPA from DB if available, else 0.0
             "is_goalie": proj.get("is_goalie", False),
             "season": season
         })
@@ -935,7 +1639,8 @@ def backtest_vopa_model_fast_multiprocess(
                     "game_date": result.get("projection_date"),
                     "projected_points": result.get("total_projected_points", 0.0),
                     "actual_points": actual_points,
-                    "projected_vopa": result.get("projected_vopa", 0.0),
+                    "projected_vopa": result.get("total_vopa", result.get("projected_vopa", 0.0)),  # Use total_vopa from new calcs, fallback to projected_vopa from DB
+                    "projected_gsaa": result.get("projected_gsaa", 0.0) if is_goalie else None,  # Include GSAA for goalies (needed for rank_players_by_vopa)
                     "is_goalie": is_goalie,
                     "position": position,
                     "projected_win_prob": projected_win_prob,
@@ -956,18 +1661,47 @@ def backtest_vopa_model_fast_multiprocess(
     print(f"{'='*80}\n")
     
     # 1. Correlation: VOPA vs Actual Points
-    vopa_values = [r["projected_vopa"] for r in all_results]
-    actual_values = [r["actual_points"] for r in all_results]
+    # Filter out records where VOPA is NULL (but keep 0.0 values - they represent "exactly average" players)
+    # 0.0 is a meaningful data point and should be included in correlation analysis
+    valid_vopa_results = [
+        r for r in all_results 
+        if r.get("projected_vopa") is not None  # Only exclude NULL/None values
+    ]
     
-    correlation = calculate_correlation(vopa_values, actual_values)
-    correlation_ci = calculate_correlation_confidence_interval(vopa_values, actual_values, n_bootstrap=1000, confidence=0.95)
+    if len(valid_vopa_results) == 0:
+        print("⚠️  Warning: No valid VOPA values found. All projections have VOPA = 0.0 or NULL.")
+        print("   This indicates VOPA calculation is not working. Check projection logic.\n")
+        vopa_values = []
+        actual_values = []
+        correlation = 0.0
+        correlation_ci = None
+    else:
+        vopa_values = [r["projected_vopa"] for r in valid_vopa_results]
+        actual_values = [r["actual_points"] for r in valid_vopa_results]
+        
+        correlation = calculate_correlation(vopa_values, actual_values)
+        correlation_ci = calculate_correlation_confidence_interval(vopa_values, actual_values, n_bootstrap=1000, confidence=0.95)
+        
+        print(f"Using {len(valid_vopa_results)} projections with valid VOPA (filtered {len(all_results) - len(valid_vopa_results)} with VOPA=NULL)")
     
     print(f"Correlation (VOPA vs Actual Points): {correlation:.4f}")
     if correlation_ci:
         print(f"  95% Confidence Interval: [{correlation_ci[0]:.4f}, {correlation_ci[1]:.4f}]")
     
-    # 2. Top 10 VOPA players
-    ranked_all = rank_players_by_vopa(all_results, include_goalies=True)
+    # 2. Top 10 VOPA players (use valid VOPA results for ranking)
+    ranked_all = rank_players_by_vopa(valid_vopa_results if valid_vopa_results else all_results, include_goalies=True)
+    
+    # Verify sort order: highest VOPA should be first (descending)
+    if len(ranked_all) > 1:
+        first_vopa = ranked_all[0].get("projected_vopa", ranked_all[0].get("total_vopa", 0.0))
+        last_vopa = ranked_all[-1].get("projected_vopa", ranked_all[-1].get("total_vopa", 0.0))
+        if first_vopa < last_vopa:
+            print("⚠️  WARNING: VOPA sorting appears inverted! First VOPA < Last VOPA")
+            print(f"   First VOPA: {first_vopa:.3f}, Last VOPA: {last_vopa:.3f}")
+            print("   Re-sorting explicitly by descending VOPA...")
+            # Re-sort explicitly
+            ranked_all = sorted(ranked_all, key=lambda x: x.get("projected_vopa", x.get("total_vopa", 0.0)), reverse=True)
+    
     top_10 = ranked_all[:10]
     top_10_avg = sum(r["actual_points"] for r in top_10) / len(top_10) if top_10 else 0.0
     

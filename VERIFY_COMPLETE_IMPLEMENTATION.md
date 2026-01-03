@@ -96,3 +96,5 @@ The frontend calculates all 8 stats, but check:
 4. **Batch failures in projection script**
    - Expected: Individual fallback works (100/100 recovered = success)
 
+
+

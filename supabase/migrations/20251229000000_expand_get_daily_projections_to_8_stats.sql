@@ -98,3 +98,5 @@ $$;
 COMMENT ON FUNCTION public.get_daily_projections IS 'Returns daily fantasy point projections for specified players on a target date. Returns all 8 skater stats (goals, assists, SOG, blocks, PPP, SHP, hits, PIM) for skaters and goalie fields for goalies based on is_goalie flag. Used by frontend to display projections in player cards.';
 
 
+
+

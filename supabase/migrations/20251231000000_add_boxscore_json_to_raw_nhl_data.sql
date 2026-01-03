@@ -12,3 +12,5 @@ COMMENT ON COLUMN public.raw_nhl_data.boxscore_json IS 'Full boxscore JSON respo
 -- Create index for faster queries on boxscore data
 CREATE INDEX IF NOT EXISTS idx_raw_nhl_data_boxscore_json ON public.raw_nhl_data USING gin (boxscore_json);
 
+
+

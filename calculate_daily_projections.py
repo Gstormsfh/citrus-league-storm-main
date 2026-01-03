@@ -49,13 +49,14 @@ def get_league_averages(db: SupabaseRest, position: str, season: int) -> Optiona
     Fetch league averages for a position from league_averages table.
     
     Returns:
-        Dict with avg_ppg, avg_goals_per_game, avg_assists_per_game, avg_sog_per_game, avg_blocks_per_game
+        Dict with avg_ppg, avg_goals_per_game, avg_assists_per_game, avg_sog_per_game, avg_blocks_per_game,
+        replacement_fpts_per_60, std_dev_fpts_per_60, and other replacement/std_dev columns
         or None if not found
     """
     try:
         results = db.select(
             "league_averages",
-            select="avg_ppg,avg_goals_per_game,avg_assists_per_game,avg_sog_per_game,avg_blocks_per_game",
+            select="avg_ppg,avg_goals_per_game,avg_assists_per_game,avg_sog_per_game,avg_blocks_per_game,replacement_fpts_per_60,std_dev_fpts_per_60,replacement_goals_per_game,replacement_assists_per_game,replacement_sog_per_game,replacement_blocks_per_game,std_dev_goals_per_game,std_dev_assists_per_game,std_dev_sog_per_game,std_dev_blocks_per_game",
             filters=[("position", "eq", position), ("season", "eq", season)],
             limit=1
         )
@@ -68,6 +69,16 @@ def get_league_averages(db: SupabaseRest, position: str, season: int) -> Optiona
                 "avg_assists_per_game": float(avg.get("avg_assists_per_game", 0)),
                 "avg_sog_per_game": float(avg.get("avg_sog_per_game", 0)),
                 "avg_blocks_per_game": float(avg.get("avg_blocks_per_game", 0)),
+                "replacement_fpts_per_60": avg.get("replacement_fpts_per_60"),  # Can be None if not yet calculated
+                "std_dev_fpts_per_60": avg.get("std_dev_fpts_per_60"),  # Can be None if not yet calculated
+                "replacement_goals_per_game": avg.get("replacement_goals_per_game"),
+                "replacement_assists_per_game": avg.get("replacement_assists_per_game"),
+                "replacement_sog_per_game": avg.get("replacement_sog_per_game"),
+                "replacement_blocks_per_game": avg.get("replacement_blocks_per_game"),
+                "std_dev_goals_per_game": avg.get("std_dev_goals_per_game"),
+                "std_dev_assists_per_game": avg.get("std_dev_assists_per_game"),
+                "std_dev_sog_per_game": avg.get("std_dev_sog_per_game"),
+                "std_dev_blocks_per_game": avg.get("std_dev_blocks_per_game"),
             }
     except Exception as e:
         print(f"⚠️  Warning: Could not fetch league averages for {position}: {e}")
@@ -79,7 +90,8 @@ def get_positional_avg_fantasy_pts_per_60(
     db: SupabaseRest, 
     position: str, 
     season: int, 
-    scoring_settings: Dict[str, Any]
+    scoring_settings: Dict[str, Any],
+    use_replacement_level: bool = True
 ) -> float:
     """
     Calculate positional average fantasy points per 60 minutes.
@@ -87,8 +99,12 @@ def get_positional_avg_fantasy_pts_per_60(
     Uses actual TOI data from league_averages or validated NHL standards to ensure
     the "Per 60" baseline is mathematically sound, not based on flat estimates.
     
+    Args:
+        use_replacement_level: If True, use 25th percentile (replacement level) instead of mean.
+                              This is the recommended baseline for VOPA calculations.
+    
     Returns:
-        Positional average fantasy points per 60 minutes (e.g., 2.5)
+        Positional average (or replacement level) fantasy points per 60 minutes (e.g., 2.5)
     """
     # Fetch the positional row (C, D, LW, RW)
     pos_data = get_league_averages(db, position, season)
@@ -96,8 +112,14 @@ def get_positional_avg_fantasy_pts_per_60(
     if not pos_data:
         return 0.0
 
-    # 1. Calculate the average fantasy points per game for this position
-    # using your league's specific scoring settings
+    # If replacement level is available and requested, use it directly
+    if use_replacement_level and pos_data.get("replacement_fpts_per_60") is not None:
+        replacement_fpts_per_60 = float(pos_data.get("replacement_fpts_per_60", 0))
+        if replacement_fpts_per_60 > 0:
+            return round(replacement_fpts_per_60, 3)
+
+    # Fallback: Calculate from per-game averages (mean, not replacement level)
+    # This is used if replacement_fpts_per_60 is not yet populated
     skater_scoring = scoring_settings.get("skater", {})
     avg_fpts_per_game = (
         (pos_data.get("avg_goals_per_game", 0) * float(skater_scoring.get("goals", 3))) +
@@ -107,18 +129,46 @@ def get_positional_avg_fantasy_pts_per_60(
         # Note: PPP, SHP, Hits, PIM could be added if available in pos_data
     )
 
-    # 2. Get the actual average TOI for this position from your data
-    # If not in league_averages, use these validated NHL standards:
+    # Get the actual average TOI for this position from your data
+    # Use validated NHL standards (TOI is not stored in league_averages):
     toi_map = {"C": 17.5, "LW": 16.5, "RW": 16.5, "D": 21.0}
-    avg_toi_min = pos_data.get("avg_toi_per_game", toi_map.get(position, 18.0))
+    avg_toi_min = toi_map.get(position, 18.0)
 
-    # 3. Convert to Per-60 Rate
+    # Convert to Per-60 Rate
     # (FPts / TOI_min) * 60
     if avg_toi_min > 0:
         fpts_per_60 = (avg_fpts_per_game / avg_toi_min) * 60
         return round(fpts_per_60, 3)
     
     return 0.0
+
+
+def get_positional_std_dev_fantasy_pts_per_60(
+    db: SupabaseRest,
+    position: str,
+    season: int
+) -> float:
+    """
+    Get positional standard deviation of fantasy points per 60 minutes.
+    
+    Used for Z-Score normalization in VOPA calculations.
+    
+    Returns:
+        Standard deviation of fantasy points per 60 minutes (e.g., 1.2)
+    """
+    pos_data = get_league_averages(db, position, season)
+    
+    if not pos_data:
+        return 1.0  # Default std dev if not available
+    
+    std_dev = pos_data.get("std_dev_fpts_per_60")
+    if std_dev is not None and std_dev > 0:
+        return float(std_dev)
+    
+    # Fallback: Use a reasonable default based on position
+    # This is a rough estimate if std dev hasn't been calculated yet
+    default_std_dev = {"C": 1.5, "LW": 1.4, "RW": 1.4, "D": 1.2}
+    return default_std_dev.get(position, 1.3)
 
 
 # Module-level cache to prevent redundant database queries
@@ -285,9 +335,9 @@ def calculate_xga_shrinkage(
     Shrinks toward positional average until player reaches stability threshold.
     This prevents outlier games from skewing defensive value calculations.
     
-    Formula:
-    - GP < 5: W = 0.20 (80% positional average)
-    - GP >= 5 && GP < 20: W = 0.20 + (GP - 5) × (0.80 / 15) (linear interpolation)
+    Formula (UPDATED - Less Aggressive):
+    - GP < 10: W = 0.50 (50% player value, 50% positional average) - was 0.20
+    - GP >= 10 && GP < 20: W = 0.50 + (GP - 10) × (0.50 / 10) (linear interpolation)
     - GP >= 20: W = 1.0 (100% player xGA/60, no shrinkage)
     
     Args:
@@ -302,17 +352,17 @@ def calculate_xga_shrinkage(
     if games_played >= min_games_for_stability:
         return player_xga_per_60  # No shrinkage needed
     
-    # Calculate shrinkage weight (similar to calculate_bayesian_weight)
-    # < 5 games: 20% weight (80% positional average)
-    # 5-20 games: Linear interpolation
+    # Calculate shrinkage weight (LESS AGGRESSIVE for small samples - captures breakouts)
+    # < 10 games: 50% weight (50% positional average) - increased from 20%
+    # 10-20 games: Linear interpolation from 0.50 to 1.0
     # >= 20 games: 100% weight (no shrinkage)
-    if games_played < 5:
-        weight = 0.20
+    if games_played < 10:
+        weight = 0.50  # Increased from 0.20 to capture breakout signals
     elif games_played >= min_games_for_stability:
         weight = 1.0
     else:
-        # Linear interpolation: W = 0.20 + (GP - 5) × (0.80 / 15)
-        weight = 0.20 + (games_played - 5) * (0.80 / 15)
+        # Linear interpolation: W = 0.50 + (GP - 10) × (0.50 / 10)
+        weight = 0.50 + (games_played - 10) * (0.50 / 10)
     
     shrunk_xga = (weight * player_xga_per_60) + ((1 - weight) * position_avg_xga_per_60)
     return shrunk_xga
@@ -1127,6 +1177,133 @@ def get_opponent_strength(
         return 1.0
 
 
+def calculate_goalie_days_rest(
+    db: SupabaseRest,
+    team_abbrev: str,
+    game_date: date,
+    season: int
+) -> int:
+    """
+    Calculates days since the TEAM's last game.
+    Fatigue affects the whole defense, not just the goalie.
+    
+    Returns:
+        Days of rest (defaults to 4 if no previous game found)
+    """
+    try:
+        # Get team's last game before this date
+        previous_games = db.select(
+            "nhl_games",
+            select="game_date",
+            filters=[
+                ("game_date", "lt", game_date.isoformat()),
+                ("season", "eq", season)
+            ],
+            order="game_date.desc",
+            limit=20  # Check last 20 games to find team's most recent
+        )
+        
+        for game in previous_games:
+            # Check if team played in this game
+            if game.get("home_team") == team_abbrev or game.get("away_team") == team_abbrev:
+                prev_date_str = game.get("game_date")
+                if prev_date_str:
+                    try:
+                        prev_date = datetime.fromisoformat(prev_date_str.replace("Z", "+00:00")).date()
+                        days_diff = (game_date - prev_date).days
+                        return days_diff
+                    except:
+                        continue
+        
+        # No previous game found, default to well-rested
+        return 4
+    except Exception as e:
+        # Default to well-rested on error
+        return 4
+
+
+def get_opponent_offensive_context(
+    db: SupabaseRest,
+    opponent_team: str,
+    season: int,
+    last_n_games: int = 10
+) -> Dict[str, float]:
+    """
+    Calculates opponent's finishing talent and high-danger shot rate.
+    
+    Returns:
+        Dict with "finishing_ratio" (goals/xG) and "hd_rate" (high-danger shots per game)
+    """
+    try:
+        # Get opponent's recent games
+        recent_games = db.select(
+            "nhl_games",
+            select="game_id",
+            filters=[
+                ("season", "eq", season),
+                ("game_date", "lte", date.today().isoformat())
+            ],
+            order="game_date.desc",
+            limit=last_n_games * 2  # Get more games to filter by team
+        )
+        
+        # Filter to opponent's games
+        opponent_game_ids = []
+        for game in recent_games:
+            if game.get("home_team") == opponent_team or game.get("away_team") == opponent_team:
+                game_id = game.get("game_id")
+                if game_id:
+                    opponent_game_ids.append(int(game_id))
+        
+        if not opponent_game_ids:
+            return {"finishing_ratio": 1.0, "hd_rate": 5.0}  # Defaults
+        
+        # Limit to last_n_games
+        opponent_game_ids = opponent_game_ids[:last_n_games]
+        
+        # Get shots data for opponent's recent games
+        shots = db.select(
+            "raw_shots",
+            select="game_id,is_goal,xg_value,shooting_talent_adjusted_xg",
+            filters=[("game_id", "in", opponent_game_ids)],
+            limit=10000
+        )
+        
+        total_goals = 0
+        total_xg = 0.0
+        hd_shots = 0
+        game_ids_seen = set()
+        
+        for shot in shots:
+            game_id = shot.get("game_id")
+            if game_id:
+                game_ids_seen.add(game_id)
+            
+            # Use shooting_talent_adjusted_xg if available, else xg_value
+            xg = float(shot.get("shooting_talent_adjusted_xg") or shot.get("xg_value") or 0.0)
+            
+            if shot.get("is_goal"):
+                total_goals += 1
+            
+            total_xg += xg
+            
+            # High-danger: xG > 0.3
+            if xg > 0.3:
+                hd_shots += 1
+        
+        total_games = len(game_ids_seen) if game_ids_seen else 1
+        
+        finishing_ratio = total_goals / total_xg if total_xg > 0 else 1.0
+        hd_rate = hd_shots / total_games if total_games > 0 else 5.0
+        
+        return {
+            "finishing_ratio": finishing_ratio,
+            "hd_rate": hd_rate
+        }
+    except Exception as e:
+        return {"finishing_ratio": 1.0, "hd_rate": 5.0}  # Defaults on error
+
+
 def check_back_to_back(db: SupabaseRest, team: str, game_date: date) -> float:
     """
     Check if team is playing back-to-back games.
@@ -1311,8 +1488,17 @@ def calculate_goalie_projection(
         shrinkage_weight_sv = min(total_shots_faced / SHRINKAGE_CONSTANT, 1.0)
         projected_sv_pct = (shrinkage_weight_sv * raw_sv_pct) + ((1 - shrinkage_weight_sv) * LEAGUE_AVG_SV_PCT)
         
+        # Apply fatigue penalty to SV% (affects GSAA and win probability)
+        days_rest = calculate_goalie_days_rest(db, goalie_team, game_date, season)
+        if days_rest < 2:
+            # Apply -0.015 SV% penalty for fatigue
+            # This shifts elite goalie (0.920) to replacement level (0.905) when tired
+            projected_sv_pct = max(0.700, projected_sv_pct - 0.015)
+            if debug:
+                print(f"  [Goalie Projection] Fatigue penalty applied: {days_rest} days rest, SV% reduced by 0.015 to {projected_sv_pct:.3f}")
+        
         if debug:
-            print(f"  [Goalie Projection] SV%: {projected_sv_pct:.3f} (raw: {raw_sv_pct:.3f}, weight: {shrinkage_weight_sv:.3f}, league avg: {LEAGUE_AVG_SV_PCT:.3f})")
+            print(f"  [Goalie Projection] SV%: {projected_sv_pct:.3f} (raw: {raw_sv_pct:.3f}, weight: {shrinkage_weight_sv:.3f}, league avg: {LEAGUE_AVG_SV_PCT:.3f}, days rest: {days_rest})")
         
         # 1. Projected Saves (Shot Funnel)
         opponent_shots_for_per_60 = get_opponent_shots_for_per_60(db, opponent_team, season, last_n_games=10, debug=debug)
@@ -1355,7 +1541,27 @@ def calculate_goalie_projection(
             if debug:
                 print(f"  [Goalie Projection] B2B detected, reducing win probability by 15%")
         
+        # Get opponent offensive context and adjust win probability
+        opponent_context = get_opponent_offensive_context(db, opponent_team, season, last_n_games=10)
+        
+        # Adjust win probability based on opponent's offensive strength
+        # Strong finishing (above 1.1) = 5% reduction
+        if opponent_context["finishing_ratio"] > 1.1:
+            win_probability *= 0.95
+            if debug:
+                print(f"  [Goalie Projection] Opponent finishing talent ({opponent_context['finishing_ratio']:.2f}) > 1.1, reducing win probability by 5%")
+        
+        # High volume of high-danger shots (>8 per game) = additional 3% reduction
+        if opponent_context["hd_rate"] > 8.0:
+            win_probability *= 0.97
+            if debug:
+                print(f"  [Goalie Projection] Opponent high-danger rate ({opponent_context['hd_rate']:.1f}) > 8.0, reducing win probability by additional 3%")
+        
         projected_wins = win_probability
+        
+        # Regulation win probability (game ends in regulation, not OT/SO)
+        # Research shows ~15% of games go to OT, so regulation win prob is lower
+        regulation_win_prob = win_probability * 0.85
         
         if debug:
             print(f"  [Goalie Projection] Projected Wins: {projected_wins:.3f} (win probability)")
@@ -1429,6 +1635,7 @@ def calculate_goalie_projection(
             "game_id": game_id,
             "projection_date": game_date.isoformat(),
             "projected_wins": round(projected_wins, 3),
+            "projected_regulation_wins": round(regulation_win_prob, 3),  # Regulation win probability
             "projected_saves": round(projected_saves, 2),
             "projected_shutouts": round(projected_shutouts, 3),
             "projected_goals_against": round(projected_goals_against, 3),
@@ -1566,9 +1773,14 @@ def calculate_daily_projection(
         total_projected_points = calculate_fantasy_points(final_projection, scoring_settings, is_goalie=False)
         
         # Step 4: Calculate Positional Value Metrics (VOPA)
-        # Get position-specific fantasy points per 60 baseline
-        pos_baseline_fpts_60 = get_positional_avg_fantasy_pts_per_60(
-            db, position, season, scoring_settings
+        # Get position-specific fantasy points per 60 baseline (REPLACEMENT LEVEL, not mean)
+        pos_replacement_fpts_60 = get_positional_avg_fantasy_pts_per_60(
+            db, position, season, scoring_settings, use_replacement_level=True
+        )
+        
+        # Get positional standard deviation for Z-Score normalization
+        pos_std_dev_fpts_60 = get_positional_std_dev_fantasy_pts_per_60(
+            db, position, season
         )
         
         # Get league baselines for defensive value
@@ -1599,8 +1811,15 @@ def calculate_daily_projection(
         projected_toi_hours = projected_toi_minutes / 60.0
         player_projected_fpts_60 = (total_projected_points / projected_toi_hours) if projected_toi_hours > 0 else 0.0
         
-        # 1. Calculate Offensive Value Above Baseline (Per 60)
-        offensive_paa_60 = player_projected_fpts_60 - pos_baseline_fpts_60
+        # 1. Calculate Offensive Value Above Replacement (Per 60) with Z-Score Normalization
+        # Formula: (Player Rate - Replacement Rate) / σ_position
+        # CRITICAL: Check for NULL/0 std dev to avoid ZeroDivisionError
+        offensive_paa_60_raw = player_projected_fpts_60 - pos_replacement_fpts_60
+        if pos_std_dev_fpts_60 is not None and pos_std_dev_fpts_60 > 0:
+            offensive_paa_60_z = offensive_paa_60_raw / pos_std_dev_fpts_60
+        else:
+            # Fallback: Use raw difference if std dev is NULL or 0
+            offensive_paa_60_z = offensive_paa_60_raw
         
         # 2. Calculate Defensive Value (VOPA_D)
         # Weight = Fantasy Points for 1 Goal (e.g., 3.0)
@@ -1636,18 +1855,31 @@ def calculate_daily_projection(
         # Positive value if player_xga < pos_avg_xga (suppressing more than average)
         if player_xga_per_60 is not None:
             xga_suppressed = pos_avg_xga_per_60 - player_xga_per_60
-            defensive_value_60 = xga_suppressed * goal_weight
+            defensive_value_60_raw = xga_suppressed * goal_weight
+            
+            # Apply Z-Score normalization to defensive value
+            # For now, use a simplified approach: normalize by goal_weight (since 1 xGA = 1 goal)
+            # In future, we could calculate std dev of xGA suppression if needed
+            # For defensive value, we'll use the same std dev as offensive (simplified)
+            # CRITICAL: Check for NULL/0 std dev to avoid ZeroDivisionError
+            if pos_std_dev_fpts_60 is not None and pos_std_dev_fpts_60 > 0:
+                defensive_value_60_z = defensive_value_60_raw / pos_std_dev_fpts_60
+            else:
+                # Fallback: Use raw value if std dev is NULL or 0
+                defensive_value_60_z = defensive_value_60_raw
         else:
             xga_suppressed = 0.0
-            defensive_value_60 = 0.0
+            defensive_value_60_raw = 0.0
+            defensive_value_60_z = 0.0
         
-        # 3. Total VOPA (Projected for the night's TOI)
-        # VOPA = (Offensive PAA/60 + Defensive Value/60) × Projected TOI (in hours)
-        total_vopa = (offensive_paa_60 + defensive_value_60) * projected_toi_hours
+        # 3. Total VOPA (Projected for the night's TOI) with Z-Score Normalization
+        # VOPA = (Offensive PAA/60 (Z-Score) + Defensive Value/60 (Z-Score)) × Projected TOI (in hours)
+        # This makes VOPA comparable across positions and increases spread
+        total_vopa = (offensive_paa_60_z + defensive_value_60_z) * projected_toi_hours
         
-        # Also calculate per-60 metrics for transparency
-        offensive_paa_per_60 = offensive_paa_60
-        defensive_value_per_60 = defensive_value_60
+        # Also calculate per-60 metrics for transparency (raw values, not Z-Score)
+        offensive_paa_per_60 = offensive_paa_60_raw
+        defensive_value_per_60 = defensive_value_60_raw
         
         # Calculate confidence score (simplified: based on games played)
         confidence_score = min(games_played / 30.0, 1.0) if games_played > 0 else 0.1
@@ -1678,15 +1910,19 @@ def calculate_daily_projection(
                 "league_avg_sv_pct": LEAGUE_AVG_SV_PCT,
                 "league_avg_xga_per_60": LEAGUE_AVG_XGA_PER_60
             },
-            "projected_paa": round(offensive_paa_60 * projected_toi_hours, 3),  # Points Above Average (fantasy points)
-            "projected_paa_per_60": round(offensive_paa_60, 3),  # PAA per 60 minutes
+            "projected_paa": round(offensive_paa_60_raw * projected_toi_hours, 3),  # Points Above Average (fantasy points, raw)
+            "projected_paa_per_60": round(offensive_paa_60_raw, 3),  # PAA per 60 minutes (raw)
             "on_ice_xga_per_60": round(player_xga_per_60, 3) if player_xga_per_60 else None,
             "on_ice_xga_per_60_raw": round(player_xga_per_60_raw, 3) if player_xga_per_60_raw else None,
             "xga_suppressed": round(xga_suppressed, 3),  # xGA suppressed vs positional average
-            "defensive_value": round(defensive_value_60 * projected_toi_hours, 3),  # Defensive value in fantasy points
-            "defensive_value_per_60": round(defensive_value_60, 3),  # Defensive value per 60
-            "total_vopa": round(total_vopa, 3),  # Total Value Over Positional Average
-            "position_avg_fpts_per_60": round(pos_baseline_fpts_60, 3),
+            "defensive_value": round(defensive_value_60_raw * projected_toi_hours, 3),  # Defensive value in fantasy points
+            "defensive_value_per_60": round(defensive_value_60_raw, 3),  # Defensive value per 60 (raw)
+            "defensive_value_per_60_z": round(defensive_value_60_z, 3),  # Defensive value per 60 (Z-Score normalized)
+            "total_vopa": round(total_vopa, 3),  # Total Value Over Positional Average (Z-Score normalized)
+            "offensive_paa_per_60": round(offensive_paa_60_raw, 3),  # Offensive PAA per 60 (raw)
+            "offensive_paa_per_60_z": round(offensive_paa_60_z, 3),  # Offensive PAA per 60 (Z-Score normalized)
+            "position_replacement_fpts_per_60": round(pos_replacement_fpts_60, 3),  # Replacement level (25th percentile)
+            "position_std_dev_fpts_per_60": round(pos_std_dev_fpts_60, 3),  # Standard deviation for Z-Score
             "position_avg_xga_per_60": round(pos_avg_xga_per_60, 3),
             "projected_toi_minutes": round(projected_toi_minutes, 2),
             "is_goalie": False,

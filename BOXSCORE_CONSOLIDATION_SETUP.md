@@ -108,3 +108,5 @@ python ingest_raw_nhl.py 2025-10-07 2025-12-30
 - [ ] Defencemen stats are extracted correctly
 - [ ] All stat categories present (SOG, PPG, PPA, SHG, SHA)
 
+
+

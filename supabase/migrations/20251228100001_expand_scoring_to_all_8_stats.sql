@@ -164,3 +164,5 @@ $$;
 
 COMMENT ON FUNCTION public.calculate_daily_matchup_scores IS 'Calculates daily fantasy scores using ALL 8 stat categories from leagues.scoring_settings. Skater stats: goals, assists, ppp, shp, shots_on_goal, blocks, hits, pim. Goalie stats: wins, saves, shutouts, goals_against. Uses nhl_* columns with FALLBACK to original columns (COALESCE for skaters, NULLIF pattern for goalies) to ensure data completeness. Matches get_matchup_stats RPC fallback logic.';
 
+
+

@@ -13,3 +13,5 @@ COMMENT ON COLUMN public.player_projected_stats.projected_shp IS 'Projected shor
 COMMENT ON COLUMN public.player_projected_stats.projected_hits IS 'Projected hits per game';
 COMMENT ON COLUMN public.player_projected_stats.projected_pim IS 'Projected penalty minutes per game';
 
+
+
