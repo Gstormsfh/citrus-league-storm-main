@@ -47,3 +47,4 @@ COMMENT ON COLUMN public.player_weekly_stats.nhl_shutouts IS 'Aggregated NHL.com
 
 
 
+

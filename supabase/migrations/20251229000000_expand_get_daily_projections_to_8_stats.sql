@@ -100,3 +100,4 @@ COMMENT ON FUNCTION public.get_daily_projections IS 'Returns daily fantasy point
 
 
 
+
