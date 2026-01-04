@@ -2571,8 +2571,11 @@ const Matchup = () => {
             opponentTeamPoints={opponentTeamPoints}
           />
           
-          {/* Weekly Schedule - Show only for active users (guests use week selector at top) */}
-          {currentMatchup && userLeagueState === 'active-user' && (
+          {/* Weekly Schedule - Show ONLY for active users (NEVER for guests) */}
+          {currentMatchup && 
+           userLeagueState === 'active-user' && 
+           userLeagueState !== 'guest' && 
+           userLeagueState !== 'logged-in-no-league' && (
             <div className="mb-6">
               <WeeklySchedule
                 weekStart={currentMatchup.week_start_date}
