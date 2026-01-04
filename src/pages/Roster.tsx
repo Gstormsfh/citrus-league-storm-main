@@ -1180,7 +1180,6 @@ const Roster = () => {
                         ...p,
                         citrusPuckData: {
                             currentSeason: d2025,
-                            lastSeason: d2024,
                             projections
                         }
                     };
