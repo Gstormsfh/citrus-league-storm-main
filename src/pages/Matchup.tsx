@@ -444,23 +444,22 @@ const Matchup = () => {
         loadingRef.current = false;
       } catch (error) {
         console.error('[Matchup] ❌ ERROR loading guest matchup:', error);
-        // Don't set error during initial load - just log it and keep loading state
-        // This prevents error flash during demo league loading
-        console.error('[Matchup] Error loading demo matchup:', error);
-        // Only set error if we're not in initial loading phase
-        // CRITICAL: Don't set hasInitializedRef to true if we're in initial load
+        // CRITICAL: During initial load, NEVER set error or mark as initialized
         // This keeps the loading screen showing and prevents error flash
+        // Only show errors after we've successfully initialized at least once
         if (hasInitializedRef.current) {
+          // We've initialized before, so it's safe to show the error
           setError(error instanceof Error ? error.message : 'Failed to load demo matchup');
           setLoading(false);
+          hasInitializedRef.current = true;
         } else {
-          // During initial load, keep loading state true to prevent error flash
-          // The loading screen will continue to show
+          // During initial load, keep loading state true and DON'T mark as initialized
+          // This ensures shouldShowLoading continues to return true
           setLoading(true);
+          // Don't set hasInitializedRef.current = true here
+          // This prevents the error from showing until we've successfully loaded once
         }
         loadingRef.current = false;
-        // Don't set hasInitializedRef.current = true here if we're in initial load
-        // This ensures shouldShowLoading continues to return true
       }
     };
 
