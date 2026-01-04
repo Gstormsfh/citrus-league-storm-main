@@ -353,46 +353,80 @@ const Roster = () => {
 
         // ═══════════════════════════════════════════════════════════════════
         // DEMO STATE: Guest or Logged-in without league
-        // Use the same logic as OtherTeam.tsx - treat user's demo team as Team 3
+        // Use the same approach as Matchup page - load from real demo league
         // ═══════════════════════════════════════════════════════════════════
         if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
-          // Use same approach as OtherTeam.tsx for demo teams
-          const demoTeamIdNum = 3; // Team 3 is the user's demo team (Citrus Crushers)
+          // Import DEMO_LEAGUE_ID_FOR_GUESTS
+          const { DEMO_LEAGUE_ID_FOR_GUESTS } = await import('@/services/DemoLeagueService');
           
-          // Get demo team data from LEAGUE_TEAMS_DATA
-          const demoTeam = LEAGUE_TEAMS_DATA.find(t => t.id === demoTeamIdNum);
-          if (!demoTeam) {
-            console.error(`Demo team ${demoTeamIdNum} not found in LEAGUE_TEAMS_DATA`);
-            setLoading(false);
-            return;
-          }
+          // Get the demo league
+          const { data: demoLeague, error: leagueError } = await supabase
+            .from('leagues')
+            .select('*')
+            .eq('id', DEMO_LEAGUE_ID_FOR_GUESTS)
+            .maybeSingle();
           
-          // Create demo team object
-          const demoTeamData = {
-            id: String(demoTeamIdNum),
-            league_id: 'demo-league-id',
-            team_name: demoTeam.name
-          };
-          
-          teamId = demoTeamData.id;
-          setUserTeamId(demoTeamData.id);
-          setUserTeam(demoTeamData);
-          
-          // Initialize demo league (same as OtherTeam.tsx)
-          await LeagueService.initializeLeague(allPlayers);
-          
-          // Get demo team roster from cachedLeagueState (same as OtherTeam.tsx)
-          const demoRoster = await LeagueService.getTeamRoster(demoTeamIdNum, allPlayers);
-          
-          if (demoRoster.length === 0) {
-            console.error(`Demo team ${demoTeamIdNum} has no players in roster`);
+          if (leagueError || !demoLeague) {
+            console.error('[Roster] Error loading demo league:', leagueError);
             setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
             setLoading(false);
             return;
           }
           
-          // Transform demo players to HockeyPlayer format (same as OtherTeam.tsx)
-          dbPlayers = demoRoster;
+          // Get the first team from the demo league (or a specific team)
+          // For now, get team 1 (we can make this configurable later)
+          const { data: demoTeams, error: teamsError } = await supabase
+            .from('teams')
+            .select('*')
+            .eq('league_id', DEMO_LEAGUE_ID_FOR_GUESTS)
+            .order('created_at', { ascending: true })
+            .limit(1);
+          
+          if (teamsError || !demoTeams || demoTeams.length === 0) {
+            console.error('[Roster] Error loading demo team:', teamsError);
+            setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
+            setLoading(false);
+            return;
+          }
+          
+          const demoTeamData = demoTeams[0];
+          teamId = demoTeamData.id;
+          setUserTeamId(demoTeamData.id);
+          setUserTeam({
+            id: demoTeamData.id,
+            league_id: demoTeamData.league_id,
+            team_name: demoTeamData.team_name
+          });
+          
+          // Get roster from draft picks (same as MatchupService.getTeamRoster)
+          const { data: teamDraftPicks, error: picksError } = await supabase
+            .from('draft_picks')
+            .select('*')
+            .eq('league_id', DEMO_LEAGUE_ID_FOR_GUESTS)
+            .eq('team_id', demoTeamData.id)
+            .is('deleted_at', null)
+            .order('pick_number', { ascending: true });
+          
+          if (picksError) {
+            console.error('[Roster] Error loading demo roster:', picksError);
+            setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
+            setLoading(false);
+            return;
+          }
+          
+          // Map draft picks to players
+          const playerIds = (teamDraftPicks || []).map(p => p.player_id);
+          const teamPlayers = allPlayers.filter(p => playerIds.includes(p.id));
+          
+          if (teamPlayers.length === 0) {
+            console.error('[Roster] Demo team has no players in roster');
+            setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
+            setLoading(false);
+            return;
+          }
+          
+          // Transform to HockeyPlayer format (will be done later in the function)
+          dbPlayers = teamPlayers;
         } else if (userLeagueState === 'active-user' && user) {
           // Logged-in users with leagues: Get their actual team from Supabase
           // If activeLeagueId is set, prefer that league's team, otherwise get any team
