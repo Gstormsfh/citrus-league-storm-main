@@ -398,10 +398,10 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
           // CASE 3: Show projection bar (game not final yet)
           <div className="player-projection-bar-container">
             {/* Label */}
-            <div className="text-[9px] text-gray-400 mb-0.5">Projected</div>
+            <div className="text-[9px] text-muted-foreground mb-0.5">Projected</div>
             {/* Centered total above bar */}
             <div className="flex justify-center items-center gap-1 mb-0.5">
-              <span className="text-base font-bold text-fantasy-primary">
+              <span className="text-base font-bold text-foreground">
                 {hasProjection && isStarterConfirmed
                   ? `${projectedPoints.toFixed(1)} pts`
                   : showTBD 
