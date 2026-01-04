@@ -83,6 +83,7 @@ def get_rostered_players(db: SupabaseRest, target_date: date, season: int) -> Li
         game_map[away_team] = game_id
     
     # LEFT JOIN Pattern: Get ALL players on playing teams (not just rostered)
+    print(f"   Fetching players from {len(playing_teams)} teams...", flush=True)
     all_players = db.select(
         "player_directory",
         select="player_id,team_abbrev",
@@ -92,6 +93,7 @@ def get_rostered_players(db: SupabaseRest, target_date: date, season: int) -> Li
         ],
         limit=10000  # Large limit for all players
     )
+    print(f"   Found {len(all_players)} players", flush=True)
     
     if not all_players:
         return []
@@ -101,8 +103,11 @@ def get_rostered_players(db: SupabaseRest, target_date: date, season: int) -> Li
     active_players = []
     
     # Query player_season_stats in batches to check games_played > 0
+    print(f"   Checking active players ({len(player_ids)} total)...", flush=True)
     for i in range(0, len(player_ids), 100):
         batch = player_ids[i:i+100]
+        if i % 200 == 0:
+            print(f"   Checking batch {i//100 + 1}...", flush=True)
         stats_batch = db.select(
             "player_season_stats",
             select="player_id,games_played",
@@ -122,15 +127,20 @@ def get_rostered_players(db: SupabaseRest, target_date: date, season: int) -> Li
             pid = int(player.get("player_id", 0))
             if pid in batch and games_played_map.get(pid, 0) > 0:
                 active_players.append(player)
+    print(f"   Found {len(active_players)} active players", flush=True)
     
     # LEFT JOIN with draft_picks to get league_id (if rostered)
     # Create map of player_id -> league_id from draft_picks
+    # OPTIMIZATION: Only fetch picks for active players, not all picks
+    print(f"   Fetching draft picks for {len(active_players)} active players...", flush=True)
+    active_player_ids_list = [int(p.get("player_id", 0)) for p in active_players if p.get("player_id")]
     all_picks = db.select(
         "draft_picks",
         select="player_id,league_id",
-        filters=[],
+        filters=[("player_id", "in", active_player_ids_list)] if active_player_ids_list else [],
         limit=10000
     )
+    print(f"   Found {len(all_picks)} draft picks", flush=True)
     
     player_to_league = {}
     for pick in all_picks:
@@ -719,6 +729,8 @@ def main():
     
     # Step 1: Get rostered players
     print("📋 Step 1: Fetching rostered players...")
+    print("   (This may take a moment...)")
+    sys.stdout.flush()
     rostered_players = get_rostered_players(db, target_date, args.season)
     
     if not rostered_players:
@@ -727,6 +739,7 @@ def main():
     
     print(f"   Found {len(rostered_players)} player-game combinations")
     print()
+    sys.stdout.flush()
     
     # Step 2: Group by league to get scoring settings
     print("📋 Step 2: Loading league scoring settings...")
@@ -739,10 +752,36 @@ def main():
     print(f"   Loaded scoring settings for {len(unique_leagues)} leagues")
     print()
     
-    # Step 3: Prepare worker arguments
-    print("📋 Step 3: Preparing worker tasks...")
+    # Step 3: Check existing projections and skip them
+    print("📋 Step 3: Checking existing projections...")
+    existing_projections = set()
+    offset = 0
+    while True:
+        batch = db.select(
+            "player_projected_stats",
+            select="player_id,game_id",
+            filters=[("projection_date", "eq", target_date.isoformat())],
+            limit=1000,
+            offset=offset
+        )
+        if not batch:
+            break
+        for proj in batch:
+            existing_projections.add((int(proj.get("player_id", 0)), int(proj.get("game_id", 0))))
+        if len(batch) < 1000:
+            break
+        offset += 1000
+    print(f"   Found {len(existing_projections)} existing projections", flush=True)
+    
+    # Step 4: Prepare worker arguments (skip existing)
+    print("📋 Step 4: Preparing worker tasks...")
     worker_args = []
+    skipped = 0
     for player_id, game_id, league_id in rostered_players:
+        # Skip if projection already exists
+        if (player_id, game_id) in existing_projections:
+            skipped += 1
+            continue
         # Use league scoring if available, otherwise use defaults
         # league_id can be None for unrostered players - use defaults
         scoring_settings = league_scoring.get(league_id) if league_id else {
@@ -756,27 +795,66 @@ def main():
             }
         worker_args.append((player_id, game_id, target_date, args.season, scoring_settings))
     
-    print(f"   Prepared {len(worker_args)} calculation tasks")
+    print(f"   Prepared {len(worker_args)} calculation tasks (skipped {skipped} existing)", flush=True)
     print()
     
-    # Step 4: Process in parallel
-    print("📋 Step 4: Calculating projections in parallel...")
+    if len(worker_args) == 0:
+        print("✅ All projections already exist! Nothing to calculate.")
+        return
+    
+    # Step 5: Process in parallel or single-threaded
+    print("📋 Step 4: Calculating projections...")
     start_time = time.time()
     results = []
     
-    try:
-        with multiprocessing.Pool(max_workers) as pool:
-            # Use chunksize to optimize inter-process communication
-            results = pool.map(
-                calculate_player_projection_worker,
-                worker_args,
-                chunksize=args.chunksize
-            )
-    except Exception as e:
-        print(f"❌ Fatal error in parallel processing: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
+    # OPTIMIZATION: Use single-threaded mode for small batches to avoid Windows multiprocessing issues
+    if len(worker_args) < 100:
+        print(f"   Small batch detected ({len(worker_args)} players) - using single-threaded mode")
+        print("   (This avoids Windows multiprocessing overhead for small jobs)")
+        sys.stdout.flush()
+        try:
+            last_progress_time = time.time()
+            progress_interval = 15.0  # Show progress every 15 seconds
+            
+            for idx, args in enumerate(worker_args, 1):
+                player_id, game_id, _, _, _ = args
+                current_time = time.time()
+                
+                # Show progress every 15 seconds OR every 5 players OR first/last
+                if (current_time - last_progress_time >= progress_interval) or (idx % 5 == 0) or (idx == 1) or (idx == len(worker_args)):
+                    elapsed = current_time - start_time
+                    rate = idx / elapsed if elapsed > 0 else 0
+                    remaining = (len(worker_args) - idx) / rate if rate > 0 else 0
+                    print(f"   [{elapsed:.0f}s] Processing {idx}/{len(worker_args)} (player {player_id}, game {game_id})... Rate: {rate:.1f}/s, ETA: {remaining:.0f}s", flush=True)
+                    last_progress_time = current_time
+                
+                result = calculate_player_projection_worker(args)
+                results.append(result)
+                
+                # Add error handling per player to continue on failures
+                if not result.get('success'):
+                    if idx <= 10:  # Show first 10 errors
+                        print(f"      Warning: Player {result.get('player_id')} failed: {result.get('error', 'Unknown')[:100]}", flush=True)
+        except Exception as e:
+            print(f"❌ Fatal error in single-threaded processing: {e}")
+            import traceback
+            traceback.print_exc()
+            sys.exit(1)
+    else:
+        print(f"   Large batch detected ({len(worker_args)} players) - using multiprocessing ({max_workers} workers)")
+        try:
+            with multiprocessing.Pool(max_workers) as pool:
+                # Use chunksize to optimize inter-process communication
+                results = pool.map(
+                    calculate_player_projection_worker,
+                    worker_args,
+                    chunksize=args.chunksize
+                )
+        except Exception as e:
+            print(f"❌ Fatal error in parallel processing: {e}")
+            import traceback
+            traceback.print_exc()
+            sys.exit(1)
     
     elapsed_time = time.time() - start_time
     print(f"   Completed in {elapsed_time:.2f} seconds")

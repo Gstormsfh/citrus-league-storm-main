@@ -153,25 +153,25 @@ export const DemoDataService = {
    */
   getDemoMyTeam(): MatchupPlayer[] {
     return [
-      { id: 1, name: "Connor McDavid", position: "C", team: "EDM", points: 32.5, gamesRemaining: 2, status: "In Game", isStarter: true, isToday: true, stats: { goals: 1, assists: 2, sog: 4, blk: 0, gamesPlayed: 32 }, gameInfo: { opponent: "vs CGY", score: "EDM 4-2", period: "3rd 12:45" } },
-      { id: 2, name: "Leon Draisaitl", position: "C", team: "EDM", points: 28.2, gamesRemaining: 1, status: "In Game", isStarter: true, isToday: true, stats: { goals: 0, assists: 1, sog: 2, blk: 0, gamesPlayed: 32 }, gameInfo: { opponent: "vs CGY", score: "EDM 4-2", period: "3rd 12:45" } },
-      { id: 3, name: "Auston Matthews", position: "C", team: "TOR", points: 25.7, gamesRemaining: 0, status: "Final", isStarter: true, isToday: false, stats: { goals: 2, assists: 0, sog: 6, blk: 1, gamesPlayed: 30 } },
-      { id: 4, name: "Nathan MacKinnon", position: "C", team: "COL", points: 22.8, gamesRemaining: 2, status: "Yet to Play", isStarter: true, isToday: false, stats: { goals: 0, assists: 3, sog: 5, blk: 0, gamesPlayed: 31 } },
-      { id: 5, name: "David Pastrnak", position: "RW", team: "BOS", points: 21.4, gamesRemaining: 1, status: "In Game", isStarter: true, isToday: true, stats: { goals: 1, assists: 1, sog: 3, blk: 0, gamesPlayed: 33 }, gameInfo: { opponent: "@ FLA", score: "BOS 2-1", period: "2nd 4:20" } },
-      { id: 6, name: "Mikko Rantanen", position: "RW", team: "COL", points: 18.9, gamesRemaining: 2, status: "Yet to Play", isStarter: true, isToday: false, stats: { goals: 0, assists: 2, sog: 2, blk: 1, gamesPlayed: 31 } },
-      { id: 7, name: "Kirill Kaprizov", position: "LW", team: "MIN", points: 17.5, gamesRemaining: 0, status: "Final", isStarter: true, isToday: false, stats: { goals: 1, assists: 0, sog: 4, blk: 0, gamesPlayed: 29 } },
-      { id: 8, name: "Alex Ovechkin", position: "LW", team: "WSH", points: 16.2, gamesRemaining: 0, status: "Final", isStarter: true, isToday: false, stats: { goals: 1, assists: 0, sog: 5, blk: 1, gamesPlayed: 28 } },
-      { id: 9, name: "Cale Makar", position: "D", team: "COL", points: 15.7, gamesRemaining: 2, status: "Yet to Play", isStarter: true, isToday: false, stats: { goals: 0, assists: 2, sog: 2, blk: 2, gamesPlayed: 31 } },
-      { id: 10, name: "Adam Fox", position: "D", team: "NYR", points: 13.8, gamesRemaining: 1, status: "Yet to Play", isStarter: true, isToday: true, stats: { goals: 0, assists: 0, sog: 0, blk: 0, gamesPlayed: 30 }, gameInfo: { opponent: "vs NJD", time: "7:00 PM" } },
-      { id: 11, name: "Roman Josi", position: "D", team: "NSH", points: 11.5, gamesRemaining: 0, status: "Final", isStarter: true, isToday: false, stats: { goals: 0, assists: 1, sog: 3, blk: 2, gamesPlayed: 32 } },
-      { id: 12, name: "Victor Hedman", position: "D", team: "TBL", points: 10.7, gamesRemaining: 1, status: "Yet to Play", isStarter: true, isToday: false, stats: { goals: 0, assists: 1, sog: 2, blk: 1, gamesPlayed: 33 } },
-      { id: 13, name: "Andrei Vasilevskiy", position: "G", team: "TBL", points: 24.8, gamesRemaining: 1, status: "Yet to Play", isStarter: true, isToday: false, stats: { goals: 0, assists: 0, sog: 0, blk: 0, gamesPlayed: 25 } },
-      { id: 14, name: "Igor Shesterkin", position: "G", team: "NYR", points: 23.2, gamesRemaining: 1, status: "Yet to Play", isStarter: true, isToday: true, stats: { goals: 0, assists: 0, sog: 0, blk: 0, gamesPlayed: 24 }, gameInfo: { opponent: "vs NJD", time: "7:00 PM" } },
-      { id: 15, name: "Matt Duchene", position: "C", team: "DAL", points: 8.5, gamesRemaining: 2, status: "Yet to Play", isStarter: false, isToday: true, stats: { goals: 0, assists: 0, sog: 0, blk: 0, gamesPlayed: 29 }, gameInfo: { opponent: "@ STL", time: "8:00 PM" } },
-      { id: 16, name: "Mitch Marner", position: "RW", team: "TOR", points: 14.8, gamesRemaining: 0, status: "Final", isStarter: false, isToday: false, stats: { goals: 0, assists: 2, sog: 3, blk: 1, gamesPlayed: 30 } },
-      { id: 17, name: "Brady Tkachuk", position: "LW", team: "OTT", points: 12.3, gamesRemaining: 1, status: "Yet to Play", isStarter: false, isToday: false, stats: { goals: 1, assists: 0, sog: 5, blk: 4, gamesPlayed: 28 } },
-      { id: 18, name: "Quinn Hughes", position: "D", team: "VAN", points: 9.7, gamesRemaining: 2, status: "Yet to Play", isStarter: false, isToday: false, stats: { goals: 0, assists: 1, sog: 2, blk: 0, gamesPlayed: 31 } },
-      { id: 19, name: "Jacob Markstrom", position: "G", team: "CGY", points: 18.5, gamesRemaining: 0, status: "Final", isStarter: false, isToday: false, stats: { goals: 0, assists: 0, sog: 0, blk: 0, gamesPlayed: 22 } },
+      { id: 1, name: "Connor McDavid", position: "C", team: "EDM", points: 32.5, total_points: 32.5, gamesRemaining: 2, status: "In Game", isStarter: true, isToday: true, stats: { goals: 1, assists: 2, sog: 4, blk: 0, gamesPlayed: 32 }, gameInfo: { opponent: "vs CGY", score: "EDM 4-2", period: "3rd 12:45" } },
+      { id: 2, name: "Leon Draisaitl", position: "C", team: "EDM", points: 28.2, total_points: 28.2, gamesRemaining: 1, status: "In Game", isStarter: true, isToday: true, stats: { goals: 0, assists: 1, sog: 2, blk: 0, gamesPlayed: 32 }, gameInfo: { opponent: "vs CGY", score: "EDM 4-2", period: "3rd 12:45" } },
+      { id: 3, name: "Auston Matthews", position: "C", team: "TOR", points: 25.7, total_points: 25.7, gamesRemaining: 0, status: "Final", isStarter: true, isToday: false, stats: { goals: 2, assists: 0, sog: 6, blk: 1, gamesPlayed: 30 } },
+      { id: 4, name: "Nathan MacKinnon", position: "C", team: "COL", points: 22.8, total_points: 22.8, gamesRemaining: 2, status: "Yet to Play", isStarter: true, isToday: false, stats: { goals: 0, assists: 3, sog: 5, blk: 0, gamesPlayed: 31 } },
+      { id: 5, name: "David Pastrnak", position: "RW", team: "BOS", points: 21.4, total_points: 21.4, gamesRemaining: 1, status: "In Game", isStarter: true, isToday: true, stats: { goals: 1, assists: 1, sog: 3, blk: 0, gamesPlayed: 33 }, gameInfo: { opponent: "@ FLA", score: "BOS 2-1", period: "2nd 4:20" } },
+      { id: 6, name: "Mikko Rantanen", position: "RW", team: "COL", points: 18.9, total_points: 18.9, gamesRemaining: 2, status: "Yet to Play", isStarter: true, isToday: false, stats: { goals: 0, assists: 2, sog: 2, blk: 1, gamesPlayed: 31 } },
+      { id: 7, name: "Kirill Kaprizov", position: "LW", team: "MIN", points: 17.5, total_points: 17.5, gamesRemaining: 0, status: "Final", isStarter: true, isToday: false, stats: { goals: 1, assists: 0, sog: 4, blk: 0, gamesPlayed: 29 } },
+      { id: 8, name: "Alex Ovechkin", position: "LW", team: "WSH", points: 16.2, total_points: 16.2, gamesRemaining: 0, status: "Final", isStarter: true, isToday: false, stats: { goals: 1, assists: 0, sog: 5, blk: 1, gamesPlayed: 28 } },
+      { id: 9, name: "Cale Makar", position: "D", team: "COL", points: 15.7, total_points: 15.7, gamesRemaining: 2, status: "Yet to Play", isStarter: true, isToday: false, stats: { goals: 0, assists: 2, sog: 2, blk: 2, gamesPlayed: 31 } },
+      { id: 10, name: "Adam Fox", position: "D", team: "NYR", points: 13.8, total_points: 13.8, gamesRemaining: 1, status: "Yet to Play", isStarter: true, isToday: true, stats: { goals: 0, assists: 0, sog: 0, blk: 0, gamesPlayed: 30 }, gameInfo: { opponent: "vs NJD", time: "7:00 PM" } },
+      { id: 11, name: "Roman Josi", position: "D", team: "NSH", points: 11.5, total_points: 11.5, gamesRemaining: 0, status: "Final", isStarter: true, isToday: false, stats: { goals: 0, assists: 1, sog: 3, blk: 2, gamesPlayed: 32 } },
+      { id: 12, name: "Victor Hedman", position: "D", team: "TBL", points: 10.7, total_points: 10.7, gamesRemaining: 1, status: "Yet to Play", isStarter: true, isToday: false, stats: { goals: 0, assists: 1, sog: 2, blk: 1, gamesPlayed: 33 } },
+      { id: 13, name: "Andrei Vasilevskiy", position: "G", team: "TBL", points: 24.8, total_points: 24.8, gamesRemaining: 1, status: "Yet to Play", isStarter: true, isToday: false, stats: { goals: 0, assists: 0, sog: 0, blk: 0, gamesPlayed: 25 } },
+      { id: 14, name: "Igor Shesterkin", position: "G", team: "NYR", points: 23.2, total_points: 23.2, gamesRemaining: 1, status: "Yet to Play", isStarter: true, isToday: true, stats: { goals: 0, assists: 0, sog: 0, blk: 0, gamesPlayed: 24 }, gameInfo: { opponent: "vs NJD", time: "7:00 PM" } },
+      { id: 15, name: "Matt Duchene", position: "C", team: "DAL", points: 8.5, total_points: 8.5, gamesRemaining: 2, status: "Yet to Play", isStarter: false, isToday: true, stats: { goals: 0, assists: 0, sog: 0, blk: 0, gamesPlayed: 29 }, gameInfo: { opponent: "@ STL", time: "8:00 PM" } },
+      { id: 16, name: "Mitch Marner", position: "RW", team: "TOR", points: 14.8, total_points: 14.8, gamesRemaining: 0, status: "Final", isStarter: false, isToday: false, stats: { goals: 0, assists: 2, sog: 3, blk: 1, gamesPlayed: 30 } },
+      { id: 17, name: "Brady Tkachuk", position: "LW", team: "OTT", points: 12.3, total_points: 12.3, gamesRemaining: 1, status: "Yet to Play", isStarter: false, isToday: false, stats: { goals: 1, assists: 0, sog: 5, blk: 4, gamesPlayed: 28 } },
+      { id: 18, name: "Quinn Hughes", position: "D", team: "VAN", points: 9.7, total_points: 9.7, gamesRemaining: 2, status: "Yet to Play", isStarter: false, isToday: false, stats: { goals: 0, assists: 1, sog: 2, blk: 0, gamesPlayed: 31 } },
+      { id: 19, name: "Jacob Markstrom", position: "G", team: "CGY", points: 18.5, total_points: 18.5, gamesRemaining: 0, status: "Final", isStarter: false, isToday: false, stats: { goals: 0, assists: 0, sog: 0, blk: 0, gamesPlayed: 22 } },
     ];
   },
 
@@ -181,20 +181,20 @@ export const DemoDataService = {
    */
   getDemoOpponentTeam(): MatchupPlayer[] {
     return [
-      { id: 101, name: "Sidney Crosby", position: "C", team: "PIT", points: 29.7, gamesRemaining: 1, status: "Yet to Play", isStarter: true, isToday: true, stats: { goals: 0, assists: 0, sog: 0, blk: 0 }, gameInfo: { opponent: "vs PHI", time: "7:30 PM" } },
-      { id: 102, name: "Nikita Kucherov", position: "RW", team: "TBL", points: 27.9, gamesRemaining: 1, status: "Yet to Play", isStarter: true, isToday: false, stats: { goals: 1, assists: 2, sog: 4, blk: 0 } },
-      { id: 103, name: "Artemi Panarin", position: "LW", team: "NYR", points: 26.2, gamesRemaining: 1, status: "Yet to Play", isStarter: true, isToday: true, stats: { goals: 0, assists: 0, sog: 0, blk: 0 }, gameInfo: { opponent: "vs NJD", time: "7:00 PM" } },
-      { id: 104, name: "Brad Marchand", position: "LW", team: "BOS", points: 22.1, gamesRemaining: 1, status: "In Game", isStarter: true, isToday: true, stats: { goals: 0, assists: 1, sog: 2, blk: 1 }, gameInfo: { opponent: "@ FLA", score: "BOS 2-1", period: "2nd 4:20" } },
-      { id: 105, name: "Elias Pettersson", position: "C", team: "VAN", points: 20.8, gamesRemaining: 2, status: "Yet to Play", isStarter: true, isToday: false, stats: { goals: 1, assists: 1, sog: 3, blk: 1 } },
-      { id: 106, name: "Jack Hughes", position: "C", team: "NJD", points: 19.5, gamesRemaining: 0, status: "Final", isStarter: true, isToday: false, stats: { goals: 1, assists: 1, sog: 5, blk: 0 } },
-      { id: 107, name: "William Nylander", position: "RW", team: "TOR", points: 18.2, gamesRemaining: 0, status: "Final", isStarter: true, isToday: false, stats: { goals: 1, assists: 0, sog: 4, blk: 0 } },
-      { id: 108, name: "Matthew Tkachuk", position: "RW", team: "FLA", points: 17.8, gamesRemaining: 2, status: "In Game", isStarter: true, isToday: true, stats: { goals: 1, assists: 0, sog: 3, blk: 2 }, gameInfo: { opponent: "vs BOS", score: "BOS 2-1", period: "2nd 4:20" } },
-      { id: 109, name: "Brent Burns", position: "D", team: "CAR", points: 13.2, gamesRemaining: 0, status: "Final", isStarter: true, isToday: false, stats: { goals: 0, assists: 1, sog: 3, blk: 2 } },
-      { id: 110, name: "Dougie Hamilton", position: "D", team: "NJD", points: 12.5, gamesRemaining: 0, status: "Final", isStarter: true, isToday: false, stats: { goals: 0, assists: 1, sog: 2, blk: 3 } },
-      { id: 111, name: "Shea Theodore", position: "D", team: "VGK", points: 11.8, gamesRemaining: 1, status: "Yet to Play", isStarter: true, isToday: true, stats: { goals: 0, assists: 0, sog: 0, blk: 0 }, gameInfo: { opponent: "@ LAK", time: "10:00 PM" } },
-      { id: 112, name: "Moritz Seider", position: "D", team: "DET", points: 9.9, gamesRemaining: 2, status: "Yet to Play", isStarter: true, isToday: false, stats: { goals: 0, assists: 0, sog: 1, blk: 4 } },
-      { id: 113, name: "Connor Hellebuyck", position: "G", team: "WPG", points: 26.3, gamesRemaining: 2, status: "Yet to Play", isStarter: true, isToday: false, stats: { goals: 0, assists: 0, sog: 0, blk: 0 } },
-      { id: 114, name: "Ilya Sorokin", position: "G", team: "NYI", points: 22.7, gamesRemaining: 1, status: "Yet to Play", isStarter: true, isToday: true, stats: { goals: 0, assists: 0, sog: 0, blk: 0 }, gameInfo: { opponent: "@ WAS", time: "7:00 PM" } },
+      { id: 101, name: "Sidney Crosby", position: "C", team: "PIT", points: 29.7, total_points: 29.7, gamesRemaining: 1, status: "Yet to Play", isStarter: true, isToday: true, stats: { goals: 0, assists: 0, sog: 0, blk: 0 }, gameInfo: { opponent: "vs PHI", time: "7:30 PM" } },
+      { id: 102, name: "Nikita Kucherov", position: "RW", team: "TBL", points: 27.9, total_points: 27.9, gamesRemaining: 1, status: "Yet to Play", isStarter: true, isToday: false, stats: { goals: 1, assists: 2, sog: 4, blk: 0 } },
+      { id: 103, name: "Artemi Panarin", position: "LW", team: "NYR", points: 26.2, total_points: 26.2, gamesRemaining: 1, status: "Yet to Play", isStarter: true, isToday: true, stats: { goals: 0, assists: 0, sog: 0, blk: 0 }, gameInfo: { opponent: "vs NJD", time: "7:00 PM" } },
+      { id: 104, name: "Brad Marchand", position: "LW", team: "BOS", points: 22.1, total_points: 22.1, gamesRemaining: 1, status: "In Game", isStarter: true, isToday: true, stats: { goals: 0, assists: 1, sog: 2, blk: 1 }, gameInfo: { opponent: "@ FLA", score: "BOS 2-1", period: "2nd 4:20" } },
+      { id: 105, name: "Elias Pettersson", position: "C", team: "VAN", points: 20.8, total_points: 20.8, gamesRemaining: 2, status: "Yet to Play", isStarter: true, isToday: false, stats: { goals: 1, assists: 1, sog: 3, blk: 1 } },
+      { id: 106, name: "Jack Hughes", position: "C", team: "NJD", points: 19.5, total_points: 19.5, gamesRemaining: 0, status: "Final", isStarter: true, isToday: false, stats: { goals: 1, assists: 1, sog: 5, blk: 0 } },
+      { id: 107, name: "William Nylander", position: "RW", team: "TOR", points: 18.2, total_points: 18.2, gamesRemaining: 0, status: "Final", isStarter: true, isToday: false, stats: { goals: 1, assists: 0, sog: 4, blk: 0 } },
+      { id: 108, name: "Matthew Tkachuk", position: "RW", team: "FLA", points: 17.8, total_points: 17.8, gamesRemaining: 2, status: "In Game", isStarter: true, isToday: true, stats: { goals: 1, assists: 0, sog: 3, blk: 2 }, gameInfo: { opponent: "vs BOS", score: "BOS 2-1", period: "2nd 4:20" } },
+      { id: 109, name: "Brent Burns", position: "D", team: "CAR", points: 13.2, total_points: 13.2, gamesRemaining: 0, status: "Final", isStarter: true, isToday: false, stats: { goals: 0, assists: 1, sog: 3, blk: 2 } },
+      { id: 110, name: "Dougie Hamilton", position: "D", team: "NJD", points: 12.5, total_points: 12.5, gamesRemaining: 0, status: "Final", isStarter: true, isToday: false, stats: { goals: 0, assists: 1, sog: 2, blk: 3 } },
+      { id: 111, name: "Shea Theodore", position: "D", team: "VGK", points: 11.8, total_points: 11.8, gamesRemaining: 1, status: "Yet to Play", isStarter: true, isToday: true, stats: { goals: 0, assists: 0, sog: 0, blk: 0 }, gameInfo: { opponent: "@ LAK", time: "10:00 PM" } },
+      { id: 112, name: "Moritz Seider", position: "D", team: "DET", points: 9.9, total_points: 9.9, gamesRemaining: 2, status: "Yet to Play", isStarter: true, isToday: false, stats: { goals: 0, assists: 0, sog: 1, blk: 4 } },
+      { id: 113, name: "Connor Hellebuyck", position: "G", team: "WPG", points: 26.3, total_points: 26.3, gamesRemaining: 2, status: "Yet to Play", isStarter: true, isToday: false, stats: { goals: 0, assists: 0, sog: 0, blk: 0 } },
+      { id: 114, name: "Ilya Sorokin", position: "G", team: "NYI", points: 22.7, total_points: 22.7, gamesRemaining: 1, status: "Yet to Play", isStarter: true, isToday: true, stats: { goals: 0, assists: 0, sog: 0, blk: 0 }, gameInfo: { opponent: "@ WAS", time: "7:00 PM" } },
     ];
   },
 
@@ -211,10 +211,53 @@ export const DemoDataService = {
   },
 
   /**
+   * Helper function to calculate slot assignments from starters
+   */
+  _calculateSlotAssignments(starters: MatchupPlayer[]): Record<string, string> {
+    const assignments: Record<string, string> = {};
+    const getFantasyPosition = (position: string): string => {
+      const pos = position?.toUpperCase() || '';
+      if (['C', 'CENTRE', 'CENTER'].includes(pos)) return 'C';
+      if (['LW', 'LEFT WING', 'LEFTWING', 'L'].includes(pos)) return 'LW';
+      if (['RW', 'RIGHT WING', 'RIGHTWING', 'R'].includes(pos)) return 'RW';
+      if (['D', 'DEFENCE', 'DEFENSE'].includes(pos)) return 'D';
+      if (['G', 'GOALIE'].includes(pos)) return 'G';
+      return 'UTIL';
+    };
+    const playersByPos: Record<string, MatchupPlayer[]> = {
+      'C': [], 'LW': [], 'RW': [], 'D': [], 'G': [], 'UTIL': []
+    };
+    starters.forEach(p => {
+      const pos = getFantasyPosition(p.position);
+      if (pos !== 'UTIL') playersByPos[pos].push(p);
+    });
+    ['C', 'LW', 'RW'].forEach(pos => {
+      playersByPos[pos].slice(0, 2).forEach((p, i) => {
+        assignments[String(p.id)] = `slot-${pos}-${i + 1}`;
+      });
+    });
+    playersByPos['D'].slice(0, 4).forEach((p, i) => {
+      assignments[String(p.id)] = `slot-D-${i + 1}`;
+    });
+    playersByPos['G'].slice(0, 2).forEach((p, i) => {
+      assignments[String(p.id)] = `slot-G-${i + 1}`;
+    });
+    const assignedIds = new Set(Object.keys(assignments));
+    const unassigned = starters.filter(p => !assignedIds.has(String(p.id)));
+    const utilPlayer = unassigned.find(p => getFantasyPosition(p.position) !== 'G');
+    if (utilPlayer) {
+      assignments[String(utilPlayer.id)] = 'slot-UTIL';
+    }
+    return assignments;
+  },
+
+  /**
    * Get demo matchup data from actual demo rosters
    * Uses Team 3 (Citrus Crushers) as "My Team" and Team 1 as opponent
    * Transforms actual roster players into MatchupPlayer format
    * Uses two-tier approach: database first, static fallback
+   * 
+   * CRITICAL: For guests, immediately returns static data to avoid database calls
    */
   async getDemoMatchupData(): Promise<{ 
     myTeam: MatchupPlayer[]; 
@@ -222,36 +265,54 @@ export const DemoDataService = {
     myTeamSlotAssignments: Record<string, string>;
     opponentTeamSlotAssignments: Record<string, string>;
   }> {
+    // CRITICAL: Use REAL NHL data for ALL users (guests and logged-in)
+    // Only team assignments are static - everything else uses real data
+    // This ensures demo matchup follows EXACT same logic as real matchups
+    console.log('[DemoDataService] getDemoMatchupData() called - attempting to use REAL NHL data with static team assignments');
+    
+    let allPlayers: any[] = [];
+    let useRealData = false;
+    
+    // Step 1: Try to load real players from database (works for guests if RLS allows)
     try {
-      console.log('[DemoDataService] getDemoMatchupData() called - using same logic as Roster.tsx');
-      const { MatchupService } = await import('./MatchupService');
+      console.log('[DemoDataService] Step 1: Attempting to load real players from database...');
       const { PlayerService } = await import('./PlayerService');
-      const { LeagueService } = await import('./LeagueService');
+      allPlayers = await PlayerService.getAllPlayers();
+      console.log('[DemoDataService] ✅ Successfully loaded', allPlayers.length, 'real players from database');
+      useRealData = true;
+    } catch (playerError) {
+      console.warn('[DemoDataService] ⚠️ Failed to load real players from database:', playerError);
+      console.log('[DemoDataService] Will use static fallback data instead');
+      useRealData = false;
+    }
+    
+    // Step 2: If we have real players, use them; otherwise use static fallback
+    if (useRealData && allPlayers.length > 0) {
+      try {
+        console.log('[DemoDataService] Step 2: Using real NHL data to build demo matchup...');
+        const { MatchupService } = await import('./MatchupService');
+        const { LeagueService } = await import('./LeagueService');
       
-      console.log('[DemoDataService] Services imported, loading players...');
-      const allPlayers = await PlayerService.getAllPlayers();
-      console.log('[DemoDataService] Players loaded:', allPlayers.length);
+        // Use same approach as Roster.tsx - use LeagueService.getTeamRoster
+        // Initialize demo league (same as Roster.tsx)
+        await LeagueService.initializeLeague(allPlayers);
+        
+        // Get Team 3 (My Team) roster - same as Roster.tsx
+        const myTeamRoster = await LeagueService.getTeamRoster(3, allPlayers);
+        console.log('[DemoDataService] My team (Team 3) roster loaded:', myTeamRoster.length, 'players');
+        
+        // Get Team 1 (Opponent) roster - same approach
+        const opponentTeamRoster = await LeagueService.getTeamRoster(1, allPlayers);
+        console.log('[DemoDataService] Opponent team (Team 1) roster loaded:', opponentTeamRoster.length, 'players');
+        
+        if (myTeamRoster.length === 0 || opponentTeamRoster.length === 0) {
+          console.error('[DemoDataService] One or both rosters are empty! Falling back to static data.');
+          throw new Error('Demo rosters not available');
+        }
       
-      // Use same approach as Roster.tsx - use LeagueService.getTeamRoster
-      // Initialize demo league (same as Roster.tsx)
-      await LeagueService.initializeLeague(allPlayers);
-      
-      // Get Team 3 (My Team) roster - same as Roster.tsx
-      const myTeamRoster = await LeagueService.getTeamRoster(3, allPlayers);
-      console.log('[DemoDataService] My team (Team 3) roster loaded:', myTeamRoster.length, 'players');
-      
-      // Get Team 1 (Opponent) roster - same approach
-      const opponentTeamRoster = await LeagueService.getTeamRoster(1, allPlayers);
-      console.log('[DemoDataService] Opponent team (Team 1) roster loaded:', opponentTeamRoster.length, 'players');
-      
-      if (myTeamRoster.length === 0 || opponentTeamRoster.length === 0) {
-        console.error('[DemoDataService] One or both rosters are empty!');
-        throw new Error('Demo rosters not available');
-      }
-      
-      // Convert Player[] to HockeyPlayer[] using MatchupService
-      const myTeamHockeyPlayers = myTeamRoster.map(p => MatchupService.transformToHockeyPlayer(p));
-      const opponentTeamHockeyPlayers = opponentTeamRoster.map(p => MatchupService.transformToHockeyPlayer(p));
+        // Convert Player[] to HockeyPlayer[] using MatchupService
+        const myTeamHockeyPlayers = myTeamRoster.map(p => MatchupService.transformToHockeyPlayer(p));
+        const opponentTeamHockeyPlayers = opponentTeamRoster.map(p => MatchupService.transformToHockeyPlayer(p));
       
       console.log('[DemoDataService] Demo rosters loaded:', {
         myTeamCount: myTeamHockeyPlayers.length,
@@ -362,9 +423,24 @@ export const DemoDataService = {
         ...opponentTeamHockeyPlayers.map(p => p.team || '').filter(t => t)
       ]));
       
+      console.log('[DemoDataService] Fetching schedule for teams:', allTeams);
+      
       // Batch fetch games for all teams at once (more efficient)
-      const { ScheduleService } = await import('./ScheduleService');
-      const { gamesByTeam } = await ScheduleService.getGamesForTeams(allTeams, weekStart, weekEnd);
+      // Wrap in try-catch in case schedule query fails for guests
+      let gamesByTeam = new Map<string, any[]>();
+      try {
+        const { ScheduleService } = await import('./ScheduleService');
+        const scheduleResult = await ScheduleService.getGamesForTeams(allTeams, weekStart, weekEnd);
+        gamesByTeam = scheduleResult.gamesByTeam || new Map();
+        console.log('[DemoDataService] Schedule loaded:', {
+          teamsWithGames: Array.from(gamesByTeam.keys()).length,
+          totalGames: Array.from(gamesByTeam.values()).flat().length
+        });
+      } catch (scheduleError) {
+        console.warn('[DemoDataService] Failed to load schedule data (non-critical):', scheduleError);
+        console.log('[DemoDataService] Continuing without schedule data - players will show without game info');
+        gamesByTeam = new Map(); // Empty map - players will still work, just without game info
+      }
       
       // Transform rosters to MatchupPlayer format
       const myTeamMatchupPlayers = myTeamHockeyPlayers.map((player, index) => {
@@ -439,21 +515,48 @@ export const DemoDataService = {
         }
       });
       
-      console.log('[DemoDataService] Slot assignments calculated:', {
-        myTeamSlots: Object.keys(myTeamSlotAssignments).length,
-        opponentTeamSlots: Object.keys(opponentTeamSlotAssignments).length
+        console.log('[DemoDataService] Slot assignments calculated:', {
+          myTeamSlots: Object.keys(myTeamSlotAssignments).length,
+          opponentTeamSlots: Object.keys(opponentTeamSlotAssignments).length
+        });
+        
+        return {
+          myTeam: myTeamMatchupPlayers,
+          opponentTeam: opponentTeamMatchupPlayers,
+          myTeamSlotAssignments,
+          opponentTeamSlotAssignments
+        };
+      } catch (realDataError) {
+        console.error('[DemoDataService] Error building matchup with real data:', realDataError);
+        console.log('[DemoDataService] Falling back to static data...');
+        useRealData = false; // Fall through to static data
+      }
+    }
+    
+    // Step 3: Fallback to static data if real data failed
+    if (!useRealData) {
+      console.log('[DemoDataService] Step 3: Using static fallback data');
+      const staticMyTeam = this.getDemoMyTeam();
+      const staticOpponentTeam = this.getDemoOpponentTeam();
+      const myStarters = staticMyTeam.filter(p => p.isStarter);
+      const oppStarters = staticOpponentTeam.filter(p => p.isStarter);
+      
+      console.log('[DemoDataService] Static data loaded:', {
+        myTeamCount: staticMyTeam.length,
+        opponentTeamCount: staticOpponentTeam.length,
+        myTeamStarters: myStarters.length,
+        opponentTeamStarters: oppStarters.length
       });
       
       return {
-        myTeam: myTeamMatchupPlayers,
-        opponentTeam: opponentTeamMatchupPlayers,
-        myTeamSlotAssignments,
-        opponentTeamSlotAssignments
+        myTeam: staticMyTeam,
+        opponentTeam: staticOpponentTeam,
+        myTeamSlotAssignments: this._calculateSlotAssignments(myStarters),
+        opponentTeamSlotAssignments: this._calculateSlotAssignments(oppStarters)
       };
-    } catch (error) {
-      console.error('[DemoDataService] Error in getDemoMatchupData():', error);
-      console.error('[DemoDataService] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-      throw error; // Re-throw to let caller handle it
     }
+    
+    // This should never be reached, but TypeScript needs it
+    throw new Error('Unexpected state in getDemoMatchupData()');
   },
 };

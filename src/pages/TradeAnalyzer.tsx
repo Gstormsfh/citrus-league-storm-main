@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -26,9 +27,12 @@ import { PlayerService, Player } from '@/services/PlayerService';
 import { LeagueService, LeagueTeam } from '@/services/LeagueService';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
+import { isGuestMode } from '@/utils/guestHelpers';
+import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 
 const TradeAnalyzer = () => {
   const [searchParams] = useSearchParams();
+  const { userLeagueState } = useLeague();
   const [selectedTeamId, setSelectedTeamId] = useState<string | number>("");
   const [myTeamRoster, setMyTeamRoster] = useState<Player[]>([]);
   const [opponentTeams, setOpponentTeams] = useState<LeagueTeam[]>([]);
@@ -238,6 +242,17 @@ const TradeAnalyzer = () => {
             </Select>
           </div>
         </div>
+
+        {/* Demo Mode Banner */}
+        {isGuestMode(userLeagueState) && (
+          <div className="mb-6">
+            <LeagueCreationCTA 
+              title="You're viewing demo trade analyzer"
+              description="Sign up to analyze trades with your actual team and get AI-powered trade recommendations."
+              variant="compact"
+            />
+          </div>
+        )}
 
         <div className="grid lg:grid-cols-12 gap-6 h-[calc(100vh-240px)] min-h-[600px]">
           {/* Left Column: My Team */}

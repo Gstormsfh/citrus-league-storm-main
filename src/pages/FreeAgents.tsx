@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLeague } from '@/contexts/LeagueContext';
 import { supabase } from '@/integrations/supabase/client';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
@@ -19,6 +20,8 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
+import { isGuestMode, shouldBlockGuestOperation } from '@/utils/guestHelpers';
+import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 
 // Helper function to format position for display (L -> LW, R -> RW)
 const formatPositionForDisplay = (position: string): string => {
@@ -36,6 +39,7 @@ const formatPositionForDisplay = (position: string): string => {
 const FreeAgents = () => {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { userLeagueState } = useLeague();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
@@ -78,18 +82,46 @@ const FreeAgents = () => {
     try {
       setLoading(true);
       
+      // DEMO MODE: For guests, show all players as free agents (no league filtering)
+      if (isGuestMode(userLeagueState)) {
+        try {
+          const allPlayers = await PlayerService.getAllPlayers();
+          // Show top players by points for demo
+          const sortedPlayers = [...allPlayers]
+            .sort((a, b) => (b.points || 0) - (a.points || 0))
+            .slice(0, 200); // Top 200 players
+          setPlayers(sortedPlayers);
+          setLoading(false);
+          return;
+        } catch (error) {
+          console.error('Error fetching demo players:', error);
+          toast({
+            title: "Error",
+            description: "Failed to load players. Please try again later.",
+            variant: "destructive"
+          });
+          setLoading(false);
+          return;
+        }
+      }
+      
       // Get user's league ID if logged in
       let currentLeagueId: string | undefined = undefined;
       if (user) {
-        const { data: userTeamData } = await supabase
-          .from('teams')
-          .select('league_id')
-          .eq('owner_id', user.id)
-          .maybeSingle();
-        
-        if (userTeamData) {
-          currentLeagueId = userTeamData.league_id;
-          setLeagueId(currentLeagueId);
+        try {
+          const { data: userTeamData } = await supabase
+            .from('teams')
+            .select('league_id')
+            .eq('owner_id', user.id)
+            .maybeSingle();
+          
+          if (userTeamData) {
+            currentLeagueId = userTeamData.league_id;
+            setLeagueId(currentLeagueId);
+          }
+        } catch (error) {
+          console.error('Error fetching user team:', error);
+          // Continue without league ID - will show all players
         }
       }
       
@@ -265,6 +297,18 @@ const FreeAgents = () => {
   };
 
   const handleAddPlayer = async (player: Player) => {
+    // Block guest operations
+    if (shouldBlockGuestOperation(userLeagueState, (msg) => {
+      toast({
+        title: "Sign Up Required",
+        description: msg,
+        variant: "default"
+      });
+      navigate('/auth?redirect=/free-agents');
+    })) {
+      return;
+    }
+
     if (!user || !leagueId) {
       toast({
         title: "Error",
@@ -706,6 +750,17 @@ const FreeAgents = () => {
             />
           </div>
         </div>
+
+        {/* Demo Mode Banner */}
+        {isGuestMode(userLeagueState) && (
+          <div className="mb-6">
+            <LeagueCreationCTA 
+              title="You're viewing demo data"
+              description="Sign up to add players to your roster and start managing your team."
+              variant="compact"
+            />
+          </div>
+        )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-3 max-w-2xl mb-6">

@@ -14,7 +14,12 @@ import { PlayerService, Player } from './PlayerService';
 import { DraftService } from './DraftService';
 import { MatchupService } from './MatchupService';
 
+// Static demo league ID (old approach - not used anymore)
 export const DEMO_LEAGUE_ID = '00000000-0000-0000-0000-000000000001';
+
+// REAL league ID to use as read-only demo for guests
+// This is the actual league that guests will see (read-only)
+export const DEMO_LEAGUE_ID_FOR_GUESTS = '750f4e1a-92ae-44cf-a798-2f3e06d0d5c9';
 
 export const DemoLeagueService = {
   /**

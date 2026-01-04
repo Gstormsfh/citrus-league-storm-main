@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -12,6 +13,8 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Narwhal } from '@/components/icons/Narwhal';
+import { isGuestMode } from '@/utils/guestHelpers';
+import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 
 interface Message {
   id: string;
@@ -21,6 +24,7 @@ interface Message {
 }
 
 const StormyAssistant = () => {
+  const { userLeagueState } = useLeague();
   const [activeTab, setActiveTab] = useState("chat");
   const [inputValue, setInputValue] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -85,6 +89,17 @@ const StormyAssistant = () => {
               Your personal fantasy sports strategist
             </p>
           </div>
+
+          {/* Demo Mode Banner */}
+          {isGuestMode(userLeagueState) && (
+            <div className="mb-8 max-w-2xl mx-auto">
+              <LeagueCreationCTA 
+                title="You're viewing demo Stormy Assistant"
+                description="Sign up to get personalized AI advice for your team and league."
+                variant="compact"
+              />
+            </div>
+          )}
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2 max-w-[400px] mx-auto mb-8">

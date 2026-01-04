@@ -83,6 +83,29 @@ def get_active_matchups(db: SupabaseRest, matchup_id: Optional[str] = None) -> L
     return matchups or []
 
 
+def get_completed_matchups(db: SupabaseRest, up_to_date: Optional[dt.date] = None, matchup_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    """
+    Fetch completed matchups (week_end_date <= up_to_date or today if not specified).
+    If matchup_id is provided, only fetch that specific matchup.
+    """
+    target_date = up_to_date or dt.date.today()
+    
+    filters = [
+        ("week_end_date", "lte", target_date.isoformat())
+    ]
+    
+    if matchup_id:
+        filters.append(("id", "eq", matchup_id))
+    
+    matchups = db.select(
+        "matchups",
+        select="id,league_id,week_number,team1_id,team2_id,week_start_date,week_end_date,status",
+        filters=filters
+    )
+    
+    return matchups or []
+
+
 def load_league_scoring_settings(db: SupabaseRest, league_id: str) -> Dict[str, Any]:
     """
     Load scoring_settings JSONB from league.
@@ -634,18 +657,24 @@ def update_matchup_scores(
 
 def calculate_matchup_scores(
     db: SupabaseRest,
-    matchup_id: Optional[str] = None
+    matchup_id: Optional[str] = None,
+    up_to_date: Optional[dt.date] = None
 ) -> int:
     """
     Main calculation function.
     If matchup_id is provided, only calculate for that matchup.
+    If up_to_date is provided, calculate for all matchups ending on or before that date.
     Otherwise, calculate for all active matchups.
     """
     print("=" * 80)
     print("WORLD CLASS MATCHUP ENGINE - SCORE CALCULATION")
     print("=" * 80)
     
-    matchups = get_active_matchups(db, matchup_id)
+    if up_to_date:
+        print(f"[INFO] Processing completed matchups up to {up_to_date.isoformat()}")
+        matchups = get_completed_matchups(db, up_to_date, matchup_id)
+    else:
+        matchups = get_active_matchups(db, matchup_id)
     
     if not matchups:
         print(f"[INFO] No active matchups found")
@@ -885,18 +914,28 @@ def main() -> int:
     
     parser = argparse.ArgumentParser(description="Calculate matchup scores for active matchups")
     parser.add_argument("--matchup-id", help="Process specific matchup ID")
+    parser.add_argument("--up-to-date", help="Process all matchups ending on or before this date (YYYY-MM-DD)")
     parser.add_argument("--verify", action="store_true", help="Run verification checks after calculation")
     args = parser.parse_args()
     
     matchup_id = args.matchup_id
+    up_to_date = None
+    if args.up_to_date:
+        try:
+            up_to_date = dt.datetime.strptime(args.up_to_date, "%Y-%m-%d").date()
+        except ValueError:
+            print(f"[ERROR] Invalid date format: {args.up_to_date}. Use YYYY-MM-DD")
+            return 1
     
     if matchup_id:
         print(f"[INFO] Processing specific matchup: {matchup_id}")
+    if up_to_date:
+        print(f"[INFO] Processing matchups up to: {up_to_date.isoformat()}")
     
     db = supabase_client()
     
     try:
-        count = calculate_matchup_scores(db, matchup_id)
+        count = calculate_matchup_scores(db, matchup_id, up_to_date)
         
         if args.verify:
             run_verification_checks(db, matchup_id)

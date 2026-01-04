@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLeague } from '@/contexts/LeagueContext';
 import { supabase } from '@/integrations/supabase/client';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -12,6 +13,8 @@ import { Narwhal } from '@/components/icons/Narwhal';
 import { PlayerService, Player } from '@/services/PlayerService';
 import { LeagueService } from '@/services/LeagueService';
 import { ScheduleService } from '@/services/ScheduleService';
+import { isGuestMode } from '@/utils/guestHelpers';
+import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 
 interface PositionStats {
   position: string;
@@ -38,28 +41,81 @@ interface FreeAgentRec {
 
 const TeamAnalytics = () => {
   const { user } = useAuth();
+  const { userLeagueState } = useLeague();
   const [freeAgentTargets, setFreeAgentTargets] = useState<FreeAgentRec[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadScheduleMaximizers();
-  }, [user]);
+  }, [user, userLeagueState]);
 
   const loadScheduleMaximizers = async () => {
     try {
       setLoading(true);
       
+      // DEMO MODE: For guests, show demo analytics
+      if (isGuestMode(userLeagueState)) {
+        try {
+          const allPlayers = await PlayerService.getAllPlayers();
+          // Show top free agents for demo
+          const topPlayers = [...allPlayers]
+            .sort((a, b) => (b.points || 0) - (a.points || 0))
+            .slice(0, 10);
+          
+          const maximizers: FreeAgentRec[] = [];
+          for (const player of topPlayers) {
+            try {
+              const { count } = await ScheduleService.getGamesThisWeek(player.team);
+              maximizers.push({
+                id: parseInt(player.id) || 0,
+                name: player.full_name,
+                position: player.position,
+                team: player.team,
+                pointsPerGame: (player.points || 0) / Math.max(1, player.games_played || 1),
+                gamesThisWeek: count || 0,
+                scheduleAdvantage: (count || 0) >= 4,
+                rostered: 0
+              });
+            } catch (error) {
+              // Skip players with schedule errors
+              console.warn(`Error getting games for ${player.team}:`, error);
+            }
+          }
+          
+          maximizers.sort((a, b) => {
+            if (b.gamesThisWeek !== a.gamesThisWeek) {
+              return b.gamesThisWeek - a.gamesThisWeek;
+            }
+            return b.pointsPerGame - a.pointsPerGame;
+          });
+          
+          setFreeAgentTargets(maximizers);
+          setLoading(false);
+          return;
+        } catch (error) {
+          console.error('Error loading demo analytics:', error);
+          setFreeAgentTargets([]);
+          setLoading(false);
+          return;
+        }
+      }
+      
       // Get user's league ID if logged in
       let currentLeagueId: string | undefined = undefined;
       if (user) {
-        const { data: userTeamData } = await supabase
-          .from('teams')
-          .select('league_id')
-          .eq('owner_id', user.id)
-          .maybeSingle();
-        
-        if (userTeamData) {
-          currentLeagueId = userTeamData.league_id;
+        try {
+          const { data: userTeamData } = await supabase
+            .from('teams')
+            .select('league_id')
+            .eq('owner_id', user.id)
+            .maybeSingle();
+          
+          if (userTeamData) {
+            currentLeagueId = userTeamData.league_id;
+          }
+        } catch (error) {
+          console.error('Error fetching user team:', error);
+          // Continue without league ID
         }
       }
       
@@ -181,6 +237,17 @@ const TeamAnalytics = () => {
                 </Card>
               </div>
             </div>
+
+            {/* Demo Mode Banner */}
+            {isGuestMode(userLeagueState) && (
+              <div className="mb-6">
+                <LeagueCreationCTA 
+                  title="You're viewing demo analytics"
+                  description="Sign up to see personalized analytics for your team and get AI-powered recommendations."
+                  variant="compact"
+                />
+              </div>
+            )}
 
             <div className="grid lg:grid-cols-3 gap-8">
               {/* Main Positional Breakdown */}

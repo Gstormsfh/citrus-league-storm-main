@@ -2004,6 +2004,60 @@ def calculate_goalie_physical_projection(
     return physical_projection
 
 
+def load_physical_projection(
+    db: SupabaseRest,
+    player_id: int,
+    game_id: int,
+    projection_date: date,
+    season: int
+) -> Optional[Dict[str, Any]]:
+    """
+    Load physical projection from projection_cache table if it exists.
+    
+    Args:
+        db: Supabase client
+        player_id: Player ID
+        game_id: Game ID
+        projection_date: Projection date
+        season: Season year
+    
+    Returns:
+        Physical projection dict if found in cache, None otherwise
+    """
+    try:
+        cached = db.select(
+            "projection_cache",
+            select="*",
+            filters=[
+                ("player_id", "eq", player_id),
+                ("game_id", "eq", game_id),
+                ("projection_date", "eq", projection_date.isoformat()),
+                ("season", "eq", season)
+            ],
+            limit=1
+        )
+        
+        if cached and len(cached) > 0:
+            cache_entry = cached[0]
+            return {
+                "goals": float(cache_entry.get("projected_goals", 0.0)),
+                "assists": float(cache_entry.get("projected_assists", 0.0)),
+                "shots": float(cache_entry.get("projected_shots", 0.0)),
+                "blocks": float(cache_entry.get("projected_blocks", 0.0)),
+                "saves": float(cache_entry.get("projected_saves", 0.0)),
+                "toi_seconds": int(cache_entry.get("projected_toi_seconds", 0)),
+                "base_goals": float(cache_entry.get("base_goals", 0.0)),
+                "base_assists": float(cache_entry.get("base_assists", 0.0)),
+                "opponent_xga_suppression": float(cache_entry.get("opponent_xga_suppression", 0.0)),
+                "goalie_gsax_factor": float(cache_entry.get("goalie_gsax_factor", 1.0)),
+                "finishing_multiplier": float(cache_entry.get("finishing_multiplier", 1.0)),
+                "opponent_adjustment": float(cache_entry.get("opponent_adjustment", 1.0))
+            }
+        return None
+    except Exception:
+        return None
+
+
 def save_physical_projection(
     db: SupabaseRest,
     player_id: int,
@@ -2661,18 +2715,24 @@ def calculate_daily_projection(
         Projection dict with all stats and model components, or None if error
     """
     try:
-        # LAYER 1: Calculate physical projection and save to cache
-        physical_projection = calculate_physical_projection(
+        # LAYER 1: Check cache first, then calculate if needed
+        physical_projection = load_physical_projection(
             db, player_id, game_id, game_date, season
         )
         
         if not physical_projection:
-            return None
-        
-        # Save physical projection to cache
-        save_physical_projection(
-            db, player_id, game_id, game_date, season, physical_projection
-        )
+            # Not in cache - calculate it
+            physical_projection = calculate_physical_projection(
+                db, player_id, game_id, game_date, season
+            )
+            
+            if not physical_projection:
+                return None
+            
+            # Save physical projection to cache for future use
+            save_physical_projection(
+                db, player_id, game_id, game_date, season, physical_projection
+            )
         
         # LAYER 2: Transform physical to fantasy points
         # Get league_id if not provided (try to get from first league)

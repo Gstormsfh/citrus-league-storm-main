@@ -1,11 +1,15 @@
+import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, Clock } from 'lucide-react';
+import { isGuestMode } from '@/utils/guestHelpers';
+import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 
 const WaiverWire = () => {
+  const { userLeagueState } = useLeague();
   const waiverClaims = [
     { player: "Connor McDavid", position: "C", team: "EDM", claimPriority: 1, processDate: "Dec 28, 2025" },
     { player: "Auston Matthews", position: "C", team: "TOR", claimPriority: 3, processDate: "Dec 29, 2025" },
@@ -24,6 +28,17 @@ const WaiverWire = () => {
                 Manage waiver claims and priorities
               </p>
             </div>
+
+            {/* Demo Mode Banner */}
+            {isGuestMode(userLeagueState) && (
+              <div className="mb-8">
+                <LeagueCreationCTA 
+                  title="You're viewing demo waiver wire"
+                  description="Sign up to manage waiver claims and priorities for your team."
+                  variant="compact"
+                />
+              </div>
+            )}
 
             <Card className="mb-8">
               <CardHeader>

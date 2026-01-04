@@ -1,3 +1,4 @@
+import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,6 +8,8 @@ import { Link } from 'react-router-dom';
 import { Narwhal } from '@/components/icons/Narwhal';
 import { HeadlinesBanner } from '@/components/gm-office/HeadlinesBanner';
 import { RosterDepthWidget } from '@/components/gm-office/RosterDepthWidget';
+import { isGuestMode } from '@/utils/guestHelpers';
+import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 
 const gmActions = [
   {
@@ -55,6 +58,7 @@ const gmActions = [
 ];
 
 const GMOffice = () => {
+  const { userLeagueState } = useLeague();
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-background/95">
       <Navbar />
@@ -76,6 +80,17 @@ const GMOffice = () => {
                   Your command center for team management and strategy
                 </p>
               </div>
+              
+              {/* Demo Mode Banner */}
+              {isGuestMode(userLeagueState) && (
+                <div className="max-w-3xl mx-auto mb-8">
+                  <LeagueCreationCTA 
+                    title="You're viewing demo GM Office"
+                    description="Sign up to access all GM tools and manage your team."
+                    variant="compact"
+                  />
+                </div>
+              )}
               
               <div className="max-w-3xl mx-auto mb-8">
                 <HeadlinesBanner />
