@@ -228,7 +228,7 @@ const Roster = () => {
   const [activeId, setActiveId] = useState<string | number | null>(null);
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [statView, setStatView] = useState<'currentWeek' | 'seasonToDate' | 'restOfSeason'>('seasonToDate');
+  const [statView, setStatView] = useState<'seasonToDate' | 'restOfSeason'>('seasonToDate');
   const [analyticsLoaded, setAnalyticsLoaded] = useState(false);
   const [userTeamId, setUserTeamId] = useState<string | number | null>(null);
   const [userTeam, setUserTeam] = useState<{ id: string; league_id: string; team_name: string } | null>(null);
@@ -1171,9 +1171,10 @@ const Roster = () => {
 
                     if (!d2025 && !d2024) return p;
 
+                    // Rest of season projections will be loaded from player_projected_stats
+                    // to match the matchup projection system exactly
                     const projections = {
-                        currentWeek: d2025 ? CitrusPuckService.projectCurrentWeek(d2025) : undefined,
-                        restOfSeason: (d2025) ? CitrusPuckService.projectRestOfSeason(d2024 || null, d2025) : undefined
+                        restOfSeason: undefined // Will be populated from player_projected_stats
                     };
 
                     return {
@@ -1189,12 +1190,132 @@ const Roster = () => {
                 }
             };
 
-            setRoster(prev => ({
-                ...prev,
-                starters: prev.starters.map(enrichPlayer),
-                bench: prev.bench.map(enrichPlayer),
-                ir: prev.ir.map(enrichPlayer)
-            }));
+            // First enrich with season stats
+            const enrichedRoster = {
+                starters: roster.starters.map(enrichPlayer),
+                bench: roster.bench.map(enrichPlayer),
+                ir: roster.ir.map(enrichPlayer)
+            };
+
+            // Now fetch rest-of-season projections from player_projected_stats (matchup system)
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const todayStr = today.toISOString().split('T')[0];
+            
+            // Get all player IDs from roster
+            const allPlayerIds = [
+                ...enrichedRoster.starters.map(p => {
+                    const id = typeof p.id === 'string' ? parseInt(p.id) : p.id;
+                    return isNaN(id) ? null : id;
+                }),
+                ...enrichedRoster.bench.map(p => {
+                    const id = typeof p.id === 'string' ? parseInt(p.id) : p.id;
+                    return isNaN(id) ? null : id;
+                }),
+                ...enrichedRoster.ir.map(p => {
+                    const id = typeof p.id === 'string' ? parseInt(p.id) : p.id;
+                    return isNaN(id) ? null : id;
+                })
+            ].filter((id): id is number => id !== null);
+
+            if (allPlayerIds.length > 0) {
+                // Fetch all future projections for these players
+                const { data: projectionsData, error: projError } = await supabase
+                    .from('player_projected_stats')
+                    .select('player_id, projected_goals, projected_assists, projected_sog, projected_blocks, total_projected_points')
+                    .in('player_id', allPlayerIds)
+                    .gte('projection_date', todayStr)
+                    .order('player_id', { ascending: true })
+                    .order('projection_date', { ascending: true });
+
+                if (!projError && projectionsData) {
+                    // Aggregate projections by player_id
+                    const aggregatedProjections = new Map<number, {
+                        goals: number;
+                        assists: number;
+                        sog: number;
+                        blocks: number;
+                        total_points: number;
+                    }>();
+
+                    projectionsData.forEach((proj: any) => {
+                        const playerId = Number(proj.player_id);
+                        if (!aggregatedProjections.has(playerId)) {
+                            aggregatedProjections.set(playerId, {
+                                goals: 0,
+                                assists: 0,
+                                sog: 0,
+                                blocks: 0,
+                                total_points: 0
+                            });
+                        }
+                        const agg = aggregatedProjections.get(playerId)!;
+                        agg.goals += Number(proj.projected_goals || 0);
+                        agg.assists += Number(proj.projected_assists || 0);
+                        agg.sog += Number(proj.projected_sog || 0);
+                        agg.blocks += Number(proj.projected_blocks || 0);
+                        agg.total_points += Number(proj.total_projected_points || 0);
+                    });
+
+                    // Update roster with aggregated projections
+                    const enrichWithProjections = (p: HockeyPlayer) => {
+                        const pId = typeof p.id === 'string' ? parseInt(p.id) : p.id;
+                        if (isNaN(pId)) return p;
+                        
+                        const aggregated = aggregatedProjections.get(pId);
+                        if (!aggregated) return p;
+
+                        // Transform aggregated projections to match CitrusPuckPlayerData format
+                        const restOfSeasonData = {
+                            I_F_goals: aggregated.goals,
+                            I_F_primaryAssists: aggregated.assists * 0.6, // Estimate primary/secondary split
+                            I_F_secondaryAssists: aggregated.assists * 0.4,
+                            I_F_points: aggregated.goals + aggregated.assists,
+                            I_F_shotsOnGoal: aggregated.sog,
+                            I_F_blocks: aggregated.blocks,
+                            // Add other required fields with defaults
+                            I_F_plusMinus: 0,
+                            I_F_powerPlayGoals: 0,
+                            I_F_powerPlayAssists: 0,
+                            I_F_shortHandedGoals: 0,
+                            I_F_shortHandedAssists: 0,
+                            I_F_hits: 0,
+                            I_F_penaltyMinutes: 0,
+                            games_played: 0 // Will be calculated from number of games projected
+                        };
+
+                        return {
+                            ...p,
+                            citrusPuckData: {
+                                ...p.citrusPuckData,
+                                projections: {
+                                    ...p.citrusPuckData?.projections,
+                                    restOfSeason: restOfSeasonData
+                                }
+                            }
+                        };
+                    };
+
+                    setRoster({
+                        ...roster,
+                        starters: enrichedRoster.starters.map(enrichWithProjections),
+                        bench: enrichedRoster.bench.map(enrichWithProjections),
+                        ir: enrichedRoster.ir.map(enrichWithProjections)
+                    });
+                } else {
+                    // If projections fetch fails, just use enriched roster without projections
+                    setRoster({
+                        ...roster,
+                        ...enrichedRoster
+                    });
+                }
+            } else {
+                // No player IDs, just set enriched roster
+                setRoster({
+                    ...roster,
+                    ...enrichedRoster
+                });
+            }
             
             setAnalyticsLoaded(true);
             toast({ title: "CitrusPuck Loaded", description: "Advanced stats and projections ready." });
@@ -1782,7 +1903,6 @@ const Roster = () => {
                     <h2 className="text-xl font-bold">Lineup</h2>
                     <ToggleGroup type="single" value={statView} onValueChange={(v) => v && setStatView(v as any)} className="bg-muted/50 p-1 rounded-lg">
                         <ToggleGroupItem value="seasonToDate" size="sm" className="text-xs">Season</ToggleGroupItem>
-                        <ToggleGroupItem value="currentWeek" size="sm" className="text-xs">This Week</ToggleGroupItem>
                         <ToggleGroupItem value="restOfSeason" size="sm" className="text-xs">Rest of Season</ToggleGroupItem>
                     </ToggleGroup>
                 </div>
