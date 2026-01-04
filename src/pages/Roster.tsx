@@ -1412,7 +1412,17 @@ const Roster = () => {
     const { active, over } = event;
     setActiveId(null);
 
-    // Read-only guard: Block drag-and-drop for demo league
+    // Read-only guard: Block drag-and-drop for guests and demo league
+    if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
+      toast({
+        title: "Demo Mode - Read Only",
+        description: "Sign up to create your own league and make lineup changes!",
+        variant: "default",
+      });
+      return;
+    }
+
+    // Also block for demo league (backup check)
     if (userTeam && isDemoLeague(userTeam.league_id)) {
       toast({
         title: "Demo League - Read Only",
