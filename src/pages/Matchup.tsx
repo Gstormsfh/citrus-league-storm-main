@@ -2526,8 +2526,8 @@ const Matchup = () => {
                 </div>
               </div>
           
-          {/* Error State - Always show if there's an error */}
-          {!loading && error && (
+          {/* Error State - Only show if NOT loading (prevents flash during demo load) */}
+          {!loading && !shouldShowLoading && error && (
             <div className="text-center py-20">
               <p className="text-destructive text-lg mb-4">{error}</p>
               <Button onClick={() => window.location.reload()}>Retry</Button>

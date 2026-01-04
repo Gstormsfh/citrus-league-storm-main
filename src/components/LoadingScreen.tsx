@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 
 export type LoadingCharacter = 'citrus' | 'narwhal';
@@ -10,13 +10,36 @@ interface LoadingScreenProps {
   className?: string;
 }
 
+// Available loading characters
+const LOADING_CHARACTERS: LoadingCharacter[] = ['citrus', 'narwhal'];
+
+// Persistent random character selection (stored in module scope to persist across renders)
+let cachedRandomCharacter: LoadingCharacter | null = null;
+
+const getRandomCharacter = (): LoadingCharacter => {
+  // If we already have a cached character, use it (ensures only one is used at a time)
+  if (cachedRandomCharacter) {
+    return cachedRandomCharacter;
+  }
+  
+  // Otherwise, pick a random one and cache it
+  const randomIndex = Math.floor(Math.random() * LOADING_CHARACTERS.length);
+  cachedRandomCharacter = LOADING_CHARACTERS[randomIndex];
+  return cachedRandomCharacter;
+};
+
 const LoadingScreen: React.FC<LoadingScreenProps> = ({
-  character = 'citrus',
+  character,
   message = 'Loading...',
   progress = undefined,
   className,
 }) => {
-  const imageSrc = character === 'citrus' 
+  // Use provided character, or randomize if not provided
+  const selectedCharacter = useMemo(() => {
+    return character || getRandomCharacter();
+  }, [character]);
+  
+  const imageSrc = selectedCharacter === 'citrus' 
     ? '/loading-citrus.png' 
     : '/loading-narwhal.png';
 
