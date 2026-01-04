@@ -1767,15 +1767,15 @@ const Roster = () => {
                 </TabsList>
 
                 <TabsContent value="roster" className="m-0 p-6">
-                {/* Read-only banner for demo league */}
-                {userTeam && isDemoLeague(userTeam.league_id) && (
+                {/* Read-only banner for demo/guest users */}
+                {(userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league' || (userTeam && isDemoLeague(userTeam.league_id))) && (
                   <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
                     <div className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400">
                       <Shield className="w-4 h-4" />
-                      <span className="text-sm font-medium">Demo League - Read Only</span>
+                      <span className="text-sm font-medium">Demo Mode - Read Only</span>
                     </div>
                     <p className="text-xs text-yellow-600/80 dark:text-yellow-400/80 mt-1">
-                      Sign up to create your own league and make changes!
+                      Sign up to create your own league and make lineup changes!
                     </p>
                   </div>
                 )}
@@ -1842,6 +1842,7 @@ const Roster = () => {
                     collisionDetection={closestCenter}
                     onDragStart={handleDragStart}
                     onDragEnd={handleDragEnd}
+                    disabled={userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league'}
                   >
                     <div className="space-y-8">
                       <StartersGrid 
