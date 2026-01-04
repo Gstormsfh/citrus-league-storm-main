@@ -6,6 +6,14 @@
 -- as a read-only demo.
 -- ============================================================================
 
+-- Drop existing policies if they exist (idempotent)
+DROP POLICY IF EXISTS "Public can view demo league" ON public.leagues;
+DROP POLICY IF EXISTS "Public can view demo league teams" ON public.teams;
+DROP POLICY IF EXISTS "Public can view demo league matchups" ON public.matchups;
+DROP POLICY IF EXISTS "Public can view demo league draft picks" ON public.draft_picks;
+DROP POLICY IF EXISTS "Public can view demo league lineups" ON public.team_lineups;
+DROP POLICY IF EXISTS "Public can view demo league daily rosters" ON public.fantasy_daily_rosters;
+
 -- Allow anonymous users to read the demo league
 CREATE POLICY "Public can view demo league"
 ON public.leagues
