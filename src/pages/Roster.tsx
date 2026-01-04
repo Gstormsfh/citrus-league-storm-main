@@ -1219,22 +1219,26 @@ const Roster = () => {
             ].filter((id): id is number => id !== null);
 
             if (allPlayerIds.length > 0) {
-                // Fetch all future projections for these players
+                // Fetch all future projections for these players (all 8 stat categories to match matchup system)
                 const { data: projectionsData, error: projError } = await supabase
                     .from('player_projected_stats')
-                    .select('player_id, projected_goals, projected_assists, projected_sog, projected_blocks, total_projected_points')
+                    .select('player_id, projected_goals, projected_assists, projected_sog, projected_blocks, projected_ppp, projected_shp, projected_hits, projected_pim, total_projected_points')
                     .in('player_id', allPlayerIds)
                     .gte('projection_date', todayStr)
                     .order('player_id', { ascending: true })
                     .order('projection_date', { ascending: true });
 
                 if (!projError && projectionsData) {
-                    // Aggregate projections by player_id
+                    // Aggregate projections by player_id (all 8 stat categories)
                     const aggregatedProjections = new Map<number, {
                         goals: number;
                         assists: number;
                         sog: number;
                         blocks: number;
+                        ppp: number;
+                        shp: number;
+                        hits: number;
+                        pim: number;
                         total_points: number;
                     }>();
 
@@ -1246,6 +1250,10 @@ const Roster = () => {
                                 assists: 0,
                                 sog: 0,
                                 blocks: 0,
+                                ppp: 0,
+                                shp: 0,
+                                hits: 0,
+                                pim: 0,
                                 total_points: 0
                             });
                         }
@@ -1254,6 +1262,10 @@ const Roster = () => {
                         agg.assists += Number(proj.projected_assists || 0);
                         agg.sog += Number(proj.projected_sog || 0);
                         agg.blocks += Number(proj.projected_blocks || 0);
+                        agg.ppp += Number(proj.projected_ppp || 0);
+                        agg.shp += Number(proj.projected_shp || 0);
+                        agg.hits += Number(proj.projected_hits || 0);
+                        agg.pim += Number(proj.projected_pim || 0);
                         agg.total_points += Number(proj.total_projected_points || 0);
                     });
 
@@ -1266,6 +1278,7 @@ const Roster = () => {
                         if (!aggregated) return p;
 
                         // Transform aggregated projections to match CitrusPuckPlayerData format
+                        // Using all 8 stat categories from matchup projection system
                         const restOfSeasonData = {
                             I_F_goals: aggregated.goals,
                             I_F_primaryAssists: aggregated.assists * 0.6, // Estimate primary/secondary split
@@ -1273,14 +1286,15 @@ const Roster = () => {
                             I_F_points: aggregated.goals + aggregated.assists,
                             I_F_shotsOnGoal: aggregated.sog,
                             I_F_blocks: aggregated.blocks,
-                            // Add other required fields with defaults
-                            I_F_plusMinus: 0,
-                            I_F_powerPlayGoals: 0,
-                            I_F_powerPlayAssists: 0,
-                            I_F_shortHandedGoals: 0,
-                            I_F_shortHandedAssists: 0,
-                            I_F_hits: 0,
-                            I_F_penaltyMinutes: 0,
+                            // Include all 8 stat categories from matchup system
+                            I_F_powerPlayGoals: aggregated.ppp * 0.4, // Estimate PPG/PPA split
+                            I_F_powerPlayAssists: aggregated.ppp * 0.6,
+                            I_F_shortHandedGoals: aggregated.shp * 0.4, // Estimate SHG/SHA split
+                            I_F_shortHandedAssists: aggregated.shp * 0.6,
+                            I_F_hits: aggregated.hits,
+                            I_F_penaltyMinutes: aggregated.pim,
+                            // Other required fields
+                            I_F_plusMinus: 0, // Not projected in current system
                             games_played: 0 // Will be calculated from number of games projected
                         };
 
