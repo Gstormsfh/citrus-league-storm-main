@@ -49,4 +49,3 @@ COMMENT ON POLICY "Public can view demo league matchups" ON public.matchups IS '
 COMMENT ON POLICY "Public can view demo league draft picks" ON public.draft_picks IS 'Allows anonymous users to read rosters (draft picks) in the demo league';
 COMMENT ON POLICY "Public can view demo league lineups" ON public.team_lineups IS 'Allows anonymous users to read lineups in the demo league';
 COMMENT ON POLICY "Public can view demo league daily rosters" ON public.fantasy_daily_rosters IS 'Allows anonymous users to read daily rosters in the demo league';
-
