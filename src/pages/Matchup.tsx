@@ -2437,8 +2437,8 @@ const Matchup = () => {
               {/* Header Section - Clean and Professional with Citrus Colors */}
               <div className="mb-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-                  {/* Week Selector - Show for both active users AND guests */}
-                  {(userLeagueState === 'active-user' || userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') && 
+                  {/* Week Selector - Show only for active users (guests use WeeklySchedule toggle) */}
+                  {userLeagueState === 'active-user' && 
                    availableWeeks.length > 0 && 
                    firstWeekStart && (
                     <MatchupScheduleSelector
@@ -2571,11 +2571,8 @@ const Matchup = () => {
             opponentTeamPoints={opponentTeamPoints}
           />
           
-          {/* Weekly Schedule - Show ONLY for active users (NEVER for guests) */}
-          {currentMatchup && 
-           userLeagueState === 'active-user' && 
-           userLeagueState !== 'guest' && 
-           userLeagueState !== 'logged-in-no-league' && (
+          {/* Weekly Schedule - Show for both active users AND guests (the one we love!) */}
+          {currentMatchup && (
             <div className="mb-6">
               <WeeklySchedule
                 weekStart={currentMatchup.week_start_date}
@@ -2585,8 +2582,8 @@ const Matchup = () => {
                 onDayClick={setSelectedDate}
                 selectedDate={selectedDate}
                 dailyStatsByDate={dailyStatsByDate}
-                team1Name={viewingTeamName || undefined}
-                team2Name={viewingOpponentTeamName || undefined}
+                team1Name={userLeagueState === 'active-user' ? (viewingTeamName || undefined) : 'Citrus Crushers'}
+                team2Name={userLeagueState === 'active-user' ? (viewingOpponentTeamName || undefined) : 'Thunder Titans'}
               />
             </div>
           )}
