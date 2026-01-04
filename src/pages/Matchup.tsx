@@ -2414,8 +2414,16 @@ const Matchup = () => {
       return true;
     }
     
+    // For guests, if we have an error but haven't fully initialized, keep showing loading
+    // This prevents the error screen from flashing during demo load
+    if ((userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') && 
+        error && 
+        !hasInitializedRef.current) {
+      return true;
+    }
+    
     return false;
-  }, [leagueContextLoading, loading, userLeagueState]);
+  }, [leagueContextLoading, loading, userLeagueState, error]);
   
   // Early return for loading - must be after all hooks are declared
   if (shouldShowLoading) {
