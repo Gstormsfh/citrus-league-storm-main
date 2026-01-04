@@ -109,4 +109,7 @@ export type MatchupPlayer = {
     confidence_score: number;
     calculation_method: string;
   };
+  // IR Status fields from player_talent_metrics
+  roster_status?: string; // Official NHL roster status: ACT, IR, LTIR, etc.
+  is_ir_eligible?: boolean; // True if player is on IR or LTIR and can be placed in IR slot
 };

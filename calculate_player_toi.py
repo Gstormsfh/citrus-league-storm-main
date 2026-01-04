@@ -19,10 +19,11 @@ import numpy as np
 import os
 import requests
 from dotenv import load_dotenv
-from supabase import create_client, Client
+from supabase_rest import SupabaseRest
 from datetime import datetime
 from typing import Dict, List, Set, Optional, Tuple
 import time
+import sys
 
 # Load environment variables
 load_dotenv()
@@ -36,7 +37,7 @@ if not supabase_url or not supabase_key:
     print("   Please ensure VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set")
     exit(1)
 
-supabase: Client = create_client(supabase_url, supabase_key)
+supabase = SupabaseRest(supabase_url, supabase_key)
 
 # NHL API base URL
 NHL_BASE_URL = "https://api-web.nhle.com/v1"
@@ -398,15 +399,14 @@ def process_game_shifts(game_id: int) -> Tuple[List[Dict], List[Dict]]:
     # Prefer Supabase `raw_nhl_data.raw_json` (no API calls / no rate limits).
     raw_data = None
     try:
-        resp = (
-            supabase.table('raw_nhl_data')
-            .select('raw_json')
-            .eq('game_id', game_id)
-            .limit(1)
-            .execute()
+        data = supabase.select(
+            'raw_nhl_data',
+            select='raw_json',
+            filters=[('game_id', 'eq', game_id)],
+            limit=1
         )
-        if resp.data and len(resp.data) > 0:
-            raw_data = resp.data[0].get('raw_json')
+        if data and len(data) > 0:
+            raw_data = data[0].get('raw_json')
     except Exception:
         raw_data = None
 
@@ -437,12 +437,28 @@ def process_game_shifts(game_id: int) -> Tuple[List[Dict], List[Dict]]:
     # Process plays
     plays = raw_data.get('plays', [])
     print(f"  Processing {len(plays)} plays...")
+    sys.stdout.flush()
+    
+    # Safety check: skip games with excessive plays (likely data corruption)
+    if len(plays) > 10000:
+        print(f"  WARNING: Game {game_id} has {len(plays)} plays (excessive, likely corrupted). Skipping.")
+        return [], []
     
     # Track previous period and time for period transitions
     prev_period = 0
     prev_time = 0.0
     
+    # Progress tracking for large games
+    play_count = 0
+    last_progress_print = 0
+    
     for play in plays:
+        play_count += 1
+        # Print progress every 1000 plays for large games
+        if len(plays) > 2000 and play_count - last_progress_print >= 1000:
+            print(f"    Progress: {play_count}/{len(plays)} plays...")
+            sys.stdout.flush()
+            last_progress_print = play_count
         type_code = play.get('typeCode')
         details = play.get('details', {})
         period_desc = play.get('periodDescriptor', {})
@@ -592,10 +608,7 @@ def store_shifts_and_toi(shifts: List[Dict], toi_records: List[Dict]):
             chunk_size = 1000
             for i in range(0, len(shifts), chunk_size):
                 chunk = shifts[i:i + chunk_size]
-                result = supabase.table('player_shifts').upsert(
-                    chunk,
-                    on_conflict='id'
-                ).execute()
+                supabase.upsert('player_shifts', chunk, on_conflict='id')
                 print(f"  Stored shifts {i+1}-{min(i+chunk_size, len(shifts))}")
         except Exception as e:
             print(f"  ERROR: Error storing shifts: {e}")
@@ -608,10 +621,7 @@ def store_shifts_and_toi(shifts: List[Dict], toi_records: List[Dict]):
             chunk_size = 1000
             for i in range(0, len(toi_records), chunk_size):
                 chunk = toi_records[i:i + chunk_size]
-                result = supabase.table('player_toi_by_situation').upsert(
-                    chunk,
-                    on_conflict='player_id,game_id,situation'
-                ).execute()
+                supabase.upsert('player_toi_by_situation', chunk, on_conflict='player_id,game_id,situation')
                 print(f"  Stored TOI records {i+1}-{min(i+chunk_size, len(toi_records))}")
         except Exception as e:
             print(f"  ERROR: Error storing TOI records: {e}")
@@ -634,18 +644,18 @@ def get_game_ids_from_shots() -> List[int]:
         offset = 0
         batch_size = 1000
         while True:
-            result = (
-                supabase.table('raw_nhl_data')
-                .select('game_id')
-                .eq('processed', True)
-                .order('game_id')
-                .range(offset, offset + batch_size - 1)
-                .execute()
+            data = supabase.select(
+                'raw_nhl_data',
+                select='game_id',
+                filters=[('processed', 'eq', True)],
+                order='game_id.asc',
+                limit=batch_size,
+                offset=offset
             )
-            if not result.data:
+            if not data:
                 break
-            game_ids.extend([row['game_id'] for row in result.data if row.get('game_id') is not None])
-            if len(result.data) < batch_size:
+            game_ids.extend([row['game_id'] for row in data if row.get('game_id') is not None])
+            if len(data) < batch_size:
                 break
             offset += batch_size
 
@@ -655,18 +665,18 @@ def get_game_ids_from_shots() -> List[int]:
             offset = 0
             game_ids_set = set()
             while True:
-                result = (
-                    supabase.table('raw_shots')
-                    .select('game_id')
-                    .range(offset, offset + batch_size - 1)
-                    .execute()
+                data = supabase.select(
+                    'raw_shots',
+                    select='game_id',
+                    limit=batch_size,
+                    offset=offset
                 )
-                if not result.data:
+                if not data:
                     break
-                for row in result.data:
+                for row in data:
                     if row.get('game_id') is not None:
                         game_ids_set.add(row['game_id'])
-                if len(result.data) < batch_size:
+                if len(data) < batch_size:
                     break
                 offset += batch_size
             game_ids = sorted(list(game_ids_set))
@@ -701,6 +711,32 @@ def main():
         print("ERROR: No games found. Please ensure raw_shots table has data.")
         return
     
+    # Check which games already have TOI data (skip them)
+    print("Checking existing TOI data...")
+    existing_toi_games = set()
+    offset = 0
+    while True:
+        batch = supabase.select('player_toi_by_situation', select='game_id', limit=1000, offset=offset)
+        if not batch:
+            break
+        existing_toi_games.update([g['game_id'] for g in batch])
+        if len(batch) < 1000:
+            break
+        offset += 1000
+    
+    # Filter out games that already have TOI
+    games_to_process = [gid for gid in game_ids if gid not in existing_toi_games]
+    
+    print(f"Total games: {len(game_ids)}")
+    print(f"Games with existing TOI: {len(existing_toi_games)}")
+    print(f"Games to process: {len(games_to_process)}")
+    print()
+    
+    if not games_to_process:
+        print("All games already have TOI data!")
+        return
+    
+    game_ids = games_to_process
     print(f"Processing {len(game_ids)} games...")
     print()
     
@@ -710,20 +746,33 @@ def main():
     
     for idx, game_id in enumerate(game_ids, 1):
         print(f"[{idx}/{len(game_ids)}] Game {game_id}")
+        sys.stdout.flush()  # Ensure progress is visible immediately
 
         # Avoid duplicating player_shifts if this script is re-run.
         # player_toi_by_situation is upserted on a unique constraint, but player_shifts is not.
         try:
-            supabase.table('player_shifts').delete().eq('game_id', game_id).execute()
-            supabase.table('player_toi_by_situation').delete().eq('game_id', game_id).execute()
-        except Exception:
+            supabase.delete('player_shifts', filters=[('game_id', 'eq', game_id)])
+            supabase.delete('player_toi_by_situation', filters=[('game_id', 'eq', game_id)])
+        except Exception as e:
+            print(f"  WARNING: Could not delete existing records: {e}")
             pass
         
-        shifts, toi_records = process_game_shifts(game_id)
-        if shifts or toi_records:
-            store_shifts_and_toi(shifts, toi_records)
-            total_shifts += len(shifts)
-            total_toi_records += len(toi_records)
+        # Process with timeout protection
+        try:
+            shifts, toi_records = process_game_shifts(game_id)
+            if shifts or toi_records:
+                store_shifts_and_toi(shifts, toi_records)
+                total_shifts += len(shifts)
+                total_toi_records += len(toi_records)
+                print(f"  [OK] Processed: {len(shifts)} shifts, {len(toi_records)} TOI records")
+            else:
+                print(f"  [WARN] No shifts/TOI data for game {game_id}")
+        except Exception as e:
+            print(f"  [ERROR] ERROR processing game {game_id}: {e}")
+            print(f"  Continuing with next game...")
+            import traceback
+            traceback.print_exc()
+            continue
         
         # Small delay to avoid rate limiting
         if idx < len(game_ids):

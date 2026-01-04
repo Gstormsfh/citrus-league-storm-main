@@ -648,22 +648,40 @@ def get_team_xga_per_60(
     Performance-optimized: Uses raw_shots with efficient aggregation.
     For a team's xGA, we sum xG of all shots taken AGAINST that team.
     
+    Uses canonical team code for cache lookups (treats ARI/UTA as single entity).
+    
     Returns:
         xGA per 60 minutes (e.g., 2.3) or None if unavailable
     """
     try:
-        # Get team's last N games
+        # Use canonical team code for cache lookups (ensures ARI/UTA continuity)
+        canonical_team = get_canonical_team_code(db, team)
+        
+        # Data leak protection: Only use games up to today
+        today = date.today()
+        
+        # Get team's last N games (use canonical team for historical continuity)
         recent_games = db.select(
             "nhl_games",
             select="game_id,game_date,home_team,away_team",
-            filters=[("season", "eq", season)],
+            filters=[
+                ("season", "eq", season),
+                ("game_date", "lte", today.isoformat())  # Data leak protection
+            ],
             order="game_date.desc",
             limit=100  # Get more games to filter
         )
         
         team_game_ids = []
         for game in recent_games:
-            if game.get("home_team") == team or game.get("away_team") == team:
+            # Check both original and canonical team codes
+            home_team = game.get("home_team")
+            away_team = game.get("away_team")
+            home_canonical = get_canonical_team_code(db, home_team) if home_team else None
+            away_canonical = get_canonical_team_code(db, away_team) if away_team else None
+            
+            if (home_canonical == canonical_team or away_canonical == canonical_team or
+                home_team == team or away_team == team):
                 team_game_ids.append(int(game.get("game_id")))
                 if len(team_game_ids) >= last_n_games:
                     break
@@ -1662,27 +1680,1017 @@ def calculate_goalie_projection(
         return None
 
 
+# ============================================================================
+# LAYER 1: PHYSICAL PROJECTION ENGINE
+# ============================================================================
+
+# Module-level cache for team mappings
+_team_mapping_cache: Dict[str, str] = {}
+
+def get_canonical_team_code(db: SupabaseRest, team_code: str) -> str:
+    """
+    Get canonical team code for cache lookups.
+    
+    Uses team_mapping_config table to map relocated franchises (e.g., ARI/UTA)
+    to a single canonical code. Results are cached for performance.
+    
+    Args:
+        db: Supabase client
+        team_code: Team code to look up (e.g., "ARI" or "UTA")
+    
+    Returns:
+        Canonical team code (e.g., "ARI" for both "ARI" and "UTA")
+    """
+    # Check cache first
+    if team_code in _team_mapping_cache:
+        return _team_mapping_cache[team_code]
+    
+    canonical = team_code  # Default to original
+    
+    try:
+        # Try to use the database function if available
+        try:
+            result = db.rpc("get_canonical_team_code", {"p_team_code": team_code})
+            if isinstance(result, str):
+                canonical = result
+            elif isinstance(result, list) and len(result) > 0:
+                canonical = result[0] if isinstance(result[0], str) else team_code
+        except Exception:
+            # Fallback: Query table directly
+            mappings = db.select(
+                "team_mapping_config",
+                select="canonical_team_code,aliased_team_codes",
+                filters=[],
+                limit=100
+            )
+            
+            for mapping in mappings or []:
+                aliases = mapping.get("aliased_team_codes", [])
+                if isinstance(aliases, list) and team_code in aliases:
+                    canonical = mapping.get("canonical_team_code", team_code)
+                    break
+    except Exception:
+        # If table doesn't exist or query fails, return original
+        pass
+    
+    # Cache result
+    _team_mapping_cache[team_code] = canonical
+    return canonical
+
+
+def calculate_physical_projection(
+    db: SupabaseRest,
+    player_id: int,
+    game_id: int,
+    game_date: date,
+    season: int
+) -> Optional[Dict[str, Any]]:
+    """
+    Layer 1: Calculate physical (score-blind) projection.
+    
+    Projects raw on-ice statistical events before any fantasy points are applied.
+    This is the "ground truth" that will be transformed by Layer 2.
+    
+    Args:
+        db: Supabase client
+        player_id: Player ID
+        game_id: Game ID
+        game_date: Game date (must be <= today for data leak protection)
+        season: Season year
+    
+    Returns:
+        Dict with physical stats: goals, assists, shots, blocks, saves, toi_seconds
+        and model components for transparency
+    """
+    # Data leak protection
+    assert game_date <= date.today(), f"Data leak: game_date {game_date} > today"
+    
+    try:
+        # Get player info
+        player_dir = db.select(
+            "player_directory",
+            select="position_code,team_abbrev,is_goalie",
+            filters=[("player_id", "eq", player_id), ("season", "eq", season)],
+            limit=1
+        )
+        
+        if not player_dir or len(player_dir) == 0:
+            return None
+        
+        position = player_dir[0].get("position_code", "C")
+        player_team = player_dir[0].get("team_abbrev", "")
+        is_goalie = player_dir[0].get("is_goalie", False)
+        
+        # Get game info
+        game = db.select(
+            "nhl_games",
+            select="home_team,away_team",
+            filters=[("game_id", "eq", game_id)],
+            limit=1
+        )
+        
+        if not game or len(game) == 0:
+            return None
+        
+        game_info = game[0]
+        opponent_team = game_info["away_team"] if game_info["home_team"] == player_team else game_info["home_team"]
+        
+        # Use canonical team code for cache lookups
+        canonical_opponent = get_canonical_team_code(db, opponent_team)
+        
+        # Get player season stats for games played
+        player_stats = db.select(
+            "player_season_stats",
+            select="games_played",
+            filters=[("player_id", "eq", player_id), ("season", "eq", season)],
+            limit=1
+        )
+        games_played = int(player_stats[0].get("games_played", 0)) if player_stats else 0
+        
+        if is_goalie:
+            # Goalie physical projection
+            return calculate_goalie_physical_projection(
+                db, player_id, game_id, game_date, season, 
+                opponent_team, canonical_opponent, games_played
+            )
+        else:
+            # Skater physical projection
+            return calculate_skater_physical_projection(
+                db, player_id, game_id, game_date, season,
+                position, player_team, opponent_team, canonical_opponent, games_played
+            )
+    
+    except AssertionError as e:
+        print(f"❌ Data leak protection: {e}")
+        return None
+    except Exception as e:
+        print(f"❌ Error calculating physical projection for player {player_id}: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+def calculate_skater_physical_projection(
+    db: SupabaseRest,
+    player_id: int,
+    game_id: int,
+    game_date: date,
+    season: int,
+    position: str,
+    player_team: str,
+    opponent_team: str,
+    canonical_opponent: str,
+    games_played: int
+) -> Optional[Dict[str, Any]]:
+    """Calculate physical projection for skaters."""
+    # Get base projection using Bayesian shrinkage
+    # Note: We pass empty scoring_settings since we don't need fantasy points here
+    base_projection = calculate_hybrid_base(
+        db, player_id, position, games_played, season, {"skater": {}, "goalie": {}}
+    )
+    
+    # Get finishing talent multiplier (for goals only)
+    finishing_multiplier = calculate_finishing_talent(db, player_id, season)
+    
+    # Get opponent strength adjustment
+    baselines = get_latest_baselines(db, season)
+    league_avg_xga = baselines.get("league_avg_xga_per_60", 2.5)
+    league_avg_sv_pct = baselines.get("league_avg_sv_pct", 0.91)
+    
+    opponent_adjustment = get_opponent_strength(
+        db, canonical_opponent, game_id, game_date, season,
+        league_avg_xga, league_avg_sv_pct, debug=False
+    )
+    
+    # Get opponent xGA suppression (for model transparency)
+    opponent_xga_suppression = get_team_xga_per_60(
+        db, canonical_opponent, season, last_n_games=10, debug=False
+    ) or league_avg_xga
+    
+    # Get opposing goalie GSAx factor
+    goalie_gsax_factor = 1.0  # Default
+    goalie_sv_pct = get_opposing_goalie_save_pct(
+        db, opponent_team, game_id, game_date, season, debug=False
+    )
+    if goalie_sv_pct and league_avg_sv_pct > 0:
+        goalie_gsax_factor = league_avg_sv_pct / goalie_sv_pct
+    
+    # Get game info for home/away adjustment
+    game_info_list = db.select(
+        "nhl_games",
+        select="home_team,away_team",
+        filters=[("game_id", "eq", game_id)],
+        limit=1
+    )
+    game_info = game_info_list[0] if game_info_list else {"home_team": "", "away_team": ""}
+    
+    # Get B2B and home/away adjustments
+    b2b_penalty = check_back_to_back(db, player_team, game_date)
+    home_away_adjustment = get_home_away_adjustment(player_team, game_info)
+    
+    # Apply adjustments to physical stats
+    # Goals: Apply finishing multiplier
+    # All stats: Apply opponent, B2B, home/away
+    physical_projection = {
+        "goals": base_projection["goals"] * finishing_multiplier * opponent_adjustment * b2b_penalty * home_away_adjustment,
+        "assists": base_projection["assists"] * opponent_adjustment * b2b_penalty * home_away_adjustment,
+        "shots": base_projection["sog"] * opponent_adjustment * b2b_penalty * home_away_adjustment,
+        "blocks": base_projection["blocks"] * opponent_adjustment * b2b_penalty * home_away_adjustment,
+        "saves": 0.0,  # Skaters don't have saves
+        "toi_seconds": int(base_projection.get("toi_seconds", 0))  # Will be calculated separately
+    }
+    
+    # Calculate projected TOI (simplified - can be enhanced)
+    # Use position-specific defaults for now
+    toi_map = {"C": 17.5, "LW": 16.5, "RW": 16.5, "D": 21.0}
+    projected_toi_minutes = toi_map.get(position, 18.0)
+    physical_projection["toi_seconds"] = int(projected_toi_minutes * 60)
+    
+    # Store model components for transparency
+    physical_projection["base_goals"] = base_projection["goals"]
+    physical_projection["base_assists"] = base_projection["assists"]
+    physical_projection["opponent_xga_suppression"] = opponent_xga_suppression
+    physical_projection["goalie_gsax_factor"] = goalie_gsax_factor
+    physical_projection["finishing_multiplier"] = finishing_multiplier
+    physical_projection["opponent_adjustment"] = opponent_adjustment
+    
+    # CRITICAL: TOI Synchronization - Zero TOI for IR players
+    # Check IR status and set toi_seconds to 0 if player is IR-eligible
+    talent_metrics = db.select(
+        "player_talent_metrics",
+        select="is_ir_eligible",
+        filters=[("player_id", "eq", player_id), ("season", "eq", season)],
+        limit=1
+    )
+    
+    is_ir_eligible = False
+    if talent_metrics and len(talent_metrics) > 0:
+        is_ir_eligible = talent_metrics[0].get("is_ir_eligible") or False
+    
+    # Zero TOI for IR players
+    if is_ir_eligible:
+        physical_projection["toi_seconds"] = 0
+    
+    return physical_projection
+
+
+def calculate_goalie_physical_projection(
+    db: SupabaseRest,
+    player_id: int,
+    game_id: int,
+    game_date: date,
+    season: int,
+    opponent_team: str,
+    canonical_opponent: str,
+    games_played: int
+) -> Optional[Dict[str, Any]]:
+    """Calculate physical projection for goalies."""
+    # Get opponent shots for per 60
+    opponent_shots_for = get_opponent_shots_for_per_60(
+        db, canonical_opponent, season, last_n_games=10, debug=False
+    ) or 30.0
+    
+    # Get goalie's SV% trend
+    goalie_stats = db.select(
+        "player_season_stats",
+        select="save_pct",
+        filters=[("player_id", "eq", player_id), ("season", "eq", season)],
+        limit=1
+    )
+    goalie_sv_pct = float(goalie_stats[0].get("save_pct", 0.91)) if goalie_stats else 0.91
+    
+    # Get goalie's GSAx factor (simplified - can use actual GSAx from goalie_gsax table)
+    goalie_gsax = get_goalie_gsax(db, player_id, debug=False)
+    goalie_gsax_factor = 1.0 + (goalie_gsax / 100.0) if goalie_gsax else 1.0  # Normalize GSAx
+    
+    # Project saves = Opponent_Shots_For_Per_60 × (1 - goalie_sv_pct_trend) × GSAx_factor
+    # Actually, saves = shots_faced × sv_pct, so we need to project shots_faced first
+    # Simplified: Project shots_faced based on opponent shots for
+    projected_shots_faced = opponent_shots_for * (60.0 / 60.0)  # Per 60 minutes
+    projected_saves = projected_shots_faced * goalie_sv_pct * goalie_gsax_factor
+    
+    physical_projection = {
+        "goals": 0.0,  # Goalies don't score goals (as skaters)
+        "assists": 0.0,  # Goalies rarely get assists
+        "shots": 0.0,  # Goalies don't take shots
+        "blocks": 0.0,  # Goalies don't block shots
+        "saves": projected_saves,
+        "toi_seconds": 3600  # Goalies play full game (60 minutes)
+    }
+    
+    # Store model components
+    physical_projection["opponent_xga_suppression"] = opponent_shots_for
+    physical_projection["goalie_gsax_factor"] = goalie_gsax_factor
+    physical_projection["finishing_multiplier"] = 1.0  # Not applicable for goalies
+    physical_projection["opponent_adjustment"] = 1.0  # Already factored into shots_for
+    
+    # CRITICAL: TOI Synchronization - Zero TOI for IR players
+    # Check IR status and set toi_seconds to 0 if player is IR-eligible
+    talent_metrics = db.select(
+        "player_talent_metrics",
+        select="is_ir_eligible",
+        filters=[("player_id", "eq", player_id), ("season", "eq", season)],
+        limit=1
+    )
+    
+    is_ir_eligible = False
+    if talent_metrics and len(talent_metrics) > 0:
+        is_ir_eligible = talent_metrics[0].get("is_ir_eligible") or False
+    
+    # Zero TOI for IR players
+    if is_ir_eligible:
+        physical_projection["toi_seconds"] = 0
+    
+    return physical_projection
+
+
+def save_physical_projection(
+    db: SupabaseRest,
+    player_id: int,
+    game_id: int,
+    projection_date: date,
+    season: int,
+    physical_projection: Dict[str, Any]
+) -> bool:
+    """
+    Save physical projection to projection_cache table.
+    
+    Args:
+        db: Supabase client
+        player_id: Player ID
+        game_id: Game ID
+        projection_date: Projection date
+        season: Season year
+        physical_projection: Physical projection dict from calculate_physical_projection()
+    
+    Returns:
+        True if saved successfully, False otherwise
+    """
+    try:
+        import hashlib
+        
+        # Generate data source hash for integrity checking
+        hash_input = f"{player_id}_{game_id}_{projection_date}_{season}"
+        data_source_hash = hashlib.md5(hash_input.encode()).hexdigest()
+        
+        # Prepare data for insert/update
+        cache_data = {
+            "player_id": player_id,
+            "game_id": game_id,
+            "projection_date": projection_date.isoformat(),
+            "season": season,
+            "projected_goals": round(physical_projection.get("goals", 0.0), 3),
+            "projected_assists": round(physical_projection.get("assists", 0.0), 3),
+            "projected_shots": round(physical_projection.get("shots", 0.0), 3),
+            "projected_blocks": round(physical_projection.get("blocks", 0.0), 3),
+            "projected_saves": round(physical_projection.get("saves", 0.0), 3),
+            "projected_toi_seconds": physical_projection.get("toi_seconds", 0),
+            "base_goals": round(physical_projection.get("base_goals", 0.0), 3),
+            "base_assists": round(physical_projection.get("base_assists", 0.0), 3),
+            "opponent_xga_suppression": round(physical_projection.get("opponent_xga_suppression", 0.0), 3),
+            "goalie_gsax_factor": round(physical_projection.get("goalie_gsax_factor", 1.0), 3),
+            "finishing_multiplier": round(physical_projection.get("finishing_multiplier", 1.0), 3),
+            "opponent_adjustment": round(physical_projection.get("opponent_adjustment", 1.0), 3),
+            "data_source_hash": data_source_hash
+        }
+        
+        # Upsert to projection_cache
+        db.upsert("projection_cache", cache_data, on_conflict="player_id,game_id,projection_date")
+        
+        return True
+    
+    except Exception as e:
+        print(f"❌ Error saving physical projection: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+# ============================================================================
+# LAYER 2: DYNAMIC SCORING TRANSFORMATION
+# ============================================================================
+
+def transform_physical_to_fantasy(
+    db: SupabaseRest,
+    physical_projection: Dict[str, Any],
+    league_id: str,
+    scoring_settings: Dict[str, Any]
+) -> float:
+    """
+    Layer 2: Transform physical projections into fantasy points.
+    
+    Applies league-specific scoring weights to physical stats.
+    This is "reactive" - can be recalculated without re-running Layer 1.
+    
+    Args:
+        db: Supabase client
+        physical_projection: Physical projection dict from Layer 1
+        league_id: League ID for scoring settings
+        scoring_settings: Scoring settings dict (can be passed or loaded)
+    
+    Returns:
+        Total projected fantasy points
+    """
+    # Load scoring settings if not provided
+    if not scoring_settings:
+        scoring_settings = get_league_scoring_settings(db, league_id)
+    
+    is_goalie = physical_projection.get("saves", 0) > 0
+    
+    if is_goalie:
+        # Goalie scoring
+        goalie_scoring = scoring_settings.get("goalie", {})
+        fantasy_points = (
+            physical_projection.get("saves", 0) * float(goalie_scoring.get("saves", 0.2)) +
+            # Note: Wins and shutouts would need to be projected separately
+            # For now, we only have saves in physical projection
+            0.0  # Wins and shutouts are binary events, not continuous
+        )
+    else:
+        # Skater scoring
+        skater_scoring = scoring_settings.get("skater", {})
+        fantasy_points = (
+            physical_projection.get("goals", 0) * float(skater_scoring.get("goals", 3)) +
+            physical_projection.get("assists", 0) * float(skater_scoring.get("assists", 2)) +
+            physical_projection.get("shots", 0) * float(skater_scoring.get("shots_on_goal", 0.4)) +
+            physical_projection.get("blocks", 0) * float(skater_scoring.get("blocks", 0.5)) +
+            # Note: PPP, SHP, Hits, PIM would need to be in physical projection
+            # For now, we only have the core 4 stats
+            0.0  # Additional stats can be added when physical projection includes them
+        )
+    
+    return round(fantasy_points, 3)
+
+
+def get_league_scoring_settings(db: SupabaseRest, league_id: str) -> Dict[str, Any]:
+    """Get scoring settings for a league."""
+    try:
+        leagues = db.select(
+            "leagues",
+            select="scoring_settings",
+            filters=[("id", "eq", league_id)],
+            limit=1
+        )
+        
+        if leagues and len(leagues) > 0:
+            settings = leagues[0].get("scoring_settings")
+            if settings and isinstance(settings, dict):
+                return settings
+        
+        # Return defaults
+        return {
+            "skater": {
+                "goals": 3,
+                "assists": 2,
+                "shots_on_goal": 0.4,
+                "blocks": 0.5,
+            },
+            "goalie": {
+                "wins": 4,
+                "shutouts": 3,
+                "saves": 0.2,
+                "goals_against": -1,
+            }
+        }
+    except Exception as e:
+        print(f"⚠️  Warning: Could not fetch scoring settings for league {league_id}: {e}")
+        return {
+            "skater": {"goals": 3, "assists": 2, "shots_on_goal": 0.4, "blocks": 0.5},
+            "goalie": {"wins": 4, "shutouts": 3, "saves": 0.2, "goals_against": -1}
+        }
+
+
+def recalculate_fantasy_points_for_league(
+    db: SupabaseRest,
+    league_id: str,
+    new_scoring_settings: Dict[str, Any]
+) -> int:
+    """
+    Reactive recalculation: Update fantasy points for a league when settings change.
+    
+    Queries all projection_cache entries and re-runs Layer 2 transformation.
+    Does NOT re-run Layer 1 (physical projections unchanged).
+    
+    Args:
+        db: Supabase client
+        league_id: League ID
+        new_scoring_settings: New scoring settings
+    
+    Returns:
+        Number of projections updated
+    """
+    # This would need to query all active projections for the league
+    # For now, this is a placeholder - full implementation would require
+    # tracking which projections belong to which league
+    # TODO: Implement full reactive recalculation
+    return 0
+
+
+# ============================================================================
+# LAYER 3: POSITIONAL VOPA CALCULATION
+# ============================================================================
+
+def calculate_positional_statistics(
+    db: SupabaseRest,
+    position: str,
+    league_id: Optional[str],
+    season: int
+) -> Dict[str, float]:
+    """
+    Calculate positional mean and standard deviation for VOPA.
+    
+    Args:
+        db: Supabase client
+        position: Position code (C, D, LW, RW, G)
+        league_id: Optional league ID for league-specific stats
+        season: Season year
+    
+    Returns:
+        Dict with mean, std_dev, and sample_size
+    """
+    # Query all projections and join with player_directory to filter by position
+    # Get player IDs for this position first
+    players = db.select(
+        "player_directory",
+        select="player_id",
+        filters=[("season", "eq", season), ("position_code", "eq", position)],
+        limit=1000
+    )
+    
+    if not players:
+        return {"mean": 0.0, "std_dev": 1.0, "sample_size": 0}
+    
+    all_player_ids = [int(p.get("player_id")) for p in players if p.get("player_id")]
+    
+    if not all_player_ids:
+        return {"mean": 0.0, "std_dev": 1.0, "sample_size": 0}
+    
+    # CRITICAL: Exclude IR-eligible players from positional statistics
+    # They shouldn't deflate the baseline for active players
+    # Get IR status for all players
+    talent_metrics = db.select(
+        "player_talent_metrics",
+        select="player_id,is_ir_eligible",
+        filters=[
+            ("season", "eq", season),
+            ("player_id", "in", all_player_ids)
+        ],
+        limit=1000
+    )
+    
+    # Create set of IR-eligible player IDs
+    ir_player_ids = set()
+    if talent_metrics:
+        for metric in talent_metrics:
+            if metric.get("is_ir_eligible"):
+                ir_player_ids.add(int(metric.get("player_id")))
+    
+    # Filter out IR-eligible players
+    active_player_ids = [pid for pid in all_player_ids if pid not in ir_player_ids]
+    
+    if not active_player_ids:
+        return {"mean": 0.0, "std_dev": 1.0, "sample_size": 0}
+    
+    # Query projections for active players only
+    # CRITICAL: Batch the query to avoid URL length limits with large "in" filters
+    # PostgREST has limits on URL length (and default 1000 row limit), so we:
+    # 1. Batch player IDs into chunks of 100
+    # 2. Paginate each batch to get all results
+    BATCH_SIZE = 100
+    PAGE_SIZE = 1000  # PostgREST default limit
+    projections = []
+    
+    for i in range(0, len(active_player_ids), BATCH_SIZE):
+        batch_ids = active_player_ids[i:i + BATCH_SIZE]
+        
+        # Paginate through all results for this batch
+        offset = 0
+        while True:
+            batch_projections = db.select(
+                "player_projected_stats",
+                select="total_projected_points",
+                filters=[
+                    ("season", "eq", season),
+                    ("player_id", "in", batch_ids)
+                ],
+                limit=PAGE_SIZE,
+                offset=offset
+            )
+            
+            if not batch_projections:
+                break  # No more results for this batch
+            
+            projections.extend(batch_projections)
+            
+            # If we got fewer than PAGE_SIZE, we've reached the end
+            if len(batch_projections) < PAGE_SIZE:
+                break
+            
+            offset += PAGE_SIZE
+    
+    positional_points = []
+    for proj in projections or []:
+        points = proj.get("total_projected_points")
+        if points is not None:
+            positional_points.append(float(points))
+    
+    if len(positional_points) == 0:
+        return {"mean": 0.0, "std_dev": 1.0, "sample_size": 0}
+    
+    # Calculate mean and std dev
+    mean = sum(positional_points) / len(positional_points)
+    variance = sum((x - mean) ** 2 for x in positional_points) / len(positional_points)
+    std_dev = variance ** 0.5
+    
+    return {
+        "mean": mean,
+        "std_dev": std_dev if std_dev > 0 else 1.0,
+        "sample_size": len(positional_points)
+    }
+
+
+def calculate_dynamic_replacement_level(
+    db: SupabaseRest,
+    league_id: str,
+    position: str
+) -> float:
+    """
+    Calculate dynamic replacement level based on league size and roster slots.
+    
+    Formula: replacement_index = (league_size × roster_slots[position]) + 1
+    
+    Args:
+        db: Supabase client
+        league_id: League ID
+        position: Position code
+    
+    Returns:
+        Replacement level (fantasy points)
+    """
+    # Load league config
+    leagues = db.select(
+        "leagues",
+        select="league_size,roster_slots",
+        filters=[("id", "eq", league_id)],
+        limit=1
+    )
+    
+    if not leagues or len(leagues) == 0:
+        return 0.0
+    
+    league = leagues[0]
+    # Handle None values - if league_size is None, use default of 12
+    league_size_raw = league.get("league_size")
+    league_size = int(league_size_raw) if league_size_raw is not None else 12
+    
+    roster_slots = league.get("roster_slots")
+    if not roster_slots or not isinstance(roster_slots, dict):
+        # Default roster slots if not configured
+        roster_slots = {"C": 2, "LW": 2, "RW": 2, "D": 4, "G": 2}
+    
+    slots_for_position_raw = roster_slots.get(position)
+    slots_for_position = int(slots_for_position_raw) if slots_for_position_raw is not None else 2
+    replacement_index = (league_size * slots_for_position) + 1
+    
+    # Get player IDs for this position
+    players = db.select(
+        "player_directory",
+        select="player_id",
+        filters=[("position_code", "eq", position)],
+        limit=1000
+    )
+    
+    if not players:
+        return 0.0
+    
+    all_player_ids = [int(p.get("player_id")) for p in players if p.get("player_id")]
+    
+    if not all_player_ids:
+        return 0.0
+    
+    # CRITICAL: Exclude IR-eligible players from replacement level calculation
+    # They shouldn't be included in the baseline calculation
+    # Get IR status for all players
+    talent_metrics = db.select(
+        "player_talent_metrics",
+        select="player_id,is_ir_eligible",
+        filters=[
+            ("player_id", "in", all_player_ids)
+        ],
+        limit=1000
+    )
+    
+    # Create set of IR-eligible player IDs
+    ir_player_ids = set()
+    if talent_metrics:
+        for metric in talent_metrics:
+            if metric.get("is_ir_eligible"):
+                ir_player_ids.add(int(metric.get("player_id")))
+    
+    # Filter out IR-eligible players
+    active_player_ids = [pid for pid in all_player_ids if pid not in ir_player_ids]
+    
+    if not active_player_ids:
+        return 0.0
+    
+    # Query player_projected_stats for active players only, sorted by total_projected_points DESC
+    # CRITICAL: Batch the query to avoid URL length limits with large "in" filters
+    # We need to get enough projections to find the replacement level, so we paginate
+    BATCH_SIZE = 100
+    PAGE_SIZE = 1000  # PostgREST default limit
+    all_projections = []
+    target_count = replacement_index + 10  # Get a few extra for safety
+    
+    for i in range(0, len(active_player_ids), BATCH_SIZE):
+        batch_ids = active_player_ids[i:i + BATCH_SIZE]
+        
+        # Paginate through results until we have enough, or run out
+        offset = 0
+        while len(all_projections) < target_count:
+            batch_projections = db.select(
+                "player_projected_stats",
+                select="total_projected_points",
+                filters=[
+                    ("player_id", "in", batch_ids)
+                ],
+                order="total_projected_points.desc",
+                limit=min(PAGE_SIZE, target_count - len(all_projections)),
+                offset=offset
+            )
+            
+            if not batch_projections:
+                break  # No more results for this batch
+            
+            all_projections.extend(batch_projections)
+            
+            # If we got fewer than requested, we've reached the end
+            if len(batch_projections) < PAGE_SIZE:
+                break
+            
+            offset += PAGE_SIZE
+            
+            # If we have enough, stop paginating
+            if len(all_projections) >= target_count:
+                break
+    
+    # Sort all projections by total_projected_points descending (in case batches weren't fully sorted)
+    projections = sorted(all_projections, key=lambda x: float(x.get("total_projected_points", 0)), reverse=True)
+    
+    if not projections or len(projections) < replacement_index:
+        return 0.0
+    
+    # Get the value at replacement_index (1-indexed, so subtract 1 for array index)
+    replacement_projection = projections[replacement_index - 1]
+    replacement_level = float(replacement_projection.get("total_projected_points", 0))
+    
+    return replacement_level
+
+
+def calculate_vopa_score(
+    db: SupabaseRest,
+    player_id: int,
+    game_id: int,
+    projection_date: date,
+    league_id: str,
+    season: int
+) -> float:
+    """
+    Calculate VOPA (Value Over Positional Average) score.
+    
+    Formula: VOPA = (player_points - replacement_level) / std_dev
+    
+    Args:
+        db: Supabase client
+        player_id: Player ID
+        game_id: Game ID
+        projection_date: Projection date
+        league_id: League ID
+        season: Season year
+    
+    Returns:
+        VOPA score
+    """
+    # Check roster status and if player is likely to play
+    talent_metrics = db.select(
+        "player_talent_metrics",
+        select="gp_last_10,is_likely_to_play,roster_status,is_ir_eligible",
+        filters=[("player_id", "eq", player_id), ("season", "eq", season)],
+        limit=1
+    )
+    
+    if talent_metrics and len(talent_metrics) > 0:
+        metrics = talent_metrics[0]
+        # Null Safety: metrics.get("is_ir_eligible", False) treats missing status as "Active"
+        # This prevents crashes if a new player hasn't been synced yet
+        is_ir_eligible = metrics.get("is_ir_eligible") or False  # Explicit None handling
+        is_likely_to_play = metrics.get("is_likely_to_play", True)  # Default to True if missing
+        
+        # Hard-stop: IR/LTIR or inactive players get zero VOPA
+        if is_ir_eligible or not is_likely_to_play:
+            return 0.0
+    else:
+        # If no talent_metrics record exists, default to active (allow VOPA calculation)
+        # This handles edge case where player exists but metrics haven't been populated yet
+        pass
+    
+    # Get player's projected points
+    projection = db.select(
+        "player_projected_stats",
+        select="total_projected_points",
+        filters=[
+            ("player_id", "eq", player_id),
+            ("game_id", "eq", game_id),
+            ("projection_date", "eq", projection_date.isoformat())
+        ],
+        limit=1
+    )
+    
+    if not projection or len(projection) == 0:
+        return 0.0
+    
+    player_points = float(projection[0].get("total_projected_points", 0))
+    
+    # Get player position
+    player_dir = db.select(
+        "player_directory",
+        select="position_code",
+        filters=[("player_id", "eq", player_id), ("season", "eq", season)],
+        limit=1
+    )
+    
+    if not player_dir or len(player_dir) == 0:
+        return 0.0
+    
+    position = player_dir[0].get("position_code", "C")
+    
+    # Get positional statistics
+    pos_stats = calculate_positional_statistics(db, position, league_id, season)
+    std_dev = pos_stats.get("std_dev", 1.0)
+    
+    # Get replacement level
+    replacement_level = calculate_dynamic_replacement_level(db, league_id, position)
+    
+    # Calculate VOPA
+    if std_dev > 0:
+        vopa = (player_points - replacement_level) / std_dev
+    else:
+        vopa = 0.0
+    
+    return round(vopa, 3)
+
+
+def persist_vopa_audit(
+    db: SupabaseRest,
+    league_id: str,
+    season: int,
+    calculation_date: date
+) -> int:
+    """
+    Persist VOPA audit data to player_talent_metrics for diagnostic verification.
+    
+    After VOPA calculation for all players, this function calculates and stores
+    positional replacement levels and standard deviations for each position.
+    
+    Args:
+        db: Supabase client
+        league_id: League ID
+        season: Season year
+        calculation_date: Date when VOPA was calculated
+    
+    Returns:
+        Number of positions processed
+    """
+    positions = ["C", "D", "LW", "RW", "G"]
+    processed = 0
+    
+    for position in positions:
+        try:
+            # Calculate positional statistics
+            pos_stats = calculate_positional_statistics(db, position, league_id, season)
+            std_dev = pos_stats.get("std_dev", 1.0)
+            
+            # Calculate replacement level
+            replacement_level = calculate_dynamic_replacement_level(db, league_id, position)
+            
+            # Get all players for this position
+            players = db.select(
+                "player_directory",
+                select="player_id",
+                filters=[("season", "eq", season), ("position_code", "eq", position)],
+                limit=1000
+            )
+            
+            if not players:
+                continue
+            
+            # Update player_talent_metrics for each player in this position
+            for player in players:
+                player_id = int(player.get("player_id", 0))
+                if not player_id:
+                    continue
+                
+                # Get existing talent metrics to preserve roster_status
+                existing_metrics = db.select(
+                    "player_talent_metrics",
+                    select="roster_status,roster_status_updated_at",
+                    filters=[("player_id", "eq", player_id), ("season", "eq", season)],
+                    limit=1
+                )
+                
+                # Get player's VOPA score (would need to be calculated first)
+                # For now, just update the positional metrics
+                talent_data = {
+                    "player_id": player_id,
+                    "season": season,
+                    "positional_replacement_level": round(replacement_level, 3),
+                    "positional_std_dev": round(std_dev, 3),
+                    "vopa_calculation_date": calculation_date.isoformat()
+                }
+                
+                # Include roster_status in audit data for historical accuracy
+                if existing_metrics and len(existing_metrics) > 0:
+                    existing = existing_metrics[0]
+                    if existing.get("roster_status"):
+                        talent_data["roster_status"] = existing.get("roster_status")
+                    if existing.get("roster_status_updated_at"):
+                        talent_data["roster_status_updated_at"] = existing.get("roster_status_updated_at")
+                
+                db.upsert("player_talent_metrics", talent_data, on_conflict="player_id,season")
+            
+            processed += 1
+        
+        except Exception as e:
+            print(f"⚠️  Error persisting VOPA audit for position {position}: {e}")
+            continue
+    
+    return processed
+
+
 def calculate_daily_projection(
     db: SupabaseRest,
     player_id: int,
     game_id: int,
     game_date: date,
     season: int,
-    scoring_settings: Dict[str, Any]
+    scoring_settings: Dict[str, Any],
+    league_id: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
     """
     Main orchestration function for calculating daily projection.
+    
+    NOTE: This function has been refactored to use the three-layer architecture:
+    - Layer 1: Physical Projection (calculate_physical_projection) → saved to projection_cache
+    - Layer 2: Dynamic Scoring (transform_physical_to_fantasy) → saved to player_projected_stats
+    - Layer 3: VOPA Calculation (calculate_vopa_score) → called separately after all projections
     
     Order of operations (critical for preventing multiplier bloat):
     1. Base Projection (Shrinkage applied)
     2. Talent Multiplier (xG adjustment)
     3. Environmental Factors (Opponent Strength × B2B × Home/Away)
     
+    Args:
+        db: Supabase client
+        player_id: Player ID
+        game_id: Game ID
+        game_date: Game date
+        season: Season year
+        scoring_settings: Scoring settings dict
+        league_id: Optional league ID for Layer 2 transformation
+    
     Returns:
         Projection dict with all stats and model components, or None if error
     """
     try:
-        # Get player info
+        # LAYER 1: Calculate physical projection and save to cache
+        physical_projection = calculate_physical_projection(
+            db, player_id, game_id, game_date, season
+        )
+        
+        if not physical_projection:
+            return None
+        
+        # Save physical projection to cache
+        save_physical_projection(
+            db, player_id, game_id, game_date, season, physical_projection
+        )
+        
+        # LAYER 2: Transform physical to fantasy points
+        # Get league_id if not provided (try to get from first league)
+        if not league_id:
+            leagues = db.select("leagues", select="id", limit=1)
+            league_id = leagues[0].get("id") if leagues else None
+        
+        if league_id:
+            fantasy_points = transform_physical_to_fantasy(
+                db, physical_projection, league_id, scoring_settings
+            )
+        else:
+            # Fallback: Calculate fantasy points directly if no league_id
+            fantasy_points = transform_physical_to_fantasy(
+                db, physical_projection, "", scoring_settings
+            )
+        
+        # Get player info for return structure
         player_dir = db.select(
             "player_directory",
             select="position_code,team_abbrev",
@@ -1701,7 +2709,26 @@ def calculate_daily_projection(
         is_goalie = position == "G" or position == "Goalie"
         if is_goalie:
             debug_goalie = os.getenv("DEBUG_GOALIE", "false").lower() == "true"
-            return calculate_goalie_projection(db, player_id, game_id, game_date, season, scoring_settings, debug=debug_goalie)
+            # For goalies, still use the existing function but save physical projection first
+            goalie_proj = calculate_goalie_projection(db, player_id, game_id, game_date, season, scoring_settings, debug=debug_goalie)
+            if goalie_proj:
+                # Save physical projection for goalie too
+                goalie_physical = {
+                    "goals": 0.0,
+                    "assists": 0.0,
+                    "shots": 0.0,
+                    "blocks": 0.0,
+                    "saves": goalie_proj.get("projected_saves", 0.0),
+                    "toi_seconds": 3600,
+                    "base_goals": 0.0,
+                    "base_assists": 0.0,
+                    "opponent_xga_suppression": 0.0,
+                    "goalie_gsax_factor": 1.0,
+                    "finishing_multiplier": 1.0,
+                    "opponent_adjustment": 1.0
+                }
+                save_physical_projection(db, player_id, game_id, game_date, season, goalie_physical)
+            return goalie_proj
         
         # Get player's games played
         player_stats = db.select(

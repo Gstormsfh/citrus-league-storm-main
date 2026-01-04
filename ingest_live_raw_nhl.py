@@ -34,6 +34,9 @@ NHL_BASE_URL = "https://api-web.nhle.com/v1"
 
 POLL_SECONDS = int(os.getenv("CITRUS_INGEST_POLL_SECONDS", "60"))
 COOLDOWN_SECONDS = int(os.getenv("CITRUS_INGEST_COOLDOWN_SECONDS", "45"))
+ADAPTIVE_MODE = os.getenv("CITRUS_INGEST_ADAPTIVE", "false").lower() == "true"
+LIVE_INTERVAL = int(os.getenv("CITRUS_INGEST_LIVE_INTERVAL", "30"))  # 30 seconds during games
+OFF_INTERVAL = int(os.getenv("CITRUS_INGEST_OFF_INTERVAL", "300"))  # 5 minutes off-hours
 
 
 def supabase_client() -> SupabaseRest:
@@ -56,6 +59,56 @@ def get_schedule_now() -> dict:
 
 def get_pbp(game_id: int) -> dict:
   return fetch_json(f"{NHL_BASE_URL}/gamecenter/{game_id}/play-by-play")
+
+
+def detect_active_games() -> bool:
+  """
+  Check if there are any active games (LIVE, CRIT, INTERMISSION, or recently finished OFF).
+  
+  Returns:
+      True if games are active, False otherwise
+  """
+  try:
+    sched = get_schedule_now()
+    games = (sched.get("games") or [])
+    
+    for game in games:
+      game_state = game.get("gameState", "").upper()
+      # Include LIVE, CRIT, and INTERMISSION as active states
+      if game_state in ("LIVE", "CRIT", "INTERMISSION"):
+        return True
+      elif game_state == "OFF":
+        # Check if game finished in last 2 hours (still processing)
+        game_date_str = game.get("startTimeUTC", "")
+        if game_date_str:
+          try:
+            game_date = dt.datetime.fromisoformat(game_date_str.replace('Z', '+00:00'))
+            now = dt.datetime.now(dt.timezone.utc)
+            if (now - game_date).total_seconds() < 7200:  # 2 hours
+              return True
+          except:
+            pass
+    
+    return False
+  except Exception as e:
+    print(f"[ingest_live_raw_nhl] Warning: Error detecting active games: {e}")
+    return False
+
+
+def get_polling_interval() -> int:
+  """
+  Get the appropriate polling interval based on game state (if adaptive mode enabled).
+  
+  Returns:
+      Polling interval in seconds
+  """
+  if ADAPTIVE_MODE:
+    if detect_active_games():
+      return LIVE_INTERVAL
+    else:
+      return OFF_INTERVAL
+  else:
+    return POLL_SECONDS
 
 
 def extract_game_state_and_last_updated(pbp_json: dict) -> Tuple[Optional[str], Optional[str], Optional[str]]:
@@ -92,7 +145,12 @@ def main() -> int:
   print("=" * 80)
   print("[ingest_live_raw_nhl] STARTING LIVE INGEST LOOP")
   print("=" * 80)
-  print(f"Poll interval: {POLL_SECONDS}s")
+  if ADAPTIVE_MODE:
+    print(f"Adaptive mode: ENABLED")
+    print(f"  Live interval: {LIVE_INTERVAL}s (during active games)")
+    print(f"  Off-hours interval: {OFF_INTERVAL}s (no active games)")
+  else:
+    print(f"Poll interval: {POLL_SECONDS}s (fixed)")
   print(f"Cooldown: {COOLDOWN_SECONDS}s")
   print(f"Timestamp: {_now_iso()}")
   print()
@@ -111,16 +169,26 @@ def main() -> int:
   
   total_ingested = 0
   last_progress_time = time.time()
+  last_interval_check = time.time()
 
   while True:
     try:
+      # Update polling interval if adaptive mode is enabled (check every 5 minutes)
+      current_interval = POLL_SECONDS
+      if ADAPTIVE_MODE and (time.time() - last_interval_check) >= 300:  # Check every 5 minutes
+        current_interval = get_polling_interval()
+        last_interval_check = time.time()
+        if current_interval != POLL_SECONDS:
+          print(f"[ingest_live_raw_nhl] [ADAPTIVE] Updated polling interval to {current_interval}s")
+      
       sched = get_schedule_now()
       games = (sched.get("games") or [])
       
       # Progress update even when no games
       current_time = time.time()
       if current_time - last_progress_time >= 15:
-        print(f"[ingest_live_raw_nhl] [PROGRESS] Polling schedule... (total ingested: {total_ingested})")
+        mode_str = f"adaptive ({current_interval}s)" if ADAPTIVE_MODE else f"fixed ({POLL_SECONDS}s)"
+        print(f"[ingest_live_raw_nhl] [PROGRESS] Polling schedule... (mode: {mode_str}, total ingested: {total_ingested})")
         last_progress_time = current_time
 
       for g in games:
@@ -130,7 +198,8 @@ def main() -> int:
           continue
 
         game_state = g.get("gameState")
-        if game_state not in ("LIVE", "CRIT", "OFF"):
+        # Include INTERMISSION as an active state (game is in progress)
+        if game_state not in ("LIVE", "CRIT", "OFF", "INTERMISSION"):
           continue
 
         if finalized.get(game_id) is True:
@@ -165,7 +234,9 @@ def main() -> int:
           cooldown[game_id] = (last_updated2, time.time())
           print(f"[ingest_live_raw_nhl] finalized game_id={game_id}")
 
-      time.sleep(POLL_SECONDS)
+      # Use adaptive interval if enabled, otherwise use fixed interval
+      sleep_interval = get_polling_interval() if ADAPTIVE_MODE else POLL_SECONDS
+      time.sleep(sleep_interval)
 
     except KeyboardInterrupt:
       print("[ingest_live_raw_nhl] Exiting (Ctrl+C).")

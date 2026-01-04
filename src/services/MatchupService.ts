@@ -1246,6 +1246,8 @@ export const MatchupService = {
       position: p.position,
       number: parseInt(p.jersey_number || '0'),
       starter: false, // Will be determined by lineup
+      roster_status: p.roster_status,
+      is_ir_eligible: p.is_ir_eligible,
       stats: {
         // For goalies, use goalie_gp instead of games_played
         gamesPlayed: (p.position === 'G' || p.position === 'Goalie') && (p as any).goalie_gp 
@@ -1546,7 +1548,10 @@ export const MatchupService = {
         garPercentage: garPercentage,
         isToday: hasGameToday,
         gameInfo,
-        games: weekGames
+        games: weekGames,
+        // IR Status fields from player object (populated from player_talent_metrics via PlayerService)
+        roster_status: player.roster_status,
+        is_ir_eligible: player.is_ir_eligible
       };
       
       // Handle goalies separately

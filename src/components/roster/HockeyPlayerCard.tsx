@@ -47,6 +47,8 @@ export interface HockeyPlayer {
   team: string;
   teamAbbreviation?: string; // e.g., "EDM", "COL"
   status?: 'IR' | 'SUSP' | 'GTD' | 'WVR' | null; // Injury Reserve, Suspended, Game Time Decision, Waiver
+  roster_status?: string; // Official NHL roster status: ACT, IR, LTIR, etc.
+  is_ir_eligible?: boolean; // True if player is on IR or LTIR and can be placed in IR slot
   height?: string;
   weight?: string;
   age?: number;

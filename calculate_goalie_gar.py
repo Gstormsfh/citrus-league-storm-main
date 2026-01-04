@@ -21,7 +21,7 @@ import numpy as np
 from datetime import datetime
 import os
 from dotenv import load_dotenv
-from supabase import create_client, Client
+from supabase_rest import SupabaseRest
 from scipy import stats
 
 # Load environment variables
@@ -35,7 +35,7 @@ if not supabase_url or not supabase_key:
     print("ERROR: Missing Supabase credentials. Set VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env")
     exit(1)
 
-supabase: Client = create_client(supabase_url, supabase_key)
+supabase = SupabaseRest(supabase_url, supabase_key)
 
 
 def load_rebound_control():
@@ -47,9 +47,9 @@ def load_rebound_control():
     try:
         # Try database first
         try:
-            response = supabase.table('goalie_rebound_control').select('*').execute()
-            if response.data and len(response.data) > 0:
-                df = pd.DataFrame(response.data)
+            data = supabase.select('goalie_rebound_control', select='*')
+            if data and len(data) > 0:
+                df = pd.DataFrame(data)
                 print("   Loaded from database")
             else:
                 raise Exception("No data in database")
@@ -97,9 +97,9 @@ def load_primary_gsax():
     try:
         # Try database first
         try:
-            response = supabase.table('goalie_gsax_primary').select('*').execute()
-            if response.data and len(response.data) > 0:
-                df = pd.DataFrame(response.data)
+            data = supabase.select('goalie_gsax_primary', select='*')
+            if data and len(data) > 0:
+                df = pd.DataFrame(data)
                 print("   Loaded from database")
             else:
                 raise Exception("No data in database")
@@ -370,10 +370,7 @@ def store_gar_results_all_configs(gar_df):
     for i in range(0, len(records), batch_size):
         batch = records[i:i + batch_size]
         try:
-            supabase.table('goalie_gar').upsert(
-                batch,
-                on_conflict='goalie_id'
-            ).execute()
+            supabase.upsert('goalie_gar', batch, on_conflict='goalie_id')
             success_count += len(batch)
         except Exception as e:
             # Most common cause: DB is missing the extended configuration columns.
@@ -381,10 +378,7 @@ def store_gar_results_all_configs(gar_df):
             # Retry with baseline-only schema for this batch.
             baseline_batch = baseline_records[i:i + batch_size]
             try:
-                supabase.table('goalie_gar').upsert(
-                    baseline_batch,
-                    on_conflict='goalie_id'
-                ).execute()
+                supabase.upsert('goalie_gar', baseline_batch, on_conflict='goalie_id')
                 success_count += len(baseline_batch)
                 continue
             except Exception as e_fallback:
@@ -392,10 +386,7 @@ def store_gar_results_all_configs(gar_df):
                 # Try individual baseline upserts
                 for record in baseline_batch:
                     try:
-                        supabase.table('goalie_gar').upsert(
-                            record,
-                            on_conflict='goalie_id'
-                        ).execute()
+                        supabase.upsert('goalie_gar', record, on_conflict='goalie_id')
                         success_count += 1
                     except Exception as e2:
                         print(f"   WARNING: Failed to upsert goalie_id {record['goalie_id']}: {e2}")

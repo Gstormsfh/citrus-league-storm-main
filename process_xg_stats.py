@@ -37,12 +37,114 @@ from data_acquisition import (
     LAST_EVENT_CATEGORY_ENCODER
 )
 
-# Load Supabase client
+# Load Supabase client using SupabaseRest (works with new sb_secret_ keys)
 load_dotenv()
 SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-from supabase import create_client, Client
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+from supabase_rest import SupabaseRest
+
+# Create SupabaseRest client (compatible with new keys)
+supabase_rest = SupabaseRest(SUPABASE_URL, SUPABASE_KEY)
+
+# For backward compatibility with old supabase-py API, create a wrapper
+class SupabaseRestWrapper:
+    def __init__(self, rest_client):
+        self.rest = rest_client
+    
+    def table(self, table_name):
+        return SupabaseTableWrapper(self.rest, table_name)
+
+class SupabaseTableWrapper:
+    def __init__(self, rest_client, table_name):
+        self.rest = rest_client
+        self.table_name = table_name
+        self._select_cols = '*'
+        self._filters = []
+        self._order = None
+        self._limit = None
+        self._offset = 0
+        self._count = None
+    
+    def select(self, cols='*', count=None):
+        self._select_cols = cols
+        self._count = count
+        return self
+    
+    def eq(self, col, val):
+        self._filters.append((col, 'eq', val))
+        return self
+    
+    def order(self, col):
+        self._order = f"{col}.asc"
+        return self
+    
+    def range(self, start, end):
+        self._offset = start
+        self._limit = end - start + 1
+        return self
+    
+    def execute(self):
+        result = self.rest.select(
+            self.table_name,
+            select=self._select_cols,
+            filters=self._filters,
+            order=self._order,
+            limit=self._limit,
+            offset=self._offset
+        )
+        
+        class Response:
+            def __init__(self, data, count=None):
+                self.data = data if data else []
+                self.count = count
+        
+        count = len(result) if result else 0
+        if self._count == 'exact':
+            # For count queries, we'd need a separate count call, but for now return length
+            count = len(result) if result else 0
+        
+        return Response(result if result else [], count=count)
+    
+    def update(self, data):
+        return UpdateWrapper(self.rest, self.table_name, data)
+    
+    def delete(self):
+        return DeleteWrapper(self.rest, self.table_name)
+
+class UpdateWrapper:
+    def __init__(self, rest_client, table_name, data):
+        self.rest = rest_client
+        self.table_name = table_name
+        self.data = data
+        self.filters = []
+    
+    def eq(self, col, val):
+        self.filters.append((col, 'eq', val))
+        return self
+    
+    def execute(self):
+        if not self.filters:
+            raise ValueError("Update requires at least one filter")
+        self.rest.update(self.table_name, self.data, filters=self.filters)
+        return self
+
+class DeleteWrapper:
+    def __init__(self, rest_client, table_name):
+        self.rest = rest_client
+        self.table_name = table_name
+        self.filters = []
+    
+    def eq(self, col, val):
+        self.filters.append((col, 'eq', val))
+        return self
+    
+    def execute(self):
+        if not self.filters:
+            raise ValueError("Delete requires at least one filter")
+        self.rest.delete(self.table_name, filters=self.filters)
+        return self
+
+supabase = SupabaseRestWrapper(supabase_rest)
 
 # Constants
 DEFAULT_BATCH_SIZE = 10
@@ -251,8 +353,8 @@ def process_single_game_json(raw_json, game_id):
             _save_shots_to_database(df_shots, db_client, game_id)
             
             # VERIFY: Check that shots were actually saved
-            verify_response = db_client.table('raw_shots').select('id').eq('game_id', game_id).execute()
-            shots_saved = len(verify_response.data) if verify_response.data else 0
+            verify_response = db_client.select('raw_shots', select='id', filters=[('game_id', 'eq', game_id)])
+            shots_saved = len(verify_response) if verify_response else 0
             
             if shots_saved == 0:
                 raise Exception(f"Verification failed: No shots found in database after save (expected {len(df_shots)})")
@@ -339,8 +441,11 @@ def process_games_batch(batch_size=10):
             
             batch_num += 1
             print(f"Processing batch #{batch_num}: {len(games)} games (total unprocessed: {total_unprocessed:,})")
+            print()
             
-            for game in games:
+            for idx, game in enumerate(games, 1):
+                game_id = game['game_id']
+                print(f"[{idx}/{len(games)}] Processing game {game_id}...")
                 game_id = game['game_id']
                 raw_json = game['raw_json']
                 
@@ -349,6 +454,7 @@ def process_games_batch(batch_size=10):
                     
                     if result is not None:
                         processed_count += 1
+                        print(f"  [OK] Game {game_id} processed successfully ({len(result)} shots)")
                     else:
                         failed_count += 1
                         print(f"  [FAILED] Game {game_id} returned None")
@@ -370,8 +476,27 @@ def process_games_batch(batch_size=10):
             remaining = total_unprocessed
             eta = remaining / rate if rate > 0 else 0
             
-            print(f"  Progress: {processed_count:,} processed, {failed_count:,} failed, {remaining:,} remaining")
-            print(f"  Rate: {rate:.1f} games/sec, ETA: {eta:.0f} seconds")
+            # Calculate percentage
+            total_games = processed_count + failed_count + remaining
+            pct_complete = (processed_count / total_games * 100) if total_games > 0 else 0
+            
+            print()
+            print("=" * 80)
+            print(f"PROGRESS UPDATE - Batch #{batch_num}")
+            print("=" * 80)
+            print(f"  Processed:  {processed_count:,} games ({pct_complete:.1f}%)")
+            print(f"  Failed:     {failed_count:,} games")
+            print(f"  Remaining:  {remaining:,} games")
+            print(f"  Rate:       {rate:.2f} games/sec")
+            if eta > 0:
+                eta_minutes = eta / 60
+                if eta_minutes < 60:
+                    print(f"  ETA:        {eta_minutes:.1f} minutes ({eta:.0f} seconds)")
+                else:
+                    eta_hours = eta_minutes / 60
+                    print(f"  ETA:        {eta_hours:.1f} hours ({eta_minutes:.0f} minutes)")
+            print(f"  Elapsed:    {elapsed/60:.1f} minutes")
+            print("=" * 80)
             print()
             
         except KeyboardInterrupt:
@@ -406,6 +531,8 @@ def main():
                        help=f'Number of games to process per batch (default: {DEFAULT_BATCH_SIZE})')
     parser.add_argument('--game-id', type=int, default=None,
                        help='Process a specific game ID (overrides batch processing)')
+    parser.add_argument('--skip-verify', action='store_true',
+                       help='Skip model file verification (faster startup)')
     
     args = parser.parse_args()
     
@@ -413,6 +540,20 @@ def main():
     print("PHASE 2: PROCESS RAW NHL DATA")
     print("=" * 80)
     print()
+    
+    # Verify model files before starting (unless skipped)
+    if not args.skip_verify:
+        try:
+            import verify_xg_model_files
+            print("Verifying xG model files...")
+            files_ok = verify_xg_model_files.check_model_files()
+            if not files_ok:
+                print("\n[ERROR] Model file verification failed. Run 'python verify_xg_model_files.py' for details.")
+                return
+            print()
+        except ImportError:
+            print("[WARNING] Could not import verify_xg_model_files.py - skipping verification")
+            print()
     
     if args.game_id:
         # Process single game

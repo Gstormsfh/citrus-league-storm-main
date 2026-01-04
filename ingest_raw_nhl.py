@@ -32,13 +32,14 @@ if sys.stdout.encoding != 'utf-8':
         sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 # Import Supabase client setup
-from supabase import create_client, Client
+from supabase_rest import SupabaseRest
 
 # Load environment variables
 load_dotenv()
 SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+if not SUPABASE_URL or not SUPABASE_KEY:
+    raise RuntimeError("Missing VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment.")
 
 # NHL API base URL
 NHL_BASE_URL = "https://api-web.nhle.com/v1"
@@ -55,7 +56,9 @@ def get_fresh_supabase_client():
     load_dotenv()
     SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
     SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-    return create_client(SUPABASE_URL, SUPABASE_KEY)
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        raise RuntimeError("Missing VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment.")
+    return SupabaseRest(SUPABASE_URL, SUPABASE_KEY)
 
 
 def scrape_single_game_json(game_id):
@@ -196,7 +199,7 @@ def save_raw_json_to_db(game_id, json_data, game_date, db_client, boxscore_json=
             upsert_data['boxscore_json'] = boxscore_json
         
         # UPSERT: Insert or update if game_id already exists
-        db_client.table('raw_nhl_data').upsert(upsert_data, on_conflict='game_id').execute()
+        db_client.upsert('raw_nhl_data', upsert_data, on_conflict='game_id')
         
         return True
     except Exception as e:
@@ -293,8 +296,6 @@ def get_finished_game_ids_from_api(start_date, end_date):
     Returns:
         list: List of game IDs
     """
-    from data_acquisition import get_finished_game_ids
-    
     start = datetime.datetime.strptime(start_date, '%Y-%m-%d').date()
     end = datetime.datetime.strptime(end_date, '%Y-%m-%d').date()
     
@@ -305,11 +306,36 @@ def get_finished_game_ids_from_api(start_date, end_date):
     
     while current_date <= end:
         date_str = current_date.strftime('%Y-%m-%d')
-        game_ids = get_finished_game_ids(date_str)
-        all_game_ids.extend(game_ids)
+        
+        # Fetch schedule for this date from NHL API
+        try:
+            schedule_url = f"{NHL_BASE_URL}/schedule/{date_str.replace('-', '')}"
+            response = requests.get(schedule_url, timeout=15)
+            response.raise_for_status()
+            schedule_data = response.json()
+            
+            # Extract finished game IDs
+            finished_game_ids = []
+            for date_entry in schedule_data.get('gameWeek', []):
+                if date_entry.get('date') == date_str:
+                    for game in date_entry.get('games', []):
+                        game_state = game.get('gameState', '')
+                        if game_state in ['FINAL', 'OFF', 'F']:
+                            game_id = game.get('id')
+                            if game_id:
+                                finished_game_ids.append(game_id)
+            
+            all_game_ids.extend(finished_game_ids)
+            if finished_game_ids:
+                print(f"  {date_str}: Found {len(finished_game_ids)} finished games")
+            
+        except Exception as e:
+            print(f"  {date_str}: Error fetching schedule: {e}")
+        
         current_date += datetime.timedelta(days=1)
         time.sleep(0.5)  # Small delay to avoid rate limiting
     
+    print(f"Total finished games from API: {len(all_game_ids)}")
     return all_game_ids
 
 
@@ -324,12 +350,31 @@ def get_unprocessed_games(start_date, end_date):
     Returns:
         list: List of game IDs that need to be scraped
     """
-    # Get all finished games
-    from pull_season_data import get_all_finished_games_from_db
-    all_game_ids = get_all_finished_games_from_db(start_date, end_date)
+    # Get all finished games - try database first, then API
+    all_game_ids = []
     
+    # Try to get from nhl_games table first
+    try:
+        db = SupabaseRest(SUPABASE_URL, SUPABASE_KEY)
+        games = db.select(
+            'nhl_games',
+            select='game_id',
+            filters=[
+                ('game_date', 'gte', start_date),
+                ('game_date', 'lte', end_date),
+                ('status', 'in', ['final', 'FINAL', 'OFF', 'F'])
+            ],
+            limit=10000
+        )
+        if games:
+            all_game_ids = [g['game_id'] for g in games if g.get('game_id')]
+            print(f"Found {len(all_game_ids)} finished games in database from {start_date} to {end_date}")
+    except Exception as e:
+        print(f"Could not query nhl_games table: {e}")
+        print("Falling back to API...")
+    
+    # Fallback to API if database query failed or returned no results
     if not all_game_ids:
-        # Fallback to API
         all_game_ids = get_finished_game_ids_from_api(start_date, end_date)
     
     if not all_game_ids:
@@ -344,12 +389,18 @@ def get_unprocessed_games(start_date, end_date):
     batch_size = 1000
     
     try:
+        db = SupabaseRest(SUPABASE_URL, SUPABASE_KEY)
         while True:
-            response = supabase.table('raw_nhl_data').select('game_id').range(offset, offset + batch_size - 1).execute()
-            if not response.data:
+            games = db.select(
+                'raw_nhl_data',
+                select='game_id',
+                limit=batch_size,
+                offset=offset
+            )
+            if not games:
                 break
-            already_scraped.update([g['game_id'] for g in response.data])
-            if len(response.data) < batch_size:
+            already_scraped.update([g['game_id'] for g in games if g.get('game_id')])
+            if len(games) < batch_size:
                 break
             offset += batch_size
     except Exception as e:

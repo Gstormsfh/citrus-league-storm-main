@@ -1310,6 +1310,24 @@ const Roster = () => {
     setIsPlayerDialogOpen(true);
   };
 
+  // Validate roster state - check if any player in IR slot has returned to ACT status
+  const validateRosterState = (currentRoster: RosterState): { isValid: boolean; invalidPlayers: HockeyPlayer[] } => {
+    const invalidPlayers: HockeyPlayer[] = [];
+    
+    // Check all players in IR slots
+    for (const irPlayer of currentRoster.ir) {
+      // If player has roster_status === 'ACT' but is still in IR slot, roster is invalid
+      if (irPlayer.roster_status === 'ACT' || !irPlayer.is_ir_eligible) {
+        invalidPlayers.push(irPlayer);
+      }
+    }
+    
+    return {
+      isValid: invalidPlayers.length === 0,
+      invalidPlayers
+    };
+  };
+
   // Position validation
   const isPositionValid = (player: HockeyPlayer, targetSlot: string): boolean => {
     const playerFantasyPos = getFantasyPosition(player.position);
@@ -1317,8 +1335,8 @@ const Roster = () => {
     if (targetSlot === 'bench-grid') return true;
     
     if (targetSlot.startsWith('ir-slot-')) {
-      // Only allow players with 'IR' or 'SUSP' status to move to IR slot (must already be injured)
-      if (player.status !== 'IR' && player.status !== 'SUSP') {
+      // Only allow players with is_ir_eligible = true (official NHL IR/LTIR status)
+      if (!player.is_ir_eligible) {
         return false;
       }
       return true;
@@ -1445,7 +1463,7 @@ const Roster = () => {
 
     if (!isPositionValid(player, finalTargetSlotId)) {
         if (finalTargetSlotId.startsWith('ir-slot-')) {
-          toast({ title: "Invalid Move", description: "Only injured players (IR/SUSP status) can be placed in IR slots.", variant: "destructive" });
+          toast({ title: "Invalid Move", description: "Only players with official IR/LTIR status can be placed in IR slots.", variant: "destructive" });
         } else {
           toast({ title: "Invalid Position", description: "Player cannot play in this position.", variant: "destructive" });
         }
@@ -1571,6 +1589,18 @@ const Roster = () => {
         }
 
         const updatedRoster = { starters: newStarters, bench: newBench, ir: newIR, slotAssignments: newAssignments };
+        
+        // Validate roster state - check if any IR players have returned to ACT
+        const validation = validateRosterState(updatedRoster);
+        if (!validation.isValid) {
+          const invalidNames = validation.invalidPlayers.map(p => p.name).join(', ');
+          toast({
+            title: "Invalid Roster State",
+            description: `The following players are in IR slots but have returned to active status: ${invalidNames}. Please move them to active slots.`,
+            variant: "destructive",
+            duration: 10000 // Show for 10 seconds
+          });
+        }
         
         // Save lineup to Supabase (only for logged-in users, not demo league)
         if (userTeamId && user && userTeam?.league_id && !isDemoLeague(userTeam.league_id)) {

@@ -49,6 +49,33 @@ import warnings
 # Suppress InconsistentVersionWarning from sklearn when loading models
 warnings.filterwarnings('ignore', message='.*Trying to unpickle.*', category=UserWarning)
 
+# Verify model files exist before attempting to load
+def _verify_model_files():
+    """Verify critical model files exist, provide helpful error if not."""
+    import os
+    critical_files = ['xg_model_moneypuck.joblib', 'xg_model.joblib']
+    missing = [f for f in critical_files if not os.path.exists(f)]
+    if len(missing) == len(critical_files):
+        print("=" * 80)
+        print("ERROR: xG MODEL FILES NOT FOUND")
+        print("=" * 80)
+        print("Required model files are missing from the root directory.")
+        print()
+        print("SOLUTION:")
+        print("  1. Copy files from archive/temp_files/ to root:")
+        print("     Copy-Item -Path archive\\temp_files\\*.joblib -Destination . -Force")
+        print("  2. Or run verification script:")
+        print("     python verify_xg_model_files.py")
+        print()
+        print("=" * 80)
+        return False
+    return True
+
+# Verify files before loading
+if not _verify_model_files():
+    print("ERROR: Cannot proceed without model files. Exiting.")
+    exit(1)
+
 # Try to load MoneyPuck-aligned model first, fallback to old model
 try:
     # Try MoneyPuck-aligned model (new, recommended)
@@ -127,8 +154,21 @@ SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
 # The Service Role Key uses a different name (without VITE_ prefix)
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
-# Initialize Supabase client
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+# Initialize Supabase client lazily (only when needed, not at module import)
+# This prevents import errors if keys aren't configured yet
+_supabase_client = None
+def _get_supabase_client():
+    global _supabase_client
+    if _supabase_client is None:
+        _supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    return _supabase_client
+
+# For backward compatibility, create a property that lazily initializes
+class LazySupabaseClient:
+    def __getattr__(self, name):
+        return getattr(_get_supabase_client(), name)
+supabase = LazySupabaseClient()
+
 # Base URL for the new NHL API (used for game center/PBP)
 NHL_BASE_URL = "https://api-web.nhle.com/v1" 
 
@@ -913,16 +953,16 @@ def get_fresh_supabase_client():
     Each worker process needs its own client to avoid connection issues across processes.
     
     Returns:
-        Client: A new Supabase client instance
+        SupabaseRest: A new SupabaseRest client instance (works with new sb_secret_ keys)
     """
-    from supabase import create_client, Client
+    from supabase_rest import SupabaseRest
     from dotenv import load_dotenv
     import os
     
     load_dotenv()
     SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
     SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-    return create_client(SUPABASE_URL, SUPABASE_KEY)
+    return SupabaseRest(SUPABASE_URL, SUPABASE_KEY)
 
 
 # --- CONSTANTS FOR RATE LIMITING ---
@@ -1296,9 +1336,10 @@ def _extract_shots_from_game(raw_data, game_id, db_client):
             goalie_name = None
             if goalie_id:
                 try:
-                    name_response = db_client.table('player_names').select('full_name').eq('player_id', goalie_id).limit(1).execute()
-                    if name_response.data:
-                        goalie_name = name_response.data[0]['full_name']
+                    # Use SupabaseRest API
+                    name_response = db_client.select('player_names', select='full_name', filters=[('player_id', 'eq', goalie_id)], limit=1)
+                    if name_response:
+                        goalie_name = name_response[0].get('full_name')
                 except:
                     pass  # Skip API lookup in parallel processing
             
@@ -1802,39 +1843,32 @@ def _save_shots_to_database(df_shots, db_client, game_id):
             total_batches = (len(cleaned_shot_records) + BATCH_SIZE - 1) // BATCH_SIZE
             
             try:
-                response = db_client.table('raw_shots').upsert(
-                    batch,
-                    on_conflict='game_id,player_id,shot_x,shot_y,shot_type_code'
-                ).execute()
+                # Use SupabaseRest API directly
+                db_client.upsert('raw_shots', batch, on_conflict='game_id,player_id,shot_x,shot_y,shot_type_code')
                 total_saved += len(batch)
             except Exception as batch_error:
                 error_msg = str(batch_error)
                 if 'constraint' in error_msg.lower() or 'unique' in error_msg.lower():
                     try:
-                        db_client.table('raw_shots').insert(batch).execute()
+                        # Try insert instead
+                        for record in batch:
+                            db_client.upsert('raw_shots', [record], on_conflict='game_id,player_id,shot_x,shot_y,shot_type_code')
                         total_saved += len(batch)
                     except Exception:
                         # Try individual inserts
                         for record in batch:
                             try:
-                                db_client.table('raw_shots').insert([record]).execute()
+                                db_client.upsert('raw_shots', [record], on_conflict='game_id,player_id,shot_x,shot_y,shot_type_code')
                                 total_saved += 1
                             except Exception:
                                 pass
                 else:
                     for record in batch:
                         try:
-                            db_client.table('raw_shots').upsert(
-                                [record],
-                                on_conflict='game_id,player_id,shot_x,shot_y,shot_type_code'
-                            ).execute()
+                            db_client.upsert('raw_shots', [record], on_conflict='game_id,player_id,shot_x,shot_y,shot_type_code')
                             total_saved += 1
                         except Exception:
-                            try:
-                                db_client.table('raw_shots').insert([record]).execute()
-                                total_saved += 1
-                            except Exception:
-                                pass
+                            pass
         
         print(f"Game {game_id}: Saved {total_saved} shot records to database")
         

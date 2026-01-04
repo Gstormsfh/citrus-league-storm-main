@@ -604,6 +604,24 @@ def batch_upsert_projections(db: SupabaseRest, projections: List[Dict[str, Any]]
     return total_upserted
 
 
+def populate_gp_last_10_metric(db: SupabaseRest, season: int) -> int:
+    """
+    Pre-calculate GP_Last_10 metric for all players.
+    
+    This should be called before calculating projections to enable
+    fast "Likely-to-Play" filtering in VOPA calculations.
+    """
+    try:
+        from populate_gp_last_10_metric import populate_gp_last_10_for_all_players
+        return populate_gp_last_10_for_all_players(db, season)
+    except ImportError:
+        print("⚠️  Warning: populate_gp_last_10_metric.py not found, skipping GP_Last_10 calculation")
+        return 0
+    except Exception as e:
+        print(f"⚠️  Warning: Error calculating GP_Last_10: {e}")
+        return 0
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Calculate daily projections for all rostered players with parallel processing"
@@ -691,6 +709,13 @@ def main():
     
     # Initialize database connection (main process)
     db = supabase_client()
+    
+    # Step 0: Pre-calculate GP_Last_10 metric for "Likely-to-Play" filtering
+    print("📋 Step 0: Pre-calculating GP_Last_10 metric...")
+    gp_updated = populate_gp_last_10_metric(db, args.season)
+    if gp_updated > 0:
+        print(f"   ✅ Updated GP_Last_10 for {gp_updated} players")
+    print()
     
     # Step 1: Get rostered players
     print("📋 Step 1: Fetching rostered players...")

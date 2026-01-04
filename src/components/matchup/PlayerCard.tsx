@@ -6,6 +6,7 @@ import { GameLogosBar } from "./GameLogosBar";
 import { ProjectionTooltip } from "./ProjectionTooltip";
 import { GoalieProjectionTooltip } from "./GoalieProjectionTooltip";
 import { getTodayMST } from "@/utils/timezoneUtils";
+import { Badge } from "@/components/ui/badge";
 
 interface PlayerCardProps {
   player: MatchupPlayer | null;
@@ -227,6 +228,16 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
           <div className="player-header-left">
             <div className="player-name" title={player.name}>
               {displayName}
+              {/* IR Badge - Display if roster_status is not ACT */}
+              {(player.roster_status && player.roster_status !== 'ACT') || player.is_ir_eligible ? (
+                <Badge 
+                  variant="destructive" 
+                  className="ml-2 text-xs px-1.5 py-0.5"
+                  title={`Roster Status: ${player.roster_status || 'IR'}`}
+                >
+                  IR
+                </Badge>
+              ) : null}
             </div>
             {/* Team Name - Below player name */}
             {player.team && (

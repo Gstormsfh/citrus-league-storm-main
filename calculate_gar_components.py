@@ -24,7 +24,7 @@ import pandas as pd
 import numpy as np
 import os
 from dotenv import load_dotenv
-from supabase import create_client, Client
+from supabase_rest import SupabaseRest
 from datetime import datetime
 from typing import Dict, Optional
 
@@ -40,7 +40,7 @@ if not supabase_url or not supabase_key:
     print("   Please ensure VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set")
     exit(1)
 
-supabase: Client = create_client(supabase_url, supabase_key)
+supabase = SupabaseRest(supabase_url, supabase_key)
 
 # Component-specific constants
 SITUATION_5V5 = "5v5"
@@ -70,18 +70,19 @@ def load_shots_data():
         batch_size = 1000
         
         while True:
-            response = supabase.table('raw_shots').select(
-                'id, player_id, game_id, period, time_remaining_seconds, shooting_talent_adjusted_xg, '
-                'flurry_adjusted_xg, xg_value, is_goal, is_empty_net, '
-                'home_skaters_on_ice, away_skaters_on_ice, team_code, is_home_team, goalie_id'
-            ).range(offset, offset + batch_size - 1).execute()
+            batch = supabase.select(
+                'raw_shots',
+                select='id, player_id, game_id, period, time_remaining_seconds, shooting_talent_adjusted_xg, flurry_adjusted_xg, xg_value, is_goal, is_empty_net, home_skaters_on_ice, away_skaters_on_ice, team_code, is_home_team, goalie_id',
+                limit=batch_size,
+                offset=offset
+            )
             
-            if not response.data or len(response.data) == 0:
+            if not batch or len(batch) == 0:
                 break
             
-            all_shots.extend(response.data)
+            all_shots.extend(batch)
             
-            if len(response.data) < batch_size:
+            if len(batch) < batch_size:
                 break  # Last batch
             
             offset += batch_size
@@ -204,16 +205,19 @@ def load_toi_data():
         batch_size = 1000
         
         while True:
-            response = supabase.table('player_toi_by_situation').select(
-                'player_id, game_id, situation, toi_seconds'
-            ).range(offset, offset + batch_size - 1).execute()
+            batch = supabase.select(
+                'player_toi_by_situation',
+                select='player_id, game_id, situation, toi_seconds',
+                limit=batch_size,
+                offset=offset
+            )
             
-            if not response.data or len(response.data) == 0:
+            if not batch or len(batch) == 0:
                 break
             
-            all_toi.extend(response.data)
+            all_toi.extend(batch)
             
-            if len(response.data) < batch_size:
+            if len(batch) < batch_size:
                 break  # Last batch
             
             offset += batch_size

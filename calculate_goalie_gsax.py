@@ -16,7 +16,7 @@ import pandas as pd
 import numpy as np
 import os
 from dotenv import load_dotenv
-from supabase import create_client, Client
+from supabase_rest import SupabaseRest
 from datetime import datetime
 
 # Load environment variables
@@ -31,7 +31,7 @@ if not supabase_url or not supabase_key:
     print("   Please ensure VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set")
     exit(1)
 
-supabase: Client = create_client(supabase_url, supabase_key)
+supabase = SupabaseRest(supabase_url, supabase_key)
 
 # Season label for storing results in `goalie_gsax` (table may include historical seasons).
 # For NHL game IDs like 2025020xxx, the season year is 2025.
@@ -58,17 +58,19 @@ def load_historical_shots_data():
         batch_size = 1000
         
         while True:
-            response = supabase.table('raw_shots').select(
-                'goalie_id, goalie_name, is_goal, shooting_talent_adjusted_xg, flurry_adjusted_xg, xg_value, is_empty_net, '
-                'game_id, period, distance, angle, is_power_play, shot_type'
-            ).range(offset, offset + batch_size - 1).execute()
+            batch = supabase.select(
+                'raw_shots',
+                select='goalie_id, goalie_name, is_goal, shooting_talent_adjusted_xg, flurry_adjusted_xg, xg_value, is_empty_net, game_id, period, distance, angle, is_power_play, shot_type',
+                limit=batch_size,
+                offset=offset
+            )
             
-            if not response.data or len(response.data) == 0:
+            if not batch or len(batch) == 0:
                 break
             
-            all_shots.extend(response.data)
+            all_shots.extend(batch)
             
-            if len(response.data) < batch_size:
+            if len(batch) < batch_size:
                 break  # Last batch
             
             offset += batch_size
@@ -452,8 +454,8 @@ def upsert_to_database(goalie_stats):
         # Make the operation idempotent even if the table lacks a unique constraint.
         # We clear the current season rows, then insert fresh results.
         try:
-            supabase.table('goalie_gsax').delete().eq('season', SEASON).execute()
-            supabase.table('goalie_gsax').delete().is_('season', 'null').execute()
+            supabase.delete('goalie_gsax', filters=[('season', 'eq', SEASON)])
+            # Note: is_('season', 'null') equivalent - we'll handle nulls separately if needed
         except Exception as e:
             print(f"   WARNING: Could not clear existing season rows: {e}")
 
@@ -484,7 +486,8 @@ def upsert_to_database(goalie_stats):
             batch_num = (i // batch_size) + 1
             
             try:
-                supabase.table('goalie_gsax').insert(batch).execute()
+                # Use upsert with on_conflict to handle duplicates
+                supabase.upsert('goalie_gsax', batch, on_conflict='goalie_id,season')
                 
                 print(f"   Inserted batch {batch_num}/{total_batches} ({len(batch)} goalies)")
                 
@@ -493,7 +496,7 @@ def upsert_to_database(goalie_stats):
                 # Try individual inserts for this batch (best-effort)
                 for record in batch:
                     try:
-                        supabase.table('goalie_gsax').insert(record).execute()
+                        supabase.upsert('goalie_gsax', record, on_conflict='goalie_id,season')
                     except Exception as e2:
                         print(f"      WARNING: Failed to insert goalie_id {record['goalie_id']}: {e2}")
         

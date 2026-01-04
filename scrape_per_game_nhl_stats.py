@@ -380,23 +380,21 @@ def get_week_dates(week_start: date, week_end: date) -> List[date]:
 
 def get_games_for_week(db: SupabaseRest, week_start: date, week_end: date) -> List[Dict]:
     """Get all games for the week from nhl_games table with pagination."""
-    # Note: supabase_rest has a bug where multiple filters on same column overwrite
-    # So we fetch more games and filter in Python
     # Use pagination to ensure we get all games
+    print(f"  [PAGINATION] Fetching games from {week_start} to {week_end}...")
     all_games = _paginate_select(
         db,
         "nhl_games",
         select="game_id,game_date,home_team,away_team,status",
         filters=[
-            ("game_date", "gte", week_start.isoformat())
-        ]
+            ("game_date", "gte", week_start.isoformat()),
+            ("game_date", "lte", week_end.isoformat())
+        ],
+        max_records=10000  # Increase limit for large date ranges
     )
     
-    # Filter by end date in Python
-    week_end_str = week_end.isoformat()
-    games = [g for g in (all_games or []) if g.get("game_date", "") <= week_end_str]
-    
-    return games
+    print(f"  [PAGINATION] Fetched {len(all_games)} games total")
+    return all_games or []
 
 
 def _paginate_select(db: SupabaseRest, table: str, select: str, filters: list, max_records: int = 50000) -> list:
@@ -414,8 +412,10 @@ def _paginate_select(db: SupabaseRest, table: str, select: str, filters: list, m
             if len(batch) < batch_size:
                 break
             offset += batch_size
+            if offset % 5000 == 0:
+                print(f"    [PAGINATION] Fetched {len(all_records)} records so far...")
         except Exception as e:
-            print(f"  [WARN] Pagination error: {e}")
+            print(f"  [WARN] Pagination error at offset {offset}: {e}")
             break
     
     return all_records
@@ -431,6 +431,7 @@ def get_games_missing_goalies(db: SupabaseRest, week_start: date, week_end: date
     week_start_str = week_start.isoformat()
     week_end_str = week_end.isoformat()
     
+    print(f"  [PAGINATION] Fetching skater games...")
     # Get distinct game_ids that have skater data (with pagination)
     skater_games = _paginate_select(
         db,
@@ -440,7 +441,8 @@ def get_games_missing_goalies(db: SupabaseRest, week_start: date, week_end: date
             ("season", "eq", season),
             ("is_goalie", "eq", False),
             ("game_date", "gte", week_start_str)
-        ]
+        ],
+        max_records=50000
     )
     
     # Filter by end date and get unique game_ids
@@ -453,36 +455,61 @@ def get_games_missing_goalies(db: SupabaseRest, week_start: date, week_end: date
             game_ids_with_skaters.add(gid)
             game_dates[gid] = gdate
     
+    print(f"  [PAGINATION] Found {len(game_ids_with_skaters)} games with skaters")
+    
+    print(f"  [PAGINATION] Fetching goalie games...")
     # Get game_ids that have goalie data (with pagination)
     goalie_games = _paginate_select(
         db,
         "player_game_stats",
-        select="game_id",
+        select="game_id,game_date",
         filters=[
             ("season", "eq", season),
             ("is_goalie", "eq", True),
             ("game_date", "gte", week_start_str)
-        ]
+        ],
+        max_records=50000
     )
     game_ids_with_goalies = set(g.get("game_id") for g in (goalie_games or []) if g.get("game_date", "") <= week_end_str)
+    
+    print(f"  [PAGINATION] Found {len(game_ids_with_goalies)} games with goalies")
     
     # Find games missing goalies
     missing_goalie_game_ids = game_ids_with_skaters - game_ids_with_goalies
     
+    print(f"  [PAGINATION] Found {len(missing_goalie_game_ids)} games missing goalies")
+    
     if not missing_goalie_game_ids:
         return []
     
-    # Get full game info from nhl_games
-    games = db.select(
-        "nhl_games",
-        select="game_id,game_date,home_team,away_team,status",
-        filters=[
-            ("game_id", "in", list(missing_goalie_game_ids))
-        ],
-        limit=500
-    )
-    
-    return games or []
+    # Get full game info from nhl_games (need to paginate if > 1000)
+    if len(missing_goalie_game_ids) > 1000:
+        # Split into chunks
+        missing_list = list(missing_goalie_game_ids)
+        all_games = []
+        for i in range(0, len(missing_list), 1000):
+            chunk = missing_list[i:i+1000]
+            games = db.select(
+                "nhl_games",
+                select="game_id,game_date,home_team,away_team,status",
+                filters=[
+                    ("game_id", "in", chunk)
+                ],
+                limit=1000
+            )
+            if games:
+                all_games.extend(games)
+        return all_games
+    else:
+        games = db.select(
+            "nhl_games",
+            select="game_id,game_date,home_team,away_team,status",
+            filters=[
+                ("game_id", "in", list(missing_goalie_game_ids))
+            ],
+            limit=1000
+        )
+        return games or []
 
 
 def update_player_game_stats_nhl_columns(
@@ -691,12 +718,15 @@ def main():
         game_date = game.get("game_date")
         status = game.get("status", "unknown")
         
-        print(f"[{idx}/{len(games)}] Processing game {game_id} ({game_date}, status: {status})...")
+        # Progress output with flushing
+        progress_msg = f"[{idx}/{len(games)}] ({idx*100//len(games)}%) Processing game {game_id} ({game_date})..."
+        print(progress_msg, flush=True)
+        sys.stdout.flush()
         
         # Fetch boxscore (reads from stored data first, falls back to API)
         boxscore = fetch_game_boxscore(game_id, db)
         if not boxscore:
-            print(f"  [ERROR] Failed to fetch boxscore (tried stored data and API)")
+            print(f"  [ERROR] Failed to fetch boxscore (tried stored data and API)", flush=True)
             errors += 1
             time.sleep(0.5)  # Rate limiting
             continue
@@ -704,14 +734,14 @@ def main():
         # Extract player stats
         player_stats = extract_player_stats_from_boxscore(boxscore)
         if not player_stats:
-            print(f"  [WARNING] No player stats found in boxscore")
+            print(f"  [WARNING] No player stats found in boxscore", flush=True)
             time.sleep(0.5)
             continue
         
         # Count goalies and skaters
         goalie_count = sum(1 for s in player_stats.values() if s.get("_is_goalie", False))
         skater_count = len(player_stats) - goalie_count
-        print(f"  Found {len(player_stats)} players ({skater_count} skaters, {goalie_count} goalies)")
+        print(f"  Found {len(player_stats)} players ({skater_count} skaters, {goalie_count} goalies)", flush=True)
         
         # Update database
         game_date_obj = datetime.strptime(game_date, "%Y-%m-%d").date() if isinstance(game_date, str) else game_date
@@ -737,8 +767,11 @@ def main():
         if result["skipped"] > 0:
             parts.append(f"skipped {result['skipped']} skaters (no base record)")
         
-        print(f"  -> {', '.join(parts) if parts else 'no changes'}")
-        print()
+        print(f"  -> {', '.join(parts) if parts else 'no changes'}", flush=True)
+        
+        # Progress summary every 10 games
+        if idx % 10 == 0:
+            print(f"\n[PROGRESS] {idx}/{len(games)} games processed | Updated: {total_updated} | Created: {total_created} | Errors: {errors}\n", flush=True)
         
         time.sleep(0.5)  # Rate limiting (500ms between requests)
     

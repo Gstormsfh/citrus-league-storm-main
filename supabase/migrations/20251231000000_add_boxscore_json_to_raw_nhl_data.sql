@@ -15,3 +15,4 @@ CREATE INDEX IF NOT EXISTS idx_raw_nhl_data_boxscore_json ON public.raw_nhl_data
 
 
 
+
