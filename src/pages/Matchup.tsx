@@ -2437,8 +2437,8 @@ const Matchup = () => {
               {/* Header Section - Clean and Professional with Citrus Colors */}
               <div className="mb-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-                  {/* Week Selector - Show ONLY for active users (REMOVE for guests - this is the top right one) */}
-                  {userLeagueState === 'active-user' && 
+                  {/* Week Selector - Show for both active users AND guests (the correct toggle!) */}
+                  {(userLeagueState === 'active-user' || userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') && 
                    availableWeeks.length > 0 && 
                    firstWeekStart && (
                     <MatchupScheduleSelector
