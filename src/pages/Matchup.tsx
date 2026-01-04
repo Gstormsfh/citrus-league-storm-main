@@ -453,9 +453,12 @@ const Matchup = () => {
           setLoading(false);
           hasInitializedRef.current = true;
         } else {
-          // During initial load, keep loading state true and DON'T mark as initialized
-          // This ensures shouldShowLoading continues to return true
+          // During initial load:
+          // 1. DON'T set error (prevents flash)
+          // 2. Keep loading state true (keeps loading screen visible)
+          // 3. DON'T mark as initialized (keeps shouldShowLoading returning true)
           setLoading(true);
+          setError(null); // Explicitly clear any error that might have been set
           // Don't set hasInitializedRef.current = true here
           // This prevents the error from showing until we've successfully loaded once
         }
