@@ -448,12 +448,19 @@ const Matchup = () => {
         // This prevents error flash during demo league loading
         console.error('[Matchup] Error loading demo matchup:', error);
         // Only set error if we're not in initial loading phase
+        // CRITICAL: Don't set hasInitializedRef to true if we're in initial load
+        // This keeps the loading screen showing and prevents error flash
         if (hasInitializedRef.current) {
           setError(error instanceof Error ? error.message : 'Failed to load demo matchup');
+          setLoading(false);
+        } else {
+          // During initial load, keep loading state true to prevent error flash
+          // The loading screen will continue to show
+          setLoading(true);
         }
-        setLoading(false);
         loadingRef.current = false;
-        hasInitializedRef.current = true;
+        // Don't set hasInitializedRef.current = true here if we're in initial load
+        // This ensures shouldShowLoading continues to return true
       }
     };
 
@@ -2540,8 +2547,8 @@ const Matchup = () => {
                 </div>
               </div>
           
-          {/* Error State - Only show if NOT loading (prevents flash during demo load) */}
-          {!loading && !shouldShowLoading && error && (
+          {/* Error State - Only show if fully initialized and NOT loading (prevents flash during demo load) */}
+          {!loading && hasInitializedRef.current && !shouldShowLoading && error && (
             <div className="text-center py-20">
               <p className="text-destructive text-lg mb-4">{error}</p>
               <Button onClick={() => window.location.reload()}>Retry</Button>
