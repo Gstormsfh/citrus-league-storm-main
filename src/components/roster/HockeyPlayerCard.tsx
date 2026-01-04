@@ -160,9 +160,6 @@ const HockeyPlayerCardContent = ({
     let data: CitrusPuckPlayerData | undefined;
     
     switch (view) {
-      case 'lastSeason':
-        data = cp?.lastSeason?.allSituation;
-        break;
       case 'currentWeek':
         data = cp?.projections?.currentWeek;
         break;
@@ -176,8 +173,8 @@ const HockeyPlayerCardContent = ({
     }
 
     if (!data) {
-        // If we are in a specific analytics view (projections/last season) and have no data, show 0s
-        if (['currentWeek', 'restOfSeason', 'lastSeason'].includes(view)) {
+        // If we are in a specific analytics view (projections) and have no data, show 0s
+        if (['currentWeek', 'restOfSeason'].includes(view)) {
              return {
                 goals: 0,
                 assists: 0,

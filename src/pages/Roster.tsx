@@ -228,7 +228,7 @@ const Roster = () => {
   const [activeId, setActiveId] = useState<string | number | null>(null);
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [statView, setStatView] = useState<'currentWeek' | 'seasonToDate' | 'lastSeason' | 'restOfSeason'>('seasonToDate');
+  const [statView, setStatView] = useState<'currentWeek' | 'seasonToDate' | 'restOfSeason'>('seasonToDate');
   const [analyticsLoaded, setAnalyticsLoaded] = useState(false);
   const [userTeamId, setUserTeamId] = useState<string | number | null>(null);
   const [userTeam, setUserTeam] = useState<{ id: string; league_id: string; team_name: string } | null>(null);
@@ -1785,7 +1785,6 @@ const Roster = () => {
                         <ToggleGroupItem value="seasonToDate" size="sm" className="text-xs">Season</ToggleGroupItem>
                         <ToggleGroupItem value="currentWeek" size="sm" className="text-xs">This Week</ToggleGroupItem>
                         <ToggleGroupItem value="restOfSeason" size="sm" className="text-xs">Rest of Season</ToggleGroupItem>
-                        <ToggleGroupItem value="lastSeason" size="sm" className="text-xs">Last Year</ToggleGroupItem>
                     </ToggleGroup>
                 </div>
 
