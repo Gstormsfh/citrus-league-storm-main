@@ -104,6 +104,149 @@ def process_single_game(game_id: int, raw_json: dict) -> bool:
         return False
 
 
+def process_recently_finished_games(max_age_hours: int = 2) -> Dict[str, int]:
+    """
+    Process games that have recently finished (gameState = OFF, processed = false).
+    Only processes games finished within the last max_age_hours to avoid processing old games.
+    
+    Args:
+        max_age_hours: Maximum age in hours for a finished game to be processed
+    
+    Returns:
+        Dictionary with processing statistics
+    """
+    print("=" * 80)
+    print(f"[run_daily_pbp_processing] Processing recently finished games (max age: {max_age_hours} hours)")
+    print("=" * 80)
+    
+    db = supabase_client()
+    now = dt.datetime.now(dt.timezone.utc)
+    cutoff_time = now - dt.timedelta(hours=max_age_hours)
+    
+    # Get all unprocessed games
+    unprocessed_games = get_unprocessed_games(db, limit=1000)
+    
+    if not unprocessed_games:
+        print("[run_daily_pbp_processing] No unprocessed games found")
+        return {"processed": 0, "failed": 0, "skipped": 0, "game_ids": []}
+    
+    # Filter to only recently finished games
+    # For today's games, we'll process any OFF games or check PBP API directly
+    recently_finished = []
+    today = dt.date.today()
+    
+    for game in unprocessed_games:
+        raw_json = game.get("raw_json")
+        game_id = game.get("game_id")
+        game_date_str = game.get("game_date")
+        
+        if not raw_json:
+            continue
+        
+        # Check if game is finished (gameState = "OFF")
+        game_state = raw_json.get("gameState", "").upper()
+        
+        # If game is OFF in raw_json, add it
+        if game_state == "OFF":
+            # If it's from today, process it (regardless of timing)
+            if game_date_str == today.isoformat():
+                recently_finished.append(game)
+                continue
+        
+        # If game state is not OFF in raw_json but it's from today,
+        # check PBP API directly to see current state
+        if game_date_str == today.isoformat() and game_id:
+            try:
+                import requests
+                pbp_response = requests.get(
+                    f"https://api-web.nhle.com/v1/gamecenter/{game_id}/play-by-play",
+                    timeout=5
+                )
+                if pbp_response.status_code == 200:
+                    pbp_data = pbp_response.json()
+                    pbp_state = pbp_data.get("gameState", "").upper()
+                    if pbp_state == "OFF":
+                        # Game is now OFF, process it
+                        recently_finished.append(game)
+                        print(f"[run_daily_pbp_processing] Game {game_id} is now OFF (was {game_state}), will process")
+            except Exception as e:
+                # If PBP check fails, skip this game
+                pass
+    
+    if not recently_finished:
+        print(f"[run_daily_pbp_processing] No recently finished games found (checked {len(unprocessed_games)} unprocessed games)")
+        return {"processed": 0, "failed": 0, "skipped": 0, "game_ids": []}
+    
+    print(f"[run_daily_pbp_processing] Found {len(recently_finished)} recently finished game(s) to process")
+    print()
+    
+    # Process the games
+    processed_count = 0
+    failed_count = 0
+    skipped_count = 0
+    processed_game_ids = []  # Track successfully processed game IDs
+    
+    for idx, game in enumerate(recently_finished, 1):
+        game_id = game.get("game_id")
+        raw_json = game.get("raw_json")
+        game_date = game.get("game_date", "unknown")
+        
+        if not game_id or not raw_json:
+            print(f"[run_daily_pbp_processing] Skipping invalid game record: {game_id}")
+            skipped_count += 1
+            continue
+        
+        print(f"[{idx}/{len(recently_finished)}] Processing recently finished game {game_id} ({game_date})...")
+        
+        game_start_time = time.time()
+        success = process_single_game(game_id, raw_json)
+        game_time = time.time() - game_start_time
+        
+        if success:
+            processed_count += 1
+            processed_game_ids.append(game_id)
+            print(f"[run_daily_pbp_processing] ✓ Game {game_id} processed successfully ({game_time:.2f}s)")
+            
+            # Verify it was marked as processed
+            try:
+                check = db.select(
+                    "raw_nhl_data",
+                    select="processed",
+                    filters=[("game_id", "eq", game_id)],
+                    limit=1
+                )
+                if check and len(check) > 0:
+                    if not check[0].get("processed", False):
+                        print(f"[run_daily_pbp_processing] Warning: Game {game_id} not marked as processed, marking now...")
+                        db.update(
+                            "raw_nhl_data",
+                            {"processed": True},
+                            filters=[("game_id", "eq", game_id)]
+                        )
+            except Exception as e:
+                print(f"[run_daily_pbp_processing] Warning: Could not verify processed flag for game {game_id}: {e}")
+        else:
+            failed_count += 1
+            print(f"[run_daily_pbp_processing] ✗ Game {game_id} failed to process")
+        
+        # Small delay between games
+        time.sleep(0.5)
+    
+    print("=" * 80)
+    print(f"[run_daily_pbp_processing] Recently finished games processing completed:")
+    print(f"  Processed: {processed_count}")
+    print(f"  Failed: {failed_count}")
+    print(f"  Skipped: {skipped_count}")
+    print("=" * 80)
+    
+    return {
+        "processed": processed_count,
+        "failed": failed_count,
+        "skipped": skipped_count,
+        "game_ids": processed_game_ids
+    }
+
+
 def process_all_unprocessed_games() -> Dict[str, int]:
     """
     Process all unprocessed games in batches.

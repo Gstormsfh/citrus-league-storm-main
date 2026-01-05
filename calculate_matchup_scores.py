@@ -655,6 +655,67 @@ def update_matchup_scores(
         print(f"[WARNING] Calibration check failed: {e}")
 
 
+def update_active_matchup_scores(
+    db: SupabaseRest,
+    game_ids: Optional[List[int]] = None,
+    league_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Update matchup scores for active matchups.
+    Uses the Supabase RPC update_all_matchup_scores for efficient updates.
+    
+    Args:
+        db: Supabase client
+        game_ids: Optional list of game IDs that were just processed (for logging)
+        league_id: Optional league ID to update only that league (None = all leagues)
+    
+    Returns:
+        Dictionary with update statistics
+    """
+    try:
+        if game_ids:
+            print(f"[update_active_matchup_scores] Updating matchup scores after processing {len(game_ids)} game(s)")
+        else:
+            print(f"[update_active_matchup_scores] Updating matchup scores for all active matchups")
+        
+        # Call the Supabase RPC function
+        # The RPC handles all the calculation logic
+        # If league_id is None, pass None explicitly (RPC default is NULL)
+        rpc_params = {}
+        if league_id:
+            rpc_params["p_league_id"] = league_id
+        else:
+            rpc_params["p_league_id"] = None
+        
+        result = db.rpc("update_all_matchup_scores", rpc_params)
+        
+        if result:
+            # The RPC returns a list of results with updated status
+            successful = [r for r in result if r.get("updated", False)]
+            failed = [r for r in result if not r.get("updated", False)]
+            
+            updated_count = len(successful)
+            failed_count = len(failed)
+            
+            print(f"[update_active_matchup_scores] Completed: {updated_count} matchups updated, {failed_count} failed")
+            
+            return {
+                "updated": updated_count,
+                "failed": failed_count,
+                "total": len(result) if result else 0,
+                "results": result
+            }
+        else:
+            print(f"[update_active_matchup_scores] RPC returned no results")
+            return {"updated": 0, "failed": 0, "total": 0, "results": []}
+            
+    except Exception as e:
+        print(f"[update_active_matchup_scores] Error updating matchup scores: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"updated": 0, "failed": 0, "total": 0, "error": str(e)}
+
+
 def calculate_matchup_scores(
     db: SupabaseRest,
     matchup_id: Optional[str] = None,

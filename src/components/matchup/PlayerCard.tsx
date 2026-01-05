@@ -126,21 +126,24 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
     : [];
   const hasGameOnDate = dateGames.length > 0;
   
-  // Check if game is final (for determining projection vs daily points)
+  // Check if game is final or live (for determining projection vs daily points)
   const gameStatus = dateGames[0]?.status || 'scheduled';
   const isGameFinal = gameStatus === 'final' || gameStatus === 'FINAL';
+  const isGameLive = gameStatus === 'live' || gameStatus === 'LIVE';
   
   // Simplified logic: Show Daily Points when:
-  // 1. Past dates with data (past games are always final)
-  // 2. OR game is FINAL and data exists
-  const shouldShowDailyPoints = ((isViewingPastDate || isGameFinal) && hasDailyStats);
+  // 1. Past dates (past games are always final, show 0 if no data)
+  // 2. OR game is FINAL (show data if exists, or 0 if no data)
+  // 3. OR game is LIVE (NEW - always show actual points during live games, even if 0)
+  // For live games, we want to show actual points (even if 0) instead of projections
+  const shouldShowDailyPoints = isViewingPastDate || isGameFinal || isGameLive;
   
   // Zero Projection Logic: If projectedPoints === 0 but hasGameOnDate is true, show "TBD" or "Calculating"
   // For goalies, also check starter_confirmed flag
-  // Only applies when game is not final (show projections until final)
+  // Only applies when game is not final and not live (show projections until game starts)
   const hasProjection = dailyProjection && projectedPoints > 0;
   const isStarterConfirmed = isGoalie ? (player.goalieProjection?.starter_confirmed ?? false) : true;
-  const showTBD = hasGameOnDate && !isGameFinal && (!hasProjection || (isGoalie && !isStarterConfirmed));
+  const showTBD = hasGameOnDate && !isGameFinal && !isGameLive && (!hasProjection || (isGoalie && !isStarterConfirmed));
   
   // Max points for bar display - 15 for all players (skaters and goalies)
   const maxBarPoints = 15;

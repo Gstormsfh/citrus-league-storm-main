@@ -80,19 +80,33 @@ def parse_time_to_seconds(time_str: str) -> int:
         return 0
 
 
-def fetch_game_boxscore(game_id: int, db: Optional[SupabaseRest] = None) -> Optional[Dict]:
+def fetch_game_boxscore(game_id: int, db: Optional[SupabaseRest] = None, force_api: bool = False) -> Optional[Dict]:
     """
     Fetch boxscore from stored raw_nhl_data first, fallback to API if not available.
     This uses the consolidated scraping approach where boxscore is stored alongside PBP data.
     
+    For LIVE games, always fetch from API to get fresh stats (force_api=True).
+    
     Args:
         game_id: NHL game ID
         db: Optional Supabase client (if None, will create one)
+        force_api: If True, always fetch from API (bypass stored data). Use for live games.
     
     Returns:
         Boxscore dict or None if not found
     """
-    # Try to read from stored data first
+    # For live games, ALWAYS fetch from API to get fresh stats
+    if force_api:
+        url = f"{NHL_API_BASE}/gamecenter/{game_id}/boxscore"
+        try:
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            print(f"  Error fetching game {game_id} boxscore from API: {e}")
+            return None
+    
+    # Try to read from stored data first (for historical games)
     if db is None:
         db = supabase_client()
     
@@ -534,7 +548,20 @@ def update_player_game_stats_nhl_columns(
     created_count = 0
     skipped_count = 0
     
+    # Validate that we have stats to process
+    if not player_stats:
+        print(f"    [WARNING] No player stats extracted for game {game_id}")
+        return {"updated": 0, "created": 0, "skipped": 0}
+    
+    print(f"    [INFO] Processing {len(player_stats)} players for game {game_id}")
+    
     for player_id, stats in player_stats.items():
+        # Validate stats dict
+        if not isinstance(stats, dict):
+            print(f"    [ERROR] Player {player_id} has invalid stats dict (type: {type(stats)})")
+            skipped_count += 1
+            continue
+        
         # Extract metadata (these are NOT stored as columns, just used for logic)
         is_goalie = stats.pop("_is_goalie", False)
         team_abbrev = stats.pop("_team_abbrev", "")
@@ -556,6 +583,13 @@ def update_player_game_stats_nhl_columns(
             # =============================================
             # UPDATE existing record (skaters and goalies)
             # =============================================
+            # Validate that stats dict contains required nhl_* fields
+            required_fields = ["nhl_goals", "nhl_assists", "nhl_points", "nhl_shots_on_goal", 
+                             "nhl_hits", "nhl_blocks", "nhl_toi_seconds"]
+            missing_fields = [f for f in required_fields if f not in stats]
+            if missing_fields:
+                print(f"    [WARNING] Player {player_id} missing required fields: {missing_fields}")
+            
             update_data = {
                 **stats,
                 "updated_at": datetime.now().isoformat()
@@ -572,8 +606,14 @@ def update_player_game_stats_nhl_columns(
                     ]
                 )
                 updated_count += 1
+                # Log successful update with key stats for verification
+                if not is_goalie:
+                    print(f"    [OK] Updated player {player_id}: G={stats.get('nhl_goals', 0)}, A={stats.get('nhl_assists', 0)}, "
+                          f"SOG={stats.get('nhl_shots_on_goal', 0)}, Hits={stats.get('nhl_hits', 0)}, "
+                          f"Blocks={stats.get('nhl_blocks', 0)}, TOI={stats.get('nhl_toi_seconds', 0)}s")
             except Exception as e:
                 print(f"    [ERROR] Failed to update player {player_id}: {e}")
+                skipped_count += 1
         
         elif is_goalie:
             # =============================================
@@ -636,12 +676,56 @@ def update_player_game_stats_nhl_columns(
             try:
                 db.upsert("player_game_stats", goalie_record, on_conflict="season,game_id,player_id")
                 created_count += 1
+                print(f"    [OK] Created goalie record for player {player_id}: W={stats.get('nhl_wins', 0)}, "
+                      f"Saves={stats.get('nhl_saves', 0)}, GA={stats.get('nhl_goals_against', 0)}, "
+                      f"TOI={stats.get('nhl_toi_seconds', 0)}s")
             except Exception as e:
                 print(f"    [ERROR] Failed to create goalie record for {player_id}: {e}")
+                skipped_count += 1
         
         else:
-            # Skater without existing record - will be created by extractor_job
-            skipped_count += 1
+            # Skater without existing record - CREATE it for live games
+            # This ensures live games have stats even if extractor_job hasn't run yet
+            skater_record = {
+                "season": season,
+                "game_id": game_id,
+                "player_id": player_id,
+                "game_date": game_date.isoformat(),
+                "team_abbrev": team_abbrev,
+                "is_goalie": False,
+                "position_code": position_code,
+                
+                # NHL official stats (from boxscore)
+                **stats,
+                
+                # Default non-NHL stats to 0 (will be populated by extractor_job if needed)
+                "goals": 0,
+                "primary_assists": 0,
+                "secondary_assists": 0,
+                "points": 0,
+                "shots_on_goal": 0,
+                "hits": 0,
+                "blocks": 0,
+                "pim": 0,
+                "ppp": 0,
+                "shp": 0,
+                "plus_minus": 0,
+                "icetime_seconds": stats.get("nhl_toi_seconds", 0),
+                
+                # Timestamps
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat()
+            }
+            
+            try:
+                db.upsert("player_game_stats", skater_record, on_conflict="season,game_id,player_id")
+                created_count += 1
+                print(f"    [OK] Created skater record for player {player_id}: G={stats.get('nhl_goals', 0)}, A={stats.get('nhl_assists', 0)}, "
+                      f"SOG={stats.get('nhl_shots_on_goal', 0)}, Hits={stats.get('nhl_hits', 0)}, "
+                      f"Blocks={stats.get('nhl_blocks', 0)}, TOI={stats.get('nhl_toi_seconds', 0)}s")
+            except Exception as e:
+                print(f"    [ERROR] Failed to create skater record for {player_id}: {e}")
+                skipped_count += 1
     
     return {
         "updated": updated_count,

@@ -54,8 +54,13 @@ export const GameLogosBar = ({ games, playerTeam, selectedDate }: GameLogosBarPr
           
           // Check if game is in the past relative to the viewing date
           // If viewing a specific date, compare to that date; otherwise compare to today
-          const isPlayed = !isLive && (game.status === 'final' || (gameDateStr < viewDateStr));
-          const isSelectedDateScheduled = isSelectedDate && game.status === 'scheduled' && !isLive; // Selected date but not started
+          // CRITICAL: If game is in the past and marked as "scheduled", treat it as final
+          // This handles cases where database hasn't been updated yet
+          const isPastDate = gameDateStr < viewDateStr;
+          const effectiveStatus = (isPastDate && game.status === 'scheduled') ? 'final' : game.status;
+          
+          const isPlayed = !isLive && (effectiveStatus === 'final' || isPastDate);
+          const isSelectedDateScheduled = isSelectedDate && effectiveStatus === 'scheduled' && !isLive; // Selected date but not started
           const isUpcoming = !isPlayed && !isSelectedDate && !isLive; // Future games relative to viewing date
           
           // Determine opponent - handle cases where playerTeam might not match
@@ -206,18 +211,23 @@ export const GameLogosBar = ({ games, playerTeam, selectedDate }: GameLogosBarPr
           }
           
           // Format game score if available (for live or final games)
+          // NEVER show 0-0 scores - it's impossible for a hockey game to end 0-0
           let gameScore = '';
           if ((isLive || isPlayed) && game.home_score !== undefined && game.away_score !== undefined) {
-            const homeScore = game.home_score || 0;
-            const awayScore = game.away_score || 0;
-            // Determine if player's team is home or away
-            const isPlayerHome = game.home_team === playerTeam;
-            if (isPlayerHome) {
-              // Player's team is home: "EDM 3-2 TOR"
-              gameScore = `${game.home_team} ${homeScore}-${awayScore} ${game.away_team}`;
-            } else {
-              // Player's team is away: "TOR 2-3 EDM"
-              gameScore = `${game.away_team} ${awayScore}-${homeScore} ${game.home_team}`;
+            const homeScore = game.home_score ?? 0;
+            const awayScore = game.away_score ?? 0;
+            
+            // Only show score if at least one team has scored (never show 0-0)
+            if (homeScore !== 0 || awayScore !== 0) {
+              // Determine if player's team is home or away
+              const isPlayerHome = game.home_team === playerTeam;
+              if (isPlayerHome) {
+                // Player's team is home: "EDM 3-2 TOR"
+                gameScore = `${game.home_team} ${homeScore}-${awayScore} ${game.away_team}`;
+              } else {
+                // Player's team is away: "TOR 2-3 EDM"
+                gameScore = `${game.away_team} ${awayScore}-${homeScore} ${game.home_team}`;
+              }
             }
           }
           

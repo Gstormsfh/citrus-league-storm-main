@@ -267,17 +267,8 @@ export const PlayerService = {
         const gamesPlayed = Number(sRaw?.games_played ?? 0);
         const hasPlayed = gamesPlayed > 0;
         
-        // Validate stats are reasonable - check for stale NHL stats
-        // If points per game is unreasonably high (> 3 PPG), NHL stats are likely stale
-        const nhlPoints = Number(sRaw?.nhl_points ?? 0);
-        const pbpPoints = Number(sRaw?.points ?? 0);
-        const pointsPerGame = gamesPlayed > 0 ? (nhlPoints / gamesPlayed) : 0;
-        const MAX_REASONABLE_PPG = 3.0; // Even elite players rarely exceed 2 PPG over a season
-        
-        // If NHL stats look stale (unreasonable PPG), prefer PBP stats or use null
-        const nhlStatsLookStale = hasPlayed && nhlPoints > 0 && pointsPerGame > MAX_REASONABLE_PPG;
-        const useNhlStats = hasPlayed && !nhlStatsLookStale;
-        
+        // ALWAYS use NHL.com official stats exclusively (no PBP fallback)
+        // This ensures we display only NHL.com data, not PBP-calculated data
         const s = hasPlayed ? sRaw : null;
         
         const assists = Number(s?.primary_assists ?? 0) + Number(s?.secondary_assists ?? 0);
@@ -288,23 +279,12 @@ export const PlayerService = {
           d.headshot_url ||
           (team && pid ? `https://assets.nhle.com/mugs/nhl/20242025/${team}/${pid}.png` : null);
 
-        // Calculate goals and assists first
-        const calculatedGoals = useNhlStats ? Number(s?.nhl_goals ?? s?.goals ?? 0) : Number(s?.goals ?? 0);
-        const calculatedAssists = useNhlStats ? Number(s?.nhl_assists ?? assists ?? 0) : assists;
+        // ALWAYS use NHL.com official stats (no fallback to PBP)
+        const calculatedGoals = Number(s?.nhl_goals ?? 0);
+        const calculatedAssists = Number(s?.nhl_assists ?? 0);
         
         // ALWAYS calculate points from goals + assists to ensure consistency
-        // This prevents issues where database points don't match goals + assists
         const calculatedPoints = calculatedGoals + calculatedAssists;
-        
-        // Get database points for validation logging
-        const dbNhlPoints = useNhlStats ? Number(s?.nhl_points ?? 0) : 0;
-        const dbPbpPoints = Number(s?.points ?? 0);
-        const dbPoints = useNhlStats ? dbNhlPoints : dbPbpPoints;
-        
-        // Log warning if database points don't match calculated points (for debugging)
-        if (hasPlayed && dbPoints > 0 && Math.abs(dbPoints - calculatedPoints) > 0.5) {
-          console.warn(`[PlayerService] Points mismatch for player ${d.full_name} (ID: ${pid}): DB points=${dbPoints}, Calculated=${calculatedPoints} (Goals=${calculatedGoals}, Assists=${calculatedAssists}). Using calculated points.`);
-        }
 
         return {
           id: String(pid),
@@ -317,38 +297,35 @@ export const PlayerService = {
           last_updated: new Date().toISOString(),
           games_played: gamesPlayed,
 
-          // Use NHL.com official stats for display, fallback to PBP-calculated for backwards compatibility
-          // If player hasn't played, all stats will be 0 (s is null)
-          // If NHL stats look stale (unreasonable PPG), use PBP stats instead
-          // ALWAYS calculate points from goals + assists to ensure consistency
+          // EXCLUSIVELY use NHL.com official stats (no PBP fallback)
+          // If NHL stats are missing/0, show 0 (don't fall back to PBP)
           goals: calculatedGoals,
           assists: calculatedAssists,
           points: calculatedPoints,
-          plus_minus: Number(s?.nhl_plus_minus ?? s?.plus_minus ?? 0),
-          shots: Number(s?.nhl_shots_on_goal ?? s?.shots_on_goal ?? 0),
-          hits: Number(s?.nhl_hits ?? s?.hits ?? 0),
-          blocks: Number(s?.nhl_blocks ?? s?.blocks ?? 0),
-          pim: Number(s?.nhl_pim ?? s?.pim ?? 0),
-          ppp: Number(s?.nhl_ppp ?? s?.ppp ?? 0),
-          shp: Number(s?.nhl_shp ?? s?.shp ?? 0),
-          // Use NHL.com TOI for display, fallback to our calculated TOI
-          icetime_seconds: Number(s?.nhl_toi_seconds ?? s?.icetime_seconds ?? 0),
+          plus_minus: Number(s?.nhl_plus_minus ?? 0),
+          shots: Number(s?.nhl_shots_on_goal ?? 0),
+          hits: Number(s?.nhl_hits ?? 0),
+          blocks: Number(s?.nhl_blocks ?? 0),
+          pim: Number(s?.nhl_pim ?? 0),
+          ppp: Number(s?.nhl_ppp ?? 0),
+          shp: Number(s?.nhl_shp ?? 0),
+          // Use NHL.com TOI exclusively (no PBP fallback)
+          icetime_seconds: Number(s?.nhl_toi_seconds ?? 0),
 
           xGoals: Number(s?.x_goals ?? 0),
 
-          // Goalie stats: Use NHL.com official stats for display, fallback to PBP-calculated
-          wins: d.is_goalie ? Number(s?.nhl_wins ?? s?.wins ?? 0) : null,
-          losses: d.is_goalie ? Number(s?.nhl_losses ?? null) : null,
-          ot_losses: d.is_goalie ? Number(s?.nhl_ot_losses ?? null) : null,
-          saves: d.is_goalie ? Number(s?.nhl_saves ?? s?.saves ?? 0) : null,
-          shutouts: d.is_goalie ? Number(s?.nhl_shutouts ?? s?.shutouts ?? 0) : null,
-          shots_faced: d.is_goalie ? Number(s?.nhl_shots_faced ?? s?.shots_faced ?? 0) : null,
-          goals_against: d.is_goalie ? Number(s?.nhl_goals_against ?? s?.goals_against ?? 0) : null,
+          // Goalie stats: EXCLUSIVELY use NHL.com official stats (no PBP fallback)
+          wins: d.is_goalie ? Number(s?.nhl_wins ?? 0) : null,
+          losses: d.is_goalie ? Number(s?.nhl_losses ?? 0) : null,
+          ot_losses: d.is_goalie ? Number(s?.nhl_ot_losses ?? 0) : null,
+          saves: d.is_goalie ? Number(s?.nhl_saves ?? 0) : null,
+          shutouts: d.is_goalie ? Number(s?.nhl_shutouts ?? 0) : null,
+          shots_faced: d.is_goalie ? Number(s?.nhl_shots_faced ?? 0) : null,
+          goals_against: d.is_goalie ? Number(s?.nhl_goals_against ?? 0) : null,
           goals_against_average: d.is_goalie 
-            ? (s?.nhl_gaa ?? (s?.goals_against && s?.goalie_gp && s.goalie_gp > 0
-                ? (s.goals_against / s.goalie_gp) : null))
+            ? (s?.nhl_gaa ?? null)
             : null,
-          save_percentage: d.is_goalie ? (s?.nhl_save_pct ?? s?.save_pct ?? null) : null,
+          save_percentage: d.is_goalie ? (s?.nhl_save_pct ?? null) : null,
           highDangerSavePct: 0,
           goalsSavedAboveExpected: d.is_goalie ? (gsaxMap.get(pid) ?? 0) : 0,
           goalie_gp: d.is_goalie ? Number(s?.goalie_gp ?? 0) : undefined,
@@ -517,17 +494,8 @@ export const PlayerService = {
         const gamesPlayed = Number(sRaw?.games_played ?? 0);
         const hasPlayed = gamesPlayed > 0;
         
-        // Validate stats are reasonable - check for stale NHL stats
-        // If points per game is unreasonably high (> 3 PPG), NHL stats are likely stale
-        const nhlPoints = Number(sRaw?.nhl_points ?? 0);
-        const pbpPoints = Number(sRaw?.points ?? 0);
-        const pointsPerGame = gamesPlayed > 0 ? (nhlPoints / gamesPlayed) : 0;
-        const MAX_REASONABLE_PPG = 3.0; // Even elite players rarely exceed 2 PPG over a season
-        
-        // If NHL stats look stale (unreasonable PPG), prefer PBP stats or use null
-        const nhlStatsLookStale = hasPlayed && nhlPoints > 0 && pointsPerGame > MAX_REASONABLE_PPG;
-        const useNhlStats = hasPlayed && !nhlStatsLookStale;
-        
+        // ALWAYS use NHL.com official stats exclusively (no PBP fallback)
+        // This ensures we display only NHL.com data, not PBP-calculated data
         const s = hasPlayed ? sRaw : null;
         
         const assists = Number(s?.primary_assists ?? 0) + Number(s?.secondary_assists ?? 0);
@@ -537,23 +505,12 @@ export const PlayerService = {
           d.headshot_url ||
           (team && pid ? `https://assets.nhle.com/mugs/nhl/20242025/${team}/${pid}.png` : null);
 
-        // Calculate goals and assists first
-        const calculatedGoals = useNhlStats ? Number(s?.nhl_goals ?? s?.goals ?? 0) : Number(s?.goals ?? 0);
-        const calculatedAssists = useNhlStats ? Number(s?.nhl_assists ?? assists ?? 0) : assists;
+        // ALWAYS use NHL.com official stats (no fallback to PBP)
+        const calculatedGoals = Number(s?.nhl_goals ?? 0);
+        const calculatedAssists = Number(s?.nhl_assists ?? 0);
         
         // ALWAYS calculate points from goals + assists to ensure consistency
-        // This prevents issues where database points don't match goals + assists
         const calculatedPoints = calculatedGoals + calculatedAssists;
-        
-        // Get database points for validation logging
-        const dbNhlPoints = useNhlStats ? Number(s?.nhl_points ?? 0) : 0;
-        const dbPbpPoints = Number(s?.points ?? 0);
-        const dbPoints = useNhlStats ? dbNhlPoints : dbPbpPoints;
-        
-        // Log warning if database points don't match calculated points (for debugging)
-        if (hasPlayed && dbPoints > 0 && Math.abs(dbPoints - calculatedPoints) > 0.5) {
-          console.warn(`[PlayerService] Points mismatch for player ${d.full_name} (ID: ${pid}): DB points=${dbPoints}, Calculated=${calculatedPoints} (Goals=${calculatedGoals}, Assists=${calculatedAssists}). Using calculated points.`);
-        }
 
         return {
           id: String(pid),
@@ -566,41 +523,35 @@ export const PlayerService = {
           last_updated: new Date().toISOString(),
           games_played: gamesPlayed,
 
-          // Use NHL.com official stats for display, fallback to PBP-calculated for backwards compatibility
-          // If player hasn't played, all stats will be 0 (s is null)
-          // If NHL stats look stale (unreasonable PPG), use PBP stats instead
-          // ALWAYS calculate points from goals + assists to ensure consistency
+          // EXCLUSIVELY use NHL.com official stats (no PBP fallback)
+          // If NHL stats are missing/0, show 0 (don't fall back to PBP)
           goals: calculatedGoals,
           assists: calculatedAssists,
           points: calculatedPoints,
-          plus_minus: useNhlStats ? Number(s?.nhl_plus_minus ?? s?.plus_minus ?? 0) : Number(s?.plus_minus ?? 0),
-          shots: useNhlStats ? Number(s?.nhl_shots_on_goal ?? s?.shots_on_goal ?? 0) : Number(s?.shots_on_goal ?? 0),
-          hits: useNhlStats ? Number(s?.nhl_hits ?? s?.hits ?? 0) : Number(s?.hits ?? 0),
-          blocks: useNhlStats ? Number(s?.nhl_blocks ?? s?.blocks ?? 0) : Number(s?.blocks ?? 0),
-          pim: useNhlStats ? Number(s?.nhl_pim ?? s?.pim ?? 0) : Number(s?.pim ?? 0),
-          ppp: useNhlStats ? Number(s?.nhl_ppp ?? s?.ppp ?? 0) : Number(s?.ppp ?? 0),
-          shp: useNhlStats ? Number(s?.nhl_shp ?? s?.shp ?? 0) : Number(s?.shp ?? 0),
-          // Use NHL.com TOI for display, fallback to our calculated TOI
-          icetime_seconds: useNhlStats ? Number(s?.nhl_toi_seconds ?? s?.icetime_seconds ?? 0) : Number(s?.icetime_seconds ?? 0),
+          plus_minus: Number(s?.nhl_plus_minus ?? 0),
+          shots: Number(s?.nhl_shots_on_goal ?? 0),
+          hits: Number(s?.nhl_hits ?? 0),
+          blocks: Number(s?.nhl_blocks ?? 0),
+          pim: Number(s?.nhl_pim ?? 0),
+          ppp: Number(s?.nhl_ppp ?? 0),
+          shp: Number(s?.nhl_shp ?? 0),
+          // Use NHL.com TOI exclusively (no PBP fallback)
+          icetime_seconds: Number(s?.nhl_toi_seconds ?? 0),
 
           xGoals: Number(s?.x_goals ?? 0),
 
-          // Goalie stats: Use NHL.com official stats for display, fallback to PBP-calculated
-          wins: d.is_goalie ? (useNhlStats ? Number(s?.nhl_wins ?? s?.wins ?? 0) : Number(s?.wins ?? 0)) : null,
-          losses: d.is_goalie ? (useNhlStats ? Number(s?.nhl_losses ?? null) : null) : null,
-          ot_losses: d.is_goalie ? (useNhlStats ? Number(s?.nhl_ot_losses ?? null) : null) : null,
-          saves: d.is_goalie ? (useNhlStats ? Number(s?.nhl_saves ?? s?.saves ?? 0) : Number(s?.saves ?? 0)) : null,
-          shutouts: d.is_goalie ? (useNhlStats ? Number(s?.nhl_shutouts ?? s?.shutouts ?? 0) : Number(s?.shutouts ?? 0)) : null,
-          shots_faced: d.is_goalie ? (useNhlStats ? Number(s?.nhl_shots_faced ?? s?.shots_faced ?? 0) : Number(s?.shots_faced ?? 0)) : null,
-          goals_against: d.is_goalie ? (useNhlStats ? Number(s?.nhl_goals_against ?? s?.goals_against ?? 0) : Number(s?.goals_against ?? 0)) : null,
+          // Goalie stats: EXCLUSIVELY use NHL.com official stats (no PBP fallback)
+          wins: d.is_goalie ? Number(s?.nhl_wins ?? 0) : null,
+          losses: d.is_goalie ? Number(s?.nhl_losses ?? 0) : null,
+          ot_losses: d.is_goalie ? Number(s?.nhl_ot_losses ?? 0) : null,
+          saves: d.is_goalie ? Number(s?.nhl_saves ?? 0) : null,
+          shutouts: d.is_goalie ? Number(s?.nhl_shutouts ?? 0) : null,
+          shots_faced: d.is_goalie ? Number(s?.nhl_shots_faced ?? 0) : null,
+          goals_against: d.is_goalie ? Number(s?.nhl_goals_against ?? 0) : null,
           goals_against_average: d.is_goalie 
-            ? (useNhlStats 
-                ? (s?.nhl_gaa ?? (s?.goals_against && s?.goalie_gp && s.goalie_gp > 0
-                    ? (s.goals_against / s.goalie_gp) : null))
-                : (s?.goals_against && s?.goalie_gp && s.goalie_gp > 0
-                    ? (s.goals_against / s.goalie_gp) : null))
+            ? (s?.nhl_gaa ?? null)
             : null,
-          save_percentage: d.is_goalie ? (useNhlStats ? (s?.nhl_save_pct ?? s?.save_pct ?? null) : (s?.save_pct ?? null)) : null,
+          save_percentage: d.is_goalie ? (s?.nhl_save_pct ?? null) : null,
           highDangerSavePct: 0,
           goalsSavedAboveExpected: d.is_goalie ? (gsaxMap.get(pid) ?? 0) : 0,
           goalie_gp: d.is_goalie ? Number(s?.goalie_gp ?? 0) : undefined,

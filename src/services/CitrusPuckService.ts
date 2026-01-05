@@ -84,15 +84,8 @@ function mapStatsToCitrusPuck(
   const gamesPlayed = stats.games_played || 0;
   const hasPlayed = gamesPlayed > 0;
   
-  // Validate stats are reasonable - check for stale NHL stats
-  // If points per game is unreasonably high (> 3 PPG), NHL stats are likely stale
-  const nhlPoints = Number(stats.nhl_points ?? 0);
-  const pointsPerGame = gamesPlayed > 0 ? (nhlPoints / gamesPlayed) : 0;
-  const MAX_REASONABLE_PPG = 3.0; // Even elite players rarely exceed 2 PPG over a season
-  
-  // If NHL stats look stale (unreasonable PPG), prefer PBP stats
-  const nhlStatsLookStale = hasPlayed && nhlPoints > 0 && pointsPerGame > MAX_REASONABLE_PPG;
-  const useNhlStats = hasPlayed && !nhlStatsLookStale;
+  // ALWAYS use NHL.com official stats exclusively (no PBP fallback)
+  // This ensures we display only NHL.com data, not PBP-calculated data
   
   // Base CitrusPuckPlayerData with all fields defaulted to 0
   const citrusData: CitrusPuckPlayerData = {
@@ -105,10 +98,9 @@ function mapStatsToCitrusPuck(
     
     // Basic stats (from player_season_stats)
     games_played: gamesPlayed,
-    // Use NHL.com TOI for display, fallback to our calculated TOI
+    // EXCLUSIVELY use NHL.com TOI (no PBP fallback)
     // If player hasn't played, TOI should be 0
-    // If NHL stats look stale, use PBP TOI instead
-    icetime: hasPlayed ? (useNhlStats ? (stats.nhl_toi_seconds || stats.icetime_seconds || 0) : (stats.icetime_seconds || 0)) : 0,
+    icetime: hasPlayed ? (stats.nhl_toi_seconds || 0) : 0,
     shifts: 0, // Not available in season stats
     gameScore: 0, // Not available
     
@@ -138,8 +130,8 @@ function mapStatsToCitrusPuck(
     // For assists, calculate from primary + secondary, but use NHL if available
     I_F_primaryAssists: hasPlayed ? (stats.primary_assists || 0) : 0,
     I_F_secondaryAssists: hasPlayed ? (stats.secondary_assists || 0) : 0,
-    // Use NHL stats with PBP fallback (matching PlayerService logic)
-    I_F_shotsOnGoal: hasPlayed ? (useNhlStats ? Number(stats.nhl_shots_on_goal ?? stats.shots_on_goal ?? 0) : Number(stats.shots_on_goal ?? 0)) : 0,
+    // EXCLUSIVELY use NHL.com shots on goal (no PBP fallback)
+    I_F_shotsOnGoal: hasPlayed ? Number(stats.nhl_shots_on_goal ?? 0) : 0,
     I_F_missedShots: 0,
     I_F_blockedShotAttempts: 0,
     I_F_shotAttempts: 0,

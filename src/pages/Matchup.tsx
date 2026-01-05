@@ -473,6 +473,15 @@ const Matchup = () => {
     // Use season-long stats if provided, otherwise fall back to matchup stats (shouldn't happen)
     const stats = seasonStats || p.stats;
     
+    // CRITICAL: For PPP/SHP, check both powerPlayPoints/shortHandedPoints AND ppp/shp
+    // This ensures we get the value even if one field is 0 and the other has the real value
+    const powerPlayPoints = stats.powerPlayPoints !== undefined && stats.powerPlayPoints !== null 
+      ? stats.powerPlayPoints 
+      : (stats.ppp !== undefined && stats.ppp !== null ? stats.ppp : 0);
+    const shortHandedPoints = stats.shortHandedPoints !== undefined && stats.shortHandedPoints !== null 
+      ? stats.shortHandedPoints 
+      : (stats.shp !== undefined && stats.shp !== null ? stats.shp : 0);
+    
     return {
       id: p.id.toString(),
       name: p.name,
@@ -495,8 +504,8 @@ const Matchup = () => {
         savePct: stats.savePct ?? stats.save_pct ?? 0,
         shutouts: stats.shutouts ?? 0,
         xGoals: stats.xGoals ?? stats.x_goals ?? 0,
-        powerPlayPoints: stats.powerPlayPoints ?? stats.ppp ?? 0,
-        shortHandedPoints: stats.shortHandedPoints ?? stats.shp ?? 0,
+        powerPlayPoints: powerPlayPoints,
+        shortHandedPoints: shortHandedPoints,
         pim: stats.pim ?? 0,
         toi: stats.toi ?? (stats.icetime_seconds && (stats.gamesPlayed ?? stats.games_played) ? formatTOIPerGame(stats.icetime_seconds, stats.gamesPlayed ?? stats.games_played ?? 1) : (stats.icetime_seconds ? formatTOI(stats.icetime_seconds) : '0:00'))
       },
@@ -590,8 +599,8 @@ const Matchup = () => {
 
   // Fetch stats for all 7 days of the matchup week (for WeeklySchedule day boxes)
   // CRITICAL: Also runs for guests/demo to use REAL NHL data
-  useEffect(() => {
-    const fetchAllDailyStats = async () => {
+  // Extract to useCallback so it can be reused for live game refreshes
+  const fetchAllDailyStats = React.useCallback(async () => {
       if (!currentMatchup) {
         setDailyStatsByDate(new Map());
         return;
@@ -754,10 +763,12 @@ const Matchup = () => {
         console.error('[Matchup] Error fetching all daily stats:', error);
         setDailyStatsByDate(new Map());
       }
-    };
-
-    fetchAllDailyStats();
   }, [currentMatchup, userLeagueState, scoringSettings, playerIdsVersion, demoMyTeam, demoOpponentTeam]);
+
+  // Initial fetch on mount and when dependencies change
+  useEffect(() => {
+    fetchAllDailyStats();
+  }, [fetchAllDailyStats]);
 
   // Fetch projections for a specific date
   const fetchProjectionsForDate = async (date: string) => {
@@ -1072,6 +1083,7 @@ const Matchup = () => {
       
       if (seasonPlayer) {
         // Map Player type to stats format for toHockeyPlayer
+        // CRITICAL: Use NHL.com official stats exclusively (no PBP fallback)
         const seasonStats = {
           goals: seasonPlayer.goals ?? 0,
           assists: seasonPlayer.assists ?? 0,
@@ -1082,8 +1094,13 @@ const Matchup = () => {
           hits: seasonPlayer.hits ?? 0,
           blockedShots: seasonPlayer.blocks ?? 0,
           xGoals: seasonPlayer.xGoals ?? 0,
-          powerPlayPoints: seasonPlayer.ppp ?? 0,
-          shortHandedPoints: seasonPlayer.shp ?? 0,
+          // CRITICAL: PlayerService already returns nhl_ppp and nhl_shp as ppp and shp
+          // Pass both powerPlayPoints and ppp/shp so toHockeyPlayer can use the correct value
+          powerPlayPoints: seasonPlayer.ppp !== undefined && seasonPlayer.ppp !== null ? seasonPlayer.ppp : undefined,
+          shortHandedPoints: seasonPlayer.shp !== undefined && seasonPlayer.shp !== null ? seasonPlayer.shp : undefined,
+          // Also pass ppp/shp directly as fallback
+          ppp: seasonPlayer.ppp ?? 0,
+          shp: seasonPlayer.shp ?? 0,
           pim: seasonPlayer.pim ?? 0,
           icetime_seconds: seasonPlayer.icetime_seconds ?? 0,
           wins: seasonPlayer.wins ?? 0,
@@ -1107,49 +1124,36 @@ const Matchup = () => {
         
         if (!error && seasonStatsData) {
           // Map player_season_stats to stats format
-          // Use NHL.com official stats for display, fallback to PBP-calculated for backwards compatibility (matching PlayerService logic)
-          const assists = (seasonStatsData.nhl_assists ?? ((seasonStatsData.primary_assists ?? 0) + (seasonStatsData.secondary_assists ?? 0)));
+          // CRITICAL: Use NHL.com official stats exclusively (no PBP fallback)
+          // This ensures player cards match NHL.com exactly
+          const calculatedGoals = Number(seasonStatsData.nhl_goals ?? 0);
+          const calculatedAssists = Number(seasonStatsData.nhl_assists ?? 0);
           
-          // Calculate goals and assists first (matching PlayerService logic)
-          const calculatedGoals = seasonStatsData.nhl_goals ?? seasonStatsData.goals ?? 0;
-          const calculatedAssists = assists;
-          
-          // ALWAYS calculate points from goals + assists to ensure consistency with PlayerService
-          // This prevents issues where database points don't match goals + assists
+          // ALWAYS calculate points from goals + assists to ensure consistency
           const calculatedPoints = calculatedGoals + calculatedAssists;
-          
-          // Get database points for validation logging
-          const dbNhlPoints = Number(seasonStatsData.nhl_points ?? 0);
-          const dbPbpPoints = Number(seasonStatsData.points ?? 0);
-          const dbPoints = dbNhlPoints > 0 ? dbNhlPoints : dbPbpPoints;
-          
-          // Log warning if database points don't match calculated points (for debugging)
-          if (dbPoints > 0 && Math.abs(dbPoints - calculatedPoints) > 0.5) {
-            console.warn(`[Matchup] Points mismatch for player ${player.name} (ID: ${player.id}): DB points=${dbPoints}, Calculated=${calculatedPoints} (Goals=${calculatedGoals}, Assists=${calculatedAssists}). Using calculated points.`);
-          }
           
           const mappedStats = {
             goals: calculatedGoals,
             assists: calculatedAssists,
             points: calculatedPoints,
-            plusMinus: seasonStatsData.nhl_plus_minus ?? seasonStatsData.plus_minus ?? 0,
-            shots: seasonStatsData.nhl_shots_on_goal ?? seasonStatsData.shots_on_goal ?? 0,
+            plusMinus: Number(seasonStatsData.nhl_plus_minus ?? 0),
+            shots: Number(seasonStatsData.nhl_shots_on_goal ?? 0),
             gamesPlayed: seasonStatsData.games_played ?? 0,
-            hits: seasonStatsData.nhl_hits ?? seasonStatsData.hits ?? 0,
-            blockedShots: seasonStatsData.nhl_blocks ?? seasonStatsData.blocks ?? 0,
+            hits: Number(seasonStatsData.nhl_hits ?? 0),
+            blockedShots: Number(seasonStatsData.nhl_blocks ?? 0),
             xGoals: seasonStatsData.x_goals ?? 0,
-            powerPlayPoints: seasonStatsData.nhl_ppp ?? seasonStatsData.ppp ?? 0,
-            shortHandedPoints: seasonStatsData.nhl_shp ?? seasonStatsData.shp ?? 0,
-            pim: seasonStatsData.nhl_pim ?? seasonStatsData.pim ?? 0,
-            icetime_seconds: seasonStatsData.nhl_toi_seconds ?? seasonStatsData.icetime_seconds ?? 0,
-            wins: seasonStatsData.nhl_wins ?? seasonStatsData.wins ?? 0,
-            saves: seasonStatsData.nhl_saves ?? seasonStatsData.saves ?? 0,
-            shots_faced: seasonStatsData.nhl_shots_faced ?? seasonStatsData.shots_faced ?? 0,
-            goals_against: seasonStatsData.nhl_goals_against ?? seasonStatsData.goals_against ?? 0,
-            shutouts: seasonStatsData.nhl_shutouts ?? seasonStatsData.shutouts ?? 0,
-            save_pct: seasonStatsData.nhl_save_pct ?? seasonStatsData.save_pct ?? 0,
-            gaa: seasonStatsData.nhl_gaa ?? (seasonStatsData.goals_against && seasonStatsData.goalie_gp 
-              ? seasonStatsData.goals_against / seasonStatsData.goalie_gp 
+            powerPlayPoints: Number(seasonStatsData.nhl_ppp ?? 0),
+            shortHandedPoints: Number(seasonStatsData.nhl_shp ?? 0),
+            pim: Number(seasonStatsData.nhl_pim ?? 0),
+            icetime_seconds: Number(seasonStatsData.nhl_toi_seconds ?? 0),
+            wins: Number(seasonStatsData.nhl_wins ?? 0),
+            saves: Number(seasonStatsData.nhl_saves ?? 0),
+            shots_faced: Number(seasonStatsData.nhl_shots_faced ?? 0),
+            goals_against: Number(seasonStatsData.nhl_goals_against ?? 0),
+            shutouts: Number(seasonStatsData.nhl_shutouts ?? 0),
+            save_pct: seasonStatsData.nhl_save_pct ?? 0,
+            gaa: seasonStatsData.nhl_gaa ?? (seasonStatsData.nhl_goals_against && seasonStatsData.goalie_gp 
+              ? seasonStatsData.nhl_goals_against / seasonStatsData.goalie_gp 
               : 0)
           };
           setSelectedPlayer(toHockeyPlayer(player, mappedStats));
@@ -1248,14 +1252,32 @@ const Matchup = () => {
       
       // CRITICAL: For past dates, always set daily_total_points (even if 0) so hasDailyStats works
       // For future/today dates, only set if dailyStats exists
+      // For live games, always set daily_total_points to 0 (if no stats yet) so we show actual points instead of projections
       const todayStr = getTodayMST();
       const isPastDate = selectedDate ? selectedDate < todayStr : false;
+      
+      // Check if player has a live game today
+      const hasLiveGameToday = player.games && Array.isArray(player.games) && player.games.some(g => {
+        if (!g || typeof g !== 'object') return false;
+        const gameDate = g.game_date?.split('T')[0];
+        const gameStatus = g.status?.toUpperCase();
+        return gameDate === todayStr && (gameStatus === 'LIVE' || gameStatus === 'CRIT' || gameStatus === 'INTERMISSION');
+      });
       
       // If no daily stats from RPC, check if we should still set daily_total_points
       if (!dailyStats) {
         // For past dates, set daily_total_points to 0 (player didn't play or no data)
         // This ensures hasDailyStats is true so we can show "0.0 pts" instead of projections
         if (isPastDate) {
+          return {
+            ...player,
+            ...mergedProjection,
+            daily_total_points: 0,
+            daily_stats_breakdown: null
+          };
+        }
+        // For live games today, set daily_total_points to 0 so we show actual points (even if 0) instead of projections
+        if (hasLiveGameToday) {
           return {
             ...player,
             ...mergedProjection,
@@ -1397,14 +1419,32 @@ const Matchup = () => {
       
       // CRITICAL: For past dates, always set daily_total_points (even if 0) so hasDailyStats works
       // For future/today dates, only set if dailyStats exists
+      // For live games, always set daily_total_points to 0 (if no stats yet) so we show actual points instead of projections
       const todayStr = getTodayMST();
       const isPastDate = selectedDate ? selectedDate < todayStr : false;
+      
+      // Check if player has a live game today
+      const hasLiveGameToday = player.games && Array.isArray(player.games) && player.games.some(g => {
+        if (!g || typeof g !== 'object') return false;
+        const gameDate = g.game_date?.split('T')[0];
+        const gameStatus = g.status?.toUpperCase();
+        return gameDate === todayStr && (gameStatus === 'LIVE' || gameStatus === 'CRIT' || gameStatus === 'INTERMISSION');
+      });
       
       // If no daily stats from RPC, check if we should still set daily_total_points
       if (!dailyStats) {
         // For past dates, set daily_total_points to 0 (player didn't play or no data)
         // This ensures hasDailyStats is true so we can show "0.0 pts" instead of projections
         if (isPastDate) {
+          return {
+            ...player,
+            ...mergedProjection,
+            daily_total_points: 0,
+            daily_stats_breakdown: null
+          };
+        }
+        // For live games today, set daily_total_points to 0 so we show actual points (even if 0) instead of projections
+        if (hasLiveGameToday) {
           return {
             ...player,
             ...mergedProjection,
@@ -2350,6 +2390,46 @@ const Matchup = () => {
 
     return () => clearInterval(intervalId);
   }, [league?.id, currentMatchup?.status, userLeagueState]);
+
+  // Periodic refresh of daily stats during live games (every 30-60 seconds)
+  // This ensures player cards show live points instead of projections once games start
+  useEffect(() => {
+    if (!league?.id || userLeagueState !== 'active-user') return;
+    if (!currentMatchup || currentMatchup.status !== 'in_progress') return;
+    
+    // Check if any players have live games today
+    const todayStr = getTodayMST();
+    const hasLiveGames = [...myStarters, ...opponentStarters].some(player => {
+      if (!player.games || !Array.isArray(player.games)) return false;
+      const todayGames = player.games.filter(g => {
+        if (!g || typeof g !== 'object') return false;
+        const gameDate = g.game_date?.split('T')[0];
+        return gameDate === todayStr && (g.status === 'live' || g.status === 'LIVE');
+      });
+      return todayGames.length > 0;
+    });
+    
+    if (!hasLiveGames) return; // No live games, don't refresh
+    
+    console.log('[Matchup] Live games detected, starting periodic refresh of daily stats');
+    
+    // Refresh daily stats immediately, then set up interval
+    fetchAllDailyStats().catch(err => {
+      console.warn('[Matchup] Initial live stats refresh failed:', err);
+    });
+    
+    // Refresh every 45 seconds during live games (slightly longer than backend 30s updates)
+    const intervalId = setInterval(() => {
+      fetchAllDailyStats().catch(err => {
+        console.warn('[Matchup] Live stats refresh failed:', err);
+      });
+    }, 45000); // 45 seconds
+    
+    return () => {
+      clearInterval(intervalId);
+      console.log('[Matchup] Stopped live stats refresh (no live games or matchup ended)');
+    };
+  }, [league?.id, currentMatchup?.status, userLeagueState, myStarters, opponentStarters, fetchAllDailyStats]);
 
 
   // Handle week selection - updates URL which triggers data reload

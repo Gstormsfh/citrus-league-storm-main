@@ -255,7 +255,16 @@ export const ScheduleService = {
   getGameInfo(game: NHLGame | null, playerTeam: string, timezone: string = 'America/Denver'): GameInfo | undefined {
     if (!game) return undefined;
 
+    // CRITICAL: Verify the player's team is actually in this game
+    // Don't show game info if the player's team doesn't match home or away
     const isHome = game.home_team === playerTeam;
+    const isAway = game.away_team === playerTeam;
+    
+    if (!isHome && !isAway) {
+      // Player's team is not in this game - don't show game info
+      return undefined;
+    }
+    
     const opponent = isHome ? game.away_team : game.home_team;
     const opponentPrefix = isHome ? 'vs' : '@';
 
@@ -267,6 +276,11 @@ export const ScheduleService = {
     // Check if game is today
     const todayStr = getTodayString();
     const isToday = game.game_date === todayStr;
+    
+    // CRITICAL: If game date is in the past and status is "scheduled", treat it as final
+    // This handles cases where database hasn't been updated yet
+    const isPastDate = game.game_date < todayStr;
+    const effectiveStatus = (isPastDate && game.status === 'scheduled') ? 'final' : game.status;
 
     // Always try to add time if game_time exists (for scheduled or upcoming games)
     if (game.game_time) {
@@ -287,16 +301,42 @@ export const ScheduleService = {
       }
     }
 
-    // Add score and period if live or final
-    if (game.status === 'live' || game.status === 'final') {
-      const homeScore = game.home_score || 0;
-      const awayScore = game.away_score || 0;
-      gameInfo.score = `${game.home_team} ${homeScore}-${awayScore} ${game.away_team}`;
+    // Add score and period ONLY if:
+    // 1. Game is live or final (never show scores for scheduled games)
+    // 2. Scores are available (not null/undefined)
+    // 3. For live games, don't show 0-0 (game might not have started yet)
+    // 4. For final games, always show score (even if 0-0, which is rare but possible)
+    // Use effectiveStatus to handle past games marked as scheduled
+    if (effectiveStatus === 'live' || effectiveStatus === 'final') {
+      const homeScore = game.home_score;
+      const awayScore = game.away_score;
       
-      if (game.status === 'live' && game.period) {
-        gameInfo.period = game.period;
-        if (game.period_time) {
-          gameInfo.period += ` ${game.period_time}`;
+      // Only show score if both scores are available
+      if (homeScore !== null && homeScore !== undefined && 
+          awayScore !== null && awayScore !== undefined) {
+        
+        // NEVER show 0-0 scores - it's impossible for a hockey game to end 0-0
+        // If scores are 0-0, the game either:
+        // 1. Hasn't started yet (scheduled) - shouldn't show score anyway
+        // 2. Just started (live) - wait until someone scores
+        // 3. Data is incorrect - don't show wrong data
+        // Only show score if at least one team has scored
+        const shouldShowScore = homeScore !== 0 || awayScore !== 0;
+        
+        if (shouldShowScore) {
+          // Format score with player's team first
+          if (isHome) {
+            gameInfo.score = `${playerTeam} ${homeScore}-${awayScore} ${opponent}`;
+          } else {
+            gameInfo.score = `${playerTeam} ${awayScore}-${homeScore} ${opponent}`;
+          }
+        }
+        
+        if (effectiveStatus === 'live' && game.period) {
+          gameInfo.period = game.period;
+          if (game.period_time) {
+            gameInfo.period += ` ${game.period_time}`;
+          }
         }
       }
     }

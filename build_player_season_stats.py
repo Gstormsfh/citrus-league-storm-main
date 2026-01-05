@@ -198,6 +198,7 @@ def main() -> int:
         "is_goalie": bool(r.get("is_goalie") or False),
         "games_played": 0,
         "icetime_seconds": 0,
+        "nhl_toi_seconds": 0,
 
         "goals": 0,
         "primary_assists": 0,
@@ -210,6 +211,22 @@ def main() -> int:
         "ppp": 0,
         "shp": 0,
         "plus_minus": 0,
+        "nhl_plus_minus": 0,
+
+        # NHL.com official stats (for display and fantasy scoring)
+        "nhl_goals": 0,
+        "nhl_assists": 0,
+        "nhl_points": 0,
+        "nhl_shots_on_goal": 0,
+        # CRITICAL: nhl_hits and nhl_blocks should ONLY come from StatsAPI (fetch_nhl_stats_from_landing.py)
+        # DO NOT initialize or aggregate them here - they will be preserved from existing records
+        # "nhl_hits": 0,  # REMOVED - preserve existing values from StatsAPI
+        # "nhl_blocks": 0,  # REMOVED - preserve existing values from StatsAPI
+        "nhl_pim": 0,
+        # CRITICAL: nhl_ppp and nhl_shp should ONLY come from landing endpoint
+        # DO NOT initialize or aggregate them here - they will be preserved from existing records
+        # "nhl_ppp": 0,  # REMOVED - preserve existing values from fetch_nhl_stats_from_landing.py
+        # "nhl_shp": 0,  # REMOVED - preserve existing values from fetch_nhl_stats_from_landing.py
 
         "x_goals": 0.0,
         "x_assists": 0.0,
@@ -221,6 +238,17 @@ def main() -> int:
         "goals_against": 0,
         "shutouts": 0,
         "save_pct": None,
+
+        # NHL.com official goalie stats
+        "nhl_wins": 0,
+        "nhl_losses": 0,
+        "nhl_ot_losses": 0,
+        "nhl_saves": 0,
+        "nhl_shots_faced": 0,
+        "nhl_goals_against": 0,
+        "nhl_shutouts": 0,
+        "nhl_save_pct": None,
+        "nhl_gaa": None,
 
         "updated_at": _now_iso(),
       }
@@ -235,6 +263,7 @@ def main() -> int:
     out["games_played"] += 1
 
     out["icetime_seconds"] += int(r.get("icetime_seconds") or 0)
+    out["nhl_toi_seconds"] += int(r.get("nhl_toi_seconds") or 0)
     out["goals"] += int(r.get("goals") or 0)
     out["primary_assists"] += int(r.get("primary_assists") or 0)
     out["secondary_assists"] += int(r.get("secondary_assists") or 0)
@@ -246,6 +275,21 @@ def main() -> int:
     out["ppp"] += int(r.get("ppp") or 0)
     out["shp"] += int(r.get("shp") or 0)
     out["plus_minus"] += int(r.get("plus_minus") or 0)
+    out["nhl_plus_minus"] += int(r.get("nhl_plus_minus") or 0)
+
+    # Aggregate NHL.com official stats (CRITICAL for frontend display)
+    out["nhl_goals"] += int(r.get("nhl_goals") or 0)
+    out["nhl_assists"] += int(r.get("nhl_assists") or 0)
+    out["nhl_points"] += int(r.get("nhl_points") or 0)
+    out["nhl_shots_on_goal"] += int(r.get("nhl_shots_on_goal") or 0)
+    # CRITICAL: nhl_hits and nhl_blocks should ONLY come from StatsAPI (fetch_nhl_stats_from_landing.py)
+    # DO NOT aggregate from per-game stats - StatsAPI provides official season totals
+    # out["nhl_hits"] += int(r.get("nhl_hits") or 0)  # REMOVED - preserve StatsAPI values
+    # out["nhl_blocks"] += int(r.get("nhl_blocks") or 0)  # REMOVED - preserve StatsAPI values
+    out["nhl_pim"] += int(r.get("nhl_pim") or 0)
+    # CRITICAL: nhl_ppp and nhl_shp should ONLY come from landing endpoint (fetch_nhl_stats_from_landing.py)
+    # DO NOT aggregate from per-game stats - landing endpoint provides official season totals
+    # Per-game nhl_ppp/nhl_shp in player_game_stats are for reference only
 
     out["goalie_gp"] += int(r.get("goalie_gp") or 0)
     out["wins"] += int(r.get("wins") or 0)
@@ -253,6 +297,15 @@ def main() -> int:
     out["shots_faced"] += int(r.get("shots_faced") or 0)
     out["goals_against"] += int(r.get("goals_against") or 0)
     out["shutouts"] += int(r.get("shutouts") or 0)
+
+    # Aggregate NHL.com official goalie stats
+    out["nhl_wins"] += int(r.get("nhl_wins") or 0)
+    out["nhl_losses"] += int(r.get("nhl_losses") or 0)
+    out["nhl_ot_losses"] += int(r.get("nhl_ot_losses") or 0)
+    out["nhl_saves"] += int(r.get("nhl_saves") or 0)
+    out["nhl_shots_faced"] += int(r.get("nhl_shots_faced") or 0)
+    out["nhl_goals_against"] += int(r.get("nhl_goals_against") or 0)
+    out["nhl_shutouts"] += int(r.get("nhl_shutouts") or 0)
     
     # Progress every 15 seconds
     current_time = time.time()
@@ -262,11 +315,21 @@ def main() -> int:
 
   print(f"[build_player_season_stats] Aggregated stats for {len(acc)} unique players")
   
-  # Save pct
+  # Save pct (both PBP and NHL)
   for out in acc.values():
     sf = float(out.get("shots_faced") or 0)
     sv = float(out.get("saves") or 0)
     out["save_pct"] = (sv / sf) if sf > 0 else None
+    
+    # NHL save pct
+    nhl_sf = float(out.get("nhl_shots_faced") or 0)
+    nhl_sv = float(out.get("nhl_saves") or 0)
+    out["nhl_save_pct"] = (nhl_sv / nhl_sf) if nhl_sf > 0 else None
+    
+    # NHL GAA (goals against average per 60 minutes)
+    nhl_ga = float(out.get("nhl_goals_against") or 0)
+    nhl_toi_minutes = float(out.get("nhl_toi_seconds") or 0) / 60.0
+    out["nhl_gaa"] = (nhl_ga * 60.0 / nhl_toi_minutes) if nhl_toi_minutes > 0 else None
 
   # xG enrich (optional)
   print()
@@ -311,6 +374,19 @@ def main() -> int:
   print("[build_player_season_stats] Upserting to player_season_stats...")
   print("[build_player_season_stats] Note: NHL.com official stats are preserved (not overwritten by PBP aggregation)")
   season_rows = list(acc.values())
+  
+  # CRITICAL: Remove nhl_ppp, nhl_shp, nhl_hits, and nhl_blocks from upsert to preserve values from fetch_nhl_stats_from_landing.py
+  # These should ONLY be set by the landing endpoint (PPP/SHP) or StatsAPI (hits/blocks), not aggregated from per-game stats
+  for row in season_rows:
+    if "nhl_ppp" in row:
+      del row["nhl_ppp"]
+    if "nhl_shp" in row:
+      del row["nhl_shp"]
+    if "nhl_hits" in row:
+      del row["nhl_hits"]
+    if "nhl_blocks" in row:
+      del row["nhl_blocks"]
+  
   upsert_player_season_stats(db, season_rows)
 
   print()

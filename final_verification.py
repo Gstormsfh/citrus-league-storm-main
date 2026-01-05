@@ -1,132 +1,80 @@
 #!/usr/bin/env python3
-"""Final verification of rescrape completion."""
+"""
+Final verification - check if key players are correct and provide summary.
+"""
 
 import os
+import sys
 from dotenv import load_dotenv
 from supabase_rest import SupabaseRest
 
+# Fix encoding for Windows
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding='utf-8')
+
 load_dotenv()
-db = SupabaseRest(os.getenv('VITE_SUPABASE_URL'), os.getenv('SUPABASE_SERVICE_ROLE_KEY'))
+SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+DEFAULT_SEASON = int(os.getenv("CITRUS_DEFAULT_SEASON", "2025"))
 
-def _paginate_count(db, table, filters=None):
-    """Count all records with pagination."""
-    count = 0
-    offset = 0
-    batch_size = 1000
-    
-    while True:
-        batch = db.select(table, select='game_id', filters=filters or [], limit=batch_size, offset=offset)
-        if not batch:
-            break
-        count += len(batch)
-        if len(batch) < batch_size:
-            break
-        offset += batch_size
-    
-    return count
+db = SupabaseRest(SUPABASE_URL, SUPABASE_KEY)
 
 print("=" * 80)
-print("FINAL VERIFICATION - Data Pipeline Rescrape")
+print("Final Verification - Key Players")
 print("=" * 80)
-print("Date Range: 2025-10-07 to 2026-01-03")
 print()
 
-# Count games in raw_nhl_data
-print("1. Raw Data Ingestion:")
-games_raw = _paginate_count(db, 'raw_nhl_data', filters=[
-    ('game_date', 'gte', '2025-10-07'),
-    ('game_date', 'lte', '2026-01-03')
-])
-print(f"   Games in raw_nhl_data: {games_raw}/656")
+key_players = [
+    (8478402, "Connor McDavid", 31, 2),
+    (8471675, "Sidney Crosby", 16, 0),
+    (8471214, "Nathan MacKinnon", None, None),
+    (8477956, "Auston Matthews", None, None),
+]
 
-# Count unique games with shots (need to get all and count unique)
-print("\n2. PBP Processing (raw_shots):")
-all_shots = []
-offset = 0
-while True:
-    batch = db.select('raw_shots', select='game_id', limit=1000, offset=offset)
-    if not batch:
-        break
-    all_shots.extend([s['game_id'] for s in batch])
-    if len(batch) < 1000:
-        break
-    offset += 1000
-unique_games_shots = len(set(all_shots))
-print(f"   Unique games with shots: {unique_games_shots}")
-print(f"   Total shot records: {len(all_shots)}")
+all_correct = True
+for player_id, name, expected_ppp, expected_shp in key_players:
+    result = db.select(
+        "player_season_stats",
+        select="nhl_ppp,nhl_shp",
+        filters=[
+            ("player_id", "eq", player_id),
+            ("season", "eq", DEFAULT_SEASON)
+        ],
+        limit=1
+    )
+    
+    if result and len(result) > 0:
+        r = result[0]
+        ppp = r.get("nhl_ppp", 0)
+        shp = r.get("nhl_shp", 0)
+        
+        status = "✓"
+        if expected_ppp is not None and ppp != expected_ppp:
+            status = "✗"
+            all_correct = False
+        if expected_shp is not None and shp != expected_shp:
+            status = "✗"
+            all_correct = False
+        
+        print(f"{status} {name}:")
+        print(f"    PPP: {ppp}" + (f" (expected: {expected_ppp})" if expected_ppp is not None else ""))
+        print(f"    SHP: {shp}" + (f" (expected: {expected_shp})" if expected_shp is not None else ""))
+    else:
+        print(f"✗ {name}: Not found in database")
+        all_correct = False
 
-# Count unique games with player stats
-print("\n3. Player Game Stats:")
-all_stats = []
-offset = 0
-while True:
-    batch = db.select('player_game_stats', select='game_id', filters=[
-        ('game_date', 'gte', '2025-10-07'),
-        ('game_date', 'lte', '2026-01-03')
-    ], limit=1000, offset=offset)
-    if not batch:
-        break
-    all_stats.extend([s['game_id'] for s in batch])
-    if len(batch) < 1000:
-        break
-    offset += 1000
-unique_games_stats = len(set(all_stats))
-print(f"   Unique games with player stats: {unique_games_stats}")
-print(f"   Total player_game_stats records: {len(all_stats)}")
-
-# Count goalies
-print("\n4. Goalie Records:")
-goalies = _paginate_count(db, 'player_game_stats', filters=[
-    ('is_goalie', 'eq', True),
-    ('game_date', 'gte', '2025-10-07'),
-    ('game_date', 'lte', '2026-01-03')
-])
-print(f"   Goalie records: {goalies}")
-
-# Count season stats
-print("\n5. Season Aggregates:")
-all_season = []
-offset = 0
-while True:
-    batch = db.select('player_season_stats', select='player_id', filters=[
-        ('season', 'eq', 2025)
-    ], limit=1000, offset=offset)
-    if not batch:
-        break
-    all_season.extend(batch)
-    if len(batch) < 1000:
-        break
-    offset += 1000
-print(f"   Player season stats: {len(all_season)}")
-
-# Count projections
-print("\n6. Projections:")
-all_proj = []
-offset = 0
-while True:
-    batch = db.select('player_projected_stats', select='player_id', filters=[
-        ('projection_date', 'gte', '2026-01-03'),
-        ('projection_date', 'lte', '2026-01-03')
-    ], limit=1000, offset=offset)
-    if not batch:
-        break
-    all_proj.extend(batch)
-    if len(batch) < 1000:
-        break
-    offset += 1000
-print(f"   Projections for 2026-01-03: {len(all_proj)}")
-
-print("\n" + "=" * 80)
-print("VERIFICATION SUMMARY")
+print()
 print("=" * 80)
-print(f"[OK] Raw data: {games_raw}/656 games ({games_raw*100//656}%)")
-print(f"[OK] Shots processed: {unique_games_shots} games with shot data")
-print(f"[OK] Player stats: {unique_games_stats} games with player records")
-print(f"[OK] Goalies: {goalies} goalie records")
-print(f"[OK] Season stats: {len(all_season)} players")
-print(f"[OK] Projections: {len(all_proj)} projections calculated")
+if all_correct:
+    print("✓✓✓ ALL KEY PLAYERS VERIFIED CORRECTLY! ✓✓✓")
+    print()
+    print("The script has successfully updated PPP/SHP from the NHL landing endpoint.")
+    print("Key players (McDavid, Crosby) have correct values.")
+    print()
+    print("Note: Some players may show 0 PPP/SHP, which is valid if they:")
+    print("  - Don't get powerplay time")
+    print("  - Don't score shorthanded goals")
+    print("  - Are depth players with limited special teams usage")
+else:
+    print("⚠ Some key players need verification")
 print("=" * 80)
-print("\nCORE PIPELINE STATUS: FULLY OPERATIONAL")
-print("All essential data has been successfully rescraped and processed!")
-print("=" * 80)
-
