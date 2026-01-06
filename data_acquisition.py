@@ -53,23 +53,25 @@ warnings.filterwarnings('ignore', message='.*Trying to unpickle.*', category=Use
 def _verify_model_files():
     """Verify critical model files exist, provide helpful error if not."""
     import os
+    # Models are now stored in models/ folder
+    model_dir = os.path.join(os.path.dirname(__file__), 'models')
     critical_files = ['xg_model_moneypuck.joblib', 'xg_model.joblib']
-    missing = [f for f in critical_files if not os.path.exists(f)]
+    missing = [f for f in critical_files if not os.path.exists(os.path.join(model_dir, f))]
     if len(missing) == len(critical_files):
         print("=" * 80)
         print("ERROR: xG MODEL FILES NOT FOUND")
         print("=" * 80)
-        print("Required model files are missing from the root directory.")
-        print()
-        print("SOLUTION:")
-        print("  1. Copy files from archive/temp_files/ to root:")
-        print("     Copy-Item -Path archive\\temp_files\\*.joblib -Destination . -Force")
-        print("  2. Or run verification script:")
-        print("     python verify_xg_model_files.py")
+        print(f"Required model files are missing from {model_dir}")
         print()
         print("=" * 80)
         return False
     return True
+
+# Helper to get model path
+def _model_path(filename):
+    """Get the full path to a model file."""
+    import os
+    return os.path.join(os.path.dirname(__file__), 'models', filename)
 
 # Verify files before loading
 if not _verify_model_files():
@@ -80,15 +82,15 @@ if not _verify_model_files():
 try:
     # Try MoneyPuck-aligned model (new, recommended)
     try:
-        XG_MODEL = joblib.load('xg_model_moneypuck.joblib')
-        MODEL_FEATURES = joblib.load('model_features_moneypuck.joblib')
+        XG_MODEL = joblib.load(_model_path('xg_model_moneypuck.joblib'))
+        MODEL_FEATURES = joblib.load(_model_path('model_features_moneypuck.joblib'))
         print("[OK] Loaded MoneyPuck-aligned xG model")
         USE_MONEYPUCK_MODEL = True
     except FileNotFoundError:
         # Fallback to old model
-        XG_MODEL = joblib.load('xg_model.joblib')
+        XG_MODEL = joblib.load(_model_path('xg_model.joblib'))
         try:
-            MODEL_FEATURES = joblib.load('model_features.joblib')
+            MODEL_FEATURES = joblib.load(_model_path('model_features.joblib'))
         except FileNotFoundError:
             # Fallback to default if feature list not found
             MODEL_FEATURES = ['distance', 'angle', 'is_rebound', 'shot_type_encoded', 'is_power_play', 'score_differential',
@@ -100,29 +102,29 @@ try:
     
     # Load the last_event_category encoder (for MoneyPuck model)
     try:
-        LAST_EVENT_CATEGORY_ENCODER = joblib.load('last_event_category_encoder.joblib')
+        LAST_EVENT_CATEGORY_ENCODER = joblib.load(_model_path('last_event_category_encoder.joblib'))
     except FileNotFoundError:
         print("WARNING: last_event_category_encoder.joblib not found. Will encode on-the-fly if needed.")
         LAST_EVENT_CATEGORY_ENCODER = None
     
     # Load the shot type encoder
     try:
-        SHOT_TYPE_ENCODER = joblib.load('shot_type_encoder.joblib')
+        SHOT_TYPE_ENCODER = joblib.load(_model_path('shot_type_encoder.joblib'))
     except FileNotFoundError:
         print("WARNING: shot_type_encoder.joblib not found. Shot type encoding may fail.")
         SHOT_TYPE_ENCODER = None
     
     # Load the pass zone encoder
     try:
-        PASS_ZONE_ENCODER = joblib.load('pass_zone_encoder.joblib')
+        PASS_ZONE_ENCODER = joblib.load(_model_path('pass_zone_encoder.joblib'))
     except FileNotFoundError:
         print("WARNING: pass_zone_encoder.joblib not found. Pass zone encoding may fail.")
         PASS_ZONE_ENCODER = None
     
     # Load the xA (Expected Assists) model
     try:
-        XA_MODEL = joblib.load('xa_model.joblib')
-        XA_MODEL_FEATURES = joblib.load('xa_model_features.joblib')
+        XA_MODEL = joblib.load(_model_path('xa_model.joblib'))
+        XA_MODEL_FEATURES = joblib.load(_model_path('xa_model_features.joblib'))
         print("xA model loaded successfully.")
     except FileNotFoundError:
         print("WARNING: xa_model.joblib not found. Expected Assists calculation will be skipped.")
@@ -131,8 +133,8 @@ try:
     
     # Load the Rebound model (for Expected Rebounds)
     try:
-        REBOUND_MODEL = joblib.load('rebound_model.joblib')
-        REBOUND_MODEL_FEATURES = joblib.load('rebound_model_features.joblib')
+        REBOUND_MODEL = joblib.load(_model_path('rebound_model.joblib'))
+        REBOUND_MODEL_FEATURES = joblib.load(_model_path('rebound_model_features.joblib'))
         print("[OK] Rebound model loaded successfully.")
     except FileNotFoundError:
         print("WARNING: rebound_model.joblib not found. Expected Rebounds calculation will be skipped.")
@@ -3596,7 +3598,7 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
         
         # Load player shooting talent dictionary
         try:
-            player_talent_dict = joblib.load('player_shooting_talent.joblib')
+            player_talent_dict = joblib.load(_model_path('player_shooting_talent.joblib'))
             print("  🔧 Applying shooting talent adjustment to xG values...")
             df_shots = calculate_shooting_talent_adjusted_xg(
                 df_shots,

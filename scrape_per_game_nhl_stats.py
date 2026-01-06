@@ -2,6 +2,18 @@
 """
 scrape_per_game_nhl_stats.py
 
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  🚨 CRITICAL: DO NOT MODIFY WITHOUT READING CRITICAL_DATA_ARCHITECTURE.md ║
+# ╠═══════════════════════════════════════════════════════════════════════════╣
+# ║  This script extracts per-game stats from NHL Boxscore API.               ║
+# ║                                                                           ║
+# ║  ⚠️  PPP/SHP ARE NOT CALCULATED HERE - Boxscore lacks PP/SH assists!     ║
+# ║      PPP/SHP come from: sync_ppp_from_gamelog.py (per-game)               ║
+# ║                         fetch_nhl_stats_from_landing.py (season)          ║
+# ║                                                                           ║
+# ║  If you "fix" PPP/SHP calculation here, YOU WILL BREAK THE SYSTEM.       ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+
 Extract per-game NHL official statistics from stored boxscore data (or fetch from API as fallback).
 Populates player_game_stats.nhl_* columns with official NHL.com game-by-game stats.
 
@@ -258,22 +270,14 @@ def extract_player_stats_from_boxscore(boxscore: Dict) -> Dict[int, Dict[str, An
                     "nhl_giveaways": _safe_int(player_stat.get("giveaways", 0)),
                     
                     # ===================
-                    # POWER PLAY BREAKDOWN
+                    # POWER PLAY / SHORTHANDED GOALS ONLY
                     # ===================
-                    # Extract components first, then calculate totals
-                    # Note: powerPlayPoints field doesn't exist in boxscore, so we calculate from components
+                    # CRITICAL: Boxscore API only has Goals, NOT Assists for PP/SH
+                    # DO NOT calculate PPP/SHP here - they would be wrong (Goals only, missing Assists)
+                    # PPP/SHP for season totals come from Landing Endpoint (fetch_nhl_stats_from_landing.py)
                     "nhl_ppg": _safe_int(player_stat.get("powerPlayGoals", 0)),
-                    "nhl_ppa": _safe_int(player_stat.get("powerPlayAssists", 0)),
-                    "nhl_ppp": _safe_int(player_stat.get("powerPlayGoals", 0)) + _safe_int(player_stat.get("powerPlayAssists", 0)),
-                    
-                    # ===================
-                    # SHORTHANDED BREAKDOWN
-                    # ===================
-                    # Extract components first, then calculate totals
-                    # Note: shorthandedPoints field doesn't exist in boxscore, so we calculate from components
                     "nhl_shg": _safe_int(player_stat.get("shorthandedGoals", 0)),
-                    "nhl_sha": _safe_int(player_stat.get("shorthandedAssists", 0)),
-                    "nhl_shp": _safe_int(player_stat.get("shorthandedGoals", 0)) + _safe_int(player_stat.get("shorthandedAssists", 0)),
+                    # nhl_ppp and nhl_shp are NOT set here - they come from landing endpoint for season stats
                     
                     # ===================
                     # SHOT METRICS (CORSI COMPONENTS)
@@ -303,17 +307,8 @@ def extract_player_stats_from_boxscore(boxscore: Dict) -> Dict[int, Dict[str, An
                     shot_attempts = sog + stats["nhl_shots_missed"] + stats["nhl_shots_blocked"]
                 stats["nhl_shot_attempts"] = shot_attempts
                 
-                # Derive PPG/PPA from PPP if not directly available
-                if stats["nhl_ppp"] > 0 and stats["nhl_ppg"] == 0 and stats["nhl_ppa"] == 0:
-                    # API didn't provide breakdown; we can't split accurately
-                    # Leave as 0 - PPP is still accurate for total
-                    pass
-                
-                # Derive SHG/SHA from SHP if not directly available  
-                if stats["nhl_shp"] > 0 and stats["nhl_shg"] == 0 and stats["nhl_sha"] == 0:
-                    # API didn't provide breakdown; we can't split accurately
-                    # Leave as 0 - SHP is still accurate for total
-                    pass
+                # Note: PPP/SHP are NOT calculated here because boxscore doesn't have PPA/SHA
+                # Season totals for PPP/SHP come from landing endpoint (fetch_nhl_stats_from_landing.py)
                 
                 # ===================
                 # GOALIE STATS
@@ -404,14 +399,14 @@ def get_games_for_week(db: SupabaseRest, week_start: date, week_end: date) -> Li
             ("game_date", "gte", week_start.isoformat()),
             ("game_date", "lte", week_end.isoformat())
         ],
-        max_records=10000  # Increase limit for large date ranges
+        max_records=100000  # Large limit for full season scraping
     )
     
     print(f"  [PAGINATION] Fetched {len(all_games)} games total")
     return all_games or []
 
 
-def _paginate_select(db: SupabaseRest, table: str, select: str, filters: list, max_records: int = 50000) -> list:
+def _paginate_select(db: SupabaseRest, table: str, select: str, filters: list, max_records: int = 100000) -> list:
     """Paginate through all records to bypass the 1000 record API limit."""
     all_records = []
     offset = 0
@@ -424,12 +419,14 @@ def _paginate_select(db: SupabaseRest, table: str, select: str, filters: list, m
                 break
             all_records.extend(batch)
             if len(batch) < batch_size:
+                # Got fewer records than requested - we've reached the end
                 break
             offset += batch_size
             if offset % 5000 == 0:
                 print(f"    [PAGINATION] Fetched {len(all_records)} records so far...")
         except Exception as e:
-            print(f"  [WARN] Pagination error at offset {offset}: {e}")
+            print(f"  [ERROR] Pagination error at offset {offset}: {e}")
+            print(f"  [ERROR] Returning {len(all_records)} records fetched so far")
             break
     
     return all_records

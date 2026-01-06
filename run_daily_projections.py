@@ -586,21 +586,39 @@ def batch_upsert_projections(db: SupabaseRest, projections: List[Dict[str, Any]]
     
     total_upserted = 0
     
+    # Columns that don't exist in the schema - filter them out
+    # Only keep columns that exist in player_projected_stats table
+    valid_columns = {
+        'player_id', 'game_id', 'projection_date', 'season',
+        'projected_goals', 'projected_assists', 'projected_sog', 'projected_blocks', 'projected_xg',
+        'projected_ppp', 'projected_shp', 'projected_hits', 'projected_pim',  # 8-stat columns
+        'total_projected_points',
+        'base_ppg', 'shrinkage_weight', 'finishing_multiplier', 'opponent_adjustment', 
+        'b2b_penalty', 'home_away_adjustment',
+        'calculation_method', 'confidence_score'
+    }
+    
     # Process in batches
     for i in range(0, len(projections), batch_size):
         batch = projections[i:i+batch_size]
         
+        # Filter to only valid columns from each projection
+        filtered_batch = []
+        for proj in batch:
+            filtered_proj = {k: v for k, v in proj.items() if k in valid_columns}
+            filtered_batch.append(filtered_proj)
+        
         try:
             db.upsert(
                 "player_projected_stats",
-                batch,
+                filtered_batch,
                 on_conflict="player_id,game_id,projection_date"
             )
-            total_upserted += len(batch)
+            total_upserted += len(filtered_batch)
         except Exception as e:
             print(f"⚠️  Error upserting batch {i//batch_size + 1}: {e}")
             # Try individual upserts for this batch
-            for proj in batch:
+            for proj in filtered_batch:
                 try:
                     db.upsert(
                         "player_projected_stats",
@@ -814,18 +832,19 @@ def main():
         sys.stdout.flush()
         try:
             last_progress_time = time.time()
-            progress_interval = 15.0  # Show progress every 15 seconds
+            progress_interval = 5.0  # Show progress every 5 seconds (more frequent)
             
             for idx, args in enumerate(worker_args, 1):
                 player_id, game_id, _, _, _ = args
                 current_time = time.time()
                 
-                # Show progress every 15 seconds OR every 5 players OR first/last
-                if (current_time - last_progress_time >= progress_interval) or (idx % 5 == 0) or (idx == 1) or (idx == len(worker_args)):
+                # Show progress every 5 seconds OR every 3 players OR first/last
+                if (current_time - last_progress_time >= progress_interval) or (idx % 3 == 0) or (idx == 1) or (idx == len(worker_args)):
                     elapsed = current_time - start_time
                     rate = idx / elapsed if elapsed > 0 else 0
                     remaining = (len(worker_args) - idx) / rate if rate > 0 else 0
-                    print(f"   [{elapsed:.0f}s] Processing {idx}/{len(worker_args)} (player {player_id}, game {game_id})... Rate: {rate:.1f}/s, ETA: {remaining:.0f}s", flush=True)
+                    pct = (idx / len(worker_args)) * 100
+                    print(f"   [{elapsed:.0f}s] {pct:5.1f}% | {idx}/{len(worker_args)} players | Rate: {rate:.1f}/s | ETA: {remaining:.0f}s", flush=True)
                     last_progress_time = current_time
                 
                 result = calculate_player_projection_worker(args)
@@ -834,7 +853,7 @@ def main():
                 # Add error handling per player to continue on failures
                 if not result.get('success'):
                     if idx <= 10:  # Show first 10 errors
-                        print(f"      Warning: Player {result.get('player_id')} failed: {result.get('error', 'Unknown')[:100]}", flush=True)
+                        print(f"      ⚠️  Player {result.get('player_id')} failed: {result.get('error', 'Unknown')[:100]}", flush=True)
         except Exception as e:
             print(f"❌ Fatal error in single-threaded processing: {e}")
             import traceback
@@ -842,14 +861,38 @@ def main():
             sys.exit(1)
     else:
         print(f"   Large batch detected ({len(worker_args)} players) - using multiprocessing ({max_workers} workers)")
+        print(f"   Progress will be shown every 10 seconds...")
+        sys.stdout.flush()
         try:
+            # Use imap_unordered for progress tracking
             with multiprocessing.Pool(max_workers) as pool:
-                # Use chunksize to optimize inter-process communication
-                results = pool.map(
+                results = []
+                completed = 0
+                last_progress_time = time.time()
+                progress_interval = 10.0  # Show progress every 10 seconds
+                
+                # Use imap_unordered to get results as they complete
+                for result in pool.imap_unordered(
                     calculate_player_projection_worker,
                     worker_args,
                     chunksize=args.chunksize
-                )
+                ):
+                    results.append(result)
+                    completed += 1
+                    
+                    # Show progress every 10 seconds
+                    current_time = time.time()
+                    if current_time - last_progress_time >= progress_interval:
+                        elapsed = current_time - start_time
+                        rate = completed / elapsed if elapsed > 0 else 0
+                        remaining = (len(worker_args) - completed) / rate if rate > 0 else 0
+                        pct = (completed / len(worker_args)) * 100
+                        print(f"   [{elapsed:.0f}s] {pct:5.1f}% | {completed}/{len(worker_args)} players | Rate: {rate:.1f}/s | ETA: {remaining:.0f}s", flush=True)
+                        last_progress_time = current_time
+                
+                # Final progress update
+                elapsed = time.time() - start_time
+                print(f"   [{elapsed:.0f}s] 100.0% | {len(worker_args)}/{len(worker_args)} players | Complete!", flush=True)
         except Exception as e:
             print(f"❌ Fatal error in parallel processing: {e}")
             import traceback
@@ -975,8 +1018,12 @@ def main():
         print("📋 Step 7: Batch Upserting to Database...")
         if args.reject_outliers and rejected_projections:
             print(f"   ⚠️  Skipping {len(rejected_projections)} rejected projections")
+        
+        print(f"   Upserting {len(projections_to_upsert)} projections in batches...", flush=True)
+        upsert_start = time.time()
         upserted = batch_upsert_projections(db, projections_to_upsert)
-        print(f"   Upserted {upserted} projections to player_projected_stats")
+        upsert_elapsed = time.time() - upsert_start
+        print(f"   ✓ Upserted {upserted} projections to player_projected_stats in {upsert_elapsed:.1f}s")
         print()
     
     # Final Summary

@@ -56,7 +56,7 @@ def get_league_averages(db: SupabaseRest, position: str, season: int) -> Optiona
     try:
         results = db.select(
             "league_averages",
-            select="avg_ppg,avg_goals_per_game,avg_assists_per_game,avg_sog_per_game,avg_blocks_per_game,replacement_fpts_per_60,std_dev_fpts_per_60,replacement_goals_per_game,replacement_assists_per_game,replacement_sog_per_game,replacement_blocks_per_game,std_dev_goals_per_game,std_dev_assists_per_game,std_dev_sog_per_game,std_dev_blocks_per_game",
+            select="avg_ppg,avg_goals_per_game,avg_assists_per_game,avg_sog_per_game,avg_blocks_per_game,avg_ppp_per_game,avg_shp_per_game,avg_hits_per_game,avg_pim_per_game,replacement_fpts_per_60,std_dev_fpts_per_60,replacement_goals_per_game,replacement_assists_per_game,replacement_sog_per_game,replacement_blocks_per_game,std_dev_goals_per_game,std_dev_assists_per_game,std_dev_sog_per_game,std_dev_blocks_per_game",
             filters=[("position", "eq", position), ("season", "eq", season)],
             limit=1
         )
@@ -69,6 +69,10 @@ def get_league_averages(db: SupabaseRest, position: str, season: int) -> Optiona
                 "avg_assists_per_game": float(avg.get("avg_assists_per_game", 0)),
                 "avg_sog_per_game": float(avg.get("avg_sog_per_game", 0)),
                 "avg_blocks_per_game": float(avg.get("avg_blocks_per_game", 0)),
+                "avg_ppp_per_game": float(avg.get("avg_ppp_per_game", 0)),
+                "avg_shp_per_game": float(avg.get("avg_shp_per_game", 0)),
+                "avg_hits_per_game": float(avg.get("avg_hits_per_game", 0)),
+                "avg_pim_per_game": float(avg.get("avg_pim_per_game", 0)),
                 "replacement_fpts_per_60": avg.get("replacement_fpts_per_60"),  # Can be None if not yet calculated
                 "std_dev_fpts_per_60": avg.get("std_dev_fpts_per_60"),  # Can be None if not yet calculated
                 "replacement_goals_per_game": avg.get("replacement_goals_per_game"),
@@ -432,8 +436,9 @@ def calculate_hybrid_base(
             "avg_blocks_per_game": 0.0
         }
     
-    # Set defaults for new stats if not in league_averages table
-    # Position-specific defaults for PPP and Hits
+    # Use league averages for all 8 stats (now that they're in the table)
+    # Fallback to defaults only if league_averages table doesn't have the data yet
+    # Position-specific defaults for PPP and Hits (used only if league avg is 0 or missing)
     if position == "D":
         default_ppp = 0.10
         default_hits = 1.5
@@ -441,10 +446,21 @@ def calculate_hybrid_base(
         default_ppp = 0.15
         default_hits = 1.0
     
+    # Use league average if available, otherwise fallback to defaults
     league_avg.setdefault("avg_ppp_per_game", default_ppp)
     league_avg.setdefault("avg_shp_per_game", 0.02)
     league_avg.setdefault("avg_hits_per_game", default_hits)
     league_avg.setdefault("avg_pim_per_game", 0.5)
+    
+    # If league average is 0 (not yet populated), use defaults
+    if league_avg.get("avg_ppp_per_game", 0) == 0:
+        league_avg["avg_ppp_per_game"] = default_ppp
+    if league_avg.get("avg_shp_per_game", 0) == 0:
+        league_avg["avg_shp_per_game"] = 0.02
+    if league_avg.get("avg_hits_per_game", 0) == 0:
+        league_avg["avg_hits_per_game"] = default_hits
+    if league_avg.get("avg_pim_per_game", 0) == 0:
+        league_avg["avg_pim_per_game"] = 0.5
     
     # Calculate weight (same for all stats)
     weight = calculate_bayesian_weight(games_played)
@@ -971,33 +987,52 @@ def get_vegas_win_probability(
                     print(f"  [Goalie Projection] Using Vegas implied probability: {implied_prob:.3f} (moneyline: {moneyline})")
                 return float(implied_prob)
         
-        # Fallback: Calculate from team's recent win rate
+        # Fallback: Calculate from team's season win rate
         if debug:
-            print(f"  [Goalie Projection] No Vegas odds, calculating from recent win rate")
+            print(f"  [Goalie Projection] No Vegas odds, calculating from team season win rate")
         
-        recent_games = db.select(
+        # Try to get team's season win rate from nhl_games
+        # Query all final games for this team this season
+        all_team_games = db.select(
             "nhl_games",
             select="game_id,game_date,home_team,away_team,home_score,away_score,status",
-            filters=[("season", "eq", season)],
-            order="game_date.desc",
-            limit=100
+            filters=[
+                ("season", "eq", season),
+                ("status", "eq", "final")
+            ],
+            limit=1000  # Large limit to get all games
         )
         
+        if not all_team_games:
+            if debug:
+                print(f"  [Goalie Projection] No final games found for season {season}")
+            # Last resort: return 0.5 (league average) but log it
+            if debug:
+                print(f"  [Goalie Projection] Using default 0.5 (league average) - no game data available")
+            return 0.5
+        
+        # Filter to games involving this team and sort by date (most recent first)
         team_games = []
-        for game in recent_games:
+        for game in all_team_games:
             if game.get("home_team") == goalie_team or game.get("away_team") == goalie_team:
-                if game.get("status") == "final":
-                    team_games.append(game)
-                    if len(team_games) >= 10:
-                        break
+                team_games.append(game)
         
         if not team_games:
             if debug:
-                print(f"  [Goalie Projection] No recent games found for {goalie_team}")
-            return None
+                print(f"  [Goalie Projection] No games found for team {goalie_team}")
+            return 0.5
+        
+        # Sort by date (most recent first) - handle date strings
+        try:
+            team_games.sort(key=lambda g: g.get("game_date", ""), reverse=True)
+        except:
+            pass  # If sorting fails, use all games
+        
+        # Use last 10 games if available, otherwise use all games
+        recent_games = team_games[:10] if len(team_games) >= 10 else team_games
         
         wins = 0
-        for game in team_games:
+        for game in recent_games:
             is_home = game.get("home_team") == goalie_team
             home_score = int(game.get("home_score", 0))
             away_score = int(game.get("away_score", 0))
@@ -1005,9 +1040,9 @@ def get_vegas_win_probability(
             if (is_home and home_score > away_score) or (not is_home and away_score > home_score):
                 wins += 1
         
-        win_rate = wins / len(team_games) if team_games else 0.5
+        win_rate = wins / len(recent_games) if recent_games else 0.5
         if debug:
-            print(f"  [Goalie Projection] Recent win rate: {win_rate:.3f} ({wins} wins in {len(team_games)} games)")
+            print(f"  [Goalie Projection] Team win rate: {win_rate:.3f} ({wins} wins in {len(recent_games)} games)")
         return win_rate
         
     except Exception as e:

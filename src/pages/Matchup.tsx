@@ -770,6 +770,51 @@ const Matchup = () => {
     fetchAllDailyStats();
   }, [fetchAllDailyStats]);
 
+  // Auto-select default date when matchup and daily stats are loaded
+  // Default to today if in matchup week, otherwise most recent date with games, otherwise first day of week
+  useEffect(() => {
+    if (!currentMatchup || dailyStatsByDate.size === 0 || selectedDate !== null) {
+      return; // Don't override if user has already selected a date
+    }
+
+    const todayStr = getTodayMST();
+    const weekStart = new Date(currentMatchup.week_start_date);
+    const weekEnd = new Date(currentMatchup.week_end_date);
+    const today = new Date(todayStr);
+    
+    // Check if today is in the matchup week
+    if (today >= weekStart && today <= weekEnd) {
+      setSelectedDate(todayStr);
+      return;
+    }
+
+    // Find the most recent date with games within the matchup week
+    let mostRecentDate: string | null = null;
+    let mostRecentDateObj: Date | null = null;
+    
+    for (const [dateStr, dayStats] of dailyStatsByDate.entries()) {
+      const date = new Date(dateStr);
+      // Only consider dates within the matchup week
+      if (date >= weekStart && date <= weekEnd) {
+        // Check if this date has any stats (not empty map)
+        if (dayStats && dayStats.size > 0) {
+          if (!mostRecentDateObj || date > mostRecentDateObj) {
+            mostRecentDate = dateStr;
+            mostRecentDateObj = date;
+          }
+        }
+      }
+    }
+
+    if (mostRecentDate) {
+      setSelectedDate(mostRecentDate);
+      return;
+    }
+
+    // Fallback: use first day of matchup week
+    setSelectedDate(weekStart.toISOString().split('T')[0]);
+  }, [currentMatchup, dailyStatsByDate, selectedDate]);
+
   // Fetch projections for a specific date
   const fetchProjectionsForDate = async (date: string) => {
     // Check cache first - if we have projections (even if empty), don't re-fetch
@@ -1549,8 +1594,10 @@ const Matchup = () => {
         const dayStats = dailyStatsByDate.get(dateStr);
         if (dayStats) {
           // Sum daily_total_points from starting lineup players for this day
+          // CRITICAL: Ensure player.id is a number for map lookup (map keys are integers from RPC)
           const dayTotal = myStarters.reduce((sum, player) => {
-            const playerStats = dayStats.get(player.id);
+            const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
+            const playerStats = dayStats.get(playerId);
             return sum + (playerStats?.daily_total_points ?? 0);
           }, 0);
           total += dayTotal;
@@ -1580,8 +1627,10 @@ const Matchup = () => {
         const dayStats = dailyStatsByDate.get(dateStr);
         if (dayStats) {
           // Sum daily_total_points from starting lineup players for this day
+          // CRITICAL: Ensure player.id is a number for map lookup (map keys are integers from RPC)
           const dayTotal = opponentStarters.reduce((sum, player) => {
-            const playerStats = dayStats.get(player.id);
+            const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
+            const playerStats = dayStats.get(playerId);
             return sum + (playerStats?.daily_total_points ?? 0);
           }, 0);
           total += dayTotal;
@@ -2280,7 +2329,7 @@ const Matchup = () => {
         setViewingTeamName(matchupData.userTeam.name);
         setViewingOpponentTeamName(matchupData.opponentTeam?.name || 'Bye Week');
 
-        // Default to null (full lineup view) - user can click a day to see daily stats
+        // Reset selectedDate when switching matchups - auto-selection useEffect will pick the right default
         setSelectedDate(null);
         setDailyStatsMap(new Map());
         

@@ -4,6 +4,25 @@ build_player_season_stats.py
 
 Rollup: aggregate public.player_game_stats into public.player_season_stats for fast UI loads.
 Optionally enrich with xG/xA totals from public.raw_shots (if available).
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║ 🚨 CRITICAL WARNING - READ BEFORE MODIFYING 🚨                               ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║ This script aggregates per-game stats into season totals.                    ║
+║                                                                              ║
+║ ⚠️  PPP and SHP are INTENTIONALLY NOT AGGREGATED here!                      ║
+║                                                                              ║
+║ WHY: The boxscore API only provides powerPlayGoals, NOT powerPlayAssists.    ║
+║      If we aggregate per-game PPG, we get WRONG PPP values.                  ║
+║      PPP = PPGoals + PPAssists (must come from landing endpoint)             ║
+║                                                                              ║
+║ The del row["nhl_ppp"] and del row["nhl_shp"] lines before upsert are       ║
+║ REQUIRED to prevent overwriting correct values from landing endpoint.        ║
+║                                                                              ║
+║ See: CRITICAL_DATA_ARCHITECTURE.md for full documentation.                   ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
 from dotenv import load_dotenv
@@ -214,19 +233,16 @@ def main() -> int:
         "nhl_plus_minus": 0,
 
         # NHL.com official stats (for display and fantasy scoring)
+        # These come from per-game boxscore API (api-web.nhle.com) and are aggregated here
         "nhl_goals": 0,
         "nhl_assists": 0,
         "nhl_points": 0,
         "nhl_shots_on_goal": 0,
-        # CRITICAL: nhl_hits and nhl_blocks should ONLY come from StatsAPI (fetch_nhl_stats_from_landing.py)
-        # DO NOT initialize or aggregate them here - they will be preserved from existing records
-        # "nhl_hits": 0,  # REMOVED - preserve existing values from StatsAPI
-        # "nhl_blocks": 0,  # REMOVED - preserve existing values from StatsAPI
+        "nhl_hits": 0,      # From boxscore API per-game data
+        "nhl_blocks": 0,    # From boxscore API per-game data
         "nhl_pim": 0,
-        # CRITICAL: nhl_ppp and nhl_shp should ONLY come from landing endpoint
-        # DO NOT initialize or aggregate them here - they will be preserved from existing records
-        # "nhl_ppp": 0,  # REMOVED - preserve existing values from fetch_nhl_stats_from_landing.py
-        # "nhl_shp": 0,  # REMOVED - preserve existing values from fetch_nhl_stats_from_landing.py
+        # nhl_ppp and nhl_shp are NOT aggregated here - they come from fetch_nhl_stats_from_landing.py
+        # because the boxscore API only has powerPlayGoals, not powerPlayPoints (goals + assists)
 
         "x_goals": 0.0,
         "x_assists": 0.0,
@@ -278,18 +294,19 @@ def main() -> int:
     out["nhl_plus_minus"] += int(r.get("nhl_plus_minus") or 0)
 
     # Aggregate NHL.com official stats (CRITICAL for frontend display)
+    # These come from per-game boxscore API data (api-web.nhle.com/v1/gamecenter/{id}/boxscore)
     out["nhl_goals"] += int(r.get("nhl_goals") or 0)
     out["nhl_assists"] += int(r.get("nhl_assists") or 0)
     out["nhl_points"] += int(r.get("nhl_points") or 0)
     out["nhl_shots_on_goal"] += int(r.get("nhl_shots_on_goal") or 0)
-    # CRITICAL: nhl_hits and nhl_blocks should ONLY come from StatsAPI (fetch_nhl_stats_from_landing.py)
-    # DO NOT aggregate from per-game stats - StatsAPI provides official season totals
-    # out["nhl_hits"] += int(r.get("nhl_hits") or 0)  # REMOVED - preserve StatsAPI values
-    # out["nhl_blocks"] += int(r.get("nhl_blocks") or 0)  # REMOVED - preserve StatsAPI values
+    out["nhl_hits"] += int(r.get("nhl_hits") or 0)      # From boxscore API per-game
+    out["nhl_blocks"] += int(r.get("nhl_blocks") or 0)  # From boxscore API per-game
     out["nhl_pim"] += int(r.get("nhl_pim") or 0)
-    # CRITICAL: nhl_ppp and nhl_shp should ONLY come from landing endpoint (fetch_nhl_stats_from_landing.py)
-    # DO NOT aggregate from per-game stats - landing endpoint provides official season totals
-    # Per-game nhl_ppp/nhl_shp in player_game_stats are for reference only
+    # CRITICAL: Do NOT aggregate nhl_ppp and nhl_shp from per-game stats!
+    # The boxscore API only provides powerPlayGoals, NOT powerPlayPoints (which includes assists).
+    # PPP/SHP must come from fetch_nhl_stats_from_landing.py which gets powerPlayPoints directly.
+    # out["nhl_ppp"] += int(r.get("nhl_ppp") or 0)  # WRONG - boxscore only has PPG!
+    # out["nhl_shp"] += int(r.get("nhl_shp") or 0)  # WRONG - boxscore only has SHG!
 
     out["goalie_gp"] += int(r.get("goalie_gp") or 0)
     out["wins"] += int(r.get("wins") or 0)
@@ -372,20 +389,21 @@ def main() -> int:
 
   print()
   print("[build_player_season_stats] Upserting to player_season_stats...")
-  print("[build_player_season_stats] Note: NHL.com official stats are preserved (not overwritten by PBP aggregation)")
+  print("[build_player_season_stats] Aggregating all nhl_* stats from per-game boxscore data")
   season_rows = list(acc.values())
   
-  # CRITICAL: Remove nhl_ppp, nhl_shp, nhl_hits, and nhl_blocks from upsert to preserve values from fetch_nhl_stats_from_landing.py
-  # These should ONLY be set by the landing endpoint (PPP/SHP) or StatsAPI (hits/blocks), not aggregated from per-game stats
+  # NOTE: nhl_hits, nhl_blocks are AGGREGATED from player_game_stats boxscore data
+  # HOWEVER: nhl_ppp and nhl_shp should NOT be aggregated from per-game stats!
+  # The boxscore API only provides powerPlayGoals/shorthandedGoals, NOT the assists.
+  # PPP = powerPlayPoints (goals + assists) must come from fetch_nhl_stats_from_landing.py
+  # SHP = shorthandedPoints (goals + assists) must come from fetch_nhl_stats_from_landing.py
+  # 
+  # CRITICAL: Remove nhl_ppp and nhl_shp from upsert - let landing endpoint populate them
   for row in season_rows:
     if "nhl_ppp" in row:
       del row["nhl_ppp"]
     if "nhl_shp" in row:
       del row["nhl_shp"]
-    if "nhl_hits" in row:
-      del row["nhl_hits"]
-    if "nhl_blocks" in row:
-      del row["nhl_blocks"]
   
   upsert_player_season_stats(db, season_rows)
 

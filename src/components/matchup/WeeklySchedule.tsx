@@ -158,13 +158,17 @@ export const WeeklySchedule = ({
           const dayStats = dailyStatsByDate.get(date);
           const myDailyPointsForDay = dayStats 
             ? myStarters.reduce((sum, player) => {
-                const playerStats = dayStats.get(player.id);
+                // CRITICAL: Ensure player.id is a number for map lookup (map keys are integers from RPC)
+                const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
+                const playerStats = dayStats.get(playerId);
                 return sum + (playerStats?.daily_total_points ?? 0);
               }, 0)
             : 0;
           const oppDailyPointsForDay = dayStats
             ? opponentStarters.reduce((sum, player) => {
-                const playerStats = dayStats.get(player.id);
+                // CRITICAL: Ensure player.id is a number for map lookup (map keys are integers from RPC)
+                const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
+                const playerStats = dayStats.get(playerId);
                 return sum + (playerStats?.daily_total_points ?? 0);
               }, 0)
             : 0;

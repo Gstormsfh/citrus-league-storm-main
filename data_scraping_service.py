@@ -2,6 +2,23 @@
 """
 data_scraping_service.py
 
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  🏒 MAIN DATA SERVICE - THE ONLY SCRIPT YOU NEED TO RUN                   ║
+# ╠═══════════════════════════════════════════════════════════════════════════╣
+# ║                                                                           ║
+# ║  Usage: python data_scraping_service.py                                   ║
+# ║                                                                           ║
+# ║  This service runs FOREVER and handles:                                   ║
+# ║    • Live stats every 30s during games                                    ║
+# ║    • PPP/SHP sync after games finish                                      ║
+# ║    • PBP processing at 11:59 PM                                           ║
+# ║    • Projections at 6:00 AM                                               ║
+# ║                                                                           ║
+# ║  ⚠️  DO NOT MODIFY unless you've read CRITICAL_DATA_ARCHITECTURE.md      ║
+# ║                                                                           ║
+# ║  See OPERATIONS.md for full documentation.                                ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+
 Main scheduler service for automated data scraping and live updates.
 Uses APScheduler to manage all data ingestion and processing jobs.
 
@@ -9,7 +26,8 @@ Jobs:
 1. Daily PBP Processing (11:59 PM) - Processes raw_nhl_data into raw_shots
 2. Adaptive Live Ingestion (Continuous) - Polls NHL API with adaptive intervals
 3. Live Stats Updates (During Game Nights) - Updates official NHL stats
-4. Daily Projections (6:00 AM) - Runs daily projection calculations
+4. PPP/SHP Sync (After Games) - Syncs accurate PPP/SHP from game-log
+5. Daily Projections (6:00 AM) - Runs daily projection calculations
 """
 
 import os
@@ -379,6 +397,37 @@ def run_immediate_pbp_processing():
         logger.error(f"Error in immediate PBP processing job: {e}", exc_info=True)
 
 
+def run_ppp_shp_sync():
+    """
+    Job: Sync PPP/SHP from game-log after games finish.
+    The boxscore API only has powerPlayGoals, but game-log has powerPlayPoints.
+    """
+    logger.info("Running PPP/SHP sync from game-log")
+    
+    try:
+        from sync_ppp_from_gamelog import sync_ppp_for_date
+        from supabase_rest import SupabaseRest
+        from dotenv import load_dotenv
+        import os
+        import datetime as dt
+        
+        load_dotenv()
+        db = SupabaseRest(
+            os.getenv("VITE_SUPABASE_URL"),
+            os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        )
+        
+        # Sync today's games
+        today = dt.date.today().isoformat()
+        result = sync_ppp_for_date(db, today)
+        
+        if result:
+            logger.info(f"PPP/SHP sync completed: {result.get('updated', 0)} updated, "
+                       f"{result.get('errors', 0)} errors")
+    except Exception as e:
+        logger.error(f"Error in PPP/SHP sync job: {e}", exc_info=True)
+
+
 def run_live_stats_update():
     """Job: Update official NHL stats for active games."""
     import datetime as dt
@@ -423,6 +472,14 @@ def run_live_stats_update():
                         logger.warning("Matchup score update returned no result")
                 except Exception as e:
                     logger.error(f"Error triggering matchup score update after stats update: {e}", exc_info=True)
+            
+            # If games finished, sync PPP/SHP from game-log (more accurate than boxscore)
+            if finished_updated > 0:
+                logger.info(f"Syncing PPP/SHP for {finished_updated} finished game(s)")
+                try:
+                    run_ppp_shp_sync()
+                except Exception as e:
+                    logger.error(f"Error in PPP/SHP sync: {e}", exc_info=True)
             elif skipped_count > 0:
                 logger.debug(f"Live stats update skipped {skipped_count} game(s) (cooldown)")
         else:

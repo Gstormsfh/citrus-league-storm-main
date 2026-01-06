@@ -1,0 +1,10 @@
+To start the Data Scraping Service, run this in PowerShell:
+
+cd "C:\Users\garre\Documents\citrus-league-storm-main"
+python data_scraping_service.py
+
+Leave this window open - the service will run continuously.
+
+To monitor the logs in a separate window, run:
+Get-Content logs\data_scraping_service.log -Tail 20 -Wait
+

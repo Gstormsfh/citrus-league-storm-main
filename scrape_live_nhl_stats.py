@@ -2,6 +2,18 @@
 """
 scrape_live_nhl_stats.py
 
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  🏒 LIVE STATS SCRAPER - Part of self-sustaining data pipeline            ║
+# ╠═══════════════════════════════════════════════════════════════════════════╣
+# ║  Called by: data_scraping_service.py (every 30s during games)             ║
+# ║  Updates: player_game_stats.nhl_* (G, A, SOG, Hits, Blocks, etc.)         ║
+# ║  Also updates: nhl_games (scores, period, status)                         ║
+# ║                                                                           ║
+# ║  ⚠️  Does NOT handle PPP/SHP - those come from sync_ppp_from_gamelog.py  ║
+# ║                                                                           ║
+# ║  DO NOT MODIFY unless you've read CRITICAL_DATA_ARCHITECTURE.md           ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+
 Live stats scraper wrapper for updating official NHL stats during game nights.
 Only processes games that are currently active (LIVE, CRIT) or recently finished (OFF).
 
@@ -283,11 +295,19 @@ def update_game_scores_in_nhl_games(db: SupabaseRest, game_id: int, boxscore: di
             status = "scheduled"
         
         # Extract period info if live
+        # Try multiple sources: periodDescriptor (PBP), linescore (boxscore), or root level
         period = None
         period_time = None
         if status == "live":
-            linescore = boxscore.get("linescore", {})
-            current_period = linescore.get("currentPeriod", 0)
+            # Try periodDescriptor first (from PBP API)
+            period_desc = boxscore.get("periodDescriptor", {})
+            current_period = period_desc.get("number", 0)
+            
+            # Fallback to linescore (boxscore API)
+            if not current_period:
+                linescore = boxscore.get("linescore", {})
+                current_period = linescore.get("currentPeriod", 0)
+            
             if current_period == 1:
                 period = "1st"
             elif current_period == 2:
@@ -299,7 +319,12 @@ def update_game_scores_in_nhl_games(db: SupabaseRest, game_id: int, boxscore: di
             elif current_period > 4:
                 period = "SO"
             
-            period_time = linescore.get("currentPeriodTimeRemaining", None)
+            # Try clock object first (PBP API), then linescore
+            clock = boxscore.get("clock", {})
+            period_time = clock.get("timeRemaining")
+            if not period_time:
+                linescore = boxscore.get("linescore", {})
+                period_time = linescore.get("currentPeriodTimeRemaining")
         
         # Update nhl_games table if we have score info
         if home_score is not None and away_score is not None:
@@ -668,6 +693,18 @@ def update_live_game_stats() -> Dict[str, int]:
             )
             
             # Also update game scores in nhl_games table
+            # For period info, we need PBP data since boxscore doesn't have it
+            try:
+                pbp_url = f"{NHL_BASE_URL}/gamecenter/{game_id}/play-by-play"
+                pbp_response = requests.get(pbp_url, timeout=10)
+                if pbp_response.status_code == 200:
+                    pbp_data = pbp_response.json()
+                    # Merge period info from PBP into boxscore for update_game_scores_in_nhl_games
+                    boxscore["periodDescriptor"] = pbp_data.get("periodDescriptor", {})
+                    boxscore["clock"] = pbp_data.get("clock", {})
+            except Exception as pbp_e:
+                logger.debug(f"[scrape_live_nhl_stats] Could not fetch PBP for period info: {pbp_e}")
+            
             update_game_scores_in_nhl_games(db, game_id, boxscore)
             
             # Validate that stats were actually written
