@@ -69,9 +69,9 @@ const AuthCallback = lazyWithErrorHandling(() => import("./pages/AuthCallback"))
 const ProfileSetup = lazyWithErrorHandling(() => import("./pages/ProfileSetup"));
 const LeagueDashboard = lazyWithErrorHandling(() => import("./pages/LeagueDashboard"));
 
-// Loading fallback component for route navigation (tab changes)
-// Uses LoadingScreen for nice visual feedback when switching between tabs
-const PageLoader = () => <LoadingScreen character="citrus" />;
+// No Suspense fallback - let individual pages handle their own loading states
+// This prevents multiple loading screens from flashing
+const PageLoader = () => null;
 
 // Configure with a higher stale time to prevent unnecessary refetches
 const queryClient = new QueryClient({

@@ -28,6 +28,8 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Users, Clock, Trophy, History, CheckCircle, Loader2, Zap, Play, Pause, Camera } from 'lucide-react';
+import LoadingScreen from '@/components/LoadingScreen';
+import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 
@@ -1870,12 +1872,20 @@ const DraftRoom = () => {
 
       <main className="pt-20 min-h-[80vh]">
         {/* Loading State - Show if loading or auth is loading, but NOT for demo state */}
-        {(loading || authLoading || (!user && userLeagueState !== 'guest' && userLeagueState !== 'logged-in-no-league')) && (
-          <LoadingScreen
-            character="narwhal"
-            message={authLoading ? 'Checking Authentication...' : !user && userLeagueState !== 'guest' && userLeagueState !== 'logged-in-no-league' ? 'Redirecting to Login...' : 'Loading Draft Room...'}
-          />
-        )}
+        {(() => {
+          const actualLoading = loading || authLoading || (!user && userLeagueState !== 'guest' && userLeagueState !== 'logged-in-no-league');
+          const displayLoading = useMinimumLoadingTime(actualLoading, 800);
+          
+          if (displayLoading) {
+            return (
+              <LoadingScreen
+                character="kiwi"
+                message={authLoading ? 'Checking Authentication...' : !user && userLeagueState !== 'guest' && userLeagueState !== 'logged-in-no-league' ? 'Redirecting to Login...' : 'Loading Draft Room...'}
+              />
+            );
+          }
+          return null;
+        })()}
 
         {/* Error State */}
         {!loading && !authLoading && error && (
@@ -1926,46 +1936,11 @@ const DraftRoom = () => {
                 }}
                 leagueDraftRounds={league?.draft_rounds || 21}
               />
-            ) : (
-              <Card className="max-w-2xl mx-auto">
-                <CardContent className="p-6 text-center">
-                  <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-                  <p className="text-muted-foreground">
-                    {!league ? 'Loading league data...' : !teams || !Array.isArray(teams) || teams.length === 0 ? 'Loading teams...' : 'Preparing draft room...'}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
+            ) : null}
           </div>
         )}
 
-        {/* Comprehensive Fallback - ensure something always renders */}
-        {!loading && !authLoading && !error && 
-         draftPhase !== DraftPhase.ACTIVE && 
-         draftPhase !== DraftPhase.COMPLETED && 
-         (!league || !teams || teams.length === 0) && (
-          <div className="container mx-auto px-4 py-20">
-            <Card className="max-w-2xl mx-auto">
-              <CardHeader>
-                <CardTitle>Preparing Draft Room</CardTitle>
-              </CardHeader>
-              <CardContent className="p-6 text-center space-y-4">
-                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-                <p className="text-muted-foreground">
-                  {!league ? 'Loading league information...' : 
-                   !teams || teams.length === 0 ? 'Loading teams...' : 
-                   'Preparing draft room...'}
-                </p>
-                <div className="text-xs text-muted-foreground space-y-1 mt-4">
-                  <p>League ID: {leagueId || 'Not set'}</p>
-                  <p>Draft Phase: {String(draftPhase)}</p>
-                  <p>Has League: {league ? 'Yes' : 'No'}</p>
-                  <p>Teams Count: {teams?.length || 0}</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+        {/* Removed conflicting Loader2 spinner - main LoadingScreen handles all loading states */}
 
         {/* ACTIVE PHASE */}
         {!loading && !authLoading && !error && draftPhase === DraftPhase.ACTIVE && (

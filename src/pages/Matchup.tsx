@@ -27,6 +27,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekLabel, getWeekDateLabel, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
 import LoadingScreen from '@/components/LoadingScreen';
 import { DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeagueService';
+import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 
 const Matchup = () => {
   const { user, profile } = useAuth();
@@ -2531,7 +2532,8 @@ const Matchup = () => {
   // 2. Component loading state is true (and not in "no league" state), OR
   // 3. We haven't initialized yet AND we're not in "no league" state (prevents initial flash)
   // 4. User state is undefined/null (still determining)
-  const shouldShowLoading = useMemo(() => {
+  // Determine actual loading state (before minimum time delay)
+  const actualLoading = useMemo(() => {
     // If userLeagueState is undefined, we're still determining state - show loading
     if (userLeagueState === undefined || userLeagueState === null) {
       return true;
@@ -2562,12 +2564,15 @@ const Matchup = () => {
     
     return false;
   }, [leagueContextLoading, loading, userLeagueState, error]);
+
+  // Apply minimum display time (800ms) to prevent jarring flash effect
+  const shouldShowLoading = useMinimumLoadingTime(actualLoading, 800);
   
   // Early return for loading - must be after all hooks are declared
   if (shouldShowLoading) {
     return (
       <LoadingScreen
-        character="citrus"
+        character="kiwi"
         message="Loading matchup..."
       />
     );

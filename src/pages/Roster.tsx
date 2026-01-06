@@ -14,6 +14,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, TrendingDown, Wand2, Trophy, Activity, ArrowUpRight, Users, Loader2, Calendar, Target, Shield, Skull, Zap, BarChart3, PieChart } from 'lucide-react';
 import LoadingScreen from '@/components/LoadingScreen';
+import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { RosterDepthWidget } from '@/components/gm-office/RosterDepthWidget';
 import { 
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer,
@@ -1921,34 +1922,56 @@ const Roster = () => {
                     </ToggleGroup>
                 </div>
 
-                {loading ? (
-                  <LoadingScreen
-                    character="narwhal"
-                    message="Loading Your Roster..."
-                  />
-                ) : userLeagueState === 'logged-in-no-league' ? (
-                  <div className="py-8">
-                    <LeagueCreationCTA 
-                      title="Your Roster Awaits"
-                      description="Create your league to start building your roster, making trades, and competing with friends."
-                    />
-                  </div>
-                ) : !userTeamId && userLeagueState === 'active-user' ? (
-                  <div className="flex flex-col items-center justify-center py-20 text-center">
-                    <Trophy className="w-16 h-16 text-muted-foreground mb-4 opacity-50" />
-                    <h3 className="text-xl font-semibold mb-2">No Team Yet</h3>
-                    <p className="text-muted-foreground mb-4">Join or create a league to start building your roster.</p>
-                    <Button asChild>
-                      <a href="/create-league">Create or Join a League</a>
-                    </Button>
-                  </div>
-                ) : roster.starters.length === 0 && roster.bench.length === 0 && userLeagueState !== 'guest' ? (
-                  <div className="flex flex-col items-center justify-center py-20 text-center">
-                    <Users className="w-16 h-16 text-muted-foreground mb-4 opacity-50" />
-                    <h3 className="text-xl font-semibold mb-2">Empty Roster</h3>
-                    <p className="text-muted-foreground mb-4">Your roster is empty. Complete your draft to add players.</p>
-                  </div>
-                ) : (
+                {(() => {
+                  // Apply minimum display time to prevent flash
+                  const actualLoading = loading || leagueLoading;
+                  const displayLoading = useMinimumLoadingTime(actualLoading, 800);
+                  
+                  if (displayLoading) {
+                    return (
+                      <LoadingScreen
+                        character="lemon"
+                        message="Loading Your Roster..."
+                      />
+                    );
+                  }
+                  
+                  if (userLeagueState === 'logged-in-no-league') {
+                    return (
+                      <div className="py-8">
+                        <LeagueCreationCTA 
+                          title="Your Roster Awaits"
+                          description="Create your league to start building your roster, making trades, and competing with friends."
+                        />
+                      </div>
+                    );
+                  }
+                  
+                  if (!userTeamId && userLeagueState === 'active-user') {
+                    return (
+                      <div className="flex flex-col items-center justify-center py-20 text-center">
+                        <Trophy className="w-16 h-16 text-muted-foreground mb-4 opacity-50" />
+                        <h3 className="text-xl font-semibold mb-2">No Team Yet</h3>
+                        <p className="text-muted-foreground mb-4">Join or create a league to start building your roster.</p>
+                        <Button asChild>
+                          <a href="/create-league">Create or Join a League</a>
+                        </Button>
+                      </div>
+                    );
+                  }
+                  
+                  if (roster.starters.length === 0 && roster.bench.length === 0 && userLeagueState !== 'guest') {
+                    return (
+                      <div className="flex flex-col items-center justify-center py-20 text-center">
+                        <Users className="w-16 h-16 text-muted-foreground mb-4 opacity-50" />
+                        <h3 className="text-xl font-semibold mb-2">Empty Roster</h3>
+                        <p className="text-muted-foreground mb-4">Your roster is empty. Complete your draft to add players.</p>
+                      </div>
+                    );
+                  }
+                  
+                  // Main roster content
+                  return (
                   // Disable drag-and-drop for demo league
                   userTeam && isDemoLeague(userTeam.league_id) ? (
                     <div className="space-y-8">
@@ -2006,8 +2029,8 @@ const Roster = () => {
                       ) : null}
                     </DragOverlay>
                   </DndContext>
-                  )
-                )}
+                  );
+                })()}
                 </TabsContent>
 
                 <TabsContent value="stats" className="m-0 p-6">

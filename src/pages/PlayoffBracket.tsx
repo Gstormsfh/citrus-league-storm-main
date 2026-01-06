@@ -10,6 +10,7 @@ import { Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import LoadingScreen from '@/components/LoadingScreen';
+import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 
 const PlayoffBracket = () => {
   const { leagueId } = useParams<{ leagueId: string }>();
@@ -64,10 +65,13 @@ const PlayoffBracket = () => {
     loadBracketData();
   }, [user, userLeagueState, leagueId]);
 
-  if (loading) {
+  // Apply minimum display time to prevent flash
+  const displayLoading = useMinimumLoadingTime(loading, 800);
+
+  if (displayLoading) {
     return (
       <LoadingScreen
-        character="narwhal"
+        character="lemon"
         message="Loading Playoff Bracket..."
       />
     );

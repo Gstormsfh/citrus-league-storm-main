@@ -17,6 +17,7 @@ import { MatchupService } from '@/services/MatchupService';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import LoadingScreen from '@/components/LoadingScreen';
+import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { supabase } from '@/integrations/supabase/client';
 
 interface StandingsTeam {
@@ -289,7 +290,10 @@ const Standings = () => {
   // ABSOLUTE RULE: If teams.length > 0, NEVER show LoadingScreen, always render content
   const shouldShowLoadingScreen = teams.length === 0 && leagues.length === 0 && loading;
   
-  if (shouldShowLoadingScreen) {
+  // Apply minimum display time to prevent flash
+  const displayLoading = useMinimumLoadingTime(shouldShowLoadingScreen, 800);
+  
+  if (displayLoading) {
     console.log('[Standings] Showing LoadingScreen - no data yet');
     return (
       <LoadingScreen

@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Calendar, TrendingUp, Filter, List, Grid, Star, Info, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import LoadingScreen from '@/components/LoadingScreen';
+import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { PlayerService, Player } from '@/services/PlayerService';
 import { LeagueService, League } from '@/services/LeagueService';
 import { ScheduleService, NHLGame } from '@/services/ScheduleService';
@@ -784,13 +785,18 @@ const FreeAgents = () => {
               ))}
             </div>
 
-            {loading ? (
-              <LoadingScreen
-                character="citrus"
-                message="Loading Free Agents..."
-              />
-            ) : (
-              <>
+            {(() => {
+              const displayLoading = useMinimumLoadingTime(loading, 800);
+              if (displayLoading) {
+                return (
+                  <LoadingScreen
+                    character="pineapple"
+                    message="Loading Free Agents..."
+                  />
+                );
+              }
+              return (
+                <>
                 {viewMode === 'summary' && !searchQuery ? (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Top Trending Table */}
@@ -1661,6 +1667,9 @@ const FreeAgents = () => {
             )}
           </TabsContent>
         </Tabs>
+              </>
+              );
+            })()}
 
         {/* Player Stats Modal */}
         <PlayerStatsModal

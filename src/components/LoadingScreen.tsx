@@ -1,7 +1,13 @@
 import React, { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 
-export type LoadingCharacter = 'citrus' | 'narwhal';
+// Import the 4 loading screen images
+import kiwiImage from '../../assets/images/Gemini_Generated_Image_Kiwi.png';
+import lemonImage from '../../assets/images/Gemini_Generated_Image_Lemon.png';
+import narwhalImage from '../../assets/images/Gemini_Generated_Image_Narwhal.png';
+import pineappleImage from '../../assets/images/Gemini_Generated_Image_Pineapple.png';
+
+export type LoadingCharacter = 'kiwi' | 'lemon' | 'narwhal' | 'pineapple';
 
 interface LoadingScreenProps {
   character?: LoadingCharacter;
@@ -10,8 +16,8 @@ interface LoadingScreenProps {
   className?: string;
 }
 
-// Available loading characters
-const LOADING_CHARACTERS: LoadingCharacter[] = ['citrus', 'narwhal'];
+// Available loading characters (all 4 images)
+const LOADING_CHARACTERS: LoadingCharacter[] = ['kiwi', 'lemon', 'narwhal', 'pineapple'];
 
 // Persistent random character selection (stored in module scope to persist across renders)
 let cachedRandomCharacter: LoadingCharacter | null = null;
@@ -39,9 +45,22 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
     return character || getRandomCharacter();
   }, [character]);
   
-  const imageSrc = selectedCharacter === 'citrus' 
-    ? '/loading-citrus.png' 
-    : '/loading-narwhal.png';
+  const getImageSrc = (char: LoadingCharacter): string => {
+    switch (char) {
+      case 'kiwi':
+        return kiwiImage;
+      case 'lemon':
+        return lemonImage;
+      case 'narwhal':
+        return narwhalImage;
+      case 'pineapple':
+        return pineappleImage;
+      default:
+        return kiwiImage;
+    }
+  };
+
+  const imageSrc = getImageSrc(selectedCharacter);
 
   return (
     <div
@@ -54,7 +73,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
       <div className="relative">
         <img
           src={imageSrc}
-          alt={character === 'citrus' ? 'Citrus loading screen' : 'Narwhal loading screen'}
+          alt={`${selectedCharacter} loading screen`}
           className="w-auto h-auto max-w-[90vw] max-h-[90vh] object-contain drop-shadow-lg relative"
           style={{
             maxWidth: '600px',
