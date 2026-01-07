@@ -12,7 +12,7 @@ import { DemoDataService } from '@/services/DemoDataService';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, TrendingDown, Wand2, Trophy, Activity, ArrowUpRight, Users, Loader2, Calendar, Target, Shield, Skull, Zap, BarChart3 } from 'lucide-react';
+import { TrendingUp, TrendingDown, Wand2, Trophy, Activity, ArrowUpRight, Users, Loader2, Calendar, Target, Shield, Skull, Zap, BarChart3, PieChart } from 'lucide-react';
 import LoadingScreen from '@/components/LoadingScreen';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { RosterDepthWidget } from '@/components/gm-office/RosterDepthWidget';
@@ -24,7 +24,7 @@ import { StartersGrid, BenchGrid, IRSlot } from '@/components/roster';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { useToast } from '@/hooks/use-toast';
 import HockeyPlayerCard from '@/components/roster/HockeyPlayerCard';
-import { PlayerService } from '@/services/PlayerService';
+import { PlayerService, Player } from '@/services/PlayerService';
 import { LeagueService, Transaction, LEAGUE_TEAMS_DATA } from '@/services/LeagueService';
 import { DraftService } from '@/services/DraftService';
 import { CitrusPuckService } from '@/services/CitrusPuckService';
@@ -358,35 +358,37 @@ const Roster = () => {
           const { DEMO_LEAGUE_ID_FOR_GUESTS } = await import('@/services/DemoLeagueService');
           
           // Get the demo league
-          const { data: demoLeague, error: leagueError } = await supabase
+          const { data: demoLeagueData, error: leagueError } = await supabase
             .from('leagues')
             .select('*')
-            .eq('id', DEMO_LEAGUE_ID_FOR_GUESTS)
+            .eq('id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
             .maybeSingle();
           
-          if (leagueError || !demoLeague) {
+          if (leagueError || !demoLeagueData) {
             console.error('[Roster] Error loading demo league:', leagueError);
             setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
             setLoading(false);
             return;
           }
+          const demoLeague = demoLeagueData as any;
           
           // Get the first team from the demo league (or a specific team)
           // For now, get team 1 (we can make this configurable later)
-          const { data: demoTeams, error: teamsError } = await supabase
+          const { data: demoTeamsData, error: teamsError } = await supabase
             .from('teams')
             .select('*')
-            .eq('league_id', DEMO_LEAGUE_ID_FOR_GUESTS)
+            .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
             .order('created_at', { ascending: true })
             .limit(1);
           
-          if (teamsError || !demoTeams || demoTeams.length === 0) {
+          if (teamsError || !demoTeamsData || demoTeamsData.length === 0) {
             console.error('[Roster] Error loading demo team:', teamsError);
             setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
             setLoading(false);
             return;
           }
           
+          const demoTeams = demoTeamsData as any[];
           const demoTeamData = demoTeams[0];
           teamId = demoTeamData.id;
           setUserTeamId(demoTeamData.id);
@@ -397,11 +399,11 @@ const Roster = () => {
           });
           
           // Get roster from draft picks (same as MatchupService.getTeamRoster)
-          const { data: teamDraftPicks, error: picksError } = await supabase
+          const { data: teamDraftPicksData, error: picksError } = await supabase
             .from('draft_picks')
             .select('*')
-            .eq('league_id', DEMO_LEAGUE_ID_FOR_GUESTS)
-            .eq('team_id', demoTeamData.id)
+            .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
+            .eq('team_id' as any, demoTeamData.id as any)
             .is('deleted_at', null)
             .order('pick_number', { ascending: true });
           
@@ -413,7 +415,8 @@ const Roster = () => {
           }
           
           // Map draft picks to players
-          const playerIds = (teamDraftPicks || []).map(p => p.player_id);
+          const teamDraftPicks = (teamDraftPicksData || []) as any[];
+          const playerIds = teamDraftPicks.map((p: any) => p.player_id);
           const teamPlayers = allPlayers.filter(p => playerIds.includes(p.id));
           
           if (teamPlayers.length === 0) {
@@ -431,16 +434,16 @@ const Roster = () => {
           let teamQuery = supabase
             .from('teams')
             .select('id, league_id, team_name')
-            .eq('owner_id', user.id);
+            .eq('owner_id' as any, user.id as any);
           
           // If we have an active league, prefer that team
           if (activeLeagueId) {
-            teamQuery = teamQuery.eq('league_id', activeLeagueId);
+            teamQuery = teamQuery.eq('league_id' as any, activeLeagueId as any);
           }
           
-          const { data: teamData, error: teamError } = await teamQuery.maybeSingle();
+          const { data: teamDataResult, error: teamError } = await teamQuery.maybeSingle();
 
-          if (teamError || !teamData) {
+          if (teamError || !teamDataResult) {
             // User doesn't have a team yet - show empty roster
             setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
             setUserTeamId(null);
@@ -449,7 +452,7 @@ const Roster = () => {
             return;
           }
 
-          userTeamData = teamData;
+          userTeamData = teamDataResult as { id: string; league_id: string; team_name: string };
 
           // Check if draft is completed before loading roster
           const { league: leagueData, error: leagueError } = await LeagueService.getLeague(userTeamData.league_id);
@@ -468,11 +471,11 @@ const Roster = () => {
           // Draft is completed - get roster from draft picks
           // Get ALL draft picks for this team (including post-draft adds with round 999)
           // Don't filter by session to include players added via free agency
-          const { data: allDraftPicks, error: picksError } = await supabase
+          const { data: allDraftPicksData, error: picksError } = await supabase
             .from('draft_picks')
             .select('*')
-            .eq('league_id', userTeamData.league_id)
-            .eq('team_id', userTeamData.id)
+            .eq('league_id' as any, userTeamData.league_id as any)
+            .eq('team_id' as any, userTeamData.id as any)
             .is('deleted_at', null)
             .order('pick_number', { ascending: true });
           
@@ -493,7 +496,8 @@ const Roster = () => {
             }
           } else {
             // Map draft picks to players
-            const playerIds = (allDraftPicks || []).map(p => p.player_id);
+            const allDraftPicks = (allDraftPicksData || []) as any[];
+            const playerIds = allDraftPicks.map((p: any) => p.player_id);
             dbPlayers = allPlayers.filter(p => playerIds.includes(p.id));
           }
         }
@@ -668,7 +672,7 @@ const Roster = () => {
             console.log('[Roster] Current position counts:', positionCounts);
             
             // Get available bench players sorted by points
-            const availableBench = [...bench].sort((a, b) => (b.points || 0) - (a.points || 0));
+            const availableBench = [...bench].sort((a, b) => ((b.stats?.points || 0) - (a.stats?.points || 0)));
             
             // Priority order: Fill critical positions first (G, D), then others
             const priorityOrder: Array<'G' | 'D' | 'C' | 'LW' | 'RW' | 'UTIL'> = ['G', 'D', 'C', 'LW', 'RW', 'UTIL'];
@@ -683,7 +687,7 @@ const Roster = () => {
                 // Find best available players of this position from bench
                 const positionPlayers = availableBench.filter(p => getFantasyPosition(p.position) === pos);
                 const bestOfPosition = positionPlayers
-                  .sort((a, b) => (b.points || 0) - (a.points || 0))
+                  .sort((a, b) => ((b.stats?.points || 0) - (a.stats?.points || 0)))
                   .slice(0, missing);
                 
                 bestOfPosition.forEach(player => {
@@ -733,7 +737,7 @@ const Roster = () => {
           const validSlotAssignments: Record<string, string> = {};
           Object.entries(savedLineup.slotAssignments || {}).forEach(([playerId, slotId]) => {
             if (playerMap.has(playerId)) {
-              validSlotAssignments[playerId] = slotId;
+              validSlotAssignments[playerId] = slotId as string;
             }
           });
           
@@ -897,11 +901,11 @@ const Roster = () => {
               },
               team: p.team,
               teamAbbreviation: p.team,
-              status: p.status === 'injured' ? 'IR' : (p.status === 'active' ? null : 'WVR'),
+              status: (p.status === 'injured' ? 'IR' : null) as 'IR' | 'SUSP' | 'GTD' | 'WVR' | null,
               image: p.headshot_url || undefined,
               nextGame: undefined,
               projectedPoints: (p.points || 0) / 20
-            }));
+            })) as HockeyPlayer[];
             
             // Auto-organize using same improved logic
             const starters: HockeyPlayer[] = [];
@@ -912,7 +916,7 @@ const Roster = () => {
             const totalSlotsNeeded = 13;
             
             // Sort by points
-            const sorted = [...transformed].sort((a, b) => (b.points || 0) - (a.points || 0));
+            const sorted = [...transformed].sort((a, b) => ((b.stats?.points || 0) - (a.stats?.points || 0)));
             
             // Place IR players first
             sorted.forEach(p => {
@@ -947,7 +951,7 @@ const Roster = () => {
             
             // Ensure all 13 slots are filled
             if (starters.length < totalSlotsNeeded) {
-              const remainingBench = [...bench].sort((a, b) => (b.points || 0) - (a.points || 0));
+              const remainingBench = [...bench].sort((a, b) => ((b.stats?.points || 0) - (a.stats?.points || 0)));
               while (starters.length < totalSlotsNeeded && remainingBench.length > 0) {
                 const bestPlayer = remainingBench.shift();
                 if (bestPlayer) {
@@ -1221,7 +1225,7 @@ const Roster = () => {
                 const { data: projectionsData, error: projError } = await supabase
                     .from('player_projected_stats')
                     .select('player_id, projected_goals, projected_assists, projected_sog, projected_blocks, projected_ppp, projected_shp, projected_hits, projected_pim, total_projected_points')
-                    .in('player_id', allPlayerIds)
+                    .in('player_id' as any, allPlayerIds as any)
                     .gte('projection_date', todayStr)
                     .order('player_id', { ascending: true })
                     .order('projection_date', { ascending: true });
@@ -1310,9 +1314,9 @@ const Roster = () => {
 
                     setRoster({
                         ...roster,
-                        starters: enrichedRoster.starters.map(enrichWithProjections),
-                        bench: enrichedRoster.bench.map(enrichWithProjections),
-                        ir: enrichedRoster.ir.map(enrichWithProjections)
+                        starters: enrichedRoster.starters.map(enrichWithProjections) as HockeyPlayer[],
+                        bench: enrichedRoster.bench.map(enrichWithProjections) as HockeyPlayer[],
+                        ir: enrichedRoster.ir.map(enrichWithProjections) as HockeyPlayer[]
                     });
                 } else {
                     // If projections fetch fails, just use enriched roster without projections
@@ -1848,4 +1852,615 @@ const Roster = () => {
                   <div className="font-bold">{teamStats.record}</div>
                 </div>
                 <div className="text-center px-4 py-2">
-                  <div className="text-sm text-
+                  <div className="text-sm text-muted-foreground">Rank</div>
+                  <div className="font-bold">{teamStats.rank}</div>
+                </div>
+                <div className="text-center px-4 py-2">
+                  <div className="text-sm text-muted-foreground">Total Pts</div>
+                  <div className="font-bold">{teamStats.totalPoints}</div>
+                </div>
+              </div>
+
+              <div>
+                {userLeagueState === 'active-user' && (
+                  <Button onClick={handleAutoLineup} variant="outline" className="flex gap-2">
+                    <Wand2 className="w-4 h-4" />
+                    Auto Lineup
+                  </Button>
+                )}
+                </div>
+              </div>
+            </div>
+
+            {/* Main Tabs */}
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+              <div className="bg-card rounded-lg shadow-md border">
+                <TabsList className="w-full p-0 bg-transparent border-b rounded-none gap-0">
+                <TabsTrigger 
+                  value="roster" 
+                  className="flex-1 py-4 rounded-none data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary"
+                >
+                  Roster
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="stats" 
+                  className="flex-1 py-4 rounded-none data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary"
+                >
+                  Team Stats
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="trends" 
+                  className="flex-1 py-4 rounded-none data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary"
+                >
+                  Trends & Analytics
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="transactions" 
+                  className="flex-1 py-4 rounded-none data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary"
+                >
+                  Transactions
+                </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="roster" className="m-0 p-6">
+                {/* Read-only banner for demo/guest users */}
+                {(userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league' || (userTeam && isDemoLeague(userTeam.league_id))) && (
+                  <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                    <div className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400">
+                      <Shield className="w-4 h-4" />
+                      <span className="text-sm font-medium">Demo Mode - Read Only</span>
+                    </div>
+                    <p className="text-xs text-yellow-600/80 dark:text-yellow-400/80 mt-1">
+                      Sign up to create your own league and make lineup changes!
+                    </p>
+                  </div>
+                )}
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold">Lineup</h2>
+                    <ToggleGroup type="single" value={statView} onValueChange={(v) => v && setStatView(v as any)} className="bg-muted/50 p-1 rounded-lg">
+                        <ToggleGroupItem value="seasonToDate" size="sm" className="text-xs">Season</ToggleGroupItem>
+                        <ToggleGroupItem value="restOfSeason" size="sm" className="text-xs">Rest of Season</ToggleGroupItem>
+                    </ToggleGroup>
+                </div>
+
+                {(() => {
+                  // Apply minimum display time to prevent flash
+                  const actualLoading = loading || leagueLoading;
+                  const displayLoading = useMinimumLoadingTime(actualLoading, 800);
+                  
+                  if (displayLoading) {
+                    return (
+                      <LoadingScreen
+                        character="lemon"
+                        message="Loading Your Roster..."
+                      />
+                    );
+                  }
+                  
+                  if (userLeagueState === 'logged-in-no-league') {
+                    return (
+                      <div className="py-8">
+                        <LeagueCreationCTA 
+                          title="Your Roster Awaits"
+                          description="Create your league to start building your roster, making trades, and competing with friends."
+                        />
+                      </div>
+                    );
+                  }
+                  
+                  if (!userTeamId && userLeagueState === 'active-user') {
+                    return (
+                      <div className="flex flex-col items-center justify-center py-20 text-center">
+                        <Trophy className="w-16 h-16 text-muted-foreground mb-4 opacity-50" />
+                        <h3 className="text-xl font-semibold mb-2">No Team Yet</h3>
+                        <p className="text-muted-foreground mb-4">Join or create a league to start building your roster.</p>
+                        <Button asChild>
+                          <a href="/create-league">Create or Join a League</a>
+                        </Button>
+                      </div>
+                    );
+                  }
+                  
+                  if (roster.starters.length === 0 && roster.bench.length === 0 && userLeagueState !== 'guest') {
+                    return (
+                      <div className="flex flex-col items-center justify-center py-20 text-center">
+                        <Users className="w-16 h-16 text-muted-foreground mb-4 opacity-50" />
+                        <h3 className="text-xl font-semibold mb-2">Empty Roster</h3>
+                        <p className="text-muted-foreground mb-4">Your roster is empty. Complete your draft to add players.</p>
+                      </div>
+                    );
+                  }
+                  
+                  // Main roster content
+                  return (
+                  // Disable drag-and-drop for demo league
+                  userTeam && isDemoLeague(userTeam.league_id) ? (
+                    <div className="space-y-8">
+                      <StartersGrid 
+                        players={roster.starters}
+                        slotAssignments={roster.slotAssignments}
+                        onPlayerClick={handlePlayerClick}
+                      />
+                      
+                      <BenchGrid 
+                        players={roster.bench}
+                        onPlayerClick={handlePlayerClick}
+                      />
+                      
+                      <IRSlot 
+                        players={roster.ir}
+                        slotAssignments={roster.slotAssignments}
+                        onPlayerClick={handlePlayerClick}
+                      />
+                    </div>
+                  ) : (
+                  <DndContext
+                    collisionDetection={closestCenter}
+                    onDragStart={(userLeagueState === 'guest' || (userLeagueState as string) === 'logged-in-no-league') ? undefined : handleDragStart}
+                    onDragEnd={(userLeagueState === 'guest' || (userLeagueState as string) === 'logged-in-no-league') ? undefined : handleDragEnd}
+                  >
+                    <div className="space-y-8">
+                      <StartersGrid 
+                        players={roster.starters}
+                        slotAssignments={roster.slotAssignments}
+                        onPlayerClick={handlePlayerClick}
+                      />
+                      
+                      <BenchGrid 
+                        players={roster.bench}
+                        onPlayerClick={handlePlayerClick}
+                      />
+                      
+                      <IRSlot 
+                        players={roster.ir}
+                        slotAssignments={roster.slotAssignments}
+                        onPlayerClick={handlePlayerClick}
+                      />
+                    </div>
+
+                    <DragOverlay>
+                      {activePlayer ? (
+                        <div className="opacity-90 rotate-3">
+                          <HockeyPlayerCard 
+                            player={activePlayer}
+                            draggable={false}
+                          />
+                        </div>
+                      ) : null}
+                    </DragOverlay>
+                  </DndContext>
+                  )
+                  );
+                })()}
+                </TabsContent>
+
+                <TabsContent value="stats" className="m-0 p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-muted-foreground">Season Points</span>
+                        <Trophy className="h-4 w-4 text-yellow-500" />
+                      </div>
+                      <div className="text-2xl font-bold">{teamStats.totalPoints}</div>
+                      <p className="text-xs text-muted-foreground mt-1">Rank: {teamStats.rank}</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-muted-foreground">Avg. Weekly</span>
+                        <Activity className="h-4 w-4 text-blue-500" />
+                      </div>
+                      <div className="text-2xl font-bold">{teamStats.avgPoints}</div>
+                      <p className="text-xs text-muted-foreground mt-1">pts / week</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-muted-foreground">Highest Score</span>
+                        <ArrowUpRight className="h-4 w-4 text-green-500" />
+                      </div>
+                      <div className="text-2xl font-bold">{teamStats.highScore}</div>
+                      <p className="text-xs text-muted-foreground mt-1">Week 2</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-muted-foreground">Moves Made</span>
+                        <Users className="h-4 w-4 text-purple-500" />
+                      </div>
+                      <div className="text-2xl font-bold">{teamStats.waiverMoves}</div>
+                      <p className="text-xs text-muted-foreground mt-1">Waiver/Trades</p>
+                    </CardContent>
+                  </Card>
+                </div>
+                </TabsContent>
+
+                <TabsContent value="trends" className="m-0 p-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Radar Charts - Category Balance */}
+                  <div className="lg:col-span-2">
+                    <Card className="h-full">
+                      <CardContent className="p-6">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+                           <div className="flex items-center gap-2">
+                             <Target className="h-5 w-5 text-primary" />
+                             <div>
+                               <h3 className="font-bold text-lg">Category Balance</h3>
+                               <p className="text-sm text-muted-foreground">Positional Breakdown</p>
+                             </div>
+                           </div>
+                           <Tabs value={selectedPosMetric} onValueChange={(v) => setSelectedPosMetric(v as any)} className="w-full sm:w-auto">
+                             <TabsList className="grid w-full grid-cols-4">
+                               <TabsTrigger value="C">C</TabsTrigger>
+                               <TabsTrigger value="LW">LW</TabsTrigger>
+                               <TabsTrigger value="RW">RW</TabsTrigger>
+                               <TabsTrigger value="D">D</TabsTrigger>
+                             </TabsList>
+                           </Tabs>
+                        </div>
+                        
+                        <div className="h-[300px] w-full relative">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <RadarChart cx="50%" cy="50%" outerRadius="80%" data={calculateRadarData(posStats[selectedPosMetric], selectedPosMetric)}>
+                              <PolarGrid stroke="#e5e7eb" />
+                              <PolarAngleAxis dataKey="subject" tick={{ fill: '#6b7280', fontSize: 12, fontWeight: 500 }} />
+                              <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                              <Radar
+                                name={selectedPosMetric}
+                                dataKey="A"
+                                stroke="#3b82f6"
+                                strokeWidth={3}
+                                fill="#3b82f6"
+                                fillOpacity={0.3}
+                              />
+                              <Tooltip 
+                                 contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                 itemStyle={{ color: '#3b82f6', fontWeight: 'bold' }}
+                              />
+                            </RadarChart>
+                          </ResponsiveContainer>
+                          <div className="absolute top-0 right-0 text-xs text-muted-foreground text-right hidden sm:block">
+                             <div className="mb-1">Chart shows % of Elite Baseline</div>
+                             <div>100% = Top Tier Production</div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Power Rankings & Key Insights */}
+                  <div className="space-y-6">
+                    <Card>
+                      <CardContent className="p-6">
+                         <div className="flex items-center gap-2 mb-4">
+                            <Zap className="h-5 w-5 text-yellow-500" />
+                            <h3 className="font-bold text-lg">Power Rankings</h3>
+                         </div>
+                         <div className="space-y-3">
+                           <div className="flex justify-between items-center p-2 bg-muted/40 rounded">
+                              <span className="text-sm font-medium">Offense</span>
+                              <Badge className="bg-green-500 hover:bg-green-600">A-</Badge>
+                           </div>
+                           <div className="flex justify-between items-center p-2 bg-muted/40 rounded">
+                              <span className="text-sm font-medium">Defense</span>
+                              <Badge className="bg-yellow-500 hover:bg-yellow-600">B</Badge>
+                           </div>
+                           <div className="flex justify-between items-center p-2 bg-muted/40 rounded">
+                              <span className="text-sm font-medium">Goalie</span>
+                              <Badge className="bg-blue-500 hover:bg-blue-600">A</Badge>
+                           </div>
+                            <div className="flex justify-between items-center p-2 bg-muted/40 rounded">
+                              <span className="text-sm font-medium">Depth</span>
+                              <Badge className="bg-orange-500 hover:bg-orange-600">C+</Badge>
+                            </div>
+                         </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+
+                {/* Detailed Stat Breakdown Table */}
+                <Card className="mt-6">
+                   <CardContent className="p-6">
+                      <div className="flex items-center gap-2 mb-4">
+                         <BarChart3 className="h-5 w-5 text-gray-500" />
+                         <h3 className="font-bold text-lg">Projected Season Totals</h3>
+                      </div>
+                      
+                      <div className="space-y-6">
+                        {['C', 'LW', 'RW', 'D'].map(pos => (
+                          <div key={pos}>
+                            <h4 className="text-sm font-semibold text-muted-foreground mb-3">{pos === 'C' ? 'Centers' : (pos === 'D' ? 'Defensemen' : `${pos} Wingers`)}</h4>
+                            <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
+                               {Object.entries(posStats[pos as 'C'|'LW'|'RW'|'D']).map(([key, value]) => (
+                                  <div key={key} className="flex flex-col p-3 bg-muted/30 rounded-lg border text-center">
+                                     <span className="text-muted-foreground uppercase text-[10px] font-bold tracking-wider">{key}</span>
+                                     <span className="text-xl font-bold mt-1 text-foreground">{value}</span>
+                                  </div>
+                               ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                   </CardContent>
+                </Card>
+                </TabsContent>
+
+                <TabsContent value="transactions" className="m-0 p-6">
+                <div className="space-y-4">
+                  <h3 className="text-lg font-bold mb-4">Transaction History</h3>
+                  {transactions.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground border rounded-lg border-dashed">
+                      No transactions found.
+                    </div>
+                  ) : (
+                    <div className="rounded-md border">
+                       <div className="hidden md:grid grid-cols-12 gap-4 p-4 border-b bg-muted/50 font-medium text-sm">
+                          <div className="col-span-2">Date</div>
+                          <div className="col-span-2">Type</div>
+                          <div className="col-span-4">Player</div>
+                          <div className="col-span-2">Team</div>
+                          <div className="col-span-2 text-right">Status</div>
+                       </div>
+                       {transactions.map((tx) => (
+                         <div key={tx.id} className="flex flex-col md:grid md:grid-cols-12 gap-2 md:gap-4 p-4 border-b last:border-0 text-sm md:items-center hover:bg-muted/20 transition-colors relative">
+                           {/* Mobile Top Row: Date & Status */}
+                           <div className="flex md:hidden justify-between items-start mb-1">
+                               <div className="text-muted-foreground text-xs">{tx.date}</div>
+                               <div className="text-right">
+                                 <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                                   tx.status === 'processed' ? 'bg-green-100 text-green-700' : 
+                                   (tx.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700')
+                                 }`}>
+                                   {tx.status}
+                                 </span>
+                               </div>
+                           </div>
+
+                           {/* Desktop: Date */}
+                           <div className="hidden md:block col-span-2 text-muted-foreground">{tx.date}</div>
+                           
+                           {/* Type Badge */}
+                           <div className="col-span-2 capitalize font-medium flex items-center">
+                             <Badge variant={tx.type === 'claim' ? 'default' : (tx.type === 'drop' ? 'destructive' : 'secondary')} className="text-xs">
+                               {tx.type}
+                             </Badge>
+                           </div>
+
+                           {/* Player & Team (Mobile: Combined) */}
+                           <div className="col-span-4 font-medium text-base md:text-sm flex items-center gap-2">
+                               {tx.playerName}
+                               <span className="md:hidden text-muted-foreground font-normal text-xs">• {tx.playerTeam}</span>
+                           </div>
+
+                           {/* Desktop: Team */}
+                           <div className="hidden md:block col-span-2">{tx.playerTeam}</div>
+                           
+                           {/* Desktop: Status */}
+                           <div className="hidden md:block col-span-2 text-right">
+                             <span className={`text-xs px-2 py-1 rounded-full ${
+                               tx.status === 'processed' ? 'bg-green-100 text-green-700' : 
+                               (tx.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700')
+                             }`}>
+                               {tx.status}
+                             </span>
+                           </div>
+                         </div>
+                       ))}
+                    </div>
+                  )}
+                </div>
+                </TabsContent>
+              </div>
+            </Tabs>
+            </div>
+            
+            {/* Enhanced Player Stats Modal */}
+        <PlayerStatsModal
+          player={selectedPlayer}
+          isOpen={isPlayerDialogOpen}
+          onClose={() => setIsPlayerDialogOpen(false)}
+          leagueId={userTeam?.league_id || null}
+          isOnRoster={selectedPlayer ? [...roster.starters, ...roster.bench, ...roster.ir].some(p => p.id === selectedPlayer.id) : false}
+          onPlayerDropped={async () => {
+            // Refresh roster and transactions without page reload
+            if (userTeam?.league_id) {
+              // Reload transactions immediately
+              const { transactions: newTransactions } = await LeagueService.fetchTransactions(userTeam.league_id);
+              setTransactions(newTransactions);
+              
+              // Trigger roster reload by calling loadRoster
+              // We'll extract loadRoster to be callable
+              const allPlayers = await PlayerService.getAllPlayers();
+              const { picks: draftPicks } = await DraftService.getDraftPicks(userTeam.league_id);
+              const teamPicks = draftPicks.filter(p => p.team_id === userTeam.id);
+              const playerIds = teamPicks.map(p => p.player_id);
+              const dbPlayers = allPlayers.filter(p => playerIds.includes(p.id));
+              
+              // Get lineup from database
+              const { data: lineupDataResult } = await supabase
+                .from('team_lineups')
+                .select('starters, bench, ir, slot_assignments')
+                .eq('team_id' as any, userTeam.id as any)
+                .single();
+              const lineupData = lineupDataResult as any;
+
+              // Transform players to HockeyPlayer format (same logic as in loadRoster)
+              const transformedPlayers: HockeyPlayer[] = dbPlayers.map((p) => ({
+                id: p.id,
+                name: p.full_name,
+                position: p.position,
+                number: parseInt(p.jersey_number || '0'),
+                starter: false,
+                stats: {
+                  gamesPlayed: p.games_played || 0,
+                  goals: p.goals || 0,
+                  assists: p.assists || 0,
+                  points: p.points || 0,
+                  plusMinus: p.plus_minus || 0,
+                  shots: p.shots || 0,
+                  hits: p.hits || 0,
+                  blockedShots: p.blocks || 0,
+                  xGoals: p.xGoals || 0,
+                  pim: (p as any).pim || 0,
+                  powerPlayPoints: (p as any).ppp || 0,
+                  shortHandedPoints: (p as any).shp || 0,
+                  toi: (() => {
+                    const secs = Number((p as any).icetime_seconds || 0) / Math.max(1, Number(p.games_played || 0));
+                    const mins = Math.floor(secs / 60);
+                    const remainingSecs = Math.floor(secs % 60);
+                    return `${mins}:${remainingSecs.toString().padStart(2, '0')}`;
+                  })(),
+                  wins: p.wins || 0,
+                  losses: p.losses || 0,
+                  otl: p.ot_losses || 0,
+                  gaa: p.goals_against_average || 0,
+                  savePct: p.save_percentage || 0,
+                  shutouts: (p as any).shutouts || 0,
+                  goalsSavedAboveExpected: p.goalsSavedAboveExpected || 0
+                },
+                team: p.team,
+                teamAbbreviation: p.team,
+                status: (p.status === 'injured' ? 'IR' : null) as 'IR' | 'SUSP' | 'GTD' | 'WVR' | null,
+                image: p.headshot_url || undefined,
+                nextGame: undefined,
+                projectedPoints: (p.points || 0) / 20
+              }));
+
+              const playerMap = new Map(transformedPlayers.map(p => [String(p.id), p]));
+              
+              const starters = (lineupData?.starters || [])
+                .map((id: string) => playerMap.get(id))
+                .filter((p): p is HockeyPlayer => !!p)
+                .map(p => ({ ...p, starter: true }));
+              
+              const bench = (lineupData?.bench || [])
+                .map((id: string) => playerMap.get(id))
+                .filter((p): p is HockeyPlayer => !!p);
+              
+              const ir = (lineupData?.ir || [])
+                .map((id: string) => playerMap.get(id))
+                .filter((p): p is HockeyPlayer => !!p);
+
+              setRoster({
+                starters,
+                bench,
+                ir,
+                slotAssignments: lineupData?.slot_assignments || {}
+              });
+            }
+          }}
+        />
+
+        {/* Drop Player Dialog for Adding New Player */}
+        <Dialog open={isDropDialogOpen} onOpenChange={setIsDropDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Roster Full - Drop a Player</DialogTitle>
+              <DialogDescription>
+                Your roster is full. Drop a player to add <strong>{pendingAddPlayer?.name}</strong>.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 mt-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[...roster.starters, ...roster.bench, ...roster.ir].map((player) => (
+                  <Card key={player.id} className="p-4 hover:border-primary cursor-pointer transition-colors" onClick={async () => {
+                    if (!user || !userTeam?.league_id || !pendingAddPlayer) return;
+                    
+                    try {
+                      // Drop the selected player
+                      const { success: dropSuccess, error: dropError } = await LeagueService.dropPlayer(
+                        userTeam.league_id,
+                        user.id,
+                        String(player.id),
+                        'Roster Page - Make Room'
+                      );
+
+                      if (!dropSuccess) {
+                        toast({
+                          title: "Error",
+                          description: dropError?.message || "Failed to drop player.",
+                          variant: "destructive"
+                        });
+                        return;
+                      }
+
+                      // Add the new player
+                      const { success: addSuccess, error: addError } = await LeagueService.addPlayer(
+                        userTeam.league_id,
+                        user.id,
+                        pendingAddPlayer.id,
+                        'Roster Page - After Drop'
+                      );
+
+                      if (addSuccess) {
+                        toast({
+                          title: "Success",
+                          description: `Dropped ${player.name} and added ${pendingAddPlayer.name} to your roster.`,
+                        });
+                        // Clear query params and close dialog
+                        setSearchParams({});
+                        setIsDropDialogOpen(false);
+                        setPendingAddPlayer(null);
+                        // Refresh roster without full page reload (keeps current roster visible)
+                        refreshRoster();
+                      } else {
+                        toast({
+                          title: "Error",
+                          description: addError?.message || "Failed to add player.",
+                          variant: "destructive"
+                        });
+                      }
+                    } catch (error: any) {
+                      toast({
+                        title: "Error",
+                        description: error?.message || "An error occurred.",
+                        variant: "destructive"
+                      });
+                    }
+                  }}>
+                    <CardContent className="p-0">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-semibold">{player.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {formatPositionForDisplay(player.position)} • {player.team}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {player.stats?.points || 0} pts • {player.stats?.gamesPlayed || 0} GP
+                          </div>
+                        </div>
+                        <Button variant="destructive" size="sm">
+                          Drop
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <Button variant="outline" onClick={() => {
+                  setSearchParams({});
+                  setIsDropDialogOpen(false);
+                  setPendingAddPlayer(null);
+                }}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+            </div>
+          </div>
+      </main>
+      
+      <Footer />
+    </div>
+  );
+};
+
+export default Roster;

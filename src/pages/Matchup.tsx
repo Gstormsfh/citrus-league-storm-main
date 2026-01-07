@@ -21,7 +21,7 @@ import { MatchupPlayer } from "@/components/matchup/types";
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { LeagueService, League, Team } from '@/services/LeagueService';
-import { MatchupService, Matchup } from '@/services/MatchupService';
+import { MatchupService, Matchup as MatchupType } from '@/services/MatchupService';
 import { PlayerService } from '@/services/PlayerService';
 import { supabase } from '@/integrations/supabase/client';
 import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekLabel, getWeekDateLabel, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
@@ -107,11 +107,11 @@ const Matchup = () => {
   const [opponentTeamSlotAssignments, setOpponentTeamSlotAssignments] = useState<Record<string, string>>({});
   const [myTeamRecord, setMyTeamRecord] = useState<{ wins: number; losses: number }>({ wins: 0, losses: 0 });
   const [opponentTeamRecord, setOpponentTeamRecord] = useState<{ wins: number; losses: number }>({ wins: 0, losses: 0 });
-  const [currentMatchup, setCurrentMatchup] = useState<Matchup | null>(null);
+  const [currentMatchup, setCurrentMatchup] = useState<MatchupType | null>(null);
   const [myDailyPoints, setMyDailyPoints] = useState<number[]>([]);
   const [opponentDailyPoints, setOpponentDailyPoints] = useState<number[]>([]);
   const [selectedMatchupId, setSelectedMatchupId] = useState<string | null>(null);
-  const [allWeekMatchups, setAllWeekMatchups] = useState<Array<Matchup & { team1_name?: string; team2_name?: string }>>([]);
+  const [allWeekMatchups, setAllWeekMatchups] = useState<Array<MatchupType & { team1_name?: string; team2_name?: string }>>([]);
   // League scoring settings for dynamic goalie/skater scoring (ALL 8 categories)
   const [scoringSettings, setScoringSettings] = useState<{
     goalie: { wins: number; saves: number; shutouts: number; goals_against: number };
@@ -175,22 +175,23 @@ const Matchup = () => {
         console.log('[Matchup] Using demo league ID:', DEMO_LEAGUE_ID_FOR_GUESTS);
         
         // Get the league data directly (using maybeSingle to avoid single() coercion error)
-        const { data: demoLeague, error: leagueError } = await supabase
+        const { data: demoLeagueData, error: leagueError } = await supabase
           .from('leagues')
           .select('*')
-          .eq('id', DEMO_LEAGUE_ID_FOR_GUESTS)
+          .eq('id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
           .maybeSingle();
         
         if (leagueError) {
           throw new Error(`Failed to load demo league: ${leagueError.message || 'Unknown error'}`);
         }
         
-        if (!demoLeague) {
+        if (!demoLeagueData) {
           throw new Error('Demo league not found');
         }
         
+        const demoLeague = demoLeagueData as any;
         console.log('[Matchup] Demo league loaded:', demoLeague.id, 'draft_status:', demoLeague.draft_status);
-        setLeague(demoLeague);
+        setLeague(demoLeague as League);
         
         // Check if draft is completed
         if (demoLeague.draft_status !== 'completed') {
@@ -241,21 +242,22 @@ const Matchup = () => {
         });
         
         // Get all matchups for this week (same as logged-in users)
-        const { data: weekMatchups, error: matchupsError } = await supabase
+        const { data: weekMatchupsData, error: matchupsError } = await supabase
           .from('matchups')
           .select('*')
-          .eq('league_id', DEMO_LEAGUE_ID_FOR_GUESTS)
-          .eq('week_number', weekToShow)
+          .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
+          .eq('week_number' as any, weekToShow as any)
           .order('created_at', { ascending: true });
         
         if (matchupsError) throw matchupsError;
         
+        const weekMatchups = weekMatchupsData as any[];
         if (!weekMatchups || weekMatchups.length === 0) {
           throw new Error(`No matchups found for week ${weekToShow}`);
         }
         
         // Use the first matchup (guests see the first matchup in the league)
-        const guestMatchup = weekMatchups[0];
+        const guestMatchup = weekMatchups[0] as any;
         
         // CRITICAL: Use the matchup's week_number to calculate dates (not weekToShow)
         // This ensures dates match exactly how the matchup was created in the database
@@ -291,8 +293,8 @@ const Matchup = () => {
         
         // Create matchup object with proper calculated dates (same format as logged-in users)
         // Always use calculated dates to ensure they're correct, even if DB dates are wrong
-        const matchupWithDates: Matchup = {
-          ...guestMatchup,
+        const matchupWithDates: MatchupType = {
+          ...(guestMatchup as any),
           week_start_date: matchupWeekStart.toISOString().split('T')[0],
           week_end_date: matchupWeekEnd.toISOString().split('T')[0]
         };
@@ -322,21 +324,21 @@ const Matchup = () => {
         }
         
         // Get teams
-        const team1 = await supabase.from('teams').select('*').eq('id', guestMatchup.team1_id).maybeSingle();
-        const team2 = guestMatchup.team2_id ? await supabase.from('teams').select('*').eq('id', guestMatchup.team2_id).maybeSingle() : { data: null, error: null };
+        const team1 = await supabase.from('teams').select('*').eq('id' as any, guestMatchup.team1_id as any).maybeSingle();
+        const team2 = guestMatchup.team2_id ? await supabase.from('teams').select('*').eq('id' as any, guestMatchup.team2_id as any).maybeSingle() : { data: null, error: null };
         
         if (team1.error) throw team1.error;
         if (team2.error) throw team2.error;
         
-        setUserTeam(team1.data);
-        setOpponentTeam(team2.data);
+        setUserTeam(team1.data as unknown as Team);
+        setOpponentTeam(team2.data as unknown as Team | null);
         
         // Get matchup rosters using the same service as logged-in users
         const { PlayerService } = await import('@/services/PlayerService');
         const allPlayers = await PlayerService.getAllPlayers();
         
         const { team1Roster, team2Roster, team1SlotAssignments, team2SlotAssignments, error: rosterError } = 
-          await MatchupService.getMatchupRosters(guestMatchup, allPlayers, 'America/Denver');
+          await MatchupService.getMatchupRosters(guestMatchup as MatchupType, allPlayers, 'America/Denver');
         
         if (rosterError) throw rosterError;
         
@@ -364,7 +366,7 @@ const Matchup = () => {
             'calculate_daily_matchup_scores',
             {
               p_matchup_id: guestMatchup.id,
-              p_team_id: team1.data.id,
+              p_team_id: (team1.data as any).id,
               p_week_start: weekStartStr,
               p_week_end: weekEndStr
             }
@@ -394,7 +396,7 @@ const Matchup = () => {
               'calculate_daily_matchup_scores',
               {
                 p_matchup_id: guestMatchup.id,
-                p_team_id: team2.data.id,
+                p_team_id: (team2.data as any).id,
                 p_week_start: weekStartStr,
                 p_week_end: weekEndStr
               }
@@ -431,8 +433,8 @@ const Matchup = () => {
         const { data: allMatchups } = await supabase
           .from('matchups')
           .select('*, teams!matchups_team1_id_fkey(team_name), teams!matchups_team2_id_fkey(team_name)')
-          .eq('league_id', DEMO_LEAGUE_ID_FOR_GUESTS)
-          .eq('week_number', weekToShow)
+          .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
+          .eq('week_number' as any, weekToShow as any)
           .order('created_at', { ascending: true });
         
         if (allMatchups) {
@@ -512,7 +514,7 @@ const Matchup = () => {
       },
       team: p.team,
       teamAbbreviation: p.team,
-      status: p.status === 'Yet to Play' ? null : (p.status === 'In Game' ? 'Active' : null),
+      status: null, // Game status not applicable here - use roster_status for IR/SUSP/GTD
       image: undefined,
       projectedPoints: 0
     };
@@ -549,8 +551,8 @@ const Matchup = () => {
             team1:teams!team1_id(team_name),
             team2:teams!team2_id(team_name)
           `)
-          .eq('league_id', league.id)
-          .eq('week_number', selectedWeek)
+          .eq('league_id' as any, league.id as any)
+          .eq('week_number' as any, selectedWeek as any)
           .order('created_at', { ascending: true });
 
         if (error) {
@@ -559,10 +561,10 @@ const Matchup = () => {
         }
 
         if (matchups) {
-          const matchupsWithNames = matchups.map(m => ({
+          const matchupsWithNames = (matchups as any[]).map((m: any) => ({
             ...m,
-            team1_name: (m.team1 as any)?.team_name || 'Unknown',
-            team2_name: (m.team2 as any)?.team_name || (m.team2_id ? 'Unknown' : 'Bye Week'),
+            team1_name: m.team1?.team_name || 'Unknown',
+            team2_name: m.team2?.team_name || (m.team2_id ? 'Unknown' : 'Bye Week'),
           }));
           setAllWeekMatchups(matchupsWithNames);
           
@@ -651,7 +653,7 @@ const Matchup = () => {
           // Create map of player_id -> daily stats for this date
           // CRITICAL: Aggregate across multiple games per day (goalies can't play multiple games per day, but skaters can)
           const dayStatsMap = new Map<number, any>();
-          (data || []).forEach((row: any) => {
+          ((data || []) as any[]).forEach((row: any) => {
             // Determine if player is on my team (works for both active users and guests)
             // For active users, use refs. For guests, use demo teams.
             const myTeamIds = userLeagueState === 'active-user'
@@ -734,7 +736,7 @@ const Matchup = () => {
                   goals_against: aggregated.goals_against,
                   weights: goalieScoring,
                   calculated_points: dailyTotalPoints,
-                  games_count: (data || []).filter((r: any) => r.player_id === row.player_id).length
+                  games_count: ((data || []) as any[]).filter((r: any) => r.player_id === row.player_id).length
                 });
               }
             } else {
@@ -944,14 +946,15 @@ const Matchup = () => {
           throw error;
         }
         
+        const statsDataArr = (data || []) as any[];
         console.log('[Matchup] get_daily_game_stats returned:', {
-          rowCount: data?.length || 0,
-          sampleRow: data?.[0] || null
+          rowCount: statsDataArr.length || 0,
+          sampleRow: statsDataArr[0] || null
         });
 
         // Create map of player_id -> comprehensive daily stats
         const statsMap = new Map<number, any>();
-        (data || []).forEach((row: any) => {
+        statsDataArr.forEach((row: any) => {
           // HARD CHECK: Use row.is_goalie for goalie detection (stable, no dependency on team arrays)
           // This ensures accurate math for "Blowout" games where goalies earn negative points
           const isGoalie = row.is_goalie || false;
@@ -1164,16 +1167,17 @@ const Matchup = () => {
         const { data: seasonStatsData, error } = await supabase
           .from('player_season_stats')
           .select('*')
-          .eq('player_id', player.id)
-          .eq('season', DEFAULT_SEASON)
+          .eq('player_id', player.id as any)
+          .eq('season', DEFAULT_SEASON as any)
           .single();
         
         if (!error && seasonStatsData) {
           // Map player_season_stats to stats format
           // CRITICAL: Use NHL.com official stats exclusively (no PBP fallback)
           // This ensures player cards match NHL.com exactly
-          const calculatedGoals = Number(seasonStatsData.nhl_goals ?? 0);
-          const calculatedAssists = Number(seasonStatsData.nhl_assists ?? 0);
+          const statsData = seasonStatsData as any;
+          const calculatedGoals = Number(statsData.nhl_goals ?? 0);
+          const calculatedAssists = Number(statsData.nhl_assists ?? 0);
           
           // ALWAYS calculate points from goals + assists to ensure consistency
           const calculatedPoints = calculatedGoals + calculatedAssists;
@@ -1182,24 +1186,24 @@ const Matchup = () => {
             goals: calculatedGoals,
             assists: calculatedAssists,
             points: calculatedPoints,
-            plusMinus: Number(seasonStatsData.nhl_plus_minus ?? 0),
-            shots: Number(seasonStatsData.nhl_shots_on_goal ?? 0),
-            gamesPlayed: seasonStatsData.games_played ?? 0,
-            hits: Number(seasonStatsData.nhl_hits ?? 0),
-            blockedShots: Number(seasonStatsData.nhl_blocks ?? 0),
-            xGoals: seasonStatsData.x_goals ?? 0,
-            powerPlayPoints: Number(seasonStatsData.nhl_ppp ?? 0),
-            shortHandedPoints: Number(seasonStatsData.nhl_shp ?? 0),
-            pim: Number(seasonStatsData.nhl_pim ?? 0),
-            icetime_seconds: Number(seasonStatsData.nhl_toi_seconds ?? 0),
-            wins: Number(seasonStatsData.nhl_wins ?? 0),
-            saves: Number(seasonStatsData.nhl_saves ?? 0),
-            shots_faced: Number(seasonStatsData.nhl_shots_faced ?? 0),
-            goals_against: Number(seasonStatsData.nhl_goals_against ?? 0),
-            shutouts: Number(seasonStatsData.nhl_shutouts ?? 0),
-            save_pct: seasonStatsData.nhl_save_pct ?? 0,
-            gaa: seasonStatsData.nhl_gaa ?? (seasonStatsData.nhl_goals_against && seasonStatsData.goalie_gp 
-              ? seasonStatsData.nhl_goals_against / seasonStatsData.goalie_gp 
+            plusMinus: Number(statsData.nhl_plus_minus ?? 0),
+            shots: Number(statsData.nhl_shots_on_goal ?? 0),
+            gamesPlayed: statsData.games_played ?? 0,
+            hits: Number(statsData.nhl_hits ?? 0),
+            blockedShots: Number(statsData.nhl_blocks ?? 0),
+            xGoals: statsData.x_goals ?? 0,
+            powerPlayPoints: Number(statsData.nhl_ppp ?? 0),
+            shortHandedPoints: Number(statsData.nhl_shp ?? 0),
+            pim: Number(statsData.nhl_pim ?? 0),
+            icetime_seconds: Number(statsData.nhl_toi_seconds ?? 0),
+            wins: Number(statsData.nhl_wins ?? 0),
+            saves: Number(statsData.nhl_saves ?? 0),
+            shots_faced: Number(statsData.nhl_shots_faced ?? 0),
+            goals_against: Number(statsData.nhl_goals_against ?? 0),
+            shutouts: Number(statsData.nhl_shutouts ?? 0),
+            save_pct: statsData.nhl_save_pct ?? 0,
+            gaa: statsData.nhl_gaa ?? (statsData.nhl_goals_against && statsData.goalie_gp 
+              ? statsData.nhl_goals_against / statsData.goalie_gp 
               : 0)
           };
           setSelectedPlayer(toHockeyPlayer(player, mappedStats));
@@ -1765,7 +1769,7 @@ const Matchup = () => {
       }
       
       // Guard: Prevent running if we've already processed "no league" state
-      if (hasProcessedNoLeague.current && userLeagueState === 'logged-in-no-league') {
+      if (hasProcessedNoLeague.current && (userLeagueState as string) === 'logged-in-no-league') {
         console.log('[MATCHUP] Already processed no-league state, skipping');
         return;
       }
@@ -2003,7 +2007,7 @@ const Matchup = () => {
           const { data: anyMatchups } = await supabase
             .from('matchups')
             .select('week_number')
-            .eq('league_id', currentLeague.id)
+            .eq('league_id' as any, currentLeague.id as any)
             .limit(1);
           
           const hasAnyMatchups = anyMatchups && anyMatchups.length > 0;
@@ -2046,8 +2050,8 @@ const Matchup = () => {
           const { data: allMatchups, error: checkError } = await supabase
             .from('matchups')
             .select('week_number, team1_id, team2_id, league_id')
-            .eq('league_id', currentLeague.id)
-            .eq('week_number', weekToShow);
+            .eq('league_id' as any, currentLeague.id as any)
+            .eq('week_number' as any, weekToShow as any);
           
           console.log('[Matchup] Debug - All matchups for week', weekToShow, ':', allMatchups);
           
@@ -2055,9 +2059,9 @@ const Matchup = () => {
           const { data: allWeeksMatchups } = await supabase
             .from('matchups')
             .select('week_number')
-            .eq('league_id', currentLeague.id);
+            .eq('league_id' as any, currentLeague.id as any);
           
-          const uniqueWeeks = new Set(allWeeksMatchups?.map(m => m.week_number) || []);
+          const uniqueWeeks = new Set((allWeeksMatchups as any[])?.map((m: any) => m.week_number) || []);
           console.log('[Matchup] Debug - All week numbers in database:', Array.from(uniqueWeeks).sort((a, b) => a - b));
           console.log('[Matchup] Debug - Requested week', weekToShow, 'exists in database?', uniqueWeeks.has(weekToShow));
           
@@ -2065,22 +2069,23 @@ const Matchup = () => {
           const { data: userTeamData } = await supabase
             .from('teams')
             .select('id, team_name, owner_id')
-            .eq('league_id', currentLeague.id)
-            .eq('owner_id', user.id)
+            .eq('league_id' as any, currentLeague.id as any)
+            .eq('owner_id' as any, user.id as any)
             .maybeSingle();
           
           console.log('[Matchup] Debug - User team:', userTeamData);
           
           if (allMatchups && allMatchups.length > 0) {
-            console.log('[Matchup] Debug - Matchups exist but user team not found. User team ID:', userTeamData?.id);
-            console.log('[Matchup] Debug - Matchups in week:', allMatchups.map(m => ({
+            const matchupsData = allMatchups as any[];
+            console.log('[Matchup] Debug - Matchups exist but user team not found. User team ID:', (userTeamData as any)?.id);
+            console.log('[Matchup] Debug - Matchups in week:', matchupsData.map((m: any) => ({
               team1: m.team1_id,
               team2: m.team2_id
             })));
             
             // Check if user's team is in any of these matchups
-            const userTeamInMatchups = allMatchups.some(m => 
-              m.team1_id === userTeamData?.id || m.team2_id === userTeamData?.id
+            const userTeamInMatchups = matchupsData.some((m: any) => 
+              m.team1_id === (userTeamData as any)?.id || m.team2_id === (userTeamData as any)?.id
             );
             console.log('[Matchup] Debug - User team in matchups?', userTeamInMatchups);
           }
@@ -2097,12 +2102,14 @@ const Matchup = () => {
             
             // If matchups exist but user's team isn't in them, this is a serious issue - FORCE REGENERATE
             if (allMatchups && allMatchups.length > 0 && userTeamData) {
-              const userTeamInMatchups = allMatchups.some(m => 
-                m.team1_id === userTeamData.id || m.team2_id === userTeamData.id
+              const matchupsArr = allMatchups as any[];
+              const teamData = userTeamData as any;
+              const userTeamInMatchups = matchupsArr.some((m: any) => 
+                m.team1_id === teamData.id || m.team2_id === teamData.id
               );
               
               if (!userTeamInMatchups) {
-                console.error('[Matchup] CRITICAL: Week', weekToShow, 'has matchups but user team', userTeamData.id, 'is not in any of them!');
+                console.error('[Matchup] CRITICAL: Week', weekToShow, 'has matchups but user team', teamData.id, 'is not in any of them!');
                 console.error('[Matchup] FORCING FULL REGENERATION of all matchups...');
                 
                 // Force delete ALL matchups and regenerate
@@ -2112,10 +2119,10 @@ const Matchup = () => {
                 const { teams: allLeagueTeams } = await LeagueService.getLeagueTeams(currentLeague.id);
                 
                 // Verify user's team is in the list
-                const userTeamInList = allLeagueTeams.some(t => t.id === userTeamData.id);
+                const userTeamInList = allLeagueTeams.some(t => t.id === teamData.id);
                 if (!userTeamInList) {
                   console.error('[Matchup] CRITICAL: User team is not in the league teams list!');
-                  setError(`Your team (${userTeamData.id}) is not found in the league teams. This is a data integrity issue.`);
+                  setError(`Your team (${teamData.id}) is not found in the league teams. This is a data integrity issue.`);
                   setLoading(false);
                   return;
                 }
@@ -2454,7 +2461,7 @@ const Matchup = () => {
       const todayGames = player.games.filter(g => {
         if (!g || typeof g !== 'object') return false;
         const gameDate = g.game_date?.split('T')[0];
-        return gameDate === todayStr && (g.status === 'live' || g.status === 'LIVE');
+        return gameDate === todayStr && ((g.status as string) === 'live' || (g.status as string) === 'LIVE');
       });
       return todayGames.length > 0;
     });

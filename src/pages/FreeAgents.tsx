@@ -110,13 +110,14 @@ const FreeAgents = () => {
       let currentLeagueId: string | undefined = undefined;
       if (user) {
         try {
-          const { data: userTeamData } = await supabase
+          const { data: userTeamDataResult } = await supabase
             .from('teams')
             .select('league_id')
-            .eq('owner_id', user.id)
+            .eq('owner_id' as any, user.id as any)
             .maybeSingle();
           
-          if (userTeamData) {
+          if (userTeamDataResult) {
+            const userTeamData = userTeamDataResult as any;
             currentLeagueId = userTeamData.league_id;
             setLeagueId(currentLeagueId);
           }
@@ -332,14 +333,14 @@ const FreeAgents = () => {
       }
 
       // Get current roster size
-      const { data: teamData } = await supabase
+      const { data: teamDataResult } = await supabase
         .from('teams')
         .select('id')
-        .eq('league_id', leagueId)
-        .eq('owner_id', user.id)
+        .eq('league_id' as any, leagueId as any)
+        .eq('owner_id' as any, user.id as any)
         .single();
 
-      if (!teamData) {
+      if (!teamDataResult) {
         toast({
           title: "Error",
           description: "Team not found.",
@@ -347,13 +348,14 @@ const FreeAgents = () => {
         });
         return;
       }
+      const teamData = teamDataResult as any;
 
       // Get lineup data (use maybeSingle to handle case where no lineup exists yet)
-      const { data: lineupData, error: lineupError } = await supabase
+      const { data: lineupDataResult, error: lineupError } = await supabase
         .from('team_lineups')
         .select('starters, bench, ir')
-        .eq('team_id', teamData.id)
-        .eq('league_id', leagueId)
+        .eq('team_id' as any, teamData.id as any)
+        .eq('league_id' as any, leagueId as any)
         .maybeSingle();
 
       // Check for query errors (not just "no rows found")
@@ -368,6 +370,7 @@ const FreeAgents = () => {
         });
         return;
       }
+      const lineupData = lineupDataResult as any;
 
       // Calculate current roster size
       // If lineup exists, use it; otherwise count draft picks
@@ -383,8 +386,8 @@ const FreeAgents = () => {
         const { count: draftPicksCount, error: picksError } = await supabase
           .from('draft_picks')
           .select('*', { count: 'exact', head: true })
-          .eq('team_id', teamData.id)
-          .eq('league_id', leagueId)
+          .eq('team_id' as any, teamData.id as any)
+          .eq('league_id' as any, leagueId as any)
           .is('deleted_at', null);
         
         if (picksError) {
@@ -1187,9 +1190,9 @@ const FreeAgents = () => {
                   </div>
                 )}
               </>
-            )}
+            );
+            })()}
           </TabsContent>
-
           <TabsContent value="schedule" className="space-y-4">
              <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-lg mb-4 flex items-start gap-3">
                 <Calendar className="h-5 w-5 text-blue-500 mt-1 shrink-0" />
@@ -1667,9 +1670,6 @@ const FreeAgents = () => {
             )}
           </TabsContent>
         </Tabs>
-              </>
-              );
-            })()}
 
         {/* Player Stats Modal */}
         <PlayerStatsModal

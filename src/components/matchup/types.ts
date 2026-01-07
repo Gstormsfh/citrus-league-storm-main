@@ -30,10 +30,20 @@ export type MatchupPlayer = {
     xGoals?: number;
   };
   matchupStats?: {
-    goals: number;
-    assists: number;
-    sog: number;
-    xGoals: number;
+    goals?: number;
+    assists?: number;
+    sog?: number;
+    blocks?: number;
+    ppp?: number;
+    shp?: number;
+    hits?: number;
+    pim?: number;
+    xGoals?: number;
+    // Goalie stats
+    wins?: number;
+    saves?: number;
+    shutouts?: number;
+    goals_against?: number;
   };
   garPercentage?: number;
   isToday?: boolean;
