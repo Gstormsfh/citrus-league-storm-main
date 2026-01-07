@@ -1,0 +1,23 @@
+ACTIVATE OPUS MODE
+
+Before making ANY changes, you MUST:
+
+1. Read the original file completely
+2. Show me EXACTLY what will change:
+   - Function: [name]
+   - Line: [number]  
+   - Before: [exact code]
+   - After: [exact code]
+   - Reason: [from plan]
+3. Wait for my confirmation
+4. Implement ONLY the confirmed changes
+5. Verify the changes match what you showed me
+
+CRITICAL RULES:
+- ZERO changes to existing code except what's explicitly in the plan
+- Progress tracking/logging format must be IDENTICAL to original
+- If you're unsure about ANY change, ASK FIRST
+- If you see yourself making "improvements" not in the plan, STOP
+
+Read OPUS_MODE_PROMPT.md for full instructions.
+

@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-fetch_nhl_stats_from_landing.py
+fetch_nhl_stats_from_landing_fast.py
 
 # ╔═══════════════════════════════════════════════════════════════════════════╗
-# ║  ⭐ PPP/SHP SOURCE OF TRUTH (Season Totals)                               ║
+# ║  ⭐ PPP/SHP SOURCE OF TRUTH (Season Totals) - CONCURRENT VERSION          ║
 # ╠═══════════════════════════════════════════════════════════════════════════╣
 # ║  This script fetches SEASON TOTALS from NHL Landing Endpoint.             ║
 # ║  It's the ONLY source for accurate PPP (Power Play Points) and            ║
 # ║  SHP (Shorthanded Points) because the boxscore API lacks PP/SH assists.   ║
 # ║                                                                           ║
-# ║  Run weekly or after the initial 914-player scrape completes.             ║
-# ║  For per-game PPP/SHP, see: sync_ppp_from_gamelog.py                      ║
+# ║  OPTIMIZED VERSION: Uses concurrent requests (3-5 workers) with          ║
+# ║  shared rate limiting to speed up processing while maintaining safety.    ║
 # ║                                                                           ║
-# ║  ⚠️  Uses 3-second delays to avoid rate limiting. DO NOT reduce!         ║
+# ║  ⚠️  Uses 1.5-3 second delays per worker to avoid rate limiting.         ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 
 Fetch all official NHL.com statistics from landing endpoint (api-web.nhle.com).
@@ -27,8 +27,10 @@ Fetches comprehensive stats in a single API call per player:
 import os
 import sys
 import time
+import threading
 import requests
 from typing import Optional, Dict, Tuple, Any
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dotenv import load_dotenv
 from supabase_rest import SupabaseRest
 
@@ -41,6 +43,38 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 NHL_API_BASE = "https://api-web.nhle.com/v1"
 STATS_API_BASE = "https://statsapi.web.nhl.com/api/v1"
 DEFAULT_SEASON = int(os.getenv("CITRUS_DEFAULT_SEASON", "2025"))
+
+
+class SharedRateLimiter:
+    """
+    Thread-safe rate limiter that ensures minimum delay between requests across all workers.
+    """
+    def __init__(self, base_delay: float = 1.5):
+        self.base_delay = base_delay
+        self.lock = threading.Lock()
+        self.last_request_time = 0.0
+        self.request_count = 0
+        self.adaptive_delay = base_delay
+    
+    def wait_if_needed(self):
+        """Wait if needed to maintain rate limit. Thread-safe."""
+        with self.lock:
+            current_time = time.time()
+            elapsed = current_time - self.last_request_time
+            
+            if elapsed < self.adaptive_delay:
+                sleep_time = self.adaptive_delay - elapsed
+                time.sleep(sleep_time)
+            
+            self.last_request_time = time.time()
+            self.request_count += 1
+    
+    def increase_delay(self, new_delay: float):
+        """Increase the delay (e.g., after 429 error). Thread-safe."""
+        with self.lock:
+            if new_delay > self.adaptive_delay:
+                self.adaptive_delay = new_delay
+                print(f"  [RATE LIMIT] Increasing delay to {new_delay}s between requests")
 
 
 def supabase_client() -> SupabaseRest:
@@ -396,9 +430,191 @@ def extract_all_official_stats(landing_data: Dict, target_season: int, is_goalie
     return stats
 
 
+def process_single_player(
+    player: Dict,
+    player_idx: int,
+    total_players: int,
+    db: SupabaseRest,
+    updated_count: Dict,
+    failed_429_players: list,
+    failed_not_found_players: list,
+    failed_error_players: list,
+    rate_limiter: SharedRateLimiter,
+    progress_lock: threading.Lock,
+    last_progress_time: list  # List with single float for mutable reference
+) -> None:
+    """
+    Process a single player. Thread-safe version of the main loop logic.
+    """
+    player_id = _safe_int(player.get("player_id"), 0)
+    player_name = player.get("full_name", "Unknown")
+    if not player_id:
+        return
+    
+    # Determine if player is a goalie (check player_directory)
+    is_goalie = False
+    try:
+        player_dir = db.select("player_directory", select="is_goalie", filters=[("player_id", "eq", player_id), ("season", "eq", DEFAULT_SEASON)], limit=1)
+        if player_dir and len(player_dir) > 0:
+            is_goalie = bool(player_dir[0].get("is_goalie", False))
+    except Exception:
+        pass  # Default to skater if we can't determine
+    
+    # Rate limit before making request
+    rate_limiter.wait_if_needed()
+    
+    # Fetch from NHL API (landing endpoint - primary)
+    landing_data, error_type = fetch_player_landing_data(player_id)
+    
+    # Track failed players for retry phase (thread-safe)
+    if error_type == "429":
+        with progress_lock:
+            failed_429_players.append((player_id, player_name, is_goalie))
+            # Increase delay after first 429
+            if rate_limiter.adaptive_delay < 5.0:
+                rate_limiter.increase_delay(5.0)
+    elif error_type == "not_found":
+        with progress_lock:
+            failed_not_found_players.append((player_id, player_name, is_goalie))
+    
+    if landing_data:
+        stats = extract_all_official_stats(landing_data, DEFAULT_SEASON, is_goalie=is_goalie)
+        
+        # For skaters: Always attempt StatsAPI for hits/blocks (official NHL.com API)
+        # Landing endpoint doesn't provide hits/blocks, so StatsAPI is the source of truth
+        if not is_goalie:
+            season_string = f"{DEFAULT_SEASON}{DEFAULT_SEASON + 1}"  # "20252026"
+            statsapi_data = fetch_player_statsapi_data(player_id, season_string)
+            
+            if statsapi_data:
+                hits, blocks = extract_hits_blocks_from_statsapi(statsapi_data)
+                # Always update with StatsAPI values (even if 0) - this is the official source
+                stats["nhl_hits"] = hits
+                stats["nhl_blocks"] = blocks
+                # Track StatsAPI success (for reporting)
+                if hits > 0 or blocks > 0:
+                    with progress_lock:
+                        updated_count["statsapi_hits_blocks"] = updated_count.get("statsapi_hits_blocks", 0) + 1
+            # If StatsAPI fails, leave as 0 (will be logged in summary)
+        
+        # Update database if we got valid data
+        # Ensure all required keys exist in stats dict
+        if not stats:
+            # No stats extracted - treat as not found
+            with progress_lock:
+                if (player_id, player_name, is_goalie) not in failed_not_found_players:
+                    failed_not_found_players.append((player_id, player_name, is_goalie))
+            return
+        
+        updates = {}
+        
+        if is_goalie:
+            # Goalie stats - use .get() with defaults to avoid KeyError
+            if "goalie_gp" in stats:
+                updates["goalie_gp"] = stats.get("goalie_gp", 0)
+            if "nhl_wins" in stats:
+                updates["nhl_wins"] = stats.get("nhl_wins", 0)
+            if "nhl_losses" in stats:
+                updates["nhl_losses"] = stats.get("nhl_losses", 0)
+            if "nhl_ot_losses" in stats:
+                updates["nhl_ot_losses"] = stats.get("nhl_ot_losses", 0)
+            if "nhl_saves" in stats:
+                updates["nhl_saves"] = stats.get("nhl_saves", 0)
+            if "nhl_shots_faced" in stats:
+                updates["nhl_shots_faced"] = stats.get("nhl_shots_faced", 0)
+            if "nhl_goals_against" in stats:
+                updates["nhl_goals_against"] = stats.get("nhl_goals_against", 0)
+            if "nhl_shutouts" in stats:
+                updates["nhl_shutouts"] = stats.get("nhl_shutouts", 0)
+            if "nhl_save_pct" in stats:
+                updates["nhl_save_pct"] = stats.get("nhl_save_pct")
+            if "nhl_gaa" in stats:
+                updates["nhl_gaa"] = stats.get("nhl_gaa")
+            if "nhl_toi_seconds" in stats and stats.get("nhl_toi_seconds", 0) > 0:
+                updates["nhl_toi_seconds"] = stats.get("nhl_toi_seconds", 0)
+        else:
+            # Skater stats - use .get() with defaults to avoid KeyError
+            if "nhl_goals" in stats:
+                updates["nhl_goals"] = stats.get("nhl_goals", 0)
+            if "nhl_assists" in stats:
+                updates["nhl_assists"] = stats.get("nhl_assists", 0)
+            if "nhl_points" in stats:
+                updates["nhl_points"] = stats.get("nhl_points", 0)
+            if "nhl_plus_minus" in stats:
+                updates["nhl_plus_minus"] = stats.get("nhl_plus_minus", 0)
+            if "nhl_shots_on_goal" in stats:
+                updates["nhl_shots_on_goal"] = stats.get("nhl_shots_on_goal", 0)
+            if "nhl_pim" in stats:
+                updates["nhl_pim"] = stats.get("nhl_pim", 0)
+            # CRITICAL: Update nhl_ppp and nhl_shp from landing endpoint
+            if "nhl_ppp" in stats:
+                updates["nhl_ppp"] = stats.get("nhl_ppp", 0)
+            if "nhl_shp" in stats:
+                updates["nhl_shp"] = stats.get("nhl_shp", 0)
+            # Note: hits and blocks are 0 (not in landing endpoint - need StatsAPI)
+            if "nhl_hits" in stats:
+                updates["nhl_hits"] = stats.get("nhl_hits", 0)
+            if "nhl_blocks" in stats:
+                updates["nhl_blocks"] = stats.get("nhl_blocks", 0)
+            if "nhl_toi_seconds" in stats and stats.get("nhl_toi_seconds", 0) > 0:
+                updates["nhl_toi_seconds"] = stats.get("nhl_toi_seconds", 0)
+        
+        if updates:
+            try:
+                updates["season"] = DEFAULT_SEASON
+                updates["player_id"] = player_id
+                db.upsert("player_season_stats", [updates], on_conflict="season,player_id")
+                
+                # Track what was updated (thread-safe)
+                with progress_lock:
+                    if is_goalie:
+                        updated_count["goalies"] += 1
+                        if updates.get("nhl_wins", 0) > 0:
+                            updated_count["wins"] += 1
+                        if updates.get("nhl_saves", 0) > 0:
+                            updated_count["saves"] += 1
+                        if updates.get("nhl_shutouts", 0) > 0:
+                            updated_count["shutouts"] += 1
+                    else:
+                        updated_count["skaters"] += 1
+                        if updates.get("nhl_goals", 0) > 0:
+                            updated_count["goals"] += 1
+                        if updates.get("nhl_assists", 0) > 0:
+                            updated_count["assists"] += 1
+                        if updates.get("nhl_points", 0) > 0:
+                            updated_count["points"] += 1
+                        if updates.get("nhl_shots_on_goal", 0) > 0:
+                            updated_count["sog"] += 1
+                        if updates.get("nhl_ppp", 0) > 0:
+                            updated_count["ppp"] += 1
+                        if updates.get("nhl_shp", 0) > 0:
+                            updated_count["shp"] += 1
+                        if updates.get("nhl_plus_minus", 0) != 0:
+                            updated_count["plus_minus"] += 1
+                    
+                    if updates.get("nhl_toi_seconds", 0) > 0:
+                        updated_count["toi"] += 1
+                    if updates.get("nhl_pim", 0) > 0:
+                        updated_count["pim"] += 1
+                    
+                    # Progress tracking (every 15 seconds)
+                    current_time = time.time()
+                    if current_time - last_progress_time[0] >= 15:
+                        not_found_count = len(failed_not_found_players)
+                        error_count = 0  # We don't track errors separately in concurrent version
+                        print(f"  [PROGRESS] Processed {player_idx}/{total_players} players ({updated_count['skaters']} skaters, {updated_count['goalies']} goalies updated, {not_found_count} not found, {error_count} errors)...")
+                        last_progress_time[0] = current_time
+            except Exception as e:
+                print(f"  [ERROR] Failed to update player {player_id} ({player_name}): {e}")
+                # Track player for retry
+                with progress_lock:
+                    if (player_id, player_name, is_goalie) not in failed_error_players:
+                        failed_error_players.append((player_id, player_name, is_goalie))
+
+
 def main() -> int:
     print("=" * 80)
-    print("[fetch_nhl_stats_from_landing] STARTING")
+    print("[fetch_nhl_stats_from_landing] STARTING (CONCURRENT VERSION)")
     print("=" * 80)
     print(f"Season: {DEFAULT_SEASON}")
     print("Fetching ALL official NHL.com statistics from landing endpoint...")
@@ -408,6 +624,8 @@ def main() -> int:
     print("  Skaters: Goals, Assists, Points, SOG, PIM, PPP, SHP, TOI, +/-")
     print("  Goalies: Wins, Losses, OTL, Saves, Shots Faced, GA, GAA, SV%, Shutouts, TOI")
     print("  Note: Hits and blocks require StatsAPI fallback (not in landing endpoint)")
+    print()
+    print("OPTIMIZATION: Using 3 concurrent workers with shared rate limiting")
     print()
     
     try:
@@ -456,176 +674,58 @@ def main() -> int:
     not_found_count = 0
     rate_limited_429_count = 0
     error_count = 0
-    last_progress_time = time.time()
     
     # Track failed players for retry phase
     failed_429_players = []  # List of (player_id, player_name, is_goalie) tuples
     failed_not_found_players = []  # List of (player_id, player_name, is_goalie) tuples
+    failed_error_players = []  # List of (player_id, player_name, is_goalie) tuples for processing errors
     
-    # Track base delay - will increase to 5s if 429 detected
-    base_delay = 3
+    # Thread-safe rate limiter and progress tracking
+    rate_limiter = SharedRateLimiter(base_delay=1.5)  # Start with 1.5s, will increase if 429s occur
+    progress_lock = threading.Lock()
+    last_progress_time = [time.time()]  # List for mutable reference
     
-    for idx, player in enumerate(players, 1):
-        player_id = _safe_int(player.get("player_id"), 0)
-        player_name = player.get("full_name", "Unknown")
-        if not player_id:
-            continue
+    # Process players concurrently
+    max_workers = 3  # Start conservative, can increase if stable
+    processed_count = [0]  # Thread-safe counter
+    
+    print(f"[fetch_nhl_stats] Processing {len(players):,} players with {max_workers} concurrent workers...")
+    print()
+    
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Submit all players
+        futures = {}
+        for idx, player in enumerate(players, 1):
+            future = executor.submit(
+                process_single_player,
+                player,
+                idx,
+                len(players),
+                db,
+                updated_count,
+                failed_429_players,
+                failed_not_found_players,
+                failed_error_players,
+                rate_limiter,
+                progress_lock,
+                last_progress_time
+            )
+            futures[future] = idx
         
-        # Determine if player is a goalie (check player_directory)
-        is_goalie = False
-        try:
-            player_dir = db.select("player_directory", select="is_goalie", filters=[("player_id", "eq", player_id), ("season", "eq", DEFAULT_SEASON)], limit=1)
-            if player_dir and len(player_dir) > 0:
-                is_goalie = bool(player_dir[0].get("is_goalie", False))
-        except Exception:
-            pass  # Default to skater if we can't determine
-        
-        # Fetch from NHL API (landing endpoint - primary)
-        landing_data, error_type = fetch_player_landing_data(player_id)
-        
-        # Track failed players for retry phase
-        if error_type == "429":
-            failed_429_players.append((player_id, player_name, is_goalie))
-            rate_limited_429_count += 1
-            # Increase base delay after first 429
-            if base_delay == 3:
-                base_delay = 5
-                print(f"  [RATE LIMIT] Detected 429 error, increasing delay to 5s between requests")
-        elif error_type == "not_found":
-            failed_not_found_players.append((player_id, player_name, is_goalie))
-            not_found_count += 1
-        
-        if landing_data:
-            stats = extract_all_official_stats(landing_data, DEFAULT_SEASON, is_goalie=is_goalie)
-            
-            # For skaters: Always attempt StatsAPI for hits/blocks (official NHL.com API)
-            # Landing endpoint doesn't provide hits/blocks, so StatsAPI is the source of truth
-            if not is_goalie:
-                season_string = f"{DEFAULT_SEASON}{DEFAULT_SEASON + 1}"  # "20252026"
-                statsapi_data = fetch_player_statsapi_data(player_id, season_string)
-                
-                if statsapi_data:
-                    hits, blocks = extract_hits_blocks_from_statsapi(statsapi_data)
-                    # Always update with StatsAPI values (even if 0) - this is the official source
-                    stats["nhl_hits"] = hits
-                    stats["nhl_blocks"] = blocks
-                    # Track StatsAPI success (for reporting)
-                    if hits > 0 or blocks > 0:
-                        updated_count["statsapi_hits_blocks"] = updated_count.get("statsapi_hits_blocks", 0) + 1
-                # If StatsAPI fails, leave as 0 (will be logged in summary)
-            
-            # Update database if we got valid data
-            # Ensure all required keys exist in stats dict
-            if not stats:
-                # No stats extracted - treat as not found
-                if (player_id, player_name, is_goalie) not in failed_not_found_players:
-                    failed_not_found_players.append((player_id, player_name, is_goalie))
-                    not_found_count += 1
-                continue
-            
-            updates = {}
-            
-            if is_goalie:
-                # Goalie stats - use .get() with defaults to avoid KeyError
-                if "goalie_gp" in stats:
-                    updates["goalie_gp"] = stats.get("goalie_gp", 0)
-                if "nhl_wins" in stats:
-                    updates["nhl_wins"] = stats.get("nhl_wins", 0)
-                if "nhl_losses" in stats:
-                    updates["nhl_losses"] = stats.get("nhl_losses", 0)
-                if "nhl_ot_losses" in stats:
-                    updates["nhl_ot_losses"] = stats.get("nhl_ot_losses", 0)
-                if "nhl_saves" in stats:
-                    updates["nhl_saves"] = stats.get("nhl_saves", 0)
-                if "nhl_shots_faced" in stats:
-                    updates["nhl_shots_faced"] = stats.get("nhl_shots_faced", 0)
-                if "nhl_goals_against" in stats:
-                    updates["nhl_goals_against"] = stats.get("nhl_goals_against", 0)
-                if "nhl_shutouts" in stats:
-                    updates["nhl_shutouts"] = stats.get("nhl_shutouts", 0)
-                if "nhl_save_pct" in stats:
-                    updates["nhl_save_pct"] = stats.get("nhl_save_pct")
-                if "nhl_gaa" in stats:
-                    updates["nhl_gaa"] = stats.get("nhl_gaa")
-                if "nhl_toi_seconds" in stats and stats.get("nhl_toi_seconds", 0) > 0:
-                    updates["nhl_toi_seconds"] = stats.get("nhl_toi_seconds", 0)
-            else:
-                # Skater stats - use .get() with defaults to avoid KeyError
-                if "nhl_goals" in stats:
-                    updates["nhl_goals"] = stats.get("nhl_goals", 0)
-                if "nhl_assists" in stats:
-                    updates["nhl_assists"] = stats.get("nhl_assists", 0)
-                if "nhl_points" in stats:
-                    updates["nhl_points"] = stats.get("nhl_points", 0)
-                if "nhl_plus_minus" in stats:
-                    updates["nhl_plus_minus"] = stats.get("nhl_plus_minus", 0)
-                if "nhl_shots_on_goal" in stats:
-                    updates["nhl_shots_on_goal"] = stats.get("nhl_shots_on_goal", 0)
-                if "nhl_pim" in stats:
-                    updates["nhl_pim"] = stats.get("nhl_pim", 0)
-                # CRITICAL: Update nhl_ppp and nhl_shp from landing endpoint
-                if "nhl_ppp" in stats:
-                    updates["nhl_ppp"] = stats.get("nhl_ppp", 0)
-                if "nhl_shp" in stats:
-                    updates["nhl_shp"] = stats.get("nhl_shp", 0)
-                # Note: hits and blocks are 0 (not in landing endpoint - need StatsAPI)
-                if "nhl_hits" in stats:
-                    updates["nhl_hits"] = stats.get("nhl_hits", 0)
-                if "nhl_blocks" in stats:
-                    updates["nhl_blocks"] = stats.get("nhl_blocks", 0)
-                if "nhl_toi_seconds" in stats and stats.get("nhl_toi_seconds", 0) > 0:
-                    updates["nhl_toi_seconds"] = stats.get("nhl_toi_seconds", 0)
-            
-            if updates:
-                try:
-                    updates["season"] = DEFAULT_SEASON
-                    updates["player_id"] = player_id
-                    db.upsert("player_season_stats", [updates], on_conflict="season,player_id")
-                    
-                    # Track what was updated
-                    if is_goalie:
-                        updated_count["goalies"] += 1
-                        if updates.get("nhl_wins", 0) > 0:
-                            updated_count["wins"] += 1
-                        if updates.get("nhl_saves", 0) > 0:
-                            updated_count["saves"] += 1
-                        if updates.get("nhl_shutouts", 0) > 0:
-                            updated_count["shutouts"] += 1
-                    else:
-                        updated_count["skaters"] += 1
-                        if updates.get("nhl_goals", 0) > 0:
-                            updated_count["goals"] += 1
-                        if updates.get("nhl_assists", 0) > 0:
-                            updated_count["assists"] += 1
-                        if updates.get("nhl_points", 0) > 0:
-                            updated_count["points"] += 1
-                        if updates.get("nhl_shots_on_goal", 0) > 0:
-                            updated_count["sog"] += 1
-                        if updates.get("nhl_ppp", 0) > 0:
-                            updated_count["ppp"] += 1
-                        if updates.get("nhl_shp", 0) > 0:
-                            updated_count["shp"] += 1
-                        if updates.get("nhl_plus_minus", 0) != 0:
-                            updated_count["plus_minus"] += 1
-                    
-                    if updates.get("nhl_toi_seconds", 0) > 0:
-                        updated_count["toi"] += 1
-                    if updates.get("nhl_pim", 0) > 0:
-                        updated_count["pim"] += 1
-                except Exception as e:
-                    print(f"  [ERROR] Failed to update player {player_id} ({player_name}): {e}")
+        # Wait for completion and track progress
+        for future in as_completed(futures):
+            try:
+                future.result()  # This will raise if there was an exception
+                processed_count[0] += 1
+            except Exception as e:
+                with progress_lock:
                     error_count += 1
-        
-        # Progress every 15 seconds
-        current_time = time.time()
-        if current_time - last_progress_time >= 15:
-            print(f"  [PROGRESS] Processed {idx}/{len(players)} players ({updated_count['skaters']} skaters, {updated_count['goalies']} goalies updated, {not_found_count} not found, {error_count} errors)...")
-            last_progress_time = current_time
-        
-        # Rate limiting - NHL API allows ~20 requests/minute safely
-        # Base delay (3s or 5s if 429 detected) = safe rate
-        if idx < len(players):
-            time.sleep(base_delay)
+                print(f"  [ERROR] Exception processing player: {e}")
+                # Note: Individual player errors are tracked in process_single_player
+    
+    # Count rate limited players
+    rate_limited_429_count = len(failed_429_players)
+    not_found_count = len(failed_not_found_players)
     
     print()
     print("=" * 80)
@@ -659,8 +759,8 @@ def main() -> int:
         print("      Players will have hits/blocks = 0 (can use PBP-calculated as fallback)")
     print()
     
-    # RETRY PHASE: Retry all failed players
-    players_to_retry = failed_429_players + failed_not_found_players
+    # RETRY PHASE: Retry all failed players (sequential for safety)
+    players_to_retry = failed_429_players + failed_not_found_players + failed_error_players
     retry_updated_count = {
         "skaters": 0,
         "goalies": 0,
@@ -685,8 +785,14 @@ def main() -> int:
     if players_to_retry:
         print("=" * 80)
         print(f"[RETRY PHASE] Retrying {len(players_to_retry)} players that failed...")
+        print(f"  - Rate limited (429): {len(failed_429_players)}")
+        print(f"  - Not found: {len(failed_not_found_players)}")
+        print(f"  - Processing errors: {len(failed_error_players)}")
         print("=" * 80)
         print()
+        
+        # Use higher delay for retry phase (sequential)
+        base_delay = 5.0  # Conservative for retries
         
         for idx, (player_id, player_name, is_goalie) in enumerate(players_to_retry, 1):
             # Fetch from NHL API (landing endpoint - primary)
@@ -798,11 +904,11 @@ def main() -> int:
                                 retry_updated_count["shp"] += 1
                             if updates.get("nhl_plus_minus", 0) != 0:
                                 retry_updated_count["plus_minus"] += 1
-                        
-                        if updates.get("nhl_toi_seconds", 0) > 0:
-                            retry_updated_count["toi"] += 1
-                        if updates.get("nhl_pim", 0) > 0:
-                            retry_updated_count["pim"] += 1
+                            
+                            if updates.get("nhl_toi_seconds", 0) > 0:
+                                retry_updated_count["toi"] += 1
+                            if updates.get("nhl_pim", 0) > 0:
+                                retry_updated_count["pim"] += 1
                     except Exception as e:
                         print(f"  [ERROR] Failed to update player {player_id} ({player_name}) in retry: {e}")
                         retry_error_count += 1
