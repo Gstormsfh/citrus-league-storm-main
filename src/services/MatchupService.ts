@@ -3641,46 +3641,6 @@ export const MatchupService = {
     try {
       console.log(`[MatchupService] Calling RPC get_daily_lineup for team ${teamId}, matchup ${matchupId}, date ${date}`);
       
-      // DIAGNOSTIC: Check raw data in fantasy_daily_rosters
-      const { data: rawRosterData, error: rawError } = await supabase
-        .from('fantasy_daily_rosters')
-        .select('player_id, slot_type, roster_date, team_id, matchup_id')
-        .eq('team_id', teamId)
-        .eq('matchup_id', matchupId)
-        .eq('roster_date', date)
-        .limit(5);
-      
-      console.log(`[MatchupService] DIAGNOSTIC: Raw fantasy_daily_rosters for ${date}:`, {
-        count: rawRosterData?.length || 0,
-        sample: rawRosterData?.[0],
-        error: rawError
-      });
-      
-      // DIAGNOSTIC: Check if players exist in player_directory for this season
-      // NHL season year: Oct-Dec = current year, Jan-Sep = previous year
-      if (rawRosterData && rawRosterData.length > 0) {
-        const dateObj = new Date(date);
-        const year = dateObj.getFullYear();
-        const month = dateObj.getMonth() + 1; // 1-12
-        // NHL season calculation: Oct-Dec uses current year, Jan-Sep uses previous year
-        const nhlSeasonYear = month >= 10 ? year : year - 1;
-        
-        const playerIds = rawRosterData.map(r => r.player_id);
-        const { data: playerDirData, error: playerDirError } = await supabase
-          .from('player_directory')
-          .select('player_id, season, full_name')
-          .in('player_id', playerIds)
-          .eq('season', nhlSeasonYear)
-          .limit(5);
-        
-        console.log(`[MatchupService] DIAGNOSTIC: player_directory for NHL season ${nhlSeasonYear} (date: ${date}):`, {
-          count: playerDirData?.length || 0,
-          sample: playerDirData?.[0],
-          error: playerDirError,
-          requestedPlayerIds: playerIds
-        });
-      }
-      
       const { data, error } = await supabase.rpc('get_daily_lineup', {
         p_team_id: teamId,
         p_matchup_id: matchupId,
