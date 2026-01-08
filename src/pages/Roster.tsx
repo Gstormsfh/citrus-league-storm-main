@@ -34,6 +34,7 @@ import { GameLockService } from '@/services/GameLockService';
 import { getPlayerWithSeasonStats } from '@/utils/playerStatsHelper';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { supabase } from '@/integrations/supabase/client';
+import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 
 // Helper function to transform position to fantasy slot
 const getFantasyPosition = (position: string): 'C' | 'LW' | 'RW' | 'D' | 'G' | 'UTIL' => {
@@ -2015,18 +2016,12 @@ const Roster = () => {
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       <Navbar />
       
-      <main className="pt-24 pb-16">
-        <div className="container max-w-7xl mx-auto px-4 w-full">
-          <div className="flex flex-col lg:flex-row gap-6">
-            {/* Left Sidebar - Roster Depth Widget */}
-            <aside className="lg:w-64 lg:flex-shrink-0 order-2 lg:order-1">
-              <div className="lg:sticky lg:top-24">
-                <RosterDepthWidget />
-              </div>
-            </aside>
-
-            {/* Main Content */}
-            <div className="flex-1 min-w-0 order-1 lg:order-2">
+      <main className="w-full pt-28 pb-16 m-0 p-0">
+        <div className="w-full m-0 p-0">
+          {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
+          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] gap-6 lg:gap-8">
+            {/* Main Content - Scrollable - Appears first on mobile */}
+            <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-4 order-1 lg:order-2">
               {/* Fantasy Team Header */}
               <div className="bg-card rounded-lg shadow-md border p-4 mb-6">
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4">
@@ -2674,7 +2669,47 @@ const Roster = () => {
           </DialogContent>
         </Dialog>
             </div>
+
+            {/* Left Sidebar - At bottom on mobile, left on desktop - World-Class Ad Space */}
+            <aside className="w-full lg:w-auto order-2 lg:order-1">
+              <div className="lg:sticky lg:top-32 space-y-4 lg:space-y-6">
+                {/* Roster Depth Widget */}
+                <RosterDepthWidget />
+
+                {/* Ad Placeholder 1 - Mobile Optimized */}
+                <div className="bg-muted/30 border border-dashed border-muted-foreground/20 rounded-lg p-6 flex flex-col items-center justify-center min-h-[180px] lg:min-h-[200px]">
+                  <div className="text-muted-foreground text-xs text-center space-y-2">
+                    <div className="w-12 h-12 mx-auto bg-muted rounded flex items-center justify-center mb-2">
+                      <span className="text-2xl">📢</span>
+                    </div>
+                    <p className="font-medium">Ad Space</p>
+                    <p className="text-xs opacity-70">300x250</p>
+                  </div>
+                </div>
+
+                {/* Ad Placeholder 2 - Mobile Optimized */}
+                <div className="bg-muted/30 border border-dashed border-muted-foreground/20 rounded-lg p-6 flex flex-col items-center justify-center min-h-[180px] lg:min-h-[200px]">
+                  <div className="text-muted-foreground text-xs text-center space-y-2">
+                    <div className="w-12 h-12 mx-auto bg-muted rounded flex items-center justify-center mb-2">
+                      <span className="text-2xl">📢</span>
+                    </div>
+                    <p className="font-medium">Ad Space</p>
+                    <p className="text-xs opacity-70">300x250</p>
+                  </div>
+                </div>
+              </div>
+            </aside>
+
+            {/* Right Sidebar - Notifications/Chat Panel - Right side on desktop, hidden on mobile */}
+            {userLeagueState === 'active-user' && userTeam?.league_id && (
+              <aside className="hidden lg:block order-3">
+                <div className="lg:sticky lg:top-32 h-[calc(100vh-12rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                  <LeagueNotifications leagueId={userTeam.league_id} />
+                </div>
+              </aside>
+            )}
           </div>
+        </div>
       </main>
       
       <Footer />
