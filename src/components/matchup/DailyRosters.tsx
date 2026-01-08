@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Lock, Unlock } from 'lucide-react';
 import { MatchupPlayer } from './types';
 import { MatchupService, DailyLineupPlayer } from '@/services/MatchupService';
+import { getTodayMST } from '@/utils/timezoneUtils';
 
 interface DailyRostersProps {
   matchupId: string;
@@ -62,12 +63,10 @@ export const DailyRosters = ({
   const datesToShow = selectedDate ? [selectedDate] : allDates;
 
   // Check if a date is in the past (before today)
+  // Use string comparison to avoid timezone issues with Date objects
   const isPastDate = (dateStr: string): boolean => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const date = new Date(dateStr);
-    date.setHours(0, 0, 0, 0);
-    return date < today;
+    const todayStr = getTodayMST(); // Returns YYYY-MM-DD format
+    return dateStr < todayStr;
   };
 
   // Fetch frozen lineups for past days using server-side RPC

@@ -244,18 +244,19 @@ const Matchup = () => {
         return;
       }
       
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const weekStart = new Date(currentMatchup.week_start_date);
+      // Use string comparison to avoid timezone issues
+      const todayStr = getTodayMST();
+      
+      // Parse weekStart carefully to avoid timezone issues
+      const [startYear, startMonth, startDay] = currentMatchup.week_start_date.split('-').map(Number);
       
       // Build list of past dates we need
       const pastDates: string[] = [];
       for (let i = 0; i < 7; i++) {
-        const date = new Date(weekStart);
-        date.setDate(weekStart.getDate() + i);
-        date.setHours(0, 0, 0, 0);
-        if (date < today) {
-          pastDates.push(date.toISOString().split('T')[0]);
+        const dayDate = new Date(startYear, startMonth - 1, startDay + i);
+        const dateStr = `${dayDate.getFullYear()}-${String(dayDate.getMonth() + 1).padStart(2, '0')}-${String(dayDate.getDate()).padStart(2, '0')}`;
+        if (dateStr < todayStr) {
+          pastDates.push(dateStr);
         }
       }
       
@@ -1055,21 +1056,20 @@ const Matchup = () => {
         return;
       }
 
-      // Check if selected date is in the past
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const selected = new Date(selectedDate);
-      selected.setHours(0, 0, 0, 0);
-      const isPast = selected < today;
+      // Check if selected date is in the past - use string comparison to avoid timezone issues
+      // getTodayMST() returns YYYY-MM-DD format, so string comparison works correctly
+      const todayStr = getTodayMST();
+      const isPast = selectedDate < todayStr;
 
       if (!isPast) {
         // Today or future: use current roster (clear frozen lineup)
+        console.log('[Matchup] Selected date is today or future, using current roster:', selectedDate, 'vs today:', todayStr);
         setFrozenDayLineup({ myStarters: [], oppStarters: [], date: null });
         return;
       }
 
       // PAST DAY: Fetch frozen lineup from server
-      console.log('[Matchup] Fetching frozen lineup for past day:', selectedDate);
+      console.log('[Matchup] Fetching frozen lineup for past day:', selectedDate, '(today is:', todayStr, ')');
       
       try {
         const myLineup = await MatchupService.getDailyLineup(
@@ -1955,17 +1955,18 @@ const Matchup = () => {
       return fallback.toFixed(1);
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const weekStart = new Date(currentMatchup.week_start_date);
+    // Use string comparison to avoid timezone issues
+    const todayStr = getTodayMST();
+    
+    // Parse weekStart carefully to avoid timezone issues
+    const [startYear, startMonth, startDay] = currentMatchup.week_start_date.split('-').map(Number);
     let total = 0;
     
     for (let i = 0; i < 7; i++) {
-      const date = new Date(weekStart);
-      date.setDate(weekStart.getDate() + i);
-      date.setHours(0, 0, 0, 0);
-      const dateStr = date.toISOString().split('T')[0];
-      const isPast = date < today;
+      // Create date string directly without Date object timezone issues
+      const dayDate = new Date(startYear, startMonth - 1, startDay + i);
+      const dateStr = `${dayDate.getFullYear()}-${String(dayDate.getMonth() + 1).padStart(2, '0')}-${String(dayDate.getDate()).padStart(2, '0')}`;
+      const isPast = dateStr < todayStr;
       
       // Check if we have a cached score for this date
       const cachedScore = cachedDailyScores.get(dateStr);
@@ -1997,17 +1998,18 @@ const Matchup = () => {
       return fallback.toFixed(1);
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const weekStart = new Date(currentMatchup.week_start_date);
+    // Use string comparison to avoid timezone issues
+    const todayStr = getTodayMST();
+    
+    // Parse weekStart carefully to avoid timezone issues
+    const [startYear, startMonth, startDay] = currentMatchup.week_start_date.split('-').map(Number);
     let total = 0;
     
     for (let i = 0; i < 7; i++) {
-      const date = new Date(weekStart);
-      date.setDate(weekStart.getDate() + i);
-      date.setHours(0, 0, 0, 0);
-      const dateStr = date.toISOString().split('T')[0];
-      const isPast = date < today;
+      // Create date string directly without Date object timezone issues
+      const dayDate = new Date(startYear, startMonth - 1, startDay + i);
+      const dateStr = `${dayDate.getFullYear()}-${String(dayDate.getMonth() + 1).padStart(2, '0')}-${String(dayDate.getDate()).padStart(2, '0')}`;
+      const isPast = dateStr < todayStr;
       
       // Check if we have a cached score for this date
       const cachedScore = cachedDailyScores.get(dateStr);
