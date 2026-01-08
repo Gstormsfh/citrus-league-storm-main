@@ -1183,13 +1183,14 @@ export const LeagueService = {
    * Save lineup configuration to Supabase (with localStorage fallback)
    * Stores player IDs and their slot assignments in shared database
    * @param leagueId - Required for league isolation
+   * @param targetDate - Optional: If set, only save to this specific date (Yahoo-style per-day rosters)
    */
   async saveLineup(teamId: string | number, leagueId: string, lineup: { 
     starters: (string | number)[], 
     bench: (string | number)[], 
     ir: (string | number)[], 
     slotAssignments: Record<string, string> 
-  }) {
+  }, targetDate?: string) {
     console.log('[LeagueService.saveLineup] Called with teamId:', teamId, 'leagueId:', leagueId, 'lineup:', {
       starters: lineup.starters?.length || 0,
       bench: lineup.bench?.length || 0,
@@ -1270,7 +1271,8 @@ export const LeagueService = {
       RosterCacheService.clearCache(String(teamId), leagueId);
       
       // NEW: Create daily roster snapshots for current matchup week
-      await this.createDailyRosterSnapshots(teamId, leagueId, lineupToSave);
+      // If targetDate is set, only save to that specific date (Yahoo-style per-day rosters)
+      await this.createDailyRosterSnapshots(teamId, leagueId, lineupToSave, targetDate);
     } catch (error) {
       // Fallback to localStorage if Supabase fails (offline mode, errors, etc.)
       try {
@@ -1283,7 +1285,7 @@ export const LeagueService = {
         RosterCacheService.clearCache(String(teamId), leagueId);
         
         // Try to create daily snapshots even with localStorage fallback
-        await this.createDailyRosterSnapshots(teamId, leagueId, lineupToSave);
+        await this.createDailyRosterSnapshots(teamId, leagueId, lineupToSave, targetDate);
       } catch (localError) {
         console.error('Failed to save lineup to both Supabase and localStorage:', localError);
       }
@@ -1516,7 +1518,9 @@ export const LeagueService = {
 
   /**
    * Create daily roster snapshots for current matchup week
-   * Updates fantasy_daily_rosters table for all future days in the week
+   * Updates fantasy_daily_rosters table for future days in the week
+   * @param targetDate - If provided, only save to this specific date (Yahoo-style per-day rosters)
+   *                     If not provided, save to today and all future dates (cascade)
    */
   async createDailyRosterSnapshots(
     teamId: string | number,
@@ -1526,7 +1530,8 @@ export const LeagueService = {
       bench: string[],
       ir: string[],
       slotAssignments: Record<string, string>
-    }
+    },
+    targetDate?: string
   ) {
     try {
       // Get current matchup for this team
@@ -1595,20 +1600,38 @@ export const LeagueService = {
       console.log('[createDailyRosterSnapshots] ROSTER LOCKING CHECK');
       console.log('[createDailyRosterSnapshots] Today:', todayStr);
       console.log('[createDailyRosterSnapshots] Week dates:', weekDates.map(d => d.toISOString().split('T')[0]));
+      console.log('[createDailyRosterSnapshots] Target date (Yahoo-style):', targetDate || 'ALL future dates');
       
       // Filter to only include TODAY and FUTURE dates
       // PAST DATES ARE PERMANENTLY FROZEN - NO EXCEPTIONS
-      const futureDates = weekDates.filter(date => {
+      let futureDates = weekDates.filter(date => {
         const dateOnly = new Date(date);
         dateOnly.setHours(0, 0, 0, 0);
         return dateOnly >= todayDate;
       });
       
+      // ============================================================
+      // YAHOO/SLEEPER STYLE: If targetDate is specified, only save
+      // to that specific date (not all future dates)
+      // This enables unique lineups for each day of the week
+      // ============================================================
+      if (targetDate) {
+        futureDates = futureDates.filter(date => 
+          date.toISOString().split('T')[0] === targetDate
+        );
+        console.log('[createDailyRosterSnapshots] 📌 Filtered to single target date:', targetDate);
+        
+        if (futureDates.length === 0) {
+          console.log('[createDailyRosterSnapshots] ⚠️ Target date is in the past or outside week, skipping');
+          return;
+        }
+      }
+      
       const pastDatesSkipped = weekDates.length - futureDates.length;
       console.log('[createDailyRosterSnapshots] Past dates (FROZEN):', pastDatesSkipped);
       console.log('[createDailyRosterSnapshots] Future dates (updatable):', futureDates.map(d => d.toISOString().split('T')[0]));
       
-      if (pastDatesSkipped > 0) {
+      if (pastDatesSkipped > 0 && !targetDate) {
         console.log(`[createDailyRosterSnapshots] ⚠️ LOCKED: ${pastDatesSkipped} past days will NOT be modified`);
       }
       console.log('[createDailyRosterSnapshots] ========================================');
@@ -1957,6 +1980,143 @@ export const LeagueService = {
       } catch (localError) {
         console.error('[getLineup] Failed to load lineup from both Supabase and localStorage:', localError);
       }
+      return null;
+    }
+  },
+
+  /**
+   * Load frozen daily roster from fantasy_daily_rosters table
+   * SINGLE SOURCE OF TRUTH for historical lineup data
+   * Used by both Roster and Matchup tabs to ensure consistency
+   * @param fetchMissingPlayers - If true, fetch dropped/traded players not in allPlayers
+   */
+  async loadDailyRoster<T extends { id: number | string }>(
+    teamId: string,
+    matchupId: string,
+    rosterDate: string,
+    allPlayers: T[],  // All available players to map from (Player[] or HockeyPlayer[])
+    fetchMissingPlayers: boolean = false
+  ): Promise<{
+    starters: T[];
+    bench: T[];
+    ir: T[];
+    slotAssignments: Record<string, string>;
+    missingPlayerIds?: string[];  // Players that were in frozen roster but not found
+  } | null> {
+    try {
+      // EXACT query from Roster.tsx lines 662-667
+      const { data: dailyRosters, error: rosterError } = await supabase
+        .from('fantasy_daily_rosters')
+        .select('player_id, slot_type, slot_id')
+        .eq('team_id', String(teamId))
+        .eq('matchup_id', matchupId)
+        .eq('roster_date', rosterDate);
+
+      if (rosterError) {
+        console.error('[LeagueService.loadDailyRoster] Error:', rosterError);
+        return null;
+      }
+
+      if (!dailyRosters || dailyRosters.length === 0) {
+        console.log('[LeagueService.loadDailyRoster] No frozen roster found for date:', rosterDate);
+        return null;
+      }
+
+      // Build roster arrays - EXACT logic from Roster.tsx lines 674-698
+      const playerMap = new Map(allPlayers.map(p => [String(p.id), p]));
+      const starters: T[] = [];
+      const bench: T[] = [];
+      const ir: T[] = [];
+      const slotAssignments: Record<string, string> = {};
+      const missingPlayerIds: string[] = [];
+
+      // First pass: identify missing players (dropped/traded)
+      dailyRosters.forEach((entry: any) => {
+        const playerId = String(entry.player_id);
+        if (!playerMap.has(playerId)) {
+          missingPlayerIds.push(playerId);
+        }
+      });
+
+      // Fetch missing players if requested (Yahoo/Sleeper behavior for dropped/traded players)
+      if (fetchMissingPlayers && missingPlayerIds.length > 0) {
+        console.log('[LeagueService.loadDailyRoster] Fetching dropped/traded players:', missingPlayerIds);
+        const missingPlayers = await PlayerService.getPlayersByIds(missingPlayerIds);
+        
+        // Transform to same format as allPlayers and add to map
+        missingPlayers.forEach((player: Player) => {
+          // Create a minimal player object that matches T type structure
+          const transformedPlayer = {
+            id: player.id,
+            name: player.full_name || player.name || 'Unknown Player',
+            position: player.position || 'UTIL',
+            number: parseInt(player.jersey_number || '0'),
+            starter: false,
+            stats: {
+              gamesPlayed: player.games_played || 0,
+              goals: player.goals || 0,
+              assists: player.assists || 0,
+              points: player.points || 0,
+              plusMinus: player.plus_minus || 0,
+              shots: player.shots || 0,
+              hits: player.hits || 0,
+              blockedShots: player.blocks || 0,
+              xGoals: player.xGoals || 0,
+              wins: player.wins || 0,
+              saves: player.saves || 0,
+              gaa: player.gaa || 0,
+              svPct: player.svPct || 0,
+            },
+            fantasyPoints: player.fantasy_points || 0,
+            projectedPoints: player.projected_points || 0,
+            team: player.team || '',
+            teamAbbreviation: player.team_abbreviation || player.team || '',
+            headshot_url: player.headshot_url,
+            status: player.status,
+            wasDropped: true,  // Flag for UI to show "no longer on roster" indicator
+          } as unknown as T;
+          
+          playerMap.set(String(player.id), transformedPlayer);
+        });
+        
+        console.log('[LeagueService.loadDailyRoster] Added', missingPlayers.length, 'dropped/traded players to map');
+      }
+
+      // Second pass: build roster arrays
+      dailyRosters.forEach((entry: any) => {
+        const playerId = String(entry.player_id);
+        const player = playerMap.get(playerId);
+        if (!player) {
+          console.warn('[LeagueService.loadDailyRoster] Player still not found:', playerId);
+          return;
+        }
+
+        if (entry.slot_type === 'active') {
+          starters.push(player);
+          if (entry.slot_id) {
+            slotAssignments[playerId] = entry.slot_id;
+          }
+        } else if (entry.slot_type === 'bench') {
+          bench.push(player);
+        } else if (entry.slot_type === 'ir') {
+          ir.push(player);
+          if (entry.slot_id) {
+            slotAssignments[playerId] = entry.slot_id;
+          }
+        }
+      });
+
+      console.log('[LeagueService.loadDailyRoster] Loaded frozen roster:', {
+        date: rosterDate,
+        starters: starters.length,
+        bench: bench.length,
+        ir: ir.length,
+        droppedPlayers: missingPlayerIds.length
+      });
+
+      return { starters, bench, ir, slotAssignments, missingPlayerIds };
+    } catch (error) {
+      console.error('[LeagueService.loadDailyRoster] Exception:', error);
       return null;
     }
   },

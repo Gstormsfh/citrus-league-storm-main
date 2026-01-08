@@ -696,8 +696,9 @@ export const MatchupService = {
         : [];
 
       // Get matchup rosters using existing function
+      // Pass targetDate to load frozen roster for past dates (if provided)
       const { team1Roster, team2Roster, team1SlotAssignments, team2SlotAssignments, error: rostersError } = 
-        await this.getMatchupRosters(matchup, allPlayers, timezone);
+        await this.getMatchupRosters(matchup, allPlayers, timezone, targetDate || undefined);
 
       if (rostersError) {
         return { data: null, error: rostersError };
@@ -830,7 +831,8 @@ export const MatchupService = {
     userId: string,
     weekNumber: number,
     timezone: string = 'America/Denver',
-    existingMatchup?: Matchup | null
+    existingMatchup?: Matchup | null,
+    targetDate?: string // Optional: if provided and is past date, load frozen roster for that date
   ): Promise<{ data: MatchupDataResponse | null; error: any }> {
     try {
       console.log('[MatchupService.getMatchupData] Received parameters:', {
@@ -924,46 +926,60 @@ export const MatchupService = {
         opponentTeamObj = teams.find(t => t.id === opponentTeamId) || null;
       }
 
-      // Optimized: Get roster player IDs first, then load only those players
-      // This is much faster than loading all 1000+ players and filtering
-      // Fallback to old method if optimized loading fails
+      // CRITICAL: For frozen rosters (past dates), we need ALL players to find dropped players
+      // For current rosters, we can optimize by loading only current team players
+      const todayStr = getTodayMST();
+      const isPastDate = targetDate && targetDate < todayStr;
+      
       let rosterPlayers: Player[];
-      try {
-        const [team1PlayerIds, team2PlayerIds] = await Promise.all([
-          withTimeout(this.getRosterPlayerIds(matchup.team1_id, matchup.league_id), 5000, 'getRosterPlayerIds timeout for team1'),
-          matchup.team2_id 
-            ? withTimeout(this.getRosterPlayerIds(matchup.team2_id, matchup.league_id), 5000, 'getRosterPlayerIds timeout for team2')
-            : Promise.resolve([])
-        ]);
-        
-        // Combine and deduplicate player IDs
-        const allRosterPlayerIds = [...new Set([...team1PlayerIds, ...team2PlayerIds])];
-        
-        if (allRosterPlayerIds.length === 0) {
-          console.warn('[MatchupService] No roster player IDs found. Roster may be empty.');
-          rosterPlayers = []; // Return empty array instead of loading all players
-        } else {
-          // Load only roster players (much faster than loading all players)
-          rosterPlayers = await withTimeout(
-            PlayerService.getPlayersByIds(allRosterPlayerIds.map(String)),
-            10000,
-            'getPlayersByIds timeout'
-          );
+      if (isPastDate) {
+        // For past dates: Load ALL players (needed to find dropped players in frozen lineups)
+        console.log('[MatchupService.getMatchupData] Loading ALL players for frozen roster lookup');
+        rosterPlayers = await withTimeout(
+          PlayerService.getAllPlayers(),
+          15000,
+          'getAllPlayers timeout for frozen roster'
+        );
+      } else {
+        // For current/future dates: Optimized - Get roster player IDs first, then load only those players
+        // This is much faster than loading all 1000+ players and filtering
+        try {
+          const [team1PlayerIds, team2PlayerIds] = await Promise.all([
+            withTimeout(this.getRosterPlayerIds(matchup.team1_id, matchup.league_id), 5000, 'getRosterPlayerIds timeout for team1'),
+            matchup.team2_id 
+              ? withTimeout(this.getRosterPlayerIds(matchup.team2_id, matchup.league_id), 5000, 'getRosterPlayerIds timeout for team2')
+              : Promise.resolve([])
+          ]);
           
-          // If optimized loading returned fewer players than expected, log warning but don't fallback
-          if (rosterPlayers.length < allRosterPlayerIds.length * 0.8) {
-            console.warn('[MatchupService] Optimized loading returned fewer players than expected:', {
-              expected: allRosterPlayerIds.length,
-              received: rosterPlayers.length
-            });
-            // Continue with partial roster rather than loading all players
+          // Combine and deduplicate player IDs
+          const allRosterPlayerIds = [...new Set([...team1PlayerIds, ...team2PlayerIds])];
+          
+          if (allRosterPlayerIds.length === 0) {
+            console.warn('[MatchupService] No roster player IDs found. Roster may be empty.');
+            rosterPlayers = []; // Return empty array instead of loading all players
+          } else {
+            // Load only roster players (much faster than loading all players)
+            rosterPlayers = await withTimeout(
+              PlayerService.getPlayersByIds(allRosterPlayerIds.map(String)),
+              10000,
+              'getPlayersByIds timeout'
+            );
+            
+            // If optimized loading returned fewer players than expected, log warning but don't fallback
+            if (rosterPlayers.length < allRosterPlayerIds.length * 0.8) {
+              console.warn('[MatchupService] Optimized loading returned fewer players than expected:', {
+                expected: allRosterPlayerIds.length,
+                received: rosterPlayers.length
+              });
+              // Continue with partial roster rather than loading all players
+            }
           }
+        } catch (error) {
+          console.error('[MatchupService] Error in optimized roster loading:', error);
+          // DO NOT fallback to getAllPlayers - it causes 504 timeouts
+          // Return empty array and let UI show error
+          rosterPlayers = [];
         }
-      } catch (error) {
-        console.error('[MatchupService] Error in optimized roster loading:', error);
-        // DO NOT fallback to getAllPlayers - it causes 504 timeouts
-        // Return empty array and let UI show error
-        rosterPlayers = [];
       }
 
       // Get rosters for both teams
@@ -973,7 +989,7 @@ export const MatchupService = {
         team1SlotAssignments,
         team2SlotAssignments,
         error: rostersError
-      } = await this.getMatchupRosters(matchup, rosterPlayers, timezone);
+      } = await this.getMatchupRosters(matchup, rosterPlayers, timezone, targetDate);
 
       if (rostersError) {
         return { data: null, error: rostersError };
@@ -1746,7 +1762,8 @@ export const MatchupService = {
   async getMatchupRosters(
     matchup: Matchup,
     allPlayers: Player[],
-    timezone: string = 'America/Denver'
+    timezone: string = 'America/Denver',
+    targetDate?: string // Optional: if provided and is past date, use frozen roster for that date
   ): Promise<{ 
     team1Roster: MatchupPlayer[]; 
     team2Roster: MatchupPlayer[]; 
@@ -1772,24 +1789,108 @@ export const MatchupService = {
       const weekStart = new Date(matchup.week_start_date);
       const weekEnd = new Date(matchup.week_end_date);
 
-      // Parallelize: Get rosters and lineups for both teams simultaneously
-      // Note: Clear cache first to ensure we get fresh lineup data
-      this.clearRosterCache(matchup.team1_id, matchup.league_id);
-      if (matchup.team2_id) {
-        this.clearRosterCache(matchup.team2_id, matchup.league_id);
+      // =============================================================================
+      // YAHOO/SLEEPER FROZEN ROSTER LOGIC: Use daily lineup for past dates
+      // =============================================================================
+      // If targetDate is provided and is a past date, use frozen roster from fantasy_daily_rosters
+      // Otherwise, use current lineup from team_lineups (today/future dates)
+      // =============================================================================
+      const todayStr = getTodayMST();
+      let useFrozenRoster = targetDate && targetDate < todayStr;
+      
+      if (useFrozenRoster) {
+        console.log(`[MatchupService.getMatchupRosters] Using frozen roster for date: ${targetDate} (today: ${todayStr})`);
+      } else {
+        // Clear cache for current lineup (only needed when using team_lineups)
+        this.clearRosterCache(matchup.team1_id, matchup.league_id);
+        if (matchup.team2_id) {
+          this.clearRosterCache(matchup.team2_id, matchup.league_id);
+        }
       }
       
-      // Wrap each query in timeout to prevent one slow query from hanging the entire Promise.all()
-      const [team1Roster, team2Roster, team1LineupResult, team2LineupResult] = await Promise.all([
-        withTimeout(this.getTeamRoster(matchup.team1_id, matchup.league_id, allPlayers), 5000, 'getTeamRoster timeout for team1'),
-        matchup.team2_id
-          ? withTimeout(this.getTeamRoster(matchup.team2_id, matchup.league_id, allPlayers), 5000, 'getTeamRoster timeout for team2')
-          : Promise.resolve([]),
-        withTimeout(LeagueService.getLineup(matchup.team1_id, matchup.league_id), 5000, 'getLineup timeout for team1'),
-        matchup.team2_id
-          ? withTimeout(LeagueService.getLineup(matchup.team2_id, matchup.league_id), 5000, 'getLineup timeout for team2')
-          : Promise.resolve(null)
-      ]);
+      // Get rosters: For frozen rosters (past dates), we'll fetch player data from frozen lineup
+      // For current rosters (today/future), use getTeamRoster (current team players)
+      let team1Roster: HockeyPlayer[], team2Roster: HockeyPlayer[];
+      
+      // Get lineups: Use frozen roster for past dates, current lineup for today/future
+      let team1LineupResult, team2LineupResult;
+      
+      if (useFrozenRoster) {
+        // For past dates, use LeagueService.loadDailyRoster (same as Roster tab)
+        // This ensures IDENTICAL query logic and results
+        const [team1FrozenRoster, team2FrozenRoster] = await Promise.all([
+          withTimeout(
+            LeagueService.loadDailyRoster(matchup.team1_id, matchup.id, targetDate!, allPlayers),
+            5000,
+            'loadDailyRoster timeout for team1'
+          ),
+          matchup.team2_id
+            ? withTimeout(
+                LeagueService.loadDailyRoster(matchup.team2_id, matchup.id, targetDate!, allPlayers),
+                5000,
+                'loadDailyRoster timeout for team2'
+              )
+            : Promise.resolve(null)
+        ]);
+        
+        if (!team1FrozenRoster) {
+          console.warn(`[MatchupService] No frozen roster found for team1 on ${targetDate}`);
+          // Fall back to current roster
+          useFrozenRoster = false;
+        } else {
+          // Extract lineup format from frozen roster
+          team1LineupResult = {
+            starters: team1FrozenRoster.starters.map(p => String(p.id)),
+            bench: team1FrozenRoster.bench.map(p => String(p.id)),
+            ir: team1FrozenRoster.ir.map(p => String(p.id)),
+            slotAssignments: team1FrozenRoster.slotAssignments
+          };
+          
+          team2LineupResult = team2FrozenRoster ? {
+            starters: team2FrozenRoster.starters.map(p => String(p.id)),
+            bench: team2FrozenRoster.bench.map(p => String(p.id)),
+            ir: team2FrozenRoster.ir.map(p => String(p.id)),
+            slotAssignments: team2FrozenRoster.slotAssignments
+          } : null;
+          
+          // Build roster from frozen players (already have full Player objects)
+          team1Roster = [
+            ...team1FrozenRoster.starters,
+            ...team1FrozenRoster.bench,
+            ...team1FrozenRoster.ir
+          ].map(p => this.transformToHockeyPlayer(p));
+          
+          team2Roster = team2FrozenRoster ? [
+            ...team2FrozenRoster.starters,
+            ...team2FrozenRoster.bench,
+            ...team2FrozenRoster.ir
+          ].map(p => this.transformToHockeyPlayer(p)) : [];
+          
+          console.log(`[MatchupService.getMatchupRosters] Using frozen rosters from LeagueService:`, {
+            team1: team1Roster.length,
+            team2: team2Roster.length,
+            date: targetDate
+          });
+        }
+      }
+      
+      if (!useFrozenRoster) {
+        // For today/future dates, use current lineup from team_lineups
+        [team1LineupResult, team2LineupResult] = await Promise.all([
+          withTimeout(LeagueService.getLineup(matchup.team1_id, matchup.league_id), 5000, 'getLineup timeout for team1'),
+          matchup.team2_id
+            ? withTimeout(LeagueService.getLineup(matchup.team2_id, matchup.league_id), 5000, 'getLineup timeout for team2')
+            : Promise.resolve(null)
+        ]);
+        
+        // Get rosters from current team (for today/future dates)
+        [team1Roster, team2Roster] = await Promise.all([
+          withTimeout(this.getTeamRoster(matchup.team1_id, matchup.league_id, allPlayers), 5000, 'getTeamRoster timeout for team1'),
+          matchup.team2_id
+            ? withTimeout(this.getTeamRoster(matchup.team2_id, matchup.league_id, allPlayers), 5000, 'getTeamRoster timeout for team2')
+            : Promise.resolve([])
+        ]);
+      }
 
       let team1Lineup = team1LineupResult;
       let team2Lineup = team2LineupResult;
@@ -2985,6 +3086,54 @@ export const MatchupService = {
         error
       };
     }
+  },
+
+  /**
+   * Convert daily lineup (from getDailyLineup RPC) to standard lineup format
+   * Used when loading frozen rosters for past dates
+   * 
+   * @param dailyLineup Array of DailyLineupPlayer from get_daily_lineup RPC
+   * @returns Standard lineup format with starters, bench, ir, and slotAssignments, or null if empty
+   */
+  convertDailyLineupToLineupFormat(
+    dailyLineup: DailyLineupPlayer[]
+  ): { starters: string[]; bench: string[]; ir: string[]; slotAssignments: Record<string, string> } | null {
+    if (!dailyLineup || dailyLineup.length === 0) {
+      console.log('[MatchupService.convertDailyLineupToLineupFormat] Empty daily lineup, returning null');
+      return null;
+    }
+    
+    const starters: string[] = [];
+    const bench: string[] = [];
+    const ir: string[] = [];
+    const slotAssignments: Record<string, string> = {};
+    
+    dailyLineup.forEach(player => {
+      const playerId = String(player.player_id);
+      
+      // Categorize player by slot_type
+      if (player.slot_type === 'active') {
+        starters.push(playerId);
+      } else if (player.slot_type === 'bench') {
+        bench.push(playerId);
+      } else if (player.slot_type === 'ir') {
+        ir.push(playerId);
+      }
+      
+      // Store slot assignment if available
+      if (player.slot_id) {
+        slotAssignments[playerId] = player.slot_id;
+      }
+    });
+    
+    console.log(`[MatchupService.convertDailyLineupToLineupFormat] Converted ${dailyLineup.length} players:`, {
+      starters: starters.length,
+      bench: bench.length,
+      ir: ir.length,
+      slotAssignments: Object.keys(slotAssignments).length
+    });
+    
+    return { starters, bench, ir, slotAssignments };
   },
 
   /**

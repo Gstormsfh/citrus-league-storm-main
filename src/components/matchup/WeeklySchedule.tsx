@@ -20,6 +20,7 @@ interface WeeklyScheduleProps {
   team2Name?: string; // Team 2 name for display
   // Cached scores for past days (frozen, won't change when roster changes)
   cachedDailyScores?: Map<string, { myScore: number; oppScore: number; isLocked: boolean }>;
+  hideScores?: boolean; // If true, hide the points display (for Roster tab)
 }
 
 export const WeeklySchedule = ({
@@ -33,6 +34,7 @@ export const WeeklySchedule = ({
   team1Name,
   team2Name,
   cachedDailyScores,
+  hideScores = false,
 }: WeeklyScheduleProps) => {
   const todayStr = getTodayMST(); // Get today's date string in MST (YYYY-MM-DD)
 
@@ -221,37 +223,39 @@ export const WeeklySchedule = ({
                     </Badge>
                   )}
 
-                  {/* Points Display - Streamlined */}
-                  <div className="w-full mt-1 space-y-1">
-                    {/* Team 1 */}
-                    <div className="flex flex-col gap-0">
-                      <div className="text-[8px] text-muted-foreground/70 font-medium leading-tight line-clamp-2 min-h-[1.5rem] flex items-center justify-center text-center px-0.5" title={team1Name || 'My Team'}>
-                        {team1Name || 'My'}
+                  {/* Points Display - Streamlined (hidden if hideScores is true) */}
+                  {!hideScores && (
+                    <div className="w-full mt-1 space-y-1">
+                      {/* Team 1 */}
+                      <div className="flex flex-col gap-0">
+                        <div className="text-[8px] text-muted-foreground/70 font-medium leading-tight line-clamp-2 min-h-[1.5rem] flex items-center justify-center text-center px-0.5" title={team1Name || 'My Team'}>
+                          {team1Name || 'My'}
+                        </div>
+                        <div className={cn(
+                          "text-xs font-bold text-center leading-tight",
+                          myDailyPointsForDay > 0 ? "text-[hsl(var(--vibrant-green))]" : "text-muted-foreground/60"
+                        )}>
+                          {myDailyPointsForDay.toFixed(1)}
+                        </div>
                       </div>
-                      <div className={cn(
-                        "text-xs font-bold text-center leading-tight",
-                        myDailyPointsForDay > 0 ? "text-[hsl(var(--vibrant-green))]" : "text-muted-foreground/60"
-                      )}>
-                        {myDailyPointsForDay.toFixed(1)}
+                      
+                      {/* Divider - Subtle */}
+                      <div className="h-[0.5px] bg-border/30 w-full"></div>
+                      
+                      {/* Team 2 */}
+                      <div className="flex flex-col gap-0">
+                        <div className="text-[8px] text-muted-foreground/70 font-medium leading-tight line-clamp-2 min-h-[1.5rem] flex items-center justify-center text-center px-0.5" title={team2Name || 'Opponent'}>
+                          {team2Name || 'Opp'}
+                        </div>
+                        <div className={cn(
+                          "text-xs font-bold text-center leading-tight",
+                          oppDailyPointsForDay > 0 ? "text-foreground/70" : "text-muted-foreground/60"
+                        )}>
+                          {oppDailyPointsForDay.toFixed(1)}
+                        </div>
                       </div>
                     </div>
-                    
-                    {/* Divider - Subtle */}
-                    <div className="h-[0.5px] bg-border/30 w-full"></div>
-                    
-                    {/* Team 2 */}
-                    <div className="flex flex-col gap-0">
-                      <div className="text-[8px] text-muted-foreground/70 font-medium leading-tight line-clamp-2 min-h-[1.5rem] flex items-center justify-center text-center px-0.5" title={team2Name || 'Opponent'}>
-                        {team2Name || 'Opp'}
-                      </div>
-                      <div className={cn(
-                        "text-xs font-bold text-center leading-tight",
-                        oppDailyPointsForDay > 0 ? "text-foreground/70" : "text-muted-foreground/60"
-                      )}>
-                        {oppDailyPointsForDay.toFixed(1)}
-                      </div>
-                    </div>
-                  </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
