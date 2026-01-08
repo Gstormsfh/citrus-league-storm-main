@@ -23,6 +23,7 @@ import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { isGuestMode, shouldBlockGuestOperation } from '@/utils/guestHelpers';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
+import { getPlayerWithSeasonStats } from '@/utils/playerStatsHelper';
 
 // Helper function to format position for display (L -> LW, R -> RW)
 const formatPositionForDisplay = (position: string): string => {
@@ -678,47 +679,19 @@ const FreeAgents = () => {
 
   const filteredPlayers = sortPlayers(getFilteredPlayers(players));
 
-  // Helper to convert Player to HockeyPlayer for the modal
-  // Uses the same stat mapping as Matchup tab to ensure consistency
-  const toHockeyPlayer = (p: Player): HockeyPlayer => ({
-    id: p.id,
-    name: p.full_name,
-    position: p.position,
-    number: parseInt(p.jersey_number || '0'),
-    starter: false,
-    stats: {
-      gamesPlayed: p.games_played || 0,
-      goals: p.goals || 0,
-      assists: p.assists || 0,
-      points: p.points || 0,
-      plusMinus: p.plus_minus || 0,
-      shots: p.shots || 0,
-      hits: p.hits || 0,
-      blockedShots: p.blocks || 0,
-      xGoals: p.xGoals || 0,
-      powerPlayPoints: p.ppp || 0,
-      shortHandedPoints: p.shp || 0,
-      pim: p.pim || 0,
-      // Goalie stats
-      wins: p.wins || 0,
-      losses: p.losses || 0,
-      otl: p.ot_losses || 0,
-      gaa: p.goals_against_average || 0,
-      savePct: p.save_percentage || 0,
-      shutouts: p.shutouts || 0,
-      saves: p.saves || 0,
-      goalsAgainst: p.goals_against || 0
-    },
-    team: p.team,
-    teamAbbreviation: p.team,
-    status: p.status === 'injured' ? 'IR' : null,
-    image: p.headshot_url || undefined,
-    projectedPoints: (p.points || 0) / 20
-  });
-
-  const handlePlayerClick = (player: Player) => {
-    setSelectedPlayer(toHockeyPlayer(player));
-    setIsPlayerDialogOpen(true);
+  const handlePlayerClick = async (player: Player) => {
+    // Fetch fresh season stats using unified helper (same as Matchup tab)
+    const playerWithStats = await getPlayerWithSeasonStats(player.id);
+    if (playerWithStats) {
+      setSelectedPlayer(playerWithStats);
+      setIsPlayerDialogOpen(true);
+    } else {
+      toast({
+        title: "Error",
+        description: "Could not load player stats. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   // Derived lists for Summary View

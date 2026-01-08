@@ -3614,5 +3614,153 @@ export const MatchupService = {
         updatedCount: 0
       };
     }
+  },
+
+  /**
+   * Get daily lineup for a team on a specific date (Yahoo/Sleeper architecture)
+   * Returns complete player data ready for display - zero client-side calculation
+   * Uses DataCacheService for caching (15+ minutes for past days)
+   */
+  async getDailyLineup(
+    teamId: string,
+    matchupId: string,
+    date: string
+  ): Promise<DailyLineupPlayer[]> {
+    // Import DataCacheService dynamically to avoid circular deps
+    const { DataCacheService, TTL } = await import('./DataCacheService');
+    
+    const cacheKey = `daily_lineup_${teamId}_${matchupId}_${date}`;
+    
+    // Check cache first (past lineups never change)
+    const cached = DataCacheService.get<DailyLineupPlayer[]>(cacheKey);
+    if (cached) {
+      console.log(`[MatchupService] getDailyLineup cache hit: ${date}, players: ${cached.length}`);
+      return cached;
+    }
+    
+    try {
+      console.log(`[MatchupService] Calling RPC get_daily_lineup for team ${teamId}, matchup ${matchupId}, date ${date}`);
+      
+      // DIAGNOSTIC: Check raw data in fantasy_daily_rosters
+      const { data: rawRosterData, error: rawError } = await supabase
+        .from('fantasy_daily_rosters')
+        .select('player_id, slot_type, roster_date, team_id, matchup_id')
+        .eq('team_id', teamId)
+        .eq('matchup_id', matchupId)
+        .eq('roster_date', date)
+        .limit(5);
+      
+      console.log(`[MatchupService] DIAGNOSTIC: Raw fantasy_daily_rosters for ${date}:`, {
+        count: rawRosterData?.length || 0,
+        sample: rawRosterData?.[0],
+        error: rawError
+      });
+      
+      // DIAGNOSTIC: Check if players exist in player_directory for this season
+      // NHL season year: Oct-Dec = current year, Jan-Sep = previous year
+      if (rawRosterData && rawRosterData.length > 0) {
+        const dateObj = new Date(date);
+        const year = dateObj.getFullYear();
+        const month = dateObj.getMonth() + 1; // 1-12
+        // NHL season calculation: Oct-Dec uses current year, Jan-Sep uses previous year
+        const nhlSeasonYear = month >= 10 ? year : year - 1;
+        
+        const playerIds = rawRosterData.map(r => r.player_id);
+        const { data: playerDirData, error: playerDirError } = await supabase
+          .from('player_directory')
+          .select('player_id, season, full_name')
+          .in('player_id', playerIds)
+          .eq('season', nhlSeasonYear)
+          .limit(5);
+        
+        console.log(`[MatchupService] DIAGNOSTIC: player_directory for NHL season ${nhlSeasonYear} (date: ${date}):`, {
+          count: playerDirData?.length || 0,
+          sample: playerDirData?.[0],
+          error: playerDirError,
+          requestedPlayerIds: playerIds
+        });
+      }
+      
+      const { data, error } = await supabase.rpc('get_daily_lineup', {
+        p_team_id: teamId,
+        p_matchup_id: matchupId,
+        p_date: date
+      });
+      
+      if (error) {
+        console.error('[MatchupService] getDailyLineup RPC error:', error);
+        return [];
+      }
+      
+      console.log(`[MatchupService] RPC returned ${data?.length || 0} players for ${date}`, data);
+      
+      const lineup: DailyLineupPlayer[] = (data || []).map((row: any) => ({
+        player_id: row.player_id,
+        player_name: row.player_name,
+        position: row.player_position,
+        nhl_team: row.nhl_team,
+        headshot_url: row.headshot_url,
+        slot_type: row.slot_type,
+        slot_id: row.slot_id,
+        is_locked: row.is_locked,
+        daily_points: parseFloat(row.daily_points) || 0,
+        goals: row.goals || 0,
+        assists: row.assists || 0,
+        shots_on_goal: row.shots_on_goal || 0,
+        blocks: row.blocks || 0,
+        hits: row.hits || 0,
+        pim: row.pim || 0,
+        ppp: row.ppp || 0,
+        shp: row.shp || 0,
+        wins: row.wins || 0,
+        saves: row.saves || 0,
+        goals_against: row.goals_against || 0,
+        shutouts: row.shutouts || 0,
+        is_goalie: row.is_goalie || false
+      }));
+      
+      if (lineup.length === 0) {
+        console.warn(`[MatchupService] WARNING: No players returned for ${date}. Check if fantasy_daily_rosters has data.`);
+      }
+      
+      // Only cache non-empty results (don't cache empty arrays)
+      if (lineup.length > 0) {
+        DataCacheService.set(cacheKey, lineup, TTL.VERY_LONG);
+        console.log(`[MatchupService] Cached ${lineup.length} players for ${date}`);
+      } else {
+        console.warn(`[MatchupService] NOT caching empty lineup for ${date} - data may be missing`);
+      }
+      
+      return lineup;
+    } catch (error) {
+      console.error('[MatchupService] getDailyLineup exception:', error);
+      return [];
+    }
   }
 };
+
+// Type for daily lineup player returned by RPC
+export interface DailyLineupPlayer {
+  player_id: number;
+  player_name: string;
+  position: string;
+  nhl_team: string;
+  headshot_url: string | null;
+  slot_type: 'active' | 'bench' | 'ir';
+  slot_id: string | null;
+  is_locked: boolean;
+  daily_points: number;
+  goals: number;
+  assists: number;
+  shots_on_goal: number;
+  blocks: number;
+  hits: number;
+  pim: number;
+  ppp: number;
+  shp: number;
+  wins: number;
+  saves: number;
+  goals_against: number;
+  shutouts: number;
+  is_goalie: boolean;
+}

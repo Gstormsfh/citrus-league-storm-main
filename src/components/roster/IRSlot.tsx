@@ -11,6 +11,7 @@ interface IRSlotProps {
   slotAssignments?: Record<string | number, string>; // Map of Player ID -> Slot ID
   onPlayerClick?: (player: HockeyPlayer) => void;
   className?: string;
+  lockedPlayerIds?: Set<string>; // Set of locked player IDs
 }
 
 interface IndividualIRSlotProps {
@@ -19,6 +20,7 @@ interface IndividualIRSlotProps {
   player: HockeyPlayer | undefined;
   isEmpty: boolean;
   onPlayerClick?: (player: HockeyPlayer) => void;
+  lockedPlayerIds?: Set<string>;
 }
 
 const IndividualIRSlot = ({ 
@@ -26,7 +28,8 @@ const IndividualIRSlot = ({
   slotNumber,
   player, 
   isEmpty,
-  onPlayerClick 
+  onPlayerClick,
+  lockedPlayerIds = new Set()
 }: IndividualIRSlotProps) => {
   const { setNodeRef, isOver } = useDroppable({
     id: slotId,
@@ -68,6 +71,7 @@ const IndividualIRSlot = ({
           <HockeyPlayerCard
             player={player}
             isInSlot={true}
+            isLocked={lockedPlayerIds.has(String(player.id))}
             onClick={() => onPlayerClick?.(player)}
             className="border-0 shadow-none bg-transparent"
           />
@@ -95,7 +99,7 @@ const IndividualIRSlot = ({
   );
 };
 
-const IRSlot = ({ players, slotAssignments = {}, onPlayerClick, className }: IRSlotProps) => {
+const IRSlot = ({ players, slotAssignments = {}, onPlayerClick, className, lockedPlayerIds = new Set() }: IRSlotProps) => {
   const getPlayerInSlot = (slotId: string) => {
     const playerId = Object.keys(slotAssignments).find(key => slotAssignments[key] === slotId);
     if (!playerId) return undefined;
@@ -133,6 +137,7 @@ const IRSlot = ({ players, slotAssignments = {}, onPlayerClick, className }: IRS
               player={player}
               isEmpty={!player}
               onPlayerClick={onPlayerClick}
+              lockedPlayerIds={lockedPlayerIds}
             />
           );
         })}

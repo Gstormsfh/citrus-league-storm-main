@@ -18,6 +18,8 @@ interface WeeklyScheduleProps {
   dailyStatsByDate: Map<string, Map<number, { daily_total_points: number }>>;
   team1Name?: string; // Team 1 name for display
   team2Name?: string; // Team 2 name for display
+  // Cached scores for past days (frozen, won't change when roster changes)
+  cachedDailyScores?: Map<string, { myScore: number; oppScore: number; isLocked: boolean }>;
 }
 
 export const WeeklySchedule = ({
@@ -30,6 +32,7 @@ export const WeeklySchedule = ({
   dailyStatsByDate,
   team1Name,
   team2Name,
+  cachedDailyScores,
 }: WeeklyScheduleProps) => {
   const todayStr = getTodayMST(); // Get today's date string in MST (YYYY-MM-DD)
 
@@ -153,25 +156,34 @@ export const WeeklySchedule = ({
           const isPastDate = isPast(date);
           const isSelectedDate = isSelected(date);
           
-          // Calculate daily total from starting lineup players for this day
-          // This matches the "Daily Total" calculation in MatchupComparison
-          const dayStats = dailyStatsByDate.get(date);
-          const myDailyPointsForDay = dayStats 
-            ? myStarters.reduce((sum, player) => {
-                // CRITICAL: Ensure player.id is a number for map lookup (map keys are integers from RPC)
-                const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
-                const playerStats = dayStats.get(playerId);
-                return sum + (playerStats?.daily_total_points ?? 0);
-              }, 0)
-            : 0;
-          const oppDailyPointsForDay = dayStats
-            ? opponentStarters.reduce((sum, player) => {
-                // CRITICAL: Ensure player.id is a number for map lookup (map keys are integers from RPC)
-                const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
-                const playerStats = dayStats.get(playerId);
-                return sum + (playerStats?.daily_total_points ?? 0);
-              }, 0)
-            : 0;
+          // Yahoo/Sleeper-style scoring: Use cached scores for past days, live calculation for today/future
+          const cachedScore = cachedDailyScores?.get(date);
+          
+          let myDailyPointsForDay: number;
+          let oppDailyPointsForDay: number;
+          
+          if (isPastDate && cachedScore?.isLocked) {
+            // Past day: Use frozen cached score (won't change when roster changes)
+            myDailyPointsForDay = cachedScore.myScore;
+            oppDailyPointsForDay = cachedScore.oppScore;
+          } else {
+            // Today or future: Calculate from current roster (reflects roster changes)
+            const dayStats = dailyStatsByDate.get(date);
+            myDailyPointsForDay = dayStats 
+              ? myStarters.reduce((sum, player) => {
+                  const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
+                  const playerStats = dayStats.get(playerId);
+                  return sum + (playerStats?.daily_total_points ?? 0);
+                }, 0)
+              : 0;
+            oppDailyPointsForDay = dayStats
+              ? opponentStarters.reduce((sum, player) => {
+                  const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
+                  const playerStats = dayStats.get(playerId);
+                  return sum + (playerStats?.daily_total_points ?? 0);
+                }, 0)
+              : 0;
+          }
 
           return (
             <Card

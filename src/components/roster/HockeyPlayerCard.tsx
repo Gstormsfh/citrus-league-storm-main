@@ -3,7 +3,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { AlertCircle, Shield, CalendarDays, Skull, Plus } from "lucide-react";
+import { AlertCircle, Shield, CalendarDays, Skull, Plus, Lock } from "lucide-react";
 import { useState } from "react";
 import { CitrusPuckPlayerData, AggregatedPlayerData } from "@/types/citruspuck";
 
@@ -81,6 +81,7 @@ interface HockeyPlayerCardProps {
   draggable?: boolean;
   className?: string;
   isInSlot?: boolean; // Whether the card is in a starter slot
+  isLocked?: boolean; // Whether the player's game has started (locked from moves)
 }
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -90,7 +91,8 @@ const HockeyPlayerCardContent = ({
   onClick, 
   draggable = true, 
   className,
-  isInSlot = false 
+  isInSlot = false,
+  isLocked = false
 }: HockeyPlayerCardProps) => {
   const {
     attributes,
@@ -253,7 +255,10 @@ const HockeyPlayerCardContent = ({
   const maxProjectedPoints = 8; 
   const projectionPercentage = Math.min((projectedPoints / maxProjectedPoints) * 100, 100);
 
-  const dragProps = draggable ? {
+  // Disable drag if player is locked
+  const canDrag = draggable && !isLocked;
+  
+  const dragProps = canDrag ? {
     ...attributes,
     ...listeners,
     isDragging // Ensure isDragging is passed or handled if used elsewhere
@@ -265,19 +270,45 @@ const HockeyPlayerCardContent = ({
       style={style}
       {...dragProps}
       className={cn(
-        "relative overflow-hidden cursor-grab active:cursor-grabbing transition-all",
+        "relative overflow-hidden transition-all",
+        canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed",
         "border hover:shadow-md h-[110px] flex flex-col",
         isInSlot 
           ? "border-border/60 bg-card" 
           : "border-border/40 hover:border-primary/50",
         isDragging && "shadow-xl z-50 opacity-90",
+        isLocked && "opacity-75 bg-muted/30",
         className
       )}
       onClick={onClick}
     >
+      {/* Lock Overlay */}
+      {isLocked && (
+        <div 
+          className="absolute inset-0 bg-background/60 backdrop-blur-[1px] z-20 flex items-center justify-center pointer-events-none"
+          title="Player's game has started - cannot be moved"
+        >
+          <div className="flex flex-col items-center gap-1">
+            <Lock className="w-5 h-5 text-muted-foreground" />
+            <span className="text-[8px] font-semibold text-muted-foreground">LOCKED</span>
+          </div>
+        </div>
+      )}
+
       {/* Compact Header Section */}
       <div className="relative p-1.5 bg-muted/30 border-b border-border/30 flex items-center gap-1.5 min-h-[35px]">
         {getStatusBadge()}
+        
+        {/* Lock Icon Badge */}
+        {isLocked && (
+          <Badge 
+            variant="secondary"
+            className="absolute top-0.5 left-0.5 text-[7px] font-bold h-4 px-1 z-10 gap-0.5 flex items-center bg-yellow-500/20 text-yellow-700 border-yellow-500/30"
+            title="Player's game has started - cannot be moved"
+          >
+            <Lock className="w-2.5 h-2.5" />
+          </Badge>
+        )}
 
         {/* Team Logo */}
         <div className="w-6 h-6 flex-shrink-0 flex items-center justify-center bg-white rounded-full shadow-sm p-0.5">

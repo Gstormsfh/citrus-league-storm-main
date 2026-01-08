@@ -2,6 +2,7 @@ import { Player } from "@/services/PlayerService";
 import { supabase } from "@/integrations/supabase/client";
 import { DraftService } from "./DraftService";
 import { MatchupService } from "./MatchupService";
+import { RosterCacheService } from "./RosterCacheService";
 
 export interface League {
   id: string;
@@ -1189,6 +1190,13 @@ export const LeagueService = {
     ir: (string | number)[], 
     slotAssignments: Record<string, string> 
   }) {
+    console.log('[LeagueService.saveLineup] Called with teamId:', teamId, 'leagueId:', leagueId, 'lineup:', {
+      starters: lineup.starters?.length || 0,
+      bench: lineup.bench?.length || 0,
+      ir: lineup.ir?.length || 0,
+      starterIds: lineup.starters
+    });
+    
     // Read-only guard: Block all lineup saves for demo league EXCEPT during initialization
     // Check if this is initialization (no lineup exists yet) vs user modification (lineup exists)
     if (leagueId === '00000000-0000-0000-0000-000000000001') {
@@ -1258,6 +1266,8 @@ export const LeagueService = {
       
       // Clear roster cache when lineup is saved so matchup page shows updated lineup
       MatchupService.clearRosterCache(String(teamId), leagueId);
+      // Clear roster page cache to force fresh load when user navigates back
+      RosterCacheService.clearCache(String(teamId), leagueId);
       
       // NEW: Create daily roster snapshots for current matchup week
       await this.createDailyRosterSnapshots(teamId, leagueId, lineupToSave);
@@ -1270,12 +1280,237 @@ export const LeagueService = {
         
         // Still clear cache even if using localStorage fallback
         MatchupService.clearRosterCache(String(teamId), leagueId);
+        RosterCacheService.clearCache(String(teamId), leagueId);
         
         // Try to create daily snapshots even with localStorage fallback
         await this.createDailyRosterSnapshots(teamId, leagueId, lineupToSave);
       } catch (localError) {
         console.error('Failed to save lineup to both Supabase and localStorage:', localError);
       }
+    }
+  },
+
+  /**
+   * Backfill missing past day roster records for a matchup
+   * This ensures fantasy_daily_rosters has complete data for score calculation
+   * Only inserts records that DON'T already exist (uses INSERT with ON CONFLICT DO NOTHING)
+   */
+  async backfillMissingDailyRosters(
+    teamId: string | number,
+    leagueId: string,
+    matchupId: string
+  ): Promise<{ backfilledCount: number; error: any }> {
+    try {
+      console.log('[backfillMissingDailyRosters] Starting backfill for team:', teamId, 'matchup:', matchupId);
+      
+      // Get matchup dates
+      const { data: matchup, error: matchupError } = await supabase
+        .from('matchups')
+        .select('id, week_start_date, week_end_date')
+        .eq('id', matchupId)
+        .single();
+      
+      if (matchupError || !matchup) {
+        console.error('[backfillMissingDailyRosters] Matchup not found:', matchupError);
+        return { backfilledCount: 0, error: matchupError };
+      }
+      
+      // Get current lineup for this team
+      const savedLineup = await this.getLineup(teamId, leagueId);
+      if (!savedLineup || !savedLineup.starters) {
+        console.log('[backfillMissingDailyRosters] No saved lineup found, skipping backfill');
+        return { backfilledCount: 0, error: null };
+      }
+      
+      // Generate all dates in the matchup week
+      const weekStart = new Date(matchup.week_start_date);
+      const weekEnd = new Date(matchup.week_end_date);
+      const weekDates: string[] = [];
+      let currentDate = new Date(weekStart);
+      while (currentDate <= weekEnd) {
+        weekDates.push(currentDate.toISOString().split('T')[0]);
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+      
+      // Check which dates already have records
+      const { data: existingRecords } = await supabase
+        .from('fantasy_daily_rosters')
+        .select('roster_date, player_id')
+        .eq('team_id', String(teamId))
+        .eq('matchup_id', matchupId);
+      
+      const existingKeys = new Set(
+        (existingRecords || []).map(r => `${r.player_id}_${r.roster_date}`)
+      );
+      
+      console.log('[backfillMissingDailyRosters] Found', existingKeys.size, 'existing records');
+      
+      // Create records for missing days using current lineup
+      const recordsToInsert: any[] = [];
+      
+      for (const dateStr of weekDates) {
+        // Add starters
+        for (const playerId of savedLineup.starters) {
+          const key = `${playerId}_${dateStr}`;
+          if (!existingKeys.has(key)) {
+            recordsToInsert.push({
+              league_id: leagueId,
+              team_id: String(teamId),
+              matchup_id: matchupId,
+              player_id: parseInt(playerId),
+              roster_date: dateStr,
+              slot_type: 'active',
+              slot_id: savedLineup.slot_assignments?.[playerId] || null,
+              is_locked: true, // Mark as locked since we're backfilling
+              locked_at: new Date().toISOString()
+            });
+          }
+        }
+        
+        // Add bench
+        for (const playerId of savedLineup.bench || []) {
+          const key = `${playerId}_${dateStr}`;
+          if (!existingKeys.has(key)) {
+            recordsToInsert.push({
+              league_id: leagueId,
+              team_id: String(teamId),
+              matchup_id: matchupId,
+              player_id: parseInt(playerId),
+              roster_date: dateStr,
+              slot_type: 'bench',
+              slot_id: null,
+              is_locked: true,
+              locked_at: new Date().toISOString()
+            });
+          }
+        }
+        
+        // Add IR
+        for (const playerId of savedLineup.ir || []) {
+          const key = `${playerId}_${dateStr}`;
+          if (!existingKeys.has(key)) {
+            recordsToInsert.push({
+              league_id: leagueId,
+              team_id: String(teamId),
+              matchup_id: matchupId,
+              player_id: parseInt(playerId),
+              roster_date: dateStr,
+              slot_type: 'ir',
+              slot_id: savedLineup.slot_assignments?.[playerId] || null,
+              is_locked: true,
+              locked_at: new Date().toISOString()
+            });
+          }
+        }
+      }
+      
+      console.log('[backfillMissingDailyRosters] Will insert', recordsToInsert.length, 'missing records');
+      
+      if (recordsToInsert.length > 0) {
+        // Insert with ON CONFLICT DO NOTHING to be safe
+        const { error: insertError } = await supabase
+          .from('fantasy_daily_rosters')
+          .upsert(recordsToInsert, {
+            onConflict: 'team_id,matchup_id,player_id,roster_date',
+            ignoreDuplicates: true // Don't overwrite existing records
+          });
+        
+        if (insertError) {
+          console.error('[backfillMissingDailyRosters] Error inserting records:', insertError);
+          return { backfilledCount: 0, error: insertError };
+        }
+        
+        console.log('[backfillMissingDailyRosters] Successfully backfilled', recordsToInsert.length, 'records');
+      }
+      
+      return { backfilledCount: recordsToInsert.length, error: null };
+      
+    } catch (error) {
+      console.error('[backfillMissingDailyRosters] Exception:', error);
+      return { backfilledCount: 0, error };
+    }
+  },
+
+  /**
+   * Manual backfill for ALL teams in ALL matchups for a league
+   * Use this to ensure all historical data exists
+   */
+  async backfillAllMatchupsForLeague(leagueId: string): Promise<{ 
+    totalBackfilled: number; 
+    matchupsProcessed: number;
+    errors: any[] 
+  }> {
+    try {
+      console.log('[LeagueService] Starting backfill for ALL matchups in league:', leagueId);
+      
+      // Get all matchups for this league
+      const { data: matchups, error: matchupsError } = await supabase
+        .from('matchups')
+        .select('id, team1_id, team2_id, week_start_date, week_end_date')
+        .eq('league_id', leagueId);
+      
+      if (matchupsError) {
+        console.error('[LeagueService] Error fetching matchups:', matchupsError);
+        return { totalBackfilled: 0, matchupsProcessed: 0, errors: [matchupsError] };
+      }
+      
+      if (!matchups || matchups.length === 0) {
+        console.log('[LeagueService] No matchups found for league:', leagueId);
+        return { totalBackfilled: 0, matchupsProcessed: 0, errors: [] };
+      }
+      
+      console.log(`[LeagueService] Found ${matchups.length} matchups to backfill`);
+      
+      let totalBackfilled = 0;
+      const errors: any[] = [];
+      
+      for (const matchup of matchups) {
+        console.log(`[LeagueService] Processing matchup ${matchup.id}...`);
+        
+        // Backfill team1
+        if (matchup.team1_id) {
+          try {
+            const result = await this.backfillMissingDailyRosters(
+              matchup.team1_id,
+              leagueId,
+              matchup.id
+            );
+            totalBackfilled += result.backfilledCount;
+            if (result.error) {
+              errors.push({ matchup: matchup.id, team: 'team1', error: result.error });
+            }
+          } catch (err) {
+            errors.push({ matchup: matchup.id, team: 'team1', error: err });
+          }
+        }
+        
+        // Backfill team2
+        if (matchup.team2_id) {
+          try {
+            const result = await this.backfillMissingDailyRosters(
+              matchup.team2_id,
+              leagueId,
+              matchup.id
+            );
+            totalBackfilled += result.backfilledCount;
+            if (result.error) {
+              errors.push({ matchup: matchup.id, team: 'team2', error: result.error });
+            }
+          } catch (err) {
+            errors.push({ matchup: matchup.id, team: 'team2', error: err });
+          }
+        }
+      }
+      
+      console.log(`[LeagueService] Backfill complete: ${totalBackfilled} records for ${matchups.length} matchups`);
+      if (errors.length > 0) {
+        console.error('[LeagueService] Errors during backfill:', errors);
+      }
+      
+      return { totalBackfilled, matchupsProcessed: matchups.length, errors };
+    } catch (error) {
+      console.error('[LeagueService] Exception in backfillAllMatchupsForLeague:', error);
+      return { totalBackfilled: 0, matchupsProcessed: 0, errors: [error] };
     }
   },
 
@@ -1323,81 +1558,231 @@ export const LeagueService = {
         currentDate.setDate(currentDate.getDate() + 1);
       }
       
-      // For each day, create/update roster snapshot if not locked
-      const rosterRecords: any[] = [];
+      // Get all player IDs and their teams for lock checking
+      const allPlayerIds = [...lineup.starters, ...lineup.bench, ...lineup.ir].map(id => parseInt(id));
       
-      for (const date of weekDates) {
+      // Get player teams from player_directory
+      let playerTeamMap = new Map<number, string>();
+      if (allPlayerIds.length > 0) {
+        const { data: players } = await supabase
+          .from('player_directory')
+          .select('player_id, team_abbrev')
+          .in('player_id', allPlayerIds);
+        
+        if (players) {
+          players.forEach((p: any) => {
+            if (p.team_abbrev) {
+              playerTeamMap.set(p.player_id, p.team_abbrev);
+            }
+          });
+        }
+      }
+      
+      // =============================================================================
+      // CRITICAL FIX: Yahoo/Sleeper/ESPN-style roster locking
+      // =============================================================================
+      // RULE 1: NEVER touch past dates - they are frozen forever
+      // RULE 2: Today's players can only be changed BEFORE their game starts
+      // RULE 3: Future dates are always updatable
+      // =============================================================================
+      const rosterRecords: any[] = [];
+      const now = new Date();
+      const todayStr = now.toISOString().split('T')[0];
+      const todayDate = new Date(todayStr);
+      todayDate.setHours(0, 0, 0, 0);
+      
+      console.log('[createDailyRosterSnapshots] ========================================');
+      console.log('[createDailyRosterSnapshots] ROSTER LOCKING CHECK');
+      console.log('[createDailyRosterSnapshots] Today:', todayStr);
+      console.log('[createDailyRosterSnapshots] Week dates:', weekDates.map(d => d.toISOString().split('T')[0]));
+      
+      // Filter to only include TODAY and FUTURE dates
+      // PAST DATES ARE PERMANENTLY FROZEN - NO EXCEPTIONS
+      const futureDates = weekDates.filter(date => {
+        const dateOnly = new Date(date);
+        dateOnly.setHours(0, 0, 0, 0);
+        return dateOnly >= todayDate;
+      });
+      
+      const pastDatesSkipped = weekDates.length - futureDates.length;
+      console.log('[createDailyRosterSnapshots] Past dates (FROZEN):', pastDatesSkipped);
+      console.log('[createDailyRosterSnapshots] Future dates (updatable):', futureDates.map(d => d.toISOString().split('T')[0]));
+      
+      if (pastDatesSkipped > 0) {
+        console.log(`[createDailyRosterSnapshots] ⚠️ LOCKED: ${pastDatesSkipped} past days will NOT be modified`);
+      }
+      console.log('[createDailyRosterSnapshots] ========================================');
+      
+      for (const date of futureDates) {
         const dateStr = date.toISOString().split('T')[0];
         const dateOnly = new Date(date);
         dateOnly.setHours(0, 0, 0, 0);
         
-        // Check if we can update this date (games haven't started yet)
-        const canUpdate = await this.canUpdateRosterForDate(teamId, dateOnly, lineup);
+        // Check if this is TODAY - if so, check if any games have started
+        // Only lock players whose games have started TODAY
+        const isToday = dateStr === todayStr;
         
-        if (canUpdate) {
-          // Create records for all players
-          // Starters
-          for (const playerId of lineup.starters) {
-            rosterRecords.push({
-              league_id: leagueId,
-              team_id: String(teamId),
-              matchup_id: matchup.id,
-              player_id: parseInt(playerId),
-              roster_date: dateStr,
-              slot_type: 'active',
-              slot_id: lineup.slotAssignments[playerId] || null,
-              is_locked: false,
-              locked_at: null
-            });
+        // Get games for this date to check lock status per player
+        const { data: games } = await supabase
+          .from('nhl_games')
+          .select('game_time, status, home_team, away_team')
+          .eq('game_date', dateStr)
+          .in('status', ['scheduled', 'live', 'final']);
+        
+        // Build map of team -> game info for quick lookup
+        const teamGameMap = new Map<string, { gameTime?: string; status: string }>();
+        (games || []).forEach((game: any) => {
+          if (game.home_team) {
+            teamGameMap.set(game.home_team, { gameTime: game.game_time, status: game.status });
+          }
+          if (game.away_team) {
+            teamGameMap.set(game.away_team, { gameTime: game.game_time, status: game.status });
+          }
+        });
+        
+        // Helper to check if a player is locked for this date (game started or finished)
+        const isPlayerLockedForDate = (playerId: number): boolean => {
+          // Only check lock status for TODAY - future dates are never locked
+          if (!isToday) return false;
+          
+          const team = playerTeamMap.get(playerId);
+          if (!team) return false; // Can't determine team, don't lock
+          
+          const gameInfo = teamGameMap.get(team);
+          if (!gameInfo) return false; // No game scheduled today, not locked
+          
+          // If game is final or live, player is locked
+          if (gameInfo.status === 'final' || gameInfo.status === 'live') {
+            return true;
           }
           
-          // Bench
-          for (const playerId of lineup.bench) {
-            rosterRecords.push({
-              league_id: leagueId,
-              team_id: String(teamId),
-              matchup_id: matchup.id,
-              player_id: parseInt(playerId),
-              roster_date: dateStr,
-              slot_type: 'bench',
-              slot_id: null,
-              is_locked: false,
-              locked_at: null
-            });
+          // If game is scheduled, check if game_time has passed
+          if (gameInfo.status === 'scheduled' && gameInfo.gameTime) {
+            const gameStart = new Date(gameInfo.gameTime);
+            if (gameStart < now) {
+              return true; // Game time has passed
+            }
           }
           
-          // IR
-          for (const playerId of lineup.ir) {
-            rosterRecords.push({
-              league_id: leagueId,
-              team_id: String(teamId),
-              matchup_id: matchup.id,
-              player_id: parseInt(playerId),
-              roster_date: dateStr,
-              slot_type: 'ir',
-              slot_id: lineup.slotAssignments[playerId] || null,
-              is_locked: false,
-              locked_at: null
-            });
-          }
-        } else {
-          console.log(`[createDailyRosterSnapshots] Skipping ${dateStr} - games have started (locked)`);
+          return false;
+        };
+        
+        // Create records for all players with per-player lock status
+        // Starters
+        for (const playerId of lineup.starters) {
+          const pid = parseInt(playerId);
+          const isLocked = isPlayerLockedForDate(pid);
+          rosterRecords.push({
+            league_id: leagueId,
+            team_id: String(teamId),
+            matchup_id: matchup.id,
+            player_id: pid,
+            roster_date: dateStr,
+            slot_type: 'active',
+            slot_id: lineup.slotAssignments[playerId] || null,
+            is_locked: isLocked,
+            locked_at: isLocked ? new Date().toISOString() : null
+          });
+        }
+        
+        // Bench
+        for (const playerId of lineup.bench) {
+          const pid = parseInt(playerId);
+          const isLocked = isPlayerLockedForDate(pid);
+          rosterRecords.push({
+            league_id: leagueId,
+            team_id: String(teamId),
+            matchup_id: matchup.id,
+            player_id: pid,
+            roster_date: dateStr,
+            slot_type: 'bench',
+            slot_id: null,
+            is_locked: isLocked,
+            locked_at: isLocked ? new Date().toISOString() : null
+          });
+        }
+        
+        // IR
+        for (const playerId of lineup.ir) {
+          const pid = parseInt(playerId);
+          const isLocked = isPlayerLockedForDate(pid);
+          rosterRecords.push({
+            league_id: leagueId,
+            team_id: String(teamId),
+            matchup_id: matchup.id,
+            player_id: pid,
+            roster_date: dateStr,
+            slot_type: 'ir',
+            slot_id: lineup.slotAssignments[playerId] || null,
+            is_locked: isLocked,
+            locked_at: isLocked ? new Date().toISOString() : null
+          });
         }
       }
       
-      // Upsert all records
+      // CRITICAL: Query existing locked records to prevent overwriting past days
+      // This prevents users from retroactively changing their lineups
       if (rosterRecords.length > 0) {
-        const { error } = await supabase
-          .from('fantasy_daily_rosters')
-          .upsert(rosterRecords, {
-            onConflict: 'team_id,matchup_id,player_id,roster_date',
-            ignoreDuplicates: false
-          });
+        console.log(`[createDailyRosterSnapshots] Processing ${rosterRecords.length} roster records`);
         
-        if (error) {
-          console.error('[createDailyRosterSnapshots] Error upserting daily rosters:', error);
+        // Query all existing records for this matchup/team that are locked
+        const { data: existingLocked, error: queryError } = await supabase
+          .from('fantasy_daily_rosters')
+          .select('player_id, roster_date, is_locked, slot_type')
+          .eq('team_id', String(teamId))
+          .eq('matchup_id', matchup.id)
+          .eq('is_locked', true);
+        
+        if (queryError) {
+          console.error('[createDailyRosterSnapshots] Error querying locked records:', queryError);
+        }
+        
+        // Create a Set of locked keys for fast lookup
+        const lockedSet = new Set(
+          (existingLocked || []).map(r => `${r.player_id}_${r.roster_date}`)
+        );
+        
+        console.log(`[createDailyRosterSnapshots] Found ${lockedSet.size} locked roster entries`);
+        
+        // Filter out records that are already locked
+        // NEVER overwrite a locked day - this prevents score manipulation
+        const recordsToUpsert = rosterRecords.filter(record => {
+          const recordDate = new Date(record.roster_date);
+          recordDate.setHours(0, 0, 0, 0);
+          
+          // Check if this specific player+date combination is locked
+          const key = `${record.player_id}_${record.roster_date}`;
+          const isLockedInDB = lockedSet.has(key);
+          
+          if (isLockedInDB) {
+            // Skip this record - don't overwrite locked days
+            return false;
+          }
+          
+          return true;
+        });
+        
+        const skippedCount = rosterRecords.length - recordsToUpsert.length;
+        if (skippedCount > 0) {
+          console.log(`[createDailyRosterSnapshots] Skipped ${skippedCount} locked records (preventing retroactive changes)`);
+        }
+        
+        // Upsert only unlocked records
+        if (recordsToUpsert.length > 0) {
+          const { error } = await supabase
+            .from('fantasy_daily_rosters')
+            .upsert(recordsToUpsert, {
+              onConflict: 'team_id,matchup_id,player_id,roster_date',
+              ignoreDuplicates: false
+            });
+          
+          if (error) {
+            console.error('[createDailyRosterSnapshots] Error upserting daily rosters:', error);
+          } else {
+            console.log(`[createDailyRosterSnapshots] Successfully upserted ${recordsToUpsert.length} unlocked roster records`);
+          }
         } else {
-          console.log(`[createDailyRosterSnapshots] Created/updated ${rosterRecords.length} daily roster records`);
+          console.log('[createDailyRosterSnapshots] No unlocked records to upsert (all days are locked)');
         }
       }
     } catch (error) {
@@ -1502,11 +1887,14 @@ export const LeagueService = {
       }
 
       // Try Supabase first (shared database, with league_id for isolation)
+      // Order by updated_at to ensure we get the most recent lineup
       const { data, error } = await supabase
         .from('team_lineups')
-        .select('starters, bench, ir, slot_assignments')
+        .select('starters, bench, ir, slot_assignments, updated_at')
         .eq('team_id', teamId)
         .eq('league_id', leagueId)
+        .order('updated_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
       
       if (error) {

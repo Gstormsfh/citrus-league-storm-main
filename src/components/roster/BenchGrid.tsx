@@ -9,6 +9,7 @@ interface BenchGridProps {
   players: HockeyPlayer[];
   onPlayerClick?: (player: HockeyPlayer) => void;
   className?: string;
+  lockedPlayerIds?: Set<string>; // Set of locked player IDs
 }
 
 // Helper to normalize position to standard abbreviations
@@ -37,7 +38,7 @@ const getPositionBorderColor = (position: string): string => {
   }
 };
 
-const BenchGrid = ({ players, onPlayerClick, className }: BenchGridProps) => {
+const BenchGrid = ({ players, onPlayerClick, className, lockedPlayerIds = new Set() }: BenchGridProps) => {
   const { setNodeRef, isOver } = useDroppable({
     id: 'bench-grid',
     data: {
@@ -78,6 +79,7 @@ const BenchGrid = ({ players, onPlayerClick, className }: BenchGridProps) => {
                     <HockeyPlayerCard
                       player={player}
                       isInSlot={false}
+                      isLocked={lockedPlayerIds.has(String(player.id))}
                       onClick={() => onPlayerClick?.(player)}
                     />
                   </div>

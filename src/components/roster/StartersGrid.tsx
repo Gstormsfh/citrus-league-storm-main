@@ -40,9 +40,10 @@ interface StartersGridProps {
   slotAssignments?: Record<string | number, string>; // Map of Player ID -> Slot ID
   onPlayerClick?: (player: HockeyPlayer) => void;
   className?: string;
+  lockedPlayerIds?: Set<string>; // Set of locked player IDs
 }
 
-const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, className }: StartersGridProps) => {
+const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, className, lockedPlayerIds = new Set() }: StartersGridProps) => {
   
   const getPlayerInSlot = (slotId: string) => {
     // Look for key in slotAssignments where value is slotId
@@ -68,6 +69,7 @@ const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, className 
            isFull={isFull}
            isEmpty={isEmpty}
            onPlayerClick={onPlayerClick}
+           lockedPlayerIds={lockedPlayerIds}
          />
        </div>
      );
@@ -166,6 +168,7 @@ interface PositionSlotProps {
   isFull: boolean;
   isEmpty: boolean;
   onPlayerClick?: (player: HockeyPlayer) => void;
+  lockedPlayerIds?: Set<string>;
 }
 
 const PositionSlot = ({ 
@@ -173,7 +176,8 @@ const PositionSlot = ({
   players, 
   isFull, 
   isEmpty, 
-  onPlayerClick 
+  onPlayerClick,
+  lockedPlayerIds = new Set()
 }: PositionSlotProps) => {
   const { setNodeRef, isOver } = useDroppable({
     id: slot.id,
@@ -234,6 +238,7 @@ const PositionSlot = ({
                 key={player.id}
                 player={player}
                 isInSlot={true}
+                isLocked={lockedPlayerIds.has(String(player.id))}
                 onClick={() => onPlayerClick?.(player)}
                 className="border-0 shadow-none bg-transparent"
               />

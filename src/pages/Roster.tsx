@@ -1,7 +1,7 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, closestCenter } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague, isDemoLeague } from '@/contexts/LeagueContext';
 import { DEMO_LEAGUE_ID } from '@/services/DemoLeagueService';
@@ -12,7 +12,7 @@ import { DemoDataService } from '@/services/DemoDataService';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, TrendingDown, Wand2, Trophy, Activity, ArrowUpRight, Users, Loader2, Calendar, Target, Shield, Skull, Zap, BarChart3, PieChart } from 'lucide-react';
+import { TrendingUp, TrendingDown, Wand2, Trophy, Activity, ArrowUpRight, Users, Loader2, Calendar, Target, Shield, Skull, Zap, BarChart3, PieChart, Lock } from 'lucide-react';
 import LoadingScreen from '@/components/LoadingScreen';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { RosterDepthWidget } from '@/components/gm-office/RosterDepthWidget';
@@ -30,6 +30,8 @@ import { DraftService } from '@/services/DraftService';
 import { CitrusPuckService } from '@/services/CitrusPuckService';
 import { ScheduleService } from '@/services/ScheduleService';
 import { MatchupService } from '@/services/MatchupService';
+import { GameLockService } from '@/services/GameLockService';
+import { getPlayerWithSeasonStats } from '@/utils/playerStatsHelper';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { supabase } from '@/integrations/supabase/client';
 
@@ -218,6 +220,7 @@ const Roster = () => {
   const { userLeagueState, loading: leagueLoading, activeLeagueId, demoLeagueId } = useLeague();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
   const [selectedPlayer, setSelectedPlayer] = useState<HockeyPlayer | null>(null);
   const [isPlayerDialogOpen, setIsPlayerDialogOpen] = useState(false);
   const [pendingAddPlayer, setPendingAddPlayer] = useState<{ id: string; name: string } | null>(null);
@@ -249,6 +252,9 @@ const Roster = () => {
 
   const [selectedPosMetric, setSelectedPosMetric] = useState<'C' | 'LW' | 'RW' | 'D'>('C');
   
+  // Locked players state
+  const [lockedPlayerIds, setLockedPlayerIds] = useState<Set<string>>(new Set());
+  
   // Initial empty roster state
   const [roster, setRoster] = useState<RosterState>({
     starters: [],
@@ -256,6 +262,14 @@ const Roster = () => {
     ir: [],
     slotAssignments: {}
   });
+
+  // Component lifecycle logging
+  useEffect(() => {
+    console.log('[Roster] Component mounted');
+    return () => {
+      console.log('[Roster] Component unmounting');
+    };
+  }, []);
 
   // Calculate positional stats
   const posStats = useMemo(() => calculateTeamCategoryStats(roster.starters), [roster.starters]);
@@ -325,8 +339,18 @@ const Roster = () => {
   // Fetch and adapt players from staging files (SINGLE SOURCE OF TRUTH)
   // Extract loadRoster so it can be called manually for refresh
   const loadRoster = useCallback(async (keepCurrentRoster = false) => {
+    console.log('[Roster] loadRoster called:', {
+      keepCurrentRoster,
+      userLeagueState,
+      leagueLoading,
+      userTeamId,
+      leagueId: userTeam?.league_id,
+      pathname: location.pathname
+    });
+    
     // For guests, load immediately. For logged-in users, wait for league context to finish loading
     if (user && leagueLoading) {
+      console.log('[Roster] Skipping load - league context still loading');
       return; // Don't load roster until we know the user's league state
     }
     
@@ -609,17 +633,27 @@ const Roster = () => {
 
         // Check for saved lineup - but for demo teams, always auto-organize (same as OtherTeam.tsx)
         let savedLineup = null;
+        // CRITICAL: Use userTeamData (local var) not userTeam (state) because setUserTeam is async!
+        const leagueIdForLineup = userTeamData?.league_id;
         if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
           // Demo teams: Always auto-organize (don't check for saved lineups)
           savedLineup = null;
-        } else if (teamId && userTeam?.league_id && !isDemoLeague(userTeam.league_id)) {
-          // Real user team - use actual league_id
-          savedLineup = await LeagueService.getLineup(teamId, userTeam.league_id);
+          console.log('[Roster] Demo user - skipping saved lineup check');
+        } else if (teamId && leagueIdForLineup && !isDemoLeague(leagueIdForLineup)) {
+          // Real user team - use actual league_id from local variable (not stale state)
+          console.log('[Roster] Loading saved lineup for teamId:', teamId, 'leagueId:', leagueIdForLineup);
+          savedLineup = await LeagueService.getLineup(teamId, leagueIdForLineup);
+          console.log('[Roster] Loaded saved lineup:', savedLineup ? {
+            starters: savedLineup.starters?.length || 0,
+            bench: savedLineup.bench?.length || 0,
+            ir: savedLineup.ir?.length || 0,
+            starterIds: savedLineup.starters
+          } : 'NULL');
         }
         
         if (savedLineup) {
           // Restore saved lineup
-          console.log('[Roster] Restoring saved lineup');
+          console.log('[Roster] Restoring saved lineup with', savedLineup.starters?.length, 'starters');
           const playerMap = new Map(transformedPlayers.map(p => [String(p.id), p]));
           const savedPlayerIds = new Set([
             ...savedLineup.starters,
@@ -802,6 +836,12 @@ const Roster = () => {
             hasUtilSlot: Object.values(normalizedSlotAssignments).includes('slot-UTIL'),
             utilSlotPlayer: Object.entries(normalizedSlotAssignments).find(([_, slot]) => slot === 'slot-UTIL')?.[0]
           });
+          console.log('[Roster] Setting roster state from saved lineup:', {
+            starters: starters.length,
+            bench: bench.length,
+            ir: ir.length,
+            slotAssignments: Object.keys(normalizedSlotAssignments).length
+          });
           setRoster({ starters, bench, ir, slotAssignments: normalizedSlotAssignments });
         } else {
           // No saved lineup - use EXACT SAME LOGIC AS OtherTeam.tsx
@@ -846,6 +886,12 @@ const Roster = () => {
             }
           });
           
+          console.log('[Roster] Setting roster state (auto-organized, no saved lineup):', {
+            starters: starters.length,
+            bench: bench.length,
+            ir: ir.length,
+            slotAssignments: Object.keys(assignments).length
+          });
           setRoster({ starters, bench, ir, slotAssignments: assignments });
           
           // Save initial lineup (only for logged-in users with actual teams, not demo league)
@@ -1011,10 +1057,139 @@ const Roster = () => {
     }
   }, [loadRoster, userLeagueState, leagueLoading]);
 
+  // Defensive State Management: Multiple reload triggers to ensure fresh data
+  
+  // 1. Visibility change (tab becomes active)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && userTeamId && (userLeagueState === 'guest' || !leagueLoading)) {
+        console.log('[Roster] Tab became visible, reloading roster to get latest changes');
+        loadRoster(true);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [loadRoster, userTeamId, userLeagueState, leagueLoading]);
+
+  // 2. Window focus (user returns to browser window)
+  useEffect(() => {
+    const handleFocus = () => {
+      if (document.visibilityState === 'visible' && userTeamId && (userLeagueState === 'guest' || !leagueLoading)) {
+        console.log('[Roster] Window gained focus, reloading roster to get latest changes');
+        loadRoster(true);
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [loadRoster, userTeamId, userLeagueState, leagueLoading]);
+
+  // 3. Storage event (changes from other tabs - future-proof for cross-tab sync)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      // If another tab saved a lineup for this team, reload
+      if (e.key === `lineup_${userTeamId}_${userTeam?.league_id}` && userTeamId) {
+        console.log('[Roster] Detected lineup change in another tab, reloading');
+        loadRoster(true);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [loadRoster, userTeamId, userTeam?.league_id]);
+
+  // Track React Router navigation key changes (more reliable than pathname)
+  const lastLocationKeyRef = useRef(location.key);
+
+  // Reload roster when navigating to this route (using location.key for better detection)
+  useEffect(() => {
+    // location.key changes on every navigation, even within the same path
+    const isNavigationChange = lastLocationKeyRef.current !== location.key;
+    const isRosterPage = location.pathname === '/roster';
+    
+    if (isNavigationChange && isRosterPage && (userLeagueState === 'guest' || !leagueLoading)) {
+      console.log('[Roster] Detected navigation to roster page (key changed from', lastLocationKeyRef.current, 'to', location.key, ') - reloading to get latest changes');
+      loadRoster(true); // Keep current roster visible during refresh
+    }
+    
+    lastLocationKeyRef.current = location.key;
+  }, [location.key, location.pathname, loadRoster, userLeagueState, leagueLoading]);
+
   // Expose refreshRoster function for manual refresh (e.g., after add/drop)
   const refreshRoster = useCallback(() => {
     loadRoster(true); // Keep current roster visible during refresh
   }, [loadRoster]);
+
+  // Fetch locked player IDs based on game start times
+  const fetchLockedPlayerIds = useCallback(async () => {
+    try {
+      const allPlayers = [...roster.starters, ...roster.bench, ...roster.ir];
+      if (allPlayers.length === 0) {
+        setLockedPlayerIds(new Set());
+        return;
+      }
+
+      const lockedIds = await GameLockService.getLockedPlayerIds(allPlayers);
+      setLockedPlayerIds(lockedIds);
+    } catch (error) {
+      console.error('[Roster] Error fetching locked player IDs:', error);
+      // Fail open - don't lock players on error
+      setLockedPlayerIds(new Set());
+    }
+  }, [roster.starters, roster.bench, roster.ir]);
+
+  // Fetch locked player IDs when roster changes
+  useEffect(() => {
+    if (roster.starters.length > 0 || roster.bench.length > 0 || roster.ir.length > 0) {
+      fetchLockedPlayerIds();
+    }
+  }, [fetchLockedPlayerIds]);
+
+  // Periodically refresh lock status (every 30 seconds)
+  useEffect(() => {
+    if (roster.starters.length === 0 && roster.bench.length === 0 && roster.ir.length === 0) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      fetchLockedPlayerIds();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [fetchLockedPlayerIds]);
+
+  // Auto-save lineup when leaving page (backup)
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Only save if user has a real team (not demo)
+      if (userTeamId && user && userTeam?.league_id && !isDemoLeague(userTeam.league_id)) {
+        // Use navigator.sendBeacon or a synchronous save if possible
+        // For now, we'll rely on the saves in handleDragEnd
+        // This is just a safety net - the main saves happen on every drag
+        const lineupToSave = {
+          starters: roster.starters.map(p => p.id),
+          bench: roster.bench.map(p => p.id),
+          ir: roster.ir.map(p => p.id),
+          slotAssignments: roster.slotAssignments
+        };
+        
+        // Use sendBeacon for reliable save on page unload
+        const data = JSON.stringify({
+          teamId: userTeamId,
+          leagueId: userTeam.league_id,
+          lineup: lineupToSave
+        });
+        
+        // Note: This would require a special endpoint that accepts beacons
+        // For now, we rely on the saves in handleDragEnd which happen immediately
+        // The beforeunload is mainly for user awareness
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [roster, userTeamId, user, userTeam]);
 
   // Calculate team stats from league data
   useEffect(() => {
@@ -1475,9 +1650,22 @@ const Roster = () => {
     return [...roster.starters, ...roster.bench, ...roster.ir].find(p => p.id === activeId) || null;
   }, [activeId, roster]);
 
-  const handlePlayerClick = (player: HockeyPlayer) => {
-    setSelectedPlayer(player);
-    setIsPlayerDialogOpen(true);
+  const handlePlayerClick = async (player: HockeyPlayer) => {
+    // Fetch fresh season stats using unified helper (same as Matchup and FreeAgents tabs)
+    const playerWithStats = await getPlayerWithSeasonStats(player.id);
+    if (playerWithStats) {
+      setSelectedPlayer(playerWithStats);
+      setIsPlayerDialogOpen(true);
+    } else {
+      // Fallback to using the player data we already have
+      setSelectedPlayer(player);
+      setIsPlayerDialogOpen(true);
+      toast({
+        title: "Warning",
+        description: "Could not fetch updated stats. Showing cached data.",
+        variant: "default"
+      });
+    }
   };
 
   // Validate roster state - check if any player in IR slot has returned to ACT status
@@ -1577,6 +1765,16 @@ const Roster = () => {
     const player = allPlayers.find(p => p.id === playerId);
     
     if (!player) return;
+
+    // Check if player is locked (game has started)
+    if (lockedPlayerIds.has(String(playerId))) {
+      toast({
+        title: "Player Locked",
+        description: `${player.name}'s game has started. Players cannot be moved once their game begins.`,
+        variant: "destructive",
+      });
+      return;
+    }
 
     // Identify if dropping onto a player or an empty slot
     const droppedOnPlayer = allPlayers.find(p => p.id === targetId); 
@@ -1915,6 +2113,21 @@ const Roster = () => {
                     </p>
                   </div>
                 )}
+                
+                {/* Locked players banner */}
+                {lockedPlayerIds.size > 0 && (userLeagueState === 'active-user' && !(userTeam && isDemoLeague(userTeam.league_id))) && (
+                  <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                    <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                      <Lock className="w-4 h-4" />
+                      <span className="text-sm font-medium">
+                        {lockedPlayerIds.size} player{lockedPlayerIds.size !== 1 ? 's' : ''} locked
+                      </span>
+                    </div>
+                    <p className="text-xs text-blue-600/80 dark:text-blue-400/80 mt-1">
+                      Players whose games have started cannot be moved. Locked players are marked with a lock icon.
+                    </p>
+                  </div>
+                )}
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-bold">Lineup</h2>
                     <ToggleGroup type="single" value={statView} onValueChange={(v) => v && setStatView(v as any)} className="bg-muted/50 p-1 rounded-lg">
@@ -1980,17 +2193,20 @@ const Roster = () => {
                         players={roster.starters}
                         slotAssignments={roster.slotAssignments}
                         onPlayerClick={handlePlayerClick}
+                        lockedPlayerIds={lockedPlayerIds}
                       />
                       
                       <BenchGrid 
                         players={roster.bench}
                         onPlayerClick={handlePlayerClick}
+                        lockedPlayerIds={lockedPlayerIds}
                       />
                       
                       <IRSlot 
                         players={roster.ir}
                         slotAssignments={roster.slotAssignments}
                         onPlayerClick={handlePlayerClick}
+                        lockedPlayerIds={lockedPlayerIds}
                       />
                     </div>
                   ) : (
@@ -2004,17 +2220,20 @@ const Roster = () => {
                         players={roster.starters}
                         slotAssignments={roster.slotAssignments}
                         onPlayerClick={handlePlayerClick}
+                        lockedPlayerIds={lockedPlayerIds}
                       />
                       
                       <BenchGrid 
                         players={roster.bench}
                         onPlayerClick={handlePlayerClick}
+                        lockedPlayerIds={lockedPlayerIds}
                       />
                       
                       <IRSlot 
                         players={roster.ir}
                         slotAssignments={roster.slotAssignments}
                         onPlayerClick={handlePlayerClick}
+                        lockedPlayerIds={lockedPlayerIds}
                       />
                     </div>
 

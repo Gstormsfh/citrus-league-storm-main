@@ -28,6 +28,8 @@ import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, ge
 import LoadingScreen from '@/components/LoadingScreen';
 import { DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeagueService';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
+import { MatchupScoreJobService } from '@/services/MatchupScoreJobService';
+import { DataCacheService, TTL } from '@/services/DataCacheService';
 
 const Matchup = () => {
   const { user, profile } = useAuth();
@@ -41,6 +43,18 @@ const Matchup = () => {
   const [dailyStatsMap, setDailyStatsMap] = useState<Map<number, any>>(new Map()); // For selected date (or today)
   const [dailyStatsByDate, setDailyStatsByDate] = useState<Map<string, Map<number, any>>>(new Map()); // For all 7 days
   const [projectionsByDate, setProjectionsByDate] = useState<Map<string, Map<number, any>>>(new Map()); // Cache projections per date
+  // Cached daily scores for past days (frozen, won't change when roster changes)
+  const [cachedDailyScores, setCachedDailyScores] = useState<Map<string, { 
+    myScore: number; 
+    oppScore: number; 
+    isLocked: boolean 
+  }>>(new Map());
+  // Frozen lineup for when viewing a past day (Yahoo/Sleeper style)
+  const [frozenDayLineup, setFrozenDayLineup] = useState<{
+    myStarters: MatchupPlayer[];
+    oppStarters: MatchupPlayer[];
+    date: string | null;
+  }>({ myStarters: [], oppStarters: [], date: null });
   // Start loading as true to prevent initial flash of content
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -108,6 +122,220 @@ const Matchup = () => {
   const [myTeamRecord, setMyTeamRecord] = useState<{ wins: number; losses: number }>({ wins: 0, losses: 0 });
   const [opponentTeamRecord, setOpponentTeamRecord] = useState<{ wins: number; losses: number }>({ wins: 0, losses: 0 });
   const [currentMatchup, setCurrentMatchup] = useState<MatchupType | null>(null);
+
+  // Trigger background job to calculate and cache matchup scores
+  // Also backfills any missing daily roster records
+  // After job completes, refresh matchup to get updated scores
+  useEffect(() => {
+    if (!currentMatchup) {
+      return;
+    }
+
+    const runBackfillAndCalculate = async () => {
+      console.log('[Matchup] Starting data integrity check for matchup:', currentMatchup.id);
+      
+      // Step 1: Backfill missing daily roster records for both teams
+      // This ensures fantasy_daily_rosters has complete data
+      if (currentMatchup.team1_id) {
+        try {
+          console.log('[Matchup] Running backfill for team1:', currentMatchup.team1_id);
+          const result = await LeagueService.backfillMissingDailyRosters(
+            currentMatchup.team1_id,
+            currentMatchup.league_id,
+            currentMatchup.id
+          );
+          console.log('[Matchup] Backfill result for team1:', result);
+          if (result.backfilledCount > 0) {
+            console.log('[Matchup] Backfilled', result.backfilledCount, 'records for team1');
+          } else if (result.error) {
+            console.error('[Matchup] Backfill error for team1:', result.error);
+          } else {
+            console.log('[Matchup] No records to backfill for team1 (all exist)');
+          }
+        } catch (err) {
+          console.error('[Matchup] Team1 backfill exception:', err);
+        }
+      }
+      
+      if (currentMatchup.team2_id) {
+        try {
+          console.log('[Matchup] Running backfill for team2:', currentMatchup.team2_id);
+          const result = await LeagueService.backfillMissingDailyRosters(
+            currentMatchup.team2_id,
+            currentMatchup.league_id,
+            currentMatchup.id
+          );
+          console.log('[Matchup] Backfill result for team2:', result);
+          if (result.backfilledCount > 0) {
+            console.log('[Matchup] Backfilled', result.backfilledCount, 'records for team2');
+          } else if (result.error) {
+            console.error('[Matchup] Backfill error for team2:', result.error);
+          } else {
+            console.log('[Matchup] No records to backfill for team2 (all exist)');
+          }
+        } catch (err) {
+          console.error('[Matchup] Team2 backfill exception:', err);
+        }
+      }
+      
+      // Step 2: Calculate and store matchup scores
+      if (currentMatchup.status === 'in_progress' || currentMatchup.status === 'scheduled') {
+        console.log('[Matchup] Triggering background score calculation job for league:', currentMatchup.league_id);
+        try {
+          const result = await MatchupScoreJobService.runJob(currentMatchup.league_id);
+          console.log('[Matchup] Background job completed:', result);
+          
+          // Step 3: Refresh matchup data to get updated scores from DB
+          if (result.updatedCount > 0) {
+            console.log('[Matchup] Refreshing matchup data after score update...');
+            const { data: refreshedMatchup } = await supabase
+              .from('matchups')
+              .select('team1_score, team2_score')
+              .eq('id' as any, currentMatchup.id as any)
+              .single();
+            
+            if (refreshedMatchup) {
+              const scores = refreshedMatchup as any;
+              // Update currentMatchup with new scores (this triggers re-render)
+              setCurrentMatchup(prev => prev ? {
+                ...prev,
+                team1_score: scores.team1_score,
+                team2_score: scores.team2_score
+              } : null);
+              console.log('[Matchup] Matchup scores refreshed:', scores);
+            }
+          }
+        } catch (err) {
+          console.error('[Matchup] Background job failed (non-blocking):', err);
+        }
+      }
+    };
+    
+    // Fire-and-forget
+    runBackfillAndCalculate();
+  }, [currentMatchup?.id]);
+
+  // Fetch and cache daily scores for past days (Yahoo/Sleeper frozen scoring)
+  // OPTIMIZED: Uses DataCacheService to prevent redundant fetches + single batched query
+  // FIXED: Now works for ANY matchup (user's or other teams) by using matchup's team1/team2 directly
+  useEffect(() => {
+    const fetchCachedScores = async () => {
+      // CRITICAL FIX: Don't require userTeam - use the matchup's teams directly
+      // This allows viewing other matchups (from dropdown) to work correctly
+      if (!currentMatchup || dailyStatsByDate.size === 0) {
+        return;
+      }
+      
+      // Get both teams from the matchup (not from userTeam)
+      const team1Id = currentMatchup.team1_id;
+      const team2Id = currentMatchup.team2_id;
+      
+      if (!team1Id) {
+        console.warn('[Matchup] No team1_id in matchup, skipping cached scores');
+        return;
+      }
+      
+      const cacheKey = DataCacheService.getCacheKey.frozenScores(currentMatchup.id);
+      
+      // Check cache first - avoid unnecessary database calls
+      const cachedData = DataCacheService.get<Map<string, { myScore: number; oppScore: number; isLocked: boolean }>>(cacheKey);
+      if (cachedData) {
+        setCachedDailyScores(cachedData);
+        return;
+      }
+      
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const weekStart = new Date(currentMatchup.week_start_date);
+      
+      // Build list of past dates we need
+      const pastDates: string[] = [];
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(weekStart);
+        date.setDate(weekStart.getDate() + i);
+        date.setHours(0, 0, 0, 0);
+        if (date < today) {
+          pastDates.push(date.toISOString().split('T')[0]);
+        }
+      }
+      
+      if (pastDates.length === 0) {
+        setCachedDailyScores(new Map());
+        return;
+      }
+      
+      // Build team ID list for query (always include both teams from the matchup)
+      const teamIds = team2Id ? [team1Id, team2Id] : [team1Id];
+      
+      // SINGLE BATCHED QUERY: Fetch ALL past days' rosters for BOTH teams at once
+      const { data: allRosters, error } = await supabase
+        .from('fantasy_daily_rosters')
+        .select('player_id, roster_date, team_id')
+        .eq('matchup_id', currentMatchup.id)
+        .in('team_id', teamIds)
+        .in('roster_date', pastDates)
+        .eq('slot_type', 'active');
+      
+      if (error) {
+        console.error('[Matchup] Error fetching cached rosters:', error);
+        return;
+      }
+      
+      // Group rosters by date and team
+      const rostersByDateTeam = new Map<string, Map<string, number[]>>();
+      allRosters?.forEach(r => {
+        if (!rostersByDateTeam.has(r.roster_date)) {
+          rostersByDateTeam.set(r.roster_date, new Map());
+        }
+        const dateMap = rostersByDateTeam.get(r.roster_date)!;
+        if (!dateMap.has(r.team_id)) {
+          dateMap.set(r.team_id, []);
+        }
+        dateMap.get(r.team_id)!.push(parseInt(r.player_id));
+      });
+      
+      // Calculate scores for each past date
+      // CRITICAL: Use team1 as "myScore" (left side) and team2 as "oppScore" (right side)
+      // This matches the UI layout where team1 is on the left
+      const scores = new Map<string, { myScore: number; oppScore: number; isLocked: boolean }>();
+      
+      for (const dateStr of pastDates) {
+        const dayStats = dailyStatsByDate.get(dateStr);
+        const dateRosters = rostersByDateTeam.get(dateStr);
+        
+        let myScore = 0;  // team1 (left side)
+        let oppScore = 0; // team2 (right side)
+        
+        if (dayStats && dateRosters) {
+          // Team 1's score (displayed on left / "my" side)
+          const team1PlayerIds = dateRosters.get(team1Id) || [];
+          team1PlayerIds.forEach(playerId => {
+            const stats = dayStats.get(playerId);
+            myScore += stats?.daily_total_points ?? 0;
+          });
+          
+          // Team 2's score (displayed on right / "opponent" side)
+          if (team2Id) {
+            const team2PlayerIds = dateRosters.get(team2Id) || [];
+            team2PlayerIds.forEach(playerId => {
+              const stats = dayStats.get(playerId);
+              oppScore += stats?.daily_total_points ?? 0;
+            });
+          }
+        }
+        
+        scores.set(dateStr, { myScore, oppScore, isLocked: true });
+      }
+      
+      // Cache the frozen scores (long TTL - past scores don't change)
+      DataCacheService.set(cacheKey, scores, TTL.VERY_LONG);
+      setCachedDailyScores(scores);
+      console.log(`[Matchup] Cached ${scores.size} frozen scores for matchup ${currentMatchup.id} (team1: ${team1Id}, team2: ${team2Id})`);
+    };
+    
+    fetchCachedScores();
+  }, [currentMatchup?.id, dailyStatsByDate, currentMatchup?.team1_id, currentMatchup?.team2_id]);
+
   const [myDailyPoints, setMyDailyPoints] = useState<number[]>([]);
   const [opponentDailyPoints, setOpponentDailyPoints] = useState<number[]>([]);
   const [selectedMatchupId, setSelectedMatchupId] = useState<string | null>(null);
@@ -817,6 +1045,115 @@ const Matchup = () => {
     // Fallback: use first day of matchup week
     setSelectedDate(weekStart.toISOString().split('T')[0]);
   }, [currentMatchup, dailyStatsByDate, selectedDate]);
+
+  // YAHOO/SLEEPER FROZEN LINEUP: Fetch historical lineup when viewing a past day
+  // This ensures we show WHO was actually starting, not the current roster
+  useEffect(() => {
+    const fetchFrozenLineup = async () => {
+      if (!selectedDate || !currentMatchup || !userTeam) {
+        setFrozenDayLineup({ myStarters: [], oppStarters: [], date: null });
+        return;
+      }
+
+      // Check if selected date is in the past
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const selected = new Date(selectedDate);
+      selected.setHours(0, 0, 0, 0);
+      const isPast = selected < today;
+
+      if (!isPast) {
+        // Today or future: use current roster (clear frozen lineup)
+        setFrozenDayLineup({ myStarters: [], oppStarters: [], date: null });
+        return;
+      }
+
+      // PAST DAY: Fetch frozen lineup from server
+      console.log('[Matchup] Fetching frozen lineup for past day:', selectedDate);
+      
+      try {
+        const myLineup = await MatchupService.getDailyLineup(
+          userTeam.id,
+          currentMatchup.id,
+          selectedDate
+        );
+
+        const oppTeamId = currentMatchup.team1_id === userTeam.id 
+          ? currentMatchup.team2_id 
+          : currentMatchup.team1_id;
+
+        const oppLineup = oppTeamId 
+          ? await MatchupService.getDailyLineup(oppTeamId, currentMatchup.id, selectedDate)
+          : [];
+
+        // Convert DailyLineupPlayer to MatchupPlayer format for display
+        const convertToMatchupPlayer = (p: any): MatchupPlayer => ({
+          id: p.player_id,
+          name: p.player_name,
+          position: p.position || 'F',
+          team: p.nhl_team || '',
+          points: p.daily_points || 0,
+          total_points: p.daily_points || 0,
+          daily_total_points: p.daily_points || 0,
+          headshot_url: p.headshot_url,
+          isStarter: p.slot_type === 'active',
+          isOnIR: p.slot_type === 'ir',
+          stats: {
+            goals: p.goals || 0,
+            assists: p.assists || 0,
+            shots_on_goal: p.shots_on_goal || 0,
+            blocks: p.blocks || 0,
+            hits: p.hits || 0,
+            pim: p.pim || 0,
+            ppp: p.ppp || 0,
+            shp: p.shp || 0,
+          }
+        });
+
+        const frozenMyStarters = myLineup
+          .filter(p => p.slot_type === 'active')
+          .map(convertToMatchupPlayer);
+        const frozenOppStarters = oppLineup
+          .filter(p => p.slot_type === 'active')
+          .map(convertToMatchupPlayer);
+
+        console.log('[Matchup] Frozen lineup loaded:', {
+          date: selectedDate,
+          myStarters: frozenMyStarters.length,
+          oppStarters: frozenOppStarters.length
+        });
+
+        setFrozenDayLineup({
+          myStarters: frozenMyStarters,
+          oppStarters: frozenOppStarters,
+          date: selectedDate
+        });
+      } catch (error) {
+        console.error('[Matchup] Error fetching frozen lineup:', error);
+        setFrozenDayLineup({ myStarters: [], oppStarters: [], date: null });
+      }
+    };
+
+    fetchFrozenLineup();
+  }, [selectedDate, currentMatchup?.id, userTeam?.id]);
+
+  // Expose backfill function to window for console access
+  useEffect(() => {
+    (window as any).backfillLeague = async (leagueId?: string) => {
+      const targetLeagueId = leagueId || currentMatchup?.league_id;
+      if (!targetLeagueId) {
+        console.error('[Matchup] No league ID provided and no current matchup');
+        return;
+      }
+      console.log('[Matchup] Starting manual backfill for league:', targetLeagueId);
+      const result = await LeagueService.backfillAllMatchupsForLeague(targetLeagueId);
+      console.log('[Matchup] Backfill complete:', result);
+      return result;
+    };
+    return () => {
+      delete (window as any).backfillLeague;
+    };
+  }, [currentMatchup?.league_id]);
 
   // Fetch projections for a specific date
   const fetchProjectionsForDate = async (date: string) => {
@@ -1582,24 +1919,64 @@ const Matchup = () => {
   const opponentStarters = useMemo(() => displayOpponentTeam.filter(p => p.isStarter), [displayOpponentTeam]);
   const opponentBench = useMemo(() => displayOpponentTeam.filter(p => !p.isStarter), [displayOpponentTeam]);
 
-  // Calculate team totals from daily scores (sum of 7 daily scores)
-  // This matches the WeeklySchedule calculation - sum daily totals from starting lineup players
+  // YAHOO/SLEEPER DISPLAY: Use frozen lineup for past days, current for today/future
+  // This ensures when clicking on past day, we show WHO was actually playing
+  const displayStarters = useMemo(() => {
+    // If we have a frozen lineup for the selected date, use it
+    if (frozenDayLineup.date === selectedDate && frozenDayLineup.myStarters.length > 0) {
+      console.log('[Matchup] Using frozen lineup for display:', selectedDate);
+      return frozenDayLineup.myStarters;
+    }
+    // Otherwise use current roster
+    return myStarters;
+  }, [frozenDayLineup, selectedDate, myStarters]);
+
+  const displayOpponentStarters = useMemo(() => {
+    // If we have a frozen lineup for the selected date, use it
+    if (frozenDayLineup.date === selectedDate && frozenDayLineup.oppStarters.length > 0) {
+      return frozenDayLineup.oppStarters;
+    }
+    // Otherwise use current roster
+    return opponentStarters;
+  }, [frozenDayLineup, selectedDate, opponentStarters]);
+
+  // =============================================================================
+  // YAHOO/SLEEPER FROZEN SCORING: Cached past + Live future
+  // =============================================================================
+  // Past days: Use cached frozen scores (won't change when roster changes)
+  // Today/Future: Calculate from current roster (reflects roster changes)
+  // This ensures past day scores are "locked in" and don't change retroactively
+  // =============================================================================
   const myTeamPoints = useMemo(() => {
-    // Use real daily stats calculation for both active users AND guests/demo
-    if (currentMatchup && dailyStatsByDate.size > 0) {
-      // Generate all 7 dates in the week
-      const weekStart = new Date(currentMatchup.week_start_date);
-      let total = 0;
+    if (!currentMatchup || dailyStatsByDate.size === 0) {
+      // Fallback: sum starter week totals if no daily breakdown available
+      const fallback = myStarters.reduce((sum, player) => sum + (player.total_points ?? 0), 0);
+      console.log('[Matchup] No daily stats, using fallback score:', fallback);
+      return fallback.toFixed(1);
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const weekStart = new Date(currentMatchup.week_start_date);
+    let total = 0;
+    
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(weekStart);
+      date.setDate(weekStart.getDate() + i);
+      date.setHours(0, 0, 0, 0);
+      const dateStr = date.toISOString().split('T')[0];
+      const isPast = date < today;
       
-      for (let i = 0; i < 7; i++) {
-        const date = new Date(weekStart);
-        date.setDate(weekStart.getDate() + i);
-        const dateStr = date.toISOString().split('T')[0];
-        
+      // Check if we have a cached score for this date
+      const cachedScore = cachedDailyScores.get(dateStr);
+      
+      if (isPast && cachedScore?.isLocked) {
+        // Past day: Use frozen cached score (won't change when roster changes)
+        total += cachedScore.myScore;
+      } else {
+        // Today or future: Calculate from current roster (reflects roster changes)
         const dayStats = dailyStatsByDate.get(dateStr);
         if (dayStats) {
-          // Sum daily_total_points from starting lineup players for this day
-          // CRITICAL: Ensure player.id is a number for map lookup (map keys are integers from RPC)
           const dayTotal = myStarters.reduce((sum, player) => {
             const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
             const playerStats = dayStats.get(playerId);
@@ -1608,31 +1985,40 @@ const Matchup = () => {
           total += dayTotal;
         }
       }
-      
-      return total.toFixed(1);
     }
-    // Fallback: sum starter points if daily scores not available (for demo/guest users)
-    // Only count starters, not bench players
-    const total = myStarters.reduce((sum, player) => sum + (player.total_points ?? 0), 0);
+    
+    console.log('[Matchup] Calculated myTeam total (frozen past + live future):', total);
     return total.toFixed(1);
-  }, [userLeagueState, currentMatchup, dailyStatsByDate, myStarters, displayMyTeam]);
+  }, [currentMatchup, dailyStatsByDate, myStarters, cachedDailyScores]);
 
   const opponentTeamPoints = useMemo(() => {
-    // Use real daily stats calculation for both active users AND guests/demo
-    if (currentMatchup && dailyStatsByDate.size > 0) {
-      // Generate all 7 dates in the week
-      const weekStart = new Date(currentMatchup.week_start_date);
-      let total = 0;
+    if (!currentMatchup || dailyStatsByDate.size === 0) {
+      const fallback = opponentStarters.reduce((sum, player) => sum + (player.total_points ?? 0), 0);
+      return fallback.toFixed(1);
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const weekStart = new Date(currentMatchup.week_start_date);
+    let total = 0;
+    
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(weekStart);
+      date.setDate(weekStart.getDate() + i);
+      date.setHours(0, 0, 0, 0);
+      const dateStr = date.toISOString().split('T')[0];
+      const isPast = date < today;
       
-      for (let i = 0; i < 7; i++) {
-        const date = new Date(weekStart);
-        date.setDate(weekStart.getDate() + i);
-        const dateStr = date.toISOString().split('T')[0];
-        
+      // Check if we have a cached score for this date
+      const cachedScore = cachedDailyScores.get(dateStr);
+      
+      if (isPast && cachedScore?.isLocked) {
+        // Past day: Use frozen cached score (won't change when roster changes)
+        total += cachedScore.oppScore;
+      } else {
+        // Today or future: Calculate from current roster (reflects roster changes)
         const dayStats = dailyStatsByDate.get(dateStr);
         if (dayStats) {
-          // Sum daily_total_points from starting lineup players for this day
-          // CRITICAL: Ensure player.id is a number for map lookup (map keys are integers from RPC)
           const dayTotal = opponentStarters.reduce((sum, player) => {
             const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
             const playerStats = dayStats.get(playerId);
@@ -1641,14 +2027,11 @@ const Matchup = () => {
           total += dayTotal;
         }
       }
-      
-      return total.toFixed(1);
     }
-    // Fallback: sum starter points if daily scores not available (for demo/guest users)
-    // Only count starters, not bench players
-    const total = opponentStarters.reduce((sum, player) => sum + (player.total_points ?? 0), 0);
+    
+    console.log('[Matchup] Calculated opponent total (frozen past + live future):', total);
     return total.toFixed(1);
-  }, [userLeagueState, currentMatchup, dailyStatsByDate, opponentStarters, displayOpponentTeam]);
+  }, [currentMatchup, dailyStatsByDate, opponentStarters, cachedDailyScores]);
 
   const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   
@@ -2741,6 +3124,7 @@ const Matchup = () => {
                 dailyStatsByDate={dailyStatsByDate}
                 team1Name={userLeagueState === 'active-user' ? (viewingTeamName || undefined) : 'Citrus Crushers'}
                 team2Name={userLeagueState === 'active-user' ? (viewingOpponentTeamName || undefined) : 'Thunder Titans'}
+                cachedDailyScores={cachedDailyScores}
               />
             </div>
           )}
@@ -2764,8 +3148,8 @@ const Matchup = () => {
               <>
                 {/* Always show full lineup, with daily stats when a day is selected */}
                 <MatchupComparison
-                  userStarters={myStarters}
-                  opponentStarters={opponentStarters}
+                  userStarters={displayStarters}
+                  opponentStarters={displayOpponentStarters}
                   userBench={myBench}
                   opponentBench={opponentBench}
                   userSlotAssignments={displayMyTeamSlotAssignments}
