@@ -61,14 +61,22 @@ export class WaiverService {
       }
 
       // Check if player is already rostered in this league
-      const { data: rostered } = await supabase
+      // team_lineups uses JSONB arrays (starters, bench, ir)
+      const { data: lineups } = await supabase
         .from('team_lineups')
-        .select('team_id')
-        .eq('league_id', leagueId)
-        .eq('player_id', playerId)
-        .maybeSingle();
+        .select('starters, bench, ir')
+        .eq('league_id', leagueId);
 
-      if (rostered) {
+      const isRostered = (lineups || []).some(lineup => {
+        const playerIdStr = playerId.toString();
+        return (
+          (lineup.starters as any[])?.includes(playerIdStr) ||
+          (lineup.bench as any[])?.includes(playerIdStr) ||
+          (lineup.ir as any[])?.includes(playerIdStr)
+        );
+      });
+
+      if (isRostered) {
         return {
           player_id: playerId,
           is_available: false,
@@ -82,11 +90,12 @@ export class WaiverService {
       // Get player's NHL team
       const { data: player } = await supabase
         .from('player_directory')
-        .select('current_team_abbrev')
-        .eq('id', playerId)
-        .single();
+        .select('team_abbrev')
+        .eq('season', 2025)
+        .eq('player_id', playerId)
+        .maybeSingle();
 
-      if (!player || !player.current_team_abbrev) {
+      if (!player || !player.team_abbrev) {
         return {
           player_id: playerId,
           is_available: true,
@@ -108,7 +117,7 @@ export class WaiverService {
           .from('nhl_games')
           .select('game_status, start_time_utc')
           .eq('game_date', today)
-          .or(`home_team_abbrev.eq.${player.current_team_abbrev},away_team_abbrev.eq.${player.current_team_abbrev}`)
+          .or(`home_team_abbrev.eq.${player.team_abbrev},away_team_abbrev.eq.${player.team_abbrev}`)
           .in('game_status', ['Live', 'Final']);
 
         if (games && games.length > 0) {
@@ -137,7 +146,91 @@ export class WaiverService {
   }
 
   /**
-   * Submit a waiver claim
+   * Add a free agent (instant pickup - no waiver claim needed)
+   * Only works if player is not game-locked
+   */
+  static async addFreeAgent(
+    leagueId: string,
+    teamId: string,
+    playerId: number,
+    dropPlayerId: number | null = null
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Check player availability
+      const availability = await this.checkPlayerAvailability(playerId, leagueId);
+      
+      if (!availability.is_available) {
+        return {
+          success: false,
+          error: availability.lock_reason || 'Player is game-locked. Submit a waiver claim instead.'
+        };
+      }
+
+      // Get current lineup
+      const { data: lineup } = await supabase
+        .from('team_lineups')
+        .select('starters, bench, ir, slot_assignments')
+        .eq('league_id', leagueId)
+        .eq('team_id', teamId)
+        .single();
+
+      if (!lineup) {
+        return {
+          success: false,
+          error: 'Team lineup not found'
+        };
+      }
+
+      let newStarters = (lineup.starters as any[]) || [];
+      let newBench = (lineup.bench as any[]) || [];
+      let newIr = (lineup.ir as any[]) || [];
+      let newSlotAssignments = (lineup.slot_assignments as any) || {};
+
+      // Drop player if specified
+      if (dropPlayerId) {
+        const dropPlayerIdStr = dropPlayerId.toString();
+        newStarters = newStarters.filter(id => id !== dropPlayerIdStr);
+        newBench = newBench.filter(id => id !== dropPlayerIdStr);
+        newIr = newIr.filter(id => id !== dropPlayerIdStr);
+        delete newSlotAssignments[dropPlayerIdStr];
+      }
+
+      // Add new player to bench
+      newBench.push(playerId.toString());
+
+      // Update lineup
+      const { error } = await supabase
+        .from('team_lineups')
+        .update({
+          starters: newStarters,
+          bench: newBench,
+          ir: newIr,
+          slot_assignments: newSlotAssignments,
+          updated_at: new Date().toISOString()
+        })
+        .eq('league_id', leagueId)
+        .eq('team_id', teamId);
+
+      if (error) {
+        return {
+          success: false,
+          error: error.message
+        };
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      console.error('Error adding free agent:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to add free agent'
+      };
+    }
+  }
+
+  /**
+   * Submit a waiver claim (for game-locked players or players on waivers)
+   * Claim will be processed at league's waiver_process_time (default 3 AM)
    */
   static async submitWaiverClaim(
     leagueId: string,
@@ -146,16 +239,6 @@ export class WaiverService {
     dropPlayerId: number | null = null
   ): Promise<{ success: boolean; error?: string; claimId?: string }> {
     try {
-      // Check player availability first
-      const availability = await this.checkPlayerAvailability(playerId, leagueId);
-      
-      if (!availability.is_available) {
-        return {
-          success: false,
-          error: availability.lock_reason || 'Player is not available'
-        };
-      }
-
       // Get team's waiver priority
       const { data: priority } = await supabase
         .from('waiver_priority')
@@ -206,6 +289,44 @@ export class WaiverService {
   }
 
   /**
+   * Smart add player - automatically chooses free agent pickup or waiver claim
+   * based on player availability
+   */
+  static async addPlayer(
+    leagueId: string,
+    teamId: string,
+    playerId: number,
+    dropPlayerId: number | null = null
+  ): Promise<{ success: boolean; error?: string; claimId?: string; isFreeAgent?: boolean }> {
+    try {
+      // Check if player is available for free agent pickup
+      const availability = await this.checkPlayerAvailability(playerId, leagueId);
+
+      if (availability.is_available) {
+        // Free agent pickup (instant)
+        const result = await this.addFreeAgent(leagueId, teamId, playerId, dropPlayerId);
+        return {
+          ...result,
+          isFreeAgent: true
+        };
+      } else {
+        // Submit waiver claim (processes at 3 AM)
+        const result = await this.submitWaiverClaim(leagueId, teamId, playerId, dropPlayerId);
+        return {
+          ...result,
+          isFreeAgent: false
+        };
+      }
+    } catch (error: any) {
+      console.error('Error adding player:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to add player'
+      };
+    }
+  }
+
+  /**
    * Cancel a pending waiver claim
    */
   static async cancelWaiverClaim(claimId: string): Promise<{ success: boolean; error?: string }> {
@@ -246,7 +367,7 @@ export class WaiverService {
           team_id,
           priority,
           updated_at,
-          teams!inner(name)
+          teams!inner(team_name)
         `)
         .eq('league_id', leagueId)
         .order('priority', { ascending: true });
@@ -259,7 +380,7 @@ export class WaiverService {
         id: wp.id,
         league_id: wp.league_id,
         team_id: wp.team_id,
-        team_name: (wp.teams as any).name,
+        team_name: (wp.teams as any).team_name,
         priority: wp.priority,
         updated_at: wp.updated_at
       }));
@@ -327,37 +448,47 @@ export class WaiverService {
     searchTerm?: string
   ): Promise<any[]> {
     try {
-      // Get all rostered players in the league
-      const { data: rosteredPlayers } = await supabase
+      // Get all rostered players in the league from JSONB arrays
+      const { data: lineups } = await supabase
         .from('team_lineups')
-        .select('player_id')
+        .select('starters, bench, ir')
         .eq('league_id', leagueId);
 
-      const rosteredPlayerIds = (rosteredPlayers || []).map(rp => rp.player_id);
+      const rosteredPlayerIds = new Set<number>();
+      (lineups || []).forEach(lineup => {
+        ((lineup.starters as any[]) || []).forEach(id => rosteredPlayerIds.add(parseInt(id)));
+        ((lineup.bench as any[]) || []).forEach(id => rosteredPlayerIds.add(parseInt(id)));
+        ((lineup.ir as any[]) || []).forEach(id => rosteredPlayerIds.add(parseInt(id)));
+      });
 
-      // Query available players
+      // Query available players (current season)
       let query = supabase
         .from('player_directory')
         .select(`
-          id,
-          first_name,
-          last_name,
-          position,
-          current_team_abbrev,
-          jersey_number
+          player_id,
+          full_name,
+          position_code,
+          team_abbrev,
+          jersey_number,
+          is_goalie
         `)
-        .not('id', 'in', `(${rosteredPlayerIds.join(',') || '0'})`)
-        .order('last_name', { ascending: true });
+        .eq('season', 2025);
+
+      if (rosteredPlayerIds.size > 0) {
+        query = query.not('player_id', 'in', `(${Array.from(rosteredPlayerIds).join(',')})`);
+      }
 
       if (position) {
-        query = query.eq('position', position);
+        query = query.eq('position_code', position);
       }
 
       if (searchTerm) {
-        query = query.or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%`);
+        query = query.ilike('full_name', `%${searchTerm}%`);
       }
 
-      const { data, error } = await query.limit(50);
+      const { data, error } = await query
+        .order('full_name', { ascending: true })
+        .limit(50);
 
       if (error) {
         throw error;

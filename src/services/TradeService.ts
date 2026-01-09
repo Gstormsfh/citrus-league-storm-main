@@ -110,50 +110,80 @@ export class TradeService {
         };
       }
 
-      // Execute the trade by swapping players
-      // Remove offered players from fromTeam
-      for (const playerId of trade.offered_player_ids) {
-        await supabase
-          .from('team_lineups')
-          .delete()
-          .eq('team_id', trade.from_team_id)
-          .eq('league_id', trade.league_id)
-          .eq('player_id', playerId);
+      // Execute the trade by swapping players in JSONB arrays
+      // Get current lineups for both teams
+      const { data: fromTeamLineup } = await supabase
+        .from('team_lineups')
+        .select('starters, bench, ir, slot_assignments')
+        .eq('league_id', trade.league_id)
+        .eq('team_id', trade.from_team_id)
+        .single();
+
+      const { data: toTeamLineup } = await supabase
+        .from('team_lineups')
+        .select('starters, bench, ir, slot_assignments')
+        .eq('league_id', trade.league_id)
+        .eq('team_id', trade.to_team_id)
+        .single();
+
+      if (!fromTeamLineup || !toTeamLineup) {
+        return {
+          success: false,
+          error: 'Team lineups not found'
+        };
       }
 
-      // Remove requested players from toTeam
-      for (const playerId of trade.requested_player_ids) {
-        await supabase
-          .from('team_lineups')
-          .delete()
-          .eq('team_id', trade.to_team_id)
-          .eq('league_id', trade.league_id)
-          .eq('player_id', playerId);
-      }
+      // Helper function to remove players from JSONB arrays
+      const removePlayers = (lineup: any, playerIds: number[]) => {
+        const playerIdStrs = playerIds.map(id => id.toString());
+        return {
+          starters: ((lineup.starters as any[]) || []).filter(id => !playerIdStrs.includes(id)),
+          bench: ((lineup.bench as any[]) || []).filter(id => !playerIdStrs.includes(id)),
+          ir: ((lineup.ir as any[]) || []).filter(id => !playerIdStrs.includes(id)),
+          slot_assignments: Object.fromEntries(
+            Object.entries((lineup.slot_assignments as any) || {}).filter(([key]) => !playerIdStrs.includes(key))
+          )
+        };
+      };
 
-      // Add offered players to toTeam
-      for (const playerId of trade.offered_player_ids) {
-        await supabase
-          .from('team_lineups')
-          .insert({
-            team_id: trade.to_team_id,
-            league_id: trade.league_id,
-            player_id: playerId,
-            roster_slot: 'BN'
-          });
-      }
+      // Helper function to add players to bench
+      const addPlayersToBench = (lineup: any, playerIds: number[]) => {
+        const newBench = [...(lineup.bench as any[]) || [], ...playerIds.map(id => id.toString())];
+        return { ...lineup, bench: newBench };
+      };
 
-      // Add requested players to fromTeam
-      for (const playerId of trade.requested_player_ids) {
-        await supabase
-          .from('team_lineups')
-          .insert({
-            team_id: trade.from_team_id,
-            league_id: trade.league_id,
-            player_id: playerId,
-            roster_slot: 'BN'
-          });
-      }
+      // Remove offered players from fromTeam and add requested players
+      let newFromTeamLineup = removePlayers(fromTeamLineup, trade.offered_player_ids);
+      newFromTeamLineup = addPlayersToBench(newFromTeamLineup, trade.requested_player_ids);
+
+      // Remove requested players from toTeam and add offered players
+      let newToTeamLineup = removePlayers(toTeamLineup, trade.requested_player_ids);
+      newToTeamLineup = addPlayersToBench(newToTeamLineup, trade.offered_player_ids);
+
+      // Update both team lineups
+      await supabase
+        .from('team_lineups')
+        .update({
+          starters: newFromTeamLineup.starters,
+          bench: newFromTeamLineup.bench,
+          ir: newFromTeamLineup.ir,
+          slot_assignments: newFromTeamLineup.slot_assignments,
+          updated_at: new Date().toISOString()
+        })
+        .eq('league_id', trade.league_id)
+        .eq('team_id', trade.from_team_id);
+
+      await supabase
+        .from('team_lineups')
+        .update({
+          starters: newToTeamLineup.starters,
+          bench: newToTeamLineup.bench,
+          ir: newToTeamLineup.ir,
+          slot_assignments: newToTeamLineup.slot_assignments,
+          updated_at: new Date().toISOString()
+        })
+        .eq('league_id', trade.league_id)
+        .eq('team_id', trade.to_team_id);
 
       // Record in trade history
       await supabase
@@ -251,8 +281,8 @@ export class TradeService {
         .from('trade_offers')
         .select(`
           *,
-          from_team:teams!from_team_id(name),
-          to_team:teams!to_team_id(name)
+          from_team:teams!from_team_id(team_name),
+          to_team:teams!to_team_id(team_name)
         `)
         .eq('league_id', leagueId)
         .or(`from_team_id.eq.${teamId},to_team_id.eq.${teamId}`)
@@ -268,19 +298,21 @@ export class TradeService {
           // Get offered players
           const { data: offeredPlayers } = await supabase
             .from('player_directory')
-            .select('id, first_name, last_name, position, current_team_abbrev')
-            .in('id', trade.offered_player_ids);
+            .select('player_id, full_name, position_code, team_abbrev')
+            .eq('season', 2025)
+            .in('player_id', trade.offered_player_ids);
 
           // Get requested players
           const { data: requestedPlayers } = await supabase
             .from('player_directory')
-            .select('id, first_name, last_name, position, current_team_abbrev')
-            .in('id', trade.requested_player_ids);
+            .select('player_id, full_name, position_code, team_abbrev')
+            .eq('season', 2025)
+            .in('player_id', trade.requested_player_ids);
 
           return {
             ...trade,
-            from_team_name: (trade.from_team as any).name,
-            to_team_name: (trade.to_team as any).name,
+            from_team_name: (trade.from_team as any).team_name,
+            to_team_name: (trade.to_team as any).team_name,
             offered_players: offeredPlayers || [],
             requested_players: requestedPlayers || []
           };
@@ -303,8 +335,8 @@ export class TradeService {
         .from('trade_history')
         .select(`
           *,
-          team1:teams!team1_id(name),
-          team2:teams!team2_id(name)
+          team1:teams!team1_id(team_name),
+          team2:teams!team2_id(team_name)
         `)
         .eq('league_id', leagueId)
         .order('executed_at', { ascending: false })

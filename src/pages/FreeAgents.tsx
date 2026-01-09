@@ -16,6 +16,7 @@ import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { PlayerService, Player } from '@/services/PlayerService';
 import { LeagueService, League } from '@/services/LeagueService';
 import { ScheduleService, NHLGame } from '@/services/ScheduleService';
+import { WaiverService } from '@/services/WaiverService';
 import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -24,6 +25,7 @@ import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { isGuestMode, shouldBlockGuestOperation } from '@/utils/guestHelpers';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import { getPlayerWithSeasonStats } from '@/utils/playerStatsHelper';
+import { CitrusBackground } from '@/components/CitrusBackground';
 
 // Helper function to format position for display (L -> LW, R -> RW)
 const formatPositionForDisplay = (position: string): string => {
@@ -710,7 +712,8 @@ const FreeAgents = () => {
   const positions = ['ALL', 'C', 'LW', 'RW', 'W', 'D', 'G'];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background relative overflow-hidden">
+      <CitrusBackground density="light" />
       <Navbar />
       <main className="pt-24 pb-12 container mx-auto px-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">

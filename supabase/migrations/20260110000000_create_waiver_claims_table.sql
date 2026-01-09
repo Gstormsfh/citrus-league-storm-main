@@ -1,10 +1,12 @@
 -- Create waiver_claims table for waiver wire system
+-- NOTE: player_id and drop_player_id are NHL API player IDs (integers)
+-- No foreign key to player_directory because that table uses composite key (season, player_id)
 CREATE TABLE IF NOT EXISTS waiver_claims (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   league_id UUID NOT NULL REFERENCES leagues(id) ON DELETE CASCADE,
   team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
-  player_id INT NOT NULL REFERENCES player_directory(id),
-  drop_player_id INT REFERENCES player_directory(id),
+  player_id INT NOT NULL,
+  drop_player_id INT,
   priority INT NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('pending', 'successful', 'failed', 'cancelled')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -16,6 +18,7 @@ CREATE TABLE IF NOT EXISTS waiver_claims (
 -- Add indexes for performance
 CREATE INDEX idx_waiver_claims_league ON waiver_claims(league_id);
 CREATE INDEX idx_waiver_claims_team ON waiver_claims(team_id);
+CREATE INDEX idx_waiver_claims_player ON waiver_claims(player_id);
 CREATE INDEX idx_waiver_claims_status ON waiver_claims(status);
 CREATE INDEX idx_waiver_claims_created_at ON waiver_claims(created_at);
 CREATE INDEX idx_waiver_claims_league_status ON waiver_claims(league_id, status);

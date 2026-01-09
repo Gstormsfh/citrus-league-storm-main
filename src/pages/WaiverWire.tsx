@@ -121,24 +121,32 @@ const WaiverWire = () => {
   const handleSubmitClaim = async () => {
     if (!selectedPlayer || !myTeamId || !activeLeagueId) return;
 
-    const result = await WaiverService.submitWaiverClaim(
+    // Use smart addPlayer function that handles both free agent and waiver claims
+    const result = await WaiverService.addPlayer(
       activeLeagueId,
       myTeamId,
-      selectedPlayer.id,
+      selectedPlayer.player_id,
       dropPlayer
     );
 
     if (result.success) {
-      toast({
-        title: "Waiver Claim Submitted",
-        description: `Claim for ${selectedPlayer.first_name} ${selectedPlayer.last_name} submitted successfully`,
-      });
+      if (result.isFreeAgent) {
+        toast({
+          title: "Player Added",
+          description: `${selectedPlayer.full_name} added to your roster immediately`,
+        });
+      } else {
+        toast({
+          title: "Waiver Claim Submitted",
+          description: `Claim for ${selectedPlayer.full_name} submitted. Will process at 3:00 AM EST.`,
+        });
+      }
       setSelectedPlayer(null);
       setDropPlayer(null);
       loadWaiverData();
     } else {
       toast({
-        title: "Claim Failed",
+        title: result.isFreeAgent === false ? "Claim Failed" : "Add Failed",
         description: result.error,
         variant: "destructive"
       });

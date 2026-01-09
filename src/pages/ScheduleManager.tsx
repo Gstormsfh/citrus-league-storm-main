@@ -1,12 +1,76 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar, Trophy, Users, ArrowRight } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Calendar, Trophy, Users, ArrowRight, Clock } from 'lucide-react';
+import { CitrusBackground } from '@/components/CitrusBackground';
+import { CitrusSparkle, CitrusLeaf } from '@/components/icons/CitrusIcons';
+import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
 
 const ScheduleManager = () => {
+  const { user } = useAuth();
+  const { activeLeagueId } = useLeague();
   const [viewMode, setViewMode] = useState<'summary' | 'full'>('summary');
+  const [nhlGames, setNhlGames] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [myRoster, setMyRoster] = useState<any[]>([]);
+
+  useEffect(() => {
+    loadScheduleData();
+  }, [user, activeLeagueId]);
+
+  const loadScheduleData = async () => {
+    setLoading(true);
+    try {
+      // Load this week's NHL games
+      const today = new Date();
+      const nextWeek = new Date(today);
+      nextWeek.setDate(nextWeek.getDate() + 7);
+
+      const { data: games } = await supabase
+        .from('nhl_games')
+        .select('*')
+        .gte('game_date', today.toISOString().split('T')[0])
+        .lte('game_date', nextWeek.toISOString().split('T')[0])
+        .order('game_date', { ascending: true })
+        .order('start_time_utc', { ascending: true });
+
+      setNhlGames(games || []);
+
+      // Load user's roster if logged in
+      if (user && activeLeagueId) {
+        const { data: team } = await supabase
+          .from('teams')
+          .select('id')
+          .eq('league_id', activeLeagueId)
+          .eq('owner_id', user.id)
+          .maybeSingle();
+
+        if (team) {
+          const { data: roster } = await supabase
+            .from('team_lineups')
+            .select(`
+              player_id,
+              roster_slot,
+              player_directory!inner(id, first_name, last_name, position, current_team_abbrev)
+            `)
+            .eq('team_id', team.id)
+            .eq('league_id', activeLeagueId);
+
+          setMyRoster(roster || []);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading schedule data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const upcomingMatchups = [
     { week: "Week 12", opponent: "Ice Warriors", date: "Dec 28 - Jan 3", status: "upcoming", projection: "145.2 - 138.5" },
@@ -26,25 +90,80 @@ const ScheduleManager = () => {
   const currentMatchup = upcomingMatchups[0];
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col relative overflow-hidden">
+      <CitrusBackground density="medium" />
       <Navbar />
-      <main className="flex-1 pt-24 pb-16">
+      <main className="flex-1 pt-24 pb-16 relative z-10">
         <div className="container mx-auto px-4">
-          <div className="max-w-5xl mx-auto">
-            <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 relative">
+              <CitrusLeaf className="absolute -top-4 -left-8 w-16 h-16 text-citrus-sage/15 rotate-12" />
               <div className="text-center md:text-left">
-                <h1 className="text-4xl font-bold">Schedule Manager</h1>
-                <p className="text-lg text-muted-foreground">
-                  View upcoming matchups and plan your lineup
+                <div className="flex items-center justify-center md:justify-start gap-3 mb-2">
+                  <Calendar className="w-8 h-8 text-citrus-orange" />
+                  <h1 className="text-4xl font-varsity font-black text-citrus-forest uppercase tracking-tight">Schedule Manager</h1>
+                  <CitrusSparkle className="w-6 h-6 text-citrus-sage animate-pulse" />
+                </div>
+                <p className="text-lg font-display text-citrus-charcoal">
+                  View upcoming NHL games and plan your lineup
                 </p>
               </div>
               
               {viewMode === 'summary' ? (
-                <Button onClick={() => setViewMode('full')}>See Full Schedule</Button>
+                <Button onClick={() => setViewMode('full')} className="bg-gradient-to-br from-citrus-sage to-citrus-orange border-4 border-citrus-forest rounded-varsity shadow-patch font-varsity font-bold uppercase">
+                  See Full Schedule
+                </Button>
               ) : (
-                <Button variant="outline" onClick={() => setViewMode('summary')}>Back to Summary</Button>
+                <Button variant="outline" onClick={() => setViewMode('summary')} className="border-2 border-citrus-sage rounded-varsity font-varsity">
+                  Back to Summary
+                </Button>
               )}
             </div>
+
+            {/* NHL Games This Week */}
+            <Card className="mb-8 bg-citrus-cream corduroy-texture border-4 border-citrus-forest rounded-[2rem] shadow-patch">
+              <CardHeader>
+                <CardTitle className="font-varsity font-black text-citrus-forest uppercase flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-citrus-orange" />
+                  NHL Games This Week
+                </CardTitle>
+                <CardDescription className="font-display text-citrus-charcoal">
+                  {loading ? 'Loading schedule...' : `${nhlGames.length} games scheduled`}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="text-center py-8 font-display text-citrus-charcoal">Loading games...</div>
+                ) : nhlGames.length > 0 ? (
+                  <div className="space-y-3">
+                    {nhlGames.slice(0, 10).map((game, idx) => (
+                      <div key={game.id || idx} className="flex items-center justify-between p-4 bg-gradient-to-r from-citrus-sage/10 to-citrus-peach/10 rounded-varsity border-2 border-citrus-sage/30">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-4">
+                            <Badge className="bg-citrus-orange text-citrus-cream font-varsity font-bold">
+                              {format(new Date(game.game_date), 'MMM d')}
+                            </Badge>
+                            <div className="font-varsity font-bold text-citrus-forest">
+                              {game.away_team_abbrev} @ {game.home_team_abbrev}
+                            </div>
+                          </div>
+                          <div className="text-sm font-display text-citrus-charcoal mt-1">
+                            {game.start_time_utc && format(new Date(game.start_time_utc), 'h:mm a')}
+                          </div>
+                        </div>
+                        <Badge variant="outline" className="font-mono text-xs border-citrus-sage">
+                          {game.game_status || 'Scheduled'}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 font-display text-citrus-charcoal">
+                    No games scheduled this week
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Summary View */}
             {viewMode === 'summary' && (

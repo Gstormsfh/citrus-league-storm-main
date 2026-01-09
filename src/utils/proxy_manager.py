@@ -3,11 +3,11 @@
 proxy_manager.py - Enterprise-Grade Proxy Management for Citrus Scraping
 
 Features:
-- Fetches and caches 100 IPs from Webshare proxy service
-- Sequential rotation using itertools.cycle
+- Fetches 100 IPs from Webshare proxy service once on startup
+- Infinite sequential rotation using itertools.cycle
 - Thread-safe proxy selection
-- Auto-refresh on authentication failures
-- 1-hour TTL cache with fallback to direct requests
+- Auto-refresh only on authentication failures (never expires on its own)
+- No TTL - cycles forever through the same 100 IPs
 """
 
 import os
@@ -29,9 +29,9 @@ class ProxyManager:
     Manages a pool of rotating proxies with caching and thread-safe access.
     
     Architecture:
-    - Fetches proxy list from Webshare API on initialization
-    - Caches proxies in memory with 1-hour TTL
-    - Uses itertools.cycle for sequential rotation
+    - Fetches 100 proxies from Webshare API once on initialization
+    - Cycles through them infinitely using itertools.cycle (never expires!)
+    - Only refreshes on auth errors (via force_refresh)
     - Thread-safe via threading.Lock
     """
     
@@ -162,7 +162,8 @@ class ProxyManager:
     def get_next_proxy(self) -> Optional[str]:
         """
         Get the next proxy in rotation sequence.
-        Thread-safe and handles cache refresh automatically.
+        Thread-safe. Cycles through 100 IPs infinitely.
+        Only refreshes if list is empty (startup) or via force_refresh() on auth errors.
         
         Returns:
             Proxy URL string or None if proxies disabled/unavailable
@@ -171,12 +172,13 @@ class ProxyManager:
             return None
         
         with self.lock:
-            # Refresh cache if expired or empty
-            if not self.proxy_list or self._is_cache_expired():
-                logger.info("[ProxyManager] Cache expired or empty, refreshing...")
+            # Only refresh if list is empty (initial startup)
+            # Cache expiration removed - itertools.cycle loops forever!
+            if not self.proxy_list:
+                logger.info("[ProxyManager] Proxy list empty, fetching from API...")
                 self._refresh_proxy_list()
             
-            # Return next proxy in cycle
+            # Return next proxy in cycle (loops infinitely)
             if self.proxy_cycle:
                 try:
                     return next(self.proxy_cycle)
