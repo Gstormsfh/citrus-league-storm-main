@@ -444,7 +444,9 @@ def bulk_upsert_projections(db: SupabaseRest, projections: List[Dict]) -> int:
         'projected_gaa', 'projected_save_pct', 'projected_gp', 'starter_confirmed', 'is_goalie'
     }
     
-    for i in range(0, len(projections), UPSERT_BATCH_SIZE):
+    total_batches = (len(projections) + UPSERT_BATCH_SIZE - 1) // UPSERT_BATCH_SIZE
+    
+    for batch_num, i in enumerate(range(0, len(projections), UPSERT_BATCH_SIZE), 1):
         batch = projections[i:i + UPSERT_BATCH_SIZE]
         
         # CRITICAL: Ensure ALL records have ALL valid columns (Supabase requirement)
@@ -465,6 +467,11 @@ def bulk_upsert_projections(db: SupabaseRest, projections: List[Dict]) -> int:
         if not filtered_batch:
             continue
         
+        # Progress tracking every 10 batches
+        if batch_num % 10 == 0 or batch_num == total_batches:
+            progress_pct = (batch_num / total_batches) * 100
+            print(f"  [{progress_pct:.0f}%] Batch {batch_num}/{total_batches} | {total_upserted} upserted")
+        
         try:
             db.upsert(
                 "player_projected_stats",
@@ -473,7 +480,7 @@ def bulk_upsert_projections(db: SupabaseRest, projections: List[Dict]) -> int:
             )
             total_upserted += len(filtered_batch)
         except Exception as e:
-            print(f"  Warning: Error upserting batch {i//UPSERT_BATCH_SIZE + 1}: {e}")
+            print(f"  ❌ Batch {batch_num} failed: {e}")
             # Try individual upserts for failed batch
             for proj in filtered_batch:
                 try:
@@ -571,8 +578,9 @@ def bulk_upsert_ros(db: SupabaseRest, ros_projections: List[Dict]) -> int:
     }
     
     total = 0
+    total_batches = (len(ros_projections) + UPSERT_BATCH_SIZE - 1) // UPSERT_BATCH_SIZE
     
-    for i in range(0, len(ros_projections), UPSERT_BATCH_SIZE):
+    for batch_num, i in enumerate(range(0, len(ros_projections), UPSERT_BATCH_SIZE), 1):
         batch = ros_projections[i:i + UPSERT_BATCH_SIZE]
         
         # CRITICAL: Normalize all records to have identical keys
@@ -586,6 +594,10 @@ def bulk_upsert_ros(db: SupabaseRest, ros_projections: List[Dict]) -> int:
                     normalized[k] = v
             normalized_batch.append(normalized)
         
+        # Progress tracking
+        progress_pct = (batch_num / total_batches) * 100
+        print(f"  [{progress_pct:.0f}%] ROS Batch {batch_num}/{total_batches} | {total} upserted")
+        
         try:
             db.upsert(
                 "player_ros_projections",
@@ -594,7 +606,7 @@ def bulk_upsert_ros(db: SupabaseRest, ros_projections: List[Dict]) -> int:
             )
             total += len(normalized_batch)
         except Exception as e:
-            print(f"  Warning: Error upserting ROS batch: {e}")
+            print(f"  ❌ ROS Batch {batch_num} failed: {e}")
     
     return total
 
