@@ -128,12 +128,17 @@ interface CacheEntry {
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
 let playersCache: CacheEntry | null = null;
 
+// EGRESS OPTIMIZATION: Per-player cache for getPlayersByIds()
+// This prevents redundant fetches when same players are requested multiple times
+const playerByIdCache = new Map<string, { data: Player; timestamp: number }>();
+
 export const PlayerService = {
   /**
    * Clear the player cache (call this when player data is updated)
    */
   clearCache(): void {
     playersCache = null;
+    playerByIdCache.clear();
   },
 
   /**
@@ -374,16 +379,37 @@ export const PlayerService = {
 
   /**
    * Get players by their IDs - optimized to only load specific players
-   * This is more efficient than loading all players and filtering
+   * EGRESS OPTIMIZATION: Uses per-player cache to avoid redundant fetches
    */
   async getPlayersByIds(playerIds: string[]): Promise<Player[]> {
     if (playerIds.length === 0) return [];
     
-    console.log(`[PlayerService] getPlayersByIds(): Fetching ${playerIds.length} players (no cache for this method)`);
+    const now = Date.now();
+    const cachedPlayers: Player[] = [];
+    const uncachedIds: string[] = [];
+    
+    // Check which players are already cached
+    for (const id of playerIds) {
+      const cached = playerByIdCache.get(id);
+      if (cached && (now - cached.timestamp) < CACHE_TTL) {
+        cachedPlayers.push(cached.data);
+      } else {
+        uncachedIds.push(id);
+      }
+    }
+    
+    // If all players are cached, return immediately
+    if (uncachedIds.length === 0) {
+      console.log(`[PlayerService] getPlayersByIds(): All ${playerIds.length} players from CACHE`);
+      return cachedPlayers;
+    }
+    
+    console.log(`[PlayerService] getPlayersByIds(): ${cachedPlayers.length} from cache, fetching ${uncachedIds.length} from DB`);
     
     try {
       const DEFAULT_SEASON = 2025;
-      const intIds = playerIds.map((id) => Number(id)).filter((n) => !Number.isNaN(n));
+      // EGRESS OPTIMIZATION: Only fetch uncached player IDs
+      const intIds = uncachedIds.map((id) => Number(id)).filter((n) => !Number.isNaN(n));
 
       // Get goalie IDs for GSAx lookup
       const [{ data: dirRowsRaw, error: dirErr }, { data: statRowsRaw, error: statErr }, { data: talentRowsRaw, error: talentErr }] = await Promise.all([
@@ -558,12 +584,20 @@ export const PlayerService = {
         };
       });
 
-      return players.sort((a, b) => (b.points || 0) - (a.points || 0));
+      // EGRESS OPTIMIZATION: Cache newly fetched players for future requests
+      const cacheTimestamp = Date.now();
+      for (const player of players) {
+        playerByIdCache.set(player.id, { data: player, timestamp: cacheTimestamp });
+      }
+      
+      // Combine cached players with newly fetched players
+      const allPlayers = [...cachedPlayers, ...players];
+      return allPlayers.sort((a, b) => (b.points || 0) - (a.points || 0));
     } catch (error) {
       console.error('[PlayerService] Error fetching players by IDs:', error);
       // DO NOT fallback to getAllPlayers - it causes 504 timeouts
-      // Return empty array and let caller handle the error
-      return [];
+      // Return cached players if we have any, otherwise empty array
+      return cachedPlayers.length > 0 ? cachedPlayers : [];
     }
   }
 };

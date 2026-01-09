@@ -35,6 +35,7 @@ import { CitrusSlice, CitrusSparkle, CitrusLeaf, CitrusWedge, CitrusBurst, Citru
 import { CitrusBackground } from '@/components/CitrusBackground';
 import { CitrusSectionDivider } from '@/components/CitrusSectionDivider';
 import { calculateEligibleGamesRemaining } from '@/utils/rosterUtils';
+import { COLUMNS } from '@/utils/queryColumns';
 
 // Debug flag - set to true only when debugging performance issues
 const DEBUG_MATCHUP = false;
@@ -439,7 +440,7 @@ const Matchup = () => {
         // Get the league data directly (using maybeSingle to avoid single() coercion error)
         const { data: demoLeagueData, error: leagueError } = await supabase
           .from('leagues')
-          .select('*')
+          .select(COLUMNS.LEAGUE)
           .eq('id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
           .maybeSingle();
         
@@ -506,7 +507,7 @@ const Matchup = () => {
         // Get all matchups for this week (same as logged-in users)
         const { data: weekMatchupsData, error: matchupsError } = await supabase
           .from('matchups')
-          .select('*')
+          .select(COLUMNS.MATCHUP)
           .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
           .eq('week_number' as any, weekToShow as any)
           .order('created_at', { ascending: true });
@@ -586,8 +587,8 @@ const Matchup = () => {
         }
         
         // Get teams
-        const team1 = await supabase.from('teams').select('*').eq('id' as any, guestMatchup.team1_id as any).maybeSingle();
-        const team2 = guestMatchup.team2_id ? await supabase.from('teams').select('*').eq('id' as any, guestMatchup.team2_id as any).maybeSingle() : { data: null, error: null };
+        const team1 = await supabase.from('teams').select(COLUMNS.TEAM).eq('id' as any, guestMatchup.team1_id as any).maybeSingle();
+        const team2 = guestMatchup.team2_id ? await supabase.from('teams').select(COLUMNS.TEAM).eq('id' as any, guestMatchup.team2_id as any).maybeSingle() : { data: null, error: null };
         
         if (team1.error) throw team1.error;
         if (team2.error) throw team2.error;
@@ -1440,7 +1441,7 @@ const Matchup = () => {
         const DEFAULT_SEASON = 2025;
         const { data: seasonStatsData, error } = await supabase
           .from('player_season_stats')
-          .select('*')
+          .select(COLUMNS.PLAYER_STATS)
           .eq('player_id', player.id as any)
           .eq('season', DEFAULT_SEASON as any)
           .single();
@@ -3437,15 +3438,16 @@ const Matchup = () => {
       updateMatchupScores()
     ]).catch(() => { /* non-blocking */ });
     
-    // Refresh every 45 seconds during live games (slightly longer than backend 30s updates)
-    // Also updates matchup scores periodically (was separate 5-min interval, now consolidated)
+    // EGRESS OPTIMIZATION: Refresh every 120 seconds during live games
+    // Backend scraper runs every 90s, so 120s polling still catches all updates
+    // This reduces egress by ~60% compared to 45s polling
     const intervalId = setInterval(() => {
       Promise.all([
         fetchAllDailyStats(),
         refreshGameStatuses(),
         updateMatchupScores()
       ]).catch(() => { /* non-blocking */ });
-    }, 45000); // 45 seconds
+    }, 120000); // 120 seconds (was 45s - enterprise egress optimization)
     
     return () => {
       clearInterval(intervalId);

@@ -13,6 +13,7 @@ import { LeagueService, LEAGUE_TEAMS_DATA } from './LeagueService';
 import { PlayerService, Player } from './PlayerService';
 import { DraftService } from './DraftService';
 import { MatchupService } from './MatchupService';
+import { COLUMNS } from '@/utils/queryColumns';
 
 // Static demo league ID (old approach - not used anymore)
 export const DEMO_LEAGUE_ID = '00000000-0000-0000-0000-000000000001';
@@ -146,7 +147,7 @@ export const DemoLeagueService = {
       if (exists) {
         const { count: draftPicksCount } = await supabase
           .from('draft_picks')
-          .select('*', { count: 'exact', head: true })
+          .select(COLUMNS.COUNT, { count: 'exact', head: true })
           .eq('league_id', DEMO_LEAGUE_ID)
           .is('deleted_at', null);
         
@@ -229,7 +230,7 @@ export const DemoLeagueService = {
         console.log('[DemoLeagueService] Demo league exists but rosters not populated, getting existing teams...');
         const { data: existingTeams } = await supabase
           .from('teams')
-          .select('*')
+          .select(COLUMNS.TEAM)
           .eq('league_id', DEMO_LEAGUE_ID);
         teams = existingTeams || [];
         console.log(`[DemoLeagueService] Found ${teams.length} existing teams`);
@@ -268,7 +269,7 @@ export const DemoLeagueService = {
       // Verify that picks were actually inserted
       const { count: finalPicksCount } = await supabase
         .from('draft_picks')
-        .select('*', { count: 'exact', head: true })
+        .select(COLUMNS.COUNT, { count: 'exact', head: true })
         .eq('league_id', DEMO_LEAGUE_ID)
         .is('deleted_at', null);
 
@@ -399,7 +400,7 @@ export const DemoLeagueService = {
       // Verify insertion
       const { count: verifyCount, error: verifyError } = await supabase
         .from('draft_picks')
-        .select('*', { count: 'exact', head: true })
+        .select(COLUMNS.COUNT, { count: 'exact', head: true })
         .eq('league_id', leagueId)
         .is('deleted_at', null);
       
@@ -412,7 +413,7 @@ export const DemoLeagueService = {
         if (teams.length > 0) {
           const { count: teamPicksCount } = await supabase
             .from('draft_picks')
-            .select('*', { count: 'exact', head: true })
+            .select(COLUMNS.COUNT, { count: 'exact', head: true })
             .eq('league_id', leagueId)
             .eq('team_id', teams[0].id)
             .is('deleted_at', null);

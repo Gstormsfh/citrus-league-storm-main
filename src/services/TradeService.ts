@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { COLUMNS } from '@/utils/queryColumns';
 
 export interface TradeOffer {
   id: string;
@@ -82,7 +83,7 @@ export class TradeService {
       // Get the trade offer details
       const { data: trade, error: fetchError } = await supabase
         .from('trade_offers')
-        .select('*')
+        .select(COLUMNS.TRADE)
         .eq('id', tradeId)
         .eq('status', 'pending')
         .single();

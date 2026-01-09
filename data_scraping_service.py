@@ -123,8 +123,22 @@ if __name__ == "__main__":
     while True:
         try:
             run_unified_loop()
-            logger.info("😴 Cycle Complete. Resting 90s to keep API healthy...")
-            time.sleep(90)
+            
+            # EGRESS OPTIMIZATION: Smart timing based on game hours
+            # NHL games typically run 5pm-11pm Mountain Time
+            # Shorter intervals during game hours, longer during off hours
+            now = dt.datetime.now()
+            is_game_hours = 17 <= now.hour <= 23  # 5pm-11pm
+            is_weekend = now.weekday() >= 5  # Saturday/Sunday (more games)
+            
+            if is_game_hours or is_weekend:
+                sleep_time = 90  # 90 seconds during game hours
+                logger.info("😴 Cycle Complete. Game hours - resting 90s...")
+            else:
+                sleep_time = 300  # 5 minutes during off hours
+                logger.info("😴 Cycle Complete. Off hours - resting 5 min to save egress...")
+            
+            time.sleep(sleep_time)
         except KeyboardInterrupt:
             logger.info("Shutting down safely...")
             sys.exit(0)

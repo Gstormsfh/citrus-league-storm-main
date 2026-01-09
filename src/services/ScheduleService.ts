@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { withTimeout } from '@/utils/promiseUtils';
 import { getTodayMST, getTodayMSTDate } from '@/utils/timezoneUtils';
+import { COLUMNS } from '@/utils/queryColumns';
 
 // Test mode: Controlled via VITE_TEST_MODE environment variable
 // Set VITE_TEST_MODE=true in .env to use test date for development
@@ -64,7 +65,7 @@ export const ScheduleService = {
       
       const { data, error } = await supabase
         .from('nhl_games')
-        .select('*')
+        .select(COLUMNS.NHL_GAME)
         .gte('game_date', startStr)
         .lte('game_date', endStr)
         .order('game_date', { ascending: true })
@@ -111,7 +112,7 @@ export const ScheduleService = {
 
       let query = supabase
         .from('nhl_games')
-        .select('*')
+        .select(COLUMNS.NHL_GAME)
         .or(orConditions)
         .order('game_date', { ascending: true })
         .order('game_time', { ascending: true });
@@ -183,7 +184,7 @@ export const ScheduleService = {
     try {
       let query = supabase
         .from('nhl_games')
-        .select('*')
+        .select(COLUMNS.NHL_GAME)
         .or(`home_team.eq.${teamAbbrev},away_team.eq.${teamAbbrev}`)
         .order('game_date', { ascending: true })
         .order('game_time', { ascending: true });
@@ -220,7 +221,7 @@ export const ScheduleService = {
 
       const { data, error } = await supabase
         .from('nhl_games')
-        .select('*')
+        .select(COLUMNS.NHL_GAME)
         .or(`home_team.eq.${teamAbbrev},away_team.eq.${teamAbbrev}`)
         .gte('game_date', todayStr)
         .in('status', ['scheduled', 'live', 'final'])
@@ -436,7 +437,7 @@ export const ScheduleService = {
 
       const { data: games, error } = await supabase
         .from('nhl_games')
-        .select('*')
+        .select(COLUMNS.NHL_GAME)
         .or(orConditions)
         .eq('game_date', targetDate)
         .in('status', ['scheduled', 'live', 'final'])
@@ -483,7 +484,7 @@ export const ScheduleService = {
 
       const { data: games, error } = await supabase
         .from('nhl_games')
-        .select('*')
+        .select(COLUMNS.NHL_GAME)
         .or(orConditions)
         .gte('game_date', todayStr)
         .in('status', ['scheduled', 'live', 'final'])
@@ -525,7 +526,7 @@ export const ScheduleService = {
       // Query for games on today's date
       const { data: games, error } = await supabase
         .from('nhl_games')
-        .select('*')
+        .select(COLUMNS.NHL_GAME)
         .or(`home_team.eq.${teamAbbrev},away_team.eq.${teamAbbrev}`)
         .eq('game_date', todayStr)
         .in('status', ['scheduled', 'live', 'final']);

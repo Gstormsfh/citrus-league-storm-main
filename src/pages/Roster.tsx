@@ -38,6 +38,7 @@ import { GameLockService } from '@/services/GameLockService';
 import { getPlayerWithSeasonStats } from '@/utils/playerStatsHelper';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { supabase } from '@/integrations/supabase/client';
+import { COLUMNS } from '@/utils/queryColumns';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { MatchupScheduleSelector } from "@/components/matchup/MatchupScheduleSelector";
 import { WeeklySchedule } from "@/components/matchup/WeeklySchedule";
@@ -405,7 +406,7 @@ const Roster = () => {
           // Get the demo league
           const { data: demoLeagueData, error: leagueError } = await supabase
             .from('leagues')
-            .select('*')
+            .select(COLUMNS.LEAGUE)
             .eq('id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
             .maybeSingle();
           
@@ -421,7 +422,7 @@ const Roster = () => {
           // For now, get team 1 (we can make this configurable later)
           const { data: demoTeamsData, error: teamsError } = await supabase
             .from('teams')
-            .select('*')
+            .select(COLUMNS.TEAM)
             .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
             .order('created_at', { ascending: true })
             .limit(1);
@@ -446,7 +447,7 @@ const Roster = () => {
           // Get roster from draft picks (same as MatchupService.getTeamRoster)
           const { data: teamDraftPicksData, error: picksError } = await supabase
             .from('draft_picks')
-            .select('*')
+            .select(COLUMNS.DRAFT_PICK)
             .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
             .eq('team_id' as any, demoTeamData.id as any)
             .is('deleted_at', null)
@@ -518,7 +519,7 @@ const Roster = () => {
           // Don't filter by session to include players added via free agency
           const { data: allDraftPicksData, error: picksError } = await supabase
             .from('draft_picks')
-            .select('*')
+            .select(COLUMNS.DRAFT_PICK)
             .eq('league_id' as any, userTeamData.league_id as any)
             .eq('team_id' as any, userTeamData.id as any)
             .is('deleted_at', null)
@@ -1384,7 +1385,8 @@ const Roster = () => {
     }
   }, [selectedDate, currentMatchup?.id, userTeamId, loadRoster]);
 
-  // Periodically refresh lock status (every 30 seconds)
+  // EGRESS OPTIMIZATION: Refresh lock status every 60 seconds (was 30s)
+  // Game locks change at game start time, not during games - 60s is sufficient
   useEffect(() => {
     if (roster.starters.length === 0 && roster.bench.length === 0 && roster.ir.length === 0) {
       return;
@@ -1392,7 +1394,7 @@ const Roster = () => {
 
     const interval = setInterval(() => {
       fetchLockedPlayerIds();
-    }, 30000); // 30 seconds
+    }, 60000); // 60 seconds (was 30s - enterprise egress optimization)
 
     return () => clearInterval(interval);
   }, [fetchLockedPlayerIds]);

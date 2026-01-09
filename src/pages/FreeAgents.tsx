@@ -26,6 +26,7 @@ import { isGuestMode, shouldBlockGuestOperation } from '@/utils/guestHelpers';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import { getPlayerWithSeasonStats } from '@/utils/playerStatsHelper';
 import { CitrusBackground } from '@/components/CitrusBackground';
+import { COLUMNS } from '@/utils/queryColumns';
 
 // Helper function to format position for display (L -> LW, R -> RW)
 const formatPositionForDisplay = (position: string): string => {
@@ -388,7 +389,7 @@ const FreeAgents = () => {
         // No lineup exists yet - count draft picks instead
         const { count: draftPicksCount, error: picksError } = await supabase
           .from('draft_picks')
-          .select('*', { count: 'exact', head: true })
+          .select(COLUMNS.COUNT, { count: 'exact', head: true })
           .eq('team_id' as any, teamData.id as any)
           .eq('league_id' as any, leagueId as any)
           .is('deleted_at', null);

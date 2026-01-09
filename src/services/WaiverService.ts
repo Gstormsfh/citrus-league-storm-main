@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { COLUMNS } from '@/utils/queryColumns';
 
 export interface WaiverClaim {
   id: string;
@@ -400,7 +401,7 @@ export class WaiverService {
     try {
       const { data, error } = await supabase
         .from('waiver_claims')
-        .select('*')
+        .select(COLUMNS.WAIVER)
         .eq('league_id', leagueId)
         .eq('team_id', teamId)
         .eq('status', 'pending')

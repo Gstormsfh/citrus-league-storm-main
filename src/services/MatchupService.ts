@@ -8,6 +8,7 @@ import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { ScheduleService, NHLGame, GameInfo } from './ScheduleService';
 import { withTimeout } from '@/utils/promiseUtils';
 import { getTodayMST, getTodayMSTDate } from '@/utils/timezoneUtils';
+import { COLUMNS } from '@/utils/queryColumns';
 
 // Roster cache for performance optimization
 interface RosterCacheEntry {
@@ -466,7 +467,7 @@ export const MatchupService = {
     try {
       const { data, error } = await supabase
         .from('matchups')
-        .select('*')
+        .select(COLUMNS.MATCHUP)
         .eq('league_id', leagueId)
         .eq('week_number', weekNumber)
         .maybeSingle();
@@ -529,7 +530,7 @@ export const MatchupService = {
       // Ensure week_number is treated as a number in the query
       const query = supabase
         .from('matchups')
-        .select('*')
+        .select(COLUMNS.MATCHUP)
         .eq('league_id', leagueId)
         .eq('week_number', weekNumber)
         .or(`team1_id.eq.${userTeam.id},team2_id.eq.${userTeam.id}`)
@@ -625,7 +626,7 @@ export const MatchupService = {
       // Get the matchup
       const { data: matchup, error: matchupError } = await supabase
         .from('matchups')
-        .select('*')
+        .select(COLUMNS.MATCHUP)
         .eq('id', matchupId)
         .single();
 
@@ -847,7 +848,7 @@ export const MatchupService = {
       let leagueError: any = null;
       try {
         const result = await withTimeout(
-          supabase.from('leagues').select('*').eq('id', leagueId).maybeSingle(),
+          supabase.from('leagues').select(COLUMNS.LEAGUE).eq('id', leagueId).maybeSingle(),
           5000,
           'getLeague timeout in getMatchupData'
         );
@@ -875,7 +876,7 @@ export const MatchupService = {
       let teamError: any = null;
       try {
         const result = await withTimeout(
-          supabase.from('teams').select('*').eq('league_id', leagueId).eq('owner_id', userId).maybeSingle(),
+          supabase.from('teams').select(COLUMNS.TEAM).eq('league_id', leagueId).eq('owner_id', userId).maybeSingle(),
           5000,
           'getUserTeam timeout in getMatchupData'
         );
@@ -1214,7 +1215,7 @@ export const MatchupService = {
       // This matches the efficient pattern used in Roster.tsx
       const { data: teamDraftPicks, error: picksError } = await supabase
         .from('draft_picks')
-        .select('*')
+        .select(COLUMNS.DRAFT_PICK)
         .eq('league_id', leagueId)
         .eq('team_id', teamId)
         .is('deleted_at', null)
@@ -3234,7 +3235,7 @@ export const MatchupService = {
       // Use two separate queries and combine results
       const { data: data1, error: error1 } = await supabase
         .from('matchups')
-        .select('*')
+        .select(COLUMNS.MATCHUP)
         .eq('league_id', leagueId)
         .eq('status', 'completed')
         .eq('team1_id', team1Id)
@@ -3244,7 +3245,7 @@ export const MatchupService = {
 
       const { data: data2, error: error2 } = await supabase
         .from('matchups')
-        .select('*')
+        .select(COLUMNS.MATCHUP)
         .eq('league_id', leagueId)
         .eq('status', 'completed')
         .eq('team1_id', team2Id)
@@ -3328,7 +3329,7 @@ export const MatchupService = {
       // Get all playoff matchups (weeks after scheduleLength)
       const { data: playoffMatchups, error: matchupsError } = await supabase
         .from('matchups')
-        .select('*')
+        .select(COLUMNS.MATCHUP)
         .eq('league_id', leagueId)
         .gt('week_number', scheduleLength)
         .order('week_number', { ascending: true })
@@ -3403,7 +3404,7 @@ export const MatchupService = {
     try {
       const queryPromise = supabase
         .from('fantasy_matchup_lines')
-        .select('*')
+        .select(COLUMNS.MATCHUP_LINES)
         .eq('matchup_id', matchupId);
       
       let data: any = null;

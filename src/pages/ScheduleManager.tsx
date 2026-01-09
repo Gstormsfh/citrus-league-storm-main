@@ -11,6 +11,7 @@ import { CitrusBackground } from '@/components/CitrusBackground';
 import { CitrusSparkle, CitrusLeaf } from '@/components/icons/CitrusIcons';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
+import { COLUMNS } from '@/utils/queryColumns';
 
 const ScheduleManager = () => {
   const { user } = useAuth();
@@ -34,7 +35,7 @@ const ScheduleManager = () => {
 
       const { data: games } = await supabase
         .from('nhl_games')
-        .select('*')
+        .select(COLUMNS.NHL_GAME)
         .gte('game_date', today.toISOString().split('T')[0])
         .lte('game_date', nextWeek.toISOString().split('T')[0])
         .order('game_date', { ascending: true })

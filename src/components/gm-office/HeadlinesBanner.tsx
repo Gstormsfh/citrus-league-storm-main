@@ -7,6 +7,7 @@ import { getCurrentWeekNumber, getFirstWeekStartDate, getWeekStartDate, getWeekE
 import { supabase } from '@/integrations/supabase/client';
 import { AlertCircle, Clock, TrendingUp, TrendingDown } from 'lucide-react';
 import { CitrusSparkle, CitrusWedge } from '@/components/icons/CitrusIcons';
+import { COLUMNS } from '@/utils/queryColumns';
 
 interface HeadlineItem {
   type: 'waiver' | 'matchup' | 'streak';
@@ -115,7 +116,7 @@ export const HeadlinesBanner = () => {
             // Get recent matchups to calculate streak
             const { data: recentMatchups } = await supabase
               .from('matchups')
-              .select('*')
+              .select(COLUMNS.MATCHUP)
               .eq('league_id', activeLeagueId)
               .eq('status', 'completed')
               .or(`team1_id.eq.${userTeam.id},team2_id.eq.${userTeam.id}`)
