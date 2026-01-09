@@ -290,10 +290,10 @@ const Matchup = () => {
       const { data: allRosters, error } = await supabase
         .from('fantasy_daily_rosters')
         .select('player_id, roster_date, team_id')
-        .eq('matchup_id', currentMatchup.id)
-        .in('team_id', teamIds)
-        .in('roster_date', pastDates)
-        .eq('slot_type', 'active');
+        .eq('matchup_id' as any, currentMatchup.id as any)
+        .in('team_id' as any, teamIds as any)
+        .in('roster_date' as any, pastDates as any)
+        .eq('slot_type' as any, 'active' as any);
       
       if (error) {
         console.error('[Matchup] Error fetching cached rosters:', error);
@@ -302,7 +302,7 @@ const Matchup = () => {
       
       // Group rosters by date and team
       const rostersByDateTeam = new Map<string, Map<string, number[]>>();
-      allRosters?.forEach(r => {
+      (allRosters as any)?.forEach((r: any) => {
         if (!rostersByDateTeam.has(r.roster_date)) {
           rostersByDateTeam.set(r.roster_date, new Map());
         }
@@ -1516,7 +1516,7 @@ const Matchup = () => {
           originalGamesLength: originalGames?.length || 0,
           isArray: Array.isArray(originalGames),
           playerTeam: player.team,
-          playerTeamAbbreviation: player.teamAbbreviation,
+          playerTeamAbbreviation: (player as any).teamAbbreviation,
           sampleGame: originalGames?.[0] || player.games?.[0] || null
         });
       }
@@ -1715,7 +1715,7 @@ const Matchup = () => {
           sampleGame: transformedPlayer.games?.[0] || null,
           hasTeam: !!transformedPlayer.team,
           team: transformedPlayer.team,
-          teamAbbreviation: transformedPlayer.teamAbbreviation,
+          teamAbbreviation: (transformedPlayer as any).teamAbbreviation,
           hasDailyStatsBreakdown: !!transformedPlayer.daily_stats_breakdown,
           dailyStatsBreakdown: transformedPlayer.daily_stats_breakdown,
           dailyStatsBreakdownKeys: transformedPlayer.daily_stats_breakdown ? Object.keys(transformedPlayer.daily_stats_breakdown).length : 0,
@@ -2200,35 +2200,37 @@ const Matchup = () => {
 
     // Helper to convert Player to MatchupPlayer format
     const transformToMatchupPlayer = (player: Player, isStarter: boolean): MatchupPlayer => {
+      const p = player as any;
       return {
-        id: player.id,
-        name: player.full_name || player.name,
-        position: player.position,
-        team: player.team || '',
-        teamAbbreviation: player.team_abbreviation || player.team || '',
-        points: player.fantasy_points || 0,
-        total_points: player.fantasy_points || 0,
-        headshot_url: player.headshot_url,
+        id: p.id as number,
+        name: p.full_name || p.name || '',
+        position: p.position,
+        team: p.team || '',
+        teamAbbreviation: p.team_abbreviation || p.team || '',
+        points: p.fantasy_points || 0,
+        total_points: p.fantasy_points || 0,
+        headshot_url: p.headshot_url,
         isStarter: isStarter,
-        isOnIR: player.status === 'IR' || player.status === 'SUSP',
+        isOnIR: p.status === 'IR' || p.status === 'SUSP',
         stats: {
           goals: 0,
           assists: 0,
           sog: 0,
-          blocks: 0,
+          blk: 0,
           xGoals: 0
         },
         matchupStats: {
           goals: 0,
           assists: 0,
           sog: 0,
-          blocks: 0,
+          blk: 0,
           xGoals: 0
         },
         games: [],
-        isGoalie: player.position === 'G',
-        status: player.status || null
-      };
+        gamesRemaining: 0,
+        isGoalie: p.position === 'G',
+        status: (p.status || null) as any
+      } as MatchupPlayer;
     };
 
     const loadMatchupData = async () => {
@@ -2911,8 +2913,8 @@ const Matchup = () => {
           const { data: allFrozenEntries } = await supabase
             .from('fantasy_daily_rosters')
             .select('player_id, team_id')
-            .eq('matchup_id', matchupData.matchup.id)
-            .in('roster_date', datesToLoad);
+            .eq('matchup_id' as any, matchupData.matchup.id)
+            .in('roster_date' as any, datesToLoad as any);
           
           if (allFrozenEntries && allFrozenEntries.length > 0) {
             // Get all current player IDs
@@ -2922,45 +2924,46 @@ const Matchup = () => {
             
             // Find player IDs that are in frozen rosters but NOT in current rosters
             const missingIds = [...new Set(
-              allFrozenEntries
-                .map(e => String(e.player_id))
-                .filter(id => !allCurrentIds.has(id))
+              (allFrozenEntries as any)
+                .map((e: any) => String(e.player_id))
+                .filter((id: string) => !allCurrentIds.has(id))
             )];
             
             if (missingIds.length > 0) {
               log(' Found dropped/traded players in frozen rosters:', missingIds);
               
               // Fetch missing players
-              const missingPlayers = await PlayerService.getPlayersByIds(missingIds);
+              const missingPlayers = await PlayerService.getPlayersByIds(missingIds as string[]);
               log(' Fetched', missingPlayers.length, 'dropped/traded players');
               
               // Transform to MatchupPlayer and add to appropriate lookup map
               missingPlayers.forEach(player => {
                 // Determine which team this player was on based on frozen roster entries
-                const playerEntries = allFrozenEntries.filter(e => String(e.player_id) === String(player.id));
-                const wasOnMyTeam = playerEntries.some(e => String(e.team_id) === matchupData.userTeam.id);
-                const wasOnOppTeam = playerEntries.some(e => String(e.team_id) === matchupData.opponentTeam?.id);
+                const playerEntries = (allFrozenEntries as any).filter((e: any) => String(e.player_id) === String(player.id));
+                const wasOnMyTeam = playerEntries.some((e: any) => String(e.team_id) === matchupData.userTeam.id);
+                const wasOnOppTeam = playerEntries.some((e: any) => String(e.team_id) === matchupData.opponentTeam?.id);
                 
                 // Create basic MatchupPlayer from Player data
+                const p = player as any;
                 const matchupPlayer: MatchupPlayer = {
-                  id: player.id,
-                  name: player.full_name || player.name,
-                  position: player.position,
-                  team: player.team || '',
-                  teamAbbreviation: player.team_abbreviation || player.team || '',
-                  points: player.fantasy_points || 0,
-                  total_points: player.fantasy_points || 0,
-                  headshot_url: player.headshot_url,
+                  id: p.id as number,
+                  name: p.full_name || p.name || '',
+                  position: p.position,
+                  team: p.team || '',
+                  teamAbbreviation: p.team_abbreviation || p.team || '',
+                  points: p.fantasy_points || 0,
+                  total_points: p.fantasy_points || 0,
+                  headshot_url: p.headshot_url,
                   isStarter: false,
-                  isOnIR: player.status === 'IR' || player.status === 'SUSP',
-                  stats: { goals: 0, assists: 0, sog: 0, blocks: 0, xGoals: 0 },
-                  matchupStats: { goals: 0, assists: 0, sog: 0, blocks: 0, xGoals: 0 },
+                  isOnIR: p.status === 'IR' || p.status === 'SUSP',
+                  stats: { goals: 0, assists: 0, sog: 0, blk: 0, xGoals: 0 },
+                  matchupStats: { goals: 0, assists: 0, sog: 0, blk: 0, xGoals: 0 },
                   games: [],
-                  isGoalie: player.position === 'G',
-                  status: player.status || null,
-                  // Mark as no longer on roster for UI indication if needed
+                  gamesRemaining: 0,
+                  isGoalie: p.position === 'G',
+                  status: (p.status || null) as any,
                   wasDropped: true
-                };
+                } as MatchupPlayer;
                 
                 if (wasOnMyTeam) {
                   enrichedMyPlayerMap.set(String(player.id), matchupPlayer);
@@ -2992,16 +2995,16 @@ const Matchup = () => {
               const { data: myDailyRoster } = await supabase
                 .from('fantasy_daily_rosters')
                 .select('player_id, slot_type, slot_id')
-                .eq('team_id', matchupData.userTeam.id)
-                .eq('matchup_id', matchupData.matchup.id)
-                .eq('roster_date', date);
+                .eq('team_id' as any, matchupData.userTeam.id as any)
+                .eq('matchup_id' as any, matchupData.matchup.id as any)
+                .eq('roster_date' as any, date as any);
               
               const { data: oppDailyRoster } = matchupData.opponentTeam ? await supabase
                 .from('fantasy_daily_rosters')
                 .select('player_id, slot_type, slot_id')
-                .eq('team_id', matchupData.opponentTeam.id)
-                .eq('matchup_id', matchupData.matchup.id)
-                .eq('roster_date', date) : { data: null };
+                .eq('team_id' as any, matchupData.opponentTeam.id as any)
+                .eq('matchup_id' as any, matchupData.matchup.id as any)
+                .eq('roster_date' as any, date as any) : { data: null };
               
               if (!myDailyRoster || myDailyRoster.length === 0) {
                 log(` No frozen roster found for ${date}`);
@@ -3021,9 +3024,8 @@ const Matchup = () => {
                   const isStarter = entry.slot_type === 'active';
                   myRoster.push({
                     ...enrichedPlayer,
-                    isStarter,
-                    isOnIR: entry.slot_type === 'ir'
-                  });
+                    isStarter
+                  } as MatchupPlayer);
                   if (entry.slot_id) {
                     mySlots[playerId] = entry.slot_id;
                   }
@@ -3045,9 +3047,8 @@ const Matchup = () => {
                     const isStarter = entry.slot_type === 'active';
                     oppRoster.push({
                       ...enrichedPlayer,
-                      isStarter,
-                      isOnIR: entry.slot_type === 'ir'
-                    });
+                      isStarter
+                    } as MatchupPlayer);
                     if (entry.slot_id) {
                       oppSlots[playerId] = entry.slot_id;
                     }
@@ -3239,14 +3240,14 @@ const Matchup = () => {
         let allTeamsArray: string[] = [];
         setMyTeam(prev => {
           prev.forEach(p => {
-            const team = (p.teamAbbreviation || p.team || '').toUpperCase();
+            const team = ((p as any).teamAbbreviation || p.team || '').toUpperCase();
             if (team && !allTeamsArray.includes(team)) allTeamsArray.push(team);
           });
           return prev; // Don't modify state, just read it
         });
         setOpponentTeamPlayers(prev => {
           prev.forEach(p => {
-            const team = (p.teamAbbreviation || p.team || '').toUpperCase();
+            const team = ((p as any).teamAbbreviation || p.team || '').toUpperCase();
             if (team && !allTeamsArray.includes(team)) allTeamsArray.push(team);
           });
           return prev; // Don't modify state, just read it
@@ -3307,7 +3308,7 @@ const Matchup = () => {
         
         // Update myTeam players' games array with fresh status
         setMyTeam(prev => prev.map(player => {
-          const teamAbbr = (player.teamAbbreviation || player.team || '').toUpperCase();
+          const teamAbbr = ((player as any).teamAbbreviation || player.team || '').toUpperCase();
           if (!teamAbbr) return player;
           
           const freshGame = gameStatusByTeam.get(teamAbbr);
@@ -3331,7 +3332,7 @@ const Matchup = () => {
         
         // Same for opponent team
         setOpponentTeamPlayers(prev => prev.map(player => {
-          const teamAbbr = (player.teamAbbreviation || player.team || '').toUpperCase();
+          const teamAbbr = ((player as any).teamAbbreviation || player.team || '').toUpperCase();
           if (!teamAbbr) return player;
           
           const freshGame = gameStatusByTeam.get(teamAbbr);
