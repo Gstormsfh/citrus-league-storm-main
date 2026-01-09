@@ -59,7 +59,46 @@ export interface HockeyPlayer {
     isToday: boolean;
     gameTime?: string; // e.g. "7:30 PM"
   };
-  projectedPoints?: number;
+  projectedPoints?: number; // Legacy field - kept for backwards compatibility
+  
+  // Daily projection from Citrus Projections 2.0 (matches Matchup tab structure)
+  // Skater projection object with full projection data
+  daily_projection?: {
+    total_projected_points: number;
+    projected_goals: number;
+    projected_assists: number;
+    projected_sog: number;
+    projected_blocks: number;
+    projected_ppp?: number;      // Power Play Points
+    projected_shp?: number;      // Shorthanded Points
+    projected_hits?: number;     // Hits
+    projected_pim?: number;      // Penalty Minutes
+    projected_xg: number;
+    base_ppg: number;
+    shrinkage_weight: number;
+    finishing_multiplier: number;
+    opponent_adjustment: number;
+    b2b_penalty: number;
+    home_away_adjustment: number;
+    confidence_score: number;
+    calculation_method: string;
+    is_goalie?: boolean; // Flag to distinguish goalie vs skater
+  };
+  
+  // Goalie-specific projection object (matches Matchup tab structure)
+  goalieProjection?: {
+    total_projected_points: number;
+    projected_wins: number;
+    projected_saves: number;
+    projected_shutouts: number;
+    projected_goals_against: number;
+    projected_gaa: number;
+    projected_save_pct: number;
+    projected_gp: number;
+    starter_confirmed: boolean;
+    confidence_score: number;
+    calculation_method: string;
+  };
   
   // CitrusPuck Integration
   citrusPuckData?: {
@@ -250,8 +289,24 @@ const HockeyPlayerCardContent = ({
   const teamAbbr = getTeamAbbreviation();
   const teamLogoUrl = `https://assets.nhle.com/logos/nhl/svg/${player.teamAbbreviation || 'NHL'}_light.svg`;
 
-  const hasGameToday = player.nextGame?.isToday;
-  const projectedPoints = hasGameToday ? (player.projectedPoints || 0) : 0;
+  // CRITICAL: Use ONLY the new projection system (daily_projection/goalieProjection)
+  // This is the SINGLE SOURCE OF TRUTH for projections - matches Matchup tab exactly
+  // 
+  // The old system (player.projectedPoints = season_points / 20) has been ERADICATED
+  // DO NOT fall back to player.projectedPoints - it will always be 0 or stale
+  //
+  // If dailyProjection doesn't exist, the player either:
+  // 1. Has no game on the selected date
+  // 2. Projections haven't been fetched yet
+  const dailyProjection = isGoalie ? player.goalieProjection : player.daily_projection;
+  
+  // CRITICAL FIX: Determine "has game" from projection presence, NOT nextGame.isToday
+  // nextGame.isToday is based on ACTUAL today, not the selectedDate
+  // If dailyProjection exists (with total_projected_points >= 0), the player has a game on that date
+  const hasGameOnSelectedDate = dailyProjection !== undefined && dailyProjection !== null;
+  
+  // ONLY use daily_projection - NO FALLBACK to old system
+  const projectedPoints = dailyProjection?.total_projected_points || 0;
   const maxProjectedPoints = 8; 
   const projectionPercentage = Math.min((projectedPoints / maxProjectedPoints) * 100, 100);
 
@@ -400,13 +455,13 @@ const HockeyPlayerCardContent = ({
       <div className="px-1.5 pb-1.5 pt-1 bg-muted/20 flex flex-col justify-center gap-1 border-t border-border/30 min-h-[28px]">
         <div className="flex items-center justify-between h-3">
           <div className="flex items-center gap-1">
-            {hasGameToday && player.nextGame ? (
+            {hasGameOnSelectedDate ? (
               <>
                 <CalendarDays className="w-2 h-2 text-green-600" />
                 <span className="text-[8px] font-bold text-green-700 truncate max-w-[50px]">
-                   {player.nextGame.opponent}
+                   {player.nextGame?.opponent || 'Game'}
                 </span>
-                {player.nextGame.gameTime && (
+                {player.nextGame?.gameTime && (
                   <span className="text-[7px] text-green-600/80 font-medium">
                     {player.nextGame.gameTime}
                   </span>
@@ -421,7 +476,7 @@ const HockeyPlayerCardContent = ({
              <span className="text-[7px] text-muted-foreground uppercase font-medium">PROJ</span>
              <span className={cn(
                "text-[9px] font-bold",
-               hasGameToday ? "text-primary" : "text-muted-foreground"
+               hasGameOnSelectedDate ? "text-primary" : "text-muted-foreground"
              )}>
                  {projectedPoints.toFixed(1)}
              </span>
@@ -431,7 +486,7 @@ const HockeyPlayerCardContent = ({
         <div className="h-1 bg-muted/50 rounded-full overflow-hidden border border-border/10 w-full">
           <div 
             className={cn("h-full rounded-full transition-all duration-500", 
-              hasGameToday ? "bg-green-500" : "bg-transparent" 
+              hasGameOnSelectedDate ? "bg-green-500" : "bg-transparent" 
             )}
             style={{ width: `${projectionPercentage}%` }}
           />

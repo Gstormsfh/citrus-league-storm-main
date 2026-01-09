@@ -70,20 +70,52 @@ def process_game_data_citrus(game_id: int, boxscore: dict, pbp_data: Optional[di
 
 # --- HELPER FUNCTIONS ---
 def update_game_scores_in_nhl_games(db: SupabaseRest, game_id: int, boxscore: dict) -> bool:
+    """
+    Update game scores, period, and clock time in nhl_games table.
+    
+    Data flow:
+    - Scores come from boxscore homeTeam/awayTeam
+    - Period number comes from periodDescriptor
+    - Clock time comes from clock.timeRemaining (e.g., "12:45")
+    
+    This enables real-time display in the UI: "2nd 12:45"
+    """
     try:
         home_score = boxscore.get("homeTeam", {}).get("score")
         away_score = boxscore.get("awayTeam", {}).get("score")
         game_state = boxscore.get("gameState", "").upper()
         
+        # Map NHL API game states to our status values
+        # LIVE/CRIT/INTERMISSION = live (game in progress)
+        # OFF/FINAL = final (game completed)
+        # Everything else = scheduled (not started)
         status = "live" if game_state in ("LIVE", "CRIT", "INTERMISSION") else "final" if game_state in ("OFF", "FINAL") else "scheduled"
         
         update_data = {"home_score": home_score, "away_score": away_score, "status": status}
         
-        # Period Info
+        # Period Info - Format for display (1st, 2nd, 3rd, OT, SO)
         pd = boxscore.get("periodDescriptor", {})
         if pd:
             num = pd.get("number")
-            update_data["period"] = "OT" if num == 4 else "SO" if num > 4 else f"{num}rd" if num == 3 else f"{num}nd" if num == 2 else "1st"
+            if num:
+                # Format period number for display
+                # 1 -> "1st", 2 -> "2nd", 3 -> "3rd", 4 -> "OT", 5+ -> "SO"
+                update_data["period"] = "OT" if num == 4 else "SO" if num > 4 else f"{num}rd" if num == 3 else f"{num}nd" if num == 2 else "1st"
+        
+        # Clock Time - Extract time remaining in period (e.g., "12:45")
+        # CRITICAL: This enables real-time period/clock display in GameLogosBar
+        clock = boxscore.get("clock", {})
+        if clock:
+            time_remaining = clock.get("timeRemaining", "")
+            if time_remaining:
+                update_data["period_time"] = time_remaining
+            # Clear period_time for intermissions or when not running
+            elif game_state == "INTERMISSION":
+                update_data["period_time"] = "INT"  # Show "INT" during intermissions
+        
+        # Clear period info when game is final (no longer live)
+        if status == "final":
+            update_data["period_time"] = None  # Clear clock for finished games
         
         db.update("nhl_games", update_data, filters=[("game_id", "eq", game_id)])
         return True

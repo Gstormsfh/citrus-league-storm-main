@@ -48,9 +48,12 @@ export const GameLogosBar = ({ games, playerTeam, selectedDate }: GameLogosBarPr
           const isSelectedDate = gameDateStr === viewDateStr; // Game is on the date being viewed
           const isToday = isTodayMST(gameDateStr); // Also check if it's actually today (for "Today" label)
           
-          // Determine if game is live - only if it's on the selected date AND status is live
-          // If viewing a past date, don't show games as live (they're final)
-          const isLive = game.status === 'live' && isSelectedDate && isToday; // Must be selected date AND actually today AND live
+          // Determine if game is live - show live indicator if:
+          // 1. Game status is 'live' or 'intermission' (from DB)
+          // 2. AND it's actually today (can't have a live game in the past or future)
+          // The isSelectedDate check is removed so live games ALWAYS show as live regardless of which date you're viewing
+          const gameStatusLower = (game.status || '').toLowerCase();
+          const isLive = (gameStatusLower === 'live' || gameStatusLower === 'intermission' || gameStatusLower === 'crit') && isToday;
           
           // Check if game is in the past relative to the viewing date
           // If viewing a specific date, compare to that date; otherwise compare to today
@@ -278,6 +281,14 @@ export const GameLogosBar = ({ games, playerTeam, selectedDate }: GameLogosBarPr
               {gameScore && (
                 <span className="game-score-display text-[8px] leading-tight whitespace-nowrap text-muted-foreground font-medium">
                   {gameScore}
+                </span>
+              )}
+              
+              {/* Live Game Period & Time Display - Show period and clock for live games */}
+              {/* Example: "2nd 12:45" or "OT 3:22" or "INT" for intermissions */}
+              {isLive && game.period && (
+                <span className="text-[8px] leading-tight whitespace-nowrap text-orange-500 font-bold animate-pulse">
+                  {game.period}{game.period_time ? ` ${game.period_time}` : ''}
                 </span>
               )}
               

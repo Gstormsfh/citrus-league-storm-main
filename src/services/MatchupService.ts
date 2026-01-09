@@ -2152,7 +2152,8 @@ export const MatchupService = {
       const team1MatchupPlayers = await Promise.all(
         team1Roster.map(p => {
           const playerId = typeof p.id === 'string' ? parseInt(p.id) || 0 : p.id || 0;
-          const playerGames = gamesByTeam.get(p.teamAbbreviation || p.team || '') || [];
+          // CRITICAL: Use uppercase for team lookup - gamesByTeam keys are normalized to uppercase
+          const playerGames = gamesByTeam.get((p.teamAbbreviation || p.team || '').toUpperCase()) || [];
           const dailyProjection = dailyProjectionsMap.get(playerId);
           if (!dailyProjection && playerId > 0) {
             console.warn(`[MatchupService] Team1 player ${p.name} (ID: ${playerId}) missing daily projection`);
@@ -2612,7 +2613,8 @@ export const MatchupService = {
       const team2MatchupPlayers = await Promise.all(
         team2Roster.map(p => {
           const playerId = typeof p.id === 'string' ? parseInt(p.id) || 0 : p.id || 0;
-          const playerGames = gamesByTeam.get(p.teamAbbreviation || p.team || '') || [];
+          // CRITICAL: Use uppercase for team lookup - gamesByTeam keys are normalized to uppercase
+          const playerGames = gamesByTeam.get((p.teamAbbreviation || p.team || '').toUpperCase()) || [];
           const dailyProjection = dailyProjectionsMap.get(playerId);
           if (!dailyProjection && playerId > 0) {
             console.warn(`[MatchupService] Team2 player ${p.name} (ID: ${playerId}) missing daily projection`);

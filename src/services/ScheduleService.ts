@@ -99,9 +99,13 @@ export const ScheduleService = {
         return { gamesByTeam: new Map(), error: null };
       }
 
-      // Build OR condition for all teams
+      // CRITICAL: Normalize all team abbreviations to uppercase for consistent matching
+      // Database stores teams in uppercase, so we need to match that
+      const normalizedTeams = teamAbbrevs.map(t => t.toUpperCase());
+
+      // Build OR condition for all teams (using uppercase)
       // Format: (home_team.eq.TEAM1,away_team.eq.TEAM1),(home_team.eq.TEAM2,away_team.eq.TEAM2),...
-      const orConditions = teamAbbrevs
+      const orConditions = normalizedTeams
         .map(team => `home_team.eq.${team},away_team.eq.${team}`)
         .join(',');
 
@@ -142,18 +146,22 @@ export const ScheduleService = {
         throw error;
       }
 
-      // Group games by team
+      // Group games by team (using uppercase keys for consistent lookup)
       const gamesByTeam = new Map<string, NHLGame[]>();
-      teamAbbrevs.forEach(team => {
+      normalizedTeams.forEach(team => {
         gamesByTeam.set(team, []);
       });
 
       (data || []).forEach((game: NHLGame) => {
-        if (game.home_team && gamesByTeam.has(game.home_team)) {
-          gamesByTeam.get(game.home_team)!.push(game);
+        // Database stores teams in uppercase, so direct matching works
+        const homeTeam = (game.home_team || '').toUpperCase();
+        const awayTeam = (game.away_team || '').toUpperCase();
+        
+        if (homeTeam && gamesByTeam.has(homeTeam)) {
+          gamesByTeam.get(homeTeam)!.push(game);
         }
-        if (game.away_team && gamesByTeam.has(game.away_team)) {
-          gamesByTeam.get(game.away_team)!.push(game);
+        if (awayTeam && gamesByTeam.has(awayTeam)) {
+          gamesByTeam.get(awayTeam)!.push(game);
         }
       });
 

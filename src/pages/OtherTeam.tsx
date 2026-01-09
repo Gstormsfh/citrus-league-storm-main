@@ -138,7 +138,7 @@ const OtherTeam = () => {
             status: p.status === 'injured' ? 'IR' : (p.status === 'active' ? null : 'WVR'),
             image: p.headshot_url || undefined,
             nextGame: undefined,
-            projectedPoints: (p.points || 0) / 20
+            projectedPoints: 0 // Will be set by daily projections system
           }));
           
           // Load schedule data for demo players
@@ -348,7 +348,7 @@ const OtherTeam = () => {
           status: p.status === 'injured' ? 'IR' : (p.status === 'active' ? null : 'WVR'),
           image: p.headshot_url || undefined,
           nextGame: undefined, // Will be populated below with real schedule data
-          projectedPoints: (p.points || 0) / 20
+          projectedPoints: 0 // Will be set by daily projections system
         }));
 
         // Load real NHL schedule data for each player

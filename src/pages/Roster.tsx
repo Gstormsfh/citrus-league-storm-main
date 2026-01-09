@@ -598,7 +598,7 @@ const Roster = () => {
           status: p.status === 'injured' ? 'IR' : (p.status === 'active' ? null : 'WVR'),
           image: p.headshot_url || undefined,
           nextGame: undefined, // Will be populated below with real schedule data
-          projectedPoints: (p.points || 0) / 20 // Rough projection
+          projectedPoints: 0 // Will be set by daily projections system (getDailyProjectionsForMatchup)
         }));
 
         // Load real NHL schedule data for all players (batch query for performance)
@@ -640,6 +640,11 @@ const Roster = () => {
           }
           // If no game today, don't set nextGame (will show "No Game" in the card)
         });
+
+        // NOTE: Projections are NOT fetched here in loadRoster
+        // Instead, they are handled by the dedicated useEffects (fetchDailyProjections + enrichment)
+        // This matches how Matchup.tsx handles projections - roster loading is separate from projection loading
+        // This ensures projections work correctly for ALL dates (today, past, and future)
 
         // Sort players consistently by ID for deterministic auto-assignment
         transformedPlayers.sort((a, b) => {
@@ -1022,7 +1027,7 @@ const Roster = () => {
               status: (p.status === 'injured' ? 'IR' : null) as 'IR' | 'SUSP' | 'GTD' | 'WVR' | null,
               image: p.headshot_url || undefined,
               nextGame: undefined,
-              projectedPoints: (p.points || 0) / 20
+              projectedPoints: 0 // Will be set by daily projections system
             })) as HockeyPlayer[];
             
             // Auto-organize using same improved logic
@@ -1358,11 +1363,20 @@ const Roster = () => {
     }
   }, [fetchLockedPlayerIds, selectedDate]);
 
-  // Reload roster when selected date changes
+  // Reload roster when selected date changes to a PAST date (to load frozen roster)
+  // For TODAY/FUTURE dates, we keep the current roster - projections are fetched by the dedicated useEffect
   useEffect(() => {
     if (selectedDate && currentMatchup && userTeamId) {
-      console.log('[Roster] Selected date changed, reloading roster for date:', selectedDate);
-      loadRoster(true); // Keep current roster visible during refresh
+      const todayStr = getTodayMST();
+      const isPastDate = selectedDate < todayStr;
+      
+      if (isPastDate) {
+        // Past date - need to load frozen roster from database
+        console.log('[Roster] Past date selected, loading frozen roster for:', selectedDate);
+        loadRoster(true);
+      }
+      // For today/future dates: projections are automatically fetched by the fetchDailyProjections useEffect
+      // which triggers on selectedDate changes
     }
   }, [selectedDate, currentMatchup?.id, userTeamId, loadRoster]);
 
@@ -1524,7 +1538,10 @@ const Roster = () => {
     calculateStats();
   }, [userTeam, user, roster.starters, roster.bench, roster.ir, transactions]);
 
-  // Fetch daily projections for selected date (similar to Matchup tab)
+  // Fetch daily projections for selected date (same pattern as Matchup tab)
+  // CRITICAL: Do NOT include projectionsByDate in dependencies - it causes circular triggers
+  const currentFetchDateRef = useRef<string | null>(null);
+  
   useEffect(() => {
     const fetchDailyProjections = async () => {
       // Collect all player IDs from roster
@@ -1544,93 +1561,108 @@ const Roster = () => {
       // Use selectedDate or default to today
       const targetDate = selectedDate || getTodayMST();
       
-      // Check if we already have projections for this date
-      if (projectionsByDate.has(targetDate)) {
-        return; // Already fetched
-      }
-
+      // Track what we're fetching to handle race conditions
+      currentFetchDateRef.current = targetDate;
+      
       try {
         console.log(`[Roster] Fetching daily projections for ${targetDate} (${allPlayerIds.length} players)`);
         const projectionMap = await MatchupService.getDailyProjectionsForMatchup(allPlayerIds, targetDate);
         
-        // Update cache
-        setProjectionsByDate(prev => {
-          const newMap = new Map(prev);
-          newMap.set(targetDate, projectionMap);
-          return newMap;
-        });
-        
-        console.log(`[Roster] Fetched ${projectionMap.size} daily projections for ${targetDate}`);
+        // Only update cache if this is still the date we want
+        // (user might have clicked to another date while we were fetching)
+        if (currentFetchDateRef.current === targetDate) {
+          setProjectionsByDate(prev => {
+            const newMap = new Map(prev);
+            newMap.set(targetDate, projectionMap);
+            return newMap;
+          });
+          
+          console.log(`[Roster] Fetched ${projectionMap.size} daily projections for ${targetDate}`);
+        } else {
+          console.log(`[Roster] Discarding stale projections for ${targetDate} (now showing ${currentFetchDateRef.current})`);
+        }
       } catch (error) {
         console.error('[Roster] Error fetching daily projections:', error);
       }
     };
 
     fetchDailyProjections();
-  }, [selectedDate, roster.starters, roster.bench, roster.ir, projectionsByDate]);
+  }, [selectedDate, roster.starters.length, roster.bench.length, roster.ir.length]); // NO projectionsByDate - matches Matchup pattern
 
-  // Enrich players with daily projections when available
-  useEffect(() => {
+  // =============================================================================
+  // DISPLAY ROSTER - Applies projections at render time (same pattern as Matchup tab)
+  // This is the SINGLE SOURCE OF TRUTH for projections in Roster tab
+  // Base 'roster' state holds structure, 'displayRoster' useMemo adds projections
+  // =============================================================================
+  const displayRoster = useMemo(() => {
     const targetDate = selectedDate || getTodayMST();
     const dateProjections = projectionsByDate.get(targetDate);
     
-    if (!dateProjections || dateProjections.size === 0) {
-      return; // No projections available yet
-    }
-
-    // Only update if we have players
-    const hasPlayers = roster.starters.length > 0 || roster.bench.length > 0 || roster.ir.length > 0;
-    if (!hasPlayers) {
-      return;
-    }
-
-    setRoster(prevRoster => {
-      // Check if any player needs updating (avoid unnecessary re-renders)
-      let needsUpdate = false;
-      const allPlayers = [...prevRoster.starters, ...prevRoster.bench, ...prevRoster.ir];
+    const enrichPlayer = (player: HockeyPlayer): HockeyPlayer => {
+      const playerId = typeof player.id === 'string' ? parseInt(player.id) : player.id;
+      if (isNaN(playerId) || playerId <= 0) return player;
       
-      for (const player of allPlayers) {
-        const playerId = typeof player.id === 'string' ? parseInt(player.id) : player.id;
-        if (!isNaN(playerId) && playerId > 0) {
-          const projection = dateProjections.get(playerId);
-          if (projection) {
-            const dailyProjectedPoints = Number(projection.total_projected_points || 0);
-            if (player.projectedPoints !== dailyProjectedPoints) {
-              needsUpdate = true;
-              break;
-            }
-          }
-        }
-      }
-
-      if (!needsUpdate) {
-        return prevRoster; // No changes needed
-      }
-
-      const enrichPlayer = (player: HockeyPlayer): HockeyPlayer => {
-        const playerId = typeof player.id === 'string' ? parseInt(player.id) : player.id;
-        if (isNaN(playerId) || playerId <= 0) return player;
-        
-        const projection = dateProjections.get(playerId);
-        if (!projection) return player; // No projection for this player
-        
-        // Use daily projection total_projected_points for projectedPoints
-        const dailyProjectedPoints = Number(projection.total_projected_points || 0);
-        
+      const projection = dateProjections?.get(playerId);
+      if (!projection) return player; // No projection = no game on this date
+      
+      const isGoalie = player.position === 'G' || player.position === 'Goalie';
+      const dailyProjectedPoints = Number(projection.total_projected_points || 0);
+      
+      if (isGoalie) {
         return {
           ...player,
-          projectedPoints: dailyProjectedPoints
+          projectedPoints: dailyProjectedPoints,
+          goalieProjection: {
+            total_projected_points: dailyProjectedPoints,
+            projected_wins: Number(projection.projected_wins || 0),
+            projected_saves: Number(projection.projected_saves || 0),
+            projected_shutouts: Number(projection.projected_shutouts || 0),
+            projected_goals_against: Number(projection.projected_goals_against || 0),
+            projected_gaa: Number(projection.projected_gaa || 0),
+            projected_save_pct: Number(projection.projected_save_pct || 0),
+            projected_gp: Number(projection.projected_gp || 0),
+            starter_confirmed: Boolean(projection.starter_confirmed),
+            confidence_score: Number(projection.confidence_score || 0),
+            calculation_method: projection.calculation_method || 'probability_based_volume'
+          }
         };
-      };
+      } else {
+        // Skater (NOT goalie) - this includes McDavid, etc.
+        return {
+          ...player,
+          projectedPoints: dailyProjectedPoints,
+          daily_projection: {
+            total_projected_points: dailyProjectedPoints,
+            projected_goals: Number(projection.projected_goals || 0),
+            projected_assists: Number(projection.projected_assists || 0),
+            projected_sog: Number(projection.projected_sog || 0),
+            projected_blocks: Number(projection.projected_blocks || 0),
+            projected_ppp: Number(projection.projected_ppp || 0),
+            projected_shp: Number(projection.projected_shp || 0),
+            projected_hits: Number(projection.projected_hits || 0),
+            projected_pim: Number(projection.projected_pim || 0),
+            projected_xg: Number(projection.projected_xg || 0),
+            base_ppg: Number(projection.base_ppg || 0),
+            shrinkage_weight: Number(projection.shrinkage_weight || 0),
+            finishing_multiplier: Number(projection.finishing_multiplier || 1),
+            opponent_adjustment: Number(projection.opponent_adjustment || 1),
+            b2b_penalty: Number(projection.b2b_penalty || 1),
+            home_away_adjustment: Number(projection.home_away_adjustment || 1),
+            confidence_score: Number(projection.confidence_score || 0),
+            calculation_method: projection.calculation_method || 'hybrid_bayesian',
+            is_goalie: false
+          }
+        };
+      }
+    };
 
-      return {
-        ...prevRoster,
-        starters: prevRoster.starters.map(enrichPlayer),
-        bench: prevRoster.bench.map(enrichPlayer),
-        ir: prevRoster.ir.map(enrichPlayer)
-      };
-    });
-  }, [projectionsByDate, selectedDate, roster.starters.length, roster.bench.length, roster.ir.length]);
+    return {
+      starters: roster.starters.map(enrichPlayer),
+      bench: roster.bench.map(enrichPlayer),
+      ir: roster.ir.map(enrichPlayer),
+      slotAssignments: roster.slotAssignments
+    };
+  }, [roster, projectionsByDate, selectedDate]);
 
   // Load CitrusPuck Analytics
   useEffect(() => {
@@ -1815,25 +1847,54 @@ const Roster = () => {
                         };
                     };
 
-                    setRoster({
-                        ...roster,
-                        starters: enrichedRoster.starters.map(enrichWithProjections) as HockeyPlayer[],
-                        bench: enrichedRoster.bench.map(enrichWithProjections) as HockeyPlayer[],
-                        ir: enrichedRoster.ir.map(enrichWithProjections) as HockeyPlayer[]
-                    });
+                    // Add CitrusPuck data to roster (projections are handled by displayRoster useMemo)
+                    setRoster(prevRoster => ({
+                        ...prevRoster,
+                        starters: prevRoster.starters.map(p => enrichWithProjections(enrichPlayer(p))) as HockeyPlayer[],
+                        bench: prevRoster.bench.map(p => enrichWithProjections(enrichPlayer(p))) as HockeyPlayer[],
+                        ir: prevRoster.ir.map(p => enrichWithProjections(enrichPlayer(p))) as HockeyPlayer[]
+                    }));
                 } else {
-                    // If projections fetch fails, just use enriched roster without projections
-                    setRoster({
-                        ...roster,
-                        ...enrichedRoster
-                    });
+                    // If projections fetch fails, just use enriched roster with CitrusPuck data
+                    setRoster(prevRoster => ({
+                        ...prevRoster,
+                        starters: prevRoster.starters.map(enrichPlayer) as HockeyPlayer[],
+                        bench: prevRoster.bench.map(enrichPlayer) as HockeyPlayer[],
+                        ir: prevRoster.ir.map(enrichPlayer) as HockeyPlayer[]
+                    }));
                 }
             } else {
-                // No player IDs, just set enriched roster
-                setRoster({
-                    ...roster,
-                    ...enrichedRoster
-                });
+                // No player IDs, just set enriched roster but preserve daily projections
+                setRoster(prevRoster => ({
+                    ...prevRoster,
+                    starters: prevRoster.starters.map(p => {
+                        const enriched = enrichPlayer(p);
+                        return {
+                            ...enriched,
+                            projectedPoints: p.projectedPoints,
+                            daily_projection: (p as any).daily_projection,
+                            goalieProjection: (p as any).goalieProjection
+                        };
+                    }) as HockeyPlayer[],
+                    bench: prevRoster.bench.map(p => {
+                        const enriched = enrichPlayer(p);
+                        return {
+                            ...enriched,
+                            projectedPoints: p.projectedPoints,
+                            daily_projection: (p as any).daily_projection,
+                            goalieProjection: (p as any).goalieProjection
+                        };
+                    }) as HockeyPlayer[],
+                    ir: prevRoster.ir.map(p => {
+                        const enriched = enrichPlayer(p);
+                        return {
+                            ...enriched,
+                            projectedPoints: p.projectedPoints,
+                            daily_projection: (p as any).daily_projection,
+                            goalieProjection: (p as any).goalieProjection
+                        };
+                    }) as HockeyPlayer[]
+                }));
             }
             
             setAnalyticsLoaded(true);
@@ -2605,21 +2666,21 @@ const Roster = () => {
                   userTeam && isDemoLeague(userTeam.league_id) ? (
                     <div className="space-y-8">
                       <StartersGrid 
-                        players={roster.starters}
-                        slotAssignments={roster.slotAssignments}
+                        players={displayRoster.starters}
+                        slotAssignments={displayRoster.slotAssignments}
                         onPlayerClick={handlePlayerClick}
                         lockedPlayerIds={lockedPlayerIds}
                       />
                       
                       <BenchGrid 
-                        players={roster.bench}
+                        players={displayRoster.bench}
                         onPlayerClick={handlePlayerClick}
                         lockedPlayerIds={lockedPlayerIds}
                       />
                       
                       <IRSlot 
-                        players={roster.ir}
-                        slotAssignments={roster.slotAssignments}
+                        players={displayRoster.ir}
+                        slotAssignments={displayRoster.slotAssignments}
                         onPlayerClick={handlePlayerClick}
                         lockedPlayerIds={lockedPlayerIds}
                       />
@@ -2632,21 +2693,21 @@ const Roster = () => {
                   >
                     <div className="space-y-8">
                       <StartersGrid 
-                        players={roster.starters}
-                        slotAssignments={roster.slotAssignments}
+                        players={displayRoster.starters}
+                        slotAssignments={displayRoster.slotAssignments}
                         onPlayerClick={handlePlayerClick}
                         lockedPlayerIds={lockedPlayerIds}
                       />
                       
                       <BenchGrid 
-                        players={roster.bench}
+                        players={displayRoster.bench}
                         onPlayerClick={handlePlayerClick}
                         lockedPlayerIds={lockedPlayerIds}
                       />
                       
                       <IRSlot 
-                        players={roster.ir}
-                        slotAssignments={roster.slotAssignments}
+                        players={displayRoster.ir}
+                        slotAssignments={displayRoster.slotAssignments}
                         onPlayerClick={handlePlayerClick}
                         lockedPlayerIds={lockedPlayerIds}
                       />
@@ -2961,7 +3022,7 @@ const Roster = () => {
                 status: (p.status === 'injured' ? 'IR' : null) as 'IR' | 'SUSP' | 'GTD' | 'WVR' | null,
                 image: p.headshot_url || undefined,
                 nextGame: undefined,
-                projectedPoints: (p.points || 0) / 20
+                projectedPoints: 0 // Will be set by daily projections system
               }));
 
               const playerMap = new Map(transformedPlayers.map(p => [String(p.id), p]));
@@ -3000,7 +3061,7 @@ const Roster = () => {
             </DialogHeader>
             <div className="space-y-4 mt-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[...roster.starters, ...roster.bench, ...roster.ir].map((player) => (
+                {[...displayRoster.starters, ...displayRoster.bench, ...displayRoster.ir].map((player) => (
                   <Card key={player.id} className="p-4 hover:border-primary cursor-pointer transition-colors" onClick={async () => {
                     if (!user || !userTeam?.league_id || !pendingAddPlayer) return;
                     
