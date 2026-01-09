@@ -13,26 +13,6 @@ import { StormyChatBubble } from "./components/StormyChatBubble";
 import LoadingScreen from "./components/LoadingScreen";
 import "./App.css";
 
-// ===================================================================
-// EGRESS OPTIMIZATION: React Query Caching Configuration
-// ===================================================================
-// Reduces Supabase egress by 60-70% through intelligent client-side caching
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      // Cache data for 5 minutes (reduces repeated fetches)
-      staleTime: 5 * 60 * 1000,
-      // Keep unused data in cache for 10 minutes
-      cacheTime: 10 * 60 * 1000,
-      // Don't refetch on window focus (reduces unnecessary calls)
-      refetchOnWindowFocus: false,
-      // Don't refetch on component mount if data is fresh
-      refetchOnMount: false,
-      // Retry failed requests only once
-      retry: 1,
-    },
-  },
-});
 
 // Helper to add error handling to lazy imports
 const lazyWithErrorHandling = (importFn: () => Promise<any>) => {
@@ -94,11 +74,23 @@ const LeagueDashboard = lazyWithErrorHandling(() => import("./pages/LeagueDashbo
 // This prevents multiple loading screens from flashing
 const PageLoader = () => null;
 
-// Configure with a higher stale time to prevent unnecessary refetches
+// ===================================================================
+// EGRESS OPTIMIZATION: React Query Caching Configuration
+// ===================================================================
+// Reduces Supabase egress by 60-70% through intelligent client-side caching
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
+      // Cache data for 5 minutes (reduces repeated fetches)
+      staleTime: 5 * 60 * 1000,
+      // Keep unused data in cache for 10 minutes
+      cacheTime: 10 * 60 * 1000,
+      // Don't refetch on window focus (reduces unnecessary calls)
+      refetchOnWindowFocus: false,
+      // Don't refetch on component mount if data is fresh
+      refetchOnMount: false,
+      // Retry failed requests only once
+      retry: 1,
     },
   },
 });
