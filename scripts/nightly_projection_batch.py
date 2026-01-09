@@ -845,11 +845,12 @@ def main():
     # Execute in parallel
     projections = []
     completed = 0
-    last_progress = 0
+    last_progress_time = time.time()
     
     if len(worker_tasks) > 100:
         # Use multiprocessing for large batches
         print(f"  Processing with {args.workers} workers...")
+        print(f"  Progress updates every 60 seconds...\n")
         
         with ProcessPoolExecutor(max_workers=args.workers) as executor:
             futures = {executor.submit(calculate_projection_worker, task): task for task in worker_tasks}
@@ -864,14 +865,16 @@ def main():
                 
                 completed += 1
                 
-                # Progress update every 10%
-                progress = (completed * 100) // len(worker_tasks)
-                if progress >= last_progress + 10:
-                    elapsed = time.time() - phase3_start
+                # Progress update every 60 seconds
+                current_time = time.time()
+                if current_time - last_progress_time >= 60:
+                    elapsed = current_time - phase3_start
+                    progress = (completed * 100) / len(worker_tasks)
                     rate = completed / elapsed if elapsed > 0 else 0
-                    eta = (len(worker_tasks) - completed) / rate if rate > 0 else 0
-                    print(f"  [{elapsed:.0f}s] {progress}% | {completed}/{len(worker_tasks)} | Rate: {rate:.1f}/s | ETA: {eta:.0f}s")
-                    last_progress = progress
+                    eta_seconds = (len(worker_tasks) - completed) / rate if rate > 0 else 0
+                    eta_minutes = eta_seconds / 60
+                    print(f"  ⏱️  [{int(elapsed)}s] {progress:.1f}% | {completed:,}/{len(worker_tasks):,} | Rate: {rate:.1f}/s | ETA: {eta_minutes:.1f} min")
+                    last_progress_time = current_time
     else:
         # Sequential for small batches
         for task in worker_tasks:
@@ -881,6 +884,10 @@ def main():
             completed += 1
     
     phase3_elapsed = time.time() - phase3_start
+    
+    # Final 100% progress update
+    rate = len(worker_tasks) / phase3_elapsed if phase3_elapsed > 0 else 0
+    print(f"  ✅ [100.0%] {len(worker_tasks):,}/{len(worker_tasks):,} | Rate: {rate:.1f}/s | Complete!")
     print(f"  Calculated {len(projections)} projections")
     print(f"  Phase 3 complete in {phase3_elapsed:.1f}s")
     print()
