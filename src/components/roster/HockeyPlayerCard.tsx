@@ -249,11 +249,11 @@ const HockeyPlayerCardContent = ({
     
     // Goalie stats (derived if present in advanced data, otherwise fallback)
     const wins = 0; 
-    const gaa = data.icetime && parseFloat(String(data.icetime)) > 0 && data.goals 
-       ? (parseFloat(String(data.goals)) * 3600) / parseFloat(String(data.icetime)) 
+    const gaa = data.icetime && parseFloat(String(data.icetime)) > 0 && data.I_F_goals 
+       ? (parseFloat(String(data.I_F_goals)) * 3600) / parseFloat(String(data.icetime)) 
        : 0;
-    const savePct = data.ongoal && parseFloat(String(data.ongoal)) > 0
-       ? (parseFloat(String(data.ongoal)) - parseFloat(String(data.goals || 0))) / parseFloat(String(data.ongoal))
+    const savePct = data.I_F_shotsOnGoal && parseFloat(String(data.I_F_shotsOnGoal)) > 0
+       ? (parseFloat(String(data.I_F_shotsOnGoal)) - parseFloat(String(data.I_F_goals || 0))) / parseFloat(String(data.I_F_shotsOnGoal))
        : 0;
     
     // Derived Advanced Goalie Stats
@@ -318,25 +318,18 @@ const HockeyPlayerCardContent = ({
       style={style}
       {...dragProps}
       className={cn(
-        "relative overflow-hidden transition-all",
+        "relative overflow-visible transition-all",
         canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed",
-        "border hover:shadow-md h-[110px] flex flex-col",
+        "h-[130px] flex flex-col",
         isInSlot 
-          ? "border-border/60 bg-card" 
-          : "border-border/40 hover:border-primary/50",
+          ? "border-0 bg-transparent shadow-none" 
+          : "border border-border/40 hover:border-primary/50 hover:shadow-md",
         isDragging && "shadow-xl z-50 opacity-90",
         isLocked && "opacity-75 bg-muted/30",
         className
       )}
       onClick={onClick}
     >
-      {/* Serial Number - Trinket Style Badge */}
-      <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 bg-citrus-cream/90 border border-citrus-forest/30 rounded-md z-10">
-        <span className="font-mono text-[7px] font-bold text-citrus-forest tracking-wider">
-          {player.position}
-        </span>
-      </div>
-      
       {/* Lock Overlay */}
       {isLocked && (
         <div 
@@ -351,7 +344,7 @@ const HockeyPlayerCardContent = ({
       )}
 
       {/* Surfer Varsity Header - MAXIMUM GREEN VIBES */}
-      <div className="relative p-2.5 bg-gradient-to-r from-citrus-sage/25 via-citrus-sage/15 to-citrus-sage/25 border-b-3 border-citrus-sage/50 flex items-center gap-2 min-h-[44px] before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-1.5 before:bg-gradient-to-r before:from-citrus-sage before:via-[#7CB518] before:to-citrus-sage before:opacity-60">
+      <div className="relative p-2 bg-gradient-to-r from-citrus-sage/25 via-citrus-sage/15 to-citrus-sage/25 border-b-2 border-citrus-sage/50 flex items-center gap-2 min-h-[42px] before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-1 before:bg-gradient-to-r before:from-citrus-sage before:via-[#7CB518] before:to-citrus-sage before:opacity-60">
         {getStatusBadge()}
         
         {/* Lock Icon Badge - Varsity Style */}
@@ -366,7 +359,7 @@ const HockeyPlayerCardContent = ({
         )}
 
         {/* Team Logo - GREEN VARSITY BADGE */}
-        <div className="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-gradient-to-br from-citrus-sage/20 to-citrus-sage/10 rounded-xl shadow-varsity p-1 border-3 border-citrus-sage relative before:content-[''] before:absolute before:inset-0 before:rounded-xl before:bg-gradient-to-br before:from-transparent before:to-citrus-sage/20 hover:border-[#7CB518] hover:shadow-[0_0_12px_rgba(124,181,24,0.5)] transition-all">
+        <div className="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-gradient-to-br from-citrus-sage/20 to-citrus-sage/10 rounded-xl shadow-varsity p-1 border-2 border-citrus-sage relative before:content-[''] before:absolute before:inset-0 before:rounded-xl before:bg-gradient-to-br before:from-transparent before:to-citrus-sage/20 hover:border-[#7CB518] hover:shadow-[0_0_12px_rgba(124,181,24,0.5)] transition-all">
            {!imageError ? (
              <img 
                src={teamLogoUrl} 
@@ -410,7 +403,7 @@ const HockeyPlayerCardContent = ({
       </div>
 
       {/* Surfer Stats Grid - MAXIMUM GREEN ENERGY */}
-      <div className="p-2.5 bg-gradient-to-br from-citrus-sage/10 via-citrus-sage/5 to-citrus-sage/10 flex-1 flex items-center justify-center border-t-3 border-citrus-sage/40 relative before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-1 before:bg-gradient-to-r before:from-citrus-sage/50 before:via-[#7CB518] before:to-citrus-sage/50">
+      <div className="p-2 bg-gradient-to-br from-citrus-sage/10 via-citrus-sage/5 to-citrus-sage/10 flex-1 flex items-center justify-center border-t-2 border-citrus-sage/40 relative before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-0.5 before:bg-gradient-to-r before:from-citrus-sage/50 before:via-[#7CB518] before:to-citrus-sage/50">
         {isGoalie ? (
           // GOALIE: Show projection stats with surfer badge styling
           hasGameOnSelectedDate && player.goalieProjection ? (
@@ -423,23 +416,23 @@ const HockeyPlayerCardContent = ({
                   </div>
                   <div className="bg-gradient-to-br from-citrus-sage/30 to-[#7CB518]/20 rounded-xl p-1.5 border-2 border-citrus-sage/50 shadow-sm hover:shadow-patch hover:border-citrus-sage transition-all">
                     <div className="text-[8px] text-citrus-forest font-display font-bold uppercase leading-none mb-1 tracking-wider">SV</div>
-                    <div className="font-bold text-[9px] text-green-700">{player.goalieProjection.projected_saves?.toFixed(0) || '0'}</div>
+                    <div className="font-varsity text-[10px] text-citrus-forest">{player.goalieProjection.projected_saves?.toFixed(0) || '0'}</div>
                   </div>
-                  <div>
-                    <div className="text-[7px] text-green-600 uppercase leading-none mb-0.5">SO</div>
-                    <div className="font-bold text-[9px] text-green-700">{player.goalieProjection.projected_shutouts?.toFixed(2) || '0.00'}</div>
+                  <div className="bg-gradient-to-br from-citrus-sage/30 to-[#7CB518]/20 rounded-xl p-1.5 border-2 border-citrus-sage/50 shadow-sm hover:shadow-patch hover:border-citrus-sage transition-all">
+                    <div className="text-[8px] text-citrus-forest font-display font-bold uppercase leading-none mb-1 tracking-wider">SO</div>
+                    <div className="font-varsity text-[10px] text-citrus-forest">{player.goalieProjection.projected_shutouts?.toFixed(2) || '0.00'}</div>
                   </div>
                 </div>
               </TooltipTrigger>
-              <TooltipContent className="p-2 bg-gray-900 text-white rounded-lg border border-gray-700 z-50 max-w-xs">
-                <h4 className="font-bold text-xs border-b border-gray-700 pb-1 mb-2">Projected Stats</h4>
+              <TooltipContent className="p-3 bg-citrus-cream border-2 border-citrus-sage rounded-varsity shadow-varsity z-[9999] max-w-xs">
+                <h4 className="font-varsity text-sm text-citrus-forest border-b-2 border-citrus-sage/30 pb-1 mb-2">Projected Stats</h4>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                  <div className="flex justify-between"><span className="text-gray-400">Wins:</span><span>{player.goalieProjection.projected_wins?.toFixed(2)}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-400">Saves:</span><span>{player.goalieProjection.projected_saves?.toFixed(0)}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-400">Shutouts:</span><span>{player.goalieProjection.projected_shutouts?.toFixed(2)}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-400">GA:</span><span>{player.goalieProjection.projected_goals_against?.toFixed(2)}</span></div>
+                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">Wins:</span><span className="font-varsity text-citrus-forest">{player.goalieProjection.projected_wins?.toFixed(2)}</span></div>
+                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">Saves:</span><span className="font-varsity text-citrus-forest">{player.goalieProjection.projected_saves?.toFixed(0)}</span></div>
+                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">Shutouts:</span><span className="font-varsity text-citrus-forest">{player.goalieProjection.projected_shutouts?.toFixed(2)}</span></div>
+                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">GA:</span><span className="font-varsity text-citrus-forest">{player.goalieProjection.projected_goals_against?.toFixed(2)}</span></div>
                 </div>
-                <div className="mt-2 pt-1 border-t border-gray-700 text-xs font-bold text-fantasy-primary">
+                <div className="mt-2 pt-1 border-t-2 border-citrus-sage/30 text-xs font-varsity font-bold text-citrus-orange">
                   Total: {player.goalieProjection.total_projected_points?.toFixed(1)} pts
                 </div>
               </TooltipContent>
@@ -468,38 +461,38 @@ const HockeyPlayerCardContent = ({
           hasGameOnSelectedDate && player.daily_projection ? (
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="grid grid-cols-4 gap-0.5 text-center w-full cursor-help">
-                  <div>
-                    <div className="text-[7px] text-green-600 uppercase leading-none mb-0.5">G</div>
-                    <div className="font-bold text-[9px] text-green-700">{player.daily_projection.projected_goals?.toFixed(2) || '0.00'}</div>
+                <div className="grid grid-cols-4 gap-1 text-center w-full cursor-help">
+                  <div className="bg-gradient-to-br from-citrus-sage/30 to-[#7CB518]/20 rounded-lg p-1 border-2 border-citrus-sage/50">
+                    <div className="text-[7px] text-citrus-forest font-display font-bold uppercase leading-none mb-0.5">G</div>
+                    <div className="font-varsity text-[9px] text-citrus-forest">{player.daily_projection.projected_goals?.toFixed(2) || '0.00'}</div>
                   </div>
-                  <div>
-                    <div className="text-[7px] text-green-600 uppercase leading-none mb-0.5">A</div>
-                    <div className="font-bold text-[9px] text-green-700">{player.daily_projection.projected_assists?.toFixed(2) || '0.00'}</div>
+                  <div className="bg-gradient-to-br from-citrus-sage/30 to-[#7CB518]/20 rounded-lg p-1 border-2 border-citrus-sage/50">
+                    <div className="text-[7px] text-citrus-forest font-display font-bold uppercase leading-none mb-0.5">A</div>
+                    <div className="font-varsity text-[9px] text-citrus-forest">{player.daily_projection.projected_assists?.toFixed(2) || '0.00'}</div>
                   </div>
-                  <div>
-                    <div className="text-[7px] text-green-600 uppercase leading-none mb-0.5">SOG</div>
-                    <div className="font-bold text-[9px] text-green-700">{player.daily_projection.projected_sog?.toFixed(1) || '0.0'}</div>
+                  <div className="bg-gradient-to-br from-citrus-sage/30 to-[#7CB518]/20 rounded-lg p-1 border-2 border-citrus-sage/50">
+                    <div className="text-[7px] text-citrus-forest font-display font-bold uppercase leading-none mb-0.5">SOG</div>
+                    <div className="font-varsity text-[9px] text-citrus-forest">{player.daily_projection.projected_sog?.toFixed(1) || '0.0'}</div>
                   </div>
-                  <div>
-                    <div className="text-[7px] text-green-600 uppercase leading-none mb-0.5">BLK</div>
-                    <div className="font-bold text-[9px] text-green-700">{player.daily_projection.projected_blocks?.toFixed(1) || '0.0'}</div>
+                  <div className="bg-gradient-to-br from-citrus-sage/30 to-[#7CB518]/20 rounded-lg p-1 border-2 border-citrus-sage/50">
+                    <div className="text-[7px] text-citrus-forest font-display font-bold uppercase leading-none mb-0.5">BLK</div>
+                    <div className="font-varsity text-[9px] text-citrus-forest">{player.daily_projection.projected_blocks?.toFixed(1) || '0.0'}</div>
                   </div>
                 </div>
               </TooltipTrigger>
-              <TooltipContent className="p-2 bg-gray-900 text-white rounded-lg border border-gray-700 z-50 max-w-xs">
-                <h4 className="font-bold text-xs border-b border-gray-700 pb-1 mb-2">Projected Stats (All 8)</h4>
+              <TooltipContent className="p-3 bg-citrus-cream border-2 border-citrus-sage rounded-varsity shadow-varsity z-[9999] max-w-xs">
+                <h4 className="font-varsity text-sm text-citrus-forest border-b-2 border-citrus-sage/30 pb-1 mb-2">Projected Stats</h4>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                  <div className="flex justify-between"><span className="text-gray-400">Goals:</span><span>{player.daily_projection.projected_goals?.toFixed(2)}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-400">Assists:</span><span>{player.daily_projection.projected_assists?.toFixed(2)}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-400">SOG:</span><span>{player.daily_projection.projected_sog?.toFixed(2)}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-400">Blocks:</span><span>{player.daily_projection.projected_blocks?.toFixed(2)}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-400">PPP:</span><span>{player.daily_projection.projected_ppp?.toFixed(2) || '0.00'}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-400">SHP:</span><span>{player.daily_projection.projected_shp?.toFixed(2) || '0.00'}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-400">Hits:</span><span>{player.daily_projection.projected_hits?.toFixed(2) || '0.00'}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-400">PIM:</span><span>{player.daily_projection.projected_pim?.toFixed(2) || '0.00'}</span></div>
+                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">Goals:</span><span className="font-varsity text-citrus-forest">{player.daily_projection.projected_goals?.toFixed(2)}</span></div>
+                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">Assists:</span><span className="font-varsity text-citrus-forest">{player.daily_projection.projected_assists?.toFixed(2)}</span></div>
+                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">SOG:</span><span className="font-varsity text-citrus-forest">{player.daily_projection.projected_sog?.toFixed(2)}</span></div>
+                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">Blocks:</span><span className="font-varsity text-citrus-forest">{player.daily_projection.projected_blocks?.toFixed(2)}</span></div>
+                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">PPP:</span><span className="font-varsity text-citrus-forest">{player.daily_projection.projected_ppp?.toFixed(2) || '0.00'}</span></div>
+                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">SHP:</span><span className="font-varsity text-citrus-forest">{player.daily_projection.projected_shp?.toFixed(2) || '0.00'}</span></div>
+                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">Hits:</span><span className="font-varsity text-citrus-forest">{player.daily_projection.projected_hits?.toFixed(2) || '0.00'}</span></div>
+                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">PIM:</span><span className="font-varsity text-citrus-forest">{player.daily_projection.projected_pim?.toFixed(2) || '0.00'}</span></div>
                 </div>
-                <div className="mt-2 pt-1 border-t border-gray-700 text-xs font-bold text-fantasy-primary">
+                <div className="mt-2 pt-1 border-t-2 border-citrus-sage/30 text-xs font-varsity font-bold text-citrus-orange">
                   Total: {player.daily_projection.total_projected_points?.toFixed(1)} pts
                 </div>
               </TooltipContent>
@@ -528,45 +521,55 @@ const HockeyPlayerCardContent = ({
         )}
       </div>
 
-      {/* Projected Points / Game Bar */}
-      <div className="px-1.5 pb-1.5 pt-1 bg-muted/20 flex flex-col justify-center gap-1 border-t border-border/30 min-h-[28px]">
-        <div className="flex items-center justify-between h-3">
-          <div className="flex items-center gap-1">
+      {/* Projected Points / Game Bar - VARSITY SCOREBOARD STYLE */}
+      <div className="relative px-2 pb-2 pt-1.5 bg-gradient-to-br from-citrus-sage/15 via-citrus-cream/50 to-citrus-peach/10 flex flex-col justify-center gap-1.5 border-t-2 border-citrus-sage/40 min-h-[32px] before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-[2px] before:bg-gradient-to-r before:from-transparent before:via-citrus-sage before:to-transparent before:opacity-60">
+        <div className="flex items-center justify-between h-3.5">
+          <div className="flex items-center gap-1.5">
             {hasGameOnSelectedDate ? (
               <>
-                <CalendarDays className="w-2 h-2 text-green-600" />
-                <span className="text-[8px] font-bold text-green-700 truncate max-w-[50px]">
-                   {player.nextGame?.opponent || 'Game'}
-                </span>
-                {player.nextGame?.gameTime && (
-                  <span className="text-[7px] text-green-600/80 font-medium">
-                    {player.nextGame.gameTime}
+                <div className="flex items-center gap-1 bg-citrus-sage/20 px-1.5 py-0.5 rounded-md border border-citrus-sage/40">
+                  <CalendarDays className="w-2.5 h-2.5 text-citrus-forest" />
+                  <span className="text-[8px] font-varsity font-bold text-citrus-forest tracking-wide truncate max-w-[50px]">
+                     {player.nextGame?.opponent || 'Game'}
                   </span>
-                )}
+                  {player.nextGame?.gameTime && (
+                    <span className="text-[7px] text-citrus-forest/70 font-display font-medium">
+                      {player.nextGame.gameTime}
+                    </span>
+                  )}
+                </div>
               </>
             ) : (
-               <span className="text-[8px] text-muted-foreground/50">No Game</span>
+               <span className="text-[8px] font-display text-citrus-charcoal/40 italic">No Game</span>
             )}
           </div>
           
-          <div className="flex items-center gap-0.5">
-             <span className="text-[7px] text-muted-foreground uppercase font-medium">PROJ</span>
+          <div className="flex items-center gap-1 bg-citrus-peach/30 px-2 py-0.5 rounded-md border-2 border-citrus-peach/50 shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)]">
+             <span className="text-[7px] text-citrus-charcoal uppercase font-varsity font-bold tracking-wider">PROJ</span>
              <span className={cn(
-               "text-[9px] font-bold",
-               hasGameOnSelectedDate ? "text-primary" : "text-muted-foreground"
+               "text-[10px] font-varsity font-black tracking-tight",
+               hasGameOnSelectedDate ? "text-citrus-orange" : "text-citrus-charcoal/40"
              )}>
                  {hasGameOnSelectedDate ? projectedPoints.toFixed(1) : '-'}
              </span>
           </div>
         </div>
         
-        <div className="h-1 bg-muted/50 rounded-full overflow-hidden border border-border/10 w-full">
+        {/* Collegiate Progress Bar with Stitching */}
+        <div className="relative h-2 bg-citrus-cream rounded-full overflow-hidden border-2 border-dashed border-citrus-sage/40 w-full shadow-[inset_0_1px_3px_rgba(0,0,0,0.15)]">
           <div 
-            className={cn("h-full rounded-full transition-all duration-500", 
-              hasGameOnSelectedDate ? "bg-green-500" : "bg-transparent" 
+            className={cn(
+              "h-full rounded-full transition-all duration-700 ease-out relative", 
+              hasGameOnSelectedDate 
+                ? "bg-gradient-to-r from-citrus-sage via-[#7CB518] to-citrus-sage shadow-[0_0_8px_rgba(124,181,24,0.4)]" 
+                : "bg-transparent"
             )}
             style={{ width: `${projectionPercentage}%` }}
-          />
+          >
+            {hasGameOnSelectedDate && projectionPercentage > 20 && (
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse" />
+            )}
+          </div>
         </div>
       </div>
     </Card>

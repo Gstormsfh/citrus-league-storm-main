@@ -13,8 +13,8 @@ import { ScoreCard } from "@/components/matchup/ScoreCard";
 import { WeeklySchedule } from "@/components/matchup/WeeklySchedule";
 import { DailyRosters } from "@/components/matchup/DailyRosters";
 import { getTodayMST, getTodayMSTDate } from '@/utils/timezoneUtils';
-import { LiveUpdates } from "@/components/matchup/LiveUpdates";
 import LeagueNotifications from "@/components/matchup/LeagueNotifications";
+import { MatchupSidebar } from "@/components/matchup/MatchupSidebar";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MatchupPlayer, StatBreakdown } from "@/components/matchup/types";
@@ -31,6 +31,10 @@ import { DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeagueService';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { MatchupScoreJobService } from '@/services/MatchupScoreJobService';
 import { DataCacheService, TTL } from '@/services/DataCacheService';
+import { CitrusSlice, CitrusSparkle, CitrusLeaf, CitrusWedge, CitrusBurst, CitrusZest } from '@/components/icons/CitrusIcons';
+import { CitrusBackground } from '@/components/CitrusBackground';
+import { CitrusSectionDivider } from '@/components/CitrusSectionDivider';
+import { calculateEligibleGamesRemaining } from '@/utils/rosterUtils';
 
 // Debug flag - set to true only when debugging performance issues
 const DEBUG_MATCHUP = false;
@@ -686,6 +690,26 @@ const Matchup = () => {
           myTeam: team1DailyPoints,
           opponentTeam: team2DailyPoints
         });
+        
+        // Populate cachedDailyScores from the daily points arrays for WeeklySchedule
+        const cachedScores = new Map<string, { myScore: number; oppScore: number; isLocked: boolean }>();
+        const [startYear, startMonth, startDay] = matchupWithDates.week_start_date.split('-').map(Number);
+        const todayStr = getTodayMST();
+        
+        for (let i = 0; i < 7 && i < team1DailyPoints.length; i++) {
+          const dayDate = new Date(startYear, startMonth - 1, startDay + i);
+          const dateStr = `${dayDate.getFullYear()}-${String(dayDate.getMonth() + 1).padStart(2, '0')}-${String(dayDate.getDate()).padStart(2, '0')}`;
+          const isPast = dateStr < todayStr;
+          
+          cachedScores.set(dateStr, {
+            myScore: team1DailyPoints[i] || 0,
+            oppScore: team2DailyPoints[i] || 0,
+            isLocked: isPast
+          });
+        }
+        
+        setCachedDailyScores(cachedScores);
+        log(' Cached daily scores populated for demo league:', Array.from(cachedScores.entries()));
         
         // Get all week matchups for dropdown (same week as selected)
         const { data: allMatchups } = await supabase
@@ -1463,12 +1487,6 @@ const Matchup = () => {
     setIsPlayerDialogOpen(true);
   }, []); // State setters are stable - no dependencies needed
 
-  const [updates] = useState<string[]>([
-    "Connor McDavid scored a goal! +5 points.",
-    "David Pastrnak with an assist! +3 points.",
-    "Igor Shesterkin made a save! +0.2 points.",
-    "Adam Fox with a power play assist! +4 points."
-  ]);
 
   // Use real data if active user, otherwise demo data
   // CRITICAL: Ensure myTeam is always the user's team (left side)
@@ -1675,27 +1693,8 @@ const Matchup = () => {
           pim: dailyStats.pim || 0,
           xGoals: dailyStats.xGoals || 0,
         },
-        // Update stats for display in statline (only when date is selected)
-        stats: isGoalie ? {
-          ...player.stats,
-          // Goalie daily stats (for selected date only)
-          wins: dailyStats.wins || 0,
-          saves: dailyStats.saves || 0,
-          shutouts: dailyStats.shutouts || 0,
-          goals_against: dailyStats.goals_against || 0,
-        } : {
-          ...player.stats,
-          // Skater daily stats (for selected date only) - ALL 8 STATS
-          goals: dailyStats.goals || 0,
-          assists: dailyStats.assists || 0,
-          sog: dailyStats.sog || 0,
-          blk: dailyStats.blocks || 0,
-          ppp: dailyStats.ppp || 0,
-          shp: dailyStats.shp || 0,
-          hits: dailyStats.hits || 0,
-          pim: dailyStats.pim || 0,
-          xGoals: dailyStats.xGoals || 0,
-        },
+        // PRESERVE season stats from service - don't overwrite!
+        // player.stats contains season totals and should not be modified here
         // Add goalie matchup stats for goalies (only when date is selected)
         // CRITICAL: In weekly view, use player.goalieMatchupStats from RPC (weekly aggregated)
         goalieMatchupStats: isGoalie ? {
@@ -1908,27 +1907,8 @@ const Matchup = () => {
           pim: dailyStats.pim || 0,
           xGoals: dailyStats.xGoals || 0,
         },
-        // Update stats for display in statline (only when date is selected)
-        stats: isGoalie ? {
-          ...player.stats,
-          // Goalie daily stats (for selected date only)
-          wins: dailyStats.wins || 0,
-          saves: dailyStats.saves || 0,
-          shutouts: dailyStats.shutouts || 0,
-          goals_against: dailyStats.goals_against || 0,
-        } : {
-          ...player.stats,
-          // Skater daily stats (for selected date only) - ALL 8 STATS
-          goals: dailyStats.goals || 0,
-          assists: dailyStats.assists || 0,
-          sog: dailyStats.sog || 0,
-          blk: dailyStats.blocks || 0,
-          ppp: dailyStats.ppp || 0,
-          shp: dailyStats.shp || 0,
-          hits: dailyStats.hits || 0,
-          pim: dailyStats.pim || 0,
-          xGoals: dailyStats.xGoals || 0,
-        },
+        // PRESERVE season stats from service - don't overwrite!
+        // player.stats contains season totals and should not be modified here
         // Add goalie matchup stats for goalies (only when date is selected)
         // CRITICAL: In weekly view, use player.goalieMatchupStats from RPC (weekly aggregated)
         goalieMatchupStats: isGoalie ? {
@@ -1962,6 +1942,32 @@ const Matchup = () => {
   const opponentStarters = useMemo(() => displayOpponentTeam.filter(p => p.isStarter), [displayOpponentTeam]);
   const opponentBench = useMemo(() => displayOpponentTeam.filter(p => !p.isStarter), [displayOpponentTeam]);
 
+  // Calculate total projections for each team
+  const myTotalProjection = useMemo(() => {
+    return myStarters.reduce((sum, player) => {
+      const projection = player.daily_projection?.total_projected_points || 
+                        player.goalieProjection?.total_projected_points || 0;
+      return sum + projection;
+    }, 0);
+  }, [myStarters]);
+
+  const opponentTotalProjection = useMemo(() => {
+    return opponentStarters.reduce((sum, player) => {
+      const projection = player.daily_projection?.total_projected_points || 
+                        player.goalieProjection?.total_projected_points || 0;
+      return sum + projection;
+    }, 0);
+  }, [opponentStarters]);
+
+  // Calculate total games remaining for each team (position-aware, respects roster slots)
+  const myTeamGamesRemaining = useMemo(() => {
+    return calculateEligibleGamesRemaining(myStarters);
+  }, [myStarters]);
+
+  const opponentTeamGamesRemaining = useMemo(() => {
+    return calculateEligibleGamesRemaining(opponentStarters);
+  }, [opponentStarters]);
+
   // YAHOO/SLEEPER DISPLAY: Use frozen lineup for past days, current for today/future
   // This ensures when clicking on past day, we show WHO was actually playing
   // CRITICAL: Use frozen lineup directly (not merged) to show exact roster state for that day
@@ -1993,10 +1999,36 @@ const Matchup = () => {
       return lastScoreRef.current.myScore;
     }
     
-    if (!currentMatchup || dailyStatsByDate.size === 0) {
+    if (!currentMatchup) {
+      return '0.0';
+    }
+    
+    // For demo leagues, if daily points arrays exist, sum them up
+    if (userLeagueState !== 'active-user' && myDailyPoints && myDailyPoints.length > 0) {
+      const total = myDailyPoints.reduce((sum, pts) => sum + pts, 0);
+      const score = total.toFixed(1);
+      console.log('[Matchup] Demo team using myDailyPoints array:', {
+        dailyPoints: myDailyPoints,
+        total
+      });
+      if (!lastScoreRef.current) {
+        lastScoreRef.current = { myScore: score, oppScore: '0.0' };
+      } else {
+        lastScoreRef.current.myScore = score;
+      }
+      return score;
+    }
+    
+    // If daily stats map is empty, use fallback
+    if (dailyStatsByDate.size === 0) {
       // Fallback: sum starter week totals if no daily breakdown available
-      const fallback = myStarters.reduce((sum, player) => sum + (player.total_points ?? 0), 0);
+      // Check both total_points and points fields
+      const fallback = myStarters.reduce((sum, player) => {
+        const pts = player.total_points || player.points || 0;
+        return sum + pts;
+      }, 0);
       const score = fallback.toFixed(1);
+      
       if (!lastScoreRef.current) {
         lastScoreRef.current = { myScore: score, oppScore: '0.0' };
       } else {
@@ -2054,8 +2086,31 @@ const Matchup = () => {
       return lastScoreRef.current.oppScore;
     }
     
-    if (!currentMatchup || dailyStatsByDate.size === 0) {
-      const fallback = opponentStarters.reduce((sum, player) => sum + (player.total_points ?? 0), 0);
+    if (!currentMatchup) {
+      return '0.0';
+    }
+    
+    // For demo leagues, if daily points arrays exist, sum them up
+    if (userLeagueState !== 'active-user' && opponentDailyPoints && opponentDailyPoints.length > 0) {
+      const total = opponentDailyPoints.reduce((sum, pts) => sum + pts, 0);
+      const score = total.toFixed(1);
+      console.log('[Matchup] Demo opponent using opponentDailyPoints array:', {
+        dailyPoints: opponentDailyPoints,
+        total
+      });
+      if (lastScoreRef.current) {
+        lastScoreRef.current.oppScore = score;
+      }
+      return score;
+    }
+    
+    // If daily stats map is empty, use fallback
+    if (dailyStatsByDate.size === 0) {
+      // Check both total_points and points fields
+      const fallback = opponentStarters.reduce((sum, player) => {
+        const pts = player.total_points || player.points || 0;
+        return sum + pts;
+      }, 0);
       const score = fallback.toFixed(1);
       if (lastScoreRef.current) {
         lastScoreRef.current.oppScore = score;
@@ -2237,6 +2292,12 @@ const Matchup = () => {
           blk: 0,
           xGoals: 0
         },
+        goalieMatchupStats: p.position === 'G' ? {
+          wins: 0,
+          saves: 0,
+          shutouts: 0,
+          goalsAgainst: 0
+        } : undefined,
         games: [],
         gamesRemaining: 0,
         isGoalie: p.position === 'G',
@@ -3500,6 +3561,9 @@ const Matchup = () => {
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden w-full">
+      {/* Citrus Background - Floating citrus elements */}
+      <CitrusBackground density="light" animated={true} />
+      
       {/* Decorative elements to match Home page */}
       <div className="absolute top-0 right-0 w-96 h-96 bg-[hsl(var(--vibrant-yellow))] rounded-full opacity-10 blur-3xl -z-10"></div>
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-[hsl(var(--vibrant-green))] rounded-full opacity-10 blur-3xl -z-10"></div>
@@ -3639,6 +3703,10 @@ const Matchup = () => {
             opponentTeamRecord={userLeagueState === 'active-user' ? opponentTeamRecord : { wins: 9, losses: 1 }}
             myTeamPoints={myTeamPoints}
             opponentTeamPoints={opponentTeamPoints}
+            myTeamGamesRemaining={myTeamGamesRemaining}
+            opponentTeamGamesRemaining={opponentTeamGamesRemaining}
+            myTeamProjection={myTotalProjection}
+            opponentTeamProjection={opponentTotalProjection}
           />
           
           {/* Weekly Schedule - Show for both active users AND guests (the weekly date selector they love!) */}
@@ -3690,8 +3758,6 @@ const Matchup = () => {
               </>
             )}
           </div>
-          
-          <LiveUpdates updates={updates} />
             </>
           )}
           
@@ -3741,65 +3807,23 @@ const Matchup = () => {
           )}
             </div>
 
-            {/* Sidebar - At bottom on mobile, left on desktop - World-Class Ad Space */}
+            {/* Dynamic Matchup Sidebar - World-Class Yahoo/Sleeper Style */}
             <aside className="w-full lg:w-auto order-2 lg:order-1">
-              <div className="lg:sticky lg:top-32 space-y-4 lg:space-y-6">
-                {/* Matchup Options Section */}
-                <div className="bg-card border rounded-lg p-4 shadow-sm">
-                  <h3 className="text-sm font-semibold mb-3 text-foreground">Matchup Options</h3>
-                  <div className="space-y-2">
-                    <button className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors">
-                      View Full Stats
-                    </button>
-                    <button className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors">
-                      Compare Teams
-                    </button>
-                    <button className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors">
-                      Export Matchup
-                    </button>
-                  </div>
-                </div>
-
-                {/* Ad Placeholder 1 - Mobile Optimized */}
-                <div className="bg-muted/30 border border-dashed border-muted-foreground/20 rounded-lg p-6 flex flex-col items-center justify-center min-h-[180px] lg:min-h-[200px]">
-                  <div className="text-muted-foreground text-xs text-center space-y-2">
-                    <div className="w-12 h-12 mx-auto bg-muted rounded flex items-center justify-center mb-2">
-                      <span className="text-2xl">📢</span>
-                    </div>
-                    <p className="font-medium">Ad Space</p>
-                    <p className="text-xs opacity-70">300x250</p>
-                  </div>
-                </div>
-
-                {/* Quick Stats Placeholder */}
-                <div className="bg-card border rounded-lg p-4 shadow-sm">
-                  <h3 className="text-sm font-semibold mb-3 text-foreground">Quick Stats</h3>
-                  <div className="space-y-3 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Projected</span>
-                      <span className="font-semibold">142.5</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Best Player</span>
-                      <span className="font-semibold">Connor McDavid</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Matchup %</span>
-                      <span className="font-semibold text-primary">52%</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Ad Placeholder 2 - Mobile Optimized */}
-                <div className="bg-muted/30 border border-dashed border-muted-foreground/20 rounded-lg p-6 flex flex-col items-center justify-center min-h-[180px] lg:min-h-[200px]">
-                  <div className="text-muted-foreground text-xs text-center space-y-2">
-                    <div className="w-12 h-12 mx-auto bg-muted rounded flex items-center justify-center mb-2">
-                      <span className="text-2xl">📢</span>
-                    </div>
-                    <p className="font-medium">Ad Space</p>
-                    <p className="text-xs opacity-70">300x250</p>
-                  </div>
-                </div>
+              <div className="lg:sticky lg:top-32">
+                <MatchupSidebar
+                  myStarters={myStarters}
+                  opponentStarters={opponentStarters}
+                  myTeamScore={parseFloat(myTeamPoints) || 0}
+                  opponentTeamScore={parseFloat(opponentTeamPoints) || 0}
+                  myTeamName={userLeagueState === 'active-user' ? (userTeam?.team_name || 'My Team') : 'Citrus Crushers'}
+                  opponentTeamName={userLeagueState === 'active-user' ? (opponentTeam?.team_name || 'Opponent') : 'Thunder Titans'}
+                  myTeamProjection={myTotalProjection}
+                  opponentTeamProjection={opponentTotalProjection}
+                  onPlayerClick={(player) => {
+                    setSelectedPlayer(player as any);
+                    setIsPlayerDialogOpen(true);
+                  }}
+                />
               </div>
             </aside>
 

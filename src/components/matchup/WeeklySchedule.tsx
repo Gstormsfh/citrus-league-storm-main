@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Lock, CheckCircle2 } from 'lucide-react';
 import { getTodayMST } from '@/utils/timezoneUtils';
+import { CitrusSparkle } from '@/components/icons/CitrusIcons';
 
 import { MatchupPlayer } from './types';
 
@@ -128,24 +129,28 @@ export const WeeklySchedule = ({
   return (
     <div className="w-full">
       {/* Header row with view indicator and Full Week button */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="text-sm font-semibold text-muted-foreground">
+      <div className="flex items-center justify-between mb-3 p-2 bg-gradient-to-r from-citrus-sage/10 via-citrus-cream to-citrus-peach/10 rounded-xl border-2 border-citrus-sage/30">
+        <div className="text-sm font-varsity font-bold text-citrus-forest flex items-center gap-2">
           {selectedDate ? (
             <span className="flex items-center gap-2">
-              <span className="text-xs uppercase tracking-wider">Viewing:</span>
-              <span className="text-foreground">{formatDateLabel(selectedDate)}</span>
+              <CitrusSparkle className="w-4 h-4 text-citrus-orange" />
+              <span className="text-xs uppercase tracking-wide">Viewing:</span>
+              <span className="text-citrus-orange">{formatDateLabel(selectedDate)}</span>
             </span>
           ) : (
-            <span className="text-xs uppercase tracking-wider">Week Overview</span>
+            <span className="flex items-center gap-2">
+              <CitrusSparkle className="w-4 h-4 text-citrus-orange" />
+              <span className="text-xs uppercase tracking-wide">Week Overview</span>
+            </span>
           )}
         </div>
         {selectedDate && (
           <button
             onClick={() => onDayClick(null)}
-            className="px-3 py-1.5 text-xs font-medium rounded-md 
-              bg-muted hover:bg-muted/80 
-              text-foreground border border-border
-              transition-colors flex items-center gap-1"
+            className="px-3 py-1.5 text-xs font-varsity font-bold uppercase rounded-xl 
+              bg-citrus-sage/20 hover:bg-citrus-sage 
+              text-citrus-forest border-2 border-citrus-sage hover:text-citrus-cream
+              transition-all flex items-center gap-1 shadow-sm hover:shadow-patch hover:-translate-y-0.5"
           >
             <span>←</span>
             <span>Full Week</span>
@@ -191,65 +196,69 @@ export const WeeklySchedule = ({
             <Card
               key={date}
               className={cn(
-                "cursor-pointer transition-all hover:shadow-sm",
-                isSelectedDate && "ring-1.5 ring-[hsl(var(--vibrant-green))] shadow-md",
-                isTodayDate && !isSelectedDate && "ring-1.5 ring-[hsl(var(--vibrant-orange))]",
-                isPastDate && "opacity-70"
+                "cursor-pointer transition-all hover:shadow-patch hover:-translate-y-1 border-3 rounded-xl overflow-hidden bg-citrus-cream",
+                isSelectedDate && "ring-4 ring-citrus-sage shadow-varsity border-citrus-sage",
+                isTodayDate && !isSelectedDate && "ring-3 ring-citrus-orange border-citrus-orange",
+                !isSelectedDate && !isTodayDate && "border-citrus-sage/40",
+                isPastDate && "opacity-75"
               )}
               onClick={() => onDayClick(date)}
             >
-              <CardContent className="p-2">
-                <div className="flex flex-col items-center gap-1">
+              <CardContent className="p-2 relative">
+                {/* Subtle corduroy texture */}
+                <div className="absolute inset-0 opacity-10 corduroy-texture pointer-events-none"></div>
+                
+                <div className="flex flex-col items-center gap-1 relative z-10">
                   {/* Day Label - Ultra Compact */}
                   <div className={cn(
-                    "text-[9px] font-semibold uppercase tracking-wider leading-none",
-                    isTodayDate ? "text-[hsl(var(--vibrant-orange))]" : "text-muted-foreground"
+                    "text-[10px] font-varsity font-black uppercase tracking-wider leading-none",
+                    isTodayDate ? "text-citrus-orange" : "text-citrus-charcoal"
                   )}>
                     {formatDayLabel(date)}
                   </div>
 
                   {/* Date - Compact */}
                   <div className={cn(
-                    "text-[10px] font-bold leading-tight",
-                    isTodayDate ? "text-[hsl(var(--vibrant-orange))]" : "text-foreground"
+                    "text-xs font-varsity font-bold leading-tight",
+                    isTodayDate ? "text-citrus-orange" : "text-citrus-forest"
                   )}>
                     {formatDateLabel(date)}
                   </div>
 
                   {/* Status Indicator - Minimal */}
                   {isTodayDate && !isPastDate && (
-                    <Badge variant="default" className="text-[8px] py-0 px-1 h-3.5 bg-[hsl(var(--vibrant-orange))] leading-none">
+                    <Badge variant="default" className="text-[8px] py-0.5 px-1.5 h-4 bg-citrus-orange border-2 border-citrus-forest text-citrus-cream leading-none font-varsity font-bold shadow-sm">
                       Today
                     </Badge>
                   )}
 
                   {/* Points Display - Streamlined (hidden if hideScores is true) */}
                   {!hideScores && (
-                    <div className="w-full mt-1 space-y-1">
+                    <div className="w-full mt-1.5 space-y-1">
                       {/* Team 1 */}
-                      <div className="flex flex-col gap-0">
-                        <div className="text-[8px] text-muted-foreground/70 font-medium leading-tight line-clamp-2 min-h-[1.5rem] flex items-center justify-center text-center px-0.5" title={team1Name || 'My Team'}>
+                      <div className="flex flex-col gap-0.5 p-1 bg-citrus-sage/10 rounded-md border border-citrus-sage/30">
+                        <div className="text-[8px] font-display font-semibold text-citrus-charcoal leading-tight line-clamp-1 text-center px-0.5" title={team1Name || 'My Team'}>
                           {team1Name || 'My'}
                         </div>
                         <div className={cn(
-                          "text-xs font-bold text-center leading-tight",
-                          myDailyPointsForDay > 0 ? "text-[hsl(var(--vibrant-green))]" : "text-muted-foreground/60"
+                          "text-sm font-varsity font-black text-center leading-tight",
+                          myDailyPointsForDay > 0 ? "text-citrus-sage" : "text-citrus-charcoal/50"
                         )}>
                           {myDailyPointsForDay.toFixed(1)}
                         </div>
                       </div>
                       
                       {/* Divider - Subtle */}
-                      <div className="h-[0.5px] bg-border/30 w-full"></div>
+                      <div className="h-[1px] bg-citrus-sage/20 w-full"></div>
                       
                       {/* Team 2 */}
-                      <div className="flex flex-col gap-0">
-                        <div className="text-[8px] text-muted-foreground/70 font-medium leading-tight line-clamp-2 min-h-[1.5rem] flex items-center justify-center text-center px-0.5" title={team2Name || 'Opponent'}>
+                      <div className="flex flex-col gap-0.5 p-1 bg-citrus-peach/10 rounded-md border border-citrus-peach/30">
+                        <div className="text-[8px] font-display font-semibold text-citrus-charcoal leading-tight line-clamp-1 text-center px-0.5" title={team2Name || 'Opponent'}>
                           {team2Name || 'Opp'}
                         </div>
                         <div className={cn(
-                          "text-xs font-bold text-center leading-tight",
-                          oppDailyPointsForDay > 0 ? "text-foreground/70" : "text-muted-foreground/60"
+                          "text-sm font-varsity font-black text-center leading-tight",
+                          oppDailyPointsForDay > 0 ? "text-citrus-peach" : "text-citrus-charcoal/50"
                         )}>
                           {oppDailyPointsForDay.toFixed(1)}
                         </div>

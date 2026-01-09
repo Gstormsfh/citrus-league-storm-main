@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { X, MessageSquare, Send, Sparkles, Minimize2, Maximize2 } from 'lucide-react';
 import { Narwhal } from '@/components/icons/Narwhal';
+import { CitrusSparkle, CitrusLeaf } from '@/components/icons/CitrusIcons';
 
 interface Message {
   id: string;
@@ -98,36 +99,46 @@ export const StormyChatBubble = () => {
     return (
       <Button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 left-6 h-14 w-14 rounded-full shadow-xl bg-gradient-to-r from-primary to-purple-600 hover:scale-105 transition-transform z-[100] p-0"
+        className="fixed bottom-6 left-6 h-14 w-14 rounded-varsity shadow-[0_6px_0_rgba(27,48,34,0.2)] bg-gradient-to-br from-citrus-sage to-citrus-orange border-4 border-citrus-forest hover:scale-105 hover:-translate-y-1 transition-all z-[9999] p-0 overflow-hidden"
+        style={{ position: 'fixed', bottom: '1.5rem', left: '1.5rem' }}
       >
-        <Narwhal className="h-7 w-7 text-white" />
-        <span className="absolute -top-1 -right-1 h-3 w-3 bg-green-500 rounded-full border-2 border-background animate-pulse" />
+        {/* Corduroy texture */}
+        <div className="absolute inset-0 opacity-20 corduroy-texture pointer-events-none" />
+        <Narwhal className="h-7 w-7 text-citrus-cream relative z-10 pointer-events-none" />
+        <span className="absolute -top-1 -right-1 h-3 w-3 bg-citrus-sage rounded-full border-2 border-citrus-cream animate-pulse shadow-[0_0_8px_rgba(120,149,97,0.6)] pointer-events-none" />
+        <CitrusSparkle className="absolute top-1 left-1 w-3 h-3 text-citrus-cream opacity-70 pointer-events-none" />
       </Button>
     );
   }
 
   return (
-    <Card className={`fixed bottom-6 left-6 w-[380px] shadow-2xl z-[100] border-primary/20 flex flex-col transition-all duration-300 ${isMinimized ? 'h-[70px]' : 'h-[600px]'}`}>
-      <CardHeader className="p-4 bg-gradient-to-r from-primary/10 to-purple-600/10 border-b flex flex-row items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
+    <Card 
+      className={`fixed bottom-6 left-6 w-[380px] shadow-[0_8px_0_rgba(27,48,34,0.2)] z-[9999] border-4 border-citrus-forest rounded-[2rem] overflow-hidden flex flex-col transition-all duration-300 bg-citrus-cream corduroy-texture ${isMinimized ? 'h-[70px]' : 'h-[600px]'}`}
+      style={{ position: 'fixed', bottom: '1.5rem', left: '1.5rem' }}
+    >
+      <CardHeader className="p-4 bg-gradient-to-r from-citrus-sage/20 via-citrus-sage/10 to-citrus-peach/10 border-b-4 border-citrus-forest flex flex-row items-center justify-between shrink-0 relative">
+        {/* Decorative citrus leaf */}
+        <CitrusLeaf className="absolute top-2 right-20 w-8 h-8 text-citrus-sage opacity-10 rotate-12" />
+        
+        <div className="flex items-center gap-3 relative z-10">
           <div className="relative">
-            <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-inner">
-               <Narwhal className="h-6 w-6 text-white" />
+            <div className="h-10 w-10 rounded-varsity bg-gradient-to-br from-citrus-sage to-citrus-orange border-3 border-citrus-forest flex items-center justify-center shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]">
+               <Narwhal className="h-6 w-6 text-citrus-cream" />
             </div>
-            <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 bg-green-500 rounded-full border-2 border-background" />
+            <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 bg-citrus-sage rounded-full border-2 border-citrus-cream shadow-[0_0_8px_rgba(120,149,97,0.6)]" />
           </div>
           <div>
-            <CardTitle className="text-base">Stormy</CardTitle>
-            <p className="text-xs text-muted-foreground flex items-center gap-1">
-              <Sparkles className="h-3 w-3 text-purple-500" /> AI Assistant
+            <CardTitle className="text-base font-varsity font-black text-citrus-forest uppercase tracking-tight">Stormy</CardTitle>
+            <p className="text-xs font-display text-citrus-charcoal flex items-center gap-1">
+              <CitrusSparkle className="h-3 w-3 text-citrus-orange" /> AI Assistant
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsMinimized(!isMinimized)}>
+        <div className="flex items-center gap-1 relative z-10">
+          <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-citrus-sage/20 text-citrus-forest" onClick={() => setIsMinimized(!isMinimized)}>
             {isMinimized ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive" onClick={() => setIsOpen(false)}>
+          <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-citrus-peach/30 text-citrus-forest" onClick={() => setIsOpen(false)}>
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -135,7 +146,7 @@ export const StormyChatBubble = () => {
 
       {!isMinimized && (
         <>
-          <CardContent className="flex-1 p-0 overflow-hidden bg-background/50 relative">
+          <CardContent className="flex-1 p-0 overflow-hidden bg-citrus-cream/50 relative">
             <ScrollArea className="h-full p-4" ref={scrollRef}>
               <div className="space-y-4">
                 {messages.map((msg) => (
@@ -144,15 +155,15 @@ export const StormyChatBubble = () => {
                     className={`flex gap-2 ${msg.sender === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
                   >
                     {msg.sender === 'stormy' && (
-                      <Avatar className="h-8 w-8 border bg-gradient-to-br from-primary/10 to-purple-600/10">
-                        <AvatarFallback><Narwhal className="h-4 w-4 text-primary" /></AvatarFallback>
+                      <Avatar className="h-8 w-8 border-2 border-citrus-sage bg-gradient-to-br from-citrus-sage/20 to-citrus-orange/20 shadow-sm">
+                        <AvatarFallback className="bg-transparent"><Narwhal className="h-4 w-4 text-citrus-forest" /></AvatarFallback>
                       </Avatar>
                     )}
                     <div
-                      className={`max-w-[80%] p-3 rounded-2xl text-sm ${
+                      className={`max-w-[80%] p-3 rounded-2xl text-sm font-display shadow-sm ${
                         msg.sender === 'user'
-                          ? 'bg-primary text-primary-foreground rounded-tr-none'
-                          : 'bg-muted border rounded-tl-none'
+                          ? 'bg-gradient-to-br from-citrus-orange to-citrus-peach text-citrus-cream font-medium rounded-tr-none border-2 border-citrus-orange'
+                          : 'bg-citrus-cream border-2 border-citrus-sage/40 rounded-tl-none text-citrus-forest'
                       }`}
                     >
                       {msg.text}
@@ -163,7 +174,7 @@ export const StormyChatBubble = () => {
             </ScrollArea>
           </CardContent>
 
-          <CardFooter className="p-3 border-t bg-background">
+          <CardFooter className="p-3 border-t-4 border-citrus-forest bg-citrus-cream">
             <form 
               className="flex w-full items-center gap-2"
               onSubmit={(e) => { e.preventDefault(); handleSend(); }}
@@ -172,11 +183,16 @@ export const StormyChatBubble = () => {
                 placeholder="Ask Stormy..." 
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                className="flex-1"
+                className="flex-1 rounded-xl border-2 border-citrus-sage/40 bg-citrus-cream/50 text-citrus-forest placeholder:text-citrus-charcoal/50 font-display focus:border-citrus-orange transition-all"
                 autoFocus
               />
-              <Button type="submit" size="icon" disabled={!inputValue.trim()}>
-                <Send className="h-4 w-4" />
+              <Button 
+                type="submit" 
+                size="icon" 
+                disabled={!inputValue.trim()}
+                className="bg-gradient-to-br from-citrus-sage to-citrus-orange border-3 border-citrus-forest rounded-varsity shadow-patch hover:-translate-y-0.5 transition-all disabled:opacity-50"
+              >
+                <Send className="h-4 w-4 text-citrus-cream" />
               </Button>
             </form>
           </CardFooter>

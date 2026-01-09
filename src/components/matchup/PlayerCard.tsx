@@ -173,7 +173,7 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
     });
     
     if (isGoalie) {
-      // Goalie stats: SV%, GSAx
+      // Goalie stats: SV%, GSAx (season stats)
       const savePct = player.goalieStats?.savePct ?? 0;
       stats.push({ 
         label: 'SV%', 
@@ -189,21 +189,20 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
         });
       }
     } else {
-      // Skater stats: xG, GAR %
-      const xG = player.stats?.xGoals ?? 0;
+      // Skater stats: PPP (Power Play Points), xG (Expected Goals) - SEASON TOTALS
+      // Use season stats from player.stats
+      const ppp = player.stats?.powerPlayPoints ?? 0;
+      const xGoals = player.stats?.xGoals ?? 0;
+      
       stats.push({ 
-        label: 'xG', 
-        value: xG.toFixed(1) 
+        label: 'PPP', 
+        value: ppp.toFixed(0) 
       });
       
-      // Season GAR % - Goals Above Replacement as percentage (season total)
-      if (player.garPercentage !== undefined) {
-        const garSign = player.garPercentage >= 0 ? '+' : '';
-        stats.push({ 
-          label: 'Season GAR', 
-          value: `${garSign}${player.garPercentage.toFixed(1)}%` 
-        });
-      }
+      stats.push({ 
+        label: 'xG', 
+        value: xGoals.toFixed(1) 
+      });
     }
     
     return stats;
@@ -231,13 +230,6 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
       )}
       onClick={() => onPlayerClick?.(player)}
     >
-      {/* Serial Number - Trinket Style Badge */}
-      <div className="absolute top-2 left-2 px-2 py-0.5 bg-citrus-cream/90 border border-citrus-forest/30 rounded-md z-10">
-        <span className="font-mono text-[8px] font-bold text-citrus-forest tracking-wider">
-          {player.position}
-        </span>
-      </div>
-      
       {/* Background Position */}
       <div className="player-card-bg-text">{player.position}</div>
       
@@ -251,7 +243,7 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
               {(player.roster_status && player.roster_status !== 'ACT') || player.is_ir_eligible ? (
                 <Badge 
                   variant="destructive" 
-                  className="ml-2 text-xs px-1.5 py-0.5"
+                  className="ml-1 text-[9px] px-1 py-0"
                   title={`Roster Status: ${player.roster_status || 'IR'}`}
                 >
                   IR
@@ -267,47 +259,18 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
             {/* Key Stats Below Name - Show DAILY stats when date selected, season stats otherwise */}
             <div className="player-key-stats">
               {isGoalie ? (
-                // Goalie: Show daily stats in daily view mode, season stats otherwise
-                isInDailyViewMode ? (
-                  // DAILY VIEW MODE: Show that day's goalie stats
-                  hasGameOnDate && hasDailyStats ? (
-                    <>
-                      W: {player.goalieMatchupStats?.wins || player.matchupStats?.wins || 0}, 
-                      SV: {player.goalieMatchupStats?.saves || player.matchupStats?.saves || 0}, 
-                      SO: {player.goalieMatchupStats?.shutouts || player.matchupStats?.shutouts || 0}, 
-                      GA: {player.goalieMatchupStats?.goalsAgainst || player.matchupStats?.goals_against || 0}
-                    </>
-                  ) : (
-                    // No game on this date = 0, 0, 0, 0
-                    <>W: 0, SV: 0, SO: 0, GA: 0</>
-                  )
-                ) : (
-                  // DEFAULT VIEW (no date selected): Show season stats
-                  <>
-                    GP: {player.goalieStats?.gamesPlayed || 0}, 
-                    W: {player.goalieStats?.wins || 0}, 
-                    SV%: {((player.goalieStats?.savePct || 0) * 100).toFixed(1)}%, 
-                    GAA: {(player.goalieStats?.gaa || 0).toFixed(2)}, 
-                    SO: {player.goalieStats?.shutouts || 0}
-                  </>
-                )
-              ) : isInDailyViewMode ? (
-                // DAILY VIEW MODE: Show that day's stats - Only Goals, Assists, SOG
-                // Advanced stats (BLK, PPP, SHP, HIT, PIM) are only shown in the Advanced Tab
-                // If player has daily stats from RPC, use them
-                // If player had NO GAME that day, show zeros
-                hasGameOnDate && hasDailyStats ? (
-                  <>
-                    {player.matchupStats?.goals || 0} G, {player.matchupStats?.assists || 0} A, {player.matchupStats?.sog || 0} SOG
-                  </>
-                ) : (
-                  // No game on this date = show zeros
-                  <>0 G, 0 A, 0 SOG</>
-                )
-              ) : (
-                // DEFAULT VIEW (no date selected): Show weekly totals
+                // Goalie: ALWAYS show SEASON TOTALS
                 <>
-                  {player.stats?.goals || 0} G, {player.stats?.assists || 0} A, {player.stats?.sog || 0} SOG
+                  GP: {player.goalieStats?.gamesPlayed || 0}, 
+                  W: {player.goalieStats?.wins || 0}, 
+                  SV%: {((player.goalieStats?.savePct || 0) * 100).toFixed(1)}%, 
+                  GAA: {(player.goalieStats?.gaa || 0).toFixed(2)}, 
+                  SO: {player.goalieStats?.shutouts || 0}
+                </>
+              ) : (
+                // Skater: ALWAYS show SEASON TOTALS (G, A, SOG)
+                <>
+                  {player.stats?.goals ?? 0} G, {player.stats?.assists ?? 0} A, {player.stats?.sog ?? 0} SOG
                 </>
               )}
             </div>
@@ -346,9 +309,9 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
           )}
         </div>
 
-        {/* Game Logos Bar - PREMIUM SHOWCASE */}
+        {/* Game Logos Bar - PREMIUM SHOWCASE - COMPACT WITH OVERLAP */}
         {player.games && Array.isArray(player.games) && player.games.length > 0 && player.team && (
-          <div className="mt-2 mb-1.5 px-1 py-2 bg-gradient-to-r from-citrus-sage/5 via-citrus-peach/5 to-citrus-sage/5 rounded-lg border border-citrus-sage/20">
+          <div className="-mt-1 mb-0 px-0.5 py-0 bg-gradient-to-r from-citrus-sage/5 via-citrus-peach/5 to-citrus-sage/5 rounded border border-citrus-sage/20">
             <GameLogosBar 
               games={player.games} 
               playerTeam={player.team}
@@ -357,13 +320,16 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
           </div>
         )}
 
-        {/* Daily Points Bar OR Projection Bar - Logic depends on game status */}
+        {/* Daily Points Bar OR Projection Bar - VARSITY SCOREBOARD STYLE - COMPACT */}
         {shouldShowDailyPoints ? (
           // CASE 1: Show daily total points (game is FINAL and data exists)
-          <div className="player-projection-bar-container">
-            {/* Label */}
-            <div className="text-[9px] text-gray-400 mb-0.5">Daily Points</div>
-            {/* Centered total above bar */}
+          <div className="player-projection-bar-container relative bg-gradient-to-br from-citrus-sage/10 via-citrus-cream/30 to-citrus-peach/10 p-1 rounded border border-citrus-sage/30 shadow-sm">
+            {/* Label - Varsity Badge Style - COMPACT */}
+            <div className="text-[7px] font-varsity font-bold text-citrus-forest uppercase tracking-wider mb-0.5 flex items-center gap-0.5 bg-citrus-cream/70 px-1 py-0 rounded border border-citrus-sage/30 w-fit">
+              <span className="w-1 h-1 rounded-full bg-citrus-sage animate-pulse" />
+              Daily Points
+            </div>
+            {/* Centered total above bar - Premium Badge - COMPACT */}
             <div className="flex justify-center mb-0.5">
               {player.daily_stats_breakdown && Object.keys(player.daily_stats_breakdown).length > 0 ? (
                 <PointsTooltip 
@@ -371,13 +337,13 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
                   totalPoints={dailyTotalPoints}
                 />
               ) : (
-                <span className="text-base font-bold text-fantasy-secondary">
+                <span className="text-xs font-varsity font-black text-citrus-orange bg-citrus-peach/30 px-1.5 py-0.5 rounded border border-citrus-peach/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)]">
                   {dailyTotalPoints.toFixed(1)} pts
                 </span>
               )}
             </div>
-            {/* Battery-style bar with 15 chunks (no projection underlay) */}
-            <div className="flex gap-[1px] w-full">
+            {/* Collegiate Battery Bar with Stitched Style - COMPACT */}
+            <div className="flex gap-0.5 w-full">
               {Array.from({ length: maxBarPoints }, (_, i) => {
                 const isFilled = i < dailyFilledChunks;
                 const isPartialFilled = i === dailyFilledChunks && dailyPartialChunk > 0;
@@ -385,19 +351,19 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
                 return (
                   <div 
                     key={i}
-                    className={`flex-1 h-2.5 rounded-[2px] overflow-hidden
+                    className={`flex-1 h-2 rounded overflow-hidden transition-all duration-300
                       ${!isFilled && !isPartialFilled 
-                        ? 'border border-muted-foreground/20 bg-muted/20' 
-                        : 'bg-muted/30'
+                        ? 'border-2 border-dashed border-citrus-sage/30 bg-citrus-cream/50' 
+                        : 'bg-citrus-cream border-2 border-citrus-sage/40'
                       }`}
                   >
-                    {/* Actual points fill (green) */}
+                    {/* Actual points fill (green gradient) */}
                     {isFilled && (
-                      <div className="w-full h-full bg-fantasy-secondary" />
+                      <div className="w-full h-full bg-gradient-to-br from-citrus-sage via-[#7CB518] to-citrus-sage shadow-[inset_0_1px_2px_rgba(255,255,255,0.3)]" />
                     )}
                     {isPartialFilled && (
                       <div 
-                        className="h-full bg-fantasy-secondary/70" 
+                        className="h-full bg-gradient-to-br from-citrus-sage/70 via-[#7CB518]/70 to-citrus-sage/70" 
                         style={{ width: `${dailyPartialChunk * 100}%` }}
                       />
                     )}
@@ -407,20 +373,23 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
             </div>
           </div>
         ) : !hasGameOnDate ? (
-          // CASE 2: NO GAME scheduled for this date - clean message
+          // CASE 2: NO GAME scheduled for this date - Varsity Badge Message - COMPACT
           <div className="player-projection-bar-container">
-            <div className="w-full py-2 text-center text-muted-foreground text-sm bg-muted/30 rounded">
+            <div className="w-full py-1 text-center font-display text-xs text-citrus-charcoal/60 bg-citrus-cream/50 rounded border border-dashed border-citrus-sage/30 italic">
               No game {isInDailyViewMode ? 'this day' : 'today'}
             </div>
           </div>
         ) : (
-          // CASE 3: Show projection bar (game not final yet)
-          <div className="player-projection-bar-container">
-            {/* Label */}
-            <div className="text-[9px] text-muted-foreground mb-0.5">Projected</div>
-            {/* Centered total above bar */}
+          // CASE 3: Show projection bar (game not final yet) - VARSITY SCOREBOARD - COMPACT
+          <div className="player-projection-bar-container relative bg-gradient-to-br from-citrus-peach/10 via-citrus-cream/30 to-citrus-sage/10 p-1 rounded border border-citrus-peach/40 shadow-sm">
+            {/* Label - Varsity Badge Style - COMPACT */}
+            <div className="text-[7px] font-varsity font-bold text-citrus-forest uppercase tracking-wider mb-0.5 flex items-center gap-0.5 bg-citrus-cream/70 px-1 py-0 rounded border border-citrus-peach/40 w-fit">
+              <span className="w-1 h-1 rounded-full bg-citrus-orange animate-pulse" />
+              Projected
+            </div>
+            {/* Centered total above bar - Premium Badge - COMPACT */}
             <div className="flex justify-center items-center gap-1 mb-0.5">
-              <span className="text-base font-bold text-foreground">
+              <span className="text-xs font-varsity font-black text-citrus-orange bg-citrus-peach/30 px-1.5 py-0.5 rounded border border-citrus-peach/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)]">
                 {hasProjection && isStarterConfirmed
                   ? `${projectedPoints.toFixed(1)} pts`
                   : showTBD 
@@ -436,27 +405,27 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
                 )
               )}
             </div>
-            {/* Battery-style projection bar */}
+            {/* Collegiate Battery Bar with Stitched Style - COMPACT */}
             {hasProjection && isStarterConfirmed ? (
-              <div className="flex gap-[1px] w-full">
+              <div className="flex gap-0.5 w-full">
                 {Array.from({ length: maxBarPoints }, (_, i) => {
                   const isFilled = i < projectionFilledChunks;
                   const isPartial = i === projectionFilledChunks && projectionPartialChunk > 0;
                   return (
                     <div 
                       key={i}
-                      className={`flex-1 h-2.5 rounded-[2px] overflow-hidden
+                      className={`flex-1 h-2 rounded overflow-hidden transition-all duration-300
                         ${!isFilled && !isPartial 
-                          ? 'border border-muted-foreground/20 bg-muted/20' 
-                          : 'bg-muted/30'
+                          ? 'border-2 border-dashed border-citrus-peach/30 bg-citrus-cream/50' 
+                          : 'bg-citrus-cream border-2 border-citrus-peach/40'
                         }`}
                     >
                       {isFilled && (
-                        <div className="w-full h-full bg-fantasy-primary" />
+                        <div className="w-full h-full bg-gradient-to-br from-citrus-orange via-citrus-peach to-citrus-orange shadow-[inset_0_1px_2px_rgba(255,255,255,0.3)]" />
                       )}
                       {isPartial && (
                         <div 
-                          className="h-full bg-fantasy-primary/60" 
+                          className="h-full bg-gradient-to-br from-citrus-orange/70 via-citrus-peach/70 to-citrus-orange/70" 
                           style={{ width: `${projectionPartialChunk * 100}%` }}
                         />
                       )}
@@ -465,20 +434,20 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
                 })}
               </div>
             ) : showTBD ? (
-              <div className="flex gap-[1px] w-full">
+              <div className="flex gap-0.5 w-full">
                 {Array.from({ length: maxBarPoints }, (_, i) => (
                   <div 
                     key={i}
-                    className="flex-1 h-2.5 rounded-[2px] border border-muted-foreground/20 bg-muted/20 animate-pulse"
+                    className="flex-1 h-2 rounded border border-dashed border-citrus-peach/30 bg-citrus-cream/50 animate-pulse"
                   />
                 ))}
               </div>
             ) : (
-              <div className="flex gap-[1px] w-full">
+              <div className="flex gap-0.5 w-full">
                 {Array.from({ length: maxBarPoints }, (_, i) => (
                   <div 
                     key={i}
-                    className="flex-1 h-2.5 rounded-[2px] border border-muted-foreground/20 bg-muted/20"
+                    className="flex-1 h-2 rounded border border-dashed border-citrus-peach/30 bg-citrus-cream/50"
                   />
                 ))}
               </div>

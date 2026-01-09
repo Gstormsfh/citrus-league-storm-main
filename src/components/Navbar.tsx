@@ -4,8 +4,9 @@ import { Button } from '@/components/ui/button';
 import { 
   Menu, X, ChevronRight, User, Bell, Search, 
   Calendar, LineChart, Newspaper, Medal, Users, Settings, 
-  LogOut, Home, FileText, Headphones, BookOpen, CircleUser
+  LogOut, Home, FileText, Headphones, BookOpen, CircleUser, Sparkles
 } from 'lucide-react';
+import { CitrusSlice, CitrusSparkle } from '@/components/icons/CitrusIcons';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
@@ -113,15 +114,23 @@ const Navbar = () => {
       <div className="container mx-auto px-4 max-w-full">
         {/* Main Navigation Row */}
         <div className="flex items-center justify-between">
-          {/* Logo with Vintage Varsity Style */}
-          <Link to="/" className="flex items-center gap-3 group">
-            <div className="w-11 h-11 rounded-varsity bg-gradient-to-br from-citrus-sage to-citrus-orange border-3 border-citrus-forest/20 flex items-center justify-center shadow-patch group-hover:shadow-varsity group-hover:-translate-y-0.5 transition-all duration-300">
-              <span className="text-citrus-cream font-varsity text-base font-black">CS</span>
+          {/* Logo with Citrus Slice - Vintage Varsity Style */}
+          <Link to="/" className="flex items-center gap-3 group relative">
+            <div className="w-11 h-11 rounded-varsity bg-gradient-to-br from-citrus-sage to-citrus-orange border-3 border-citrus-forest/20 flex items-center justify-center shadow-patch group-hover:shadow-varsity group-hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden">
+              {/* Background pattern */}
+              <div className="absolute inset-0 opacity-20">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(255,255,255,0.3)_0%,_transparent_60%)]"></div>
+              </div>
+              {/* Citrus Slice Icon */}
+              <CitrusSlice className="w-7 h-7 relative z-10 text-citrus-cream group-hover:rotate-12 transition-transform duration-300" />
             </div>
             <div className="flex flex-col">
-              <span className="font-varsity font-black text-lg uppercase text-citrus-forest group-hover:text-citrus-orange transition-colors duration-300 tracking-tight">
-                Citrus
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="font-varsity font-black text-lg uppercase text-citrus-forest group-hover:text-citrus-orange transition-colors duration-300 tracking-tight">
+                  Citrus
+                </span>
+                <CitrusSparkle className="w-3 h-3 text-citrus-orange opacity-60 group-hover:opacity-100 transition-opacity" />
+              </div>
               <span className="text-[10px] text-citrus-charcoal font-display tracking-widest uppercase">Fantasy League</span>
             </div>
           </Link>
@@ -132,20 +141,20 @@ const Navbar = () => {
                 <NavigationMenuList>
                   <NavigationMenuItem>
                     <NavigationMenuTrigger className={cn(
-                      "text-sm font-medium text-foreground/80",
-                      (isActive("/roster") || isActive("/gm-office")) && "text-primary"
+                      "text-sm font-varsity font-bold text-citrus-forest uppercase tracking-wide hover:text-citrus-orange transition-colors",
+                      (isActive("/roster") || isActive("/gm-office")) && "text-citrus-orange"
                     )}>My Team</NavigationMenuTrigger>
                     <NavigationMenuContent>
-                      <div className="w-[320px] p-2 grid gap-2 grid-cols-2">
-                        <Link to="/roster" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-primary/5 to-primary/10 p-4 no-underline outline-none focus:shadow-sm hover:shadow-sm hover:scale-[1.01] transition-all duration-200">
-                          <div className="mb-1 mt-2 text-base font-medium">Roster</div>
-                          <p className="text-xs leading-tight text-muted-foreground">Manage your team's lineup</p>
-                          <ChevronRight className="h-3 w-3 mt-2 text-primary" />
+                      <div className="w-[340px] p-3 grid gap-3 grid-cols-2 bg-citrus-cream corduroy-texture border-4 border-citrus-forest rounded-[1.5rem] shadow-[0_6px_0_rgba(27,48,34,0.25)]">
+                        <Link to="/roster" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-xl bg-gradient-to-br from-citrus-sage/20 to-citrus-sage/10 p-4 no-underline outline-none border-3 border-citrus-sage/40 hover:shadow-patch hover:-translate-y-1 transition-all duration-200">
+                          <div className="mb-1 mt-2 text-base font-varsity font-black text-citrus-forest uppercase">Roster</div>
+                          <p className="text-xs leading-tight font-display text-citrus-charcoal">Manage your team's lineup</p>
+                          <ChevronRight className="h-4 w-4 mt-2 text-citrus-orange" />
                         </Link>
-                        <Link to="/gm-office" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-secondary/5 to-secondary/10 p-4 no-underline outline-none focus:shadow-sm hover:shadow-sm hover:scale-[1.01] transition-all duration-200">
-                          <div className="mb-1 mt-2 text-base font-medium">GM's Office</div>
-                          <p className="text-xs leading-tight text-muted-foreground">Team operations center</p>
-                          <ChevronRight className="h-3 w-3 mt-2 text-primary" />
+                        <Link to="/gm-office" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-xl bg-gradient-to-br from-citrus-peach/20 to-citrus-orange/10 p-4 no-underline outline-none border-3 border-citrus-peach/40 hover:shadow-patch hover:-translate-y-1 transition-all duration-200">
+                          <div className="mb-1 mt-2 text-base font-varsity font-black text-citrus-forest uppercase">GM's Office</div>
+                          <p className="text-xs leading-tight font-display text-citrus-charcoal">Team operations center</p>
+                          <ChevronRight className="h-4 w-4 mt-2 text-citrus-orange" />
                         </Link>
                       </div>
                     </NavigationMenuContent>
@@ -153,30 +162,30 @@ const Navbar = () => {
                 
                 <NavigationMenuItem>
                   <NavigationMenuTrigger className={cn(
-                    "text-sm font-medium text-foreground/80",
-                    (isActive("/matchup") || isActive("/standings") || isActive("/free-agents") || isActive("/draft")) && "text-primary"
+                    "text-sm font-varsity font-bold text-citrus-forest uppercase tracking-wide hover:text-citrus-orange transition-colors",
+                    (isActive("/matchup") || isActive("/standings") || isActive("/free-agents") || isActive("/draft")) && "text-citrus-orange"
                   )}>League</NavigationMenuTrigger>
                   <NavigationMenuContent>
-                    <div className="w-[320px] p-2 grid gap-2 grid-cols-2">
-                      <Link to="/matchup" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-primary/5 to-primary/10 p-4 no-underline outline-none focus:shadow-sm hover:shadow-sm hover:scale-[1.01] transition-all duration-200">
-                        <div className="mb-1 mt-2 text-base font-medium">Matchup</div>
-                        <p className="text-xs leading-tight text-muted-foreground">Current matchups</p>
-                        <ChevronRight className="h-3 w-3 mt-2 text-primary" />
+                    <div className="w-[340px] p-3 grid gap-3 grid-cols-2 bg-citrus-cream corduroy-texture border-4 border-citrus-forest rounded-[1.5rem] shadow-[0_6px_0_rgba(27,48,34,0.25)]">
+                      <Link to="/matchup" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-xl bg-gradient-to-br from-citrus-orange/20 to-citrus-peach/10 p-4 no-underline outline-none border-3 border-citrus-orange/40 hover:shadow-patch hover:-translate-y-1 transition-all duration-200">
+                        <div className="mb-1 mt-2 text-base font-varsity font-black text-citrus-forest uppercase">Matchup</div>
+                        <p className="text-xs leading-tight font-display text-citrus-charcoal">Current matchups</p>
+                        <ChevronRight className="h-4 w-4 mt-2 text-citrus-orange" />
                       </Link>
-                      <Link to="/standings" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-secondary/5 to-secondary/10 p-4 no-underline outline-none focus:shadow-sm hover:shadow-sm hover:scale-[1.01] transition-all duration-200">
-                        <div className="mb-1 mt-2 text-base font-medium">Standings</div>
-                        <p className="text-xs leading-tight text-muted-foreground">League rankings</p>
-                        <ChevronRight className="h-3 w-3 mt-2 text-primary" />
+                      <Link to="/standings" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-xl bg-gradient-to-br from-citrus-sage/20 to-citrus-sage/10 p-4 no-underline outline-none border-3 border-citrus-sage/40 hover:shadow-patch hover:-translate-y-1 transition-all duration-200">
+                        <div className="mb-1 mt-2 text-base font-varsity font-black text-citrus-forest uppercase">Standings</div>
+                        <p className="text-xs leading-tight font-display text-citrus-charcoal">League rankings</p>
+                        <ChevronRight className="h-4 w-4 mt-2 text-citrus-orange" />
                       </Link>
-                      <Link to="/draft-room" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-accent/5 to-accent/10 p-4 no-underline outline-none focus:shadow-sm hover:shadow-sm hover:scale-[1.01] transition-all duration-200">
-                        <div className="mb-1 mt-2 text-base font-medium">Draft Room</div>
-                        <p className="text-xs leading-tight text-muted-foreground">Live fantasy draft</p>
-                        <ChevronRight className="h-3 w-3 mt-2 text-primary" />
+                      <Link to="/draft-room" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-xl bg-gradient-to-br from-citrus-peach/20 to-citrus-orange/10 p-4 no-underline outline-none border-3 border-citrus-peach/40 hover:shadow-patch hover:-translate-y-1 transition-all duration-200">
+                        <div className="mb-1 mt-2 text-base font-varsity font-black text-citrus-forest uppercase">Draft Room</div>
+                        <p className="text-xs leading-tight font-display text-citrus-charcoal">Live fantasy draft</p>
+                        <ChevronRight className="h-4 w-4 mt-2 text-citrus-orange" />
                       </Link>
-                      <Link to="/free-agents" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-accent/5 to-accent/10 p-4 no-underline outline-none focus:shadow-sm hover:shadow-sm hover:scale-[1.01] transition-all duration-200">
-                        <div className="mb-1 mt-2 text-base font-medium">Free Agents</div>
-                        <p className="text-xs leading-tight text-muted-foreground">Available players</p>
-                        <ChevronRight className="h-3 w-3 mt-2 text-primary" />
+                      <Link to="/free-agents" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-xl bg-gradient-to-br from-citrus-sage/20 to-citrus-orange/10 p-4 no-underline outline-none border-3 border-citrus-sage/40 hover:shadow-patch hover:-translate-y-1 transition-all duration-200">
+                        <div className="mb-1 mt-2 text-base font-varsity font-black text-citrus-forest uppercase">Free Agents</div>
+                        <p className="text-xs leading-tight font-display text-citrus-charcoal">Available players</p>
+                        <ChevronRight className="h-4 w-4 mt-2 text-citrus-orange" />
                       </Link>
                     </div>
                   </NavigationMenuContent>
@@ -184,30 +193,30 @@ const Navbar = () => {
                 
                 <NavigationMenuItem>
                   <NavigationMenuTrigger className={cn(
-                    "text-sm font-medium text-foreground/80",
-                    (isActive("/blog") || isActive("/podcasts") || isActive("/guides") || isActive("/news")) && "text-primary"
+                    "text-sm font-varsity font-bold text-citrus-forest uppercase tracking-wide hover:text-citrus-orange transition-colors",
+                    (isActive("/blog") || isActive("/podcasts") || isActive("/guides") || isActive("/news")) && "text-citrus-orange"
                   )}>Resources</NavigationMenuTrigger>
                   <NavigationMenuContent>
-                    <div className="w-[320px] p-2 grid gap-2 grid-cols-2">
-                      <Link to="/news" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-orange-500/5 to-orange-500/10 p-4 no-underline outline-none focus:shadow-sm hover:shadow-sm hover:scale-[1.01] transition-all duration-200">
-                        <div className="mb-1 mt-2 text-base font-medium">News</div>
-                        <p className="text-xs leading-tight text-muted-foreground">Latest fantasy updates</p>
-                        <ChevronRight className="h-3 w-3 mt-2 text-primary" />
+                    <div className="w-[340px] p-3 grid gap-3 grid-cols-2 bg-citrus-cream corduroy-texture border-4 border-citrus-forest rounded-[1.5rem] shadow-[0_6px_0_rgba(27,48,34,0.25)]">
+                      <Link to="/news" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-xl bg-gradient-to-br from-citrus-orange/20 to-citrus-peach/10 p-4 no-underline outline-none border-3 border-citrus-orange/40 hover:shadow-patch hover:-translate-y-1 transition-all duration-200">
+                        <div className="mb-1 mt-2 text-base font-varsity font-black text-citrus-forest uppercase">News</div>
+                        <p className="text-xs leading-tight font-display text-citrus-charcoal">Latest fantasy updates</p>
+                        <ChevronRight className="h-4 w-4 mt-2 text-citrus-orange" />
                       </Link>
-                      <Link to="/create-league" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-primary/5 to-primary/10 p-4 no-underline outline-none focus:shadow-sm hover:shadow-sm hover:scale-[1.01] transition-all duration-200">
-                        <div className="mb-1 mt-2 text-base font-medium">Create League</div>
-                        <p className="text-xs leading-tight text-muted-foreground">Start a new league</p>
-                        <ChevronRight className="h-3 w-3 mt-2 text-primary" />
+                      <Link to="/create-league" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-xl bg-gradient-to-br from-citrus-sage/20 to-citrus-sage/10 p-4 no-underline outline-none border-3 border-citrus-sage/40 hover:shadow-patch hover:-translate-y-1 transition-all duration-200">
+                        <div className="mb-1 mt-2 text-base font-varsity font-black text-citrus-forest uppercase">Create League</div>
+                        <p className="text-xs leading-tight font-display text-citrus-charcoal">Start a new league</p>
+                        <ChevronRight className="h-4 w-4 mt-2 text-citrus-orange" />
                       </Link>
-                      <Link to="/blog" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-secondary/5 to-secondary/10 p-4 no-underline outline-none focus:shadow-sm hover:shadow-sm hover:scale-[1.01] transition-all duration-200">
-                        <div className="mb-1 mt-2 text-base font-medium">Blog & Podcasts</div>
-                        <p className="text-xs leading-tight text-muted-foreground">Insights & Analysis</p>
-                        <ChevronRight className="h-3 w-3 mt-2 text-primary" />
+                      <Link to="/blog" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-xl bg-gradient-to-br from-citrus-peach/20 to-citrus-orange/10 p-4 no-underline outline-none border-3 border-citrus-peach/40 hover:shadow-patch hover:-translate-y-1 transition-all duration-200">
+                        <div className="mb-1 mt-2 text-base font-varsity font-black text-citrus-forest uppercase">Blog & Podcasts</div>
+                        <p className="text-xs leading-tight font-display text-citrus-charcoal">Insights & Analysis</p>
+                        <ChevronRight className="h-4 w-4 mt-2 text-citrus-orange" />
                       </Link>
-                      <Link to="/guides" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-accent/5 to-accent/10 p-4 no-underline outline-none focus:shadow-sm hover:shadow-sm hover:scale-[1.01] transition-all duration-200">
-                        <div className="mb-1 mt-2 text-base font-medium">Strategy Guides</div>
-                        <p className="text-xs leading-tight text-muted-foreground">Winning tactics</p>
-                        <ChevronRight className="h-3 w-3 mt-2 text-primary" />
+                      <Link to="/guides" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-xl bg-gradient-to-br from-citrus-sage/20 to-citrus-orange/10 p-4 no-underline outline-none border-3 border-citrus-sage/40 hover:shadow-patch hover:-translate-y-1 transition-all duration-200">
+                        <div className="mb-1 mt-2 text-base font-varsity font-black text-citrus-forest uppercase">Strategy Guides</div>
+                        <p className="text-xs leading-tight font-display text-citrus-charcoal">Winning tactics</p>
+                        <ChevronRight className="h-4 w-4 mt-2 text-citrus-orange" />
                       </Link>
                     </div>
                   </NavigationMenuContent>
@@ -216,8 +225,8 @@ const Navbar = () => {
                 <NavigationMenuItem>
                   <NavigationMenuLink asChild>
                     <Link to="/contact" className={cn(
-                      "inline-flex items-center justify-center rounded-md h-9 px-3 py-1.5 text-sm font-medium text-foreground/90 hover:text-primary transition-colors",
-                      isActive("/contact") && "text-primary"
+                      "inline-flex items-center justify-center rounded-varsity h-9 px-4 py-1.5 text-sm font-varsity font-bold text-citrus-forest uppercase tracking-wide hover:text-citrus-cream hover:bg-citrus-orange border-2 border-transparent hover:border-citrus-forest transition-all",
+                      isActive("/contact") && "text-citrus-cream bg-citrus-orange border-citrus-forest"
                     )}>
                       Contact
                     </Link>

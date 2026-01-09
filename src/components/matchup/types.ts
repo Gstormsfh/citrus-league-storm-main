@@ -28,6 +28,7 @@ export type MatchupPlayer = {
     blk: number;
     gamesPlayed?: number;
     xGoals?: number;
+    powerPlayPoints?: number;
   };
   matchupStats?: {
     goals?: number;

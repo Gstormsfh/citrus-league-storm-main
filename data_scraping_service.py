@@ -13,8 +13,7 @@ import datetime as dt
 from typing import Optional, Dict, Any, List
 from dotenv import load_dotenv
 import requests
-# TEMP: Proxy system disabled - use direct requests
-# from src.utils.citrus_request import citrus_request
+from src.utils.citrus_request import citrus_request
 
 load_dotenv()
 
@@ -36,7 +35,7 @@ def safe_api_call(url: str, max_retries: int = 5) -> Optional[Dict[Any, Any]]:
             time.sleep(2.5 - elapsed + random.uniform(0.2, 0.5))
         try:
             logger.info(f"📡 Fetching: ...{url[-25:]}")
-            r = requests.get(url, timeout=15)  # TEMP: Direct request, no proxy
+            r = citrus_request(url, timeout=15)  # Using 100-IP proxy rotation
             LAST_CALL_TIME = time.time()
             if r.status_code == 429:
                 wait = (attempt + 1) * 20

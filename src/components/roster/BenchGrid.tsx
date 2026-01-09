@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import HockeyPlayerCard, { HockeyPlayer } from "./HockeyPlayerCard";
+import { CitrusLeaf } from "@/components/icons/CitrusIcons";
 
 interface BenchGridProps {
   players: HockeyPlayer[];
@@ -51,9 +52,10 @@ const BenchGrid = ({ players, onPlayerClick, className, lockedPlayerIds = new Se
   return (
     <div className={cn("space-y-4", className)}>
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold flex items-center gap-2">
+        <h2 className="text-xl font-varsity font-black flex items-center gap-2 text-citrus-forest uppercase tracking-tight">
+          <CitrusLeaf className="w-5 h-5 text-citrus-sage" />
           Bench
-          <Badge variant="outline" className="ml-2">
+          <Badge variant="outline" className="ml-2 font-display">
             {players.length} players
           </Badge>
         </h2>
@@ -62,10 +64,10 @@ const BenchGrid = ({ players, onPlayerClick, className, lockedPlayerIds = new Se
       <Card
         ref={setNodeRef}
         className={cn(
-          "p-3 transition-all",
+          "p-3 transition-all rounded-lg",
           "border-2",
-          isOver && "border-primary bg-primary/5 border-dashed",
-          !isOver && "border-border"
+          isOver && "border-citrus-sage bg-citrus-sage/10 shadow-lg",
+          !isOver && "border-citrus-sage/30 bg-citrus-cream shadow-sm"
         )}
       >
         {players.length > 0 ? (
@@ -89,17 +91,25 @@ const BenchGrid = ({ players, onPlayerClick, className, lockedPlayerIds = new Se
           </SortableContext>
         ) : (
           <div className={cn(
-            "flex items-center justify-center h-64 rounded-lg border-2 border-dashed",
-            isOver ? "border-primary bg-primary/10" : "border-muted-foreground/20 bg-muted/10"
+            "flex items-center justify-center h-64 rounded-lg border-2 border-dashed relative overflow-hidden",
+            isOver ? "border-citrus-sage bg-citrus-sage/10" : "border-citrus-sage/30 bg-citrus-cream/50"
           )}>
-            <div className="text-center">
+            {/* Decorative citrus slices in background */}
+            <CitrusLeaf className="absolute top-4 left-4 w-16 h-16 text-citrus-sage opacity-10 rotate-12" />
+            <CitrusLeaf className="absolute bottom-4 right-4 w-20 h-20 text-citrus-peach opacity-10 -rotate-45" />
+            
+            <div className="text-center relative z-10">
+              <CitrusLeaf className={cn(
+                "w-12 h-12 mx-auto mb-3 transition-colors",
+                isOver ? "text-citrus-sage" : "text-citrus-charcoal/40"
+              )} />
               <p className={cn(
-                "text-sm font-medium mb-1",
-                isOver ? "text-primary" : "text-muted-foreground"
+                "text-sm font-varsity font-bold mb-1 uppercase tracking-wide",
+                isOver ? "text-citrus-forest" : "text-citrus-charcoal/60"
               )}>
                 {isOver ? "Drop players here" : "No bench players"}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs font-display text-citrus-charcoal/50">
                 Drag players from starters or add from free agents
               </p>
             </div>

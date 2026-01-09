@@ -1,9 +1,14 @@
+import { Calendar } from "lucide-react";
+import { CitrusWedge } from "@/components/icons/CitrusIcons";
+
 interface MatchupTotalBarProps {
   team1Score: number;
   team2Score: number;
   team1Name?: string;
   team2Name?: string;
   showLabels?: boolean; // Default true
+  team1GamesRemaining?: number;
+  team2GamesRemaining?: number;
 }
 
 export const MatchupTotalBar = ({ 
@@ -11,7 +16,9 @@ export const MatchupTotalBar = ({
   team2Score, 
   team1Name = 'Team 1',
   team2Name = 'Team 2',
-  showLabels = true
+  showLabels = true,
+  team1GamesRemaining = 0,
+  team2GamesRemaining = 0
 }: MatchupTotalBarProps) => {
   const total = team1Score + team2Score || 1; // Avoid divide by zero
   const percent1 = (team1Score / total) * 100;
@@ -36,6 +43,17 @@ export const MatchupTotalBar = ({
             <div className="font-varsity text-5xl text-citrus-sage mt-1">
               {team1Score.toFixed(1)}
             </div>
+            {/* Games Remaining Badge */}
+            <div className="mt-2 flex items-center justify-center gap-1 bg-citrus-cream/50 px-2 py-1 rounded-lg border border-citrus-sage/40">
+              <Calendar className="w-3 h-3 text-citrus-forest" />
+              <span className="text-[10px] font-varsity font-bold text-citrus-forest uppercase tracking-wide">
+                {team1GamesRemaining}
+              </span>
+              <span className="text-[9px] font-display text-citrus-charcoal/70">
+                games left
+              </span>
+              <CitrusWedge className="w-2.5 h-2.5 text-citrus-sage opacity-70" />
+            </div>
           </div>
           
           {/* VS Divider */}
@@ -50,6 +68,17 @@ export const MatchupTotalBar = ({
             </div>
             <div className="font-varsity text-5xl text-citrus-peach mt-1">
               {team2Score.toFixed(1)}
+            </div>
+            {/* Games Remaining Badge */}
+            <div className="mt-2 flex items-center justify-center gap-1 bg-citrus-cream/50 px-2 py-1 rounded-lg border border-citrus-peach/40">
+              <Calendar className="w-3 h-3 text-citrus-forest" />
+              <span className="text-[10px] font-varsity font-bold text-citrus-forest uppercase tracking-wide">
+                {team2GamesRemaining}
+              </span>
+              <span className="text-[9px] font-display text-citrus-charcoal/70">
+                games left
+              </span>
+              <CitrusWedge className="w-2.5 h-2.5 text-citrus-peach opacity-70" />
             </div>
           </div>
         </div>

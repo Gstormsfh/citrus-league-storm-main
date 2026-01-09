@@ -240,7 +240,7 @@ export const DailyRosters = ({
           : opponentTeamRoster.filter(p => p.isOnIR);
 
         return (
-          <Card key={date} className="overflow-hidden">
+          <Card key={date} className="overflow-visible">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg flex items-center gap-2">

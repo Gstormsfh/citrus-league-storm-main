@@ -6,6 +6,7 @@ import { LeagueService } from '@/services/LeagueService';
 import { getCurrentWeekNumber, getFirstWeekStartDate, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
 import { supabase } from '@/integrations/supabase/client';
 import { AlertCircle, Clock, TrendingUp, TrendingDown } from 'lucide-react';
+import { CitrusSparkle, CitrusWedge } from '@/components/icons/CitrusIcons';
 
 interface HeadlineItem {
   type: 'waiver' | 'matchup' | 'streak';
@@ -207,11 +208,10 @@ export const HeadlinesBanner = () => {
   // Show loading state or placeholder for guests
   if (loading) {
     return (
-      <div 
-        className="w-full px-4 py-3 rounded-lg mb-6 flex items-center gap-3 text-white font-medium text-sm md:text-base animate-pulse"
-        style={{ backgroundColor: '#F9A436', opacity: 0.7 }}
-      >
+      <div className="w-full px-6 py-4 rounded-varsity mb-6 flex items-center gap-3 text-citrus-cream font-varsity font-bold text-sm md:text-base animate-pulse bg-gradient-to-r from-citrus-orange to-citrus-peach border-4 border-citrus-forest/50 shadow-patch corduroy-texture relative overflow-hidden">
+        <CitrusSparkle className="w-5 h-5 animate-pulse" />
         <div className="flex-1">Loading updates...</div>
+        <CitrusWedge className="absolute top-1 right-2 w-8 h-8 opacity-20 rotate-12" />
       </div>
     );
   }
@@ -219,11 +219,10 @@ export const HeadlinesBanner = () => {
   // For guests or users without leagues, show a welcome message
   if (!user || !activeLeagueId || !headline) {
     return (
-      <div 
-        className="w-full px-4 py-3 rounded-lg mb-6 flex items-center gap-3 text-white font-medium text-sm md:text-base"
-        style={{ backgroundColor: '#F9A436' }}
-      >
-        <div className="flex-1">Welcome to GM's Office! Create or join a league to see personalized updates.</div>
+      <div className="w-full px-6 py-4 rounded-varsity mb-6 flex items-center gap-3 text-citrus-cream font-varsity font-bold text-sm md:text-base bg-gradient-to-r from-citrus-sage to-citrus-orange border-4 border-citrus-forest shadow-[inset_0_2px_4px_rgba(0,0,0,0.1),0_4px_0_rgba(27,48,34,0.2)] corduroy-texture relative overflow-hidden">
+        <CitrusSparkle className="w-5 h-5" />
+        <div className="flex-1 font-display font-semibold">Welcome to GM's Office! Create or join a league to see personalized updates.</div>
+        <CitrusWedge className="absolute top-1 right-2 w-10 h-10 opacity-15 rotate-12" />
       </div>
     );
   }
@@ -243,15 +242,22 @@ export const HeadlinesBanner = () => {
     }
   };
 
+  const urgencyStyles = {
+    high: 'from-citrus-orange to-citrus-peach',
+    medium: 'from-citrus-peach to-citrus-sage',
+    low: 'from-citrus-sage to-citrus-orange'
+  };
+
   return (
-    <div 
-      className="w-full px-4 py-3 rounded-lg mb-6 flex items-center gap-3 text-white font-medium text-sm md:text-base"
-      style={{ backgroundColor: '#F9A436' }}
-    >
-      <div className="flex-shrink-0">
+    <div className={`w-full px-6 py-4 rounded-varsity mb-6 flex items-center gap-4 text-citrus-cream font-varsity font-bold text-sm md:text-base bg-gradient-to-r ${urgencyStyles[headline.urgency]} border-4 border-citrus-forest shadow-[inset_0_2px_4px_rgba(0,0,0,0.1),0_4px_0_rgba(27,48,34,0.2)] corduroy-texture relative overflow-hidden group hover:-translate-y-0.5 transition-all`}>
+      {/* Decorative citrus icons */}
+      <CitrusWedge className="absolute top-1 right-2 w-12 h-12 opacity-15 rotate-12 group-hover:rotate-45 transition-transform" />
+      <CitrusSparkle className="absolute bottom-1 left-2 w-8 h-8 opacity-10 group-hover:scale-110 transition-transform" />
+      
+      <div className="flex-shrink-0 w-10 h-10 rounded-varsity bg-citrus-cream/20 border-2 border-citrus-cream/40 flex items-center justify-center backdrop-blur-sm">
         {getIcon()}
       </div>
-      <div className="flex-1">
+      <div className="flex-1 relative z-10 font-display font-semibold uppercase tracking-wide">
         {headline.message}
       </div>
     </div>

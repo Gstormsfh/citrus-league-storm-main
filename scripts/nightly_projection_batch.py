@@ -216,10 +216,10 @@ def fetch_team_defense_stats(db: SupabaseRest, season: int) -> Dict[str, Dict]:
     print(f"  Fetching team defense stats...")
     
     try:
-        # First try team_stats table
+        # First try team_stats table (columns are already averages)
         teams = db.select(
             "team_stats",
-            select="team_abbrev,goals_against,shots_against,xg_against,games_played",
+            select="team_abbrev,goals_against_avg,shots_against_avg,games_played",
             filters=[("season", "eq", season)],
             limit=50
         )
@@ -227,14 +227,14 @@ def fetch_team_defense_stats(db: SupabaseRest, season: int) -> Dict[str, Dict]:
         if teams:
             team_stats = {}
             for t in teams:
-                gp = max(t.get("games_played", 1), 1)
+                gp = t.get("games_played", 1)
                 team_stats[t["team_abbrev"]] = {
-                    "goals_against_avg": t.get("goals_against", 0) / gp,
-                    "shots_against_avg": t.get("shots_against", 0) / gp,
-                    "xg_against_avg": t.get("xg_against", 0) / gp,
+                    "goals_against_avg": t.get("goals_against_avg", 3.0),
+                    "shots_against_avg": t.get("shots_against_avg", 30.0),
+                    "xg_against_avg": 2.8,  # Not available in table, use default
                     "games_played": gp
                 }
-            print(f"  Loaded defense stats for {len(team_stats)} teams")
+            print(f"  ✅ Loaded defense stats for {len(team_stats)} teams")
             return team_stats
     except Exception as e:
         print(f"  Warning: team_stats table not available: {e}")
@@ -841,6 +841,45 @@ def main():
             ))
     
     print(f"  Created {len(worker_tasks)} projection tasks")
+    
+    # Check for existing projections and skip them
+    print(f"  Checking for existing projections...")
+    existing_projections = set()
+    offset = 0
+    while True:
+        batch = db.select(
+            "player_projected_stats",
+            select="player_id,game_id",
+            filters=[("season", "eq", args.season)],
+            limit=1000,
+            offset=offset
+        )
+        if not batch:
+            break
+        for proj in batch:
+            existing_projections.add((int(proj.get("player_id", 0)), int(proj.get("game_id", 0))))
+        if len(batch) < 1000:
+            break
+        offset += 1000
+    
+    print(f"  Found {len(existing_projections)} existing projections")
+    
+    # Filter out existing projections
+    original_count = len(worker_tasks)
+    worker_tasks = [
+        task for task in worker_tasks
+        if (task[0], task[1]) not in existing_projections
+    ]
+    skipped_count = original_count - len(worker_tasks)
+    print(f"  Filtered to {len(worker_tasks)} new projection tasks (skipped {skipped_count} existing)")
+    
+    if len(worker_tasks) == 0:
+        print(f"  ✅ All projections already exist! Nothing to calculate.")
+        print()
+        print("=" * 80)
+        print("BATCH COMPLETE - NO NEW PROJECTIONS NEEDED")
+        print("=" * 80)
+        return
     
     # Execute in parallel
     projections = []

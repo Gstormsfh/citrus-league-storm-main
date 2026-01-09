@@ -227,7 +227,7 @@ export const TeamCard = ({ title, starters, bench, gradientClass, slotAssignment
 
   return (
     <Card className="card-citrus matchup-team-card p-0 border-none shadow-md" style={{ width: '100%', minWidth: 0, maxWidth: '100%' }}>
-      <CardHeader className={`${gradientClass} py-4 border-b bg-white flex-shrink-0`}>
+      <CardHeader className={`${gradientClass} py-4 border-b bg-citrus-cream flex-shrink-0`}>
         <CardTitle className="text-lg font-bold tracking-tight">{title}</CardTitle>
       </CardHeader>
       <CardContent className="p-0 flex flex-col w-full">
@@ -281,7 +281,7 @@ export const TeamCard = ({ title, starters, bench, gradientClass, slotAssignment
         </div>
 
         {/* Desktop View */}
-        <div className="hidden md:block table-container" style={{ width: '100%', overflow: 'hidden' }}>
+        <div className="hidden md:block table-container" style={{ width: '100%', overflow: 'visible' }}>
           <Table className="w-full" style={{ tableLayout: 'fixed', width: '100%' }}>
             <colgroup>
               <col style={{ width: '60px' }} />
@@ -492,7 +492,7 @@ export const TeamCard = ({ title, starters, bench, gradientClass, slotAssignment
             </div>
 
             {/* Desktop View Bench */}
-            <div className="hidden md:block table-container w-full" style={{ width: '100%', overflow: 'hidden' }}>
+            <div className="hidden md:block table-container w-full" style={{ width: '100%', overflow: 'visible' }}>
               <Table className="w-full" style={{ tableLayout: 'fixed', width: '100%' }}>
                 <colgroup>
                   <col style={{ width: '60px' }} />

@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -11,6 +12,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Search, 
   ArrowLeftRight, 
@@ -21,18 +23,28 @@ import {
   UserPlus, 
   UserMinus,
   Scale,
-  Info
+  Info,
+  Send,
+  History
 } from 'lucide-react';
 import { PlayerService, Player } from '@/services/PlayerService';
 import { LeagueService, LeagueTeam } from '@/services/LeagueService';
+import { TradeService, type TradeOfferWithPlayers } from '@/services/TradeService';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { isGuestMode } from '@/utils/guestHelpers';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
+import { CitrusBackground } from '@/components/CitrusBackground';
+import { CitrusSparkle, CitrusLeaf, CitrusWedge } from '@/components/icons/CitrusIcons';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 const TradeAnalyzer = () => {
   const [searchParams] = useSearchParams();
-  const { userLeagueState } = useLeague();
+  const { user } = useAuth();
+  const { userLeagueState, activeLeagueId } = useLeague();
+  const { toast } = useToast();
+  
   const [selectedTeamId, setSelectedTeamId] = useState<string | number>("");
   const [myTeamRoster, setMyTeamRoster] = useState<Player[]>([]);
   const [opponentTeams, setOpponentTeams] = useState<LeagueTeam[]>([]);
@@ -41,11 +53,33 @@ const TradeAnalyzer = () => {
   // State for Player Stats Modal
   const [selectedPlayerForStats, setSelectedPlayerForStats] = useState<HockeyPlayer | null>(null);
   const [isPlayerDialogOpen, setIsPlayerDialogOpen] = useState(false);
+  
+  // Trade offer state
+  const [myTeamId, setMyTeamId] = useState<string | null>(null);
+  const [tradeOffers, setTradeOffers] = useState<TradeOfferWithPlayers[]>([]);
+  const [activeTab, setActiveTab] = useState('propose');
+  const [tradeMessage, setTradeMessage] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
+        // Get user's team ID if logged in
+        if (user && activeLeagueId) {
+          const { data: team } = await supabase
+            .from('teams')
+            .select('id')
+            .eq('league_id', activeLeagueId)
+            .eq('owner_id', user.id)
+            .maybeSingle();
+          
+          if (team) {
+            setMyTeamId(team.id);
+            // Load trade offers
+            await loadTradeOffers(team.id);
+          }
+        }
+        
         // Get all players from our pipeline tables (player_directory + player_season_stats)
         // PlayerService.getAllPlayers() is the ONLY source for player data
         const allPlayers = await PlayerService.getAllPlayers();
@@ -66,7 +100,115 @@ const TradeAnalyzer = () => {
       }
     };
     fetchData();
-  }, []);
+  }, [user, activeLeagueId]);
+
+  const loadTradeOffers = async (teamId: string) => {
+    if (!activeLeagueId) return;
+    
+    const offers = await TradeService.getTeamTradeOffers(activeLeagueId, teamId);
+    setTradeOffers(offers);
+  };
+
+  const handleProposeTrade = async () => {
+    if (!myTeamId || !activeLeagueId || !selectedTeamId || 
+        mySelectedPlayers.length === 0 || theirSelectedPlayers.length === 0) {
+      toast({
+        title: "Invalid Trade",
+        description: "Please select players from both teams",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const result = await TradeService.createTradeOffer(
+      activeLeagueId,
+      myTeamId,
+      String(selectedTeamId),
+      mySelectedPlayers.map(Number),
+      theirSelectedPlayers.map(Number),
+      tradeMessage || undefined
+    );
+
+    if (result.success) {
+      toast({
+        title: "Trade Proposed",
+        description: "Your trade offer has been sent",
+      });
+      setMySelectedPlayers([]);
+      setTheirSelectedPlayers([]);
+      setTradeMessage('');
+      if (myTeamId) {
+        await loadTradeOffers(myTeamId);
+      }
+      setActiveTab('offers');
+    } else {
+      toast({
+        title: "Trade Failed",
+        description: result.error,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleAcceptTrade = async (tradeId: string) => {
+    const result = await TradeService.acceptTradeOffer(tradeId);
+    
+    if (result.success) {
+      toast({
+        title: "Trade Accepted",
+        description: "The trade has been completed",
+      });
+      if (myTeamId) {
+        await loadTradeOffers(myTeamId);
+      }
+    } else {
+      toast({
+        title: "Trade Failed",
+        description: result.error,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleRejectTrade = async (tradeId: string) => {
+    const result = await TradeService.rejectTradeOffer(tradeId);
+    
+    if (result.success) {
+      toast({
+        title: "Trade Rejected",
+        description: "The trade offer has been declined",
+      });
+      if (myTeamId) {
+        await loadTradeOffers(myTeamId);
+      }
+    } else {
+      toast({
+        title: "Action Failed",
+        description: result.error,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleCancelTrade = async (tradeId: string) => {
+    const result = await TradeService.cancelTradeOffer(tradeId);
+    
+    if (result.success) {
+      toast({
+        title: "Trade Cancelled",
+        description: "Your trade offer has been cancelled",
+      });
+      if (myTeamId) {
+        await loadTradeOffers(myTeamId);
+      }
+    } else {
+      toast({
+        title: "Action Failed",
+        description: result.error,
+        variant: "destructive"
+      });
+    }
+  };
 
   useEffect(() => {
     const partnerId = searchParams.get('partner');

@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import HockeyPlayerCard, { HockeyPlayer } from "./HockeyPlayerCard";
 import { Plus } from "lucide-react";
+import { CitrusSparkle } from "@/components/icons/CitrusIcons";
 
 interface PositionSlot {
   id: string;
@@ -95,7 +96,8 @@ const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, className,
   return (
     <div className={cn("space-y-6", className)}>
       <div className="flex items-center justify-between mb-1">
-        <h2 className="text-lg font-bold flex items-center gap-2">
+        <h2 className="text-lg font-varsity font-black flex items-center gap-2 text-citrus-forest uppercase tracking-tight">
+          <CitrusSparkle className="w-5 h-5 text-citrus-orange" />
           Starting Lineup
         </h2>
       </div>
@@ -207,13 +209,11 @@ const PositionSlot = ({
     <Card
       ref={setNodeRef}
       className={cn(
-        "p-2 transition-all rounded-md min-h-[110px] w-full", 
-        "border",
-        isOver && "border-primary bg-primary/5 shadow-md border-2",
-        isEmpty && "border-dashed border-muted-foreground/20 bg-muted/5",
-        !isEmpty && !isOver && !isFull && getPositionStyle(),
-        !isEmpty && !isOver && "hover:border-border hover:bg-card",
-        isFull && !isOver && "border-green-500/20 bg-green-500/5"
+        "p-2 transition-all rounded-lg min-h-[110px] w-full", 
+        "border-2",
+        isOver && "border-citrus-sage bg-citrus-sage/10 shadow-lg",
+        isEmpty && "border-dashed border-citrus-charcoal/20 bg-citrus-cream/50",
+        isFull && !isOver && "border-citrus-sage/30 bg-citrus-cream shadow-sm"
       )}
     >
       {/* Compact Slot Header */}

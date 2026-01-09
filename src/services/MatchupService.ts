@@ -1664,21 +1664,15 @@ export const MatchupService = {
           xGoals: 0
         };
       } else {
-        // Skater stats
-        basePlayer.stats = matchupStats ? {
-          goals: matchupStats.goals || 0,
-          assists: matchupStats.assists || 0,
-          sog: matchupStats.sog || 0,
-          blk: matchupStats.blocks || 0,
-          gamesPlayed: 0,
-          xGoals: matchupStats.xGoals || 0
-        } : {
-          goals: 0,
-          assists: 0,
-          sog: 0,
-          blk: 0,
-          gamesPlayed: 0,
-          xGoals: 0
+        // Skater stats - USE SEASON STATS from player.stats (already populated by transformToHockeyPlayer)
+        basePlayer.stats = {
+          goals: player.stats?.goals || 0,
+          assists: player.stats?.assists || 0,
+          sog: player.stats?.shots || 0,  // Note: HockeyPlayer uses 'shots', not 'sog'
+          blk: player.stats?.blockedShots || 0,
+          gamesPlayed: player.stats?.gamesPlayed || 0,
+          xGoals: player.stats?.xGoals || 0,
+          powerPlayPoints: player.stats?.powerPlayPoints || 0
         };
         
         basePlayer.matchupStats = matchupStats ? (isGoalie ? {
@@ -1688,12 +1682,16 @@ export const MatchupService = {
           shutouts: matchupStats.shutouts || 0,
           goals_against: matchupStats.goals_against || 0,
         } : {
-          // Skater matchup stats
-          goals: matchupStats.goals,
-          assists: matchupStats.assists,
-          sog: matchupStats.sog,
+          // Skater matchup stats - ALL 8 categories
+          goals: matchupStats.goals || 0,
+          assists: matchupStats.assists || 0,
+          sog: matchupStats.sog || 0,
           blocks: matchupStats.blocks || 0,
-          xGoals: matchupStats.xGoals
+          ppp: matchupStats.ppp || 0,
+          shp: matchupStats.shp || 0,
+          hits: matchupStats.hits || 0,
+          pim: matchupStats.pim || 0,
+          xGoals: matchupStats.xGoals || 0
         }) : undefined;
         
         // Skater projection
@@ -1737,7 +1735,8 @@ export const MatchupService = {
           sog: player.stats.shots || 0,
           blk: player.stats.blockedShots || 0,
           gamesPlayed: player.stats.gamesPlayed || 0,
-          xGoals: player.stats.xGoals || 0
+          xGoals: player.stats.xGoals || 0,
+          powerPlayPoints: player.stats.powerPlayPoints || 0
         },
         matchupStats: undefined,
         garPercentage: undefined,
@@ -1815,9 +1814,10 @@ export const MatchupService = {
       // Otherwise, use current lineup from team_lineups (today/future dates)
       // =============================================================================
       const todayStr = getTodayMST();
-      let useFrozenRoster = targetDate && targetDate < todayStr;
+      // CRITICAL: Ensure targetDate exists before using it
+      let useFrozenRoster = targetDate !== undefined && targetDate !== null && targetDate < todayStr;
       
-      if (useFrozenRoster) {
+      if (useFrozenRoster && targetDate) {
         console.log(`[MatchupService.getMatchupRosters] Using frozen roster for date: ${targetDate} (today: ${todayStr})`);
       } else {
         // Clear cache for current lineup (only needed when using team_lineups)
@@ -1834,18 +1834,18 @@ export const MatchupService = {
       // Get lineups: Use frozen roster for past dates, current lineup for today/future
       let team1LineupResult, team2LineupResult;
       
-      if (useFrozenRoster) {
+      if (useFrozenRoster && targetDate) {
         // For past dates, use LeagueService.loadDailyRoster (same as Roster tab)
         // This ensures IDENTICAL query logic and results
         const [team1FrozenRoster, team2FrozenRoster] = await Promise.all([
           withTimeout(
-            LeagueService.loadDailyRoster(matchup.team1_id, matchup.id, targetDate!, allPlayers),
+            LeagueService.loadDailyRoster(matchup.team1_id, matchup.id, targetDate, allPlayers),
             5000,
             'loadDailyRoster timeout for team1'
           ),
           matchup.team2_id
             ? withTimeout(
-                LeagueService.loadDailyRoster(matchup.team2_id, matchup.id, targetDate!, allPlayers),
+                LeagueService.loadDailyRoster(matchup.team2_id, matchup.id, targetDate, allPlayers),
                 5000,
                 'loadDailyRoster timeout for team2'
               )
@@ -1888,7 +1888,7 @@ export const MatchupService = {
           console.log(`[MatchupService.getMatchupRosters] Using frozen rosters from LeagueService:`, {
             team1: team1Roster.length,
             team2: team2Roster.length,
-            date: targetDate
+            date: targetDate || 'N/A'
           });
         }
       }
@@ -3165,38 +3165,44 @@ export const MatchupService = {
   },
 
   /**
-   * Get team record (wins/losses) from completed matchups
+   * Get team record (wins/losses) directly from standings calculation
+   * This ensures the matchup tab records always match the standings page
    */
   async getTeamRecord(teamId: string, leagueId: string): Promise<{ wins: number; losses: number }> {
     try {
-      const { data: matchups, error } = await supabase
-        .from('matchups')
-        .select('*')
-        .eq('league_id', leagueId)
-        .eq('status', 'completed')
-        .or(`team1_id.eq.${teamId},team2_id.eq.${teamId}`);
+      // Get all required data for standings calculation
+      const [teamsResult, picksResult, playersResult] = await Promise.all([
+        LeagueService.getLeagueTeams(leagueId),
+        DraftService.getDraftPicks(leagueId),
+        PlayerService.getAllPlayers()
+      ]);
 
-      if (error) throw error;
+      if (!teamsResult.teams || teamsResult.teams.length === 0) {
+        console.warn('[MatchupService] No teams found for league:', leagueId);
+        return { wins: 0, losses: 0 };
+      }
 
-      let wins = 0;
-      let losses = 0;
+      // Calculate standings using the official standings logic
+      const standings = await LeagueService.calculateTeamStandings(
+        leagueId,
+        teamsResult.teams,
+        picksResult.picks || [],
+        playersResult
+      );
 
-      (matchups || []).forEach(matchup => {
-        const isTeam1 = matchup.team1_id === teamId;
-        const myScore = isTeam1 ? matchup.team1_score : matchup.team2_score;
-        const oppScore = isTeam1 ? matchup.team2_score : matchup.team1_score;
+      // Get the record for this specific team
+      const teamStanding = standings[teamId];
+      if (!teamStanding) {
+        console.warn('[MatchupService] No standing found for team:', teamId);
+        return { wins: 0, losses: 0 };
+      }
 
-        if (myScore > oppScore) {
-          wins++;
-        } else if (oppScore > myScore) {
-          losses++;
-        }
-        // Ties are not counted (or could be counted as 0.5 wins/losses)
-      });
-
-      return { wins, losses };
+      return { 
+        wins: teamStanding.wins, 
+        losses: teamStanding.losses 
+      };
     } catch (error) {
-      console.error('Error getting team record:', error);
+      console.error('Error getting team record from standings:', error);
       return { wins: 0, losses: 0 };
     }
   },

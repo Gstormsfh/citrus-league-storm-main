@@ -14,6 +14,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, TrendingDown, Wand2, Trophy, Activity, ArrowUpRight, Users, Loader2, Calendar, Target, Shield, Skull, Zap, BarChart3, PieChart, Lock } from 'lucide-react';
 import LoadingScreen from '@/components/LoadingScreen';
+import { CitrusSlice, CitrusSparkle, CitrusLeaf, CitrusBurst, CitrusWedge, CitrusZest } from '@/components/icons/CitrusIcons';
+import { AdSpace } from '@/components/AdSpace';
+import { CitrusBackground } from '@/components/CitrusBackground';
+import { CitrusSectionDivider } from '@/components/CitrusSectionDivider';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { RosterDepthWidget } from '@/components/gm-office/RosterDepthWidget';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cell } from 'recharts';
@@ -2495,7 +2499,10 @@ const Roster = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
+    <div className="min-h-screen bg-background text-foreground overflow-x-hidden relative">
+      {/* Citrus Background - Floating citrus elements */}
+      <CitrusBackground density="medium" animated={true} />
+      
       <Navbar />
       
       <main className="w-full pt-28 pb-16 m-0 p-0">
@@ -2504,18 +2511,31 @@ const Roster = () => {
           <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] gap-6 lg:gap-8">
             {/* Main Content - Scrollable - Appears first on mobile */}
             <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-4 order-1 lg:order-2">
-              {/* Fantasy Team Header */}
-              <div className="bg-card rounded-lg shadow-md border p-4 mb-6">
-                <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+              {/* Fantasy Team Header with Citrus Flair */}
+              <div className="bg-card rounded-lg shadow-md border p-4 mb-6 relative overflow-hidden">
+                {/* Decorative citrus leaves in background */}
+                <CitrusLeaf className="absolute top-2 right-2 w-16 h-16 text-citrus-sage opacity-10 rotate-12" />
+                <CitrusLeaf className="absolute bottom-2 left-1/4 w-12 h-12 text-citrus-peach opacity-10 -rotate-45" />
+                
+                <div className="flex flex-col md:flex-row justify-between items-center gap-4 relative z-10">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-2xl font-bold">
-                  {userLeagueState === 'guest' ? 'CC' : (userTeam?.team_name?.substring(0, 2).toUpperCase() || profile?.username?.substring(0, 2).toUpperCase() || 'TM')}
+                <div className="w-12 h-12 rounded-varsity bg-gradient-to-br from-citrus-sage to-citrus-orange border-2 border-citrus-forest/20 flex items-center justify-center text-citrus-cream text-2xl font-varsity font-black shadow-patch relative overflow-hidden">
+                  {/* Background pattern */}
+                  <div className="absolute inset-0 opacity-20">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(255,255,255,0.3)_0%,_transparent_60%)]"></div>
+                  </div>
+                  <span className="relative z-10">
+                    {userLeagueState === 'guest' ? 'CC' : (userTeam?.team_name?.substring(0, 2).toUpperCase() || profile?.username?.substring(0, 2).toUpperCase() || 'TM')}
+                  </span>
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold">
-                    {userLeagueState === 'guest' ? 'Citrus Crushers' : (userTeam?.team_name || 'My Team')}
-                  </h1>
-                  <div className="text-muted-foreground text-sm">
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-2xl font-varsity font-black text-citrus-forest">
+                      {userLeagueState === 'guest' ? 'Citrus Crushers' : (userTeam?.team_name || 'My Team')}
+                    </h1>
+                    <CitrusSparkle className="w-4 h-4 text-citrus-orange opacity-70" />
+                  </div>
+                  <div className="text-citrus-charcoal text-sm font-display">
                     Manager: {userLeagueState === 'guest' ? 'Demo Team' : (profile?.username || 'You')}
                   </div>
                 </div>
@@ -3215,27 +3235,11 @@ const Roster = () => {
                 {/* Roster Depth Widget */}
                 <RosterDepthWidget />
 
-                {/* Ad Placeholder 1 - Mobile Optimized */}
-                <div className="bg-muted/30 border border-dashed border-muted-foreground/20 rounded-lg p-6 flex flex-col items-center justify-center min-h-[180px] lg:min-h-[200px]">
-                  <div className="text-muted-foreground text-xs text-center space-y-2">
-                    <div className="w-12 h-12 mx-auto bg-muted rounded flex items-center justify-center mb-2">
-                      <span className="text-2xl">📢</span>
-                    </div>
-                    <p className="font-medium">Ad Space</p>
-                    <p className="text-xs opacity-70">300x250</p>
-                  </div>
-                </div>
+                {/* Premium Ad Space 1 */}
+                <AdSpace size="300x250" label="Roster Sponsor" />
 
-                {/* Ad Placeholder 2 - Mobile Optimized */}
-                <div className="bg-muted/30 border border-dashed border-muted-foreground/20 rounded-lg p-6 flex flex-col items-center justify-center min-h-[180px] lg:min-h-[200px]">
-                  <div className="text-muted-foreground text-xs text-center space-y-2">
-                    <div className="w-12 h-12 mx-auto bg-muted rounded flex items-center justify-center mb-2">
-                      <span className="text-2xl">📢</span>
-                    </div>
-                    <p className="font-medium">Ad Space</p>
-                    <p className="text-xs opacity-70">300x250</p>
-                  </div>
-                </div>
+                {/* Premium Ad Space 2 */}
+                <AdSpace size="300x250" label="Fantasy Partner" />
               </div>
             </aside>
 

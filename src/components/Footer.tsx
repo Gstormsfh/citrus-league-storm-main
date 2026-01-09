@@ -3,6 +3,7 @@ import { Facebook, Twitter, Instagram, Youtube, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Link } from 'react-router-dom';
+import { CitrusSlice, CitrusSparkle, CitrusLeaf } from '@/components/icons/CitrusIcons';
 
 const Footer = () => {
   return (
@@ -13,13 +14,21 @@ const Footer = () => {
       <div className="container mx-auto relative z-10">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 border-b-3 border-citrus-sage/20 pb-12 mb-10">
           <div className="lg:col-span-2">
-            {/* Logo with Vintage Style */}
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-14 h-14 rounded-varsity bg-gradient-to-br from-citrus-sage to-citrus-orange border-4 border-citrus-forest/20 flex items-center justify-center shadow-patch">
-                <span className="text-citrus-cream font-varsity text-xl font-black">CS</span>
+            {/* Logo with Citrus Icon - Vintage Style */}
+            <div className="flex items-center gap-3 mb-6 group">
+              <div className="w-14 h-14 rounded-varsity bg-gradient-to-br from-citrus-sage to-citrus-orange border-4 border-citrus-forest/20 flex items-center justify-center shadow-patch relative overflow-hidden">
+                {/* Background shine */}
+                <div className="absolute inset-0 opacity-20">
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(255,255,255,0.3)_0%,_transparent_60%)]"></div>
+                </div>
+                {/* Citrus Slice */}
+                <CitrusSlice className="w-9 h-9 relative z-10 text-citrus-cream" />
               </div>
               <div>
-                <span className="font-varsity font-black text-2xl uppercase text-citrus-forest block leading-none">Citrus</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-varsity font-black text-2xl uppercase text-citrus-forest block leading-none">Citrus</span>
+                  <CitrusSparkle className="w-3.5 h-3.5 text-citrus-orange opacity-70" />
+                </div>
                 <span className="text-xs text-citrus-charcoal font-display tracking-widest uppercase">Sports</span>
               </div>
             </div>
@@ -80,11 +89,18 @@ const Footer = () => {
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-          {/* Newsletter Signup */}
-          <div className="card-letterman p-6 bg-citrus-sage/10 border-3 border-citrus-sage">
-            <h4 className="font-varsity text-lg uppercase text-citrus-forest mb-3 tracking-wide">
-              Join The Team
-            </h4>
+          {/* Newsletter Signup with Citrus Flair */}
+          <div className="card-letterman p-6 bg-citrus-sage/10 border-3 border-citrus-sage relative overflow-hidden">
+            {/* Decorative citrus leaves */}
+            <CitrusLeaf className="absolute top-2 right-2 w-8 h-8 text-citrus-sage opacity-20 rotate-12" />
+            <CitrusLeaf className="absolute bottom-2 left-2 w-6 h-6 text-citrus-sage opacity-15 -rotate-45" />
+            
+            <div className="flex items-center gap-2 mb-3">
+              <h4 className="font-varsity text-lg uppercase text-citrus-forest tracking-wide">
+                Join The Team
+              </h4>
+              <CitrusSparkle className="w-4 h-4 text-citrus-orange" />
+            </div>
             <p className="text-citrus-charcoal mb-5 font-sans">Get the latest fantasy sports tips and updates</p>
             <div className="flex gap-3">
               <Input 
@@ -109,8 +125,10 @@ const Footer = () => {
             <p className="text-citrus-charcoal text-sm font-sans">
               © {new Date().getFullYear()} CitrusSports. <span className="font-bold">All rights reserved.</span>
             </p>
-            <p className="text-citrus-charcoal/60 text-xs font-sans mt-2">
-              Made with 🍊 by hockey fanatics
+            <p className="text-citrus-charcoal/60 text-xs font-sans mt-2 flex items-center justify-start lg:justify-end gap-1.5">
+              Made with 
+              <CitrusSlice className="w-3.5 h-3.5 text-citrus-orange inline-block" />
+              by hockey fanatics
             </p>
           </div>
         </div>

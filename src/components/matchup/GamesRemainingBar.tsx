@@ -22,7 +22,7 @@ export const GamesRemainingBar = ({
   
   if (total === 0) {
     return showLabel ? (
-      <span className={`${sizeClasses[size].text} text-gray-400`}>No games</span>
+      <span className={`${sizeClasses[size].text} text-citrus-charcoal/60`}>No games</span>
     ) : null;
   }
   
@@ -33,15 +33,15 @@ export const GamesRemainingBar = ({
           key={i}
           className={`${sizeClasses[size].pip} rounded-sm ${
             i < played 
-              ? 'bg-gray-400' // Game finished
+              ? 'bg-citrus-charcoal/40' // Game finished
               : i === played && isLocked 
-                ? 'bg-orange-500 animate-pulse' // Live/Locked game
+                ? 'bg-citrus-orange animate-pulse' // Live/Locked game
                 : 'bg-green-500' // Future game
           }`}
         />
       ))}
       {showLabel && (
-        <span className={`${sizeClasses[size].text} ml-2 font-bold text-gray-500`}>
+        <span className={`${sizeClasses[size].text} ml-2 font-bold text-citrus-charcoal/70`}>
           {remaining} GR
         </span>
       )}

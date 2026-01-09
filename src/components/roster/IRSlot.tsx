@@ -45,11 +45,11 @@ const IndividualIRSlot = ({
     <Card
       ref={setNodeRef}
       className={cn(
-        "p-2 transition-all rounded-md min-h-[110px] w-full",
+        "p-2 transition-all rounded-lg min-h-[110px] w-full",
         "border-2",
-        isOver && "border-red-500 bg-red-500/10 shadow-md",
-        isEmpty && !isOver && "border-dashed border-red-300/50 bg-red-50/30 dark:bg-red-950/10",
-        !isEmpty && !isOver && "border-red-500/30 bg-red-500/5"
+        isOver && "border-red-500 bg-red-500/10 shadow-lg",
+        isEmpty && !isOver && "border-dashed border-red-400/30 bg-citrus-cream/50",
+        !isEmpty && !isOver && "border-red-400/30 bg-citrus-cream shadow-sm"
       )}
     >
       {/* Slot Header */}

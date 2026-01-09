@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { Notification } from '@/services/NotificationService';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { CitrusSparkle, CitrusLeaf } from '@/components/icons/CitrusIcons';
 
 interface LeagueNotificationsProps {
   leagueId: string;
@@ -204,28 +205,28 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
   const getNotificationIcon = (type: Notification['type']) => {
     switch (type) {
       case 'ADD':
-        return <UserPlus className="w-4 h-4 text-[hsl(var(--vibrant-green))]" />;
+        return <UserPlus className="w-4 h-4 text-citrus-sage" />;
       case 'DROP':
-        return <UserMinus className="w-4 h-4 text-[hsl(var(--vibrant-orange))]" />;
+        return <UserMinus className="w-4 h-4 text-citrus-orange" />;
       case 'WAIVER':
-        return <AlertCircle className="w-4 h-4 text-[hsl(var(--vibrant-yellow))]" />;
+        return <AlertCircle className="w-4 h-4 text-citrus-peach" />;
       case 'CHAT':
-        return <MessageSquare className="w-4 h-4 text-[hsl(var(--vibrant-purple))]" />;
+        return <MessageSquare className="w-4 h-4 text-citrus-sage" />;
       case 'TRADE':
-        return <AlertCircle className="w-4 h-4 text-primary" />;
+        return <AlertCircle className="w-4 h-4 text-citrus-orange" />;
       default:
-        return <Clock className="w-4 h-4 text-muted-foreground" />;
+        return <Clock className="w-4 h-4 text-citrus-charcoal" />;
     }
   };
 
   const getNotificationColor = (type: Notification['type'], isRead: boolean) => {
     const baseColors = {
-      ADD: 'bg-[hsl(var(--vibrant-green))]/10 border-[hsl(var(--vibrant-green))]/30',
-      DROP: 'bg-[hsl(var(--vibrant-orange))]/10 border-[hsl(var(--vibrant-orange))]/30',
-      WAIVER: 'bg-[hsl(var(--vibrant-yellow))]/10 border-[hsl(var(--vibrant-yellow))]/30',
-      CHAT: 'bg-[hsl(var(--vibrant-purple))]/10 border-[hsl(var(--vibrant-purple))]/30',
-      TRADE: 'bg-primary/10 border-primary/30',
-      SYSTEM: 'bg-muted/30 border-border/30',
+      ADD: 'bg-citrus-sage/15 border-citrus-sage/40',
+      DROP: 'bg-citrus-orange/15 border-citrus-orange/40',
+      WAIVER: 'bg-citrus-peach/20 border-citrus-peach/40',
+      CHAT: 'bg-citrus-sage/10 border-citrus-sage/30',
+      TRADE: 'bg-citrus-orange/10 border-citrus-orange/30',
+      SYSTEM: 'bg-citrus-cream border-citrus-sage/30',
     };
 
     const color = baseColors[type] || baseColors.SYSTEM;
@@ -275,28 +276,35 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
   }
 
   return (
-    <div className="h-full flex flex-col bg-[#D4E8B8]">
+    <div className="h-full flex flex-col bg-citrus-cream corduroy-texture relative">
+      {/* Decorative citrus leaves */}
+      <CitrusLeaf className="absolute top-4 right-2 w-16 h-16 text-citrus-sage opacity-5 rotate-12 pointer-events-none" />
+      <CitrusLeaf className="absolute bottom-20 left-2 w-12 h-12 text-citrus-peach opacity-5 -rotate-45 pointer-events-none" />
+      
       {/* Header */}
-      <div className="px-4 py-3 border-b border-border/30 bg-[#D4E8B8]/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="flex items-center justify-between mb-1">
-          <h3 className="text-sm font-semibold text-foreground">League Activity</h3>
+      <div className="px-4 py-3 border-b-4 border-citrus-forest bg-gradient-to-r from-citrus-sage/20 via-citrus-sage/10 to-citrus-peach/10 backdrop-blur-sm sticky top-0 z-10 relative">
+        <div className="flex items-center justify-between mb-1 relative z-10">
+          <h3 className="text-sm font-varsity font-black text-citrus-forest uppercase tracking-tight flex items-center gap-1.5">
+            <CitrusSparkle className="w-4 h-4 text-citrus-orange" />
+            League Activity
+          </h3>
           {unreadCount > 0 && (
             <button
               onClick={handleMarkAllAsRead}
-              className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 transition-colors"
+              className="text-xs font-display font-semibold text-citrus-forest hover:text-citrus-orange flex items-center gap-1 transition-colors bg-citrus-cream/60 px-2 py-1 rounded-lg border border-citrus-sage/30"
               title="Mark all as read"
             >
               <CheckCheck className="w-3.5 h-3.5" />
-              <span>Mark all read</span>
+              <span>Mark all</span>
             </button>
           )}
         </div>
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-muted-foreground">
+        <div className="flex items-center justify-between relative z-10">
+          <p className="text-xs font-display text-citrus-charcoal">
             Real-time updates
           </p>
           {unreadCount > 0 && (
-            <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+            <span className="text-xs font-varsity font-bold text-citrus-orange bg-citrus-peach/30 px-2 py-0.5 rounded-full border border-citrus-peach/50">
               {unreadCount} unread
             </span>
           )}
@@ -306,10 +314,11 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
       {/* Notifications List - Scrollable */}
       <div className="flex-1 overflow-y-auto px-2 py-2">
         {leagueNotifications.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center px-4">
-            <Clock className="w-8 h-8 text-muted-foreground/50 mb-2" />
-            <p className="text-sm text-muted-foreground">No activity yet</p>
-            <p className="text-xs text-muted-foreground/70 mt-1">
+          <div className="flex flex-col items-center justify-center h-full text-center px-4 relative">
+            <CitrusLeaf className="w-20 h-20 text-citrus-sage opacity-20 mb-4" />
+            <Clock className="w-8 h-8 text-citrus-charcoal/50 mb-2" />
+            <p className="text-sm font-varsity font-bold text-citrus-forest uppercase tracking-wide">No activity yet</p>
+            <p className="text-xs font-display text-citrus-charcoal/70 mt-1">
               Transactions will appear here
             </p>
           </div>
@@ -334,12 +343,12 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
                     >
                       {/* Team Logo/Name - Outside message bubble */}
                       <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                        <Avatar className="h-8 w-8 border-2 border-background shadow-sm">
-                          <AvatarFallback className="bg-gradient-to-br from-primary/20 to-purple-600/20 text-primary font-bold text-[10px]">
+                        <Avatar className="h-8 w-8 border-3 border-citrus-sage shadow-patch bg-gradient-to-br from-citrus-sage/20 to-citrus-orange/20">
+                          <AvatarFallback className="bg-transparent text-citrus-forest font-varsity font-black text-[10px]">
                             {teamLogo}
                           </AvatarFallback>
                         </Avatar>
-                        <span className="text-[9px] font-medium text-muted-foreground max-w-[60px] truncate text-center leading-tight">
+                        <span className="text-[9px] font-display font-medium text-citrus-charcoal max-w-[60px] truncate text-center leading-tight">
                           {teamName}
                         </span>
                       </div>
@@ -347,21 +356,21 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
                       {/* Message Bubble */}
                       <div className="flex flex-col gap-0.5 max-w-[75%]">
                         <div
-                          className={`p-2.5 rounded-xl text-xs leading-snug shadow-sm ${
+                          className={`p-2.5 rounded-xl text-xs leading-snug shadow-sm font-display ${
                             isOwnMessage
-                              ? 'bg-primary text-primary-foreground rounded-tr-none'
-                              : 'bg-muted border rounded-tl-none'
+                              ? 'bg-gradient-to-br from-citrus-orange to-citrus-peach text-citrus-cream border-2 border-citrus-orange rounded-tr-none'
+                              : 'bg-citrus-cream border-2 border-citrus-sage/40 rounded-tl-none text-citrus-forest'
                           } ${notification.read_status ? 'opacity-90' : ''}`}
                         >
                           {notification.message}
                         </div>
                         <div className={`flex items-center gap-1 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
-                          <Clock className="w-2.5 h-2.5 text-muted-foreground/50" />
-                          <span className="text-[9px] text-muted-foreground/70">
+                          <Clock className="w-2.5 h-2.5 text-citrus-charcoal/50" />
+                          <span className="text-[9px] font-display text-citrus-charcoal/70">
                             {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
                           </span>
                           {!notification.read_status && !isOwnMessage && (
-                            <div className="w-1 h-1 bg-primary rounded-full" />
+                            <div className="w-1 h-1 bg-citrus-orange rounded-full shadow-[0_0_4px_rgba(223,117,54,0.6)]" />
                           )}
                         </div>
                       </div>
@@ -378,7 +387,7 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
                   <div
                     key={notification.id}
                     onClick={() => handleNotificationClick(notification)}
-                    className={`p-3 rounded-lg border cursor-pointer transition-all hover:shadow-sm ${getNotificationColor(notification.type, notification.read_status)}`}
+                    className={`p-3 rounded-xl border-2 cursor-pointer transition-all hover:shadow-patch hover:-translate-y-0.5 ${getNotificationColor(notification.type, notification.read_status)}`}
                   >
                     <div className="flex items-start gap-2.5">
                       <div className="mt-0.5 flex-shrink-0">
@@ -386,19 +395,19 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
-                          <p className={`text-xs font-medium line-clamp-1 ${notification.read_status ? 'text-muted-foreground' : 'text-foreground'}`}>
+                          <p className={`text-xs font-varsity font-bold line-clamp-1 ${notification.read_status ? 'text-citrus-charcoal/70' : 'text-citrus-forest'}`}>
                             {notification.title}
                           </p>
                           {!notification.read_status && (
-                            <div className="w-2 h-2 bg-primary rounded-full flex-shrink-0 mt-1" />
+                            <div className="w-2 h-2 bg-citrus-orange rounded-full flex-shrink-0 mt-1 shadow-[0_0_4px_rgba(223,117,54,0.6)]" />
                           )}
                         </div>
-                        <p className={`text-xs mt-0.5 line-clamp-2 ${notification.read_status ? 'text-muted-foreground/70' : 'text-muted-foreground'}`}>
+                        <p className={`text-xs font-display mt-0.5 line-clamp-2 ${notification.read_status ? 'text-citrus-charcoal/60' : 'text-citrus-charcoal'}`}>
                           {notification.message}
                         </p>
                         <div className="flex items-center gap-1.5 mt-1.5">
-                          <Clock className="w-3 h-3 text-muted-foreground/60" />
-                          <span className="text-xs text-muted-foreground/70">
+                          <Clock className="w-3 h-3 text-citrus-charcoal/50" />
+                          <span className="text-xs font-display text-citrus-charcoal/70">
                             {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
                           </span>
                         </div>
@@ -413,20 +422,20 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
       </div>
 
       {/* Chat Input - Fixed at bottom */}
-      <div className="px-3 py-2.5 border-t border-border/20 bg-background/95 backdrop-blur-sm sticky bottom-0 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
+      <div className="px-3 py-2.5 border-t-4 border-citrus-forest bg-citrus-cream backdrop-blur-sm sticky bottom-0 shadow-[0_-4px_10px_rgba(27,48,34,0.1)]">
         <form onSubmit={handleSendChatMessage} className="flex items-center gap-2">
           <input
             type="text"
             value={chatMessage}
             onChange={(e) => setChatMessage(e.target.value)}
             placeholder="Type a message..."
-            className="flex-1 px-4 py-2.5 text-xs bg-muted/50 border border-border/30 rounded-full focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 placeholder:text-muted-foreground/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-2.5 text-xs font-display bg-citrus-cream/50 border-2 border-citrus-sage/40 rounded-full focus:outline-none focus:ring-2 focus:ring-citrus-orange/30 focus:border-citrus-orange placeholder:text-citrus-charcoal/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-citrus-forest"
             disabled={sendingMessage || !user}
           />
           <button
             type="submit"
             disabled={!chatMessage.trim() || sendingMessage || !user}
-            className="h-9 w-9 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center flex-shrink-0 shadow-sm hover:shadow-md active:scale-95"
+            className="h-9 w-9 bg-gradient-to-br from-citrus-sage to-citrus-orange border-3 border-citrus-forest text-citrus-cream rounded-varsity hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center flex-shrink-0 shadow-patch hover:shadow-varsity active:scale-95"
             title="Send message"
           >
             {sendingMessage ? (

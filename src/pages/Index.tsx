@@ -7,6 +7,9 @@ import StormySection from '../components/StormySection';
 import TestimonialsSection from '../components/TestimonialsSection';
 import CtaSection from '../components/CtaSection';
 import Footer from '../components/Footer';
+import { AdSpace } from '@/components/AdSpace';
+import { CitrusBackground } from '@/components/CitrusBackground';
+import { CitrusSectionDivider } from '@/components/CitrusSectionDivider';
 
 const Index = () => {
   console.log("✅ Index component rendering");
@@ -43,7 +46,10 @@ const Index = () => {
 
   try {
     return (
-      <div className="min-h-screen">
+      <div className="min-h-screen relative overflow-hidden">
+        {/* Citrus Background - Floating citrus elements */}
+        <CitrusBackground density="medium" animated={true} />
+        
         <Suspense fallback={<div>Loading Navbar...</div>}>
           <Navbar />
         </Suspense>
@@ -51,8 +57,27 @@ const Index = () => {
           <Suspense fallback={<div>Loading sections...</div>}>
             <HeroSection />
             <FeaturesSection />
+            
+            {/* Citrus Divider */}
+            <CitrusSectionDivider />
+            
+            {/* Premium Banner Ad - After Features */}
+            <section className="w-full max-w-7xl mx-auto px-4 py-8">
+              <AdSpace size="728x90" label="Premier Partner" />
+            </section>
+            
             <StormySection />
+            
+            {/* Citrus Divider */}
+            <CitrusSectionDivider />
+            
             <TestimonialsSection />
+            
+            {/* Premium Banner Ad - Before CTA */}
+            <section className="w-full max-w-7xl mx-auto px-4 py-8">
+              <AdSpace size="728x90" label="Featured Partner" />
+            </section>
+            
             <CtaSection />
           </Suspense>
         </main>

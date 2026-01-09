@@ -19,6 +19,9 @@ import { useToast } from '@/hooks/use-toast';
 import LoadingScreen from '@/components/LoadingScreen';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { supabase } from '@/integrations/supabase/client';
+import { AdSpace } from '@/components/AdSpace';
+import { CitrusBackground } from '@/components/CitrusBackground';
+import { CitrusSlice, CitrusLeaf, CitrusSparkle } from '@/components/icons/CitrusIcons';
 
 interface StandingsTeam {
   id: string;
@@ -317,6 +320,9 @@ const Standings = () => {
   
   return (
     <div className="min-h-screen bg-background relative overflow-hidden" style={{ visibility: 'visible', opacity: 1 }}>
+      {/* Citrus Background - Floating citrus elements */}
+      <CitrusBackground density="light" animated={true} />
+      
       {/* Decorative elements to match Home page */}
       <div className="absolute top-0 right-0 w-96 h-96 bg-[hsl(var(--vibrant-yellow))] rounded-full opacity-10 blur-3xl -z-10"></div>
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-[hsl(var(--vibrant-green))] rounded-full opacity-10 blur-3xl -z-10"></div>
@@ -324,8 +330,16 @@ const Standings = () => {
       <Navbar />
       <main className="pt-28 pb-16" style={{ visibility: 'visible', opacity: 1, zIndex: 1 }}>
         <div className="container mx-auto px-4" style={{ visibility: 'visible', opacity: 1 }}>
-          <div className="max-w-3xl mx-auto text-center mb-10 animated-element animate" style={{ visibility: 'visible', opacity: 1 }}>
-            <h1 className="text-4xl md:text-5xl font-bold mb-4 citrus-gradient-text" style={{ visibility: 'visible', opacity: 1 }}>League Standings</h1>
+          <div className="max-w-3xl mx-auto text-center mb-10 animated-element animate relative" style={{ visibility: 'visible', opacity: 1 }}>
+            {/* Citrus Decorations */}
+            <CitrusSlice className="absolute -top-6 -left-6 w-12 h-12 text-citrus-orange/20 rotate-12" />
+            <CitrusLeaf className="absolute -top-4 -right-8 w-10 h-10 text-citrus-sage/20 -rotate-45" />
+            
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <CitrusSparkle className="w-8 h-8 text-citrus-orange animate-pulse" />
+              <h1 className="text-4xl md:text-5xl font-bold citrus-gradient-text" style={{ visibility: 'visible', opacity: 1 }}>League Standings</h1>
+              <CitrusSparkle className="w-8 h-8 text-citrus-sage animate-pulse" style={{ animationDelay: '0.3s' }} />
+            </div>
             <p className="text-lg text-muted-foreground" style={{ visibility: 'visible', opacity: 1 }}>Track your team's position in the league rankings.</p>
           </div>
           
@@ -562,6 +576,11 @@ const Standings = () => {
                 </div>
               </CardContent>
             </Card>
+          </div>
+          
+          {/* Premium Banner Ad - After Standings */}
+          <div className="max-w-5xl mx-auto mt-12 mb-8">
+            <AdSpace size="728x90" label="League Sponsor" />
           </div>
         </div>
       </main>

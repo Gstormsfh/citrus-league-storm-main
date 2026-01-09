@@ -1,3 +1,7 @@
+import { Calendar } from "lucide-react";
+import { CitrusWedge, CitrusSparkle, CitrusSlice, CitrusBurst } from "@/components/icons/CitrusIcons";
+import { Badge } from "@/components/ui/badge";
+
 interface ScoreCardProps {
   myTeamName: string;
   myTeamRecord: { wins: number; losses: number };
@@ -5,6 +9,10 @@ interface ScoreCardProps {
   opponentTeamRecord: { wins: number; losses: number };
   myTeamPoints: string;
   opponentTeamPoints: string;
+  myTeamGamesRemaining?: number;
+  opponentTeamGamesRemaining?: number;
+  myTeamProjection?: number;
+  opponentTeamProjection?: number;
 }
 
 export const ScoreCard = ({
@@ -14,18 +22,35 @@ export const ScoreCard = ({
   opponentTeamRecord,
   myTeamPoints,
   opponentTeamPoints,
+  myTeamGamesRemaining = 0,
+  opponentTeamGamesRemaining = 0,
+  myTeamProjection = 0,
+  opponentTeamProjection = 0,
 }: ScoreCardProps) => {
-  // Calculate win probability based on scores
+  // Calculate win probability based on scores and projections
   const myPointsNum = parseFloat(myTeamPoints) || 0;
   const oppPointsNum = parseFloat(opponentTeamPoints) || 0;
   const totalPoints = myPointsNum + oppPointsNum;
-  const winProbability = totalPoints > 0 ? Math.round((myPointsNum / totalPoints) * 100) : 50;
+  
+  // If no scores yet, use projections for win probability
+  let winProbability = 50;
+  if (totalPoints > 0) {
+    winProbability = Math.round((myPointsNum / totalPoints) * 100);
+  } else if (myTeamProjection > 0 || opponentTeamProjection > 0) {
+    const totalProjection = myTeamProjection + opponentTeamProjection;
+    winProbability = totalProjection > 0 ? Math.round((myTeamProjection / totalProjection) * 100) : 50;
+  }
+  
   const isWinning = myPointsNum > oppPointsNum;
   const isLosing = myPointsNum < oppPointsNum;
   const isTied = Math.abs(myPointsNum - oppPointsNum) < 0.01;
   
   return (
-    <div className="mb-6 rounded-[2rem] bg-citrus-cream corduroy-texture border-4 border-citrus-forest shadow-[0_8px_0_rgba(27,48,34,0.2)] overflow-hidden">
+    <div className="mb-6 rounded-[2rem] bg-citrus-cream corduroy-texture border-4 border-citrus-forest shadow-[0_8px_0_rgba(27,48,34,0.2)] overflow-hidden relative">
+      {/* Floating Citrus Decorations */}
+      <CitrusSlice className="absolute top-3 right-3 w-8 h-8 text-citrus-orange/10 rotate-12" />
+      <CitrusBurst className="absolute bottom-3 left-3 w-10 h-10 text-citrus-sage/10" />
+      
       {/* Header with team badges */}
       <div className="relative px-4 py-4 md:px-6 md:py-5 bg-citrus-cream border-b-4 border-citrus-forest">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
@@ -37,6 +62,19 @@ export const ScoreCard = ({
             <div>
               <div className="font-varsity text-sm text-citrus-sage uppercase">{myTeamName}</div>
               <div className="font-mono text-xs text-citrus-forest">{myTeamRecord.wins}-{myTeamRecord.losses}</div>
+              <div className="flex flex-col gap-0.5 mt-1">
+                {/* Games Remaining */}
+                <div className="flex items-center gap-1 bg-citrus-cream/60 px-2 py-0.5 rounded-md border border-citrus-sage/40">
+                  <Calendar className="w-2.5 h-2.5 text-citrus-forest" />
+                  <span className="text-[9px] font-varsity font-bold text-citrus-forest">
+                    {myTeamGamesRemaining}
+                  </span>
+                  <span className="text-[8px] font-display text-citrus-charcoal/70">
+                    left
+                  </span>
+                  <CitrusWedge className="w-2 h-2 text-citrus-sage opacity-60" />
+                </div>
+              </div>
             </div>
           </div>
           
@@ -59,6 +97,19 @@ export const ScoreCard = ({
             <div>
               <div className="font-varsity text-sm text-citrus-peach uppercase text-right">{opponentTeamName}</div>
               <div className="font-mono text-xs text-citrus-forest text-right">{opponentTeamRecord.wins}-{opponentTeamRecord.losses}</div>
+              <div className="flex flex-col gap-0.5 mt-1 items-end">
+                {/* Games Remaining */}
+                <div className="flex items-center gap-1 bg-citrus-cream/60 px-2 py-0.5 rounded-md border border-citrus-peach/40">
+                  <CitrusWedge className="w-2 h-2 text-citrus-peach opacity-60" />
+                  <span className="text-[8px] font-display text-citrus-charcoal/70">
+                    left
+                  </span>
+                  <span className="text-[9px] font-varsity font-bold text-citrus-forest">
+                    {opponentTeamGamesRemaining}
+                  </span>
+                  <Calendar className="w-2.5 h-2.5 text-citrus-forest" />
+                </div>
+              </div>
             </div>
             <div className="w-12 h-12 rounded-full bg-citrus-peach border-4 border-citrus-forest flex items-center justify-center shadow-[inset_0_2px_4px_rgba(0,0,0,0.15)]">
               <span className="font-varsity text-xl text-citrus-cream">A</span>

@@ -62,7 +62,7 @@ const TestimonialsSection = () => {
   }, [isAnimating]);
 
   return (
-    <section className="section-padding bg-white" ref={testimonialsRef}>
+    <section className="section-padding bg-citrus-cream" ref={testimonialsRef}>
       <div className="container mx-auto">
         <div className="text-center mb-16 animated-element animate">
           <h6 className="text-primary font-semibold mb-3">TESTIMONIALS</h6>
@@ -89,7 +89,7 @@ const TestimonialsSection = () => {
                         <Star 
                           key={i} 
                           size={18} 
-                          className={i < testimonial.rating ? "fill-citrus-yellow text-citrus-yellow" : "text-gray-300"} 
+                          className={i < testimonial.rating ? "fill-citrus-yellow text-citrus-yellow" : "text-citrus-sage/30"} 
                         />
                       ))}
                     </div>
@@ -125,7 +125,7 @@ const TestimonialsSection = () => {
                 <button 
                   key={index}
                   className={`w-2 h-2 rounded-full transition-colors ${
-                    activeIndex === index ? 'bg-primary' : 'bg-gray-300'
+                    activeIndex === index ? 'bg-primary' : 'bg-citrus-sage/30'
                   }`}
                   onClick={() => setActiveIndex(index)}
                 />

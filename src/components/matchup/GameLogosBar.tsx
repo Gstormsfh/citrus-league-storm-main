@@ -38,7 +38,7 @@ export const GameLogosBar = ({ games, playerTeam, selectedDate }: GameLogosBarPr
   }
   
   return (
-    <div className="flex gap-3 items-center flex-wrap justify-center py-1">
+    <div className="flex gap-1.5 items-center flex-wrap justify-center py-0.5 -mt-1">
       {sortedGames.map((game, idx) => {
         try {
           const gameDateStr = game.game_date.split('T')[0];
@@ -147,36 +147,36 @@ export const GameLogosBar = ({ games, playerTeam, selectedDate }: GameLogosBarPr
             }
           }
           
-          // PREMIUM DESIGN: Bigger logos with surfer varsity styling
-          // Base container - MUCH BIGGER (12x12 instead of 8x8!)
-          let containerClasses = 'relative w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300 bg-citrus-cream/50 backdrop-blur-sm';
+          // PREMIUM DESIGN: Compact logos with surfer varsity styling
+          // Base container - COMPACT (8x8 instead of 12x12)
+          let containerClasses = 'relative w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-300 bg-citrus-cream/50 backdrop-blur-sm';
           let borderStyle: React.CSSProperties | undefined;
           let glowEffect = '';
           
           if (isLive) {
-            // 3. Live games - pulsing orange glow with thick border
-            containerClasses += ' border-3 opacity-100 border-citrus-orange shadow-varsity';
+            // 3. Live games - pulsing orange glow with compact border
+            containerClasses += ' border-2 opacity-100 border-citrus-orange shadow-sm';
             glowEffect = 'animate-pulse';
             borderStyle = { 
               borderColor: '#DF7536', 
-              boxShadow: '0 0 16px rgba(223, 117, 54, 0.8), 0 0 24px rgba(223, 117, 54, 0.5), 0 4px 0 rgba(27, 48, 34, 0.15)' 
+              boxShadow: '0 0 8px rgba(223, 117, 54, 0.6), 0 0 12px rgba(223, 117, 54, 0.4)' 
             };
           } else if (isPlayed) {
             // 1. Past games - subtle sage border, reduced opacity
-            containerClasses += ' border-2 opacity-40 grayscale border-citrus-sage/40';
+            containerClasses += ' border opacity-40 grayscale border-citrus-sage/40';
           } else if (isSelectedDateScheduled) {
-            // 2. Selected date's games - SAGE GREEN GLOW! (more green energy)
-            containerClasses += ' border-3 opacity-100 shadow-varsity border-citrus-sage';
+            // 2. Selected date's games - SAGE GREEN GLOW! (compact)
+            containerClasses += ' border-2 opacity-100 shadow-sm border-citrus-sage';
             borderStyle = { 
               borderColor: '#AAD1A3', 
-              boxShadow: '0 0 12px rgba(170, 209, 163, 0.8), 0 0 20px rgba(170, 209, 163, 0.5), 0 4px 0 rgba(27, 48, 34, 0.15)' 
+              boxShadow: '0 0 8px rgba(170, 209, 163, 0.6), 0 0 12px rgba(170, 209, 163, 0.4)' 
             };
           } else if (isUpcoming) {
             // 4. Upcoming games - peach border (softer)
-            containerClasses += ' border-2 opacity-100 border-citrus-peach/60';
+            containerClasses += ' border opacity-100 border-citrus-peach/60';
           } else {
             // Fallback
-            containerClasses += ' border-2 opacity-100 border-citrus-sage/40';
+            containerClasses += ' border opacity-100 border-citrus-sage/40';
             borderStyle = { borderColor: teamColor };
           }
           
@@ -238,20 +238,20 @@ export const GameLogosBar = ({ games, playerTeam, selectedDate }: GameLogosBarPr
           }
           
           return (
-            <div key={idx} className="flex flex-col items-center gap-1.5">
+            <div key={idx} className="flex flex-col items-center gap-0.5">
               <div
                 className={`${containerClasses} ${glowEffect} group cursor-pointer`}
                 style={borderStyle}
                 title={tooltipText}
               >
                 {/* Premium Gradient Overlay on Hover */}
-                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-citrus-sage/0 to-citrus-orange/0 group-hover:from-citrus-sage/10 group-hover:to-citrus-orange/10 transition-all duration-300"></div>
+                <div className="absolute inset-0 rounded-lg bg-gradient-to-br from-citrus-sage/0 to-citrus-orange/0 group-hover:from-citrus-sage/10 group-hover:to-citrus-orange/10 transition-all duration-300"></div>
                 
-                {/* Team Logo - BIGGER! */}
+                {/* Team Logo - COMPACT */}
                 <img
                   src={logoUrl}
                   alt={opponent}
-                  className={`w-9 h-9 object-contain relative z-10 transition-transform duration-300 group-hover:scale-110 ${isLive ? 'brightness-110' : ''}`}
+                  className={`w-6 h-6 object-contain relative z-10 transition-transform duration-300 group-hover:scale-110 ${isLive ? 'brightness-110' : ''}`}
                   onError={(e) => {
                     // Fallback to text abbreviation if logo fails to load
                     const target = e.target as HTMLImageElement;
@@ -267,44 +267,44 @@ export const GameLogosBar = ({ games, playerTeam, selectedDate }: GameLogosBarPr
                   }}
                 />
                 
-                {/* Live Badge - PREMIUM SURF STYLE */}
+                {/* Live Badge - COMPACT */}
                 {isLive && (
-                  <div className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gradient-to-br from-citrus-orange via-citrus-orange to-red-500 rounded-lg border-2 border-citrus-cream shadow-varsity animate-pulse">
-                    <div className="absolute inset-0 bg-citrus-orange rounded-lg animate-ping opacity-75"></div>
+                  <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-gradient-to-br from-citrus-orange via-citrus-orange to-red-500 rounded border border-citrus-cream shadow-sm animate-pulse">
+                    <div className="absolute inset-0 bg-citrus-orange rounded animate-ping opacity-75"></div>
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-[8px] font-varsity font-black text-citrus-cream relative z-10">L</span>
+                      <span className="text-[6px] font-varsity font-black text-citrus-cream relative z-10">L</span>
                     </div>
                     <span className="sr-only">Live</span>
                   </div>
                 )}
                 
-                {/* Selected Date Badge - PREMIUM VARSITY PATCH */}
+                {/* Selected Date Badge - COMPACT */}
                 {isSelectedDateScheduled && (
-                  <div className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gradient-to-br from-citrus-sage to-citrus-sage/80 rounded-lg border-2 border-citrus-forest shadow-patch">
+                  <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-gradient-to-br from-citrus-sage to-citrus-sage/80 rounded border border-citrus-forest shadow-sm">
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-[8px] font-varsity font-black text-citrus-forest">T</span>
+                      <span className="text-[6px] font-varsity font-black text-citrus-forest">T</span>
                     </div>
                     <span className="sr-only">{isToday ? 'Today' : 'Scheduled'}</span>
                   </div>
                 )}
               </div>
               
-              {/* Game Score Display - PREMIUM STYLE */}
+              {/* Game Score Display - COMPACT */}
               {gameScore && (
-                <span className="game-score-display text-[9px] leading-tight whitespace-nowrap text-citrus-forest font-display font-bold">
+                <span className="game-score-display text-[7px] leading-tight whitespace-nowrap text-citrus-forest font-display font-bold">
                   {gameScore}
                 </span>
               )}
               
-              {/* Live Game Period & Time - ORANGE ENERGY */}
+              {/* Live Game Period & Time - COMPACT */}
               {isLive && game.period && (
-                <span className="text-[9px] leading-tight whitespace-nowrap text-citrus-orange font-varsity font-black animate-pulse">
+                <span className="text-[7px] leading-tight whitespace-nowrap text-citrus-orange font-varsity font-black animate-pulse">
                   {game.period}{game.period_time ? ` ${game.period_time}` : ''}
                 </span>
               )}
               
-              {/* Date Display - VARSITY STYLE */}
-              <span className={`text-[10px] leading-tight whitespace-nowrap font-display font-semibold ${
+              {/* Date Display - COMPACT */}
+              <span className={`text-[8px] leading-tight whitespace-nowrap font-display font-semibold ${
                 isPlayed 
                   ? 'text-citrus-charcoal/40' 
                   : isSelectedDate && (isSelectedDateScheduled || isLive)

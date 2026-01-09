@@ -78,14 +78,14 @@ function SortableQueueItem({
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const posColor = positionColors[player.position as keyof typeof positionColors] || 'bg-gray-200/40 text-gray-700 border-gray-300/40';
+  const posColor = positionColors[player.position as keyof typeof positionColors] || 'bg-citrus-sage/20 text-citrus-forest border-citrus-sage/40';
 
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={cn(
-        'flex items-center gap-3 p-2 rounded-lg border bg-white transition-all',
+        'flex items-center gap-3 p-2 rounded-lg border bg-citrus-cream transition-all',
         isDrafted && 'opacity-50 bg-muted/50',
         isDragging && 'shadow-lg scale-105 z-50',
         index === 0 && isYourTurn && !isDrafted && 'ring-2 ring-fantasy-primary bg-fantasy-primary/5'

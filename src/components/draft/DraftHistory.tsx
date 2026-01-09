@@ -35,7 +35,7 @@ export const DraftHistory = ({ draftHistory }: DraftHistoryProps) => {
       </div>
 
       {draftHistory.length > 0 ? (
-        <div className="border border-fantasy-border rounded-lg overflow-hidden bg-white">
+        <div className="border border-fantasy-border rounded-lg overflow-hidden bg-citrus-cream">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-fantasy-light/50 border-b border-fantasy-border">

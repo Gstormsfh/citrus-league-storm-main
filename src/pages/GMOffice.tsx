@@ -10,13 +10,17 @@ import { HeadlinesBanner } from '@/components/gm-office/HeadlinesBanner';
 import { RosterDepthWidget } from '@/components/gm-office/RosterDepthWidget';
 import { isGuestMode } from '@/utils/guestHelpers';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
+import { CitrusBackground } from '@/components/CitrusBackground';
+import { CitrusSectionDivider } from '@/components/CitrusSectionDivider';
+import { CitrusSlice, CitrusSparkle, CitrusLeaf, CitrusWedge, CitrusBurst } from '@/components/icons/CitrusIcons';
 
 const gmActions = [
   {
     title: "Stormy AI Assistant",
     description: "Get personalized advice and insights from your AI GM",
     icon: Narwhal,
-    gradient: "from-primary to-secondary",
+    citrusIcon: CitrusSparkle,
+    gradient: "from-citrus-sage to-citrus-orange",
     link: "/gm-office/stormy",
     hasNewInsight: false // Will be dynamic later
   },
@@ -24,35 +28,40 @@ const gmActions = [
     title: "Make a Trade",
     description: "Propose, negotiate, and view pending offers with league managers.",
     icon: ArrowLeftRight,
-    gradient: "from-primary to-secondary",
+    citrusIcon: CitrusWedge,
+    gradient: "from-citrus-peach to-citrus-orange",
     link: "/trade-analyzer"
   },
   {
     title: "Free Agents",
     description: "Browse and claim players. View Top 5 Adds.",
     icon: Users,
-    gradient: "from-primary to-secondary",
+    citrusIcon: CitrusSlice,
+    gradient: "from-citrus-sage to-citrus-peach",
     link: "/free-agents"
   },
   {
     title: "Team Analytics",
     description: "Deep dive into your team's performance metrics",
     icon: BarChart3,
-    gradient: "from-primary to-secondary",
+    citrusIcon: CitrusBurst,
+    gradient: "from-citrus-orange to-citrus-sage",
     link: "/team-analytics"
   },
   {
     title: "Waiver Wire",
     description: "Manage waiver claims and priorities",
     icon: TrendingUp,
-    gradient: "from-primary to-secondary",
+    citrusIcon: CitrusLeaf,
+    gradient: "from-citrus-sage to-citrus-orange",
     link: "/waiver-wire"
   },
   {
     title: "Lineup Manager",
     description: "Set your daily lineups and plan for positional limits.",
     icon: Calendar,
-    gradient: "from-primary to-secondary",
+    citrusIcon: CitrusWedge,
+    gradient: "from-citrus-peach to-citrus-sage",
     link: "/schedule-manager"
   }
 ];
@@ -60,9 +69,12 @@ const gmActions = [
 const GMOffice = () => {
   const { userLeagueState } = useLeague();
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-background/95">
+    <div className="min-h-screen bg-background relative overflow-hidden">
+      {/* Citrus Background */}
+      <CitrusBackground density="medium" animated={true} />
+      
       <Navbar />
-      <main className="pt-24 pb-16">
+      <main className="pt-24 pb-16 relative z-10">
         <div className="container mx-auto px-4">
           <div className="flex flex-col lg:flex-row gap-6">
             {/* Left Sidebar - Roster Depth Widget */}
@@ -74,9 +86,17 @@ const GMOffice = () => {
 
             {/* Main Content */}
             <div className="flex-1 min-w-0 order-1 lg:order-2">
-              <div className="max-w-3xl mx-auto text-center mb-8">
-                <h1 className="text-4xl md:text-5xl font-bold mb-4 citrus-gradient-text">GM's Office</h1>
-                <p className="text-lg text-muted-foreground">
+              <div className="max-w-3xl mx-auto text-center mb-8 relative">
+                {/* Citrus Decorations */}
+                <CitrusSlice className="absolute -top-6 -left-6 w-16 h-16 text-citrus-orange/15 rotate-12" />
+                <CitrusLeaf className="absolute -top-4 -right-8 w-12 h-12 text-citrus-sage/15 -rotate-45" />
+                
+                <div className="flex items-center justify-center gap-3 mb-4">
+                  <CitrusSparkle className="w-10 h-10 text-citrus-orange animate-pulse" />
+                  <h1 className="text-4xl md:text-5xl font-varsity font-black text-citrus-forest uppercase tracking-tight">GM's Office</h1>
+                  <CitrusSparkle className="w-10 h-10 text-citrus-sage animate-pulse" style={{ animationDelay: '0.3s' }} />
+                </div>
+                <p className="text-lg font-display text-citrus-charcoal">
                   Your command center for team management and strategy
                 </p>
               </div>
@@ -96,6 +116,8 @@ const GMOffice = () => {
                 <HeadlinesBanner />
               </div>
               
+              <CitrusSectionDivider />
+              
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-3xl mx-auto">
                 {gmActions.map((action, index) => (
                   <Link 
@@ -104,21 +126,26 @@ const GMOffice = () => {
                     className="group"
                     style={{ animationDelay: `${index * 50}ms` }}
                   >
-                    <Card className="h-full transition-all duration-300 hover:shadow-xl hover:scale-105 border-2 border-transparent hover:border-[#F9A436] cursor-pointer overflow-hidden relative">
-                      <div className="absolute top-0 left-0 w-full h-32 bg-[#F9E076] opacity-10" />
-                      <CardHeader className="relative">
+                    <Card className="h-full transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_0_rgba(223,117,54,0.4)] border-4 border-citrus-forest cursor-pointer overflow-hidden relative bg-citrus-cream corduroy-texture rounded-[2rem] shadow-[0_6px_0_rgba(27,48,34,0.2)]">
+                      {/* Background gradient */}
+                      <div className={`absolute top-0 left-0 w-full h-32 bg-gradient-to-br ${action.gradient} opacity-10`} />
+                      
+                      {/* Floating citrus icon */}
+                      <action.citrusIcon className="absolute top-2 right-2 w-12 h-12 text-citrus-sage/10 rotate-12" />
+                      
+                      <CardHeader className="relative z-10">
                         <div className="relative">
-                          <div className="w-16 h-16 rounded-2xl bg-[#F9E076] flex items-center justify-center mb-4 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 shadow-lg">
-                            <action.icon className="h-8 w-8" style={{ color: '#459345' }} strokeWidth={2.5} />
+                          <div className={`w-20 h-20 rounded-varsity bg-gradient-to-br ${action.gradient} border-4 border-citrus-forest flex items-center justify-center mb-4 group-hover:scale-110 group-hover:-rotate-3 transition-all duration-300 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1),0_4px_0_rgba(27,48,34,0.2)]`}>
+                            <action.icon className="h-10 w-10 text-citrus-cream" strokeWidth={2.5} />
                           </div>
                           {action.hasNewInsight && (
-                            <Badge className="absolute top-0 right-0 bg-[#459345] text-white text-xs">
-                              New Insight
+                            <Badge className="absolute top-0 right-0 bg-citrus-orange border-2 border-citrus-forest text-citrus-cream text-xs font-varsity font-bold shadow-patch">
+                              New!
                             </Badge>
                           )}
                         </div>
-                        <CardTitle className="text-xl group-hover:text-primary transition-colors">{action.title}</CardTitle>
-                        <CardDescription className="text-sm mt-2">
+                        <CardTitle className="text-xl font-varsity font-black text-citrus-forest uppercase tracking-tight group-hover:text-citrus-orange transition-colors">{action.title}</CardTitle>
+                        <CardDescription className="text-sm mt-2 font-display text-citrus-charcoal">
                           {action.description}
                         </CardDescription>
                       </CardHeader>

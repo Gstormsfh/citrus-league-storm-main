@@ -103,7 +103,7 @@ const StormySection = () => {
         <div className="flex flex-col lg:flex-row items-center gap-12">
           <div className="lg:w-1/2">
             <div className="mb-8 animated-element animate">
-              <div className="inline-flex items-center bg-white/70 backdrop-blur-sm rounded-full px-4 py-2 mb-4">
+              <div className="inline-flex items-center bg-citrus-cream/70 backdrop-blur-sm rounded-full px-4 py-2 mb-4">
                 <Narwhal className="h-5 w-5 text-primary mr-2" />
                 <span className="text-sm font-medium">Powered by Advanced AI</span>
               </div>
@@ -145,7 +145,7 @@ const StormySection = () => {
           </div>
 
           <div className="lg:w-1/2 animated-element animate">
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden">
+            <div className="bg-citrus-cream/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden">
               <div className="bg-primary/10 p-4 flex items-center">
                 <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
                   <Narwhal className="w-6 h-6 text-white" />
@@ -169,7 +169,7 @@ const StormySection = () => {
                       <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0 mt-1">
                         <Narwhal className="w-5 h-5 text-white" />
                       </div>
-                      <div className="bg-white rounded-lg rounded-tl-none p-4 max-w-[85%] shadow-sm border border-border">
+                      <div className="bg-citrus-cream rounded-lg rounded-tl-none p-4 max-w-[85%] shadow-sm border border-border">
                         <p className="text-sm leading-relaxed">{displayedAnswer}</p>
                         {isAnimating && (
                           <span className="inline-block w-1.5 h-4 bg-primary animate-pulse ml-1 align-middle"></span>
@@ -182,7 +182,7 @@ const StormySection = () => {
                     <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0 mt-1">
                       <Narwhal className="w-5 h-5 text-white" />
                     </div>
-                    <div className="bg-white rounded-lg rounded-tl-none p-4 max-w-[85%] shadow-sm border border-border">
+                    <div className="bg-citrus-cream rounded-lg rounded-tl-none p-4 max-w-[85%] shadow-sm border border-border">
                       <p className="text-sm leading-relaxed">{displayedAnswer}</p>
                       {isAnimating && (
                         <span className="inline-block w-1.5 h-4 bg-primary animate-pulse ml-1 align-middle"></span>

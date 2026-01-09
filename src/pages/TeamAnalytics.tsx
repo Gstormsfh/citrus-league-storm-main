@@ -8,13 +8,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, TrendingDown, AlertCircle, Calendar, ChevronRight, ShieldCheck } from 'lucide-react';
+import { TrendingUp, TrendingDown, AlertCircle, Calendar, ChevronRight, ShieldCheck, BarChart3 } from 'lucide-react';
 import { Narwhal } from '@/components/icons/Narwhal';
 import { PlayerService, Player } from '@/services/PlayerService';
 import { LeagueService } from '@/services/LeagueService';
 import { ScheduleService } from '@/services/ScheduleService';
 import { isGuestMode } from '@/utils/guestHelpers';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
+import { CitrusBackground } from '@/components/CitrusBackground';
+import { CitrusSparkle, CitrusBurst } from '@/components/icons/CitrusIcons';
 
 interface PositionStats {
   position: string;
