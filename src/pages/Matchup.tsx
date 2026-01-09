@@ -314,8 +314,13 @@ const Matchup = () => {
       });
       
       // Calculate scores for each past date
-      // CRITICAL: Determine which team is "my team" vs "opponent" based on viewingTeamId
+      // CRITICAL: Determine which team is "my team" vs "opponent" based on currentMatchup
       const scores = new Map<string, { myScore: number; oppScore: number; isLocked: boolean }>();
+      
+      // Use actual viewing team (handles both user and guest viewing)
+      // For guest: currentMatchup contains viewing_team_id that UI sets
+      // For user: userTeam.id should match one of the matchup teams
+      const viewingTeamId = (currentMatchup as any).viewing_team_id || userTeam?.id || team1Id;
       
       // Determine if viewing team is team1 or team2
       const isViewingTeam1 = viewingTeamId === team1Id;
@@ -359,7 +364,7 @@ const Matchup = () => {
     };
     
     fetchCachedScores();
-  }, [currentMatchup?.id, dailyStatsByDate, currentMatchup?.team1_id, currentMatchup?.team2_id]);
+  }, [currentMatchup?.id, dailyStatsByDate, currentMatchup?.team1_id, currentMatchup?.team2_id, userTeam?.id]);
 
   const [myDailyPoints, setMyDailyPoints] = useState<number[]>([]);
   const [opponentDailyPoints, setOpponentDailyPoints] = useState<number[]>([]);
