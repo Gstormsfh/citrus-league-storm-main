@@ -69,17 +69,37 @@ const WaiverWire = () => {
         const claims = await WaiverService.getTeamWaiverClaims(activeLeagueId, team.id);
         setWaiverClaims(claims);
 
-        // Load roster for drop selection
-        const { data: roster } = await supabase
+        // Load roster for drop selection (team_lineups uses JSONB arrays)
+        const { data: lineup } = await supabase
           .from('team_lineups')
-          .select(`
-            player_id,
-            player_directory!inner(id, first_name, last_name, position, current_team_abbrev)
-          `)
+          .select('starters, bench, ir')
           .eq('team_id', team.id)
-          .eq('league_id', activeLeagueId);
+          .eq('league_id', activeLeagueId)
+          .maybeSingle();
         
-        setMyRoster(roster || []);
+        if (lineup) {
+          // Get all player IDs from JSONB arrays
+          const allPlayerIds: number[] = [
+            ...((lineup.starters as string[]) || []).map(id => parseInt(id)),
+            ...((lineup.bench as string[]) || []).map(id => parseInt(id)),
+            ...((lineup.ir as string[]) || []).map(id => parseInt(id))
+          ].filter(id => !isNaN(id));
+
+          if (allPlayerIds.length > 0) {
+            // Fetch player details from player_directory
+            const { data: playerDetails } = await supabase
+              .from('player_directory')
+              .select('player_id, full_name, position_code, team_abbrev')
+              .eq('season', 2025)
+              .in('player_id', allPlayerIds);
+            
+            setMyRoster(playerDetails || []);
+          } else {
+            setMyRoster([]);
+          }
+        } else {
+          setMyRoster([]);
+        }
       }
 
       // Load waiver priority

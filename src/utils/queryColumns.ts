@@ -85,6 +85,16 @@ export const TRADE_OFFER_COLUMNS = 'id, league_id, offering_team_id, receiving_t
 export const MATCHUP_LINES_COLUMNS = 'id, matchup_id, player_id, team_id, slot, is_starter, points, stats';
 
 // ============================================================================
+// PROFILE COLUMNS
+// ============================================================================
+export const PROFILE_COLUMNS = 'id, username, first_name, last_name, phone, location, bio, default_team_name, timezone, created_at, updated_at';
+
+// ============================================================================
+// DRAFT ORDER COLUMNS
+// ============================================================================
+export const DRAFT_ORDER_COLUMNS = 'id, league_id, team_id, round_number, pick_position, created_at';
+
+// ============================================================================
 // COUNT-ONLY QUERIES (use with { count: 'exact', head: true })
 // ============================================================================
 // For count queries, we still need a column selection even though data isn't returned
@@ -100,11 +110,13 @@ export const COLUMNS = {
   LEAGUE: LEAGUE_COLUMNS,
   TEAM: TEAM_COLUMNS,
   DRAFT_PICK: DRAFT_PICK_COLUMNS,
+  DRAFT_ORDER: DRAFT_ORDER_COLUMNS,
   NHL_GAME: NHL_GAME_COLUMNS,
   PLAYER_STATS: PLAYER_STATS_DISPLAY,
   WAIVER: WAIVER_CLAIM_COLUMNS,
   TRADE: TRADE_OFFER_COLUMNS,
   MATCHUP_LINES: MATCHUP_LINES_COLUMNS,
+  PROFILE: PROFILE_COLUMNS,
   
   // Slim versions
   MATCHUP_SLIM: MATCHUP_COLUMNS_SLIM,

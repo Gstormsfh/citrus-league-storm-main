@@ -36,9 +36,10 @@ async function loadPlayerNamesCache(): Promise<void> {
   }
   
   try {
+    // EGRESS OPTIMIZATION: Select only needed columns
     const { data, error } = await supabase
       .from('player_names')
-      .select('*');
+      .select('player_id, full_name, first_name, last_name, position, team, jersey_number, is_active, headshot_url');
     
     if (error) throw error;
     
