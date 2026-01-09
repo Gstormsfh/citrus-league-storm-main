@@ -75,6 +75,7 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 # Batch sizes for database operations
 UPSERT_BATCH_SIZE = 500
 FETCH_BATCH_SIZE = 1000
+DEFAULT_SEASON = 2025
 
 # Team ID to abbreviation mapping (NHL standard)
 TEAM_ABBREV_MAP = {
@@ -444,17 +445,33 @@ def bulk_upsert_projections(db: SupabaseRest, projections: List[Dict]) -> int:
         'projected_gaa', 'projected_save_pct', 'projected_gp', 'starter_confirmed', 'is_goalie'
     }
     
+    # Default values for columns with NOT NULL constraints (use 0 instead of None)
+    column_defaults = {
+        'projected_goals': 0.0,
+        'projected_assists': 0.0,
+        'projected_sog': 0.0,
+        'projected_blocks': 0.0,
+        'projected_xg': 0.0,
+        'projected_ppp': 0.0,
+        'projected_shp': 0.0,
+        'projected_hits': 0.0,
+        'projected_pim': 0.0,
+        'total_projected_points': 0.0,
+        'is_goalie': False,
+        'season': DEFAULT_SEASON
+    }
+    
     total_batches = (len(projections) + UPSERT_BATCH_SIZE - 1) // UPSERT_BATCH_SIZE
     
     for batch_num, i in enumerate(range(0, len(projections), UPSERT_BATCH_SIZE), 1):
         batch = projections[i:i + UPSERT_BATCH_SIZE]
         
         # CRITICAL: Ensure ALL records have ALL valid columns (Supabase requirement)
-        # Set missing columns to None so all dicts have identical keys
+        # Set missing columns to sensible defaults (NOT NULL columns get 0, others get None)
         filtered_batch = []
         for proj in batch:
-            # Start with all columns set to None
-            normalized = {col: None for col in valid_columns}
+            # Start with defaults for NOT NULL columns, None for others
+            normalized = {col: column_defaults.get(col, None) for col in valid_columns}
             # Overwrite with actual values from projection
             for k, v in proj.items():
                 if k in valid_columns:
