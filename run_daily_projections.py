@@ -42,7 +42,18 @@ from calculate_daily_projections import (
 load_dotenv()
 
 SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+# Support both old and new service role key variable names
+# The new variable may contain extra characters that need cleaning
+_raw_key = os.getenv("SUPABASE_Real_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+if _raw_key and '(' in _raw_key and ')' in _raw_key:
+    # Clean the key: extract JWT from "eyJ... (actualJWT)"
+    _start = _raw_key.index('(') + 1
+    _end = _raw_key.rindex(')')
+    SUPABASE_KEY = _raw_key[_start:_end]
+else:
+    SUPABASE_KEY = _raw_key
+
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise RuntimeError("Missing VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment.")
 
@@ -834,8 +845,8 @@ def main():
             last_progress_time = time.time()
             progress_interval = 5.0  # Show progress every 5 seconds (more frequent)
             
-            for idx, args in enumerate(worker_args, 1):
-                player_id, game_id, _, _, _ = args
+            for idx, worker_task in enumerate(worker_args, 1):
+                player_id, game_id, _, _, _ = worker_task
                 current_time = time.time()
                 
                 # Show progress every 5 seconds OR every 3 players OR first/last
@@ -847,7 +858,7 @@ def main():
                     print(f"   [{elapsed:.0f}s] {pct:5.1f}% | {idx}/{len(worker_args)} players | Rate: {rate:.1f}/s | ETA: {remaining:.0f}s", flush=True)
                     last_progress_time = current_time
                 
-                result = calculate_player_projection_worker(args)
+                result = calculate_player_projection_worker(worker_task)
                 results.append(result)
                 
                 # Add error handling per player to continue on failures

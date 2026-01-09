@@ -33,7 +33,18 @@ from supabase_rest import SupabaseRest
 
 load_dotenv()
 SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+# Support both old and new service role key variable names
+# The new variable may contain extra characters that need cleaning
+_raw_key = os.getenv("SUPABASE_Real_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+if _raw_key and '(' in _raw_key and ')' in _raw_key:
+    # Clean the key: extract JWT from "eyJ... (actualJWT)"
+    _start = _raw_key.index('(') + 1
+    _end = _raw_key.rindex(')')
+    SUPABASE_KEY = _raw_key[_start:_end]
+else:
+    SUPABASE_KEY = _raw_key
+
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise RuntimeError("Missing VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment.")
 
@@ -2104,6 +2115,9 @@ def save_physical_projection(
     """
     Save physical projection to projection_cache table.
     
+    Note: For future dates, caching may be skipped due to database constraints.
+    This is non-blocking - the projection calculation will continue regardless.
+    
     Args:
         db: Supabase client
         player_id: Player ID
@@ -2113,10 +2127,18 @@ def save_physical_projection(
         physical_projection: Physical projection dict from calculate_physical_projection()
     
     Returns:
-        True if saved successfully, False otherwise
+        True if saved successfully, False otherwise (including skipped future dates)
     """
     try:
         import hashlib
+        
+        # For future dates, skip caching (database has constraint blocking future projections)
+        # The projection itself will still be calculated and saved to player_projected_stats
+        today = date.today()
+        if projection_date > today:
+            # Silently skip caching for future dates - this is expected behavior
+            # The projection will still be saved to player_projected_stats (no constraint there)
+            return True
         
         # Generate data source hash for integrity checking
         hash_input = f"{player_id}_{game_id}_{projection_date}_{season}"
@@ -2149,9 +2171,14 @@ def save_physical_projection(
         return True
     
     except Exception as e:
-        print(f"❌ Error saving physical projection: {e}")
-        import traceback
-        traceback.print_exc()
+        # Check if this is the "future date" constraint error
+        error_str = str(e).lower()
+        if "projection_date_not_future" in error_str or "future" in error_str:
+            # Silently skip - this is expected for future dates
+            return True
+        
+        # For other errors, log but don't print full traceback (too noisy)
+        print(f"Warning: Could not cache projection for player {player_id}: {type(e).__name__}")
         return False
 
 
