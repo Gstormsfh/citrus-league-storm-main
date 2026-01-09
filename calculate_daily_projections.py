@@ -2003,7 +2003,7 @@ def calculate_goalie_physical_projection(
         filters=[("player_id", "eq", player_id), ("season", "eq", season)],
         limit=1
     )
-    goalie_sv_pct = float(goalie_stats[0].get("save_pct", 0.91)) if goalie_stats else 0.91
+    goalie_sv_pct = float(goalie_stats[0].get("save_pct") or 0.91) if goalie_stats else 0.91
     
     # Get goalie's GSAx factor (simplified - can use actual GSAx from goalie_gsax table)
     goalie_gsax = get_goalie_gsax(db, player_id, debug=False)
