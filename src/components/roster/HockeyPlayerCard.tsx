@@ -330,6 +330,13 @@ const HockeyPlayerCardContent = ({
       )}
       onClick={onClick}
     >
+      {/* Serial Number - Trinket Style Badge */}
+      <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 bg-citrus-cream/90 border border-citrus-forest/30 rounded-md z-10">
+        <span className="font-mono text-[7px] font-bold text-citrus-forest tracking-wider">
+          {player.position}
+        </span>
+      </div>
+      
       {/* Lock Overlay */}
       {isLocked && (
         <div 

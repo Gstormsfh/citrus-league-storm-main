@@ -21,77 +21,57 @@ export const MatchupTotalBar = ({
   const team2Leading = team2Score > team1Score;
 
   return (
-    <div className="w-full">
-      {/* PASTEL SCOREBOARD HEADER */}
-      <div className="relative bg-gradient-to-r from-citrus-cream via-citrus-peach/20 to-citrus-cream p-3 rounded-t-xl border-2 border-citrus-sage/30">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_2px_2px,_#AAD1A3_2px,_transparent_2px)] bg-[length:32px_32px] opacity-5 rounded-t-xl"></div>
+    <div className="w-full rounded-[2rem] overflow-hidden border-4 border-citrus-forest shadow-[0_6px_0_rgba(27,48,34,0.2)]">
+      {/* Scoreboard Header - Like patch on jacket */}
+      <div className="relative bg-citrus-cream corduroy-texture p-4 border-b-4 border-citrus-forest">
+        {/* Radial texture overlay */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_2px_2px,_rgba(0,0,0,0.02)_1px,_transparent_1px)] bg-[length:20px_20px]"></div>
+        
         <div className="flex justify-between items-center relative z-10">
-          {/* TEAM 1 */}
-          <div className="flex-1 flex flex-col items-start gap-1">
-            <div className={`font-varsity text-xs uppercase tracking-widest ${team1Leading ? 'text-citrus-sage' : 'text-citrus-charcoal/50'} transition-colors`}>
+          {/* Team 1 - Vintage Sage */}
+          <div className="flex-1 text-center p-3 bg-citrus-sage/20 rounded-xl border-3 border-citrus-sage">
+            <div className="font-varsity text-xs text-citrus-sage uppercase tracking-tighter">
               {team1Name}
             </div>
-            <div className={`font-varsity text-4xl font-black ${team1Leading ? 'text-citrus-sage drop-shadow-sm' : 'text-citrus-charcoal'} transition-all`}>
+            <div className="font-varsity text-5xl text-citrus-sage mt-1">
               {team1Score.toFixed(1)}
             </div>
           </div>
-
-          {/* CENTER DIVIDER */}
-          <div className="flex flex-col items-center gap-2 px-4">
-            <div className="w-1 h-16 bg-gradient-to-b from-citrus-sage/40 via-citrus-orange/40 to-citrus-peach/40 rounded-full"></div>
-            {isTied && (
-              <div className="absolute bg-citrus-peach/80 border-2 border-citrus-orange/50 px-3 py-1 rounded-varsity shadow-sm">
-                <span className="font-varsity text-[10px] font-black text-citrus-charcoal uppercase tracking-widest">
-                  TIED
-                </span>
-              </div>
-            )}
+          
+          {/* VS Divider */}
+          <div className="px-4">
+            <span className="font-script text-2xl text-citrus-orange">vs</span>
           </div>
-
-          {/* TEAM 2 */}
-          <div className="flex-1 flex flex-col items-end gap-1">
-            <div className={`font-varsity text-xs uppercase tracking-widest ${team2Leading ? 'text-citrus-orange' : 'text-citrus-charcoal/50'} transition-colors`}>
+          
+          {/* Team 2 - Muted Coral */}
+          <div className="flex-1 text-center p-3 bg-citrus-peach/20 rounded-xl border-3 border-citrus-peach">
+            <div className="font-varsity text-xs text-citrus-peach uppercase tracking-tighter">
               {team2Name}
             </div>
-            <div className={`font-varsity text-4xl font-black ${team2Leading ? 'text-citrus-orange drop-shadow-sm' : 'text-citrus-charcoal'} transition-all`}>
+            <div className="font-varsity text-5xl text-citrus-peach mt-1">
               {team2Score.toFixed(1)}
             </div>
           </div>
         </div>
       </div>
-
-      {/* PASTEL PROGRESS BAR */}
-      <div className="relative h-6 bg-citrus-cream border-x-2 border-b-2 border-citrus-sage/30 rounded-b-xl overflow-hidden">
-        {/* Soft center line */}
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,_transparent_48%,_#AAD1A3_48%,_#AAD1A3_52%,_transparent_52%)] opacity-5"></div>
-        
-        {/* Progress bars */}
-        <div className="absolute inset-0 flex">
-          <div 
-            className="h-full bg-gradient-to-r from-citrus-sage/60 to-citrus-sage/40 transition-all duration-700 border-r border-citrus-sage/30 relative" 
-            style={{ width: `${percent1}%` }}
-          >
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_2px_2px,_#FFFDF2_2px,_transparent_2px)] bg-[length:16px_16px] opacity-20"></div>
-          </div>
-          <div 
-            className="h-full bg-gradient-to-l from-citrus-peach/60 to-citrus-peach/40 flex-grow transition-all duration-700 relative" 
-            style={{ width: `${percent2}%` }}
-          >
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_2px_2px,_#FFFDF2_2px,_transparent_2px)] bg-[length:16px_16px] opacity-20"></div>
-          </div>
-        </div>
-
-        {/* Percentage labels */}
-        {showLabels && (
-          <div className="absolute inset-0 flex justify-between items-center px-3">
-            <span className="font-varsity text-[10px] font-black text-citrus-charcoal drop-shadow-sm">
-              {percent1.toFixed(0)}%
-            </span>
-            <span className="font-varsity text-[10px] font-black text-citrus-charcoal drop-shadow-sm">
-              {percent2.toFixed(0)}%
-            </span>
+      
+      {/* Progress Bar - Thick embroidered stripe */}
+      <div className="h-6 flex bg-citrus-cream relative">
+        {isTied && (
+          <div className="absolute inset-0 flex items-center justify-center z-10">
+            <div className="text-xs font-bold text-citrus-forest bg-citrus-cream/80 px-2 py-0.5 rounded-lg shadow-sm">
+              TIED
+            </div>
           </div>
         )}
+        <div 
+          className="bg-citrus-sage border-r-2 border-citrus-forest transition-all duration-700"
+          style={{ width: `${percent1}%` }}
+        />
+        <div 
+          className="bg-citrus-peach flex-grow transition-all duration-700"
+          style={{ width: `${percent2}%` }}
+        />
       </div>
     </div>
   );

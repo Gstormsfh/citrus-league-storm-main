@@ -30,61 +30,42 @@ export const PointsTooltip = ({
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <button className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-citrus-orange/10 hover:bg-citrus-orange/20 border-2 border-citrus-orange/30 hover:border-citrus-orange/50 transition-all cursor-help hover:scale-105">
-          <span className="font-varsity font-black text-citrus-orange">{totalPoints.toFixed(1)}</span>
-          <span className="text-[8px] font-display font-bold text-citrus-orange/80 uppercase">pts</span>
+        <button className="text-citrus-orange hover:text-citrus-forest cursor-help font-bold text-base font-varsity">
+          {totalPoints.toFixed(1)}
         </button>
       </TooltipTrigger>
       <TooltipContent 
-        className="p-0 bg-citrus-forest rounded-varsity shadow-varsity border-4 border-citrus-orange max-w-md"
+        className="p-0 bg-citrus-cream corduroy-texture rounded-[1.5rem] border-4 border-citrus-forest shadow-[0_6px_0_rgba(27,48,34,0.25)] max-w-md"
         side="top"
         align="center"
-        sideOffset={8}
+        sideOffset={10}
         style={{ zIndex: 9999 }}
       >
-        {/* 1970s SCOREBOARD HEADER */}
-        <div className="relative bg-gradient-to-r from-citrus-orange via-citrus-orange to-citrus-peach p-3 rounded-t-xl border-b-3 border-citrus-forest">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,_#1B3022_1px,_transparent_1px)] bg-[length:24px_24px] opacity-10 rounded-t-xl"></div>
-          <h4 className="font-varsity text-sm uppercase tracking-widest text-citrus-cream text-center relative z-10 drop-shadow-sm">
+        {/* Header patch */}
+        <div className="bg-citrus-orange px-4 py-3 rounded-t-[1.25rem] border-b-3 border-citrus-forest">
+          <h4 className="font-varsity text-sm text-citrus-cream uppercase tracking-tighter text-center">
             🏒 Scoring Breakdown
           </h4>
         </div>
 
-        {/* 2-COLUMN STAT GRID - HOCKEY SCOREBOARD */}
+        {/* Stats grid with stitched borders */}
         <div className="p-4 grid grid-cols-2 gap-3">
-          {/* Left Column */}
-          <div className="space-y-2">
-            {leftColumn.map((stat, idx) => (
-              <div key={idx} className="bg-citrus-cream/10 border-2 border-citrus-orange/30 rounded-lg p-2 hover:bg-citrus-orange/20 hover:border-citrus-orange/50 transition-all">
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-[8px] font-display font-bold text-citrus-peach uppercase tracking-wider">{stat.label}</span>
-                  <span className="text-[7px] font-display text-citrus-sage">×{stat.count}</span>
-                </div>
-                <div className="font-varsity text-sm font-black text-citrus-cream mt-0.5">+{stat.points.toFixed(2)}</div>
+          {breakdownArray.map((stat) => (
+            <div key={stat.label} className="p-2 bg-citrus-cream rounded-lg border-2 border-dashed border-citrus-sage/40">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="font-mono text-[9px] text-citrus-sage uppercase">{stat.label}</span>
+                <span className="text-[7px] font-display text-citrus-charcoal">×{stat.count}</span>
               </div>
-            ))}
-          </div>
-
-          {/* Right Column */}
-          <div className="space-y-2">
-            {rightColumn.map((stat, idx) => (
-              <div key={idx} className="bg-citrus-cream/10 border-2 border-citrus-orange/30 rounded-lg p-2 hover:bg-citrus-orange/20 hover:border-citrus-orange/50 transition-all">
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-[8px] font-display font-bold text-citrus-peach uppercase tracking-wider">{stat.label}</span>
-                  <span className="text-[7px] font-display text-citrus-sage">×{stat.count}</span>
-                </div>
-                <div className="font-varsity text-sm font-black text-citrus-cream mt-0.5">+{stat.points.toFixed(2)}</div>
-              </div>
-            ))}
-          </div>
+              <div className="font-varsity text-base text-citrus-forest">+{stat.points.toFixed(2)}</div>
+            </div>
+          ))}
         </div>
 
-        {/* TOTAL POINTS BANNER - 1970s CHAMPIONSHIP STYLE */}
-        <div className="relative bg-gradient-to-r from-citrus-sage via-[#7CB518] to-citrus-sage p-3 border-t-3 border-citrus-forest rounded-b-xl">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,_#1B3022_1px,_transparent_1px)] bg-[length:24px_24px] opacity-10 rounded-b-xl"></div>
-          <div className="flex justify-between items-center relative z-10">
-            <span className="font-varsity text-xs uppercase tracking-widest text-citrus-forest drop-shadow-sm">Total Points</span>
-            <span className="font-varsity text-2xl font-black text-citrus-forest drop-shadow-sm">{totalPoints.toFixed(1)}</span>
+        {/* Footer patch */}
+        <div className="bg-citrus-peach px-4 py-3 rounded-b-[1.25rem] border-t-3 border-citrus-forest">
+          <div className="flex justify-between items-center">
+            <span className="font-varsity text-xs text-citrus-forest uppercase">Total</span>
+            <span className="font-varsity text-2xl text-citrus-forest">{totalPoints.toFixed(1)}</span>
           </div>
         </div>
       </TooltipContent>

@@ -231,6 +231,13 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
       )}
       onClick={() => onPlayerClick?.(player)}
     >
+      {/* Serial Number - Trinket Style Badge */}
+      <div className="absolute top-2 left-2 px-2 py-0.5 bg-citrus-cream/90 border border-citrus-forest/30 rounded-md z-10">
+        <span className="font-mono text-[8px] font-bold text-citrus-forest tracking-wider">
+          {player.position}
+        </span>
+      </div>
+      
       {/* Background Position */}
       <div className="player-card-bg-text">{player.position}</div>
       

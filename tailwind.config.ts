@@ -63,14 +63,14 @@ export default {
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
 				},
-				// Vintage Varsity Citrus Theme - Nostalgic 90s Sports Aesthetic
+				// Digital Starter Jacket - Physical Vintage Artifact Colors
 				citrus: {
-					cream: '#FFFDF2',       // Warm cotton base
-					sage: '#AAD1A3',        // Pipi & Apple Green
-					peach: '#EFCCC6',       // Cream & Romantic Coral
-					orange: '#DF7536',      // Miami Varsity Orange
-					charcoal: '#333333',    // Warm soft dark (instead of black)
-					forest: '#1B3022',      // Deep green text anchor
+					cream: '#FFFDF2',       // Warm Cream (base) - Pure white FORBIDDEN
+					sage: '#789561',        // Vintage Apple/Sage (primary green)
+					peach: '#E6A99F',       // Muted Coral (secondary)
+					orange: '#DF7536',      // Miami Varsity Orange (accents)
+					charcoal: '#333333',    // Warm soft dark
+					forest: '#1B3022',      // Deep Forest Green (text anchor)
 				},
 				// Citrus fantasy sports theme colors - High-Contrast Citrus Palette
 				fantasy: {
