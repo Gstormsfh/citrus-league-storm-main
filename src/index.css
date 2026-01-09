@@ -772,7 +772,7 @@
     color: hsl(var(--vibrant-orange)); /* Soft Orange */
   }
   
-  /* Surfer Varsity Player Card - MAXIMUM GREEN ENERGY */
+  /* Surfer Varsity Player Card - SOFT PASTEL VIBES */
   .player-card {
     position: relative;
     width: auto;
@@ -781,55 +781,52 @@
     padding: 8px 10px;
     min-height: 52px;
     border-radius: 16px;
-    border: 3px solid #7CB518;
-    background: linear-gradient(135deg, #AAD1A3 0%, #AAD1A3 6px, #FFFDF2 6px, #FFFDF2 100%);
+    border: 2px solid #AAD1A3;
+    background: linear-gradient(135deg, #F5F9F0 0%, #F5F9F0 5px, #FFFDF2 5px, #FFFDF2 100%);
     overflow: hidden;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 4px 0 0 rgba(124, 181, 24, 0.2), inset 6px 0 0 0 #AAD1A3;
+    box-shadow: 0 2px 0 0 rgba(170, 209, 163, 0.2), inset 5px 0 0 0 rgba(170, 209, 163, 0.3);
     position: relative;
   }
   
-  /* Surfer stripe accent on left */
+  /* Soft stripe accent on left */
   .player-card::before {
     content: '';
     position: absolute;
     left: 0;
     top: 0;
     bottom: 0;
-    width: 4px;
-    background: linear-gradient(180deg, #AAD1A3 0%, #7CB518 50%, #AAD1A3 100%);
-    box-shadow: 0 0 8px rgba(170, 209, 163, 0.4);
+    width: 3px;
+    background: linear-gradient(180deg, rgba(170, 209, 163, 0.3) 0%, rgba(170, 209, 163, 0.5) 50%, rgba(170, 209, 163, 0.3) 100%);
   }
   
-  /* Beach wave pattern on top */
+  /* Soft wave pattern on top */
   .player-card::after {
     content: '';
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
-    height: 3px;
+    height: 2px;
     background: repeating-linear-gradient(
       90deg,
-      #AAD1A3 0px,
-      #AAD1A3 8px,
-      #EFCCC6 8px,
-      #EFCCC6 16px,
-      #DF7536 16px,
-      #DF7536 24px
+      rgba(170, 209, 163, 0.3) 0px,
+      rgba(170, 209, 163, 0.3) 8px,
+      rgba(239, 204, 198, 0.3) 8px,
+      rgba(239, 204, 198, 0.3) 16px,
+      rgba(223, 117, 54, 0.3) 16px,
+      rgba(223, 117, 54, 0.3) 24px
     );
-    opacity: 0.6;
   }
   
   .player-card:hover {
-    transform: translateY(-3px) scale(1.01);
-    box-shadow: 0 8px 0 0 rgba(124, 181, 24, 0.3), 0 4px 16px rgba(124, 181, 24, 0.4);
-    border-color: #7CB518;
-    background: linear-gradient(135deg, #AAD1A3 0%, #AAD1A3 6px, #FFFDF2 6px, #FFFDF2 100%);
+    transform: translateY(-2px) scale(1.005);
+    box-shadow: 0 4px 0 0 rgba(170, 209, 163, 0.3), 0 2px 12px rgba(170, 209, 163, 0.2);
+    border-color: #AAD1A3;
   }
   
   .player-card:hover::before {
-    box-shadow: 0 0 16px rgba(124, 181, 24, 0.8);
+    background: linear-gradient(180deg, rgba(170, 209, 163, 0.4) 0%, rgba(170, 209, 163, 0.6) 50%, rgba(170, 209, 163, 0.4) 100%);
   }
   
   /* Background Position Text - Surfer Varsity Style */
@@ -937,10 +934,10 @@
     font-family: 'Inter', sans-serif;
   }
   
-  /* Unique Stats Box - COLLEGIATE GREEN VARSITY BADGE */
+  /* Unique Stats Box - SOFT PASTEL BADGE */
   .player-unique-stats-box {
-    background: linear-gradient(135deg, #AAD1A3 0%, #7CB518 100%);
-    border: 3px solid #1B3022;
+    background: linear-gradient(135deg, #EFCCC6 0%, #F5E5D3 100%);
+    border: 2px solid #DF7536;
     border-radius: 12px;
     padding: 6px 8px;
     display: flex;
@@ -948,7 +945,7 @@
     gap: 2px;
     min-width: 75px;
     flex-shrink: 0;
-    box-shadow: 0 4px 0 0 rgba(27, 48, 34, 0.25), inset 0 2px 0 rgba(255, 255, 255, 0.3);
+    box-shadow: 0 2px 0 0 rgba(223, 117, 54, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.5);
     position: relative;
   }
   
@@ -958,8 +955,8 @@
     top: 0;
     left: 0;
     right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, #1B3022 0%, #AAD1A3 50%, #1B3022 100%);
+    height: 2px;
+    background: linear-gradient(90deg, #DF7536 0%, #EFCCC6 50%, #DF7536 100%);
     border-radius: 12px 12px 0 0;
   }
   
@@ -974,21 +971,20 @@
   }
   
   .unique-stat-label {
-    color: #FFFDF2;
-    font-weight: 900;
+    color: #DF7536;
+    font-weight: 700;
     font-size: 0.625rem; /* 10px */
     text-transform: uppercase;
     letter-spacing: 0.06em;
     font-family: 'Montserrat', sans-serif;
-    text-shadow: 0 1px 1px rgba(27, 48, 34, 0.3);
   }
   
   .unique-stat-value {
     color: #1B3022;
-    font-weight: 900;
-    font-size: 0.875rem; /* 14px - even more prominent */
+    font-weight: 800;
+    font-size: 0.875rem; /* 14px */
     font-family: 'Graduate', serif;
-    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+    text-shadow: 0 0.5px 0 rgba(255, 255, 255, 0.5);
   }
   
   /* Projection Bar - Smaller but More Obvious - Compact */
