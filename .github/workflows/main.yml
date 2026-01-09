@@ -22,6 +22,6 @@ jobs:
       
       - name: Run nightly projections
         env:
-          VITE_SUPABASE_URL: ${{ https://iezwazccqqrhrjupxzvf.supabase.co }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImllendhemNjcXFyaHJqdXB4enZmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1Njc2MzYwNiwiZXhwIjoyMDcyMzM5NjA2fQ.8gt9OvtXSHdzy30h20OnaUqzgiyvt-ErXw5PwOk_FVY }}
+          VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: python scripts/nightly_projection_batch.py --season 2025
