@@ -272,6 +272,9 @@ const Roster = () => {
   // Daily projections state (similar to Matchup tab)
   const [projectionsByDate, setProjectionsByDate] = useState<Map<string, Map<number, any>>>(new Map());
   
+  // Schedule data by date - tracks which teams have games on each date
+  const [scheduleByDate, setScheduleByDate] = useState<Map<string, Map<string, any>>>(new Map());
+  
   // Initial empty roster state
   const [roster, setRoster] = useState<RosterState>({
     starters: [],
@@ -1620,27 +1623,101 @@ const Roster = () => {
   }, [selectedDate, roster.starters.length, roster.bench.length, roster.ir.length, fetchProjectionsForDate]);
 
   // =============================================================================
-  // DISPLAY ROSTER - Applies projections at render time (same pattern as Matchup tab)
+  // SCHEDULE DATA FETCH - Load game schedule for selected date (not just today)
+  // This enables proper "has game" detection even when projections aren't available
+  // =============================================================================
+  const scheduleLoadingRef = useRef<boolean>(false);
+  
+  useEffect(() => {
+    const fetchScheduleForDate = async () => {
+      const targetDate = selectedDate || getTodayMST();
+      
+      // Check cache first
+      if (scheduleByDate.has(targetDate)) {
+        return;
+      }
+      
+      // Prevent concurrent fetches
+      if (scheduleLoadingRef.current) {
+        return;
+      }
+      
+      // Collect unique teams from roster
+      const allPlayers = [...roster.starters, ...roster.bench, ...roster.ir];
+      const uniqueTeams = Array.from(new Set(
+        allPlayers
+          .map(p => p.teamAbbreviation || p.team || '')
+          .filter(team => team !== '')
+      ));
+      
+      if (uniqueTeams.length === 0) {
+        return;
+      }
+      
+      scheduleLoadingRef.current = true;
+      console.log(`[Roster.fetchSchedule] Fetching schedule for ${targetDate} (${uniqueTeams.length} teams)`);
+      
+      try {
+        const gamesMap = await ScheduleService.getGamesForTeamsOnDate(uniqueTeams, targetDate);
+        
+        setScheduleByDate(prev => {
+          const newMap = new Map(prev);
+          newMap.set(targetDate, gamesMap);
+          return newMap;
+        });
+        
+        console.log(`[Roster.fetchSchedule] ✅ Fetched schedule for ${targetDate}: ${Array.from(gamesMap.values()).filter(g => g !== null).length} games`);
+      } catch (error) {
+        console.error(`[Roster.fetchSchedule] ❌ Error fetching schedule for ${targetDate}:`, error);
+      } finally {
+        scheduleLoadingRef.current = false;
+      }
+    };
+    
+    fetchScheduleForDate();
+  }, [selectedDate, roster.starters.length, roster.bench.length, roster.ir.length, scheduleByDate]);
+
+  // =============================================================================
+  // DISPLAY ROSTER - Applies projections AND schedule at render time
   // This is the SINGLE SOURCE OF TRUTH for projections in Roster tab
-  // Base 'roster' state holds structure, 'displayRoster' useMemo adds projections
+  // Base 'roster' state holds structure, 'displayRoster' useMemo adds projections + games
   // =============================================================================
   const displayRoster = useMemo(() => {
     const targetDate = selectedDate || getTodayMST();
     const dateProjections = projectionsByDate.get(targetDate);
+    const dateSchedule = scheduleByDate.get(targetDate);
+    const userTimezone = profile?.timezone || 'America/Denver';
     
     const enrichPlayer = (player: HockeyPlayer): HockeyPlayer => {
       const playerId = typeof player.id === 'string' ? parseInt(player.id) : player.id;
+      const teamAbbrev = player.teamAbbreviation || player.team || '';
       if (isNaN(playerId) || playerId <= 0) return player;
       
+      // Get schedule info for this player's team on the selected date
+      const game = dateSchedule?.get(teamAbbrev);
+      let enrichedPlayer = { ...player };
+      
+      // Always set nextGame based on schedule (not just projections)
+      if (game) {
+        const gameInfo = ScheduleService.getGameInfo(game, teamAbbrev, userTimezone);
+        if (gameInfo) {
+          enrichedPlayer.nextGame = {
+            opponent: gameInfo.opponent,
+            isToday: true, // "isToday" means "has game on selected date" for display purposes
+            gameTime: gameInfo.time
+          };
+        }
+      }
+      
       const projection = dateProjections?.get(playerId);
-      if (!projection) return player; // No projection = no game on this date
+      if (!projection) return enrichedPlayer; // No projection but might still have game (shows TBD)
       
       const isGoalie = player.position === 'G' || player.position === 'Goalie';
       const dailyProjectedPoints = Number(projection.total_projected_points || 0);
       
       if (isGoalie) {
         return {
-          ...player,
+          ...enrichedPlayer,
           projectedPoints: dailyProjectedPoints,
           goalieProjection: {
             total_projected_points: dailyProjectedPoints,
@@ -1659,7 +1736,7 @@ const Roster = () => {
       } else {
         // Skater (NOT goalie) - this includes McDavid, etc.
         return {
-          ...player,
+          ...enrichedPlayer,
           projectedPoints: dailyProjectedPoints,
           daily_projection: {
             total_projected_points: dailyProjectedPoints,
@@ -1692,7 +1769,7 @@ const Roster = () => {
       ir: roster.ir.map(enrichPlayer),
       slotAssignments: roster.slotAssignments
     };
-  }, [roster, projectionsByDate, selectedDate]);
+  }, [roster, projectionsByDate, scheduleByDate, selectedDate, profile?.timezone]);
 
   // Load CitrusPuck Analytics
   useEffect(() => {

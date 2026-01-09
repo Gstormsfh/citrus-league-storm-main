@@ -373,12 +373,19 @@ export const ScheduleService = {
    * Returns a map of team abbreviation -> boolean
    */
   async hasGamesTodayBatch(teamAbbrevs: string[]): Promise<Map<string, boolean>> {
+    return this.hasGamesOnDateBatch(teamAbbrevs, getTodayString());
+  },
+
+  /**
+   * Batch check if multiple teams have games on a specific date
+   * Returns a map of team abbreviation -> boolean
+   */
+  async hasGamesOnDateBatch(teamAbbrevs: string[], targetDate: string): Promise<Map<string, boolean>> {
     try {
       if (teamAbbrevs.length === 0) {
         return new Map();
       }
 
-      const todayStr = getTodayString();
       const orConditions = teamAbbrevs
         .map(team => `home_team.eq.${team},away_team.eq.${team}`)
         .join(',');
@@ -387,18 +394,18 @@ export const ScheduleService = {
         .from('nhl_games')
         .select('home_team, away_team')
         .or(orConditions)
-        .eq('game_date', todayStr)
+        .eq('game_date', targetDate)
         .in('status', ['scheduled', 'live', 'final']);
 
       if (error) {
         if (error.message?.includes('does not exist') || error.message?.includes('relation')) {
           return new Map(teamAbbrevs.map(team => [team, false]));
         }
-        console.error('Error checking games today batch:', error);
+        console.error('Error checking games on date batch:', error);
         return new Map(teamAbbrevs.map(team => [team, false]));
       }
 
-      // Build set of teams with games today
+      // Build set of teams with games on that date
       const teamsWithGames = new Set<string>();
       (games || []).forEach((game: { home_team: string; away_team: string }) => {
         if (teamAbbrevs.includes(game.home_team)) teamsWithGames.add(game.home_team);
@@ -408,8 +415,54 @@ export const ScheduleService = {
       // Return map
       return new Map(teamAbbrevs.map(team => [team, teamsWithGames.has(team)]));
     } catch (error) {
-      console.error('Error checking games today batch:', error);
+      console.error('Error checking games on date batch:', error);
       return new Map(teamAbbrevs.map(team => [team, false]));
+    }
+  },
+
+  /**
+   * Batch get games for multiple teams on a specific date
+   * Returns a map of team abbreviation -> game (or null)
+   */
+  async getGamesForTeamsOnDate(teamAbbrevs: string[], targetDate: string): Promise<Map<string, NHLGame | null>> {
+    try {
+      if (teamAbbrevs.length === 0) {
+        return new Map();
+      }
+
+      const orConditions = teamAbbrevs
+        .map(team => `home_team.eq.${team},away_team.eq.${team}`)
+        .join(',');
+
+      const { data: games, error } = await supabase
+        .from('nhl_games')
+        .select('*')
+        .or(orConditions)
+        .eq('game_date', targetDate)
+        .in('status', ['scheduled', 'live', 'final'])
+        .order('game_time', { ascending: true });
+
+      if (error) {
+        if (error.message?.includes('does not exist') || error.message?.includes('relation')) {
+          return new Map(teamAbbrevs.map(team => [team, null]));
+        }
+        console.error('Error fetching games for date batch:', error);
+        return new Map(teamAbbrevs.map(team => [team, null]));
+      }
+
+      // Find game for each team on this date
+      const gamesMap = new Map<string, NHLGame | null>();
+      teamAbbrevs.forEach(team => {
+        const game = (games || []).find(
+          (g: NHLGame) => g.home_team === team || g.away_team === team
+        ) || null;
+        gamesMap.set(team, game);
+      });
+
+      return gamesMap;
+    } catch (error) {
+      console.error('Error fetching games for date batch:', error);
+      return new Map(teamAbbrevs.map(team => [team, null]));
     }
   },
 

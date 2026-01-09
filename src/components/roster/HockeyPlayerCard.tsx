@@ -294,21 +294,26 @@ const HockeyPlayerCardContent = ({
   // 
   // The old system (player.projectedPoints = season_points / 20) has been ERADICATED
   // DO NOT fall back to player.projectedPoints - it will always be 0 or stale
-  //
-  // If dailyProjection doesn't exist, the player either:
-  // 1. Has no game on the selected date
-  // 2. Projections haven't been fetched yet
   const dailyProjection = isGoalie ? player.goalieProjection : player.daily_projection;
   
-  // CRITICAL FIX: Determine "has game" from projection presence, NOT nextGame.isToday
-  // nextGame.isToday is based on ACTUAL today, not the selectedDate
-  // If dailyProjection exists (with total_projected_points >= 0), the player has a game on that date
-  const hasGameOnSelectedDate = dailyProjection !== undefined && dailyProjection !== null;
+  // IMPROVED: Determine "has game" from BOTH nextGame AND projection presence
+  // nextGame is now populated by Roster.tsx for the selected date (via ScheduleService)
+  // This allows showing "TBD" when there's a game but projections aren't available yet
+  const hasGameFromSchedule = player.nextGame?.isToday === true;
+  const hasGameFromProjection = dailyProjection !== undefined && dailyProjection !== null;
+  const hasGameOnSelectedDate = hasGameFromSchedule || hasGameFromProjection;
   
   // ONLY use daily_projection - NO FALLBACK to old system
   const projectedPoints = dailyProjection?.total_projected_points || 0;
   const maxProjectedPoints = 8; 
   const projectionPercentage = Math.min((projectedPoints / maxProjectedPoints) * 100, 100);
+  
+  // TBD Logic (matches Matchup tab's PlayerCard.tsx)
+  // Show "TBD" when there's a game but no projection data available
+  // For goalies, show "Probable" if starter not confirmed
+  const hasProjection = dailyProjection && projectedPoints > 0;
+  const isStarterConfirmed = isGoalie ? (player.goalieProjection?.starter_confirmed ?? false) : true;
+  const showTBD = hasGameOnSelectedDate && (!hasProjection || (isGoalie && !isStarterConfirmed));
 
   // Disable drag if player is locked
   const canDrag = draggable && !isLocked;
@@ -476,20 +481,32 @@ const HockeyPlayerCardContent = ({
              <span className="text-[7px] text-muted-foreground uppercase font-medium">PROJ</span>
              <span className={cn(
                "text-[9px] font-bold",
-               hasGameOnSelectedDate ? "text-primary" : "text-muted-foreground"
+               hasGameOnSelectedDate 
+                 ? (showTBD ? "text-amber-600" : "text-primary")
+                 : "text-muted-foreground"
              )}>
-                 {projectedPoints.toFixed(1)}
+                 {hasProjection && isStarterConfirmed
+                   ? projectedPoints.toFixed(1)
+                   : showTBD 
+                     ? (isGoalie && !isStarterConfirmed ? 'Probable' : 'TBD')
+                     : '0.0'
+                 }
              </span>
           </div>
         </div>
         
         <div className="h-1 bg-muted/50 rounded-full overflow-hidden border border-border/10 w-full">
-          <div 
-            className={cn("h-full rounded-full transition-all duration-500", 
-              hasGameOnSelectedDate ? "bg-green-500" : "bg-transparent" 
-            )}
-            style={{ width: `${projectionPercentage}%` }}
-          />
+          {showTBD ? (
+            // Animated TBD bar (matches PlayerCard.tsx pattern)
+            <div className="h-full w-full bg-gradient-to-r from-amber-400/30 via-amber-500/50 to-amber-400/30 animate-pulse rounded-full" />
+          ) : (
+            <div 
+              className={cn("h-full rounded-full transition-all duration-500", 
+                hasGameOnSelectedDate ? "bg-green-500" : "bg-transparent" 
+              )}
+              style={{ width: `${projectionPercentage}%` }}
+            />
+          )}
         </div>
       </div>
     </Card>
