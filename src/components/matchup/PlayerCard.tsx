@@ -339,9 +339,9 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
           )}
         </div>
 
-        {/* Game Logos Bar - Show opponent logos for each game */}
+        {/* Game Logos Bar - PREMIUM SHOWCASE */}
         {player.games && Array.isArray(player.games) && player.games.length > 0 && player.team && (
-          <div className="mt-0.5 mb-0.5">
+          <div className="mt-2 mb-1.5 px-1 py-2 bg-gradient-to-r from-citrus-sage/5 via-citrus-peach/5 to-citrus-sage/5 rounded-lg border border-citrus-sage/20">
             <GameLogosBar 
               games={player.games} 
               playerTeam={player.team}

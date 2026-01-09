@@ -31,30 +31,30 @@ export const MatchupBadge = ({
   showLabel = false,
   className 
 }: MatchupBadgeProps) => {
-  // Determine color and label based on difficulty
+  // Determine color and label - CITRUS THEME COLORS!
   const getConfig = (diff: number) => {
     if (diff <= 0.95) {
       return { 
-        color: 'bg-emerald-500', 
-        textColor: 'text-emerald-500',
-        borderColor: 'border-emerald-500',
+        color: 'bg-citrus-sage', 
+        textColor: 'text-citrus-sage',
+        borderColor: 'border-citrus-sage',
         label: 'Easy', 
         description: 'Favorable matchup - weak defense'
       };
     }
     if (diff <= 1.05) {
       return { 
-        color: 'bg-amber-500', 
-        textColor: 'text-amber-500',
-        borderColor: 'border-amber-500',
+        color: 'bg-citrus-peach', 
+        textColor: 'text-citrus-orange',
+        borderColor: 'border-citrus-peach',
         label: 'Avg', 
         description: 'Average matchup'
       };
     }
     return { 
-      color: 'bg-rose-500', 
-      textColor: 'text-rose-500',
-      borderColor: 'border-rose-500',
+      color: 'bg-citrus-orange', 
+      textColor: 'text-citrus-orange',
+      borderColor: 'border-citrus-orange',
       label: 'Tough', 
       description: 'Tough matchup - strong defense'
     };
@@ -62,40 +62,46 @@ export const MatchupBadge = ({
 
   const config = getConfig(difficulty);
   
-  // Size variants
+  // PREMIUM SIZE VARIANTS - Surfer Varsity Style
   const sizeClasses = {
-    sm: 'text-[9px] px-1 py-0.5',
-    md: 'text-[10px] px-1.5 py-0.5',
-    lg: 'text-xs px-2 py-1'
+    sm: 'text-[10px] px-2 py-1',
+    md: 'text-[11px] px-2.5 py-1',
+    lg: 'text-xs px-3 py-1.5'
   };
 
   const dotSizes = {
-    sm: 'w-1.5 h-1.5',
-    md: 'w-2 h-2',
-    lg: 'w-2.5 h-2.5'
+    sm: 'w-2 h-2',
+    md: 'w-2.5 h-2.5',
+    lg: 'w-3 h-3'
   };
 
   const badge = (
     <div 
       className={cn(
-        "inline-flex items-center gap-1 rounded-full font-semibold",
+        "inline-flex items-center gap-1.5 rounded-varsity font-display font-bold transition-all duration-200 hover:scale-105",
         sizeClasses[size],
-        showLabel ? `${config.color} text-white` : `border ${config.borderColor} bg-transparent`,
+        showLabel 
+          ? `${config.color} text-citrus-cream border-2 border-citrus-forest/20 shadow-patch` 
+          : `border-2 ${config.borderColor} bg-citrus-cream/80 backdrop-blur-sm`,
         className
       )}
     >
-      {/* Difficulty indicator dot */}
+      {/* Premium Difficulty Dot with Glow */}
       <span className={cn(
-        "rounded-full",
+        "rounded-full relative flex items-center justify-center",
         dotSizes[size],
-        config.color
-      )} />
+        config.color,
+        "shadow-sm"
+      )}>
+        {/* Inner shine */}
+        <span className="absolute inset-0 rounded-full bg-gradient-to-br from-white/40 to-transparent"></span>
+      </span>
       
-      {/* Opponent abbreviation or label */}
+      {/* Opponent/Label Text */}
       {showLabel ? (
-        <span>{config.label}</span>
+        <span className="uppercase tracking-wide">{config.label}</span>
       ) : opponent ? (
-        <span className={config.textColor}>@{opponent}</span>
+        <span className={cn(config.textColor, "font-varsity font-black tracking-wide")}>@{opponent}</span>
       ) : null}
     </div>
   );
@@ -109,16 +115,16 @@ export const MatchupBadge = ({
         </TooltipTrigger>
         <TooltipContent 
           side="top" 
-          className="bg-slate-900 text-white p-2 rounded-lg shadow-lg border-0"
+          className="bg-citrus-forest text-citrus-cream p-3 rounded-varsity shadow-varsity border-2 border-citrus-sage"
         >
-          <div className="text-xs space-y-1">
-            <div className="font-semibold flex items-center gap-1.5">
-              <span className={cn("w-2 h-2 rounded-full", config.color)} />
-              {config.label} Matchup
-              {opponent && <span className="text-slate-400">vs {opponent}</span>}
+          <div className="text-xs space-y-1.5">
+            <div className="font-varsity flex items-center gap-2">
+              <span className={cn("w-2.5 h-2.5 rounded-full shadow-sm", config.color)} />
+              <span className="uppercase tracking-wide">{config.label} Matchup</span>
+              {opponent && <span className="text-citrus-sage font-display">vs {opponent}</span>}
             </div>
-            <div className="text-slate-300">{config.description}</div>
-            <div className="text-slate-400 text-[10px]">
+            <div className="text-citrus-cream/90 font-display">{config.description}</div>
+            <div className="text-citrus-sage text-[10px] font-display">
               Difficulty: {difficulty.toFixed(2)}
             </div>
           </div>

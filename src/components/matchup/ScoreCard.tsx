@@ -21,71 +21,126 @@ export const ScoreCard = ({
   const totalPoints = myPointsNum + oppPointsNum;
   const winProbability = totalPoints > 0 ? Math.round((myPointsNum / totalPoints) * 100) : 50;
   const isWinning = myPointsNum > oppPointsNum;
+  const isLosing = myPointsNum < oppPointsNum;
+  const isTied = Math.abs(myPointsNum - oppPointsNum) < 0.01;
   
   return (
-    <div className="mb-6 bg-card/60 backdrop-blur-sm border border-border/40 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-200">
-      {/* Main Score Display - Sleeper Style Compact */}
-      <div className="px-4 py-5 md:px-6 md:py-6">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4 md:gap-6">
-          {/* My Team Section - Left */}
-          <div className="flex-1 min-w-0 w-full md:w-auto order-1 md:order-1">
-            <div className="flex items-center gap-2.5">
-              <div className="flex-shrink-0 w-2.5 h-2.5 rounded-full bg-fantasy-secondary shadow-sm ring-1 ring-fantasy-secondary/20"></div>
+    <div className="mb-6 bg-gradient-to-br from-citrus-forest via-citrus-charcoal to-citrus-forest border-4 border-citrus-sage rounded-varsity shadow-varsity overflow-hidden hover:shadow-[0_8px_0_0_rgba(124,181,24,0.3),0_4px_16px_rgba(124,181,24,0.4)] transition-all duration-300">
+      {/* 1970s HOCKEY SCOREBOARD HEADER */}
+      <div className="relative px-4 py-4 md:px-6 md:py-5 bg-gradient-to-r from-citrus-forest via-citrus-charcoal to-citrus-forest border-b-3 border-citrus-sage/30">
+        {/* Vintage texture overlay */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_2px_2px,_#AAD1A3_2px,_transparent_2px)] bg-[length:32px_32px] opacity-5"></div>
+        
+        <div className="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
+          {/* MY TEAM - GREEN SIDE */}
+          <div className="flex-1 min-w-0 w-full md:w-auto order-1">
+            <div className="flex items-center gap-3">
+              {/* Varsity Badge */}
+              <div className="flex-shrink-0 w-10 h-10 rounded-varsity bg-gradient-to-br from-citrus-sage to-[#7CB518] border-2 border-citrus-forest shadow-patch flex items-center justify-center">
+                <span className="font-varsity text-lg font-black text-citrus-forest">H</span>
+              </div>
               <div className="min-w-0 flex-1">
-                <div className="text-sm md:text-base font-bold text-foreground truncate leading-tight">{myTeamName}</div>
-                <div className="text-[10px] md:text-xs text-muted-foreground mt-0.5 md:mt-1 font-medium">
-                  {myTeamRecord.wins}-{myTeamRecord.losses} W-L
+                <div className="font-varsity text-sm md:text-base font-black text-citrus-sage uppercase tracking-wide truncate">{myTeamName}</div>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="font-display text-[10px] md:text-xs text-citrus-cream/80 font-bold">
+                    {myTeamRecord.wins}-{myTeamRecord.losses}
+                  </span>
+                  <span className="text-citrus-cream/40">•</span>
+                  <span className="font-display text-[10px] md:text-xs text-citrus-sage/80 uppercase tracking-wider">Home</span>
                 </div>
               </div>
             </div>
           </div>
           
-          {/* Score Display - Center (Focal Point) */}
-          <div className="flex items-baseline gap-3 md:gap-5 px-4 md:px-8 flex-shrink-0 order-3 md:order-2 w-full md:w-auto justify-center">
-            <div className="text-center">
-              <div className="text-3xl md:text-4xl lg:text-5xl font-extrabold leading-none tracking-tight text-[hsl(var(--vibrant-green))]">
+          {/* SCOREBOARD - CENTER PIECE */}
+          <div className="flex items-center gap-4 md:gap-6 px-6 md:px-10 order-3 md:order-2 bg-citrus-charcoal/50 border-2 border-citrus-sage/30 rounded-varsity py-4 relative">
+            {/* Period indicator (always show "WEEK") */}
+            <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-citrus-orange border-2 border-citrus-forest px-3 py-0.5 rounded-lg shadow-patch">
+              <span className="font-varsity text-[9px] font-black text-citrus-cream uppercase tracking-widest">WEEK</span>
+            </div>
+            
+            {/* My Score */}
+            <div className="text-center relative">
+              <div className={`font-varsity text-4xl md:text-5xl lg:text-6xl font-black leading-none tracking-tight transition-all ${
+                isWinning ? 'text-citrus-sage drop-shadow-[0_0_12px_rgba(170,209,163,0.8)]' : 'text-citrus-cream'
+              }`}>
                 {myTeamPoints}
               </div>
-              <div className="text-[9px] md:text-[10px] text-muted-foreground/60 mt-0.5 md:mt-1 font-medium uppercase tracking-wider">Pts</div>
+              {isWinning && (
+                <div className="absolute -top-2 -right-2 w-4 h-4 bg-citrus-sage rounded-full border-2 border-citrus-forest animate-pulse"></div>
+              )}
             </div>
-            <div className="text-muted-foreground/25 text-lg md:text-xl font-light pb-1">—</div>
-            <div className="text-center">
-              <div className="text-3xl md:text-4xl lg:text-5xl font-extrabold leading-none tracking-tight text-foreground/80">
+            
+            {/* Center Divider */}
+            <div className="flex flex-col items-center gap-1">
+              <div className="w-0.5 h-12 bg-gradient-to-b from-citrus-sage via-citrus-orange to-citrus-peach rounded-full"></div>
+              {isTied && (
+                <span className="font-varsity text-[8px] font-black text-citrus-orange uppercase tracking-widest">TIE</span>
+              )}
+            </div>
+            
+            {/* Opponent Score */}
+            <div className="text-center relative">
+              <div className={`font-varsity text-4xl md:text-5xl lg:text-6xl font-black leading-none tracking-tight transition-all ${
+                isLosing ? 'text-citrus-orange drop-shadow-[0_0_12px_rgba(223,117,54,0.8)]' : 'text-citrus-cream'
+              }`}>
                 {opponentTeamPoints}
               </div>
-              <div className="text-[9px] md:text-[10px] text-muted-foreground/60 mt-0.5 md:mt-1 font-medium uppercase tracking-wider">Pts</div>
+              {isLosing && (
+                <div className="absolute -top-2 -right-2 w-4 h-4 bg-citrus-orange rounded-full border-2 border-citrus-forest animate-pulse"></div>
+              )}
             </div>
           </div>
           
-          {/* Opponent Team Section - Right */}
+          {/* OPPONENT TEAM - ORANGE SIDE */}
           <div className="flex-1 min-w-0 flex justify-end w-full md:w-auto order-2 md:order-3">
-            <div className="flex items-center gap-2.5 max-w-full w-full md:w-auto justify-end">
+            <div className="flex items-center gap-3 max-w-full">
               <div className="min-w-0 flex-1 md:flex-none text-right">
-                <div className="text-sm md:text-base font-bold text-foreground truncate leading-tight">{opponentTeamName}</div>
-                <div className="text-[10px] md:text-xs text-muted-foreground mt-0.5 md:mt-1 font-medium">
-                  {opponentTeamRecord.wins}-{opponentTeamRecord.losses} W-L
+                <div className="font-varsity text-sm md:text-base font-black text-citrus-orange uppercase tracking-wide truncate">{opponentTeamName}</div>
+                <div className="flex items-center justify-end gap-2 mt-1">
+                  <span className="font-display text-[10px] md:text-xs text-citrus-orange/80 uppercase tracking-wider">Away</span>
+                  <span className="text-citrus-cream/40">•</span>
+                  <span className="font-display text-[10px] md:text-xs text-citrus-cream/80 font-bold">
+                    {opponentTeamRecord.wins}-{opponentTeamRecord.losses}
+                  </span>
                 </div>
               </div>
-              <div className="flex-shrink-0 w-2.5 h-2.5 rounded-full bg-[hsl(var(--vibrant-orange))] shadow-sm ring-1 ring-[hsl(var(--vibrant-orange))]/20"></div>
+              {/* Varsity Badge */}
+              <div className="flex-shrink-0 w-10 h-10 rounded-varsity bg-gradient-to-br from-citrus-orange to-citrus-peach border-2 border-citrus-forest shadow-patch flex items-center justify-center">
+                <span className="font-varsity text-lg font-black text-citrus-forest">A</span>
+              </div>
             </div>
           </div>
         </div>
       </div>
       
-      {/* Subtle Win Probability Indicator - Centered at bottom */}
-      <div className="px-4 md:px-6 py-2.5 md:py-3 bg-muted/10 border-t border-border/20">
-        <div className="flex flex-col items-center gap-2">
-          <span className="text-[10px] md:text-xs text-muted-foreground font-semibold uppercase tracking-wider">Win Probability</span>
-          <div className="flex items-center gap-2.5 w-full max-w-[280px]">
-            <div className="flex-1 h-1.5 bg-muted/30 rounded-full overflow-hidden shadow-inner">
+      {/* 1970s WIN PROBABILITY BAR */}
+      <div className="relative px-4 md:px-6 py-3 md:py-4 bg-gradient-to-r from-citrus-forest/80 to-citrus-charcoal/80">
+        {/* Ice texture */}
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,_transparent_48%,_#AAD1A3_48%,_#AAD1A3_52%,_transparent_52%)] opacity-5"></div>
+        
+        <div className="flex flex-col gap-2 relative z-10">
+          <div className="flex items-center justify-between">
+            <span className="font-varsity text-[10px] font-black text-citrus-sage uppercase tracking-widest">Win Probability</span>
+            <span className="font-varsity text-sm font-black text-citrus-cream">{winProbability}%</span>
+          </div>
+          
+          {/* Hockey Rink Style Progress Bar */}
+          <div className="relative h-4 bg-citrus-cream/10 rounded-lg overflow-hidden border-2 border-citrus-sage/20">
+            <div className="absolute inset-0 flex">
               <div 
-                className="h-full bg-gradient-to-r from-fantasy-secondary via-fantasy-primary to-fantasy-tertiary rounded-full transition-all duration-500 ease-out shadow-sm"
+                className="h-full bg-gradient-to-r from-citrus-sage to-[#7CB518] transition-all duration-700 relative"
                 style={{ width: `${winProbability}%` }}
-              />
+              >
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_2px_2px,_#FFFDF2_2px,_transparent_2px)] bg-[length:12px_12px] opacity-20"></div>
+              </div>
+              <div 
+                className="h-full bg-gradient-to-l from-citrus-orange to-citrus-peach flex-grow transition-all duration-700 relative"
+                style={{ width: `${100 - winProbability}%` }}
+              >
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_2px_2px,_#FFFDF2_2px,_transparent_2px)] bg-[length:12px_12px] opacity-20"></div>
+              </div>
             </div>
-            <span className="text-[10px] md:text-xs font-bold text-foreground min-w-[38px] text-right">
-              {winProbability}%
-            </span>
           </div>
         </div>
       </div>

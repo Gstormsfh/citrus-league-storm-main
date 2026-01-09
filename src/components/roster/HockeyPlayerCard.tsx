@@ -343,23 +343,23 @@ const HockeyPlayerCardContent = ({
         </div>
       )}
 
-      {/* Compact Header Section */}
-      <div className="relative p-1.5 bg-muted/30 border-b border-border/30 flex items-center gap-1.5 min-h-[35px]">
+      {/* Surfer Varsity Header - MAXIMUM GREEN VIBES */}
+      <div className="relative p-2.5 bg-gradient-to-r from-citrus-sage/25 via-citrus-sage/15 to-citrus-sage/25 border-b-3 border-citrus-sage/50 flex items-center gap-2 min-h-[44px] before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-1.5 before:bg-gradient-to-r before:from-citrus-sage before:via-[#7CB518] before:to-citrus-sage before:opacity-60">
         {getStatusBadge()}
         
-        {/* Lock Icon Badge */}
+        {/* Lock Icon Badge - Varsity Style */}
         {isLocked && (
           <Badge 
             variant="secondary"
-            className="absolute top-0.5 left-0.5 text-[7px] font-bold h-4 px-1 z-10 gap-0.5 flex items-center bg-yellow-500/20 text-yellow-700 border-yellow-500/30"
+            className="absolute top-1 left-1 text-[7px] font-bold h-5 px-1.5 z-10 gap-0.5 flex items-center bg-citrus-orange/30 text-citrus-forest border-2 border-citrus-orange rounded-lg shadow-sm"
             title="Player's game has started - cannot be moved"
           >
-            <Lock className="w-2.5 h-2.5" />
+            <Lock className="w-3 h-3" />
           </Badge>
         )}
 
-        {/* Team Logo */}
-        <div className="w-6 h-6 flex-shrink-0 flex items-center justify-center bg-white rounded-full shadow-sm p-0.5">
+        {/* Team Logo - GREEN VARSITY BADGE */}
+        <div className="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-gradient-to-br from-citrus-sage/20 to-citrus-sage/10 rounded-xl shadow-varsity p-1 border-3 border-citrus-sage relative before:content-[''] before:absolute before:inset-0 before:rounded-xl before:bg-gradient-to-br before:from-transparent before:to-citrus-sage/20 hover:border-[#7CB518] hover:shadow-[0_0_12px_rgba(124,181,24,0.5)] transition-all">
            {!imageError ? (
              <img 
                src={teamLogoUrl} 
@@ -368,14 +368,14 @@ const HockeyPlayerCardContent = ({
                onError={() => setImageError(true)}
              />
            ) : (
-             <Shield className="w-4 h-4 text-muted-foreground/50" />
+             <Shield className="w-5 h-5 text-citrus-sage" />
            )}
         </div>
 
-        {/* Player Name and Team */}
+        {/* Player Name and Team - Varsity Typography */}
         <div className="flex-1 min-w-0 pr-5">
           <h3 
-            className="font-semibold text-[10px] leading-3 line-clamp-2 cursor-pointer hover:underline decoration-primary/50"
+            className="font-display font-bold text-[11px] leading-tight line-clamp-2 cursor-pointer hover:text-citrus-orange transition-colors text-citrus-forest"
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
@@ -384,39 +384,38 @@ const HockeyPlayerCardContent = ({
           >
             {player.name}
           </h3>
-          <div className="flex items-center text-[8px] text-muted-foreground mt-0.5 gap-1">
-            <span className="font-medium">{teamAbbr}</span>
+          <div className="flex items-center text-[9px] text-citrus-sage font-display font-bold mt-1 gap-1 uppercase tracking-wide">
+            <span>{teamAbbr}</span>
             <span>•</span>
             <span>#{player.number}</span>
             {(player.status === 'IR' || player.status === 'SUSP') && (
-              <Plus className="w-3 h-3 text-red-500 ml-0.5 flex-shrink-0 stroke-[3]" />
+              <Plus className="w-3 h-3 text-destructive ml-0.5 flex-shrink-0 stroke-[3]" />
             )}
           </div>
         </div>
 
-        {/* Position Badge - absolute top right */}
+        {/* Position Badge - GREEN VARSITY PATCH absolute top right */}
         <Badge 
-          variant="outline"
-          className="absolute top-0.5 right-0.5 text-[8px] font-bold h-3 px-1 border-border/50 bg-background/50"
+          className="absolute top-0.5 right-0.5 bg-gradient-to-br from-citrus-sage to-[#7CB518] border-2 border-citrus-forest text-citrus-forest font-varsity shadow-patch text-[9px] tracking-wider font-black h-5 px-2"
         >
           {positionAbbr}
         </Badge>
       </div>
 
-      {/* Compact Stats Grid - Shows projection stats when available, season stats otherwise */}
-      <div className="p-1 bg-card flex-1 flex items-center justify-center">
+      {/* Surfer Stats Grid - MAXIMUM GREEN ENERGY */}
+      <div className="p-2.5 bg-gradient-to-br from-citrus-sage/10 via-citrus-sage/5 to-citrus-sage/10 flex-1 flex items-center justify-center border-t-3 border-citrus-sage/40 relative before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-1 before:bg-gradient-to-r before:from-citrus-sage/50 before:via-[#7CB518] before:to-citrus-sage/50">
         {isGoalie ? (
-          // GOALIE: Show projection stats (W, SV, SO) when available with tooltip for details
+          // GOALIE: Show projection stats with surfer badge styling
           hasGameOnSelectedDate && player.goalieProjection ? (
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="grid grid-cols-3 gap-0.5 text-center w-full cursor-help">
-                  <div>
-                    <div className="text-[7px] text-green-600 uppercase leading-none mb-0.5">W</div>
-                    <div className="font-bold text-[9px] text-green-700">{player.goalieProjection.projected_wins?.toFixed(2) || '0.00'}</div>
+                <div className="grid grid-cols-3 gap-1.5 text-center w-full cursor-help">
+                  <div className="bg-gradient-to-br from-citrus-sage/30 to-[#7CB518]/20 rounded-xl p-1.5 border-2 border-citrus-sage/50 shadow-sm hover:shadow-patch hover:border-citrus-sage transition-all">
+                    <div className="text-[8px] text-citrus-forest font-display font-bold uppercase leading-none mb-1 tracking-wider">W</div>
+                    <div className="font-varsity text-[11px] text-citrus-forest">{player.goalieProjection.projected_wins?.toFixed(2) || '0.00'}</div>
                   </div>
-                  <div>
-                    <div className="text-[7px] text-green-600 uppercase leading-none mb-0.5">SV</div>
+                  <div className="bg-gradient-to-br from-citrus-sage/30 to-[#7CB518]/20 rounded-xl p-1.5 border-2 border-citrus-sage/50 shadow-sm hover:shadow-patch hover:border-citrus-sage transition-all">
+                    <div className="text-[8px] text-citrus-forest font-display font-bold uppercase leading-none mb-1 tracking-wider">SV</div>
                     <div className="font-bold text-[9px] text-green-700">{player.goalieProjection.projected_saves?.toFixed(0) || '0'}</div>
                   </div>
                   <div>

@@ -106,21 +106,23 @@ const Navbar = () => {
       className={cn(
         "fixed top-0 left-0 right-0 w-full z-50 transition-all duration-500", 
         isScrolled ? 
-          "py-3 bg-background/80 backdrop-blur-lg shadow-sm border-b border-border/20" : 
-          "py-5 bg-transparent"
+          "py-3 bg-citrus-cream/95 backdrop-blur-lg shadow-varsity border-b-4 border-citrus-sage/30" : 
+          "py-5 bg-citrus-cream/90 backdrop-blur-sm border-b-2 border-citrus-sage/20"
       )}
     >
       <div className="container mx-auto px-4 max-w-full">
         {/* Main Navigation Row */}
         <div className="flex items-center justify-between">
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 group">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-sm group-hover:shadow-md transition-all duration-300">
-              <span className="text-white font-bold text-base">CS</span>
+          {/* Logo with Vintage Varsity Style */}
+          <Link to="/" className="flex items-center gap-3 group">
+            <div className="w-11 h-11 rounded-varsity bg-gradient-to-br from-citrus-sage to-citrus-orange border-3 border-citrus-forest/20 flex items-center justify-center shadow-patch group-hover:shadow-varsity group-hover:-translate-y-0.5 transition-all duration-300">
+              <span className="text-citrus-cream font-varsity text-base font-black">CS</span>
             </div>
             <div className="flex flex-col">
-              <span className="font-display font-bold text-lg group-hover:text-primary transition-colors duration-300">CitrusSports</span>
-              <span className="text-xs text-muted-foreground">Fantasy League</span>
+              <span className="font-varsity font-black text-lg uppercase text-citrus-forest group-hover:text-citrus-orange transition-colors duration-300 tracking-tight">
+                Citrus
+              </span>
+              <span className="text-[10px] text-citrus-charcoal font-display tracking-widest uppercase">Fantasy League</span>
             </div>
           </Link>
 
@@ -231,7 +233,7 @@ const Navbar = () => {
               <>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="ghost" size="icon" className="text-foreground hover:text-primary hover:bg-primary/5 h-9 w-9 rounded-md">
+                    <Button variant="ghost" size="icon" className="text-citrus-forest hover:text-citrus-orange hover:bg-citrus-sage/10 h-9 w-9 rounded-lg border-2 border-transparent hover:border-citrus-sage/30 transition-all">
                       <Search className="h-4 w-4" />
                     </Button>
                   </PopoverTrigger>
@@ -257,7 +259,7 @@ const Navbar = () => {
                     <Button 
                       variant="ghost" 
                       size="icon" 
-                      className="text-foreground hover:text-primary hover:bg-primary/5 relative h-9 w-9 rounded-md"
+                      className="text-citrus-forest hover:text-citrus-orange hover:bg-citrus-sage/10 relative h-9 w-9 rounded-lg border-2 border-transparent hover:border-citrus-sage/30 transition-all"
                       onClick={() => {
                         // Navigate to matchup page with notifications panel visible
                         if (activeLeagueId) {
@@ -267,7 +269,7 @@ const Navbar = () => {
                     >
                       <Bell className="h-4 w-4" />
                       {unreadCount > 0 && (
-                        <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-medium text-white">
+                        <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-citrus-orange border-2 border-citrus-cream text-[9px] font-varsity font-bold text-citrus-cream shadow-patch">
                           {unreadCount > 9 ? '9+' : unreadCount}
                         </span>
                       )}
@@ -360,9 +362,11 @@ const Navbar = () => {
                 
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="bg-background rounded-md border-border/30 flex gap-2 pl-2 pr-3 h-9 hover:shadow-sm">
-                      <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-medium">{userInitial}</div>
-                      <span className="text-xs font-medium">{displayName}</span>
+                    <Button className="bg-citrus-sage border-3 border-citrus-forest/20 rounded-xl flex gap-2 pl-2 pr-4 h-10 hover:shadow-patch hover:-translate-y-0.5 transition-all">
+                      <div className="h-6 w-6 rounded-full bg-citrus-orange border-2 border-citrus-charcoal/20 flex items-center justify-center text-citrus-cream text-xs font-varsity font-bold shadow-sm">
+                        {userInitial}
+                      </div>
+                      <span className="text-xs font-display font-bold text-citrus-forest">{displayName}</span>
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent align="end" className="w-48 p-1.5">
@@ -387,7 +391,7 @@ const Navbar = () => {
                 </Popover>
               </>
             ) : (
-              <Button variant="default" asChild>
+              <Button variant="varsity" size="sm" asChild>
                 <Link to="/auth">Sign In</Link>
               </Button>
             )}

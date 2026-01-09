@@ -63,6 +63,15 @@ export default {
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
 				},
+				// Vintage Varsity Citrus Theme - Nostalgic 90s Sports Aesthetic
+				citrus: {
+					cream: '#FFFDF2',       // Warm cotton base
+					sage: '#AAD1A3',        // Pipi & Apple Green
+					peach: '#EFCCC6',       // Cream & Romantic Coral
+					orange: '#DF7536',      // Miami Varsity Orange
+					charcoal: '#333333',    // Warm soft dark (instead of black)
+					forest: '#1B3022',      // Deep green text anchor
+				},
 				// Citrus fantasy sports theme colors - High-Contrast Citrus Palette
 				fantasy: {
 					primary: '#F9E076',     // Bright Lemon Peel (Center)
@@ -84,7 +93,12 @@ export default {
 			borderRadius: {
 				lg: 'var(--radius)',
 				md: 'calc(var(--radius) - 2px)',
-				sm: 'calc(var(--radius) - 4px)'
+				sm: 'calc(var(--radius) - 4px)',
+				'varsity': '2rem',        // Aggressively rounded for that "patch" look
+			},
+			boxShadow: {
+				'patch': '0 4px 0 0 rgba(27, 48, 34, 0.1)',  // Soft, tactile lift
+				'varsity': '0 6px 0 0 rgba(27, 48, 34, 0.15), 0 2px 8px rgba(0, 0, 0, 0.1)',  // Enhanced depth
 			},
 			keyframes: {
 				'accordion-down': {
@@ -135,8 +149,10 @@ export default {
         "bounce-subtle": "bounce-subtle 2s ease-in-out infinite"
 			},
 			fontFamily: {
-				sans: ['Poppins', 'sans-serif'],
-				display: ['Montserrat', 'sans-serif']
+				sans: ['Inter', 'Montserrat', 'sans-serif'],         // Clean body text
+				display: ['Montserrat', 'sans-serif'],               // Secondary headers
+				varsity: ['Graduate', 'Alfa Slab One', 'serif'],     // Bold varsity lettering
+				script: ['Pacifico', 'Bangers', 'cursive'],          // Surfer script accent
 			}
 		}
 	},

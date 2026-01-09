@@ -447,12 +447,20 @@ def bulk_upsert_projections(db: SupabaseRest, projections: List[Dict]) -> int:
     for i in range(0, len(projections), UPSERT_BATCH_SIZE):
         batch = projections[i:i + UPSERT_BATCH_SIZE]
         
-        # Filter to valid columns only
+        # CRITICAL: Ensure ALL records have ALL valid columns (Supabase requirement)
+        # Set missing columns to None so all dicts have identical keys
         filtered_batch = []
         for proj in batch:
-            filtered = {k: v for k, v in proj.items() if k in valid_columns}
-            if filtered.get("player_id") and filtered.get("game_id"):
-                filtered_batch.append(filtered)
+            # Start with all columns set to None
+            normalized = {col: None for col in valid_columns}
+            # Overwrite with actual values from projection
+            for k, v in proj.items():
+                if k in valid_columns:
+                    normalized[k] = v
+            
+            # Only include if has required keys
+            if normalized.get("player_id") and normalized.get("game_id"):
+                filtered_batch.append(normalized)
         
         if not filtered_batch:
             continue
@@ -551,18 +559,40 @@ def bulk_upsert_ros(db: SupabaseRest, ros_projections: List[Dict]) -> int:
     if not ros_projections:
         return 0
     
+    # Define all valid ROS columns
+    valid_ros_columns = {
+        'player_id', 'season', 'games_remaining', 'player_name', 'team_abbrev',
+        'position', 'is_goalie', 'total_projected_points', 'projected_goals',
+        'projected_assists', 'projected_sog', 'projected_blocks', 'projected_ppp',
+        'projected_shp', 'projected_hits', 'projected_pim', 'avg_points_per_game',
+        'avg_goals_per_game', 'avg_assists_per_game',
+        # Goalie-specific
+        'projected_wins_ros', 'projected_saves_ros', 'projected_shutouts_ros'
+    }
+    
     total = 0
     
     for i in range(0, len(ros_projections), UPSERT_BATCH_SIZE):
         batch = ros_projections[i:i + UPSERT_BATCH_SIZE]
         
+        # CRITICAL: Normalize all records to have identical keys
+        normalized_batch = []
+        for ros in batch:
+            # Start with all columns set to None
+            normalized = {col: None for col in valid_ros_columns}
+            # Overwrite with actual values
+            for k, v in ros.items():
+                if k in valid_ros_columns:
+                    normalized[k] = v
+            normalized_batch.append(normalized)
+        
         try:
             db.upsert(
                 "player_ros_projections",
-                batch,
+                normalized_batch,
                 on_conflict="player_id"
             )
-            total += len(batch)
+            total += len(normalized_batch)
         except Exception as e:
             print(f"  Warning: Error upserting ROS batch: {e}")
     
