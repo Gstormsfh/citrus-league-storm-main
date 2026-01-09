@@ -18,6 +18,7 @@ import sys
 import time
 import requests
 from datetime import date, timedelta, datetime
+from src.utils.citrus_request import citrus_request
 from typing import Dict, List, Optional
 from collections import defaultdict
 
@@ -122,7 +123,7 @@ def fetch_nhl_roster_status(db: SupabaseRest, season: int) -> int:
             response = None
             for attempt in range(max_retries):
                 try:
-                    response = requests.get(api_url, timeout=10)
+                    response = citrus_request(api_url, timeout=10)
                     if response.status_code == 200:
                         break
                     elif response.status_code == 404:

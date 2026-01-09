@@ -32,6 +32,7 @@ from datetime import datetime, date, timedelta
 from typing import Dict, Optional, List, Any
 from dotenv import load_dotenv
 from supabase_rest import SupabaseRest
+from src.utils.citrus_request import citrus_request
 
 load_dotenv()
 SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
@@ -111,7 +112,7 @@ def fetch_game_boxscore(game_id: int, db: Optional[SupabaseRest] = None, force_a
     if force_api:
         url = f"{NHL_API_BASE}/gamecenter/{game_id}/boxscore"
         try:
-            response = requests.get(url, timeout=10)
+            response = citrus_request(url, timeout=10)
             response.raise_for_status()
             return response.json()
         except Exception as e:

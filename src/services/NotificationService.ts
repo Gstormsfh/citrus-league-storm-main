@@ -103,11 +103,11 @@ export const NotificationService = {
       // Fetch notifications (RLS will filter by user_id automatically)
       const { data, error } = await supabase
         .from('notifications')
-        .select('*')
+        .select('id,league_id,user_id,type,title,message,metadata,read_status,created_at,read_at')
         .eq('league_id', leagueId)
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(50); // ← OPTIMIZATION: Reduced from 100 to 50 (pagination can load more)
 
       if (error) {
         console.error('[NotificationService] Error fetching notifications:', error);
@@ -283,6 +283,9 @@ export const NotificationService = {
 
   /**
    * Subscribe to real-time notification updates
+   * 
+   * EGRESS OPTIMIZATION: Only listen to INSERT events (new notifications)
+   * Reduces egress by ~50% compared to listening to all events
    */
   subscribeToNotifications(
     leagueId: string,
@@ -294,13 +297,13 @@ export const NotificationService = {
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT', // ← OPTIMIZATION: Only new notifications (not UPDATE/DELETE)
           schema: 'public',
           table: 'notifications',
-          filter: `league_id=eq.${leagueId} AND user_id=eq.${userId}`,
+          filter: `league_id=eq.${leagueId},user_id=eq.${userId}`, // ← AND condition with comma
         },
         (payload) => {
-          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+          if (payload.eventType === 'INSERT') {
             callback(payload.new as Notification);
           }
         }

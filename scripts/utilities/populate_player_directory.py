@@ -18,6 +18,7 @@ from typing import Dict, Optional, Set
 import requests
 
 from dotenv import load_dotenv
+from src.utils.citrus_request import citrus_request
 
 print("[populate_player_directory] Loading environment variables...")
 load_dotenv()
@@ -58,7 +59,7 @@ def fetch_team_roster(team_abbrev: str) -> list:
   """Fetch team roster from NHL API."""
   try:
     url = f"{NHL_API_BASE}/roster/{team_abbrev}/current"
-    response = requests.get(url, timeout=10)
+    response = citrus_request(url, timeout=10)
     if response.status_code == 200:
       data = response.json()
       return data.get("forwards", []) + data.get("defensemen", []) + data.get("goalies", [])
@@ -72,7 +73,7 @@ def fetch_player_details(player_id: int) -> Optional[dict]:
   """Fetch player details from NHL API."""
   try:
     url = f"{NHL_API_BASE}/player/{player_id}/landing"
-    response = requests.get(url, timeout=10)
+    response = citrus_request(url, timeout=10)
     if response.status_code == 200:
       return response.json()
     return None

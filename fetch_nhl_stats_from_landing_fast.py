@@ -33,6 +33,7 @@ from typing import Optional, Dict, Tuple, Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dotenv import load_dotenv
 from supabase_rest import SupabaseRest
+from src.utils.citrus_request import citrus_request
 
 load_dotenv()
 SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
@@ -140,7 +141,7 @@ def fetch_player_landing_data(player_id: int, retries: int = 5) -> Tuple[Optiona
     
     for attempt in range(retries):
         try:
-            response = requests.get(url, timeout=10)
+            response = citrus_request(url, timeout=10)
             
             # Success case
             if response.status_code == 200:
@@ -202,7 +203,7 @@ def fetch_player_statsapi_data(player_id: int, season: str, retries: int = 5) ->
                 "stats": "statsSingleSeason",
                 "season": season
             }
-            response = requests.get(url, params=params, timeout=15)
+            response = citrus_request(url, params=params, timeout=15)
             response.raise_for_status()
             data = response.json()
             

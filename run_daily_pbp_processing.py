@@ -19,6 +19,7 @@ import datetime as dt
 from typing import Dict, List, Optional
 from dotenv import load_dotenv
 from supabase_rest import SupabaseRest
+from src.utils.citrus_request import citrus_request
 
 load_dotenv()
 
@@ -157,8 +158,7 @@ def process_recently_finished_games(max_age_hours: int = 2) -> Dict[str, int]:
         # check PBP API directly to see current state
         if game_date_str == today.isoformat() and game_id:
             try:
-                import requests
-                pbp_response = requests.get(
+                pbp_response = citrus_request(
                     f"https://api-web.nhle.com/v1/gamecenter/{game_id}/play-by-play",
                     timeout=5
                 )

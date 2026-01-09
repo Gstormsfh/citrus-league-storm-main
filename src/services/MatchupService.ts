@@ -846,8 +846,9 @@ export const MatchupService = {
       let league: any = null;
       let leagueError: any = null;
       try {
+        // EGRESS OPTIMIZATION: Select only needed league fields
         const result = await withTimeout(
-          supabase.from('leagues').select('*').eq('id', leagueId).maybeSingle(),
+          supabase.from('leagues').select('id,name,season,draft_status,schedule_length,playoff_teams,playoff_start_week').eq('id', leagueId).maybeSingle(),
           5000,
           'getLeague timeout in getMatchupData'
         );
@@ -874,8 +875,9 @@ export const MatchupService = {
       let userTeam: any = null;
       let teamError: any = null;
       try {
+        // EGRESS OPTIMIZATION: Select only needed team fields
         const result = await withTimeout(
-          supabase.from('teams').select('*').eq('league_id', leagueId).eq('owner_id', userId).maybeSingle(),
+          supabase.from('teams').select('id,name,owner_id,league_id,wins,losses,ties').eq('league_id', leagueId).eq('owner_id', userId).maybeSingle(),
           5000,
           'getUserTeam timeout in getMatchupData'
         );

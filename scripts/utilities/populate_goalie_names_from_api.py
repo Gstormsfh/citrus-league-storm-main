@@ -10,6 +10,7 @@ import os
 from dotenv import load_dotenv
 from supabase import create_client
 import pandas as pd
+from src.utils.citrus_request import citrus_request
 
 load_dotenv()
 
@@ -24,7 +25,7 @@ def fetch_goalie_name_from_api(goalie_id):
     """Fetch goalie name from NHL API."""
     try:
         url = f"{NHL_API_BASE}/player/{goalie_id}/landing"
-        response = requests.get(url, timeout=5)
+        response = citrus_request(url, timeout=5)
         if response.status_code == 200:
             data = response.json()
             first_name = data.get('firstName', {}).get('default', '')

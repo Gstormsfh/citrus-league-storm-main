@@ -24,6 +24,7 @@ from datetime import datetime
 from typing import Dict, List, Set, Optional, Tuple
 import time
 import sys
+from src.utils.citrus_request import citrus_request
 
 # Load environment variables
 load_dotenv()
@@ -413,7 +414,7 @@ def process_game_shifts(game_id: int) -> Tuple[List[Dict], List[Dict]]:
     if raw_data is None:
         pbp_url = f"{NHL_BASE_URL}/gamecenter/{game_id}/play-by-play"
         try:
-            response = requests.get(pbp_url, timeout=30)
+            response = citrus_request(pbp_url, timeout=30)
             response.raise_for_status()
             raw_data = response.json()
         except Exception as e:

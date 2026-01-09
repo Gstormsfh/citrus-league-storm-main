@@ -22,6 +22,7 @@ from typing import Dict, Optional, Tuple
 import requests
 from dotenv import load_dotenv
 from supabase_rest import SupabaseRest
+from src.utils.citrus_request import citrus_request
 
 load_dotenv()
 
@@ -48,7 +49,7 @@ def _now_iso() -> str:
 
 
 def fetch_json(url: str, timeout: int = 15) -> dict:
-  r = requests.get(url, timeout=timeout)
+  r = citrus_request(url, timeout=timeout)
   r.raise_for_status()
   return r.json()
 

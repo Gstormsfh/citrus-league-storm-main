@@ -22,6 +22,7 @@ from functools import partial
 import traceback
 from dotenv import load_dotenv
 import os
+from src.utils.citrus_request import citrus_request
 
 # Set UTF-8 encoding for stdout
 if sys.stdout.encoding != 'utf-8':
@@ -78,7 +79,7 @@ def scrape_single_game_json(game_id):
     
     for attempt in range(MAX_429_RETRIES):
         try:
-            response = requests.get(pbp_url, timeout=15)
+            response = citrus_request(pbp_url, timeout=15)
             
             if response.status_code == 429:
                 if attempt < MAX_429_RETRIES - 1:
@@ -133,7 +134,7 @@ def scrape_single_game_boxscore(game_id):
     
     for attempt in range(MAX_429_RETRIES):
         try:
-            response = requests.get(boxscore_url, timeout=15)
+            response = citrus_request(boxscore_url, timeout=15)
             
             if response.status_code == 429:
                 if attempt < MAX_429_RETRIES - 1:
@@ -310,7 +311,7 @@ def get_finished_game_ids_from_api(start_date, end_date):
         # Fetch schedule for this date from NHL API
         try:
             schedule_url = f"{NHL_BASE_URL}/schedule/{date_str.replace('-', '')}"
-            response = requests.get(schedule_url, timeout=15)
+            response = citrus_request(schedule_url, timeout=15)
             response.raise_for_status()
             schedule_data = response.json()
             

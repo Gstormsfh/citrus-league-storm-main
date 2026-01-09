@@ -19,6 +19,7 @@ from typing import Dict, List, Optional
 import requests
 from dotenv import load_dotenv
 from supabase_rest import SupabaseRest
+from src.utils.citrus_request import citrus_request
 
 load_dotenv()
 SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
@@ -52,7 +53,7 @@ def mmss_to_seconds(v: Optional[str]) -> int:
 
 def fetch_shiftcharts(game_id: int) -> List[dict]:
   params = {"cayenneExp": f"gameId={int(game_id)}"}
-  r = requests.get(SHIFTCHARTS_URL, params=params, timeout=30)
+  r = citrus_request(SHIFTCHARTS_URL, params=params, timeout=30)
   r.raise_for_status()
   payload = r.json()
   return payload.get("data") or []

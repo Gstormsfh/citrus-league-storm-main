@@ -37,6 +37,7 @@ import requests
 from dotenv import load_dotenv
 
 from supabase_rest import SupabaseRest
+from src.utils.citrus_request import citrus_request
 
 load_dotenv()
 
@@ -77,7 +78,7 @@ def fetch_player_gamelog(player_id: int, season: str = SEASON_STRING) -> Optiona
     """Fetch player's game log for the season."""
     url = f"{NHL_API}/player/{player_id}/game-log/{season}/2"
     try:
-        resp = requests.get(url, timeout=10)
+        resp = citrus_request(url, timeout=10)
         if resp.status_code == 200:
             data = resp.json()
             return data.get("gameLog", [])

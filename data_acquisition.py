@@ -6,6 +6,7 @@ import requests
 import datetime
 from dotenv import load_dotenv # Used to load your .env file
 from supabase import create_client, Client
+from src.utils.citrus_request import citrus_request
 
 # Set UTF-8 encoding for stdout to handle Unicode characters on Windows
 import sys
@@ -560,7 +561,7 @@ def get_finished_game_ids(date_str=None):
     
     for attempt in range(max_retries):
         try:
-            response = requests.get(schedule_url, timeout=10)
+            response = citrus_request(schedule_url, timeout=10)
             
             # Handle rate limiting (429)
             if response.status_code == 429:
@@ -1923,7 +1924,7 @@ def process_single_game(game_id, rate_limit_flag=None):
             time.sleep(cooldown_time)
         
         try:
-            response = requests.get(pbp_url, timeout=10)
+            response = citrus_request(pbp_url, timeout=10)
             
             # Handle 429 rate limiting
             if response.status_code == 429:
@@ -2155,7 +2156,7 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
         
         for attempt in range(max_retries):
             try:
-                response = requests.get(pbp_url, timeout=15)  # Increased timeout
+                response = citrus_request(pbp_url, timeout=15)  # Increased timeout
                 
                 # Handle rate limiting (429)
                 if response.status_code == 429:
@@ -2881,7 +2882,7 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                         # If table lookup fails, try API fetch (slower)
                         try:
                             goalie_api_url = f"https://api-web.nhle.com/v1/player/{goalie_id}/landing"
-                            goalie_api_response = requests.get(goalie_api_url, timeout=2)
+                            goalie_api_response = citrus_request(goalie_api_url, timeout=2)
                             if goalie_api_response.status_code == 200:
                                 goalie_data = goalie_api_response.json()
                                 first_name = goalie_data.get('firstName', {}).get('default', '')
