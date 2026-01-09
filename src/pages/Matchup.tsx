@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
@@ -23,6 +23,7 @@ import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { LeagueService, League, Team } from '@/services/LeagueService';
 import { MatchupService, Matchup as MatchupType } from '@/services/MatchupService';
 import { PlayerService, Player } from '@/services/PlayerService';
+import { ScheduleService } from '@/services/ScheduleService';
 import { supabase } from '@/integrations/supabase/client';
 import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekLabel, getWeekDateLabel, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
 import LoadingScreen from '@/components/LoadingScreen';
@@ -31,14 +32,15 @@ import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { MatchupScoreJobService } from '@/services/MatchupScoreJobService';
 import { DataCacheService, TTL } from '@/services/DataCacheService';
 
+// Debug flag - set to true only when debugging performance issues
+const DEBUG_MATCHUP = false;
+const log = DEBUG_MATCHUP ? console.log.bind(console, '[Matchup]') : () => {};
+
 const Matchup = () => {
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const { userLeagueState, loading: leagueContextLoading } = useLeague();
   const { leagueId: urlLeagueId, weekId: urlWeekId } = useParams<{ leagueId?: string; weekId?: string }>();
   const navigate = useNavigate();
-  
-  // Debug: Log URL parameters
-  console.log('[Matchup] URL parameters:', { urlLeagueId, urlWeekId, userLeagueState, leagueContextLoading });
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [dailyStatsMap, setDailyStatsMap] = useState<Map<number, any>>(new Map()); // For selected date (or today)
   const [dailyStatsByDate, setDailyStatsByDate] = useState<Map<string, Map<number, any>>>(new Map()); // For all 7 days
@@ -53,10 +55,14 @@ const Matchup = () => {
   // Start loading as true to prevent initial flash of content
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isSwitchingDate, setIsSwitchingDate] = useState(false);
   const loadingRef = useRef(false); // Prevent concurrent loads
+  const previousRosterRef = useRef<{ myTeam: MatchupPlayer[]; oppTeam: MatchupPlayer[] } | null>(null);
   const projectionsLoadingRef = useRef(false); // Prevent concurrent projection fetches
   const hasProcessedNoLeague = useRef(false); // Track if we've processed "no league" state
   const hasInitializedRef = useRef(false); // Track if we've completed initial load
+  const statsLoadingRef = useRef(false); // Prevent concurrent stats fetches that cause score flashing
+  const lastScoreRef = useRef<{ myScore: string; oppScore: string } | null>(null); // Stable score display
   
   // Stable refs for player IDs to break dependency on team arrays (prevents death loop)
   const myTeamPlayerIdsRef = useRef<number[]>([]);
@@ -83,7 +89,7 @@ const Matchup = () => {
     // Handle "no league" state once (prevent re-processing)
     if (userLeagueState === 'logged-in-no-league' && !hasProcessedNoLeague.current) {
       hasProcessedNoLeague.current = true;
-      console.log('[MATCHUP] User has no league - stopping all loading');
+      log(' User has no league - stopping all loading');
       setLoading(false);
       hasInitializedRef.current = true; // Mark initialization complete
       loadingRef.current = false; // Release any locks
@@ -144,25 +150,25 @@ const Matchup = () => {
     }
 
     const runBackfillAndCalculate = async () => {
-      console.log('[Matchup] Starting data integrity check for matchup:', currentMatchup.id);
+      log(' Starting data integrity check for matchup:', currentMatchup.id);
       
       // Step 1: Backfill missing daily roster records for both teams
       // This ensures fantasy_daily_rosters has complete data
       if (currentMatchup.team1_id) {
         try {
-          console.log('[Matchup] Running backfill for team1:', currentMatchup.team1_id);
+          log(' Running backfill for team1:', currentMatchup.team1_id);
           const result = await LeagueService.backfillMissingDailyRosters(
             currentMatchup.team1_id,
             currentMatchup.league_id,
             currentMatchup.id
           );
-          console.log('[Matchup] Backfill result for team1:', result);
+          log(' Backfill result for team1:', result);
           if (result.backfilledCount > 0) {
-            console.log('[Matchup] Backfilled', result.backfilledCount, 'records for team1');
+            log(' Backfilled', result.backfilledCount, 'records for team1');
           } else if (result.error) {
             console.error('[Matchup] Backfill error for team1:', result.error);
           } else {
-            console.log('[Matchup] No records to backfill for team1 (all exist)');
+            log(' No records to backfill for team1 (all exist)');
           }
         } catch (err) {
           console.error('[Matchup] Team1 backfill exception:', err);
@@ -171,19 +177,19 @@ const Matchup = () => {
       
       if (currentMatchup.team2_id) {
         try {
-          console.log('[Matchup] Running backfill for team2:', currentMatchup.team2_id);
+          log(' Running backfill for team2:', currentMatchup.team2_id);
           const result = await LeagueService.backfillMissingDailyRosters(
             currentMatchup.team2_id,
             currentMatchup.league_id,
             currentMatchup.id
           );
-          console.log('[Matchup] Backfill result for team2:', result);
+          log(' Backfill result for team2:', result);
           if (result.backfilledCount > 0) {
-            console.log('[Matchup] Backfilled', result.backfilledCount, 'records for team2');
+            log(' Backfilled', result.backfilledCount, 'records for team2');
           } else if (result.error) {
             console.error('[Matchup] Backfill error for team2:', result.error);
           } else {
-            console.log('[Matchup] No records to backfill for team2 (all exist)');
+            log(' No records to backfill for team2 (all exist)');
           }
         } catch (err) {
           console.error('[Matchup] Team2 backfill exception:', err);
@@ -192,14 +198,14 @@ const Matchup = () => {
       
       // Step 2: Calculate and store matchup scores
       if (currentMatchup.status === 'in_progress' || currentMatchup.status === 'scheduled') {
-        console.log('[Matchup] Triggering background score calculation job for league:', currentMatchup.league_id);
+        log(' Triggering background score calculation job for league:', currentMatchup.league_id);
         try {
           const result = await MatchupScoreJobService.runJob(currentMatchup.league_id);
-          console.log('[Matchup] Background job completed:', result);
+          log(' Background job completed:', result);
           
           // Step 3: Refresh matchup data to get updated scores from DB
           if (result.updatedCount > 0) {
-            console.log('[Matchup] Refreshing matchup data after score update...');
+            log(' Refreshing matchup data after score update...');
             const { data: refreshedMatchup } = await supabase
               .from('matchups')
               .select('team1_score, team2_score')
@@ -214,7 +220,7 @@ const Matchup = () => {
                 team1_score: scores.team1_score,
                 team2_score: scores.team2_score
               } : null);
-              console.log('[Matchup] Matchup scores refreshed:', scores);
+              log(' Matchup scores refreshed:', scores);
             }
           }
         } catch (err) {
@@ -243,7 +249,7 @@ const Matchup = () => {
       const team2Id = currentMatchup.team2_id;
       
       if (!team1Id) {
-        console.warn('[Matchup] No team1_id in matchup, skipping cached scores');
+        log('WARN: No team1_id in matchup, skipping cached scores');
         return;
       }
       
@@ -343,7 +349,7 @@ const Matchup = () => {
       // Cache the frozen scores (long TTL - past scores don't change)
       DataCacheService.set(cacheKey, scores, TTL.VERY_LONG);
       setCachedDailyScores(scores);
-      console.log(`[Matchup] Cached ${scores.size} frozen scores for matchup ${currentMatchup.id} (team1: ${team1Id}, team2: ${team2Id})`);
+      log(` Cached ${scores.size} frozen scores for matchup ${currentMatchup.id} (team1: ${team1Id}, team2: ${team2Id})`);
     };
     
     fetchCachedScores();
@@ -402,7 +408,7 @@ const Matchup = () => {
     // This uses the exact same code path as logged-in users, just with a hardcoded league ID
     const loadGuestMatchup = async () => {
       if (loadingRef.current) {
-        console.log('[Matchup] Guest load already in progress, skipping');
+        log(' Guest load already in progress, skipping');
         return;
       }
       
@@ -412,8 +418,8 @@ const Matchup = () => {
         setLoading(true);
         setError(null);
         
-        console.log('[Matchup] ========== Loading REAL league data for guest ==========');
-        console.log('[Matchup] Using demo league ID:', DEMO_LEAGUE_ID_FOR_GUESTS);
+        log(' ========== Loading REAL league data for guest ==========');
+        log(' Using demo league ID:', DEMO_LEAGUE_ID_FOR_GUESTS);
         
         // Get the league data directly (using maybeSingle to avoid single() coercion error)
         const { data: demoLeagueData, error: leagueError } = await supabase
@@ -431,7 +437,7 @@ const Matchup = () => {
         }
         
         const demoLeague = demoLeagueData as any;
-        console.log('[Matchup] Demo league loaded:', demoLeague.id, 'draft_status:', demoLeague.draft_status);
+        log(' Demo league loaded:', demoLeague.id, 'draft_status:', demoLeague.draft_status);
         setLeague(demoLeague as League);
         
         // Check if draft is completed
@@ -454,7 +460,7 @@ const Matchup = () => {
         // Get available weeks (same as logged-in users)
         const currentYear = new Date().getFullYear();
         const weeks = getAvailableWeeks(firstWeek, currentYear);
-        console.log(`[Matchup] Calculated ${weeks.length} available weeks:`, weeks);
+        log(` Calculated ${weeks.length} available weeks:`, weeks);
         setAvailableWeeks(weeks);
         
         // Determine which week to show (from URL or current week) - same logic as logged-in users
@@ -474,7 +480,7 @@ const Matchup = () => {
         
         setSelectedWeek(weekToShow);
         
-        console.log('[Matchup] Week calculation details:', {
+        log(' Week calculation details:', {
           urlWeekId,
           weekToShow,
           weekToShowType: typeof weekToShow,
@@ -504,7 +510,7 @@ const Matchup = () => {
         // This ensures dates match exactly how the matchup was created in the database
         const matchupWeekNumber = guestMatchup.week_number;
         
-        console.log('[Matchup] Guest matchup selected:', {
+        log(' Guest matchup selected:', {
           id: guestMatchup.id,
           team1_id: guestMatchup.team1_id,
           team2_id: guestMatchup.team2_id,
@@ -519,7 +525,7 @@ const Matchup = () => {
         const matchupWeekStart = getWeekStartDate(matchupWeekNumber, firstWeek);
         const matchupWeekEnd = getWeekEndDate(matchupWeekNumber, firstWeek);
         
-        console.log('[Matchup] Setting matchup week dates (same logic as database):', {
+        log(' Setting matchup week dates (same logic as database):', {
           matchupWeekNumber,
           firstWeekStart: firstWeek.toISOString().split('T')[0],
           calculatedWeekStart: matchupWeekStart.toISOString().split('T')[0],
@@ -596,7 +602,7 @@ const Matchup = () => {
         setOpponentTeamSlotAssignments(team2SlotAssignments || {});
         
         // Calculate daily points using the same RPC as logged-in users
-        console.log('[Matchup] Calculating daily points for guest matchup...');
+        log(' Calculating daily points for guest matchup...');
         const weekStartStr = matchupWithDates.week_start_date;
         const weekEndStr = matchupWithDates.week_end_date;
         
@@ -619,9 +625,9 @@ const Matchup = () => {
               new Date(a.roster_date).getTime() - new Date(b.roster_date).getTime()
             );
             team1DailyPoints = sorted.map(d => parseFloat(d.daily_score) || 0);
-            console.log('[Matchup] Team1 daily points calculated:', team1DailyPoints);
+            log(' Team1 daily points calculated:', team1DailyPoints);
           } else {
-            console.warn('[Matchup] Error calculating team1 daily scores:', team1Error);
+            log('WARN: Error calculating team1 daily scores:', team1Error);
             team1DailyPoints = Array(7).fill(0);
           }
         } catch (error) {
@@ -649,9 +655,9 @@ const Matchup = () => {
                 new Date(a.roster_date).getTime() - new Date(b.roster_date).getTime()
               );
               team2DailyPoints = sorted.map(d => parseFloat(d.daily_score) || 0);
-              console.log('[Matchup] Team2 daily points calculated:', team2DailyPoints);
+              log(' Team2 daily points calculated:', team2DailyPoints);
             } else {
-              console.warn('[Matchup] Error calculating team2 daily scores:', team2Error);
+              log('WARN: Error calculating team2 daily scores:', team2Error);
               team2DailyPoints = Array(7).fill(0);
             }
           } catch (error) {
@@ -665,7 +671,7 @@ const Matchup = () => {
         // Set daily points state (same as logged-in users)
         setMyDailyPoints(team1DailyPoints);
         setOpponentDailyPoints(team2DailyPoints);
-        console.log('[Matchup] Daily points set:', {
+        log(' Daily points set:', {
           myTeam: team1DailyPoints,
           opponentTeam: team2DailyPoints
         });
@@ -682,7 +688,7 @@ const Matchup = () => {
           setAllWeekMatchups(allMatchups as any);
         }
         
-        console.log('[Matchup] ✅ Guest matchup loaded successfully');
+        log(' ✅ Guest matchup loaded successfully');
         setLoading(false);
         hasInitializedRef.current = true;
         loadingRef.current = false;
@@ -797,7 +803,7 @@ const Matchup = () => {
           .order('created_at', { ascending: true });
 
         if (error) {
-          console.warn('[Matchup] Error fetching all week matchups:', error);
+          log('WARN: Error fetching all week matchups:', error);
           return;
         }
 
@@ -845,10 +851,17 @@ const Matchup = () => {
   // CRITICAL: Also runs for guests/demo to use REAL NHL data
   // Extract to useCallback so it can be reused for live game refreshes
   const fetchAllDailyStats = React.useCallback(async () => {
+      // Prevent concurrent fetches that cause score flashing
+      if (statsLoadingRef.current) {
+        return;
+      }
+      
       if (!currentMatchup) {
         setDailyStatsByDate(new Map());
         return;
       }
+      
+      statsLoadingRef.current = true;
       
       // For guests/demo, we still need player IDs from demo teams
       // For active users, we use the real matchup
@@ -887,7 +900,7 @@ const Matchup = () => {
           });
 
           if (error) {
-            console.warn(`[Matchup] Error fetching stats for ${date}:`, error);
+            log(`WARN: Error fetching stats for ${date}:`, error);
             return;
           }
 
@@ -968,7 +981,7 @@ const Matchup = () => {
               
               // Debug logging for goalies with stats
               if (aggregated.wins > 0 || aggregated.saves > 0 || aggregated.shutouts > 0 || aggregated.goals_against > 0) {
-                console.log('[Matchup.fetchAllDailyStats] Goalie daily points (aggregated):', {
+                log('fetchAllDailyStats Goalie daily points (aggregated):', {
                   date,
                   player_id: row.player_id,
                   wins: aggregated.wins,
@@ -1006,6 +1019,8 @@ const Matchup = () => {
       } catch (error) {
         console.error('[Matchup] Error fetching all daily stats:', error);
         setDailyStatsByDate(new Map());
+      } finally {
+        statsLoadingRef.current = false;
       }
   }, [currentMatchup, userLeagueState, scoringSettings, playerIdsVersion, demoMyTeam, demoOpponentTeam]);
 
@@ -1062,36 +1077,25 @@ const Matchup = () => {
   // Removed duplicate frozen lineup fetch - data now loaded directly in getMatchupRosters()
   // This eliminates score flashing and ensures single source of truth
 
-  // Expose backfill function to window for console access
-  useEffect(() => {
+  // Debug backfill function - only exposed in development
+  // Removed useEffect - exposed only when DEBUG_MATCHUP is true
+  if (DEBUG_MATCHUP && typeof window !== 'undefined') {
     (window as any).backfillLeague = async (leagueId?: string) => {
       const targetLeagueId = leagueId || currentMatchup?.league_id;
-      if (!targetLeagueId) {
-        console.error('[Matchup] No league ID provided and no current matchup');
-        return;
-      }
-      console.log('[Matchup] Starting manual backfill for league:', targetLeagueId);
-      const result = await LeagueService.backfillAllMatchupsForLeague(targetLeagueId);
-      console.log('[Matchup] Backfill complete:', result);
-      return result;
+      if (!targetLeagueId) return;
+      return await LeagueService.backfillAllMatchupsForLeague(targetLeagueId);
     };
-    return () => {
-      delete (window as any).backfillLeague;
-    };
-  }, [currentMatchup?.league_id]);
+  }
 
-  // Fetch projections for a specific date
-  const fetchProjectionsForDate = async (date: string) => {
+  // Fetch projections for a specific date - memoized to prevent recreation
+  const fetchProjectionsForDate = useCallback(async (date: string) => {
     // Check cache first - if we have projections (even if empty), don't re-fetch
     if (projectionsByDate.has(date)) {
-      const cached = projectionsByDate.get(date);
-      console.log(`[Matchup] Using cached projections for ${date}: ${cached?.size || 0} projections`);
       return;
     }
 
     // Prevent concurrent fetches
     if (projectionsLoadingRef.current) {
-      console.log(`[Matchup] Projection fetch already in progress for ${date}, skipping`);
       return;
     }
 
@@ -1099,46 +1103,32 @@ const Matchup = () => {
       return;
     }
 
-    // Get player IDs from refs (stable references, no dependency on team arrays)
+    // Get player IDs from refs (stable references)
     const allPlayerIds = [
       ...myTeamPlayerIdsRef.current,
       ...opponentTeamPlayerIdsRef.current
     ];
 
     if (allPlayerIds.length === 0) {
-      console.warn(`[Matchup] No player IDs available for projection fetch on ${date}`);
       return;
     }
 
     projectionsLoadingRef.current = true;
-    console.log(`[Matchup] Fetching projections for ${date} (${allPlayerIds.length} players)`);
 
     try {
       const projectionMap = await MatchupService.getDailyProjectionsForMatchup(allPlayerIds, date);
       
-      // Update cache (store even if empty - indicates we tried to fetch)
       setProjectionsByDate(prev => {
         const newMap = new Map(prev);
         newMap.set(date, projectionMap);
         return newMap;
       });
-
-      console.log(`[Matchup] Fetched ${projectionMap.size} projections for ${date} (requested ${allPlayerIds.length} players)`);
-      
-      // Debug: Log sample of what we got
-      if (projectionMap.size > 0) {
-        const sample = Array.from(projectionMap.entries())[0];
-        console.log(`[Matchup] Sample projection for ${date}:`, { player_id: sample[0], has_data: !!sample[1] });
-      } else {
-        console.warn(`[Matchup] No projections found for ${date} - players will use original projections from initial load`);
-      }
     } catch (error) {
-      console.error('[Matchup] Error fetching projections:', error);
       // Don't cache errors - allow retry
     } finally {
       projectionsLoadingRef.current = false;
     }
-  };
+  }, [projectionsByDate, currentMatchup, userLeagueState]);
 
   // Fetch detailed stats for selected date (or today) - for PlayerCard display
   useEffect(() => {
@@ -1184,19 +1174,14 @@ const Matchup = () => {
             ];
 
         if (allPlayerIds.length === 0) {
-          console.warn('[Matchup] No player IDs available for daily stats fetch');
+          log('WARN: No player IDs available for daily stats fetch');
           setDailyStatsMap(new Map());
           return;
         }
         
-        console.log('[Matchup] Fetching daily stats for date:', dateToFetch, 'playerIds:', allPlayerIds.length, 'userState:', userLeagueState);
+        log(' Fetching daily stats for date:', dateToFetch, 'playerIds:', allPlayerIds.length);
 
         // Fetch comprehensive daily game stats using new RPC
-        console.log('[Matchup] Calling get_daily_game_stats RPC:', {
-          date: dateToFetch,
-          playerCount: allPlayerIds.length,
-          userState: userLeagueState
-        });
         
         const { data, error } = await supabase.rpc('get_daily_game_stats', {
           p_player_ids: allPlayerIds,
@@ -1209,10 +1194,7 @@ const Matchup = () => {
         }
         
         const statsDataArr = (data || []) as any[];
-        console.log('[Matchup] get_daily_game_stats returned:', {
-          rowCount: statsDataArr.length || 0,
-          sampleRow: statsDataArr[0] || null
-        });
+        log(' get_daily_game_stats returned:', statsDataArr.length, 'rows');
 
         // Create map of player_id -> comprehensive daily stats
         const statsMap = new Map<number, any>();
@@ -1251,7 +1233,7 @@ const Matchup = () => {
             
             // Debug logging for goalies
             if (row.wins > 0 || row.saves > 0 || row.shutouts > 0 || row.goals_against > 0) {
-              console.log('[Matchup] Goalie daily points calculation:', {
+              log(' Goalie daily points calculation:', {
                 player_id: row.player_id,
                 wins: row.wins,
                 saves: row.saves,
@@ -1386,15 +1368,13 @@ const Matchup = () => {
     fetchData();
   }, [selectedDate, currentMatchup, userLeagueState, scoringSettings, playerIdsVersion, demoMyTeam, demoOpponentTeam]); // Use playerIdsVersion instead of team arrays to prevent Death Loop, but include demo teams for guests
 
-  const handlePlayerClick = async (player: MatchupPlayer) => {
+  const handlePlayerClick = useCallback(async (player: MatchupPlayer) => {
     try {
       // Fetch season-long stats for this player
       const seasonPlayers = await PlayerService.getPlayersByIds([player.id.toString()]);
       const seasonPlayer = seasonPlayers.find(p => Number(p.id) === player.id);
       
       if (seasonPlayer) {
-        // Map Player type to stats format for toHockeyPlayer
-        // CRITICAL: Use NHL.com official stats exclusively (no PBP fallback)
         const seasonStats = {
           goals: seasonPlayer.goals ?? 0,
           assists: seasonPlayer.assists ?? 0,
@@ -1405,11 +1385,8 @@ const Matchup = () => {
           hits: seasonPlayer.hits ?? 0,
           blockedShots: seasonPlayer.blocks ?? 0,
           xGoals: seasonPlayer.xGoals ?? 0,
-          // CRITICAL: PlayerService already returns nhl_ppp and nhl_shp as ppp and shp
-          // Pass both powerPlayPoints and ppp/shp so toHockeyPlayer can use the correct value
           powerPlayPoints: seasonPlayer.ppp !== undefined && seasonPlayer.ppp !== null ? seasonPlayer.ppp : undefined,
           shortHandedPoints: seasonPlayer.shp !== undefined && seasonPlayer.shp !== null ? seasonPlayer.shp : undefined,
-          // Also pass ppp/shp directly as fallback
           ppp: seasonPlayer.ppp ?? 0,
           shp: seasonPlayer.shp ?? 0,
           pim: seasonPlayer.pim ?? 0,
@@ -1434,14 +1411,9 @@ const Matchup = () => {
           .single();
         
         if (!error && seasonStatsData) {
-          // Map player_season_stats to stats format
-          // CRITICAL: Use NHL.com official stats exclusively (no PBP fallback)
-          // This ensures player cards match NHL.com exactly
           const statsData = seasonStatsData as any;
           const calculatedGoals = Number(statsData.nhl_goals ?? 0);
           const calculatedAssists = Number(statsData.nhl_assists ?? 0);
-          
-          // ALWAYS calculate points from goals + assists to ensure consistency
           const calculatedPoints = calculatedGoals + calculatedAssists;
           
           const mappedStats = {
@@ -1470,19 +1442,15 @@ const Matchup = () => {
           };
           setSelectedPlayer(toHockeyPlayer(player, mappedStats));
         } else {
-          // Last resort: use matchup stats (shouldn't happen in production)
-          console.warn(`[Matchup] Could not fetch season stats for player ${player.id}, using matchup stats`);
           setSelectedPlayer(toHockeyPlayer(player));
         }
       }
     } catch (error) {
-      console.error(`[Matchup] Error fetching season stats for player ${player.id}:`, error);
-      // Fallback to matchup stats on error
       setSelectedPlayer(toHockeyPlayer(player));
     }
     
     setIsPlayerDialogOpen(true);
-  };
+  }, []); // State setters are stable - no dependencies needed
 
   const [updates] = useState<string[]>([
     "Connor McDavid scored a goal! +5 points.",
@@ -1497,6 +1465,11 @@ const Matchup = () => {
   // CRITICAL FIX: Only use daily stats when a date is EXPLICITLY selected
   // When viewing weekly totals (no date selected), use weekly matchupStats from RPC (aggregated across all games)
   const displayMyTeam = useMemo(() => {
+    // During date switching, use previous roster to prevent blank slots
+    if (isSwitchingDate && previousRosterRef.current?.myTeam && previousRosterRef.current.myTeam.length > 0) {
+      return previousRosterRef.current.myTeam;
+    }
+    
     const baseTeam = userLeagueState === 'active-user' ? myTeam : demoMyTeam;
     
     // CRITICAL: Only enrich with daily stats if a date is explicitly selected
@@ -1505,7 +1478,7 @@ const Matchup = () => {
       // Debug: Check if base team has games
       const samplePlayer = baseTeam[0];
       if (samplePlayer) {
-        console.log('[displayMyTeam] No selectedDate - returning baseTeam. Sample player games:', {
+        log('displayMyTeam No selectedDate - returning baseTeam. Sample player games:', {
           playerId: samplePlayer.id,
           playerName: samplePlayer.name,
           hasGames: !!samplePlayer.games,
@@ -1532,7 +1505,7 @@ const Matchup = () => {
       
       // Debug: Log games capture for first few players
       if (player.id === baseTeam[0]?.id || player.id === baseTeam[1]?.id) {
-        console.log('[displayMyTeam] Player games capture:', {
+        log('displayMyTeam Player games capture:', {
           playerId: player.id,
           playerName: player.name,
           playerGames: player.games,
@@ -1599,14 +1572,28 @@ const Matchup = () => {
       // For future/today dates, only set if dailyStats exists
       // For live games, always set daily_total_points to 0 (if no stats yet) so we show actual points instead of projections
       const todayStr = getTodayMST();
+      const viewingDateStr = selectedDate || todayStr; // The date being viewed (selected or today)
       const isPastDate = selectedDate ? selectedDate < todayStr : false;
       
-      // Check if player has a live game today - use originalGames instead of player.games
-      const hasLiveGameToday = originalGames && originalGames.some(g => {
+      // Check if player has a live/started/final game on THE DATE BEING VIEWED
+      // CRITICAL: Use viewingDateStr not todayStr - the user might be viewing a different date
+      // Also check if game has started based on scores/period, not just status
+      // This handles cases where status field is stale but game has actually started
+      const hasStartedOrFinalGameOnViewedDate = originalGames && originalGames.some(g => {
         if (!g || typeof g !== 'object') return false;
         const gameDate = g.game_date?.split('T')[0];
-        const gameStatus = g.status?.toUpperCase();
-        return gameDate === todayStr && (gameStatus === 'LIVE' || gameStatus === 'CRIT' || gameStatus === 'INTERMISSION');
+        if (gameDate !== viewingDateStr) return false;
+        
+        const gameStatus = (g.status || '').toLowerCase();
+        // Check if game is live/intermission by status
+        const isLiveByStatus = gameStatus === 'live' || gameStatus === 'crit' || gameStatus === 'intermission';
+        // Check if game is final by status
+        const isFinalByStatus = gameStatus === 'final';
+        // Check if game has started by looking at scores or period info (handles stale status)
+        const hasScores = (g.home_score || 0) + (g.away_score || 0) > 0;
+        const hasPeriod = g.period !== null && g.period !== undefined && g.period !== '';
+        
+        return isLiveByStatus || isFinalByStatus || hasScores || hasPeriod;
       });
       
       // Helper function to get daily_stats_breakdown with proper empty object check
@@ -1636,8 +1623,8 @@ const Matchup = () => {
             games: originalGames !== undefined ? originalGames : player.games
           };
         }
-        // For live games today, set daily_total_points to 0 so we show actual points (even if 0) instead of projections
-        if (hasLiveGameToday) {
+        // For live/started/final games on the viewed date, set daily_total_points to 0 so we show actual points (even if 0) instead of projections
+        if (hasStartedOrFinalGameOnViewedDate) {
           return {
             ...player,
             ...mergedProjection,
@@ -1718,7 +1705,7 @@ const Matchup = () => {
     }).map(transformedPlayer => {
       // Debug: Log final games for first few players
       if (transformedPlayer.id === baseTeam[0]?.id || transformedPlayer.id === baseTeam[1]?.id) {
-        console.log('[displayMyTeam] Final transformed player games:', {
+        log('displayMyTeam Final transformed player games:', {
           playerId: transformedPlayer.id,
           playerName: transformedPlayer.name,
           hasGames: !!transformedPlayer.games,
@@ -1737,9 +1724,14 @@ const Matchup = () => {
       }
       return transformedPlayer;
     });
-  }, [userLeagueState, playerIdsVersion, demoMyTeam.length, dailyStatsMap, selectedDate, projectionsByDate]);
+  }, [userLeagueState, playerIdsVersion, demoMyTeam.length, dailyStatsMap, selectedDate, projectionsByDate, isSwitchingDate, myTeam]);
 
   const displayOpponentTeam = useMemo(() => {
+    // During date switching, use previous roster to prevent blank slots
+    if (isSwitchingDate && previousRosterRef.current?.oppTeam && previousRosterRef.current.oppTeam.length > 0) {
+      return previousRosterRef.current.oppTeam;
+    }
+    
     const baseTeam = userLeagueState === 'active-user' ? opponentTeamPlayers : demoOpponentTeam;
     
     // CRITICAL: Only enrich with daily stats if a date is explicitly selected
@@ -1813,14 +1805,28 @@ const Matchup = () => {
       // For future/today dates, only set if dailyStats exists
       // For live games, always set daily_total_points to 0 (if no stats yet) so we show actual points instead of projections
       const todayStr = getTodayMST();
+      const viewingDateStr = selectedDate || todayStr; // The date being viewed (selected or today)
       const isPastDate = selectedDate ? selectedDate < todayStr : false;
       
-      // Check if player has a live game today - use originalGames instead of player.games
-      const hasLiveGameToday = originalGames && originalGames.some(g => {
+      // Check if player has a live/started/final game on THE DATE BEING VIEWED
+      // CRITICAL: Use viewingDateStr not todayStr - the user might be viewing a different date
+      // Also check if game has started based on scores/period, not just status
+      // This handles cases where status field is stale but game has actually started
+      const hasStartedOrFinalGameOnViewedDate = originalGames && originalGames.some(g => {
         if (!g || typeof g !== 'object') return false;
         const gameDate = g.game_date?.split('T')[0];
-        const gameStatus = g.status?.toUpperCase();
-        return gameDate === todayStr && (gameStatus === 'LIVE' || gameStatus === 'CRIT' || gameStatus === 'INTERMISSION');
+        if (gameDate !== viewingDateStr) return false;
+        
+        const gameStatus = (g.status || '').toLowerCase();
+        // Check if game is live/intermission by status
+        const isLiveByStatus = gameStatus === 'live' || gameStatus === 'crit' || gameStatus === 'intermission';
+        // Check if game is final by status
+        const isFinalByStatus = gameStatus === 'final';
+        // Check if game has started by looking at scores or period info (handles stale status)
+        const hasScores = (g.home_score || 0) + (g.away_score || 0) > 0;
+        const hasPeriod = g.period !== null && g.period !== undefined && g.period !== '';
+        
+        return isLiveByStatus || isFinalByStatus || hasScores || hasPeriod;
       });
       
       // Helper function to get daily_stats_breakdown with proper empty object check
@@ -1850,8 +1856,8 @@ const Matchup = () => {
             games: originalGames !== undefined ? originalGames : player.games
           };
         }
-        // For live games today, set daily_total_points to 0 so we show actual points (even if 0) instead of projections
-        if (hasLiveGameToday) {
+        // For live/started/final games on the viewed date, set daily_total_points to 0 so we show actual points (even if 0) instead of projections
+        if (hasStartedOrFinalGameOnViewedDate) {
           return {
             ...player,
             ...mergedProjection,
@@ -1929,7 +1935,7 @@ const Matchup = () => {
         // Keep weekly total_points unchanged - it's the matchup week total
       };
     });
-  }, [userLeagueState, playerIdsVersion, demoOpponentTeam.length, dailyStatsMap, selectedDate, projectionsByDate]);
+  }, [userLeagueState, playerIdsVersion, demoOpponentTeam.length, dailyStatsMap, selectedDate, projectionsByDate, isSwitchingDate, opponentTeamPlayers]);
   const displayMyTeamSlotAssignments = useMemo(() =>
     userLeagueState === 'active-user' ? myTeamSlotAssignments : demoMyTeamSlotAssignments,
     [userLeagueState, myTeamSlotAssignments, demoMyTeamSlotAssignments]
@@ -1968,13 +1974,24 @@ const Matchup = () => {
   // Past days: Use cached frozen scores (won't change when roster changes)
   // Today/Future: Calculate from current roster (reflects roster changes)
   // This ensures past day scores are "locked in" and don't change retroactively
+  // ANTI-FLASH: Only update when stats are fully loaded (prevents 0.0 flashing)
   // =============================================================================
   const myTeamPoints = useMemo(() => {
+    // If stats are currently loading, return last stable score to prevent flashing
+    if (statsLoadingRef.current && lastScoreRef.current) {
+      return lastScoreRef.current.myScore;
+    }
+    
     if (!currentMatchup || dailyStatsByDate.size === 0) {
       // Fallback: sum starter week totals if no daily breakdown available
       const fallback = myStarters.reduce((sum, player) => sum + (player.total_points ?? 0), 0);
-      console.log('[Matchup] No daily stats, using fallback score:', fallback);
-      return fallback.toFixed(1);
+      const score = fallback.toFixed(1);
+      if (!lastScoreRef.current) {
+        lastScoreRef.current = { myScore: score, oppScore: '0.0' };
+      } else {
+        lastScoreRef.current.myScore = score;
+      }
+      return score;
     }
 
     // Use string comparison to avoid timezone issues
@@ -2010,14 +2027,29 @@ const Matchup = () => {
       }
     }
     
-    console.log('[Matchup] Calculated myTeam total (frozen past + live future):', total);
-    return total.toFixed(1);
+    const score = total.toFixed(1);
+    // Cache the stable score
+    if (!lastScoreRef.current) {
+      lastScoreRef.current = { myScore: score, oppScore: '0.0' };
+    } else {
+      lastScoreRef.current.myScore = score;
+    }
+    return score;
   }, [currentMatchup, dailyStatsByDate, myStarters, cachedDailyScores]);
 
   const opponentTeamPoints = useMemo(() => {
+    // If stats are currently loading, return last stable score to prevent flashing
+    if (statsLoadingRef.current && lastScoreRef.current) {
+      return lastScoreRef.current.oppScore;
+    }
+    
     if (!currentMatchup || dailyStatsByDate.size === 0) {
       const fallback = opponentStarters.reduce((sum, player) => sum + (player.total_points ?? 0), 0);
-      return fallback.toFixed(1);
+      const score = fallback.toFixed(1);
+      if (lastScoreRef.current) {
+        lastScoreRef.current.oppScore = score;
+      }
+      return score;
     }
 
     // Use string comparison to avoid timezone issues
@@ -2053,8 +2085,12 @@ const Matchup = () => {
       }
     }
     
-    console.log('[Matchup] Calculated opponent total (frozen past + live future):', total);
-    return total.toFixed(1);
+    const score = total.toFixed(1);
+    // Cache the stable score
+    if (lastScoreRef.current) {
+      lastScoreRef.current.oppScore = score;
+    }
+    return score;
   }, [currentMatchup, dailyStatsByDate, opponentStarters, cachedDailyScores]);
 
   const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -2077,7 +2113,7 @@ const Matchup = () => {
     }
     
     if (!user?.id) {
-      console.log('[MATCHUP] No user ID, skipping');
+      log(' No user ID, skipping');
       setLoading(false);
       hasInitializedRef.current = true; // Mark initialization complete
       return;
@@ -2086,7 +2122,7 @@ const Matchup = () => {
     // If userLeagueState says no league, don't try to load matchup data
     // But also don't freeze - just show the appropriate UI
     if (userLeagueState === 'logged-in-no-league') {
-      console.log('[MATCHUP] User has no league, showing league creation CTA - EXITING EARLY');
+      log(' User has no league, showing league creation CTA - EXITING EARLY');
       setLoading(false);
       hasInitializedRef.current = true; // Mark initialization complete
       loadingRef.current = false; // Release lock
@@ -2094,7 +2130,7 @@ const Matchup = () => {
     }
     
     if (userLeagueState === 'guest') {
-      console.log('[MATCHUP] Guest user, skipping matchup load');
+      log(' Guest user, skipping matchup load');
       setLoading(false);
       hasInitializedRef.current = true; // Mark initialization complete
       return;
@@ -2102,7 +2138,7 @@ const Matchup = () => {
     
     // Only proceed if we're an active user
     if (userLeagueState !== 'active-user') {
-      console.log('[MATCHUP] Not active user state:', userLeagueState, '- skipping load');
+      log(' Not active user state:', userLeagueState, '- skipping load');
       setLoading(false);
       hasInitializedRef.current = true; // Mark initialization complete
       return;
@@ -2110,7 +2146,7 @@ const Matchup = () => {
     
     // Guard: Don't run if we don't have a league ID and haven't determined one yet
     if (!urlLeagueId && loadingRef.current) {
-      console.log('[MATCHUP] No league ID and load in progress, skipping');
+      log(' No league ID and load in progress, skipping');
       return;
     }
     
@@ -2122,7 +2158,7 @@ const Matchup = () => {
     
     // If selectedMatchupId changed, ALWAYS bypass cache and reload
     if (selectedMatchupIdChanged) {
-      console.log('[MATCHUP] Selected matchup changed, bypassing cache:', {
+      log(' Selected matchup changed, bypassing cache:', {
         previous: prevSelectedMatchupIdRef.current,
         current: selectedMatchupId
       });
@@ -2136,7 +2172,7 @@ const Matchup = () => {
           loadedMatchupDataRef.current.matchupId === selectedMatchupId) {
         const age = Date.now() - loadedMatchupDataRef.current.timestamp;
         if (age < CACHE_TTL && !loadingRef.current) {
-          console.log('[MATCHUP] Using cached data, skipping reload');
+          log(' Using cached data, skipping reload');
           setLoading(false);
           return;
         }
@@ -2149,7 +2185,7 @@ const Matchup = () => {
     prevSelectedMatchupIdRef.current = selectedMatchupId;
     // Note: prevSelectedDateRef removed - date changes handled by separate useEffect
     
-    console.log('[MATCHUP] useEffect triggered - starting load', {
+    log(' useEffect triggered - starting load', {
       hasUser: !!user,
       userId: user?.id,
       userLeagueState,
@@ -2198,7 +2234,7 @@ const Matchup = () => {
     const loadMatchupData = async () => {
       // CRITICAL: Prevent concurrent loads AND infinite loops
       if (loadingRef.current) {
-        console.log('[MATCHUP] Load already in progress, skipping duplicate call...');
+        log(' Load already in progress, skipping duplicate call...');
         return;
       }
       
@@ -2208,13 +2244,13 @@ const Matchup = () => {
       // Additional guard: If we've already tried loading and failed, don't retry immediately
       // This prevents infinite retry loops
       if (error && !loading) {
-        console.log('[MATCHUP] Previous load failed, not retrying automatically');
+        log(' Previous load failed, not retrying automatically');
         return;
       }
       
       // Guard: Prevent running if we've already processed "no league" state
       if (hasProcessedNoLeague.current && (userLeagueState as string) === 'logged-in-no-league') {
-        console.log('[MATCHUP] Already processed no-league state, skipping');
+        log(' Already processed no-league state, skipping');
         return;
       }
       
@@ -2238,7 +2274,7 @@ const Matchup = () => {
         let targetLeagueId = urlLeagueId;
         
         if (!targetLeagueId) {
-          console.log('[MATCHUP] No leagueId in URL, fetching user leagues...');
+          log(' No leagueId in URL, fetching user leagues...');
           // Get user's leagues if no leagueId in URL
           const { leagues: userLeagues, error: leaguesError } = await LeagueService.getUserLeagues(user.id);
           if (leaguesError) {
@@ -2257,7 +2293,7 @@ const Matchup = () => {
           // Use first league and redirect to URL with leagueId
           const currentLeague = userLeagues[0];
           targetLeagueId = currentLeague.id;
-          console.log('[MATCHUP] Redirecting to league:', targetLeagueId);
+          log(' Redirecting to league:', targetLeagueId);
           
           // Redirect to URL with leagueId (and weekId if available) - use window.location to avoid loops
           const weekParam = urlWeekId ? `/${urlWeekId}` : '';
@@ -2265,7 +2301,7 @@ const Matchup = () => {
           return;
         }
 
-        console.log('[MATCHUP] LeagueId from URL:', targetLeagueId);
+        log(' LeagueId from URL:', targetLeagueId);
         // Get league data
         const { leagues: userLeagues, error: leagueError } = await LeagueService.getUserLeagues(user.id);
         if (leagueError) {
@@ -2282,12 +2318,12 @@ const Matchup = () => {
           return;
         }
 
-        console.log('[MATCHUP] Found league:', currentLeague.id, 'draft_status:', currentLeague.draft_status);
+        log(' Found league:', currentLeague.id, 'draft_status:', currentLeague.draft_status);
         setLeague(currentLeague);
 
         // Check if draft is completed
         if (currentLeague.draft_status !== 'completed') {
-          console.log('[MATCHUP] Draft not completed, cannot view matchups');
+          log(' Draft not completed, cannot view matchups');
           setError('Draft must be completed before viewing matchups');
           setLoading(false);
           loadingRef.current = false;
@@ -2300,15 +2336,15 @@ const Matchup = () => {
         try {
           const { error: updateScoresError } = await MatchupService.updateMatchupScores(currentLeague.id);
           if (updateScoresError) {
-            console.warn('[MATCHUP] Error updating matchup scores:', updateScoresError);
+            log('WARN: Error updating matchup scores:', updateScoresError);
             // Don't block matchup load if score update fails
           }
         } catch (error) {
-          console.warn('[MATCHUP] Exception updating matchup scores:', error);
+          log('WARN: Exception updating matchup scores:', error);
           // Don't block matchup load if score update fails
         }
 
-        console.log('[MATCHUP] Getting user team for league:', currentLeague.id);
+        log(' Getting user team for league:', currentLeague.id);
         // Get user's team
         const { team: userTeamData } = await LeagueService.getUserTeam(currentLeague.id, user.id);
         if (!userTeamData) {
@@ -2318,7 +2354,7 @@ const Matchup = () => {
           loadingRef.current = false;
           return;
         }
-        console.log('[MATCHUP] Found user team:', userTeamData.id);
+        log(' Found user team:', userTeamData.id);
         setUserTeam(userTeamData);
 
         // Extract and store league scoring settings
@@ -2356,7 +2392,7 @@ const Matchup = () => {
             penalty_minutes: skaterScoring.penalty_minutes ?? 0.5
           }
         });
-        console.log('[MATCHUP] Loaded scoring settings (all 8 categories):', {
+        log(' Loaded scoring settings (all 8 categories):', {
           goalie: goalieScoring,
           skater: skaterScoring
         });
@@ -2375,7 +2411,7 @@ const Matchup = () => {
         // Get available weeks
         const currentYear = new Date().getFullYear();
         const weeks = getAvailableWeeks(firstWeek, currentYear);
-        console.log(`[Matchup] Calculated ${weeks.length} available weeks:`, weeks);
+        log(` Calculated ${weeks.length} available weeks:`, weeks);
         setAvailableWeeks(weeks);
 
         // Determine which week to show (from URL or current week)
@@ -2400,7 +2436,7 @@ const Matchup = () => {
         setSelectedWeek(weekToShow);
         
         // Debug: Log week calculation details
-        console.log('[Matchup] Week calculation details:', {
+        log(' Week calculation details:', {
           urlWeekId,
           weekToShow,
           weekToShowType: typeof weekToShow,
@@ -2413,7 +2449,7 @@ const Matchup = () => {
         });
 
         // Quick check: Does a matchup exist for this week? If yes, skip generation entirely
-        console.log('[Matchup] Checking for existing matchup:', {
+        log(' Checking for existing matchup:', {
           leagueId: currentLeague.id,
           userId: user.id,
           weekNumber: weekToShow,
@@ -2431,7 +2467,7 @@ const Matchup = () => {
           setUserMatchupId(existingMatchup.id);
         }
         
-        console.log('[Matchup] Existing matchup check result:', {
+        log(' Existing matchup check result:', {
           found: !!existingMatchup,
           matchup: existingMatchup ? {
             id: existingMatchup.id,
@@ -2444,7 +2480,7 @@ const Matchup = () => {
         
         if (!existingMatchup) {
           // No matchup found for this week - generate all missing weeks
-          console.log('[Matchup] No matchup found for week', weekToShow, '- generating matchups...');
+          log(' No matchup found for week', weekToShow, '- generating matchups...');
           const { teams: leagueTeams } = await LeagueService.getLeagueTeams(currentLeague.id);
           
           // Check if ANY matchups exist for this league
@@ -2460,8 +2496,8 @@ const Matchup = () => {
           // Otherwise, generate only missing weeks (which will include this one)
           const forceRegenerate = !hasAnyMatchups;
           
-          console.log('[Matchup] Generating matchups with forceRegenerate:', forceRegenerate, 'for week:', weekToShow);
-          console.log('[Matchup] Generation parameters:', {
+          log(' Generating matchups with forceRegenerate:', forceRegenerate, 'for week:', weekToShow);
+          log(' Generation parameters:', {
             leagueId: currentLeague.id,
             teamCount: leagueTeams.length,
             teams: leagueTeams.map(t => ({ id: t.id, name: t.team_name || t.id })),
@@ -2485,7 +2521,7 @@ const Matchup = () => {
             return;
           }
           
-          console.log('[Matchup] Matchup generation completed successfully');
+          log(' Matchup generation completed successfully');
           
           // Wait longer to ensure database commits complete
           await new Promise(resolve => setTimeout(resolve, 2000));
@@ -2497,7 +2533,7 @@ const Matchup = () => {
             .eq('league_id' as any, currentLeague.id as any)
             .eq('week_number' as any, weekToShow as any);
           
-          console.log('[Matchup] Debug - All matchups for week', weekToShow, ':', allMatchups);
+          log(' Debug - All matchups for week', weekToShow, ':', allMatchups);
           
           // Also check ALL weeks in database to see what's actually stored
           const { data: allWeeksMatchups } = await supabase
@@ -2506,8 +2542,8 @@ const Matchup = () => {
             .eq('league_id' as any, currentLeague.id as any);
           
           const uniqueWeeks = new Set((allWeeksMatchups as any[])?.map((m: any) => m.week_number) || []);
-          console.log('[Matchup] Debug - All week numbers in database:', Array.from(uniqueWeeks).sort((a, b) => a - b));
-          console.log('[Matchup] Debug - Requested week', weekToShow, 'exists in database?', uniqueWeeks.has(weekToShow));
+          log(' Debug - All week numbers in database:', Array.from(uniqueWeeks).sort((a, b) => a - b));
+          log(' Debug - Requested week', weekToShow, 'exists in database?', uniqueWeeks.has(weekToShow));
           
           // Also check user's team
           const { data: userTeamData } = await supabase
@@ -2517,12 +2553,12 @@ const Matchup = () => {
             .eq('owner_id' as any, user.id as any)
             .maybeSingle();
           
-          console.log('[Matchup] Debug - User team:', userTeamData);
+          log(' Debug - User team:', userTeamData);
           
           if (allMatchups && allMatchups.length > 0) {
             const matchupsData = allMatchups as any[];
-            console.log('[Matchup] Debug - Matchups exist but user team not found. User team ID:', (userTeamData as any)?.id);
-            console.log('[Matchup] Debug - Matchups in week:', matchupsData.map((m: any) => ({
+            log(' Debug - Matchups exist but user team not found. User team ID:', (userTeamData as any)?.id);
+            log(' Debug - Matchups in week:', matchupsData.map((m: any) => ({
               team1: m.team1_id,
               team2: m.team2_id
             })));
@@ -2531,7 +2567,7 @@ const Matchup = () => {
             const userTeamInMatchups = matchupsData.some((m: any) => 
               m.team1_id === (userTeamData as any)?.id || m.team2_id === (userTeamData as any)?.id
             );
-            console.log('[Matchup] Debug - User team in matchups?', userTeamInMatchups);
+            log(' Debug - User team in matchups?', userTeamInMatchups);
           }
           
           // Verify the matchup was created
@@ -2571,7 +2607,7 @@ const Matchup = () => {
                   return;
                 }
                 
-                console.log('[Matchup] Regenerating ALL matchups with complete team list...');
+                log(' Regenerating ALL matchups with complete team list...');
                 const { error: regenError } = await MatchupService.generateMatchupsForLeague(
                   currentLeague.id,
                   allLeagueTeams,
@@ -2603,7 +2639,7 @@ const Matchup = () => {
                   return;
                 }
                 
-                console.log('[Matchup] Successfully regenerated and verified matchup exists');
+                log(' Successfully regenerated and verified matchup exists');
                 // Matchup now exists, continue with normal flow below
               } else {
                 setError(`No matchup found for week ${weekToShow}. The matchup generation may have failed. Please try refreshing the page.`);
@@ -2631,12 +2667,12 @@ const Matchup = () => {
               return;
             }
             
-            console.log('[Matchup] Verified matchup exists after forced regeneration');
+            log(' Verified matchup exists after forced regeneration');
           }
           
-          console.log('[Matchup] Verified matchup exists for week', weekToShow);
+          log(' Verified matchup exists for week', weekToShow);
         } else {
-          console.log('[Matchup] Matchup already exists for week', weekToShow, '- skipping generation');
+          log(' Matchup already exists for week', weekToShow, '- skipping generation');
         }
 
         // Load matchup data using unified method
@@ -2648,14 +2684,14 @@ const Matchup = () => {
         if (selectedMatchupId) {
           // Always try to load the selected matchup, even if not in allWeekMatchups
           // This handles cases where the dropdown was changed but allWeekMatchups hasn't updated yet
-          console.log('[MATCHUP] Loading selected matchup from dropdown:', selectedMatchupId);
+          log(' Loading selected matchup from dropdown:', selectedMatchupId);
           matchupDataPromise = MatchupService.getMatchupDataById(
             selectedMatchupId,
             user.id,
             userTimezone
           );
         } else {
-          console.log('[MATCHUP] STEP 10: Calling getMatchupData for user matchup', {
+          log(' STEP 10: Calling getMatchupData for user matchup', {
             leagueId: targetLeagueId,
             userId: user.id,
             weekNumber: weekToShow,
@@ -2718,7 +2754,7 @@ const Matchup = () => {
           } else {
             // Original error handling for user's matchup
             if (matchupError?.message?.includes('No matchup found') || matchupError?.message?.includes('timed out')) {
-              console.log('[MATCHUP] No matchup found or timeout for week', weekToShow);
+              log(' No matchup found or timeout for week', weekToShow);
               setError(`Failed to load matchup for week ${weekToShow}. ${matchupError.message?.includes('timed out') ? 'Request timed out.' : 'Matchup may need to be generated.'} Please try refreshing the page.`);
               setLoading(false);
               loadingRef.current = false;
@@ -2750,7 +2786,7 @@ const Matchup = () => {
           }
         }
         
-        console.log('[MATCHUP] STEP 11: Matchup data loaded successfully');
+        log(' STEP 11: Matchup data loaded successfully');
         
         // Update cache with loaded data (include selectedMatchupId in cache key)
         if (targetLeagueId && weekToShow) {
@@ -2791,7 +2827,7 @@ const Matchup = () => {
         // Check if we're loading a different matchup than currently displayed
         const isMatchupChange = !previousMatchupId || previousMatchupId !== matchupData.matchup.id;
         if (isMatchupChange) {
-          console.log('[Matchup] Matchup changed, resetting selectedDate');
+          log(' Matchup changed, resetting selectedDate');
           setSelectedDate(null);
           setDailyStatsMap(new Map());
         }
@@ -2849,7 +2885,7 @@ const Matchup = () => {
         const datesToLoad = weekDates; // Changed from pastDates to ALL dates
         
         if (datesToLoad.length > 0) {
-          console.log('[MATCHUP] Pre-loading rosters for ALL week dates:', datesToLoad);
+          log(' Pre-loading rosters for ALL week dates:', datesToLoad);
           
           // Create lookup maps from enriched roster players
           const enrichedMyPlayerMap = new Map<string, MatchupPlayer>();
@@ -2862,7 +2898,7 @@ const Matchup = () => {
             enrichedOppPlayerMap.set(String(p.id), p);
           });
           
-          console.log('[MATCHUP] Initial enriched player lookup maps:', {
+          log(' Initial enriched player lookup maps:', {
             myPlayers: enrichedMyPlayerMap.size,
             oppPlayers: enrichedOppPlayerMap.size
           });
@@ -2892,11 +2928,11 @@ const Matchup = () => {
             )];
             
             if (missingIds.length > 0) {
-              console.log('[MATCHUP] Found dropped/traded players in frozen rosters:', missingIds);
+              log(' Found dropped/traded players in frozen rosters:', missingIds);
               
               // Fetch missing players
               const missingPlayers = await PlayerService.getPlayersByIds(missingIds);
-              console.log('[MATCHUP] Fetched', missingPlayers.length, 'dropped/traded players');
+              log(' Fetched', missingPlayers.length, 'dropped/traded players');
               
               // Transform to MatchupPlayer and add to appropriate lookup map
               missingPlayers.forEach(player => {
@@ -2934,7 +2970,7 @@ const Matchup = () => {
                 }
               });
               
-              console.log('[MATCHUP] Updated enriched player lookup maps after adding dropped players:', {
+              log(' Updated enriched player lookup maps after adding dropped players:', {
                 myPlayers: enrichedMyPlayerMap.size,
                 oppPlayers: enrichedOppPlayerMap.size
               });
@@ -2968,7 +3004,7 @@ const Matchup = () => {
                 .eq('roster_date', date) : { data: null };
               
               if (!myDailyRoster || myDailyRoster.length === 0) {
-                console.log(`[MATCHUP] No frozen roster found for ${date}`);
+                log(` No frozen roster found for ${date}`);
                 return null;
               }
               
@@ -2992,7 +3028,7 @@ const Matchup = () => {
                     mySlots[playerId] = entry.slot_id;
                   }
                 } else {
-                  console.warn(`[MATCHUP] Player ${playerId} not found in enriched map for date ${date}`);
+                  log(`WARN: Player ${playerId} not found in enriched map for date ${date}`);
                 }
               });
               
@@ -3038,9 +3074,9 @@ const Matchup = () => {
           });
           
           setFrozenRostersByDate(frozenMap);
-          console.log(`[MATCHUP] Pre-loaded ${frozenMap.size} saved rosters for week (Yahoo/Sleeper style)`);
+          log(` Pre-loaded ${frozenMap.size} saved rosters for week (Yahoo/Sleeper style)`);
         } else {
-          console.log('[MATCHUP] No week dates to load rosters for');
+          log(' No week dates to load rosters for');
           setFrozenRostersByDate(new Map());
         }
 
@@ -3065,7 +3101,7 @@ const Matchup = () => {
         if (timeoutId) {
           clearTimeout(timeoutId);
         }
-        console.log('[MATCHUP] Finally block - clearing loading state');
+        log(' Finally block - clearing loading state');
         setLoading(false); // Always complete loading
         hasInitializedRef.current = true; // Mark that initial load is complete
         loadingRef.current = false; // Release lock - CRITICAL to prevent freeze
@@ -3083,6 +3119,7 @@ const Matchup = () => {
   // DATE CHANGE HANDLER - Uses pre-loaded rosters for ALL dates
   // Yahoo/Sleeper style: each day can have its own unique roster
   // NO API calls - instant roster switching from local state
+  // Smooth transitions: preserve previous roster during switch
   // ============================================================
   useEffect(() => {
     // If no date selected, nothing to do
@@ -3090,30 +3127,49 @@ const Matchup = () => {
       return;
     }
     
-    // First, check if we have a saved roster for this date (past OR future)
-    const savedRoster = frozenRostersByDate.get(selectedDate);
-    
-    if (savedRoster && savedRoster.myRoster.length > 0) {
-      // Use the saved roster for this specific date
-      console.log('[MATCHUP DATE-HANDLER] Using saved roster for date:', selectedDate, {
-        myRosterSize: savedRoster.myRoster.length,
-        oppRosterSize: savedRoster.oppRoster.length
-      });
-      setMyTeam(savedRoster.myRoster);
-      setOpponentTeamPlayers(savedRoster.oppRoster);
-      setMyTeamSlotAssignments(savedRoster.mySlots);
-      setOpponentTeamSlotAssignments(savedRoster.oppSlots);
-    } else if (baseCurrentRoster && baseCurrentRoster.myRoster.length > 0) {
-      // No saved roster for this date - use base current roster as fallback
-      console.log('[MATCHUP DATE-HANDLER] No saved roster for date:', selectedDate, '- using base roster');
-      setMyTeam(baseCurrentRoster.myRoster);
-      setOpponentTeamPlayers(baseCurrentRoster.oppRoster);
-      setMyTeamSlotAssignments(baseCurrentRoster.mySlots);
-      setOpponentTeamSlotAssignments(baseCurrentRoster.oppSlots);
-    } else {
-      console.warn('[MATCHUP DATE-HANDLER] No roster data available for date:', selectedDate);
+    // Store current roster as previous before switching
+    if (myTeam.length > 0 || opponentTeamPlayers.length > 0) {
+      previousRosterRef.current = {
+        myTeam: [...myTeam],
+        oppTeam: [...opponentTeamPlayers]
+      };
     }
-  }, [selectedDate, frozenRostersByDate, baseCurrentRoster]);
+    
+    // Set switching state to show smooth transition
+    setIsSwitchingDate(true);
+    
+    // Use requestAnimationFrame to ensure smooth transition
+    requestAnimationFrame(() => {
+      // First, check if we have a saved roster for this date (past OR future)
+      const savedRoster = frozenRostersByDate.get(selectedDate);
+      
+      if (savedRoster && savedRoster.myRoster.length > 0) {
+        // Use the saved roster for this specific date
+        log('DATE-HANDLER Using saved roster for date:', selectedDate, {
+          myRosterSize: savedRoster.myRoster.length,
+          oppRosterSize: savedRoster.oppRoster.length
+        });
+        setMyTeam(savedRoster.myRoster);
+        setOpponentTeamPlayers(savedRoster.oppRoster);
+        setMyTeamSlotAssignments(savedRoster.mySlots);
+        setOpponentTeamSlotAssignments(savedRoster.oppSlots);
+      } else if (baseCurrentRoster && baseCurrentRoster.myRoster.length > 0) {
+        // No saved roster for this date - use base current roster as fallback
+        log('DATE-HANDLER No saved roster for date:', selectedDate, '- using base roster');
+        setMyTeam(baseCurrentRoster.myRoster);
+        setOpponentTeamPlayers(baseCurrentRoster.oppRoster);
+        setMyTeamSlotAssignments(baseCurrentRoster.mySlots);
+        setOpponentTeamSlotAssignments(baseCurrentRoster.oppSlots);
+      } else {
+        log('WARN: DATE-HANDLER No roster data available for date:', selectedDate);
+      }
+      
+      // Clear switching state after a brief delay to allow render
+      setTimeout(() => {
+        setIsSwitchingDate(false);
+      }, 50);
+    });
+  }, [selectedDate, frozenRostersByDate, baseCurrentRoster, myTeam, opponentTeamPlayers]);
 
   // Refresh matchup when page becomes visible (e.g., navigating back from roster page)
   useEffect(() => {
@@ -3122,7 +3178,7 @@ const Matchup = () => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && !loadingRef.current) {
         // Page became visible - clear cache and reload by triggering URL change
-        console.log('[Matchup] Page visible, refreshing matchup data...');
+        log(' Page visible, refreshing matchup data...');
         MatchupService.clearRosterCache(userTeam.id, league.id);
         // Use window.location to avoid React Router navigation loops
         window.location.href = `/matchup/${urlLeagueId}/${urlWeekId}`;
@@ -3134,116 +3190,229 @@ const Matchup = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, league?.id, userTeam?.id, urlLeagueId, urlWeekId]);
 
-  // Periodic refresh for in-progress matchups (every 5 minutes)
-  // This ensures scores stay current as new game stats are scraped
+  // =============================================================================
+  // CONSOLIDATED REFRESH EFFECT - Handles both score updates and live game stats
+  // - Fast refresh (45s) when games are live
+  // - Slow refresh (5min) for score updates when no live games
+  // =============================================================================
+  const liveRefreshSetupRef = useRef(false);
+  
   useEffect(() => {
     if (!league?.id || userLeagueState !== 'active-user') return;
-    if (!currentMatchup || currentMatchup.status !== 'in_progress') return;
-
-    // Update scores immediately, then set up interval
-    const updateScores = async () => {
+    if (!currentMatchup) return;
+    
+    // Check if today is within this matchup's week
+    const todayStr = getTodayMST();
+    const isWithinMatchupWeek = todayStr >= currentMatchup.week_start_date && todayStr <= currentMatchup.week_end_date;
+    
+    if (!isWithinMatchupWeek) {
+      log(' Today is not within matchup week, skipping live refresh');
+      liveRefreshSetupRef.current = false;
+      return;
+    }
+    
+    // Prevent setting up multiple intervals - only set up once per matchup
+    if (liveRefreshSetupRef.current) {
+      log(' Live refresh already set up, skipping duplicate setup');
+      return;
+    }
+    liveRefreshSetupRef.current = true;
+    
+    log(' Today is within matchup week, starting consolidated refresh...');
+    
+    // Function to update matchup scores in database
+    const updateMatchupScores = async () => {
+      if (currentMatchup.status !== 'in_progress') return;
       try {
-        const result = await MatchupService.updateMatchupScores(league.id);
-        if (result.error) {
-          console.warn('[Matchup] Periodic score update had errors:', result.error);
-        } else {
-          console.log(`[Matchup] Periodic score update completed: ${result.updatedCount || 0} matchups updated`);
-        }
+        await MatchupService.updateMatchupScores(league.id);
       } catch (error) {
-        console.warn('[Matchup] Error in periodic score update:', error);
-        // Don't throw - allow interval to continue
+        // Non-blocking - don't stop refresh cycle
       }
     };
-
-    // Update immediately (but don't block)
-    updateScores().catch(err => {
-      console.warn('[Matchup] Initial periodic update failed:', err);
-    });
-
-    // Then update every 5 minutes (300000 ms)
-    const intervalId = setInterval(() => {
-      updateScores().catch(err => {
-        console.warn('[Matchup] Periodic update failed:', err);
-      });
-    }, 300000);
-
-    return () => clearInterval(intervalId);
-  }, [league?.id, currentMatchup?.status, userLeagueState]);
-
-  // Periodic refresh of daily stats during live games (every 30-60 seconds)
-  // This ensures player cards show live points instead of projections once games start
-  useEffect(() => {
-    if (!league?.id || userLeagueState !== 'active-user') return;
-    if (!currentMatchup || currentMatchup.status !== 'in_progress') return;
     
-    // Check if any players have live games today
-    const todayStr = getTodayMST();
-    const hasLiveGames = [...myStarters, ...opponentStarters].some(player => {
-      if (!player.games || !Array.isArray(player.games)) return false;
-      const todayGames = player.games.filter(g => {
-        if (!g || typeof g !== 'object') return false;
-        const gameDate = g.game_date?.split('T')[0];
-        return gameDate === todayStr && ((g.status as string) === 'live' || (g.status as string) === 'LIVE');
-      });
-      return todayGames.length > 0;
-    });
+    // Function to refresh game statuses from DB and update player.games arrays
+    // Uses functional state updates to avoid stale closure issues
+    const refreshGameStatuses = async () => {
+      try {
+        // Get teams from current state using functional pattern
+        // This avoids stale closure issues with myStarters/opponentStarters
+        let allTeamsArray: string[] = [];
+        setMyTeam(prev => {
+          prev.forEach(p => {
+            const team = (p.teamAbbreviation || p.team || '').toUpperCase();
+            if (team && !allTeamsArray.includes(team)) allTeamsArray.push(team);
+          });
+          return prev; // Don't modify state, just read it
+        });
+        setOpponentTeamPlayers(prev => {
+          prev.forEach(p => {
+            const team = (p.teamAbbreviation || p.team || '').toUpperCase();
+            if (team && !allTeamsArray.includes(team)) allTeamsArray.push(team);
+          });
+          return prev; // Don't modify state, just read it
+        });
+        
+        // Small delay to ensure state reads complete
+        await new Promise(resolve => setTimeout(resolve, 10));
+        
+        if (allTeamsArray.length === 0) {
+          log(' No teams to refresh');
+          return;
+        }
+        
+        log(` Refreshing game statuses for ${allTeamsArray.length} teams: ${allTeamsArray.join(', ')}`);
+        log(` Looking for games on: ${todayStr}`);
+        
+        // Use MST-aware date to avoid timezone issues
+        // CRITICAL: new Date() + toISOString() can give wrong date if it's late evening in MST
+        const todayDate = getTodayMSTDate();
+        const { gamesByTeam } = await ScheduleService.getGamesForTeams(allTeamsArray, todayDate, todayDate);
+        
+        if (!gamesByTeam || gamesByTeam.size === 0) {
+          log('WARN: No games found for today from ScheduleService');
+          return;
+        }
+        
+        // Log what we got - be verbose for debugging
+        let liveCount = 0;
+        let totalGames = 0;
+        gamesByTeam.forEach((games, team) => {
+          games.forEach(g => {
+            totalGames++;
+            const gameDate = g.game_date?.split('T')[0] || g.game_date;
+            const matchesToday = gameDate === todayStr;
+            log(` Game: ${g.away_team} @ ${g.home_team} | date: ${gameDate} | status: ${g.status} | matchesToday: ${matchesToday}`);
+            const statusLower = (g.status || '').toLowerCase();
+            if (statusLower === 'live' || statusLower === 'intermission' || statusLower === 'crit') {
+              liveCount++;
+              log(` 🔴 LIVE: ${g.away_team} @ ${g.home_team} (${g.period || 'no period'} ${g.period_time || ''})`);
+            }
+          });
+        });
+        log(` Found ${totalGames} total games, ${liveCount} live/intermission from DB`);
+        
+        // Create a map of team -> latest game for today
+        // Handle both 'YYYY-MM-DD' and 'YYYY-MM-DDTHH:MM:SS' formats
+        const gameStatusByTeam = new Map<string, any>();
+        gamesByTeam.forEach((games, team) => {
+          const todayGame = games.find(g => {
+            const gameDate = g.game_date?.split('T')[0] || g.game_date;
+            return gameDate === todayStr;
+          });
+          if (todayGame) {
+            gameStatusByTeam.set(team.toUpperCase(), todayGame);
+            log(` Team ${team} has game today: ${todayGame.status}`);
+          }
+        });
+        
+        // Update myTeam players' games array with fresh status
+        setMyTeam(prev => prev.map(player => {
+          const teamAbbr = (player.teamAbbreviation || player.team || '').toUpperCase();
+          if (!teamAbbr) return player;
+          
+          const freshGame = gameStatusByTeam.get(teamAbbr);
+          if (!freshGame) return player;
+          
+          // If player has no games array, create one
+          if (!player.games || !Array.isArray(player.games)) {
+            return { ...player, games: [freshGame] };
+          }
+          
+          // Update the games array with fresh status
+          const updatedGames = player.games.map(g => {
+            if (g.game_date?.split('T')[0] === todayStr) {
+              return { ...g, status: freshGame.status, home_score: freshGame.home_score, away_score: freshGame.away_score, period: freshGame.period, period_time: freshGame.period_time };
+            }
+            return g;
+          });
+          
+          return { ...player, games: updatedGames };
+        }));
+        
+        // Same for opponent team
+        setOpponentTeamPlayers(prev => prev.map(player => {
+          const teamAbbr = (player.teamAbbreviation || player.team || '').toUpperCase();
+          if (!teamAbbr) return player;
+          
+          const freshGame = gameStatusByTeam.get(teamAbbr);
+          if (!freshGame) return player;
+          
+          if (!player.games || !Array.isArray(player.games)) {
+            return { ...player, games: [freshGame] };
+          }
+          
+          const updatedGames = player.games.map(g => {
+            if (g.game_date?.split('T')[0] === todayStr) {
+              return { ...g, status: freshGame.status, home_score: freshGame.home_score, away_score: freshGame.away_score, period: freshGame.period, period_time: freshGame.period_time };
+            }
+            return g;
+          });
+          
+          return { ...player, games: updatedGames };
+        }));
+        
+        log(' ✅ Game statuses refreshed successfully');
+      } catch (err) {
+        console.error('[Matchup] ❌ Error refreshing game statuses:', err);
+      }
+    };
     
-    if (!hasLiveGames) return; // No live games, don't refresh
-    
-    console.log('[Matchup] Live games detected, starting periodic refresh of daily stats');
-    
-    // Refresh daily stats immediately, then set up interval
-    fetchAllDailyStats().catch(err => {
-      console.warn('[Matchup] Initial live stats refresh failed:', err);
-    });
+    // Refresh stats, game statuses, AND matchup scores immediately
+    Promise.all([
+      fetchAllDailyStats(),
+      refreshGameStatuses(),
+      updateMatchupScores()
+    ]).catch(() => { /* non-blocking */ });
     
     // Refresh every 45 seconds during live games (slightly longer than backend 30s updates)
+    // Also updates matchup scores periodically (was separate 5-min interval, now consolidated)
     const intervalId = setInterval(() => {
-      fetchAllDailyStats().catch(err => {
-        console.warn('[Matchup] Live stats refresh failed:', err);
-      });
+      Promise.all([
+        fetchAllDailyStats(),
+        refreshGameStatuses(),
+        updateMatchupScores()
+      ]).catch(() => { /* non-blocking */ });
     }, 45000); // 45 seconds
     
     return () => {
       clearInterval(intervalId);
-      console.log('[Matchup] Stopped live stats refresh (no live games or matchup ended)');
+      liveRefreshSetupRef.current = false;
+      log(' Stopped live stats refresh (no live games or matchup ended)');
     };
-  }, [league?.id, currentMatchup?.status, userLeagueState, myStarters, opponentStarters, fetchAllDailyStats]);
+    // CRITICAL: Do NOT include myStarters/opponentStarters in deps - it creates infinite loop
+    // The refreshGameStatuses function uses functional state updates to get current state
+  }, [league?.id, currentMatchup?.id, currentMatchup?.week_start_date, currentMatchup?.week_end_date, currentMatchup?.status, userLeagueState, fetchAllDailyStats]);
 
 
   // Handle week selection - updates URL which triggers data reload
   // Works for both logged-in users and guests
-  const handleWeekChange = (weekNumber: number) => {
+  const handleWeekChange = useCallback((weekNumber: number) => {
     // Determine league ID based on user state
     const leagueId = (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league')
       ? DEMO_LEAGUE_ID_FOR_GUESTS
       : league?.id;
     
-    if (!leagueId) {
-      console.warn('[Matchup] handleWeekChange called but league is not set');
-      return;
-    }
+    if (!leagueId) return;
     
-    console.log('[Matchup] handleWeekChange called, navigating to week:', weekNumber, 'for league:', leagueId, 'userState:', userLeagueState);
     // Use window.location to avoid React Router navigation loops
     window.location.href = `/matchup/${leagueId}/${weekNumber}`;
-  };
+  }, [userLeagueState, league?.id]);
   
   // Refresh matchup data (useful after making lineup changes on roster page)
-  const refreshMatchup = () => {
+  const refreshMatchup = useCallback(() => {
     if (!league?.id || !userTeam?.id || !urlLeagueId || !urlWeekId) return;
     // Clear all caches to force fresh data
     MatchupService.clearRosterCache();
     // Use window.location to avoid React Router navigation loops
     window.location.href = `/matchup/${urlLeagueId}/${urlWeekId}`;
-  };
+  }, [league?.id, userTeam?.id, urlLeagueId, urlWeekId]);
 
   // Debug: Log render state (using ref counter to prevent spam)
   // MUST be declared before early return to maintain hook order
   const renderCountRef = useRef(0);
   renderCountRef.current += 1;
   if (renderCountRef.current <= 3) { // Only log first 3 renders
-    console.log('[MATCHUP] Component rendering', {
+    log(' Component rendering', {
       renderCount: renderCountRef.current,
       loading,
       error,
@@ -3253,49 +3422,59 @@ const Matchup = () => {
     });
   }
 
-  // Show full-page loading screen IMMEDIATELY - before any other logic
-  // This prevents any flash between Suspense fallback and component loading state
-  // Use useMemo to compute synchronously on every render
-  // Be very conservative - show loading if:
-  // 1. LeagueContext is still loading, OR
-  // 2. Component loading state is true (and not in "no league" state), OR
-  // 3. We haven't initialized yet AND we're not in "no league" state (prevents initial flash)
-  // 4. User state is undefined/null (still determining)
-  // Determine actual loading state (before minimum time delay)
+  // =============================================================================
+  // SIMPLIFIED LOADING STATE - One-way gate prevents flash/cycling
+  // =============================================================================
+  // Simple rule: Show loading until we have everything needed to render
+  // Once we transition to "ready", we NEVER go back to loading (prevents flash)
   const actualLoading = useMemo(() => {
-    // If userLeagueState is undefined, we're still determining state - show loading
-    if (userLeagueState === undefined || userLeagueState === null) {
+    // Already completed initial load? Never show loading again
+    if (hasInitializedRef.current) {
+      return false;
+    }
+    
+    // Still determining user state? Show loading
+    if (authLoading || leagueContextLoading || userLeagueState === undefined || userLeagueState === null) {
       return true;
     }
     
-    // If leagueContext is loading, show loading
-    if (leagueContextLoading) {
+    // Component still loading data? Show loading
+    if (loading) {
       return true;
     }
     
-    // If we haven't initialized and not in "no league" state, show loading
-    if (!hasInitializedRef.current && userLeagueState !== 'logged-in-no-league') {
+    // For "no league" state, only hide loading once we've processed it
+    // This ensures a smooth transition instead of instant render
+    if (userLeagueState === 'logged-in-no-league') {
+      // Mark as initialized so we don't show loading again
+      if (!hasInitializedRef.current) {
+        hasInitializedRef.current = true;
+      }
+      return false;
+    }
+    
+    // For active users and guests, ensure we have data before hiding loading
+    // This prevents showing empty UI while data is being fetched
+    const hasData = userLeagueState === 'guest' 
+      ? (demoMyTeam.length > 0 || demoOpponentTeam.length > 0)
+      : (myTeam.length > 0 || opponentTeamPlayers.length > 0);
+    
+    if (!hasData && !error) {
+      // Still waiting for data - keep showing loading
       return true;
     }
     
-    // If component is loading and not in "no league" state, show loading
-    if (loading && userLeagueState !== 'logged-in-no-league') {
-      return true;
+    // All conditions met - ready to show content
+    // Mark as initialized so we don't show loading again
+    if (!hasInitializedRef.current) {
+      hasInitializedRef.current = true;
     }
-    
-    // For guests, if we have an error but haven't fully initialized, keep showing loading
-    // This prevents the error screen from flashing during demo load
-    if ((userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') && 
-        error && 
-        !hasInitializedRef.current) {
-      return true;
-    }
-    
     return false;
-  }, [leagueContextLoading, loading, userLeagueState, error]);
+  }, [authLoading, leagueContextLoading, loading, userLeagueState, myTeam.length, opponentTeamPlayers.length, demoMyTeam.length, demoOpponentTeam.length, error]);
 
-  // Apply minimum display time (800ms) to prevent jarring flash effect
-  const shouldShowLoading = useMinimumLoadingTime(actualLoading, 800);
+  // Apply minimum display time (1000ms) to prevent jarring flash effect
+  // This ensures a single, smooth loading screen without cycling
+  const shouldShowLoading = useMinimumLoadingTime(actualLoading, 1000);
   
   // Early return for loading - must be after all hooks are declared
   if (shouldShowLoading) {
@@ -3342,7 +3521,7 @@ const Matchup = () => {
                       <Select
                         value={selectedMatchupId || currentMatchup?.id || ''}
                         onValueChange={async (value) => {
-                          console.log('[Matchup] Dropdown changed to:', value);
+                          log(' Dropdown changed to:', value);
                           // CRITICAL: Clear cache when dropdown changes to force fresh load
                           loadedMatchupDataRef.current = null;
                           setSelectedMatchupId(value);
@@ -3378,7 +3557,7 @@ const Matchup = () => {
                                                   Math.abs(tabTeam2Score - team2Score) < 0.1;
                               
                               if (!scoresMatch) {
-                                console.warn('[Matchup] Dropdown score vs Tab score mismatch:', {
+                                log('WARN: Dropdown score vs Tab score mismatch:', {
                                   matchup_id: matchup.id,
                                   dropdown_team1: team1Score,
                                   dropdown_team2: team2Score,
@@ -3388,7 +3567,7 @@ const Matchup = () => {
                                   note: 'Dropdown reads from database, tab calculates on frontend. They should match after score update.'
                                 });
                               } else {
-                                console.log('[Matchup] Dropdown score vs Tab score match:', {
+                                log(' Dropdown score vs Tab score match:', {
                                   matchup_id: matchup.id,
                                   team1: team1Score,
                                   team2: team2Score
