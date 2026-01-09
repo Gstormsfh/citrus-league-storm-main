@@ -1,0 +1,27 @@
+name: Nightly Projection Batch
+
+on:
+  schedule:
+    - cron: '0 7 * * *'  # 2 AM ET (7 AM UTC)
+  workflow_dispatch:      # Manual trigger button
+
+jobs:
+  calculate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - run: pip install -r requirements.txt
+      
+      - name: Run nightly projections
+        env:
+          VITE_SUPABASE_URL: ${{ https://iezwazccqqrhrjupxzvf.supabase.co }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImllendhemNjcXFyaHJqdXB4enZmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1Njc2MzYwNiwiZXhwIjoyMDcyMzM5NjA2fQ.8gt9OvtXSHdzy30h20OnaUqzgiyvt-ErXw5PwOk_FVY }}
+        run: python scripts/nightly_projection_batch.py --season 2025
