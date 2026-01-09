@@ -314,34 +314,40 @@ const Matchup = () => {
       });
       
       // Calculate scores for each past date
-      // CRITICAL: Use team1 as "myScore" (left side) and team2 as "oppScore" (right side)
-      // This matches the UI layout where team1 is on the left
+      // CRITICAL: Determine which team is "my team" vs "opponent" based on viewingTeamId
       const scores = new Map<string, { myScore: number; oppScore: number; isLocked: boolean }>();
+      
+      // Determine if viewing team is team1 or team2
+      const isViewingTeam1 = viewingTeamId === team1Id;
       
       for (const dateStr of pastDates) {
         const dayStats = dailyStatsByDate.get(dateStr);
         const dateRosters = rostersByDateTeam.get(dateStr);
         
-        let myScore = 0;  // team1 (left side)
-        let oppScore = 0; // team2 (right side)
+        let team1Score = 0;
+        let team2Score = 0;
         
         if (dayStats && dateRosters) {
-          // Team 1's score (displayed on left / "my" side)
+          // Calculate team1's score
           const team1PlayerIds = dateRosters.get(team1Id) || [];
           team1PlayerIds.forEach(playerId => {
             const stats = dayStats.get(playerId);
-            myScore += stats?.daily_total_points ?? 0;
+            team1Score += stats?.daily_total_points ?? 0;
           });
           
-          // Team 2's score (displayed on right / "opponent" side)
+          // Calculate team2's score
           if (team2Id) {
             const team2PlayerIds = dateRosters.get(team2Id) || [];
             team2PlayerIds.forEach(playerId => {
               const stats = dayStats.get(playerId);
-              oppScore += stats?.daily_total_points ?? 0;
+              team2Score += stats?.daily_total_points ?? 0;
             });
           }
         }
+        
+        // Assign to myScore/oppScore based on viewing perspective
+        const myScore = isViewingTeam1 ? team1Score : team2Score;
+        const oppScore = isViewingTeam1 ? team2Score : team1Score;
         
         scores.set(dateStr, { myScore, oppScore, isLocked: true });
       }
