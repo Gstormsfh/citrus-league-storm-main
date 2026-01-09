@@ -2,8 +2,9 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { AlertCircle, Shield, CalendarDays, Skull, Plus, Lock } from "lucide-react";
+import { AlertCircle, Shield, CalendarDays, Skull, Plus, Lock, Info } from "lucide-react";
 import { useState } from "react";
 import { CitrusPuckPlayerData, AggregatedPlayerData } from "@/types/citruspuck";
 
@@ -291,29 +292,16 @@ const HockeyPlayerCardContent = ({
 
   // CRITICAL: Use ONLY the new projection system (daily_projection/goalieProjection)
   // This is the SINGLE SOURCE OF TRUTH for projections - matches Matchup tab exactly
-  // 
-  // The old system (player.projectedPoints = season_points / 20) has been ERADICATED
-  // DO NOT fall back to player.projectedPoints - it will always be 0 or stale
+  // PROJECTION EXISTS = PLAYER HAS GAME ON SELECTED DATE
   const dailyProjection = isGoalie ? player.goalieProjection : player.daily_projection;
   
-  // IMPROVED: Determine "has game" from BOTH nextGame AND projection presence
-  // nextGame is now populated by Roster.tsx for the selected date (via ScheduleService)
-  // This allows showing "TBD" when there's a game but projections aren't available yet
-  const hasGameFromSchedule = player.nextGame?.isToday === true;
-  const hasGameFromProjection = dailyProjection !== undefined && dailyProjection !== null;
-  const hasGameOnSelectedDate = hasGameFromSchedule || hasGameFromProjection;
+  // If projection exists, player has a game on this date
+  const hasGameOnSelectedDate = dailyProjection !== undefined && dailyProjection !== null;
   
-  // ONLY use daily_projection - NO FALLBACK to old system
+  // Get projected points from daily projection
   const projectedPoints = dailyProjection?.total_projected_points || 0;
   const maxProjectedPoints = 8; 
   const projectionPercentage = Math.min((projectedPoints / maxProjectedPoints) * 100, 100);
-  
-  // TBD Logic (matches Matchup tab's PlayerCard.tsx)
-  // Show "TBD" when there's a game but no projection data available
-  // For goalies, show "Probable" if starter not confirmed
-  const hasProjection = dailyProjection && projectedPoints > 0;
-  const isStarterConfirmed = isGoalie ? (player.goalieProjection?.starter_confirmed ?? false) : true;
-  const showTBD = hasGameOnSelectedDate && (!hasProjection || (isGoalie && !isStarterConfirmed));
 
   // Disable drag if player is locked
   const canDrag = draggable && !isLocked;
@@ -415,44 +403,122 @@ const HockeyPlayerCardContent = ({
         </Badge>
       </div>
 
-      {/* Compact Stats Grid - Flex grow to fill space */}
+      {/* Compact Stats Grid - Shows projection stats when available, season stats otherwise */}
       <div className="p-1 bg-card flex-1 flex items-center justify-center">
         {isGoalie ? (
-          <div className="grid grid-cols-3 gap-0.5 text-center w-full">
-            <div>
-              <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">W</div>
-              <div className="font-bold text-[9px]">{displayStats.wins || 0}</div>
-            </div>
-            <div>
-              <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">GAA</div>
-              <div className="font-bold text-[9px]">{displayStats.gaa?.toFixed(2) || '0.00'}</div>
-            </div>
-            <div>
-              <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">SV%</div>
-              <div className="font-bold text-[9px]">
-                {displayStats.savePct ? (displayStats.savePct * 100).toFixed(2) : '0.00'}%
+          // GOALIE: Show projection stats (W, SV, SO) when available with tooltip for details
+          hasGameOnSelectedDate && player.goalieProjection ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="grid grid-cols-3 gap-0.5 text-center w-full cursor-help">
+                  <div>
+                    <div className="text-[7px] text-green-600 uppercase leading-none mb-0.5">W</div>
+                    <div className="font-bold text-[9px] text-green-700">{player.goalieProjection.projected_wins?.toFixed(2) || '0.00'}</div>
+                  </div>
+                  <div>
+                    <div className="text-[7px] text-green-600 uppercase leading-none mb-0.5">SV</div>
+                    <div className="font-bold text-[9px] text-green-700">{player.goalieProjection.projected_saves?.toFixed(0) || '0'}</div>
+                  </div>
+                  <div>
+                    <div className="text-[7px] text-green-600 uppercase leading-none mb-0.5">SO</div>
+                    <div className="font-bold text-[9px] text-green-700">{player.goalieProjection.projected_shutouts?.toFixed(2) || '0.00'}</div>
+                  </div>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent className="p-2 bg-gray-900 text-white rounded-lg border border-gray-700 z-50 max-w-xs">
+                <h4 className="font-bold text-xs border-b border-gray-700 pb-1 mb-2">Projected Stats</h4>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                  <div className="flex justify-between"><span className="text-gray-400">Wins:</span><span>{player.goalieProjection.projected_wins?.toFixed(2)}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">Saves:</span><span>{player.goalieProjection.projected_saves?.toFixed(0)}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">Shutouts:</span><span>{player.goalieProjection.projected_shutouts?.toFixed(2)}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">GA:</span><span>{player.goalieProjection.projected_goals_against?.toFixed(2)}</span></div>
+                </div>
+                <div className="mt-2 pt-1 border-t border-gray-700 text-xs font-bold text-fantasy-primary">
+                  Total: {player.goalieProjection.total_projected_points?.toFixed(1)} pts
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            // No projection - show season stats
+            <div className="grid grid-cols-3 gap-0.5 text-center w-full">
+              <div>
+                <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">W</div>
+                <div className="font-bold text-[9px]">{displayStats.wins || 0}</div>
+              </div>
+              <div>
+                <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">GAA</div>
+                <div className="font-bold text-[9px]">{displayStats.gaa?.toFixed(2) || '0.00'}</div>
+              </div>
+              <div>
+                <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">SV%</div>
+                <div className="font-bold text-[9px]">
+                  {displayStats.savePct ? (displayStats.savePct * 100).toFixed(2) : '0.00'}%
+                </div>
               </div>
             </div>
-          </div>
+          )
         ) : (
-          <div className="grid grid-cols-4 gap-0.5 text-center w-full">
-            <div>
-              <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">GP</div>
-              <div className="font-bold text-[9px]">{displayStats.gamesPlayed || 0}</div>
+          // SKATER: Show projection stats (G, A, SOG, BLK) when available with tooltip for all 8
+          hasGameOnSelectedDate && player.daily_projection ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="grid grid-cols-4 gap-0.5 text-center w-full cursor-help">
+                  <div>
+                    <div className="text-[7px] text-green-600 uppercase leading-none mb-0.5">G</div>
+                    <div className="font-bold text-[9px] text-green-700">{player.daily_projection.projected_goals?.toFixed(2) || '0.00'}</div>
+                  </div>
+                  <div>
+                    <div className="text-[7px] text-green-600 uppercase leading-none mb-0.5">A</div>
+                    <div className="font-bold text-[9px] text-green-700">{player.daily_projection.projected_assists?.toFixed(2) || '0.00'}</div>
+                  </div>
+                  <div>
+                    <div className="text-[7px] text-green-600 uppercase leading-none mb-0.5">SOG</div>
+                    <div className="font-bold text-[9px] text-green-700">{player.daily_projection.projected_sog?.toFixed(1) || '0.0'}</div>
+                  </div>
+                  <div>
+                    <div className="text-[7px] text-green-600 uppercase leading-none mb-0.5">BLK</div>
+                    <div className="font-bold text-[9px] text-green-700">{player.daily_projection.projected_blocks?.toFixed(1) || '0.0'}</div>
+                  </div>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent className="p-2 bg-gray-900 text-white rounded-lg border border-gray-700 z-50 max-w-xs">
+                <h4 className="font-bold text-xs border-b border-gray-700 pb-1 mb-2">Projected Stats (All 8)</h4>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                  <div className="flex justify-between"><span className="text-gray-400">Goals:</span><span>{player.daily_projection.projected_goals?.toFixed(2)}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">Assists:</span><span>{player.daily_projection.projected_assists?.toFixed(2)}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">SOG:</span><span>{player.daily_projection.projected_sog?.toFixed(2)}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">Blocks:</span><span>{player.daily_projection.projected_blocks?.toFixed(2)}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">PPP:</span><span>{player.daily_projection.projected_ppp?.toFixed(2) || '0.00'}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">SHP:</span><span>{player.daily_projection.projected_shp?.toFixed(2) || '0.00'}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">Hits:</span><span>{player.daily_projection.projected_hits?.toFixed(2) || '0.00'}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">PIM:</span><span>{player.daily_projection.projected_pim?.toFixed(2) || '0.00'}</span></div>
+                </div>
+                <div className="mt-2 pt-1 border-t border-gray-700 text-xs font-bold text-fantasy-primary">
+                  Total: {player.daily_projection.total_projected_points?.toFixed(1)} pts
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            // No projection - show season stats
+            <div className="grid grid-cols-4 gap-0.5 text-center w-full">
+              <div>
+                <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">GP</div>
+                <div className="font-bold text-[9px]">{displayStats.gamesPlayed || 0}</div>
+              </div>
+              <div>
+                <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">G</div>
+                <div className="font-bold text-[9px]">{displayStats.goals || 0}</div>
+              </div>
+              <div>
+                <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">A</div>
+                <div className="font-bold text-[9px]">{displayStats.assists || 0}</div>
+              </div>
+              <div>
+                <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">SOG</div>
+                <div className="font-bold text-[9px]">{displayStats.shots || 0}</div>
+              </div>
             </div>
-            <div>
-              <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">G</div>
-              <div className="font-bold text-[9px]">{displayStats.goals || 0}</div>
-            </div>
-            <div>
-              <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">A</div>
-              <div className="font-bold text-[9px]">{displayStats.assists || 0}</div>
-            </div>
-            <div>
-              <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">SOG</div>
-              <div className="font-bold text-[9px]">{displayStats.shots || 0}</div>
-            </div>
-          </div>
+          )
         )}
       </div>
 
@@ -481,32 +547,20 @@ const HockeyPlayerCardContent = ({
              <span className="text-[7px] text-muted-foreground uppercase font-medium">PROJ</span>
              <span className={cn(
                "text-[9px] font-bold",
-               hasGameOnSelectedDate 
-                 ? (showTBD ? "text-amber-600" : "text-primary")
-                 : "text-muted-foreground"
+               hasGameOnSelectedDate ? "text-primary" : "text-muted-foreground"
              )}>
-                 {hasProjection && isStarterConfirmed
-                   ? projectedPoints.toFixed(1)
-                   : showTBD 
-                     ? (isGoalie && !isStarterConfirmed ? 'Probable' : 'TBD')
-                     : '0.0'
-                 }
+                 {hasGameOnSelectedDate ? projectedPoints.toFixed(1) : '-'}
              </span>
           </div>
         </div>
         
         <div className="h-1 bg-muted/50 rounded-full overflow-hidden border border-border/10 w-full">
-          {showTBD ? (
-            // Animated TBD bar (matches PlayerCard.tsx pattern)
-            <div className="h-full w-full bg-gradient-to-r from-amber-400/30 via-amber-500/50 to-amber-400/30 animate-pulse rounded-full" />
-          ) : (
-            <div 
-              className={cn("h-full rounded-full transition-all duration-500", 
-                hasGameOnSelectedDate ? "bg-green-500" : "bg-transparent" 
-              )}
-              style={{ width: `${projectionPercentage}%` }}
-            />
-          )}
+          <div 
+            className={cn("h-full rounded-full transition-all duration-500", 
+              hasGameOnSelectedDate ? "bg-green-500" : "bg-transparent" 
+            )}
+            style={{ width: `${projectionPercentage}%` }}
+          />
         </div>
       </div>
     </Card>

@@ -1797,8 +1797,8 @@ def calculate_physical_projection(
         Dict with physical stats: goals, assists, shots, blocks, saves, toi_seconds
         and model components for transparency
     """
-    # Data leak protection
-    assert game_date <= date.today(), f"Data leak: game_date {game_date} > today"
+    # Note: Removed data leak assertion to allow forecasting future games
+    # For forecasting, we use historical data to predict future games - this is not a data leak
     
     try:
         # Get player info
