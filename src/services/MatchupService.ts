@@ -846,9 +846,8 @@ export const MatchupService = {
       let league: any = null;
       let leagueError: any = null;
       try {
-        // EGRESS OPTIMIZATION: Select only needed league fields
         const result = await withTimeout(
-          supabase.from('leagues').select('id,name,season,draft_status,schedule_length,playoff_teams,playoff_start_week').eq('id', leagueId).maybeSingle(),
+          supabase.from('leagues').select('*').eq('id', leagueId).maybeSingle(),
           5000,
           'getLeague timeout in getMatchupData'
         );
@@ -875,9 +874,8 @@ export const MatchupService = {
       let userTeam: any = null;
       let teamError: any = null;
       try {
-        // EGRESS OPTIMIZATION: Select only needed team fields
         const result = await withTimeout(
-          supabase.from('teams').select('id,name,owner_id,league_id,wins,losses,ties').eq('league_id', leagueId).eq('owner_id', userId).maybeSingle(),
+          supabase.from('teams').select('*').eq('league_id', leagueId).eq('owner_id', userId).maybeSingle(),
           5000,
           'getUserTeam timeout in getMatchupData'
         );
@@ -1311,17 +1309,34 @@ export const MatchupService = {
   ): Promise<Map<number, any>> {
     try {
       if (!playerIds || playerIds.length === 0) {
+        console.warn('[MatchupService.getDailyProjections] No player IDs provided');
         return new Map();
       }
 
+      console.log(`[MatchupService.getDailyProjections] Calling RPC for ${playerIds.length} players on ${targetDate}`);
+      
       const { data, error } = await supabase.rpc('get_daily_projections', {
         p_player_ids: playerIds,
         p_target_date: targetDate
       });
       
       if (error) {
-        console.warn('[MatchupService] Failed to fetch daily projections:', error);
+        console.error('[MatchupService.getDailyProjections] ❌ RPC error:', error);
         return new Map(); // Return empty map on error (graceful degradation)
+      }
+      
+      console.log(`[MatchupService.getDailyProjections] ✅ RPC returned ${data?.length || 0} projections`);
+      
+      // Log sample projection to verify structure
+      if (data && data.length > 0) {
+        console.log('[MatchupService.getDailyProjections] Sample projection:', {
+          player_id: data[0].player_id,
+          total_projected_points: data[0].total_projected_points,
+          is_goalie: data[0].is_goalie,
+          has_all_fields: !!(data[0].player_id && data[0].total_projected_points !== undefined)
+        });
+      } else {
+        console.warn('[MatchupService.getDailyProjections] ⚠️ RPC returned empty array - no projections for this date');
       }
       
       // Create a map for O(1) lookup during player transformation
@@ -1334,9 +1349,11 @@ export const MatchupService = {
         });
       }
       
+      console.log(`[MatchupService.getDailyProjections] Created projection map with ${projectionMap.size} entries`);
+      
       return projectionMap;
     } catch (error) {
-      console.error('[MatchupService] Error fetching daily projections:', error);
+      console.error('[MatchupService.getDailyProjections] ❌ Unexpected error:', error);
       return new Map(); // Return empty map on error
     }
   },
