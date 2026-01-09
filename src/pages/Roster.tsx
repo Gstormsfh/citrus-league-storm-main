@@ -1681,10 +1681,18 @@ const Roster = () => {
   // DISPLAY ROSTER - Applies projections AND schedule at render time
   // This is the SINGLE SOURCE OF TRUTH for projections in Roster tab
   // Base 'roster' state holds structure, 'displayRoster' useMemo adds projections + games
+  // CRITICAL: Matches Matchup.tsx behavior - use TODAY's projections as fallback when
+  // selected date has no projections (e.g., future dates not yet scraped)
   // =============================================================================
   const displayRoster = useMemo(() => {
     const targetDate = selectedDate || getTodayMST();
+    const todayStr = getTodayMST();
+    
+    // Try to get projections for selected date, fall back to today's projections
     const dateProjections = projectionsByDate.get(targetDate);
+    const todayProjections = projectionsByDate.get(todayStr);
+    const fallbackProjections = dateProjections || todayProjections; // Use today's if selected date has none
+    
     const dateSchedule = scheduleByDate.get(targetDate);
     const userTimezone = profile?.timezone || 'America/Denver';
     
@@ -1709,10 +1717,15 @@ const Roster = () => {
         }
       }
       
-      const projection = dateProjections?.get(playerId);
-      if (!projection) return enrichedPlayer; // No projection but might still have game (shows TBD)
-      
+      // CRITICAL: Use fallback projections (today's) when selected date has no projections
+      // This matches Matchup.tsx behavior - always show SOME projection rather than TBD
+      const projection = fallbackProjections?.get(playerId);
       const isGoalie = player.position === 'G' || player.position === 'Goalie';
+      
+      if (!projection) {
+        return enrichedPlayer; // No projection available from any date
+      }
+      
       const dailyProjectedPoints = Number(projection.total_projected_points || 0);
       
       if (isGoalie) {
