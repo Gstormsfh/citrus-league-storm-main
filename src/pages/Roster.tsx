@@ -1538,56 +1538,86 @@ const Roster = () => {
     calculateStats();
   }, [userTeam, user, roster.starters, roster.bench, roster.ir, transactions]);
 
-  // Fetch daily projections for selected date (same pattern as Matchup tab)
+  // Fetch daily projections for selected date (WORLD-CLASS PATTERN - matches Matchup tab)
   // CRITICAL: Do NOT include projectionsByDate in dependencies - it causes circular triggers
   const currentFetchDateRef = useRef<string | null>(null);
+  const projectionsLoadingRef = useRef<boolean>(false);
   
-  useEffect(() => {
-    const fetchDailyProjections = async () => {
-      // Collect all player IDs from roster
-      const allPlayerIds: number[] = [];
+  // Memoized projection fetch function (matches Matchup.tsx pattern)
+  const fetchProjectionsForDate = useCallback(async (date: string, playerIds: number[]) => {
+    // Check cache first - if we have projections for this date, don't re-fetch
+    if (projectionsByDate.has(date)) {
+      console.log(`[Roster.fetchProjections] Using CACHED projections for ${date}`);
+      return;
+    }
+
+    // Prevent concurrent fetches
+    if (projectionsLoadingRef.current) {
+      console.log(`[Roster.fetchProjections] Skipping concurrent fetch for ${date}`);
+      return;
+    }
+
+    if (playerIds.length === 0) {
+      console.log(`[Roster.fetchProjections] No players to fetch projections for on ${date}`);
+      return;
+    }
+
+    projectionsLoadingRef.current = true;
+    console.log(`[Roster.fetchProjections] 🚀 Fetching projections for ${date} (${playerIds.length} players)`);
+    
+    try {
+      const projectionMap = await MatchupService.getDailyProjectionsForMatchup(playerIds, date);
       
-      [...roster.starters, ...roster.bench, ...roster.ir].forEach(player => {
-        const playerId = typeof player.id === 'string' ? parseInt(player.id) : player.id;
-        if (!isNaN(playerId) && playerId > 0) {
-          allPlayerIds.push(playerId);
-        }
+      setProjectionsByDate(prev => {
+        const newMap = new Map(prev);
+        newMap.set(date, projectionMap);
+        return newMap;
       });
-
-      if (allPlayerIds.length === 0) {
-        return; // No players to fetch projections for
-      }
-
-      // Use selectedDate or default to today
-      const targetDate = selectedDate || getTodayMST();
       
-      // Track what we're fetching to handle race conditions
-      currentFetchDateRef.current = targetDate;
-      
-      try {
-        console.log(`[Roster] Fetching daily projections for ${targetDate} (${allPlayerIds.length} players)`);
-        const projectionMap = await MatchupService.getDailyProjectionsForMatchup(allPlayerIds, targetDate);
-        
-        // Only update cache if this is still the date we want
-        // (user might have clicked to another date while we were fetching)
-        if (currentFetchDateRef.current === targetDate) {
-          setProjectionsByDate(prev => {
-            const newMap = new Map(prev);
-            newMap.set(targetDate, projectionMap);
-            return newMap;
-          });
-          
-          console.log(`[Roster] Fetched ${projectionMap.size} daily projections for ${targetDate}`);
-        } else {
-          console.log(`[Roster] Discarding stale projections for ${targetDate} (now showing ${currentFetchDateRef.current})`);
-        }
-      } catch (error) {
-        console.error('[Roster] Error fetching daily projections:', error);
-      }
-    };
+      console.log(`[Roster.fetchProjections] ✅ Fetched ${projectionMap.size} projections for ${date}`);
+    } catch (error) {
+      console.error(`[Roster.fetchProjections] ❌ Error fetching projections for ${date}:`, error);
+      // Don't cache errors - allow retry
+    } finally {
+      projectionsLoadingRef.current = false;
+    }
+  }, [projectionsByDate]);
+  
+  // Main useEffect - triggers projection fetch when roster or date changes
+  useEffect(() => {
+    console.log(`[Roster.useEffect.projections] Triggered with:`, {
+      selectedDate,
+      startersCount: roster.starters.length,
+      benchCount: roster.bench.length,
+      irCount: roster.ir.length,
+      totalPlayers: roster.starters.length + roster.bench.length + roster.ir.length
+    });
 
-    fetchDailyProjections();
-  }, [selectedDate, roster.starters.length, roster.bench.length, roster.ir.length]); // NO projectionsByDate - matches Matchup pattern
+    // Collect all player IDs from roster
+    const allPlayerIds: number[] = [];
+    
+    [...roster.starters, ...roster.bench, ...roster.ir].forEach(player => {
+      const playerId = typeof player.id === 'string' ? parseInt(player.id) : player.id;
+      if (!isNaN(playerId) && playerId > 0) {
+        allPlayerIds.push(playerId);
+      }
+    });
+
+    console.log(`[Roster.useEffect.projections] Collected ${allPlayerIds.length} player IDs`);
+
+    if (allPlayerIds.length === 0) {
+      console.warn(`[Roster.useEffect.projections] ⚠️ No players in roster yet, skipping projection fetch`);
+      return;
+    }
+
+    // Use selectedDate or default to today
+    const targetDate = selectedDate || getTodayMST();
+    console.log(`[Roster.useEffect.projections] Target date: ${targetDate} (selected: ${selectedDate}, today: ${getTodayMST()})`);
+    
+    // Fetch projections for this date
+    fetchProjectionsForDate(targetDate, allPlayerIds);
+    
+  }, [selectedDate, roster.starters.length, roster.bench.length, roster.ir.length, fetchProjectionsForDate]);
 
   // =============================================================================
   // DISPLAY ROSTER - Applies projections at render time (same pattern as Matchup tab)
