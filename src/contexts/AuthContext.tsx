@@ -1,7 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { COLUMNS } from '@/utils/queryColumns';
 
 interface Profile {
   id: string;
@@ -40,7 +39,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select(COLUMNS.PROFILE)
+        .select('*')
         .eq('id', userId)
         .maybeSingle();
 

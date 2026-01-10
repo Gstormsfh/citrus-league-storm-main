@@ -3297,7 +3297,7 @@ export const MatchupService = {
       // Get league to determine schedule length
       const { data: league, error: leagueError } = await supabase
         .from('leagues')
-        .select(COLUMNS.LEAGUE)
+        .select('*')
         .eq('id', leagueId)
         .maybeSingle();
 

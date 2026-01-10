@@ -46,7 +46,7 @@ export const TEAM_COLUMNS_SLIM = 'id, league_id, owner_id, team_name';
 // ============================================================================
 // DRAFT PICKS TABLE COLUMNS
 // ============================================================================
-export const DRAFT_PICK_COLUMNS = 'id, league_id, team_id, player_id, pick_number, round, draft_session_id, created_at';
+export const DRAFT_PICK_COLUMNS = 'id, league_id, team_id, player_id, pick_number, round_number, draft_session_id, picked_at, deleted_at, created_at';
 
 // Slim version - just what's needed for roster building
 export const DRAFT_PICK_COLUMNS_SLIM = 'id, player_id, team_id, pick_number';

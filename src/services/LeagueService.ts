@@ -3,7 +3,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { DraftService } from "./DraftService";
 import { MatchupService } from "./MatchupService";
 import { RosterCacheService } from "./RosterCacheService";
-import { COLUMNS } from "@/utils/queryColumns";
 
 export interface League {
   id: string;
@@ -284,7 +283,7 @@ export const LeagueService = {
     try {
       const { data, error } = await supabase
         .from('leagues')
-        .select(COLUMNS.LEAGUE)
+        .select('*')
         .eq('id', leagueId)
         .single();
 
@@ -303,7 +302,7 @@ export const LeagueService = {
       // Get leagues where user is commissioner (exclude demo league)
       const { data: commissionerLeagues, error: commError } = await supabase
         .from('leagues')
-        .select(COLUMNS.LEAGUE)
+        .select('*')
         .eq('commissioner_id', userId)
         .neq('id', '00000000-0000-0000-0000-000000000001') // Exclude demo league
         .order('created_at', { ascending: false });
@@ -323,7 +322,7 @@ export const LeagueService = {
       if (leagueIds.length > 0) {
         const { data, error: ownerError } = await supabase
           .from('leagues')
-          .select(COLUMNS.LEAGUE)
+          .select('*')
           .in('id', leagueIds)
           .neq('id', '00000000-0000-0000-0000-000000000001') // Exclude demo league
           .order('created_at', { ascending: false });
@@ -352,7 +351,7 @@ export const LeagueService = {
       console.log('Fetching teams for league:', leagueId);
       const { data, error } = await supabase
         .from('teams')
-        .select(COLUMNS.TEAM)
+        .select('*')
         .eq('league_id', leagueId)
         .order('created_at', { ascending: true });
 
@@ -376,7 +375,7 @@ export const LeagueService = {
       console.log('Fetching teams with owners for league:', leagueId);
       const { data: teams, error: teamsError } = await supabase
         .from('teams')
-        .select(COLUMNS.TEAM)
+        .select('*')
         .eq('league_id', leagueId)
         .order('created_at', { ascending: true });
 
@@ -541,7 +540,7 @@ export const LeagueService = {
     try {
       const { data, error } = await supabase
         .from('teams')
-        .select(COLUMNS.TEAM)
+        .select('*')
         .eq('league_id', leagueId)
         .eq('owner_id', userId)
         .single();

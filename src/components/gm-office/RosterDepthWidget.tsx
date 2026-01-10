@@ -6,7 +6,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { PlayerService, Player } from '@/services/PlayerService';
 import { LeagueService } from '@/services/LeagueService';
 import { Loader2 } from 'lucide-react';
-import { COLUMNS } from '@/utils/queryColumns';
 
 interface PositionDepth {
   position: string;
@@ -117,7 +116,7 @@ export const RosterDepthWidget = () => {
         // Get roster from draft_picks (same approach as Roster.tsx)
         const { data: allDraftPicks, error: picksError } = await supabase
           .from('draft_picks')
-          .select(COLUMNS.DRAFT_PICK)
+          .select('*')
           .eq('league_id', activeLeagueId)
           .eq('team_id', userTeam.id)
           .is('deleted_at', null)

@@ -2,7 +2,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
 import { Team, LeagueService } from './LeagueService';
 import { PlayerService } from './PlayerService';
-import { COLUMNS } from '@/utils/queryColumns';
 
 export interface DraftPick {
   id: string;
@@ -115,7 +114,7 @@ export const DraftService = {
 
       const { data, error } = await supabase
         .from('draft_picks')
-        .select(COLUMNS.DRAFT_PICK)
+        .select('*')
         .eq('league_id', leagueId)
         .eq('draft_session_id', targetSessionId)
         .is('deleted_at', null)
@@ -138,7 +137,7 @@ export const DraftService = {
 
       const { data, error } = await supabase
         .from('draft_order')
-        .select(COLUMNS.DRAFT_ORDER)
+        .select('*')
         .eq('league_id', leagueId)
         .eq('round_number', roundNumber)
         .eq('draft_session_id', targetSessionId)
