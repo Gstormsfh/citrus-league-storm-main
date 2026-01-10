@@ -80,8 +80,8 @@ export const ScoreCard = ({
           
           {/* Center scores with stitched divider */}
           <div className="flex items-center gap-6 relative">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-citrus-peach/80 border-2 border-citrus-orange text-citrus-forest font-varsity text-xs px-3 py-1 rounded-varsity shadow-patch">
-              WEEK
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-citrus-peach/80 border-2 border-citrus-orange text-citrus-forest font-script text-xl px-3 py-1 rounded-varsity shadow-patch">
+              vs
             </div>
             <div className="text-center">
               <div className={`font-varsity text-6xl ${isWinning ? 'text-citrus-sage' : 'text-citrus-charcoal'}`}>{myTeamPoints}</div>
