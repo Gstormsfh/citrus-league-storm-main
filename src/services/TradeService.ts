@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { PlayerService } from './PlayerService';
 import { COLUMNS } from '@/utils/queryColumns';
 
 export interface TradeOffer {
@@ -293,29 +294,35 @@ export class TradeService {
         throw error;
       }
 
-      // Fetch player details for each trade
+      // Fetch player details for each trade using PlayerService
       const tradesWithPlayers = await Promise.all(
         (trades || []).map(async (trade) => {
-          // Get offered players
-          const { data: offeredPlayers } = await supabase
-            .from('player_directory')
-            .select('player_id, full_name, position_code, team_abbrev')
-            .eq('season', 2025)
-            .in('player_id', trade.offered_player_ids);
+          // Get offered players using PlayerService
+          const offeredPlayerIds = (trade.offered_player_ids || []).map(String);
+          const offeredPlayersRaw = await PlayerService.getPlayersByIds(offeredPlayerIds);
+          const offeredPlayers = offeredPlayersRaw.map(p => ({
+            player_id: Number(p.id),
+            full_name: p.full_name,
+            position_code: p.position,
+            team_abbrev: p.team
+          }));
 
-          // Get requested players
-          const { data: requestedPlayers } = await supabase
-            .from('player_directory')
-            .select('player_id, full_name, position_code, team_abbrev')
-            .eq('season', 2025)
-            .in('player_id', trade.requested_player_ids);
+          // Get requested players using PlayerService
+          const requestedPlayerIds = (trade.requested_player_ids || []).map(String);
+          const requestedPlayersRaw = await PlayerService.getPlayersByIds(requestedPlayerIds);
+          const requestedPlayers = requestedPlayersRaw.map(p => ({
+            player_id: Number(p.id),
+            full_name: p.full_name,
+            position_code: p.position,
+            team_abbrev: p.team
+          }));
 
           return {
             ...trade,
             from_team_name: (trade.from_team as any).team_name,
             to_team_name: (trade.to_team as any).team_name,
-            offered_players: offeredPlayers || [],
-            requested_players: requestedPlayers || []
+            offered_players: offeredPlayers,
+            requested_players: requestedPlayers
           };
         })
       );

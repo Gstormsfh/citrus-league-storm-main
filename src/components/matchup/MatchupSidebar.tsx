@@ -79,37 +79,6 @@ export const MatchupSidebar: React.FC<MatchupSidebarProps> = ({
       .slice(0, 5);
   }, [myStarters, opponentStarters, myTeamName, opponentTeamName]);
 
-  // Get breakout players (projected vs actual)
-  const breakoutPlayers = useMemo(() => {
-    const allPlayers = [
-      ...myStarters.map(p => ({ ...p, teamName: myTeamName, isMyTeam: true })),
-      ...opponentStarters.map(p => ({ ...p, teamName: opponentTeamName, isMyTeam: false }))
-    ];
-    
-    return allPlayers
-      .map(p => {
-        // Calculate actual points the same way as top performers
-        let actualPoints = 0;
-        if (p.total_points && p.total_points > 0) {
-          actualPoints = p.total_points;
-        } else if (p.points && p.points > 0) {
-          actualPoints = p.points;
-        } else if (p.matchupStats) {
-          const stats = p.matchupStats;
-          actualPoints = (stats.goals || 0) + (stats.assists || 0) + (stats.sog || 0) * 0.2 + 
-                       (stats.powerPlayPoints || 0) + (stats.shortHandedPoints || 0) + 
-                       (stats.hits || 0) * 0.25 + (stats.blocks || 0) * 0.25;
-        }
-        
-        const projectedPoints = p.daily_projection?.total_projected_points || 
-                               p.goalieProjection?.total_projected_points || 0;
-        const differential = actualPoints - projectedPoints;
-        return { ...p, differential, actualPoints };
-      })
-      .filter(p => p.differential > 2 && p.actualPoints > 0) // Beating projection by 2+ points
-      .sort((a, b) => b.differential - a.differential)
-      .slice(0, 3);
-  }, [myStarters, opponentStarters, myTeamName, opponentTeamName]);
 
   return (
     <div className="space-y-4">
@@ -175,47 +144,6 @@ export const MatchupSidebar: React.FC<MatchupSidebarProps> = ({
           )}
         </CardContent>
       </Card>
-
-      {/* Breakout Players Card */}
-      {breakoutPlayers.length > 0 && (
-        <Card className="overflow-hidden bg-gradient-to-br from-citrus-orange/10 to-citrus-peach/10 corduroy-texture border-4 border-citrus-orange/50 rounded-[1.5rem] shadow-[0_4px_0_rgba(223,117,54,0.2)] relative">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(223,117,54,0.1)_0%,_transparent_60%)] pointer-events-none"></div>
-          
-          <CardHeader className="pb-3 relative z-10">
-            <CardTitle className="text-sm font-varsity font-black text-citrus-orange uppercase tracking-tight flex items-center gap-2">
-              <TrendingUp className="w-4 h-4" />
-              Breakout Stars
-              <Badge className="ml-auto bg-citrus-orange/30 border-2 border-citrus-orange text-citrus-forest font-mono text-[9px] px-1.5">
-                HOT
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 space-y-2 relative z-10">
-            {breakoutPlayers.map((player) => (
-              <button
-                key={player.id}
-                onClick={() => onPlayerClick?.(player)}
-                className="w-full p-2 rounded-xl bg-citrus-cream/60 border-2 border-citrus-orange/40 hover:bg-citrus-cream hover:shadow-patch hover:-translate-y-0.5 transition-all"
-              >
-                <div className="flex items-center gap-2">
-                  <Flame className="w-4 h-4 text-citrus-orange flex-shrink-0" />
-                  <div className="flex-1 text-left min-w-0">
-                    <div className="font-varsity text-xs font-bold text-citrus-forest truncate">
-                      {player.name}
-                    </div>
-                    <div className="font-display text-[10px] text-citrus-charcoal/70">
-                      +{player.differential.toFixed(1)} vs proj
-                    </div>
-                  </div>
-                  <div className="font-varsity text-sm font-black text-citrus-orange">
-                    {player.actualPoints.toFixed(1)}
-                  </div>
-                </div>
-              </button>
-            ))}
-          </CardContent>
-        </Card>
-      )}
 
       {/* Premium Ad Space - Varsity Sponsor Patch */}
       <AdSpace size="300x250" label="Featured Sponsor" />

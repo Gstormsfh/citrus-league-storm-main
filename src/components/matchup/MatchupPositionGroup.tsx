@@ -8,6 +8,7 @@ interface MatchupPositionGroupProps {
   isBench?: boolean;
   onPlayerClick?: (player: MatchupPlayer) => void;
   selectedDate?: string | null;
+  dailyStatsMap?: Map<number, { daily_total_points?: number; [key: string]: any }>; // Optional: daily stats map for the selected date
 }
 
 export const MatchupPositionGroup = ({
@@ -16,7 +17,8 @@ export const MatchupPositionGroup = ({
   isUtilSlot = [],
   isBench = false,
   onPlayerClick,
-  selectedDate
+  selectedDate,
+  dailyStatsMap
 }: MatchupPositionGroupProps) => {
   // Ensure both arrays have the same length
   const maxLength = Math.max(userPlayers.length, opponentPlayers.length);
@@ -45,6 +47,7 @@ export const MatchupPositionGroup = ({
             isBench={isBench}
             onPlayerClick={onPlayerClick}
             selectedDate={selectedDate}
+            dailyStatsMap={dailyStatsMap}
           />
         );
       })}

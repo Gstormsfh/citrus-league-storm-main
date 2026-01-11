@@ -14,6 +14,7 @@ interface PlayerCardProps {
   isBench?: boolean;
   onPlayerClick?: (player: MatchupPlayer) => void;
   selectedDate?: string | null; // Optional: to determine if showing daily stats
+  dailyStatsMap?: Map<number, { daily_total_points?: number; [key: string]: any }>; // Optional: daily stats map for the selected date
 }
 
 // Get position color classes for border - Citrus Pastel Theme (Distinct Colors)
@@ -67,7 +68,7 @@ const calculatePercentages = (player: MatchupPlayer) => {
   return { shotPct, pointRate };
 };
 
-export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick, selectedDate }: PlayerCardProps) => {
+export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick, selectedDate, dailyStatsMap }: PlayerCardProps) => {
   if (!player) {
     return (
       <div className={cn(`player-card player-card-empty ${isUserTeam ? 'user-team' : 'opponent-team'} opacity-50`)}>
@@ -226,7 +227,8 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
         `player-card ${isUserTeam ? 'user-team' : 'opponent-team'} cursor-pointer relative`,
         !isBench && positionColors,
         player.isToday && !isBench && 'ring-2 ring-primary/30',
-        isBench && 'opacity-40 grayscale bg-muted/50 border-muted'
+        isBench && 'opacity-40 grayscale bg-muted/50 border-muted',
+        player.wasDropped && !isBench && 'border-citrus-orange/30 bg-citrus-orange/5 opacity-95'
       )}
       onClick={() => onPlayerClick?.(player)}
     >
@@ -247,6 +249,16 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
                   title={`Roster Status: ${player.roster_status || 'IR'}`}
                 >
                   IR
+                </Badge>
+              ) : null}
+              {/* Dropped Badge - Display if player was dropped but points still count */}
+              {player.wasDropped ? (
+                <Badge 
+                  variant="secondary"
+                  className="ml-1 text-[9px] px-1 py-0 border-citrus-orange/40 bg-citrus-orange/20 text-citrus-orange font-semibold"
+                  title="Player was dropped but points still count from when they were in the lineup"
+                >
+                  Dropped
                 </Badge>
               ) : null}
             </div>
@@ -273,6 +285,63 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
                   {player.stats?.goals ?? 0} G, {player.stats?.assists ?? 0} A, {player.stats?.sog ?? 0} SOG
                 </>
               )}
+              {/* Show matchup points contribution for dropped players */}
+              {player.wasDropped && (() => {
+                // For daily view: Try to get points from daily_total_points, or calculate from daily stats
+                let contributingPoints = 0;
+                let pointsLabel = '';
+                
+                if (isInDailyViewMode && selectedDate) {
+                  // In daily view - try multiple sources for points
+                  // 1. First try dailyStatsMap (same source as WeeklySchedule uses)
+                  if (dailyStatsMap) {
+                    const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
+                    const dailyStats = dailyStatsMap.get(playerId);
+                    if (dailyStats?.daily_total_points !== undefined && dailyStats.daily_total_points !== null) {
+                      contributingPoints = dailyStats.daily_total_points;
+                      pointsLabel = 'pts contributing today';
+                    }
+                  }
+                  
+                  // 2. Fallback to player.daily_total_points if not found in map
+                  if (contributingPoints === 0 && player.daily_total_points !== undefined && player.daily_total_points !== null) {
+                    contributingPoints = player.daily_total_points;
+                    pointsLabel = 'pts contributing today';
+                  }
+                  
+                  // 3. Calculate from breakdown if available
+                  if (contributingPoints === 0 && player.daily_stats_breakdown && Object.keys(player.daily_stats_breakdown).length > 0) {
+                    contributingPoints = Object.values(player.daily_stats_breakdown).reduce(
+                      (sum, stat) => sum + (stat.points || 0), 
+                      0
+                    );
+                    pointsLabel = 'pts contributing today';
+                  }
+                  
+                  // 4. Final fallback to weekly total
+                  if (contributingPoints === 0) {
+                    contributingPoints = player.total_points || player.points || 0;
+                    pointsLabel = 'pts contributing this week';
+                  }
+                } else {
+                  // Weekly view - use total_points or points
+                  contributingPoints = player.total_points || player.points || 0;
+                  pointsLabel = 'pts contributing this week';
+                }
+                
+                // Always show the indicator for dropped players (even if 0, to show they're being counted)
+                return (
+                  <div className="mt-1 text-[10px] font-semibold text-citrus-orange flex items-center gap-1">
+                    <span className="inline-flex items-center">
+                      <span className="w-1.5 h-1.5 rounded-full bg-citrus-orange mr-1" />
+                      {contributingPoints > 0 
+                        ? `${contributingPoints.toFixed(1)} ${pointsLabel}`
+                        : 'Points counted from lineup'
+                      }
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
           </div>
           {/* Unique Stats Box - Top Right Corner */}

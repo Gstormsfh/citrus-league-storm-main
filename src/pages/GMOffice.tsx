@@ -7,7 +7,7 @@ import { ArrowLeftRight, Users, TrendingUp, Calendar, FileText, BarChart3, ListC
 import { Link } from 'react-router-dom';
 import { Narwhal } from '@/components/icons/Narwhal';
 import { HeadlinesBanner } from '@/components/gm-office/HeadlinesBanner';
-import { RosterDepthWidget } from '@/components/gm-office/RosterDepthWidget';
+import { TeamIntelHub } from '@/components/gm-office/TeamIntelHub';
 import { isGuestMode } from '@/utils/guestHelpers';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import { CitrusBackground } from '@/components/CitrusBackground';
@@ -80,7 +80,7 @@ const GMOffice = () => {
             {/* Left Sidebar - Roster Depth Widget */}
             <aside className="lg:w-64 lg:flex-shrink-0 order-2 lg:order-1">
               <div className="lg:sticky lg:top-24">
-                <RosterDepthWidget />
+                <TeamIntelHub />
               </div>
             </aside>
 

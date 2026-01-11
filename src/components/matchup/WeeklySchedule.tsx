@@ -21,6 +21,9 @@ interface WeeklyScheduleProps {
   team2Name?: string; // Team 2 name for display
   // Cached scores for past days (frozen, won't change when roster changes)
   cachedDailyScores?: Map<string, { myScore: number; oppScore: number; isLocked: boolean }>;
+  // DIRECT daily breakdown from myTeamPoints/opponentTeamPoints calculation (SINGLE SOURCE OF TRUTH)
+  myDailyBreakdown?: Map<string, number>;
+  oppDailyBreakdown?: Map<string, number>;
   hideScores?: boolean; // If true, hide the points display (for Roster tab)
 }
 
@@ -35,6 +38,8 @@ export const WeeklySchedule = ({
   team1Name,
   team2Name,
   cachedDailyScores,
+  myDailyBreakdown,
+  oppDailyBreakdown,
   hideScores = false,
 }: WeeklyScheduleProps) => {
   const todayStr = getTodayMST(); // Get today's date string in MST (YYYY-MM-DD)
@@ -163,34 +168,10 @@ export const WeeklySchedule = ({
           const isPastDate = isPast(date);
           const isSelectedDate = isSelected(date);
           
-          // Yahoo/Sleeper-style scoring: Use cached scores for past days, live calculation for today/future
-          const cachedScore = cachedDailyScores?.get(date);
-          
-          let myDailyPointsForDay: number;
-          let oppDailyPointsForDay: number;
-          
-          if (isPastDate && cachedScore?.isLocked) {
-            // Past day: Use frozen cached score (won't change when roster changes)
-            myDailyPointsForDay = cachedScore.myScore;
-            oppDailyPointsForDay = cachedScore.oppScore;
-          } else {
-            // Today or future: Calculate from current roster (reflects roster changes)
-            const dayStats = dailyStatsByDate.get(date);
-            myDailyPointsForDay = dayStats 
-              ? myStarters.reduce((sum, player) => {
-                  const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
-                  const playerStats = dayStats.get(playerId);
-                  return sum + (playerStats?.daily_total_points ?? 0);
-                }, 0)
-              : 0;
-            oppDailyPointsForDay = dayStats
-              ? opponentStarters.reduce((sum, player) => {
-                  const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
-                  const playerStats = dayStats.get(playerId);
-                  return sum + (playerStats?.daily_total_points ?? 0);
-                }, 0)
-              : 0;
-          }
+          // USE DIRECT BREAKDOWN - from the exact same calculation that drives bottom totals
+          // undefined means not calculated yet, 0 means calculated as 0
+          const myDailyPointsForDay = myDailyBreakdown?.get(date);
+          const oppDailyPointsForDay = oppDailyBreakdown?.get(date);
 
           return (
             <Card
@@ -242,9 +223,9 @@ export const WeeklySchedule = ({
                         </div>
                         <div className={cn(
                           "text-sm font-varsity font-black text-center leading-tight",
-                          myDailyPointsForDay > 0 ? "text-citrus-sage" : "text-citrus-charcoal/50"
+                          myDailyPointsForDay !== undefined && myDailyPointsForDay > 0 ? "text-citrus-sage" : "text-citrus-charcoal/50"
                         )}>
-                          {myDailyPointsForDay.toFixed(1)}
+                          {myDailyPointsForDay !== undefined ? myDailyPointsForDay.toFixed(1) : '--'}
                         </div>
                       </div>
                       
@@ -258,9 +239,9 @@ export const WeeklySchedule = ({
                         </div>
                         <div className={cn(
                           "text-sm font-varsity font-black text-center leading-tight",
-                          oppDailyPointsForDay > 0 ? "text-citrus-peach" : "text-citrus-charcoal/50"
+                          oppDailyPointsForDay !== undefined && oppDailyPointsForDay > 0 ? "text-citrus-peach" : "text-citrus-charcoal/50"
                         )}>
-                          {oppDailyPointsForDay.toFixed(1)}
+                          {oppDailyPointsForDay !== undefined ? oppDailyPointsForDay.toFixed(1) : '--'}
                         </div>
                       </div>
                     </div>

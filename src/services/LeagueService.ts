@@ -13,6 +13,12 @@ export interface League {
   roster_size: number;
   draft_rounds: number;
   settings: Record<string, any>;
+  // Waiver settings (added for world-class waiver system)
+  waiver_process_time?: string;
+  waiver_period_hours?: number;
+  waiver_game_lock?: boolean;
+  waiver_type?: 'rolling' | 'faab' | 'reverse_standings';
+  allow_trades_during_games?: boolean;
   scoring_settings?: {
     skater?: {
       goals?: number;
@@ -291,6 +297,46 @@ export const LeagueService = {
       return { league: data, error: null };
     } catch (error) {
       return { league: null, error };
+    }
+  },
+
+  /**
+   * Update waiver/trade settings for a league (commissioner only)
+   */
+  async updateWaiverSettings(
+    leagueId: string,
+    userId: string,
+    settings: {
+      waiver_process_time?: string;
+      waiver_period_hours?: number;
+      waiver_game_lock?: boolean;
+      waiver_type?: 'rolling' | 'faab' | 'reverse_standings';
+      allow_trades_during_games?: boolean;
+    }
+  ): Promise<{ success: boolean; error: any }> {
+    try {
+      // Verify user is commissioner
+      const { data: league } = await supabase
+        .from('leagues')
+        .select('commissioner_id')
+        .eq('id', leagueId)
+        .single();
+
+      if (!league || league.commissioner_id !== userId) {
+        return { success: false, error: new Error('Only commissioners can update league settings') };
+      }
+
+      // Update the settings
+      const { error } = await supabase
+        .from('leagues')
+        .update(settings)
+        .eq('id', leagueId);
+
+      if (error) throw error;
+      return { success: true, error: null };
+    } catch (error) {
+      console.error('Error updating waiver settings:', error);
+      return { success: false, error };
     }
   },
 
@@ -1055,7 +1101,7 @@ export const LeagueService = {
           created_at,
           source,
           teams(team_name),
-          profiles(full_name)
+          profiles(first_name, last_name)
         `)
         .eq('league_id', leagueId)
         .order('created_at', { ascending: false })
@@ -2040,8 +2086,13 @@ export const LeagueService = {
 
       // Fetch missing players if requested (Yahoo/Sleeper behavior for dropped/traded players)
       if (fetchMissingPlayers && missingPlayerIds.length > 0) {
-        console.log('[LeagueService.loadDailyRoster] Fetching dropped/traded players:', missingPlayerIds);
+        console.log('[LeagueService.loadDailyRoster] ========== FETCHING DROPPED PLAYERS ==========');
+        console.log('[LeagueService.loadDailyRoster] Missing player IDs:', missingPlayerIds);
+        console.log('[LeagueService.loadDailyRoster] Date:', rosterDate);
+        
         const missingPlayers = await PlayerService.getPlayersByIds(missingPlayerIds);
+        console.log('[LeagueService.loadDailyRoster] Fetched', missingPlayers.length, 'dropped players:', 
+          missingPlayers.map(p => ({ id: p.id, name: p.full_name || p.name })));
         
         // Transform to same format as allPlayers and add to map
         missingPlayers.forEach((player: Player) => {

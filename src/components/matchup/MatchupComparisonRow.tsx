@@ -9,6 +9,7 @@ interface MatchupComparisonRowProps {
   isBench?: boolean;
   onPlayerClick?: (player: MatchupPlayer) => void;
   selectedDate?: string | null;
+  dailyStatsMap?: Map<number, { daily_total_points?: number; [key: string]: any }>; // Optional: daily stats map for the selected date
 }
 
 export const MatchupComparisonRow = ({
@@ -17,7 +18,8 @@ export const MatchupComparisonRow = ({
   position,
   isBench = false,
   onPlayerClick,
-  selectedDate
+  selectedDate,
+  dailyStatsMap
 }: MatchupComparisonRowProps) => {
   // Calculate projected points for tonight (points / 20 is the standard projection calculation)
   const userProjectedPoints = userPlayer ? (userPlayer.points || 0) / 20 : 0;
@@ -36,6 +38,7 @@ export const MatchupComparisonRow = ({
         isBench={isBench}
         onPlayerClick={onPlayerClick}
         selectedDate={selectedDate}
+        dailyStatsMap={dailyStatsMap}
       />
       
       {/* Center Column - hidden on mobile, visible on desktop */}
@@ -59,6 +62,7 @@ export const MatchupComparisonRow = ({
         isBench={isBench}
         onPlayerClick={onPlayerClick}
         selectedDate={selectedDate}
+        dailyStatsMap={dailyStatsMap}
       />
     </div>
   );

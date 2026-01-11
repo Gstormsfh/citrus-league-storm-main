@@ -19,7 +19,7 @@ import { AdSpace } from '@/components/AdSpace';
 import { CitrusBackground } from '@/components/CitrusBackground';
 import { CitrusSectionDivider } from '@/components/CitrusSectionDivider';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
-import { RosterDepthWidget } from '@/components/gm-office/RosterDepthWidget';
+import { TeamIntelHub } from '@/components/gm-office/TeamIntelHub';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cell } from 'recharts';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -667,11 +667,16 @@ const Roster = () => {
         // Note: Use currentMatchup from state (closure) - it's already set by the matchup useEffect
         const matchupForLoading = currentMatchup; // Use from closure
         if (selectedDate && matchupForLoading && teamId && leagueIdForLineup && !isDemoLeague(leagueIdForLineup)) {
-          console.log('[Roster] Loading roster from fantasy_daily_rosters for date:', selectedDate);
+          console.log('[Roster] ========== LOADING FROZEN ROSTER ==========');
+          console.log('[Roster] Date:', selectedDate);
           
           // Determine if this is a past date - if so, fetch dropped/traded players
           const todayStr = getTodayMST();
           const isPastDate = selectedDate < todayStr;
+          
+          console.log('[Roster] Today:', todayStr, '| isPastDate:', isPastDate);
+          console.log('[Roster] Team ID:', teamId, '| Matchup ID:', matchupForLoading.id);
+          console.log('[Roster] Available players count:', transformedPlayers.length);
           
           const dailyRoster = await LeagueService.loadDailyRoster(
             String(teamId),
@@ -682,6 +687,13 @@ const Roster = () => {
           );
           
           if (dailyRoster) {
+            console.log('[Roster] Frozen roster loaded successfully:', {
+              starters: dailyRoster.starters.length,
+              bench: dailyRoster.bench.length,
+              ir: dailyRoster.ir.length,
+              missingPlayerIds: dailyRoster.missingPlayerIds?.length || 0
+            });
+            
             // Transform to HockeyPlayer format with starter flag
             const starters = dailyRoster.starters.map(p => ({ ...p, starter: true }));
             const bench = [...dailyRoster.bench];
@@ -690,7 +702,18 @@ const Roster = () => {
             // Log if there were dropped/traded players
             if (dailyRoster.missingPlayerIds && dailyRoster.missingPlayerIds.length > 0) {
               console.log('[Roster] Loaded', dailyRoster.missingPlayerIds.length, 'dropped/traded players for historical view');
+              console.log('[Roster] Dropped player IDs:', dailyRoster.missingPlayerIds);
             }
+            
+            // Debug: Log starters details
+            console.log('[Roster] Starters being set:', starters.map(p => ({
+              id: p.id,
+              name: p.name,
+              position: p.position,
+              wasDropped: (p as any).wasDropped
+            })));
+            
+            console.log('[Roster] ========================================');
             
             // Add any new players not in frozen roster to bench (only for current/future dates)
             if (!isPastDate) {
@@ -3235,7 +3258,7 @@ const Roster = () => {
             <aside className="w-full lg:w-auto order-2 lg:order-1">
               <div className="lg:sticky lg:top-32 space-y-4 lg:space-y-6">
                 {/* Roster Depth Widget */}
-                <RosterDepthWidget />
+                <TeamIntelHub />
 
                 {/* Premium Ad Space 1 */}
                 <AdSpace size="300x250" label="Roster Sponsor" />

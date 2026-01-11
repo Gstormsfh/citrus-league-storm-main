@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { PlayerService } from './PlayerService';
 import { COLUMNS } from '@/utils/queryColumns';
 
 export interface WaiverClaim {
@@ -442,6 +443,7 @@ export class WaiverService {
 
   /**
    * Get available players for waiver claims (not rostered in league)
+   * Uses PlayerService as the source of truth for player data
    */
   static async getAvailablePlayers(
     leagueId: string,
@@ -455,47 +457,44 @@ export class WaiverService {
         .select('starters, bench, ir')
         .eq('league_id', leagueId);
 
-      const rosteredPlayerIds = new Set<number>();
+      const rosteredPlayerIds = new Set<string>();
       (lineups || []).forEach(lineup => {
-        ((lineup.starters as any[]) || []).forEach(id => rosteredPlayerIds.add(parseInt(id)));
-        ((lineup.bench as any[]) || []).forEach(id => rosteredPlayerIds.add(parseInt(id)));
-        ((lineup.ir as any[]) || []).forEach(id => rosteredPlayerIds.add(parseInt(id)));
+        ((lineup.starters as any[]) || []).forEach(id => rosteredPlayerIds.add(String(id)));
+        ((lineup.bench as any[]) || []).forEach(id => rosteredPlayerIds.add(String(id)));
+        ((lineup.ir as any[]) || []).forEach(id => rosteredPlayerIds.add(String(id)));
       });
 
-      // Query available players (current season)
-      let query = supabase
-        .from('player_directory')
-        .select(`
-          player_id,
-          full_name,
-          position_code,
-          team_abbrev,
-          jersey_number,
-          is_goalie
-        `)
-        .eq('season', 2025);
+      // Use PlayerService as the source of truth (handles all player data correctly)
+      let players = await PlayerService.getAllPlayers();
 
-      if (rosteredPlayerIds.size > 0) {
-        query = query.not('player_id', 'in', `(${Array.from(rosteredPlayerIds).join(',')})`);
-      }
+      // Filter out rostered players
+      players = players.filter(p => !rosteredPlayerIds.has(String(p.id)));
 
+      // Apply position filter
       if (position) {
-        query = query.eq('position_code', position);
+        players = players.filter(p => p.position === position);
       }
 
+      // Apply search filter
       if (searchTerm) {
-        query = query.ilike('full_name', `%${searchTerm}%`);
+        const lowerSearch = searchTerm.toLowerCase();
+        players = players.filter(p => p.full_name.toLowerCase().includes(lowerSearch));
       }
 
-      const { data, error } = await query
-        .order('full_name', { ascending: true })
-        .limit(50);
+      // Sort by name and limit
+      players = players
+        .sort((a, b) => a.full_name.localeCompare(b.full_name))
+        .slice(0, 50);
 
-      if (error) {
-        throw error;
-      }
-
-      return data || [];
+      // Map to the expected format for WaiverWire UI
+      return players.map(p => ({
+        player_id: Number(p.id),
+        full_name: p.full_name,
+        position_code: p.position,
+        team_abbrev: p.team,
+        jersey_number: p.jersey_number || '',
+        is_goalie: p.position === 'G'
+      }));
     } catch (error) {
       console.error('Error fetching available players:', error);
       return [];

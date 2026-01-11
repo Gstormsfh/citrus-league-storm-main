@@ -123,4 +123,6 @@ export type MatchupPlayer = {
   // IR Status fields from player_talent_metrics
   roster_status?: string; // Official NHL roster status: ACT, IR, LTIR, etc.
   is_ir_eligible?: boolean; // True if player is on IR or LTIR and can be placed in IR slot
+  // Dropped player indicator
+  wasDropped?: boolean; // True if player was dropped but points still count from when they were in the lineup
 };

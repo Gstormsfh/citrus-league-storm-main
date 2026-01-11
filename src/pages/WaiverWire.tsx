@@ -14,6 +14,7 @@ import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import { CitrusBackground } from '@/components/CitrusBackground';
 import { CitrusSparkle, CitrusLeaf, CitrusWedge } from '@/components/icons/CitrusIcons';
 import { WaiverService, type WaiverClaim, type WaiverPriority } from '@/services/WaiverService';
+import { PlayerService } from '@/services/PlayerService';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -79,21 +80,23 @@ const WaiverWire = () => {
         
         if (lineup) {
           // Get all player IDs from JSONB arrays
-          const allPlayerIds: number[] = [
-            ...((lineup.starters as string[]) || []).map(id => parseInt(id)),
-            ...((lineup.bench as string[]) || []).map(id => parseInt(id)),
-            ...((lineup.ir as string[]) || []).map(id => parseInt(id))
-          ].filter(id => !isNaN(id));
+          const allPlayerIds: string[] = [
+            ...((lineup.starters as string[]) || []),
+            ...((lineup.bench as string[]) || []),
+            ...((lineup.ir as string[]) || [])
+          ].filter(id => id && !isNaN(Number(id)));
 
           if (allPlayerIds.length > 0) {
-            // Fetch player details from player_directory
-            const { data: playerDetails } = await supabase
-              .from('player_directory')
-              .select('player_id, full_name, position_code, team_abbrev')
-              .eq('season', 2025)
-              .in('player_id', allPlayerIds);
-            
-            setMyRoster(playerDetails || []);
+            // Use PlayerService to get player details (handles all data correctly)
+            const players = await PlayerService.getPlayersByIds(allPlayerIds);
+            // Map to the expected format
+            const rosterPlayers = players.map(p => ({
+              player_id: Number(p.id),
+              full_name: p.full_name,
+              position_code: p.position,
+              team_abbrev: p.team
+            }));
+            setMyRoster(rosterPlayers);
           } else {
             setMyRoster([]);
           }
@@ -333,13 +336,13 @@ const WaiverWire = () => {
                 {availablePlayers.length > 0 && (
                   <div className="space-y-3">
                     {availablePlayers.map((player) => (
-                      <div key={player.id} className="flex items-center justify-between p-4 bg-citrus-sage/10 rounded-varsity border-2 border-citrus-sage/30 hover:border-citrus-orange hover:shadow-patch transition-all">
+                      <div key={player.player_id} className="flex items-center justify-between p-4 bg-citrus-sage/10 rounded-varsity border-2 border-citrus-sage/30 hover:border-citrus-orange hover:shadow-patch transition-all">
                         <div className="flex-1">
                           <div className="font-varsity font-bold text-citrus-forest">
-                            {player.first_name} {player.last_name}
+                            {player.full_name}
                           </div>
                           <div className="text-sm font-display text-citrus-charcoal">
-                            {player.position} - {player.current_team_abbrev} #{player.jersey_number}
+                            {player.position_code} - {player.team_abbrev} #{player.jersey_number}
                           </div>
                         </div>
                         <Button 

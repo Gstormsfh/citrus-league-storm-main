@@ -77,7 +77,7 @@ export const PLAYER_STATS_PROJECTIONS = 'player_id, projected_goals, projected_a
 // ============================================================================
 export const WAIVER_CLAIM_COLUMNS = 'id, league_id, team_id, player_id, priority, status, created_at';
 
-export const TRADE_OFFER_COLUMNS = 'id, league_id, offering_team_id, receiving_team_id, offering_player_ids, receiving_player_ids, status, created_at, expires_at';
+export const TRADE_OFFER_COLUMNS = 'id, league_id, from_team_id, to_team_id, offered_player_ids, requested_player_ids, status, message, created_at, expires_at, processed_at, counter_offer_id';
 
 // ============================================================================
 // FANTASY MATCHUP LINES COLUMNS

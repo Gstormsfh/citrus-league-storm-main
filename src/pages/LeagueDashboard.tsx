@@ -8,8 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Trophy, Users, Calendar, Settings, Play, Copy, CheckCircle } from 'lucide-react';
+import { Loader2, Trophy, Users, Calendar, Settings, Play, Copy, CheckCircle, Clock, Shield, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 
 const LeagueDashboard = () => {
   const { leagueId } = useParams<{ leagueId: string }>();
@@ -22,6 +26,17 @@ const LeagueDashboard = () => {
   const [teams, setTeams] = useState<Team[]>([]);
   const [userTeam, setUserTeam] = useState<Team | null>(null);
   const [error, setError] = useState<string | null>(null);
+  
+  // Commissioner Settings State
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [waiverSettings, setWaiverSettings] = useState({
+    waiver_process_time: '03:00:00',
+    waiver_period_hours: 48,
+    waiver_game_lock: true,
+    waiver_type: 'rolling' as 'rolling' | 'faab' | 'reverse_standings',
+    allow_trades_during_games: true,
+  });
 
   useEffect(() => {
     if (!user) {
@@ -63,6 +78,15 @@ const LeagueDashboard = () => {
       if (leagueError) throw leagueError;
       if (!leagueData) throw new Error('League not found');
       setLeague(leagueData);
+      
+      // Update waiver settings from league data
+      setWaiverSettings({
+        waiver_process_time: leagueData.waiver_process_time || '03:00:00',
+        waiver_period_hours: leagueData.waiver_period_hours || 48,
+        waiver_game_lock: leagueData.waiver_game_lock ?? true,
+        waiver_type: leagueData.waiver_type || 'rolling',
+        allow_trades_during_games: leagueData.allow_trades_during_games ?? true,
+      });
 
       // Load teams
       const { teams: teamsData, error: teamsError } = await LeagueService.getLeagueTeams(leagueId);
@@ -191,6 +215,45 @@ const LeagueDashboard = () => {
     });
   };
 
+  const handleSaveSettings = async () => {
+    if (!leagueId || !user) return;
+    
+    setSavingSettings(true);
+    try {
+      const { success, error: saveError } = await LeagueService.updateWaiverSettings(
+        leagueId,
+        user.id,
+        waiverSettings
+      );
+
+      if (saveError || !success) {
+        toast({
+          title: 'Error',
+          description: saveError?.message || 'Failed to save settings',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Settings Saved',
+        description: 'League waiver and trade settings have been updated.',
+      });
+      setSettingsOpen(false);
+      
+      // Reload league data to reflect changes
+      loadLeagueData();
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: err.message || 'Failed to save settings',
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
   const isCommissioner = league?.commissioner_id === user?.id;
 
   if (loading) {
@@ -243,10 +306,157 @@ const LeagueDashboard = () => {
                 </div>
               </div>
               {isCommissioner && (
-                <Button variant="outline" onClick={copyJoinCode}>
-                  <Copy className="mr-2 h-4 w-4" />
-                  Copy Join Code
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={copyJoinCode}>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copy Join Code
+                  </Button>
+                  <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline">
+                        <Settings className="mr-2 h-4 w-4" />
+                        League Settings
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[500px]">
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                          <Settings className="h-5 w-5" />
+                          League Settings
+                        </DialogTitle>
+                        <DialogDescription>
+                          Configure waiver wire and trade settings for your league.
+                        </DialogDescription>
+                      </DialogHeader>
+                      
+                      <div className="space-y-6 py-4">
+                        {/* Waiver Process Time */}
+                        <div className="space-y-2">
+                          <Label className="flex items-center gap-2">
+                            <Clock className="h-4 w-4" />
+                            Waiver Process Time (EST)
+                          </Label>
+                          <Select 
+                            value={waiverSettings.waiver_process_time}
+                            onValueChange={(value) => setWaiverSettings(prev => ({ ...prev, waiver_process_time: value }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="00:00:00">12:00 AM (Midnight)</SelectItem>
+                              <SelectItem value="03:00:00">3:00 AM</SelectItem>
+                              <SelectItem value="06:00:00">6:00 AM</SelectItem>
+                              <SelectItem value="09:00:00">9:00 AM</SelectItem>
+                              <SelectItem value="12:00:00">12:00 PM (Noon)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            Time when waiver claims are processed daily
+                          </p>
+                        </div>
+
+                        {/* Waiver Period */}
+                        <div className="space-y-2">
+                          <Label className="flex items-center gap-2">
+                            <RefreshCw className="h-4 w-4" />
+                            Waiver Period (Hours)
+                          </Label>
+                          <Select 
+                            value={waiverSettings.waiver_period_hours.toString()}
+                            onValueChange={(value) => setWaiverSettings(prev => ({ ...prev, waiver_period_hours: parseInt(value) }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="24">24 hours (1 day)</SelectItem>
+                              <SelectItem value="48">48 hours (2 days)</SelectItem>
+                              <SelectItem value="72">72 hours (3 days)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            How long dropped players stay on waivers
+                          </p>
+                        </div>
+
+                        {/* Waiver Type */}
+                        <div className="space-y-2">
+                          <Label className="flex items-center gap-2">
+                            <Trophy className="h-4 w-4" />
+                            Waiver Type
+                          </Label>
+                          <Select 
+                            value={waiverSettings.waiver_type}
+                            onValueChange={(value: 'rolling' | 'faab' | 'reverse_standings') => setWaiverSettings(prev => ({ ...prev, waiver_type: value }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="rolling">Rolling Priority</SelectItem>
+                              <SelectItem value="reverse_standings">Reverse Standings</SelectItem>
+                              <SelectItem value="faab">FAAB (Bidding)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            Rolling: Priority moves after claim. Reverse: Worst team gets priority.
+                          </p>
+                        </div>
+
+                        {/* Game Lock */}
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-0.5">
+                            <Label className="flex items-center gap-2">
+                              <Shield className="h-4 w-4" />
+                              Game Lock
+                            </Label>
+                            <p className="text-xs text-muted-foreground">
+                              Lock players during/after their games
+                            </p>
+                          </div>
+                          <Switch
+                            checked={waiverSettings.waiver_game_lock}
+                            onCheckedChange={(checked) => setWaiverSettings(prev => ({ ...prev, waiver_game_lock: checked }))}
+                          />
+                        </div>
+
+                        {/* Allow Trades During Games */}
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-0.5">
+                            <Label className="flex items-center gap-2">
+                              <RefreshCw className="h-4 w-4" />
+                              Allow Trades During Games
+                            </Label>
+                            <p className="text-xs text-muted-foreground">
+                              Players can be traded even if game-locked
+                            </p>
+                          </div>
+                          <Switch
+                            checked={waiverSettings.allow_trades_during_games}
+                            onCheckedChange={(checked) => setWaiverSettings(prev => ({ ...prev, allow_trades_during_games: checked }))}
+                          />
+                        </div>
+                      </div>
+
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setSettingsOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button onClick={handleSaveSettings} disabled={savingSettings}>
+                          {savingSettings ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            'Save Settings'
+                          )}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
               )}
             </div>
           </div>
