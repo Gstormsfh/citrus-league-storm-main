@@ -150,11 +150,8 @@ export const PlayerService = {
     // Check cache first
     const now = Date.now();
     if (playersCache && (now - playersCache.timestamp) < CACHE_TTL) {
-      const cacheAge = Math.round((now - playersCache.timestamp) / 1000);
-      console.log(`[PlayerService] getAllPlayers(): Returning CACHED data (age: ${cacheAge} seconds)`);
       return playersCache.data;
     }
-    console.log(`[PlayerService] getAllPlayers(): Cache expired or missing, fetching fresh data`);
 
     try {
       const DEFAULT_SEASON = 2025;
@@ -179,8 +176,6 @@ export const PlayerService = {
       const dirRows = (dirRowsRaw || []) as PlayerDirectoryRow[];
       const statRows = (statRowsRaw || []) as PlayerSeasonStatsRow[];
 
-      console.log(`[PlayerService] getAllPlayers(): Fetched ${dirRows.length} directory rows, ${statRows.length} stats rows for season ${DEFAULT_SEASON}`);
-
       const statsByPlayerId = new Map<number, PlayerSeasonStatsRow>();
       statRows.forEach((r) => {
         if (r?.player_id != null) {
@@ -195,9 +190,6 @@ export const PlayerService = {
       
       // Validate directory rows have correct season
       const wrongSeasonDir = dirRows.filter(d => d.season !== DEFAULT_SEASON);
-      if (wrongSeasonDir.length > 0) {
-        console.warn(`[PlayerService] WARNING: ${wrongSeasonDir.length} directory rows have wrong season (not ${DEFAULT_SEASON})`);
-      }
 
       // Fetch GSAx for goalies (only for players that have stats)
       const goalieIds = dirRows
@@ -251,7 +243,7 @@ export const PlayerService = {
           const pid = Number(d.player_id);
           const hasStats = statsByPlayerId.has(pid);
           if (!hasStats) {
-            console.warn(`[PlayerService] getAllPlayers(): Skipping player ${d.full_name} (ID: ${pid}) - no stats record found in player_season_stats for season ${DEFAULT_SEASON}`);
+            // Skip player without stats
           }
           return hasStats; // Only include players with matching stats
         })
@@ -341,17 +333,12 @@ export const PlayerService = {
 
       // Log sample of players to verify data
       if (sortedPlayers.length > 0) {
-        const sample = sortedPlayers.slice(0, 3);
-        console.log(`[PlayerService] getAllPlayers(): Sample players:`, 
-          sample.map(p => `${p.full_name} (${p.id}): ${p.goals}G ${p.assists}A ${p.points}P (GP: ${p.games_played})`).join(', '));
       }
 
       playersCache = {
         data: sortedPlayers,
         timestamp: Date.now(),
       };
-      
-      console.log(`[PlayerService] getAllPlayers(): Fetched ${sortedPlayers.length} players (filtered to only those with stats), cached for ${CACHE_TTL / 1000} seconds`);
 
       return sortedPlayers;
     } catch (error) {
@@ -400,11 +387,8 @@ export const PlayerService = {
     
     // If all players are cached, return immediately
     if (uncachedIds.length === 0) {
-      console.log(`[PlayerService] getPlayersByIds(): All ${playerIds.length} players from CACHE`);
       return cachedPlayers;
     }
-    
-    console.log(`[PlayerService] getPlayersByIds(): ${cachedPlayers.length} from cache, fetching ${uncachedIds.length} from DB`);
     
     try {
       const DEFAULT_SEASON = 2025;
@@ -478,7 +462,6 @@ export const PlayerService = {
       const dirRows = (dirRowsRaw || []) as PlayerDirectoryRow[];
       const statRows = (statRowsRaw || []) as PlayerSeasonStatsRow[];
 
-      console.log(`[PlayerService] getPlayersByIds(): Fetched ${dirRows.length} directory rows, ${statRows.length} stats rows for ${intIds.length} requested player IDs`);
 
       const statsByPlayerId = new Map<number, PlayerSeasonStatsRow>();
       statRows.forEach((r) => {
@@ -499,7 +482,7 @@ export const PlayerService = {
           const pid = Number(d.player_id);
           const hasStats = statsByPlayerId.has(pid);
           if (!hasStats) {
-            console.warn(`[PlayerService] getPlayersByIds(): Skipping player ${d.full_name} (ID: ${pid}) - no stats record found`);
+            // Skip player without stats
           }
           return hasStats; // Only include players with matching stats
         })

@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { PlayerService } from './PlayerService';
 import { COLUMNS } from '@/utils/queryColumns';
+import { GameLockService } from './GameLockService';
 
 export interface WaiverClaim {
   id: string;
@@ -113,20 +114,21 @@ export class WaiverService {
       let lockReason = null;
 
       if (league.waiver_game_lock) {
-        const today = new Date().toISOString().split('T')[0];
+        // Use GameLockService which has correct column names and logic
+        const lockInfo = await GameLockService.isPlayerLocked(
+          playerId,
+          player.team_abbrev
+        );
         
-        const { data: games } = await supabase
-          .from('nhl_games')
-          .select('game_status, start_time_utc')
-          .eq('game_date', today)
-          .or(`home_team_abbrev.eq.${player.team_abbrev},away_team_abbrev.eq.${player.team_abbrev}`)
-          .in('game_status', ['Live', 'Final']);
-
-        if (games && games.length > 0) {
+        if (lockInfo.isLocked) {
           isGameLocked = true;
-          lockReason = games[0].game_status === 'Live' 
-            ? 'Player is currently in a game'
-            : 'Player\'s game just finished - waivers clear tomorrow morning';
+          if (lockInfo.gameStatus === 'live') {
+            lockReason = 'Player is currently in a game';
+          } else if (lockInfo.gameStatus === 'final') {
+            lockReason = 'Player\'s game just finished - waivers clear tomorrow morning';
+          } else {
+            lockReason = 'Player\'s game has started';
+          }
         }
       }
 

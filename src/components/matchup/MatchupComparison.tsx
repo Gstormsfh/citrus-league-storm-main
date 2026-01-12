@@ -13,12 +13,8 @@ interface MatchupComparisonProps {
   onPlayerClick?: (player: MatchupPlayer) => void;
   selectedDate?: string | null; // Optional: show stats for specific date
   dailyStatsMap?: Map<number, { daily_total_points?: number; [key: string]: any }>; // Optional: daily stats map for the selected date
-  // SINGLE SOURCE OF TRUTH: Pre-calculated daily totals from parent
-  // When provided, these are used instead of calculating internally (prevents flicker)
-  userDailyTotal?: number;
-  opponentDailyTotal?: number;
   // Callback to report calculated totals back to parent (for WeeklySchedule sync)
-  onTotalsCalculated?: (userTotal: number, opponentTotal: number) => void;
+  onTotalsCalculated?: (userTotal: number, opponentTotal: number, date?: string) => void;
 }
 
 export const MatchupComparison = ({
@@ -31,8 +27,6 @@ export const MatchupComparison = ({
   onPlayerClick,
   selectedDate,
   dailyStatsMap,
-  userDailyTotal,
-  opponentDailyTotal,
   onTotalsCalculated
 }: MatchupComparisonProps) => {
   // Organize players by slot order (flattened, no position grouping)
@@ -106,30 +100,6 @@ export const MatchupComparison = ({
     // Weekly view: use weekly points
     return sum + (player.points || 0);
   }, 0);
-
-  // SINGLE SOURCE OF TRUTH: Use pre-calculated totals when provided (daily view)
-  // This ensures consistency with WeeklySchedule and prevents flicker
-  const displayUserTotal = isShowingDailyView && userDailyTotal !== undefined 
-    ? userDailyTotal 
-    : userTotal;
-  const displayOpponentTotal = isShowingDailyView && opponentDailyTotal !== undefined 
-    ? opponentDailyTotal 
-    : opponentTotal;
-  
-  // Debug: Log when using pre-calculated vs calculated totals
-  if (isShowingDailyView && selectedDate) {
-    console.log(`[MATCHUP-COMPARISON] ${selectedDate} Daily Total:`, {
-      selectedDate,
-      usingPreCalculated: userDailyTotal !== undefined,
-      displayUserTotal,
-      displayOpponentTotal,
-      preCalcUser: userDailyTotal,
-      preCalcOpp: opponentDailyTotal,
-      calculatedUser: userTotal,
-      calculatedOpp: opponentTotal,
-      match: userDailyTotal === userTotal && opponentDailyTotal === opponentTotal
-    });
-  }
   
   // Track previous values to prevent redundant callbacks
   const prevTotalsRef = useRef<{ user: number; opp: number; date: string | null } | null>(null);
@@ -141,14 +111,14 @@ export const MatchupComparison = ({
       const prev = prevTotalsRef.current;
       if (!prev || 
           prev.date !== selectedDate ||
-          Math.abs(prev.user - displayUserTotal) >= 0.01 || 
-          Math.abs(prev.opp - displayOpponentTotal) >= 0.01) {
+          Math.abs(prev.user - userTotal) >= 0.01 || 
+          Math.abs(prev.opp - opponentTotal) >= 0.01) {
         
-        onTotalsCalculated(displayUserTotal, displayOpponentTotal);
-        prevTotalsRef.current = { user: displayUserTotal, opp: displayOpponentTotal, date: selectedDate };
+        onTotalsCalculated(userTotal, opponentTotal, selectedDate || undefined);
+        prevTotalsRef.current = { user: userTotal, opp: opponentTotal, date: selectedDate };
       }
     }
-  }, [displayUserTotal, displayOpponentTotal, isShowingDailyView, onTotalsCalculated, selectedDate]);
+  }, [userTotal, opponentTotal, isShowingDailyView, onTotalsCalculated, selectedDate]);
 
   return (
     <div className="w-full">
@@ -169,7 +139,7 @@ export const MatchupComparison = ({
           <div className="matchup-total-label">
             {isShowingDailyView ? 'Daily Total' : 'Total'}
           </div>
-          <div className="matchup-total-score">{displayUserTotal.toFixed(1)}</div>
+          <div className="matchup-total-score">{userTotal.toFixed(1)}</div>
         </div>
         <div className="matchup-center-column matchup-total-center">
           <span className="position-label">{isShowingDailyView ? 'DAY' : 'TOT'}</span>
@@ -178,7 +148,7 @@ export const MatchupComparison = ({
           <div className="matchup-total-label">
             {isShowingDailyView ? 'Daily Total' : 'Total'}
           </div>
-          <div className="matchup-total-score">{displayOpponentTotal.toFixed(1)}</div>
+          <div className="matchup-total-score">{opponentTotal.toFixed(1)}</div>
         </div>
       </div>
 

@@ -46,7 +46,8 @@ export const TEAM_COLUMNS_SLIM = 'id, league_id, owner_id, team_name';
 // ============================================================================
 // DRAFT PICKS TABLE COLUMNS
 // ============================================================================
-export const DRAFT_PICK_COLUMNS = 'id, league_id, team_id, player_id, pick_number, round_number, draft_session_id, picked_at, deleted_at, created_at';
+// Note: draft_picks table has 'picked_at', NOT 'created_at'
+export const DRAFT_PICK_COLUMNS = 'id, league_id, team_id, player_id, pick_number, round_number, draft_session_id, picked_at, deleted_at';
 
 // Slim version - just what's needed for roster building
 export const DRAFT_PICK_COLUMNS_SLIM = 'id, player_id, team_id, pick_number';
@@ -82,7 +83,14 @@ export const TRADE_OFFER_COLUMNS = 'id, league_id, from_team_id, to_team_id, off
 // ============================================================================
 // FANTASY MATCHUP LINES COLUMNS
 // ============================================================================
-export const MATCHUP_LINES_COLUMNS = 'id, matchup_id, player_id, team_id, slot, is_starter, points, stats';
+// Note: The table schema is:
+// - total_points (not 'points')
+// - stats_breakdown (not 'stats')
+// - No 'slot' or 'is_starter' columns (those are in fantasy_daily_rosters)
+export const MATCHUP_LINES_COLUMNS = 'id, matchup_id, player_id, team_id, total_points, stats_breakdown, games_played, games_remaining_total, games_remaining_active, has_live_game, updated_at, created_at';
+
+// Slim version - just essentials for matchup display
+export const MATCHUP_LINES_COLUMNS_SLIM = 'id, matchup_id, player_id, team_id, total_points';
 
 // ============================================================================
 // PROFILE COLUMNS
@@ -120,6 +128,7 @@ export const COLUMNS = {
   
   // Slim versions
   MATCHUP_SLIM: MATCHUP_COLUMNS_SLIM,
+  MATCHUP_LINES_SLIM: MATCHUP_LINES_COLUMNS_SLIM,
   LEAGUE_SLIM: LEAGUE_COLUMNS_SLIM,
   TEAM_SLIM: TEAM_COLUMNS_SLIM,
   DRAFT_PICK_SLIM: DRAFT_PICK_COLUMNS_SLIM,

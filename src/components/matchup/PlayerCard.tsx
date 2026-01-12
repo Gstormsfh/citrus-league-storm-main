@@ -191,8 +191,8 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
       }
     } else {
       // Skater stats: PPP (Power Play Points), xG (Expected Goals) - SEASON TOTALS
-      // Use season stats from player.stats
-      const ppp = player.stats?.powerPlayPoints ?? 0;
+      // Use season stats from player.stats (fallback to ppp for safety)
+      const ppp = player.stats?.powerPlayPoints ?? (player as any).ppp ?? 0;
       const xGoals = player.stats?.xGoals ?? 0;
       
       stats.push({ 

@@ -83,7 +83,6 @@ export const MatchupService = {
         .eq('league_id', leagueId);
       
       if (error) throw error;
-      console.log(`[MatchupService] Deleted all matchups for league ${leagueId}`);
       return { error: null };
     } catch (error) {
       console.error('[MatchupService] Error deleting matchups:', error);
@@ -195,7 +194,6 @@ export const MatchupService = {
       // Get available weeks
       const currentYear = new Date().getFullYear();
       const availableWeeks = getAvailableWeeks(firstWeekStart, currentYear);
-      console.log(`[MatchupService] Generating matchups for ${availableWeeks.length} weeks (weeks ${availableWeeks[0]} to ${availableWeeks[availableWeeks.length - 1]})`);
 
       if (teams.length < 2) {
         return { error: new Error('Need at least 2 teams to generate matchups') };
@@ -217,13 +215,6 @@ export const MatchupService = {
         return { error: new Error(`Cannot generate matchups: ${teamsWithInvalidIds.length} teams have invalid IDs`) };
       }
       
-      // Log all teams to verify completeness
-      console.log(`[MatchupService] Teams passed to generation (${numTeams} teams):`, teams.map(t => ({
-        id: t.id,
-        name: t.team_name || t.id,
-        owner_id: t.owner_id
-      })));
-      
       // Get all unique team IDs to verify no duplicates
       const teamIds = teams.map(t => t.id);
       const uniqueTeamIds = new Set(teamIds);
@@ -236,13 +227,6 @@ export const MatchupService = {
       
       // Shuffle teams once for randomness (deterministic after that)
       const shuffledTeams = [...teams].sort(() => Math.random() - 0.5);
-      
-      console.log(`[MatchupService] Generating schedule for ${numTeams} teams (${numRounds} rounds per cycle)`);
-      console.log(`[MatchupService] Shuffled team order:`, shuffledTeams.map((t, i) => ({
-        index: i,
-        id: t.id,
-        name: t.team_name || t.id
-      })));
       
       // Check existing matchups - simple check: does each week have matchups?
       const { data: existingMatchups } = await supabase
@@ -268,19 +252,14 @@ export const MatchupService = {
         // we need to regenerate it. For now, if ANY week is missing, regenerate ALL weeks
         // to ensure consistency. This is safer than trying to patch individual weeks.
         if (weeksNeedingMatchups.length > 0) {
-          console.log('[MatchupService] Some weeks are missing matchups. Regenerating ALL weeks to ensure consistency...');
           await this.deleteAllMatchupsForLeague(leagueId);
           weeksNeedingMatchups = availableWeeks;
         }
       }
       
       if (weeksNeedingMatchups.length === 0) {
-        console.log('[MatchupService] No weeks need matchup generation - all matchups already exist');
         return { error: null };
       }
-      
-      console.log(`[MatchupService] Generating matchups for ${weeksNeedingMatchups.length} weeks:`, weeksNeedingMatchups);
-      console.log(`[MatchupService] Teams in league:`, teams.map(t => ({ id: t.id, name: t.team_name || t.id })));
       
       let matchupsCreated = 0;
       let matchupsSkipped = 0;
@@ -324,7 +303,6 @@ export const MatchupService = {
         for (const pair of teamPairs) {
           // Skip bye weeks (team2 is null) for even number of teams
           if (!pair.team2 && numTeams % 2 === 0) {
-            console.log(`[MatchupService] Week ${weekNumber} - Skipping bye week for even teams`);
             continue;
           }
           
@@ -350,7 +328,6 @@ export const MatchupService = {
           const existing = existing1 || existing2;
 
           if (existing) {
-            console.log(`[MatchupService] Week ${weekNumber} - Matchup already exists: ${pair.team1.team_name || pair.team1.id} vs ${pair.team2?.team_name || pair.team2?.id || 'BYE'}`);
             matchupsSkipped++;
             continue;
           }
@@ -364,8 +341,6 @@ export const MatchupService = {
             week_end_date: weekEnd.toISOString().split('T')[0],
             status: 'scheduled'
           };
-          
-          console.log(`[MatchupService] Week ${weekNumber} - Inserting matchup:`, insertData);
           
           const { data: inserted, error } = await supabase
             .from('matchups')
@@ -384,8 +359,6 @@ export const MatchupService = {
         }
       }
 
-      console.log(`[MatchupService] Generation complete: ${matchupsCreated} created, ${matchupsSkipped} skipped, ${matchupsErrors} errors across ${weeksNeedingMatchups.length} weeks`);
-      
       // Small delay to ensure all database commits are complete
       await new Promise(resolve => setTimeout(resolve, 500));
       
@@ -400,11 +373,7 @@ export const MatchupService = {
         if (verifyError) {
           console.error(`[MatchupService] Verification query error:`, verifyError);
         } else {
-          console.log(`[MatchupService] Verification: Found ${verifyMatchups?.length || 0} matchups in database for generated weeks`);
           if (verifyMatchups && verifyMatchups.length > 0) {
-            const weeksWithMatchups = new Set(verifyMatchups.map(m => m.week_number));
-            console.log(`[MatchupService] Verification: Weeks with matchups:`, Array.from(weeksWithMatchups).sort((a, b) => a - b));
-            
             // Check if all teams are represented in each week
             const allTeamIds = new Set(teams.map(t => t.id));
             let hasIncompleteWeeks = false;
@@ -420,11 +389,7 @@ export const MatchupService = {
               const missingTeams = Array.from(allTeamIds).filter(id => !teamsInWeek.has(id));
               if (missingTeams.length > 0) {
                 console.error(`[MatchupService] Week ${weekNum} - CRITICAL: Missing teams:`, missingTeams);
-                console.error(`[MatchupService] Week ${weekNum} - Teams in matchups:`, Array.from(teamsInWeek));
-                console.error(`[MatchupService] Week ${weekNum} - All team IDs:`, Array.from(allTeamIds));
                 hasIncompleteWeeks = true;
-              } else {
-                console.log(`[MatchupService] Week ${weekNum} - All teams have matchups ✓`);
               }
             }
             
@@ -488,13 +453,6 @@ export const MatchupService = {
     weekNumber: number
   ): Promise<{ matchup: Matchup | null; error: any }> {
     try {
-      console.log('[MatchupService.getUserMatchup] Querying for matchup:', {
-        leagueId,
-        userId,
-        weekNumber,
-        weekNumberType: typeof weekNumber
-      });
-      
       // First, get user's team
       let userTeam: any = null;
       let teamError: any = null;
@@ -536,7 +494,6 @@ export const MatchupService = {
         .or(`team1_id.eq.${userTeam.id},team2_id.eq.${userTeam.id}`)
         .limit(1);
       
-      console.log('[MatchupService.getUserMatchup] Supabase query constructed, executing...');
       let matchups: any = null;
       let error: any = null;
       try {
@@ -550,26 +507,8 @@ export const MatchupService = {
       
       if (error) {
         console.error('[MatchupService.getUserMatchup] Database query error:', error);
-        console.error('[MatchupService.getUserMatchup] Error details:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        });
         throw error;
       }
-      
-      console.log('[MatchupService.getUserMatchup] Query result:', {
-        matchupsFound: matchups?.length || 0,
-        matchups: matchups?.map(m => ({
-          id: m.id,
-          week_number: m.week_number,
-          week_number_type: typeof m.week_number,
-          team1_id: m.team1_id,
-          team2_id: m.team2_id,
-          league_id: m.league_id
-        }))
-      });
       
       // Additional verification: Check if week_number matches what we queried for
       if (matchups && matchups.length > 0) {
@@ -580,32 +519,10 @@ export const MatchupService = {
             received: firstMatchup.week_number,
             matchup_id: firstMatchup.id
           });
-        } else {
-          console.log('[MatchupService.getUserMatchup] Week number verification passed:', {
-            requested: weekNumber,
-            received: firstMatchup.week_number
-          });
         }
       }
       
-      // If multiple matchups found, log warning and use first one
-      if (matchups && matchups.length > 1) {
-        console.warn(`[MatchupService.getUserMatchup] Multiple matchups found for user team ${userTeam.id} in week ${weekNumber}. Using first one.`);
-      }
-      
       const data = matchups && matchups.length > 0 ? matchups[0] : null;
-
-      if (data) {
-        console.log('[MatchupService.getUserMatchup] Returning matchup:', {
-          id: data.id,
-          week_number: data.week_number,
-          team1_id: data.team1_id,
-          team2_id: data.team2_id,
-          status: data.status
-        });
-      } else {
-        console.warn('[MatchupService.getUserMatchup] No matchup found for week:', weekNumber);
-      }
       
       return { matchup: data || null, error: null };
     } catch (error) {

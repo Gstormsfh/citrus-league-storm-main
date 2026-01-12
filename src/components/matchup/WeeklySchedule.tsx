@@ -1,45 +1,29 @@
-import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { Lock, CheckCircle2 } from 'lucide-react';
 import { getTodayMST } from '@/utils/timezoneUtils';
 import { CitrusSparkle } from '@/components/icons/CitrusIcons';
-
-import { MatchupPlayer } from './types';
 
 interface WeeklyScheduleProps {
   weekStart: string; // Monday date (YYYY-MM-DD)
   weekEnd: string; // Sunday date (YYYY-MM-DD)
-  myStarters: MatchupPlayer[]; // Starting lineup players for my team
-  opponentStarters: MatchupPlayer[]; // Starting lineup players for opponent team
   onDayClick: (date: string | null) => void; // null clears selection (returns to full week view)
   selectedDate: string | null;
-  // Daily stats map: date -> player_id -> daily stats (including daily_total_points)
-  dailyStatsByDate: Map<string, Map<number, { daily_total_points: number }>>;
   team1Name?: string; // Team 1 name for display
   team2Name?: string; // Team 2 name for display
-  // Cached scores for past days (frozen, won't change when roster changes)
-  cachedDailyScores?: Map<string, { myScore: number; oppScore: number; isLocked: boolean }>;
-  // DIRECT daily breakdown from myTeamPoints/opponentTeamPoints calculation (SINGLE SOURCE OF TRUTH)
-  myDailyBreakdown?: Map<string, number>;
-  oppDailyBreakdown?: Map<string, number>;
+  // SINGLE SOURCE OF TRUTH: Calculated totals from MatchupComparison
+  calculatedDailyTotals?: Map<string, { myTotal: number; oppTotal: number }>;
   hideScores?: boolean; // If true, hide the points display (for Roster tab)
 }
 
 export const WeeklySchedule = ({
   weekStart,
   weekEnd,
-  myStarters,
-  opponentStarters,
   onDayClick,
   selectedDate,
-  dailyStatsByDate,
   team1Name,
   team2Name,
-  cachedDailyScores,
-  myDailyBreakdown,
-  oppDailyBreakdown,
+  calculatedDailyTotals,
   hideScores = false,
 }: WeeklyScheduleProps) => {
   const todayStr = getTodayMST(); // Get today's date string in MST (YYYY-MM-DD)
@@ -168,10 +152,10 @@ export const WeeklySchedule = ({
           const isPastDate = isPast(date);
           const isSelectedDate = isSelected(date);
           
-          // USE DIRECT BREAKDOWN - from the exact same calculation that drives bottom totals
+          // Get scores from calculatedDailyTotals (ONLY source of truth from MatchupComparison)
           // undefined means not calculated yet, 0 means calculated as 0
-          const myDailyPointsForDay = myDailyBreakdown?.get(date);
-          const oppDailyPointsForDay = oppDailyBreakdown?.get(date);
+          const myDailyPointsForDay = calculatedDailyTotals?.get(date)?.myTotal;
+          const oppDailyPointsForDay = calculatedDailyTotals?.get(date)?.oppTotal;
 
           return (
             <Card
@@ -225,7 +209,7 @@ export const WeeklySchedule = ({
                           "text-sm font-varsity font-black text-center leading-tight",
                           myDailyPointsForDay !== undefined && myDailyPointsForDay > 0 ? "text-citrus-sage" : "text-citrus-charcoal/50"
                         )}>
-                          {myDailyPointsForDay !== undefined ? myDailyPointsForDay.toFixed(1) : '--'}
+                          {myDailyPointsForDay !== undefined ? myDailyPointsForDay.toFixed(1) : '-'}
                         </div>
                       </div>
                       
@@ -241,7 +225,7 @@ export const WeeklySchedule = ({
                           "text-sm font-varsity font-black text-center leading-tight",
                           oppDailyPointsForDay !== undefined && oppDailyPointsForDay > 0 ? "text-citrus-peach" : "text-citrus-charcoal/50"
                         )}>
-                          {oppDailyPointsForDay !== undefined ? oppDailyPointsForDay.toFixed(1) : '--'}
+                          {oppDailyPointsForDay !== undefined ? oppDailyPointsForDay.toFixed(1) : '-'}
                         </div>
                       </div>
                     </div>

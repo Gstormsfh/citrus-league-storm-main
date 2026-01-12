@@ -32,7 +32,6 @@ export const RosterCacheService = {
     const cached = rosterCache.get(key);
     
     if (!cached) {
-      console.log('[RosterCacheService] Cache miss for', key);
       return null;
     }
     
@@ -40,12 +39,10 @@ export const RosterCacheService = {
     const age = now - cached.timestamp;
     
     if (age > ROSTER_CACHE_TTL) {
-      console.log('[RosterCacheService] Cache expired for', key, `(age: ${age}ms)`);
       rosterCache.delete(key);
       return null;
     }
     
-    console.log('[RosterCacheService] Cache hit for', key, `(age: ${age}ms)`);
     return cached;
   },
 
@@ -67,7 +64,6 @@ export const RosterCacheService = {
       ...lineup,
       timestamp: Date.now()
     });
-    console.log('[RosterCacheService] Cached lineup for', key);
   },
 
   /**
@@ -77,8 +73,7 @@ export const RosterCacheService = {
     if (teamId && leagueId) {
       // Clear specific team's cache
       const key = getRosterCacheKey(teamId, leagueId);
-      const deleted = rosterCache.delete(key);
-      console.log('[RosterCacheService] Cleared cache for', key, deleted ? '(found)' : '(not found)');
+      rosterCache.delete(key);
     } else if (leagueId) {
       // Clear all caches for a league
       const keysToDelete: string[] = [];
@@ -88,12 +83,10 @@ export const RosterCacheService = {
         }
       });
       keysToDelete.forEach(key => rosterCache.delete(key));
-      console.log('[RosterCacheService] Cleared', keysToDelete.length, 'cache entries for league', leagueId);
     } else {
       // Clear all caches
       const size = rosterCache.size;
       rosterCache.clear();
-      console.log('[RosterCacheService] Cleared all', size, 'cache entries');
     }
   }
 };
