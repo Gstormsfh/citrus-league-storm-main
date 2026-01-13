@@ -92,8 +92,8 @@ BEGIN
       AND wc.status = 'pending'
     ORDER BY 
       CASE v_waiver_type
-        WHEN 'reverse_standings' THEN wp.priority DESC
-        ELSE wp.priority ASC
+        WHEN 'reverse_standings' THEN -wp.priority  -- Negative value reverses sort order
+        ELSE wp.priority
       END,
       wc.created_at ASC
     LIMIT v_batch_size
