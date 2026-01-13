@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { 
   Menu, X, ChevronRight, User, Bell, Search, 
   Calendar, LineChart, Newspaper, Medal, Users, Settings, 
-  LogOut, Home, FileText, Headphones, BookOpen, CircleUser, Sparkles
+  LogOut, Home, FileText, Headphones, BookOpen, CircleUser, Sparkles,
+  Trophy, ChevronDown
 } from 'lucide-react';
 import { CitrusSlice, CitrusSparkle } from '@/components/icons/CitrusIcons';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -18,6 +19,14 @@ import {
   NavigationMenuList, 
   NavigationMenuTrigger 
 } from "@/components/ui/navigation-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useNotificationStore } from '@/stores/notificationStore';
@@ -38,6 +47,9 @@ const Navbar = () => {
   // Get active league and notification count
   const league = useLeague();
   const activeLeagueId = league?.activeLeagueId ?? null;
+  const activeLeague = league?.activeLeague ?? null;
+  const userLeagues = league?.userLeagues ?? [];
+  const setActiveLeagueId = league?.setActiveLeagueId ?? (() => {});
   const notificationStore = useNotificationStore();
   const unreadCount = activeLeagueId ? (notificationStore.unreadCounts.get(activeLeagueId) || 0) : 0;
   
@@ -248,6 +260,60 @@ const Navbar = () => {
                     </div>
                   </PopoverContent>
                 </Popover>
+
+                {/* LEAGUE SWITCHER - Multi-League Support (Yahoo/Sleeper style) */}
+                {userLeagues.length > 1 && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        className="text-citrus-forest hover:text-citrus-orange hover:bg-citrus-sage/10 h-9 px-3 rounded-lg border-2 border-transparent hover:border-citrus-sage/30 transition-all flex items-center gap-1.5"
+                      >
+                        <Trophy className="h-4 w-4" />
+                        <span className="text-xs font-varsity font-bold uppercase max-w-[120px] truncate">
+                          {activeLeague?.name || 'Select League'}
+                        </span>
+                        <ChevronDown className="h-3.5 w-3.5 opacity-50" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-64">
+                      <DropdownMenuLabel className="text-xs font-varsity uppercase text-citrus-forest">
+                        My Leagues ({userLeagues.length})
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {userLeagues.map((l) => (
+                        <DropdownMenuItem
+                          key={l.id}
+                          onClick={() => {
+                            setActiveLeagueId(l.id);
+                            // Optionally navigate to league dashboard
+                            navigate(`/league/${l.id}`);
+                          }}
+                          className={cn(
+                            "cursor-pointer",
+                            activeLeagueId === l.id && "bg-citrus-sage/10 text-citrus-orange font-semibold"
+                          )}
+                        >
+                          <Trophy className="h-4 w-4 mr-2" />
+                          <div className="flex-1">
+                            <div className="font-medium truncate">{l.name}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {l.draft_status === 'completed' ? 'Season Active' : 'Draft Pending'}
+                            </div>
+                          </div>
+                        </DropdownMenuItem>
+                      ))}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => navigate('/create-league')}
+                        className="text-citrus-orange font-medium"
+                      >
+                        <Trophy className="h-4 w-4 mr-2" />
+                        Create/Join League
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
                 
                 <Popover>
                   <PopoverTrigger asChild>

@@ -301,7 +301,7 @@ export const LeagueService = {
    */
   async getLeague(leagueId: string): Promise<{ league: League | null; error: any }> {
     try {
-      const { data, error } = await supabase
+      const { data, error} = await supabase
         .from('leagues')
         .select('*')
         .eq('id', leagueId)
@@ -311,6 +311,106 @@ export const LeagueService = {
       return { league: data, error: null };
     } catch (error) {
       return { league: null, error };
+    }
+  },
+
+  /**
+   * Join a league using a join code
+   * Creates a team for the user in the specified league
+   */
+  async joinLeagueByCode(
+    joinCode: string,
+    userId: string,
+    teamName?: string
+  ): Promise<{ league: League | null; team: Team | null; error: any }> {
+    try {
+      // 1. Find league by join code
+      const { data: league, error: leagueError } = await supabase
+        .from('leagues')
+        .select('*')
+        .eq('join_code', joinCode)
+        .single();
+
+      if (leagueError) {
+        if (leagueError.code === 'PGRST116') {
+          return { league: null, team: null, error: new Error('Invalid join code. Please check and try again.') };
+        }
+        throw leagueError;
+      }
+
+      if (!league) {
+        return { league: null, team: null, error: new Error('League not found') };
+      }
+
+      // 2. Check if user is already in this league
+      const { data: existingTeam } = await supabase
+        .from('teams')
+        .select('id')
+        .eq('league_id', league.id)
+        .eq('owner_id', userId)
+        .maybeSingle();
+
+      if (existingTeam) {
+        return { league: null, team: null, error: new Error('You are already in this league') };
+      }
+
+      // 3. Check league capacity
+      const { data: teams, error: teamsError } = await supabase
+        .from('teams')
+        .select('id')
+        .eq('league_id', league.id);
+
+      if (teamsError) throw teamsError;
+
+      const currentTeamCount = teams?.length || 0;
+      const maxTeams = league.settings?.teamsCount || 12; // Default to 12 if not set
+
+      if (currentTeamCount >= maxTeams) {
+        return { league: null, team: null, error: new Error(`League is full (${currentTeamCount}/${maxTeams} teams)`) };
+      }
+
+      // 4. Check if draft has already started (optional - can be made configurable)
+      if (league.draft_status === 'in_progress' || league.draft_status === 'completed') {
+        return { league: null, team: null, error: new Error('Cannot join league after draft has started') };
+      }
+
+      // 5. Get user's profile for default team name
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('username, default_team_name')
+        .eq('id', userId)
+        .single();
+
+      // Use provided team name, or fall back to profile defaults
+      const finalTeamName = teamName?.trim() 
+        || profile?.default_team_name?.trim()
+        || (profile?.username ? `${profile.username}'s Team` : 'My Team');
+
+      // 6. Create team for user in the league
+      const { data: team, error: teamError } = await supabase
+        .from('teams')
+        .insert({
+          league_id: league.id,
+          owner_id: userId,
+          team_name: finalTeamName,
+        })
+        .select()
+        .single();
+
+      if (teamError) {
+        // Check for unique constraint violation (user already has team)
+        if (teamError.code === '23505') {
+          return { league: null, team: null, error: new Error('You already have a team in this league') };
+        }
+        throw teamError;
+      }
+
+      console.log(`User ${userId} successfully joined league ${league.id} with team ${team.id}`);
+      
+      return { league, team, error: null };
+    } catch (error) {
+      console.error('Error joining league:', error);
+      return { league: null, team: null, error };
     }
   },
 

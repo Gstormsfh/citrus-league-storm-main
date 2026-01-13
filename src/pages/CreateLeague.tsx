@@ -7,7 +7,8 @@ import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -17,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
-import { Trophy, Users, Settings, CheckCircle, AlertCircle } from "lucide-react";
+import { Trophy, Users, Settings, CheckCircle, AlertCircle, UserPlus, Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -30,13 +31,17 @@ const CreateLeague = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Form State
+  // Create League Form State
   const [leagueName, setLeagueName] = useState("");
   const [teamsCount, setTeamsCount] = useState("12");
   const [draftRounds, setDraftRounds] = useState("21");
   const [scoringType, setScoringType] = useState("h2h-points");
   const [draftType, setDraftType] = useState("snake");
   const [isPublic, setIsPublic] = useState(false);
+
+  // Join League Form State
+  const [joinCode, setJoinCode] = useState("");
+  const [teamNameForJoin, setTeamNameForJoin] = useState("");
 
   // Consolidated Stats State (Standard + Fun)
   const [leagueStats, setLeagueStats] = useState([
@@ -142,6 +147,59 @@ const CreateLeague = () => {
     }
   };
 
+  const handleJoinLeague = async () => {
+    if (!user) {
+      setError("You must be logged in to join a league");
+      navigate("/auth");
+      return;
+    }
+
+    if (!profile || profile.username.startsWith('user_')) {
+      setError("Please complete your profile setup first");
+      navigate("/profile-setup");
+      return;
+    }
+
+    if (!joinCode.trim()) {
+      setError("Join code is required");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { league, team, error: joinError } = await LeagueService.joinLeagueByCode(
+        joinCode.trim(),
+        user.id,
+        teamNameForJoin.trim() || undefined
+      );
+
+      if (joinError) throw joinError;
+      if (!league || !team) throw new Error("Failed to join league");
+
+      // Show success message
+      toast({
+        title: "Joined League!",
+        description: `Welcome to ${league.name}! Your team "${team.team_name}" has been created.`,
+      });
+
+      // Navigate to league dashboard
+      navigate(`/league/${league.id}`);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to join league";
+      setError(errorMessage);
+      setLoading(false);
+      
+      // Also show toast for errors
+      toast({
+        title: "Error Joining League",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  };
+
   const statsByCategory = {
     Offense: leagueStats.filter(s => s.category === "Offense"),
     Defense: leagueStats.filter(s => s.category === "Defense"),
@@ -162,26 +220,29 @@ const CreateLeague = () => {
           
           <div className="mb-8 text-center">
             <h1 className="text-4xl md:text-5xl font-bold mb-4 citrus-gradient-text">
-              Create Your League
+              Create or Join a League
             </h1>
             <p className="text-lg text-muted-foreground">
-              Customize your fantasy experience and invite your friends.
+              Start your own league or join your friends.
             </p>
           </div>
 
           <Card className="card-citrus border-none shadow-xl overflow-hidden">
-            <CardHeader className="bg-muted/20 border-b border-border/40 pb-6">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-xl flex items-center gap-2">
-                  <Trophy className="w-6 h-6 text-primary" />
-                  League Setup
-                </CardTitle>
-              </div>
-            </CardHeader>
-
             <CardContent className="p-8">
-              
-              <div className="space-y-8 animate-fade-in">
+              <Tabs defaultValue="create" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 mb-8">
+                  <TabsTrigger value="create" className="flex items-center gap-2">
+                    <Trophy className="w-4 h-4" />
+                    Create League
+                  </TabsTrigger>
+                  <TabsTrigger value="join" className="flex items-center gap-2">
+                    <UserPlus className="w-4 h-4" />
+                    Join League
+                  </TabsTrigger>
+                </TabsList>
+
+                {/* CREATE LEAGUE TAB */}
+                <TabsContent value="create" className="space-y-8 animate-fade-in">
                 {/* ERROR MESSAGE */}
                 {error && (
                   <Alert variant="destructive">
@@ -368,7 +429,99 @@ const CreateLeague = () => {
                     )}
                   </Button>
                 </div>
-              </div>
+              </TabsContent>
+
+              {/* JOIN LEAGUE TAB */}
+              <TabsContent value="join" className="space-y-6">
+                {/* ERROR MESSAGE */}
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+
+                <div className="text-center pb-4">
+                  <UserPlus className="w-12 h-12 mx-auto mb-4 text-primary" />
+                  <h2 className="text-2xl font-bold mb-2">Join a League</h2>
+                  <p className="text-muted-foreground">
+                    Enter the join code provided by your league commissioner
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="join-code" className="text-base">Join Code</Label>
+                    <Input 
+                      id="join-code" 
+                      placeholder="e.g. 550e8400-e29b-41d4-a716-446655440000" 
+                      value={joinCode}
+                      onChange={(e) => setJoinCode(e.target.value)}
+                      disabled={loading}
+                      className="font-mono text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Ask your commissioner for the league join code
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="team-name-join" className="text-base">
+                      Team Name <span className="text-muted-foreground font-normal">(optional)</span>
+                    </Label>
+                    <Input 
+                      id="team-name-join" 
+                      placeholder="e.g. Ice Warriors" 
+                      value={teamNameForJoin}
+                      onChange={(e) => setTeamNameForJoin(e.target.value)}
+                      disabled={loading}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Leave blank to use your default team name
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-muted/30 rounded-lg p-4 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <CheckCircle className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="font-medium">Before joining:</p>
+                      <ul className="text-sm text-muted-foreground space-y-1 mt-1">
+                        <li>• Make sure you trust the league commissioner</li>
+                        <li>• Check if the draft has already happened</li>
+                        <li>• You can only own one team per league</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-4 flex justify-end items-center gap-4">
+                  <Button 
+                    variant="outline"
+                    onClick={() => navigate('/dashboard')}
+                    disabled={loading}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    size="lg" 
+                    className="rounded-full px-8 min-w-[200px]"
+                    onClick={handleJoinLeague} 
+                    disabled={loading || !joinCode.trim()}
+                  >
+                    {loading ? (
+                      <div className="flex items-center">
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
+                        Joining...
+                      </div>
+                    ) : (
+                      <>Join League <UserPlus className="ml-2 w-4 h-4" /></>
+                    )}
+                  </Button>
+                </div>
+              </TabsContent>
+            </Tabs>
 
             </CardContent>
           </Card>
