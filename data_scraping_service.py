@@ -62,41 +62,85 @@ def run_unified_loop():
     
     if not games:
         logger.warning("⚠️ No games found in DB schedule.")
-        return
+        return ("OFF_HOURS", 0)  # Return state info for smart scheduling
 
-    logger.info(f"📋 Found {len(games)} games in slate. Processing sequentially...")
+    logger.info(f"📋 Found {len(games)} games in slate. Processing with 100-IP power...")
 
-    # 2. Sequential Processing
+    # 2. SMART PROCESSING - Detect game states first
+    live_games = []
+    intermission_games = []
+    final_games = []
+    scheduled_games = []
+    
     for g in games:
         gid = g['game_id']
-        logger.info(f"--- [Game {gid}] ---")
+        # Quick state check (minimal API call)
         pbp = safe_api_call(f"https://api-web.nhle.com/v1/gamecenter/{gid}/play-by-play")
-        if not pbp: continue
+        if not pbp: 
+            scheduled_games.append((gid, g))
+            continue
         
-        # Ingest Raw (For Live xG)
+        state = pbp.get("gameState", "").upper()
+        game_data = (gid, g, pbp, state)
+        
+        if state in ("LIVE", "CRIT"):
+            live_games.append(game_data)
+        elif state == "INTERMISSION":
+            intermission_games.append(game_data)
+        elif state in ("FINAL", "OFF"):
+            final_games.append(game_data)
+        else:
+            scheduled_games.append(game_data)
+    
+    # 3. Process LIVE games first (highest priority)
+    for gid, g, pbp, state in live_games:
+        logger.info(f"🔴 LIVE: [Game {gid}] - PRIORITY PROCESSING")
+        
+        # Ingest Raw
         try:
             from ingest_live_raw_nhl import upsert_raw_game, supabase_client
             upsert_raw_game(supabase_client(), gid, today, pbp)
             logger.info("   ∟ ✅ Raw Data Ingested")
         except: pass
 
-        # Reconcile Stats (8-Stat Model)
-        state = pbp.get("gameState", "").upper()
-        if state in ("LIVE", "CRIT", "OFF", "FINAL", "INTERMISSION"):
-            box = safe_api_call(f"https://api-web.nhle.com/v1/gamecenter/{gid}/boxscore")
-            if box:
-                try:
-                    from scrape_live_nhl_stats import process_game_data_citrus
-                    process_game_data_citrus(gid, box, pbp)
-                    logger.info("   ∟ ✅ 8-Stats Reconciled")
-                except Exception as e: logger.error(f"   ∟ ❌ Stats Error: {e}")
+        # Get Boxscore & Reconcile
+        box = safe_api_call(f"https://api-web.nhle.com/v1/gamecenter/{gid}/boxscore")
+        if box:
+            try:
+                from scrape_live_nhl_stats import process_game_data_citrus
+                process_game_data_citrus(gid, box, pbp)
+                logger.info("   ∟ ✅ 8-Stats Reconciled")
+            except Exception as e: 
+                logger.error(f"   ∟ ❌ Stats Error: {e}")
 
-    # 3. Matchup Refresh
+    # 4. Process INTERMISSION/FINAL games (lower priority)
+    for gid, g, pbp, state in intermission_games + final_games:
+        logger.info(f"⏸️  {state}: [Game {gid}]")
+        
+        try:
+            from ingest_live_raw_nhl import upsert_raw_game, supabase_client
+            upsert_raw_game(supabase_client(), gid, today, pbp)
+        except: pass
+
+        box = safe_api_call(f"https://api-web.nhle.com/v1/gamecenter/{gid}/boxscore")
+        if box:
+            try:
+                from scrape_live_nhl_stats import process_game_data_citrus
+                process_game_data_citrus(gid, box, pbp)
+                logger.info("   ∟ ✅ Stats Updated")
+            except Exception as e: 
+                logger.error(f"   ∟ ❌ Stats Error: {e}")
+
+    # 5. Matchup Refresh
     try:
         from calculate_matchup_scores import update_active_matchup_scores
         update_active_matchup_scores(db)
         logger.info("🏆 [MATCHUPS] Scoreboard Balanced.")
     except: pass
+    
+    # Return game state for smart scheduling
+    game_state = "LIVE" if live_games else "INTERMISSION" if intermission_games else "SCHEDULED"
+    return (game_state, len(live_games))
 
     # 4. NIGHTLY PBP AUDIT
     now = dt.datetime.now()
@@ -126,31 +170,43 @@ def run_unified_loop():
 
 if __name__ == "__main__":
     # BOOT MESSAGE - Verify this in your terminal
-    print("\n" + "█" * 60)
-    print("█" + " " * 58 + "█")
-    print("█   🍋 CITRUS MASTER COMMAND CENTER ONLINE              █")
-    print("█   Architecture: Sequential Heartbeat (429-Proof)      █")
-    print("█   Features: Live 8-Stat Sync + Nightly xG Audit + Landing Stats █")
-    print("█" + " " * 58 + "█")
-    print("█" * 60 + "\n")
+    print("\n" + "█" * 70)
+    print("█" + " " * 68 + "█")
+    print("█   🍋 CITRUS MASTER COMMAND CENTER ONLINE - AGGRESSIVE MODE       █")
+    print("█   Architecture: Adaptive Scheduling with 100-IP Rotation         █")
+    print("█   Features: 15s Live Updates + xG Audit + PPP/SHP Sync           █")
+    print("█   Performance: Yahoo/ESPN Competitive (Real-Time)                █")
+    print("█" + " " * 68 + "█")
+    print("█" * 70 + "\n")
 
     while True:
         try:
-            run_unified_loop()
+            game_state, live_count = run_unified_loop()
             
-            # EGRESS OPTIMIZATION: Smart timing based on game hours
-            # NHL games typically run 5pm-11pm Mountain Time
-            # Shorter intervals during game hours, longer during off hours
+            # ADAPTIVE SCHEDULING: Use game state to determine refresh rate
+            # With 100 IPs, we can be MUCH more aggressive during live action
             now = dt.datetime.now()
-            is_game_hours = 17 <= now.hour <= 23  # 5pm-11pm
-            is_weekend = now.weekday() >= 5  # Saturday/Sunday (more games)
+            is_game_hours = 17 <= now.hour <= 23  # 5pm-11pm MT
             
-            if is_game_hours or is_weekend:
-                sleep_time = 90  # 90 seconds during game hours
-                logger.info("😴 Cycle Complete. Game hours - resting 90s...")
+            # LIVE GAME MODE - ESPN/Yahoo competitive (15 seconds)
+            if game_state == "LIVE" and live_count > 0:
+                sleep_time = 15  # 🔥 15s refresh during live action!
+                logger.info(f"🔴 {live_count} LIVE GAMES - Yahoo Mode (15s refresh)...")
+            
+            # INTERMISSION MODE - Moderate refresh (60 seconds)
+            elif game_state == "INTERMISSION" and is_game_hours:
+                sleep_time = 60  # Games on break, check every minute
+                logger.info("⏸️  Intermission - checking every 60s...")
+            
+            # SCHEDULED MODE - Games haven't started yet (2 minutes)
+            elif game_state == "SCHEDULED" and is_game_hours:
+                sleep_time = 120  # Check every 2 min for game start
+                logger.info("📅 Pre-game - checking every 2 min...")
+            
+            # OFF HOURS - Save bandwidth (5 minutes)
             else:
-                sleep_time = 300  # 5 minutes during off hours
-                logger.info("😴 Cycle Complete. Off hours - resting 5 min to save egress...")
+                sleep_time = 300  # 5 minutes when no games
+                logger.info("😴 Off hours - resting 5 min to save bandwidth...")
             
             time.sleep(sleep_time)
         except KeyboardInterrupt:
