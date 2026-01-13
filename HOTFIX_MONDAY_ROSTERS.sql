@@ -1,7 +1,6 @@
 -- ============================================================================
 -- HOTFIX: Restore Monday January 13th rosters
--- Issue: cleanup_stale_frozen_rosters deleted today's rosters
--- Solution: Regenerate from current team_lineups
+-- Run this in Supabase SQL Editor
 -- ============================================================================
 
 -- Restore active players for Monday January 13th
@@ -72,3 +71,11 @@ WHERE m.week_start_date <= '2026-01-13'::DATE
   AND tl.ir IS NOT NULL
   AND jsonb_array_length(tl.ir) > 0
 ON CONFLICT (team_id, matchup_id, player_id, roster_date) DO NOTHING;
+
+-- Verify restoration
+SELECT 
+  COUNT(*) as restored_roster_slots,
+  COUNT(DISTINCT team_id) as teams_restored,
+  COUNT(DISTINCT matchup_id) as matchups_restored
+FROM fantasy_daily_rosters
+WHERE roster_date = '2026-01-13'::DATE;
