@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 data_scraping_service.py - THE TOTAL CITRUS ENGINE (MASTER EDITION)
-Sequential Live Sync + Automated Nightly PBP Processing (xG Audit).
-Built to stop 429 errors and recover Winnipeg/Vegas slate gaps.
+PARALLEL Live Sync + Automated Nightly PBP Processing (xG Audit).
+Built with 100-IP rotation for TRUE real-time updates (Yahoo competitive).
 """
 import os
 import sys
@@ -13,6 +13,7 @@ import datetime as dt
 from typing import Optional, Dict, Any, List
 from dotenv import load_dotenv
 import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from src.utils.citrus_request import citrus_request
 
 load_dotenv()
@@ -25,29 +26,67 @@ logging.basicConfig(
 )
 logger = logging.getLogger("CitrusMaster")
 
-# --- THE PACE-MAKER ---
-LAST_CALL_TIME = 0.0
-def safe_api_call(url: str, max_retries: int = 5) -> Optional[Dict[Any, Any]]:
-    global LAST_CALL_TIME
+# --- PARALLEL API CALLER (NO THROTTLING - WE HAVE 100 IPs!) ---
+def safe_api_call(url: str, max_retries: int = 3) -> Optional[Dict[Any, Any]]:
+    """
+    Make API call using 100-IP rotation (no artificial delays needed).
+    citrus_request handles rate limiting via proxy rotation.
+    """
     for attempt in range(max_retries):
-        elapsed = time.time() - LAST_CALL_TIME
-        if elapsed < 2.5:
-            time.sleep(2.5 - elapsed + random.uniform(0.2, 0.5))
         try:
-            logger.info(f"📡 Fetching: ...{url[-25:]}")
-            r = citrus_request(url, timeout=15)  # Using 100-IP proxy rotation
-            LAST_CALL_TIME = time.time()
+            r = citrus_request(url, timeout=15)  # 100-IP proxy rotation
             if r.status_code == 429:
-                wait = (attempt + 1) * 20
+                wait = (attempt + 1) * 10
                 logger.warning(f"🛑 [429 LIMIT] Resting {wait}s...")
                 time.sleep(wait)
                 continue
             r.raise_for_status()
             return r.json()
         except Exception as e:
-            logger.error(f"❌ API Error: {e}")
-            time.sleep(5)
+            if attempt < max_retries - 1:
+                time.sleep(2)  # Brief retry delay
+            else:
+                logger.error(f"❌ API Error after {max_retries} attempts: {e}")
     return None
+
+# --- PROCESS SINGLE GAME (FOR PARALLEL EXECUTION) ---
+def process_single_game(game_id: str, game_date: str) -> Dict[str, Any]:
+    """
+    Process a single game (PBP + Boxscore + Stats).
+    Returns: {"game_id": ..., "state": ..., "success": bool}
+    """
+    try:
+        # 1. Get Play-by-Play
+        pbp = safe_api_call(f"https://api-web.nhle.com/v1/gamecenter/{game_id}/play-by-play")
+        if not pbp:
+            return {"game_id": game_id, "state": "ERROR", "success": False}
+        
+        state = pbp.get("gameState", "").upper()
+        
+        # 2. Ingest Raw PBP (for xG processing later)
+        try:
+            from ingest_live_raw_nhl import upsert_raw_game, supabase_client
+            upsert_raw_game(supabase_client(), game_id, game_date, pbp)
+        except Exception as e:
+            logger.error(f"   [Game {game_id}] Raw ingest error: {e}")
+        
+        # 3. Get Boxscore & Process Stats (if game is active/final)
+        if state in ("LIVE", "CRIT", "OFF", "FINAL", "INTERMISSION"):
+            box = safe_api_call(f"https://api-web.nhle.com/v1/gamecenter/{game_id}/boxscore")
+            if box:
+                try:
+                    from scrape_live_nhl_stats import process_game_data_citrus
+                    process_game_data_citrus(game_id, box, pbp)
+                    return {"game_id": game_id, "state": state, "success": True}
+                except Exception as e:
+                    logger.error(f"   [Game {game_id}] Stats error: {e}")
+                    return {"game_id": game_id, "state": state, "success": False}
+        
+        return {"game_id": game_id, "state": state, "success": True}
+        
+    except Exception as e:
+        logger.error(f"   [Game {game_id}] Processing error: {e}")
+        return {"game_id": game_id, "state": "ERROR", "success": False}
 
 # --- THE UNIFIED LOOP ---
 def run_unified_loop():
@@ -64,83 +103,63 @@ def run_unified_loop():
         logger.warning("⚠️ No games found in DB schedule.")
         return ("OFF_HOURS", 0)  # Return state info for smart scheduling
 
-    logger.info(f"📋 Found {len(games)} games in slate. Processing with 100-IP power...")
+    logger.info(f"📋 Found {len(games)} games in slate. Processing ALL IN PARALLEL...")
 
-    # 2. SMART PROCESSING - Detect game states first
-    live_games = []
-    intermission_games = []
-    final_games = []
-    scheduled_games = []
+    # 2. PARALLEL PROCESSING - Hit all games at once with 100 IPs!
+    # Use ThreadPoolExecutor to process all games simultaneously
+    results = []
+    live_count = 0
     
-    for g in games:
-        gid = g['game_id']
-        # Quick state check (minimal API call)
-        pbp = safe_api_call(f"https://api-web.nhle.com/v1/gamecenter/{gid}/play-by-play")
-        if not pbp: 
-            scheduled_games.append((gid, g))
-            continue
+    with ThreadPoolExecutor(max_workers=min(len(games), 20)) as executor:
+        # Submit all games for parallel processing
+        future_to_game = {
+            executor.submit(process_single_game, g['game_id'], today): g
+            for g in games
+        }
         
-        state = pbp.get("gameState", "").upper()
-        game_data = (gid, g, pbp, state)
-        
-        if state in ("LIVE", "CRIT"):
-            live_games.append(game_data)
-        elif state == "INTERMISSION":
-            intermission_games.append(game_data)
-        elif state in ("FINAL", "OFF"):
-            final_games.append(game_data)
-        else:
-            scheduled_games.append(game_data)
+        # Collect results as they complete
+        for future in as_completed(future_to_game):
+            game = future_to_game[future]
+            try:
+                result = future.result()
+                results.append(result)
+                
+                # Log result
+                state = result.get("state", "UNKNOWN")
+                success = "✅" if result.get("success") else "❌"
+                
+                if state in ("LIVE", "CRIT"):
+                    live_count += 1
+                    logger.info(f"🔴 LIVE: [{result['game_id']}] {success}")
+                elif state == "INTERMISSION":
+                    logger.info(f"⏸️  INT: [{result['game_id']}] {success}")
+                elif state in ("FINAL", "OFF"):
+                    logger.info(f"🏁 FINAL: [{result['game_id']}] {success}")
+                else:
+                    logger.info(f"📅 {state}: [{result['game_id']}] {success}")
+                    
+            except Exception as e:
+                logger.error(f"❌ Game {game['game_id']} failed: {e}")
     
-    # 3. Process LIVE games first (highest priority)
-    for gid, g, pbp, state in live_games:
-        logger.info(f"🔴 LIVE: [Game {gid}] - PRIORITY PROCESSING")
-        
-        # Ingest Raw
-        try:
-            from ingest_live_raw_nhl import upsert_raw_game, supabase_client
-            upsert_raw_game(supabase_client(), gid, today, pbp)
-            logger.info("   ∟ ✅ Raw Data Ingested")
-        except: pass
+    # All games processed in parallel! Total time = slowest game (not sum of all games)
 
-        # Get Boxscore & Reconcile
-        box = safe_api_call(f"https://api-web.nhle.com/v1/gamecenter/{gid}/boxscore")
-        if box:
-            try:
-                from scrape_live_nhl_stats import process_game_data_citrus
-                process_game_data_citrus(gid, box, pbp)
-                logger.info("   ∟ ✅ 8-Stats Reconciled")
-            except Exception as e: 
-                logger.error(f"   ∟ ❌ Stats Error: {e}")
-
-    # 4. Process INTERMISSION/FINAL games (lower priority)
-    for gid, g, pbp, state in intermission_games + final_games:
-        logger.info(f"⏸️  {state}: [Game {gid}]")
-        
-        try:
-            from ingest_live_raw_nhl import upsert_raw_game, supabase_client
-            upsert_raw_game(supabase_client(), gid, today, pbp)
-        except: pass
-
-        box = safe_api_call(f"https://api-web.nhle.com/v1/gamecenter/{gid}/boxscore")
-        if box:
-            try:
-                from scrape_live_nhl_stats import process_game_data_citrus
-                process_game_data_citrus(gid, box, pbp)
-                logger.info("   ∟ ✅ Stats Updated")
-            except Exception as e: 
-                logger.error(f"   ∟ ❌ Stats Error: {e}")
-
-    # 5. Matchup Refresh
+    # 3. Matchup Refresh
     try:
         from calculate_matchup_scores import update_active_matchup_scores
         update_active_matchup_scores(db)
         logger.info("🏆 [MATCHUPS] Scoreboard Balanced.")
     except: pass
     
-    # Return game state for smart scheduling
-    game_state = "LIVE" if live_games else "INTERMISSION" if intermission_games else "SCHEDULED"
-    return (game_state, len(live_games))
+    # 4. Determine game state from results
+    game_states = [r.get("state", "SCHEDULED") for r in results]
+    if any(s in ("LIVE", "CRIT") for s in game_states):
+        game_state = "LIVE"
+    elif any(s == "INTERMISSION" for s in game_states):
+        game_state = "INTERMISSION"
+    else:
+        game_state = "SCHEDULED"
+    
+    return (game_state, live_count)
 
     # 4. NIGHTLY PBP AUDIT
     now = dt.datetime.now()
@@ -172,10 +191,10 @@ if __name__ == "__main__":
     # BOOT MESSAGE - Verify this in your terminal
     print("\n" + "█" * 70)
     print("█" + " " * 68 + "█")
-    print("█   🍋 CITRUS MASTER COMMAND CENTER ONLINE - AGGRESSIVE MODE       █")
-    print("█   Architecture: Adaptive Scheduling with 100-IP Rotation         █")
-    print("█   Features: 15s Live Updates + xG Audit + PPP/SHP Sync           █")
-    print("█   Performance: Yahoo/ESPN Competitive (Real-Time)                █")
+    print("█   🍋 CITRUS MASTER - PARALLEL MODE (TRUE 15s REFRESH)           █")
+    print("█   Architecture: 100-IP Rotation + Concurrent Processing         █")
+    print("█   Features: ALL games hit simultaneously (Yahoo-level speed)    █")
+    print("█   Performance: McDavid scores → 15s to your app ⚡              █")
     print("█" + " " * 68 + "█")
     print("█" * 70 + "\n")
 
