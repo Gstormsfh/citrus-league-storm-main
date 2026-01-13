@@ -108,7 +108,7 @@ function normalizeTeamName(teamName: string): string {
   return trimmed.toUpperCase();
 }
 
-function parseDate(dateValue: any): Date | null {
+function parseDate(dateValue: unknown): Date | null {
   if (!dateValue) return null;
   
   // If it's already a Date object
@@ -153,7 +153,7 @@ function parseDate(dateValue: any): Date | null {
   return null;
 }
 
-function parseTime(timeValue: any): Date | null {
+function parseTime(timeValue: unknown): Date | null {
   if (!timeValue) return null;
   
   // If it's already a Date object
@@ -192,10 +192,19 @@ function parseTime(timeValue: any): Date | null {
 }
 
 interface ExcelGameRow {
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
-function transformExcelRowToGame(row: ExcelGameRow, rowIndex: number): any | null {
+interface TransformedGame {
+  game_id: string;
+  game_date: string;
+  home_team: string;
+  away_team: string;
+  status: string;
+  game_start_utc?: string;
+}
+
+function transformExcelRowToGame(row: ExcelGameRow, rowIndex: number): TransformedGame | null {
   // Try to detect column names (common variations)
   const dateCol = Object.keys(row).find(k => 
     /date/i.test(k) || k.toLowerCase() === 'game date' || k.toLowerCase() === 'date'
@@ -306,7 +315,7 @@ async function importScheduleFromExcel(filePath: string) {
     // Transform rows to game objects
     const games = rows
       .map((row, index) => transformExcelRowToGame(row, index))
-      .filter((game): game is any => game !== null);
+      .filter((game): game is TransformedGame => game !== null);
 
     console.log(`✅ Transformed ${games.length} valid games from ${rows.length} rows`);
 
@@ -346,9 +355,11 @@ async function importScheduleFromExcel(filePath: string) {
     if (errors > 0) {
       console.log(`   ❌ Errors: ${errors} games`);
     }
-  } catch (error: any) {
-    console.error('❌ Error reading Excel file:', error.message);
-    if (error.code === 'ENOENT') {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorCode = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
+    console.error('❌ Error reading Excel file:', errorMessage);
+    if (errorCode === 'ENOENT') {
       console.error(`   File not found: ${filePath}`);
       console.error(`   Please place your Excel file at: ${filePath}`);
     }

@@ -128,8 +128,8 @@ const CreateLeague = () => {
 
       // Navigate to league dashboard
       navigate(`/league/${league.id}`);
-    } catch (err: any) {
-      const errorMessage = err.message || "Failed to create league";
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to create league";
       setError(errorMessage);
       setLoading(false);
       

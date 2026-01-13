@@ -20,7 +20,7 @@ async function backfillMissingDailyRosters(
   teamId: string,
   leagueId: string,
   matchupId: string
-): Promise<{ backfilledCount: number; error: any }> {
+): Promise<{ backfilledCount: number; error: unknown }> {
   try {
     console.log(`[Backfill] Starting for team: ${teamId}, matchup: ${matchupId}`);
     
@@ -60,7 +60,7 @@ async function backfillMissingDailyRosters(
     const weekStart = new Date(matchup.week_start_date);
     const weekEnd = new Date(matchup.week_end_date);
     const weekDates: string[] = [];
-    let currentDate = new Date(weekStart);
+    const currentDate = new Date(weekStart);
     while (currentDate <= weekEnd) {
       weekDates.push(currentDate.toISOString().split('T')[0]);
       currentDate.setDate(currentDate.getDate() + 1);
@@ -80,7 +80,18 @@ async function backfillMissingDailyRosters(
     console.log(`[Backfill] Found ${existingKeys.size} existing records`);
     
     // Create records for missing days
-    const recordsToInsert: any[] = [];
+    interface DailyRosterRecord {
+      league_id: string;
+      team_id: string;
+      matchup_id: string;
+      player_id: number;
+      roster_date: string;
+      slot_type: string;
+      slot_id: number | null;
+      is_locked: boolean;
+      locked_at: string;
+    }
+    const recordsToInsert: DailyRosterRecord[] = [];
     
     for (const dateStr of weekDates) {
       // Add starters

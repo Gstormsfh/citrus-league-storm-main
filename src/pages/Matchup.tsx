@@ -723,6 +723,93 @@ const Matchup = () => {
         setCachedDailyScores(cachedScores);
         log(' Cached daily scores populated for demo league:', Array.from(cachedScores.entries()));
         
+        // Populate calculatedDailyTotals from daily points arrays for WeeklySchedule
+        // This ensures the daily breakdown shows points
+        const calculatedTotals = new Map<string, { myTotal: number; oppTotal: number }>();
+        const totalDailyPoints = team1DailyPoints.reduce((sum, pts) => sum + pts, 0) + team2DailyPoints.reduce((sum, pts) => sum + pts, 0);
+        
+        for (let i = 0; i < 7 && i < team1DailyPoints.length; i++) {
+          const dayDate = new Date(startYear, startMonth - 1, startDay + i);
+          const dateStr = `${dayDate.getFullYear()}-${String(dayDate.getMonth() + 1).padStart(2, '0')}-${String(dayDate.getDate()).padStart(2, '0')}`;
+          
+          const myPoints = team1DailyPoints[i] || 0;
+          const oppPoints = team2DailyPoints[i] || 0;
+          
+          // If all daily points are zero (RPC returned zeros), try to calculate from matchupStats
+          // Otherwise use the actual daily points from RPC
+          if (totalDailyPoints < 0.1 && team1Roster.length > 0) {
+            // Try to calculate weekly totals from matchupStats (more reliable than total_points)
+            const myWeeklyTotal = team1Roster.reduce((sum, p) => {
+              if (p.matchupStats) {
+                const isGoalie = p.position === 'G' || p.position === 'Goalie';
+                if (isGoalie) {
+                  return sum + ((p.matchupStats.wins || 0) * 4 + 
+                               (p.matchupStats.saves || 0) * 0.2 + 
+                               (p.matchupStats.shutouts || 0) * 3 - 
+                               (p.matchupStats.goals_against || 0) * 1);
+                } else {
+                  return sum + ((p.matchupStats.goals || 0) * 3 + 
+                               (p.matchupStats.assists || 0) * 2 + 
+                               ((p.matchupStats.ppp || 0) * 1) +
+                               ((p.matchupStats.shp || 0) * 2) +
+                               (p.matchupStats.sog || 0) * 0.4 + 
+                               ((p.matchupStats.blocks || 0) * 0.5) +
+                               ((p.matchupStats.hits || 0) * 0.2) +
+                               ((p.matchupStats.pim || 0) * 0.5));
+                }
+              }
+              // Fallback to total_points or points
+              return sum + (p.total_points || p.points || 0);
+            }, 0);
+            
+            const oppWeeklyTotal = (team2Roster || []).reduce((sum, p) => {
+              if (p.matchupStats) {
+                const isGoalie = p.position === 'G' || p.position === 'Goalie';
+                if (isGoalie) {
+                  return sum + ((p.matchupStats.wins || 0) * 4 + 
+                               (p.matchupStats.saves || 0) * 0.2 + 
+                               (p.matchupStats.shutouts || 0) * 3 - 
+                               (p.matchupStats.goals_against || 0) * 1);
+                } else {
+                  return sum + ((p.matchupStats.goals || 0) * 3 + 
+                               (p.matchupStats.assists || 0) * 2 + 
+                               ((p.matchupStats.ppp || 0) * 1) +
+                               ((p.matchupStats.shp || 0) * 2) +
+                               (p.matchupStats.sog || 0) * 0.4 + 
+                               ((p.matchupStats.blocks || 0) * 0.5) +
+                               ((p.matchupStats.hits || 0) * 0.2) +
+                               ((p.matchupStats.pim || 0) * 0.5));
+                }
+              }
+              // Fallback to total_points or points
+              return sum + (p.total_points || p.points || 0);
+            }, 0);
+            
+            // Only distribute if we have a meaningful total
+            if (myWeeklyTotal > 0.1 || oppWeeklyTotal > 0.1) {
+              // Distribute evenly across 7 days (simple approach for demo when RPC has no data)
+              calculatedTotals.set(dateStr, {
+                myTotal: myWeeklyTotal / 7,
+                oppTotal: oppWeeklyTotal / 7
+              });
+            } else {
+              // If still 0, use 0 (don't distribute)
+              calculatedTotals.set(dateStr, {
+                myTotal: 0,
+                oppTotal: 0
+              });
+            }
+          } else {
+            // Use actual daily points from RPC
+            calculatedTotals.set(dateStr, {
+              myTotal: myPoints,
+              oppTotal: oppPoints
+            });
+          }
+        }
+        setCalculatedDailyTotals(calculatedTotals);
+        log(' Calculated daily totals populated for demo league:', Array.from(calculatedTotals.entries()));
+        
         // Get all week matchups for dropdown (same week as selected)
         const { data: allMatchups } = await supabase
           .from('matchups')
@@ -2864,18 +2951,52 @@ const Matchup = () => {
   // ANTI-FLASH: Only update when stats are fully loaded (prevents 0.0 flashing)
   // =============================================================================
   const myTeamPoints = useMemo(() => {
-    // If stats are currently loading, return last stable score to prevent flashing
-    if (statsLoadingRef.current && lastScoreRef.current) {
-      return lastScoreRef.current.myScore;
-    }
-    
     if (!currentMatchup) {
       return '0.0';
     }
     
-    // For demo leagues, if daily points arrays exist, sum them up
+    // PRIORITY 1: For demo leagues, ALWAYS use calculatedDailyTotals (same as weekly selector)
+    // The weekly selector shows correct values, so this is the single source of truth
+    // CRITICAL: Check calculatedDailyTotals BEFORE statsLoadingRef to avoid using cached zeros
+    // This ensures demo league scorecard matches the weekly selector exactly
+    if (userLeagueState !== 'active-user' && calculatedDailyTotals && calculatedDailyTotals.size > 0) {
+      let total = 0;
+      calculatedDailyTotals.forEach((totals) => {
+        total += totals.myTotal;
+      });
+      const score = total.toFixed(1);
+      // Always update cache with calculatedDailyTotals value (don't use old cached zeros)
+      if (!lastScoreRef.current) {
+        lastScoreRef.current = { myScore: score, oppScore: '0.0' };
+      } else {
+        lastScoreRef.current.myScore = score;
+      }
+      return score;
+    }
+    
+    // For active users: If stats are currently loading, return last stable score to prevent flashing
+    if (statsLoadingRef.current && lastScoreRef.current) {
+      return lastScoreRef.current.myScore;
+    }
+    
+    // PRIORITY 2: For demo leagues, if daily points arrays exist, sum them up
     if (userLeagueState !== 'active-user' && myDailyPoints && myDailyPoints.length > 0) {
       const total = myDailyPoints.reduce((sum, pts) => sum + pts, 0);
+      // If daily points sum is 0 or very small, use fallback to sum player.total_points
+      // This handles cases where RPC returns zeros but matchup lines have data
+      if (total < 0.1) {
+        const fallback = myStarters.reduce((sum, player) => {
+          const pts = player.total_points || player.points || 0;
+          return sum + pts;
+        }, 0);
+        const score = fallback.toFixed(1);
+        if (!lastScoreRef.current) {
+          lastScoreRef.current = { myScore: score, oppScore: '0.0' };
+        } else {
+          lastScoreRef.current.myScore = score;
+        }
+        return score;
+      }
       const score = total.toFixed(1);
       if (!lastScoreRef.current) {
         lastScoreRef.current = { myScore: score, oppScore: '0.0' };
@@ -2885,7 +3006,7 @@ const Matchup = () => {
       return score;
     }
     
-    // If daily stats map is empty, use fallback
+    // PRIORITY 3: If daily stats map is empty, use fallback
     if (dailyStatsByDate.size === 0) {
       // Fallback: sum starter week totals if no daily breakdown available
       // Check both total_points and points fields
@@ -2903,7 +3024,7 @@ const Matchup = () => {
       return score;
     }
 
-    // Sum calculatedDailyTotals (includes confirmed totals from MatchupComparison)
+    // PRIORITY 4: Sum calculatedDailyTotals (includes confirmed totals from MatchupComparison)
     let total = 0;
     calculatedDailyTotals.forEach((totals) => {
       total += totals.myTotal;
@@ -2920,18 +3041,49 @@ const Matchup = () => {
   }, [currentMatchup, calculatedDailyTotals, dailyStatsByDate, userLeagueState, myDailyPoints, myStarters]);
 
   const opponentTeamPoints = useMemo(() => {
-    // If stats are currently loading, return last stable score to prevent flashing
-    if (statsLoadingRef.current && lastScoreRef.current) {
-      return lastScoreRef.current.oppScore;
-    }
-    
     if (!currentMatchup) {
       return '0.0';
     }
     
-    // For demo leagues, if daily points arrays exist, sum them up
+    // PRIORITY 1: For demo leagues, ALWAYS use calculatedDailyTotals (same as weekly selector)
+    // The weekly selector shows correct values, so this is the single source of truth
+    // Don't use cached score if calculatedDailyTotals is available (it's more reliable)
+    if (userLeagueState !== 'active-user' && calculatedDailyTotals && calculatedDailyTotals.size > 0) {
+      let total = 0;
+      calculatedDailyTotals.forEach((totals) => {
+        total += totals.oppTotal;
+      });
+      const score = total.toFixed(1);
+      // Always update cache with calculatedDailyTotals value (don't use old cached zeros)
+      if (lastScoreRef.current) {
+        lastScoreRef.current.oppScore = score;
+      } else {
+        lastScoreRef.current = { myScore: '0.0', oppScore: score };
+      }
+      return score;
+    }
+    
+    // For active users: If stats are currently loading, return last stable score to prevent flashing
+    if (statsLoadingRef.current && lastScoreRef.current) {
+      return lastScoreRef.current.oppScore;
+    }
+    
+    // PRIORITY 2: For demo leagues, if daily points arrays exist, sum them up
     if (userLeagueState !== 'active-user' && opponentDailyPoints && opponentDailyPoints.length > 0) {
       const total = opponentDailyPoints.reduce((sum, pts) => sum + pts, 0);
+      // If daily points sum is 0 or very small, use fallback to sum player.total_points
+      // This handles cases where RPC returns zeros but matchup lines have data
+      if (total < 0.1) {
+        const fallback = opponentStarters.reduce((sum, player) => {
+          const pts = player.total_points || player.points || 0;
+          return sum + pts;
+        }, 0);
+        const score = fallback.toFixed(1);
+        if (lastScoreRef.current) {
+          lastScoreRef.current.oppScore = score;
+        }
+        return score;
+      }
       const score = total.toFixed(1);
       if (lastScoreRef.current) {
         lastScoreRef.current.oppScore = score;
@@ -2939,7 +3091,7 @@ const Matchup = () => {
       return score;
     }
     
-    // If daily stats map is empty, use fallback
+    // PRIORITY 3: If daily stats map is empty, use fallback
     if (dailyStatsByDate.size === 0) {
       // Check both total_points and points fields
       const fallback = opponentStarters.reduce((sum, player) => {
@@ -2953,7 +3105,7 @@ const Matchup = () => {
       return score;
     }
 
-    // Sum calculatedDailyTotals (includes confirmed totals from MatchupComparison)
+    // PRIORITY 4: Sum calculatedDailyTotals (includes confirmed totals from MatchupComparison)
     let total = 0;
     calculatedDailyTotals.forEach((totals) => {
       total += totals.oppTotal;
@@ -4568,6 +4720,33 @@ const Matchup = () => {
                   selectedDate={selectedDate}
                   dailyStatsMap={selectedDate ? dailyStatsByDate.get(selectedDate) : dailyStatsMap}
                   onTotalsCalculated={handleTotalsCalculated}
+                  calculatedDailyTotals={calculatedDailyTotals}
+                  weeklyUserTotal={(() => {
+                    // For weekly view, use sum of calculatedDailyTotals (same as weekly selector)
+                    // This ensures we match what the weekly selector shows
+                    if (!selectedDate && calculatedDailyTotals && calculatedDailyTotals.size >= 7) {
+                      let total = 0;
+                      calculatedDailyTotals.forEach((totals) => {
+                        total += totals.myTotal;
+                      });
+                      return total;
+                    }
+                    // Fallback to myTeamPoints
+                    return parseFloat(myTeamPoints || '0');
+                  })()}
+                  weeklyOpponentTotal={(() => {
+                    // For weekly view, use sum of calculatedDailyTotals (same as weekly selector)
+                    // This ensures we match what the weekly selector shows
+                    if (!selectedDate && calculatedDailyTotals && calculatedDailyTotals.size >= 7) {
+                      let total = 0;
+                      calculatedDailyTotals.forEach((totals) => {
+                        total += totals.oppTotal;
+                      });
+                      return total;
+                    }
+                    // Fallback to opponentTeamPoints
+                    return parseFloat(opponentTeamPoints || '0');
+                  })()}
                 />
               </>
             )}

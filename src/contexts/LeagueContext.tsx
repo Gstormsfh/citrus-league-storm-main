@@ -121,7 +121,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       }
 
       setLoading(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error loading leagues:', err);
       setError('Failed to load leagues');
       setLoading(false);

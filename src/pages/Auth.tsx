@@ -90,9 +90,10 @@ const Auth = () => {
         setError('Account created! Please sign in.');
         setLoading(false);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Catch any unexpected errors
-      setError(err.message || 'An unexpected error occurred. Please try again.');
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.';
+      setError(errorMessage);
       setLoading(false);
     }
   };

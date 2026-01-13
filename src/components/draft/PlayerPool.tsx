@@ -51,7 +51,7 @@ export const PlayerPool = ({
 
 
   const filteredAndSortedPlayers = useMemo(() => {
-    let filtered = availablePlayers.filter(player => {
+    const filtered = availablePlayers.filter(player => {
       const matchesSearch = player.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            player.team.toLowerCase().includes(searchTerm.toLowerCase());
       const normalizedPlayerPos = normalizePosition(player.position);
@@ -75,18 +75,20 @@ export const PlayerPool = ({
           case 'wins':
             comparison = (b.wins || 0) - (a.wins || 0);
             break;
-          case 'gaa':
+          case 'gaa': {
             // Lower GAA is better, so reverse the comparison
             const gaaA = a.goals_against_average || 999;
             const gaaB = b.goals_against_average || 999;
             comparison = gaaA - gaaB;
             break;
-          case 'savePct':
+          }
+          case 'savePct': {
             // Higher save % is better
             const svA = a.save_percentage || 0;
             const svB = b.save_percentage || 0;
             comparison = svB - svA;
             break;
+          }
           case 'saves':
             comparison = (b.saves || 0) - (a.saves || 0);
             break;

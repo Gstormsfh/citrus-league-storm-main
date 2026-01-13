@@ -30,30 +30,16 @@ const Navbar = () => {
   const navigate = useNavigate();
   
   // Get auth - handle gracefully if context not ready
-  let user, profile, signOut;
-  try {
-    const auth = useAuth();
-    user = auth?.user ?? null;
-    profile = auth?.profile ?? null;
-    signOut = auth?.signOut ?? (async () => {});
-  } catch (error) {
-    console.warn("Auth context not ready yet:", error);
-    user = null;
-    profile = null;
-    signOut = async () => {};
-  }
+  const auth = useAuth();
+  const user = auth?.user ?? null;
+  const profile = auth?.profile ?? null;
+  const signOut = auth?.signOut ?? (async () => {});
 
   // Get active league and notification count
-  let activeLeagueId: string | null = null;
-  let unreadCount = 0;
-  try {
-    const league = useLeague();
-    activeLeagueId = league?.activeLeagueId ?? null;
-    const notificationStore = useNotificationStore();
-    unreadCount = activeLeagueId ? (notificationStore.unreadCounts.get(activeLeagueId) || 0) : 0;
-  } catch (error) {
-    // League context not ready
-  }
+  const league = useLeague();
+  const activeLeagueId = league?.activeLeagueId ?? null;
+  const notificationStore = useNotificationStore();
+  const unreadCount = activeLeagueId ? (notificationStore.unreadCounts.get(activeLeagueId) || 0) : 0;
   
   useEffect(() => {
     const handleScroll = () => {

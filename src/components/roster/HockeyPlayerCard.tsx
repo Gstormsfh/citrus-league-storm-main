@@ -221,6 +221,9 @@ const HockeyPlayerCardContent = ({
                 plusMinus: 0,
                 shots: 0,
                 gamesPlayed: 0,
+                powerPlayPoints: 0,
+                shortHandedPoints: 0,
+                pim: 0,
                 wins: 0,
                 gaa: 0,
                 savePct: 0
@@ -276,6 +279,11 @@ const HockeyPlayerCardContent = ({
         hits: Math.round(hits),
         blockedShots: Math.round(blockedShots),
         xGoals: xGoals,
+        // CRITICAL FIX: CitrusPuck data doesn't include PPP/SHP, so always use player.stats
+        // These come from PlayerService which uses nhl_ppp and nhl_shp from database
+        powerPlayPoints: player.stats?.powerPlayPoints ?? 0,
+        shortHandedPoints: player.stats?.shortHandedPoints ?? 0,
+        pim: player.stats?.pim ?? 0, // Also include PIM for consistency
         wins: wins, 
         gaa: gaa,
         savePct: savePct,

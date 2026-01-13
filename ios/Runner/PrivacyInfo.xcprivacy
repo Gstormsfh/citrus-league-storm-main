@@ -1,5 +1,163 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+    Citrus Fantasy Hockey - Privacy Manifest
+    
+    This manifest declares all data collection, API usage, and tracking practices
+    in accordance with Apple's App Privacy Requirements (iOS 17+).
+    
+    Last Updated: January 13, 2026
+-->
 <plist version="1.0">
-<dict/>
+<dict>
+    <!-- ========================================== -->
+    <!-- TRACKING DISCLOSURE -->
+    <!-- ========================================== -->
+    <key>NSPrivacyTracking</key>
+    <false/>
+    <!-- We do NOT track users across apps/websites for advertising -->
+    
+    <key>NSPrivacyTrackingDomains</key>
+    <array>
+        <!-- No tracking domains - we don't do cross-site tracking -->
+    </array>
+    
+    <!-- ========================================== -->
+    <!-- DATA COLLECTION DISCLOSURE -->
+    <!-- ========================================== -->
+    <key>NSPrivacyCollectedDataTypes</key>
+    <array>
+        <!-- EMAIL ADDRESS -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeEmailAddress</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <!-- Linked to user identity for account authentication -->
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <!-- Not used for tracking -->
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+                <!-- Used for account creation, login, and password recovery -->
+            </array>
+        </dict>
+        
+        <!-- USER ID (Username) -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeUserID</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+                <!-- Used for display name, team identification, and league participation -->
+            </array>
+        </dict>
+        
+        <!-- GAMEPLAY CONTENT (League/Team Data) -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeGameplayContent</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+                <!-- League names, team names, roster choices, draft picks, transactions -->
+            </array>
+        </dict>
+        
+        <!-- PRODUCT INTERACTION (Usage Analytics) -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeProductInteraction</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <false/>
+            <!-- Not linked to user identity - aggregated analytics only -->
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+                <!-- Used to improve app performance and understand feature usage -->
+                <string>NSPrivacyCollectedDataTypePurposeProductPersonalization</string>
+                <!-- Used to customize user experience (e.g., favorite teams) -->
+            </array>
+        </dict>
+        
+        <!-- PERFORMANCE DATA (Crash Reports) -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypePerformanceData</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+                <!-- Crash reports and performance monitoring to fix bugs -->
+            </array>
+        </dict>
+    </array>
+    
+    <!-- ========================================== -->
+    <!-- REQUIRED REASON API USAGE -->
+    <!-- ========================================== -->
+    <key>NSPrivacyAccessedAPITypes</key>
+    <array>
+        <!-- FILE TIMESTAMP API -->
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>C617.1</string>
+                <!-- Reason: Displaying file timestamps to the user in app UI -->
+                <string>3B52.1</string>
+                <!-- Reason: Accessing timestamps of files created by the app -->
+            </array>
+        </dict>
+        
+        <!-- USER DEFAULTS API -->
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>CA92.1</string>
+                <!-- Reason: Accessing user defaults to store app preferences (theme, notifications) -->
+            </array>
+        </dict>
+        
+        <!-- SYSTEM BOOT TIME API -->
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategorySystemBootTime</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>35F9.1</string>
+                <!-- Reason: Measuring time intervals for performance monitoring -->
+            </array>
+        </dict>
+        
+        <!-- DISK SPACE API -->
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryDiskSpace</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>E174.1</string>
+                <!-- Reason: Checking available disk space before caching player images -->
+            </array>
+        </dict>
+    </array>
+</dict>
 </plist>

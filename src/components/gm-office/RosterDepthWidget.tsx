@@ -167,7 +167,7 @@ export const RosterDepthWidget = () => {
 
         rosterPlayers.forEach(player => {
           const pos = normalizePosition(player.position);
-          if (pos && positionCounts.hasOwnProperty(pos)) {
+          if (pos && Object.prototype.hasOwnProperty.call(positionCounts, pos)) {
             positionCounts[pos]++;
           }
         });

@@ -99,7 +99,20 @@ async function fetchNHLSchedule(season: string = '20242025'): Promise<NHLAPIGame
   return allGames;
 }
 
-function transformGame(game: NHLAPIGame): any {
+interface TransformedGame {
+  game_id: number;
+  game_date: string;
+  home_team: string;
+  away_team: string;
+  status: 'scheduled' | 'live' | 'final' | 'postponed';
+  period: string | null;
+  period_time: string | null;
+  home_score: number | null;
+  away_score: number | null;
+  venue: string | null;
+}
+
+function transformGame(game: NHLAPIGame): TransformedGame {
   const gameDate = new Date(game.gameDate);
   const status = game.status.abstractGameState.toLowerCase();
   
@@ -163,8 +176,9 @@ async function storeGames(games: NHLAPIGame[]) {
         inserted += batch.length;
         console.log(`   ✅ Inserted batch ${i / batchSize + 1} (${inserted}/${transformedGames.length} games)`);
       }
-    } catch (error: any) {
-      console.error(`   ❌ Error inserting batch ${i / batchSize + 1}:`, error.message);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`   ❌ Error inserting batch ${i / batchSize + 1}:`, errorMessage);
       errors++;
     }
   }

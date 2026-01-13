@@ -58,32 +58,29 @@ const Footer = () => {
             <h4 className="font-display font-bold text-base uppercase text-citrus-forest mb-5 tracking-wide">Product</h4>
             <ul className="space-y-3">
               <li><Link to="/features" className="text-citrus-charcoal hover:text-citrus-orange transition-colors font-sans">Features</Link></li>
-              <li><Link to="/standings" className="text-citrus-charcoal hover:text-citrus-orange transition-colors font-sans">Leagues</Link></li>
-              <li><Link to="/free-agents" className="text-citrus-charcoal hover:text-citrus-orange transition-colors font-sans">Players</Link></li>
-              <li><Link to="/gm-office/stormy" className="text-citrus-charcoal hover:text-citrus-orange transition-colors font-sans">Stormy AI</Link></li>
-              <li><Link to="/pricing" className="text-citrus-charcoal hover:text-citrus-orange transition-colors font-sans">Pricing</Link></li>
+              <li><Link to="/draft-room" className="text-citrus-charcoal hover:text-citrus-orange transition-colors font-sans">Draft Room</Link></li>
+              <li><Link to="/matchup" className="text-citrus-charcoal hover:text-citrus-orange transition-colors font-sans">Matchups</Link></li>
+              <li><Link to="/roster" className="text-citrus-charcoal hover:text-citrus-orange transition-colors font-sans">Roster</Link></li>
+              <li><Link to="/free-agents" className="text-citrus-charcoal hover:text-citrus-orange transition-colors font-sans">Free Agents</Link></li>
             </ul>
           </div>
           
           <div>
             <h4 className="font-display font-bold text-base uppercase text-citrus-forest mb-5 tracking-wide">Resources</h4>
             <ul className="space-y-3">
-              <li><Link to="/blog" className="text-citrus-charcoal hover:text-citrus-orange transition-colors font-sans">Blog</Link></li>
-              <li><Link to="/podcasts" className="text-citrus-charcoal hover:text-citrus-orange transition-colors font-sans">Podcasts</Link></li>
-              <li><Link to="/guides" className="text-citrus-charcoal hover:text-citrus-orange transition-colors font-sans">Strategy Guides</Link></li>
               <li><Link to="/news" className="text-citrus-charcoal hover:text-citrus-orange transition-colors font-sans">Player News</Link></li>
-              <li><Link to="/contact" className="text-citrus-charcoal hover:text-citrus-orange transition-colors font-sans">Support</Link></li>
+              <li><Link to="/standings" className="text-citrus-charcoal hover:text-citrus-orange transition-colors font-sans">Standings</Link></li>
+              <li><Link to="/gm-office/stormy" className="text-citrus-charcoal hover:text-citrus-orange transition-colors font-sans">Stormy AI</Link></li>
+              <li><a href="mailto:support@citrusfantasy.com" className="text-citrus-charcoal hover:text-citrus-orange transition-colors font-sans">Contact Support</a></li>
             </ul>
           </div>
           
           <div>
-            <h4 className="font-display font-bold text-base uppercase text-citrus-forest mb-5 tracking-wide">Company</h4>
+            <h4 className="font-display font-bold text-base uppercase text-citrus-forest mb-5 tracking-wide">Legal</h4>
             <ul className="space-y-3">
-              <li><Link to="/about" className="text-citrus-charcoal hover:text-citrus-orange transition-colors font-sans">About Us</Link></li>
-              <li><Link to="/careers" className="text-citrus-charcoal hover:text-citrus-orange transition-colors font-sans">Careers</Link></li>
-              <li><Link to="/contact" className="text-citrus-charcoal hover:text-citrus-orange transition-colors font-sans">Contact</Link></li>
-              <li><Link to="/privacy" className="text-citrus-charcoal hover:text-citrus-orange transition-colors font-sans">Privacy Policy</Link></li>
-              <li><Link to="/terms" className="text-citrus-charcoal hover:text-citrus-orange transition-colors font-sans">Terms of Service</Link></li>
+              <li><Link to="/settings" className="text-citrus-charcoal hover:text-citrus-orange transition-colors font-sans">Account Settings</Link></li>
+              <li><a href="/privacy-policy.html" target="_blank" rel="noopener noreferrer" className="text-citrus-charcoal hover:text-citrus-orange transition-colors font-sans">Privacy Policy</a></li>
+              <li><a href="/terms-of-service.html" target="_blank" rel="noopener noreferrer" className="text-citrus-charcoal hover:text-citrus-orange transition-colors font-sans">Terms of Service</a></li>
             </ul>
           </div>
         </div>

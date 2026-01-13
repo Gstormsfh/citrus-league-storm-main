@@ -9,10 +9,10 @@ fetch_nhl_stats_from_landing.py
 # ║  It's the ONLY source for accurate PPP (Power Play Points) and            ║
 # ║  SHP (Shorthanded Points) because the boxscore API lacks PP/SH assists.   ║
 # ║                                                                           ║
-# ║  Run weekly or after the initial 914-player scrape completes.             ║
+# ║  Runs nightly automatically at midnight MT via data_scraping_service.py. ║
 # ║  For per-game PPP/SHP, see: sync_ppp_from_gamelog.py                      ║
 # ║                                                                           ║
-# ║  ⚠️  Uses 3-second delays to avoid rate limiting. DO NOT reduce!         ║
+# ║  ⚡ Optimized for 100-IP proxy rotation - minimal delays for speed!        ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 
 Fetch all official NHL.com statistics from landing endpoint (api-web.nhle.com).
@@ -160,44 +160,35 @@ def fetch_player_statsapi_data(player_id: int, season: str, retries: int = 5) ->
     Fetch player stats from StatsAPI endpoint (official NHL.com API for hits/blocks).
     Returns dict with stats or None if failed.
     
-    Uses aggressive retries with exponential backoff to handle DNS issues.
+    WARNING: StatsAPI has DNS issues as of 2026. This is a best-effort fallback.
+    If it fails, the script continues without hits/blocks (they'll be 0).
     """
-    for attempt in range(retries):
-        try:
-            url = f"{STATS_API_BASE}/people/{player_id}/stats"
-            params = {
-                "stats": "statsSingleSeason",
-                "season": season
-            }
-            response = requests.get(url, params=params, timeout=15)
-            response.raise_for_status()
-            data = response.json()
-            
-            # Extract stats from response
-            stats_list = data.get("stats", [])
-            if stats_list:
-                splits = stats_list[0].get("splits", [])
-                if splits:
-                    return splits[0].get("stat", {})
-            
-            return None
-            
-        except requests.exceptions.RequestException as e:
-            if attempt < retries - 1:
-                # Exponential backoff: 2s, 4s, 8s, 16s, 32s
-                delay = 2 ** (attempt + 1)
-                time.sleep(delay)
-            else:
-                # StatsAPI often has DNS issues - this is expected, don't log as error
-                return None
-        except Exception as e:
-            if attempt < retries - 1:
-                delay = 2 ** (attempt + 1)
-                time.sleep(delay)
-            else:
-                return None
+    url = f"{STATS_API_BASE}/people/{player_id}/stats"
+    params = {
+        "stats": "statsSingleSeason",
+        "season": season
+    }
     
-    return None
+    try:
+        # Try with direct requests (no proxy) - StatsAPI DNS is broken, proxies won't help
+        # If this fails, it's okay - hits/blocks will be 0
+        response = requests.get(url, params=params, timeout=5)
+        response.raise_for_status()
+        data = response.json()
+        
+        # Extract stats from response
+        stats_list = data.get("stats", [])
+        if stats_list:
+            splits = stats_list[0].get("splits", [])
+            if splits:
+                return splits[0].get("stat", {})
+        
+        return None
+        
+    except Exception as e:
+        # StatsAPI has DNS issues - this is expected, don't log as error
+        # Just return None and continue (hits/blocks will be 0)
+        return None
 
 
 def extract_hits_blocks_from_statsapi(statsapi_data: Dict[str, Any]) -> Tuple[int, int]:
@@ -463,8 +454,9 @@ def main() -> int:
     failed_429_players = []  # List of (player_id, player_name, is_goalie) tuples
     failed_not_found_players = []  # List of (player_id, player_name, is_goalie) tuples
     
-    # Track base delay - will increase to 5s if 429 detected
-    base_delay = 3
+    # Track base delay - optimized for 100-IP proxy rotation
+    # With proxy rotation, we can use minimal delays (citrus_request handles rate limiting)
+    base_delay = 0.1  # 100ms - proxy rotation eliminates need for 3s delays
     
     for idx, player in enumerate(players, 1):
         player_id = _safe_int(player.get("player_id"), 0)
@@ -488,10 +480,10 @@ def main() -> int:
         if error_type == "429":
             failed_429_players.append((player_id, player_name, is_goalie))
             rate_limited_429_count += 1
-            # Increase base delay after first 429
-            if base_delay == 3:
-                base_delay = 5
-                print(f"  [RATE LIMIT] Detected 429 error, increasing delay to 5s between requests")
+            # Increase base delay after first 429 (proxy rotation should handle most, but be safe)
+            if base_delay < 0.5:
+                base_delay = 0.5
+                print(f"  [RATE LIMIT] Detected 429 error, increasing delay to 0.5s between requests")
         elif error_type == "not_found":
             failed_not_found_players.append((player_id, player_name, is_goalie))
             not_found_count += 1
@@ -499,21 +491,26 @@ def main() -> int:
         if landing_data:
             stats = extract_all_official_stats(landing_data, DEFAULT_SEASON, is_goalie=is_goalie)
             
-            # For skaters: Always attempt StatsAPI for hits/blocks (official NHL.com API)
-            # Landing endpoint doesn't provide hits/blocks, so StatsAPI is the source of truth
+            # For skaters: Attempt StatsAPI for hits/blocks (optional - has DNS issues)
+            # Landing endpoint doesn't provide hits/blocks
+            # CRITICAL: StatsAPI often fails due to DNS issues - don't let it block the script!
             if not is_goalie:
-                season_string = f"{DEFAULT_SEASON}{DEFAULT_SEASON + 1}"  # "20252026"
-                statsapi_data = fetch_player_statsapi_data(player_id, season_string)
-                
-                if statsapi_data:
-                    hits, blocks = extract_hits_blocks_from_statsapi(statsapi_data)
-                    # Always update with StatsAPI values (even if 0) - this is the official source
-                    stats["nhl_hits"] = hits
-                    stats["nhl_blocks"] = blocks
-                    # Track StatsAPI success (for reporting)
-                    if hits > 0 or blocks > 0:
-                        updated_count["statsapi_hits_blocks"] = updated_count.get("statsapi_hits_blocks", 0) + 1
-                # If StatsAPI fails, leave as 0 (will be logged in summary)
+                try:
+                    season_string = f"{DEFAULT_SEASON}{DEFAULT_SEASON + 1}"  # "20252026"
+                    statsapi_data = fetch_player_statsapi_data(player_id, season_string)
+                    
+                    if statsapi_data:
+                        hits, blocks = extract_hits_blocks_from_statsapi(statsapi_data)
+                        # Always update with StatsAPI values (even if 0) - this is the official source
+                        stats["nhl_hits"] = hits
+                        stats["nhl_blocks"] = blocks
+                        # Track StatsAPI success (for reporting)
+                        if hits > 0 or blocks > 0:
+                            updated_count["statsapi_hits_blocks"] = updated_count.get("statsapi_hits_blocks", 0) + 1
+                except Exception as e:
+                    # StatsAPI has DNS issues - silently skip, don't trigger circuit breaker
+                    # Hits/blocks will be 0 (can use PBP-calculated values as fallback elsewhere)
+                    pass
             
             # Update database if we got valid data
             # Ensure all required keys exist in stats dict
@@ -623,8 +620,9 @@ def main() -> int:
             print(f"  [PROGRESS] Processed {idx}/{len(players)} players ({updated_count['skaters']} skaters, {updated_count['goalies']} goalies updated, {not_found_count} not found, {error_count} errors)...")
             last_progress_time = current_time
         
-        # Rate limiting - NHL API allows ~20 requests/minute safely
-        # Base delay (3s or 5s if 429 detected) = safe rate
+        # Rate limiting - With 100-IP proxy rotation, minimal delay needed
+        # citrus_request handles rate limiting via proxy rotation and exponential backoff
+        # Base delay (0.1s default, 0.5s if 429 detected) = optimized for proxy system
         if idx < len(players):
             time.sleep(base_delay)
     
@@ -701,17 +699,22 @@ def main() -> int:
             if landing_data:
                 stats = extract_all_official_stats(landing_data, DEFAULT_SEASON, is_goalie=is_goalie)
                 
-                # For skaters: Always attempt StatsAPI for hits/blocks (official NHL.com API)
+                # For skaters: Attempt StatsAPI for hits/blocks (optional - has DNS issues)
+                # CRITICAL: StatsAPI often fails due to DNS issues - don't let it block the script!
                 if not is_goalie:
-                    season_string = f"{DEFAULT_SEASON}{DEFAULT_SEASON + 1}"  # "20252026"
-                    statsapi_data = fetch_player_statsapi_data(player_id, season_string)
-                    
-                    if statsapi_data:
-                        hits, blocks = extract_hits_blocks_from_statsapi(statsapi_data)
-                        stats["nhl_hits"] = hits
-                        stats["nhl_blocks"] = blocks
-                        if hits > 0 or blocks > 0:
-                            retry_updated_count["statsapi_hits_blocks"] = retry_updated_count.get("statsapi_hits_blocks", 0) + 1
+                    try:
+                        season_string = f"{DEFAULT_SEASON}{DEFAULT_SEASON + 1}"  # "20252026"
+                        statsapi_data = fetch_player_statsapi_data(player_id, season_string)
+
+                        if statsapi_data:
+                            hits, blocks = extract_hits_blocks_from_statsapi(statsapi_data)
+                            stats["nhl_hits"] = hits
+                            stats["nhl_blocks"] = blocks
+                            if hits > 0 or blocks > 0:
+                                retry_updated_count["statsapi_hits_blocks"] = retry_updated_count.get("statsapi_hits_blocks", 0) + 1
+                    except Exception as e:
+                        # StatsAPI has DNS issues - silently skip
+                        pass
                 
                 # Update database if we got valid data
                 if not stats:
@@ -808,7 +811,7 @@ def main() -> int:
                         print(f"  [ERROR] Failed to update player {player_id} ({player_name}) in retry: {e}")
                         retry_error_count += 1
             
-            # Rate limiting delay
+            # Rate limiting delay - optimized for proxy rotation
             if idx < len(players_to_retry):
                 time.sleep(base_delay)
         

@@ -108,6 +108,20 @@ def run_unified_loop():
             logger.info("✅ Nightly PBP processing complete.")
         except Exception as e: logger.error(f"❌ Nightly PBP Error: {e}")
 
+    # 5. NIGHTLY LANDING STATS UPDATE (PPP/SHP Season Totals)
+    # Run at midnight MT (00:00-00:05) to update season totals after all games are final
+    if now.hour == 0 and now.minute < 5:
+        logger.info("🌙 MIDNIGHT MT - Starting Nightly Landing Stats Update (PPP/SHP)...")
+        try:
+            from fetch_nhl_stats_from_landing import main as fetch_landing_stats
+            result = fetch_landing_stats()
+            if result == 0:
+                logger.info("✅ Nightly landing stats update complete.")
+            else:
+                logger.error(f"❌ Nightly landing stats update failed with code {result}")
+        except Exception as e:
+            logger.error(f"❌ Nightly Landing Stats Error: {e}")
+
     logger.info("=" * 60)
 
 if __name__ == "__main__":
@@ -116,7 +130,7 @@ if __name__ == "__main__":
     print("█" + " " * 58 + "█")
     print("█   🍋 CITRUS MASTER COMMAND CENTER ONLINE              █")
     print("█   Architecture: Sequential Heartbeat (429-Proof)      █")
-    print("█   Features: Live 8-Stat Sync + Nightly xG Audit       █")
+    print("█   Features: Live 8-Stat Sync + Nightly xG Audit + Landing Stats █")
     print("█" + " " * 58 + "█")
     print("█" * 60 + "\n")
 

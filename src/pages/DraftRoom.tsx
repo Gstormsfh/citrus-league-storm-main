@@ -92,6 +92,10 @@ const DraftRoom = () => {
   const [snapshotCreatedAt, setSnapshotCreatedAt] = useState<string | undefined>(undefined);
   const [savingSnapshot, setSavingSnapshot] = useState(false);
 
+  // Calculate loading state for minimum loading time hook
+  const actualLoading = loading || authLoading || (!user && userLeagueState !== 'guest' && userLeagueState !== 'logged-in-no-league');
+  const displayLoading = useMinimumLoadingTime(actualLoading, 800);
+
   // Memoize loadUserLeague to prevent infinite loops
   const loadUserLeague = useCallback(async () => {
     if (!user) {
@@ -119,7 +123,7 @@ const DraftRoom = () => {
       const newSearchParams = new URLSearchParams(searchParams);
       newSearchParams.set('league', firstLeague.id);
       navigate(`/draft-room?${newSearchParams.toString()}`, { replace: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       setError('Failed to load your leagues. Please try again.');
       setLoading(false);
     }
@@ -248,7 +252,7 @@ const DraftRoom = () => {
         
         setLoading(false);
         return;
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error('DraftRoom: Error loading demo draft:', error);
         setError('Failed to load demo draft. Please try again.');
         setLoading(false);
@@ -396,9 +400,9 @@ const DraftRoom = () => {
       // Only set loading to false after all data is loaded
       setLoading(false);
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('DraftRoom: Error loading draft data:', error);
-      const errorMessage = error?.message || JSON.stringify(error) || 'Failed to load draft data';
+      const errorMessage = error instanceof Error ? error.message : (typeof error === 'string' ? error : JSON.stringify(error)) || 'Failed to load draft data';
       setError(errorMessage);
       setLoading(false);
       // Ensure draftPhase is set even on error
@@ -653,7 +657,7 @@ const DraftRoom = () => {
       logger.log('loadDraftState: Draft state loaded successfully', state);
       setDraftState(state);
       return state; // Return the state so caller can use it immediately
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error('loadDraftState: Exception loading draft state', err);
       // Retry if we haven't exceeded max retries
       if (retryCount < 3) {
@@ -732,9 +736,10 @@ const DraftRoom = () => {
         logger.log('First pick is AI team, will auto-pick in 2 seconds');
       }
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Error starting draft timer:', error);
-      alert(`Failed to start draft timer: ${error.message || 'Unknown error'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to start draft timer: ${errorMessage}`);
     }
   };
 
@@ -1082,9 +1087,10 @@ const DraftRoom = () => {
       timerRunningRef.current = false;
       lastPickNumberRef.current = 0;
       await loadDraftState();
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('handlePlayerDraft error:', error);
-      alert(`Failed to draft player: ${error?.message || 'Unknown error'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to draft player: ${errorMessage}`);
       // Don't throw - let draft continue
     }
   };
@@ -1270,9 +1276,10 @@ const DraftRoom = () => {
       
       // Reload data to show updated status
       await loadDraftData();
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('handlePrepareDraft: Error preparing draft', error);
-      alert(`Failed to prepare draft: ${error.message || 'Unknown error'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to prepare draft: ${errorMessage}`);
     }
   };
 
@@ -1378,7 +1385,7 @@ const DraftRoom = () => {
               setTimeout(() => loadStateAfterStart(retryCount + 1), 500);
             }
           }
-        } catch (stateError: any) {
+        } catch (stateError: unknown) {
           logger.error('Error loading draft state after start:', stateError);
           if (retryCount < 10) {
             setTimeout(() => loadStateAfterStart(retryCount + 1), 500);
@@ -1390,9 +1397,10 @@ const DraftRoom = () => {
       setTimeout(() => loadStateAfterStart(0), 500);
 
       logger.log('handleStartDraft: Draft started successfully');
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('handleStartDraft: Error starting draft', error);
-      alert(`Failed to start draft: ${error.message || 'Unknown error'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to start draft: ${errorMessage}`);
     }
   };
 
@@ -1490,9 +1498,10 @@ const DraftRoom = () => {
       logger.log('Draft reset complete - ready for fresh start');
       alert('✅ Draft reset complete! You can now start a fresh draft. When you click "Start Draft", a new draft session will be created.');
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Error resetting draft:', error);
-      alert(`Failed to reset draft: ${error.message || 'Unknown error'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to reset draft: ${errorMessage}`);
     }
   };
 
@@ -1614,9 +1623,10 @@ const DraftRoom = () => {
       // Reload data - this will see draft_status is 'not_started' and won't load old state
       await loadDraftData();
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Error resetting draft:', error);
-      alert(`Failed to reset draft: ${error.message || 'Unknown error'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to reset draft: ${errorMessage}`);
     }
   };
 
@@ -1872,20 +1882,12 @@ const DraftRoom = () => {
 
       <main className="pt-20 min-h-[80vh]">
         {/* Loading State - Show if loading or auth is loading, but NOT for demo state */}
-        {(() => {
-          const actualLoading = loading || authLoading || (!user && userLeagueState !== 'guest' && userLeagueState !== 'logged-in-no-league');
-          const displayLoading = useMinimumLoadingTime(actualLoading, 800);
-          
-          if (displayLoading) {
-            return (
-              <LoadingScreen
-                character="kiwi"
-                message={authLoading ? 'Checking Authentication...' : !user && userLeagueState !== 'guest' && userLeagueState !== 'logged-in-no-league' ? 'Redirecting to Login...' : 'Loading Draft Room...'}
-              />
-            );
-          }
-          return null;
-        })()}
+        {displayLoading && (
+          <LoadingScreen
+            character="kiwi"
+            message={authLoading ? 'Checking Authentication...' : !user && userLeagueState !== 'guest' && userLeagueState !== 'logged-in-no-league' ? 'Redirecting to Login...' : 'Loading Draft Room...'}
+          />
+        )}
 
         {/* Error State */}
         {!loading && !authLoading && error && (
@@ -1915,7 +1917,7 @@ const DraftRoom = () => {
                 teams={teams.map(t => ({
                   id: t.id,
                   name: t.team_name || 'Unnamed Team',
-                  owner: (t as any).owner_name || (t.owner_id ? 'User' : 'AI Team'),
+                  owner: (t as { owner_name?: string }).owner_name || (t.owner_id ? 'User' : 'AI Team'),
                   color: '#7CB518', // Default color, can be customized later
                   picks: []
                 }))} 

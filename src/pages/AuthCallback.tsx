@@ -102,10 +102,11 @@ const AuthCallback = () => {
           setMessage('Invalid verification link. Please check your email and try again.');
           setTimeout(() => navigate('/auth'), 3000);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Auth callback error:', err);
         setStatus('error');
-        setMessage(err.message || 'An error occurred during verification.');
+        const errorMessage = err instanceof Error ? err.message : 'An error occurred during verification.';
+        setMessage(errorMessage);
         setTimeout(() => navigate('/auth'), 3000);
       }
     };

@@ -160,7 +160,7 @@ export function usePlayerNews(
 
           debounceTimeoutRef.current = setTimeout(() => {
             // Check if this update affects one of our roster players
-            const updatedPlayerId = (payload.new as any).player_id;
+            const updatedPlayerId = (payload.new as { player_id?: string })?.player_id;
             if (playerIds.includes(updatedPlayerId)) {
               // Refresh news feed
               fetchPlayerNews();

@@ -113,8 +113,9 @@ async function verifyFunction() {
       console.log('✅ roster_transactions table exists\n');
     }
 
-  } catch (error: any) {
-    console.error('❌ Error verifying function:', error.message);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('❌ Error verifying function:', errorMessage);
     console.log('\n📋 Please check manually in Supabase dashboard:\n');
     console.log('1. Go to https://supabase.com/dashboard');
     console.log('2. Select your project');

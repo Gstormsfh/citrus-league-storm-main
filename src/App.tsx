@@ -15,7 +15,7 @@ import "./App.css";
 
 
 // Helper to add error handling to lazy imports
-const lazyWithErrorHandling = (importFn: () => Promise<any>) => {
+const lazyWithErrorHandling = (importFn: () => Promise<{ default: React.ComponentType }>) => {
   return lazy(() =>
     importFn().catch((error) => {
       console.error("Failed to load component:", error);
@@ -65,6 +65,7 @@ const About = lazyWithErrorHandling(() => import("./pages/About"));
 const Careers = lazyWithErrorHandling(() => import("./pages/Careers"));
 const Privacy = lazyWithErrorHandling(() => import("./pages/Privacy"));
 const Terms = lazyWithErrorHandling(() => import("./pages/Terms"));
+const Settings = lazyWithErrorHandling(() => import("./pages/Settings"));
 const Auth = lazyWithErrorHandling(() => import("./pages/Auth"));
 const AuthCallback = lazyWithErrorHandling(() => import("./pages/AuthCallback"));
 const ProfileSetup = lazyWithErrorHandling(() => import("./pages/ProfileSetup"));
@@ -153,6 +154,7 @@ const App = () => {
                 <Route path="/careers" element={<Careers />} />
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/terms" element={<Terms />} />
+                <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

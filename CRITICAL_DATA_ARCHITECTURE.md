@@ -193,13 +193,10 @@ Before making changes, verify:
 # 3. Updates matchup scores
 ```
 
-### End of Day
-```bash
-# Run these in order:
-python fetch_nhl_stats_from_landing.py  # Update PPP/SHP from NHL.com
-python build_player_season_stats.py     # Aggregate season totals
-python run_daily_projections.py         # Update projections
-```
+### End of Day (Automatic)
+- `fetch_nhl_stats_from_landing.py` runs automatically at midnight MT via `data_scraping_service.py`
+- Updates PPP/SHP season totals from NHL.com landing endpoint
+- Optimized with 100-IP proxy rotation for fast execution (~2-5 minutes vs ~45 minutes)
 
 ---
 

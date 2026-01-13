@@ -14,7 +14,7 @@ interface PlayerCardProps {
   isBench?: boolean;
   onPlayerClick?: (player: MatchupPlayer) => void;
   selectedDate?: string | null; // Optional: to determine if showing daily stats
-  dailyStatsMap?: Map<number, { daily_total_points?: number; [key: string]: any }>; // Optional: daily stats map for the selected date
+  dailyStatsMap?: Map<number, { daily_total_points?: number; [key: string]: unknown }>; // Optional: daily stats map for the selected date
 }
 
 // Get position color classes for border - Citrus Pastel Theme (Distinct Colors)
@@ -192,7 +192,7 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
     } else {
       // Skater stats: PPP (Power Play Points), xG (Expected Goals) - SEASON TOTALS
       // Use season stats from player.stats (fallback to ppp for safety)
-      const ppp = player.stats?.powerPlayPoints ?? (player as any).ppp ?? 0;
+      const ppp = player.stats?.powerPlayPoints ?? (player as { ppp?: number }).ppp ?? 0;
       const xGoals = player.stats?.xGoals ?? 0;
       
       stats.push({ 

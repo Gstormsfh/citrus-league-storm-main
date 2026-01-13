@@ -13,10 +13,8 @@ python data_scraping_service.py
 - ✅ Runs projections at 6 AM
 - ✅ Processes PBP data at 11:59 PM
 
-### Weekly (Optional - for PPP/SHP accuracy):
-```bash
-python fetch_nhl_stats_from_landing.py
-```
+### Nightly (Automatic - updates PPP/SHP after games):
+Runs automatically at midnight MT via `data_scraping_service.py`
 
 ---
 
@@ -32,7 +30,7 @@ python fetch_nhl_stats_from_landing.py
 
 ✅ **PPP/SHP are now synced automatically!** 
 - Per-game: `sync_ppp_from_gamelog.py` runs after games finish
-- Season totals: `fetch_nhl_stats_from_landing.py` (weekly)
+- Season totals: `fetch_nhl_stats_from_landing.py` (nightly at midnight MT)
 
 ---
 
@@ -45,7 +43,7 @@ python fetch_nhl_stats_from_landing.py
 | `data_scraping_service.py` | **Main scheduler** - runs everything | Always running during season |
 | `scrape_live_nhl_stats.py` | Live game updates | Called by service |
 | `calculate_matchup_scores.py` | Fantasy point calculations | Called by service |
-| `fetch_nhl_stats_from_landing.py` | Get PPP/SHP from NHL.com | Weekly/on-demand |
+| `fetch_nhl_stats_from_landing.py` | Get PPP/SHP from NHL.com | Nightly (automatic at midnight MT) |
 | `build_player_season_stats.py` | Aggregate per-game → season | Called by service |
 | `run_daily_projections.py` | Player projections | End of day |
 
@@ -71,10 +69,10 @@ python build_player_season_stats.py    # Aggregate stats
 python run_daily_projections.py        # Update projections
 ```
 
-### Weekly Maintenance
-```bash
-python fetch_nhl_stats_from_landing.py  # Sync PPP/SHP with NHL.com
-```
+### Nightly Maintenance (Automatic)
+- `fetch_nhl_stats_from_landing.py` runs automatically at midnight MT
+- Updates PPP/SHP season totals from NHL.com landing endpoint
+- Optimized with 100-IP proxy rotation for fast execution (~2-5 minutes)
 
 ---
 
@@ -111,9 +109,9 @@ python fetch_nhl_stats_from_landing.py  # Sync PPP/SHP with NHL.com
 3. Verify game is actually live on NHL.com
 
 ### PPP showing wrong values?
-1. Run `python fetch_nhl_stats_from_landing.py`
-2. Wait for it to complete (~45 min)
-3. PPP/SHP will be correct
+1. Check if nightly landing stats update ran (should run at midnight MT)
+2. If needed, run manually: `python fetch_nhl_stats_from_landing.py`
+3. With 100-IP proxy rotation, completes in ~2-5 minutes (vs ~45 min before)
 
 ### Matchup scores not calculating?
 1. Check `player_game_stats` has data for the game

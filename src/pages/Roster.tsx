@@ -35,6 +35,7 @@ import { CitrusPuckService } from '@/services/CitrusPuckService';
 import { ScheduleService } from '@/services/ScheduleService';
 import { MatchupService } from '@/services/MatchupService';
 import { GameLockService } from '@/services/GameLockService';
+import { WaiverService } from '@/services/WaiverService';
 import { getPlayerWithSeasonStats } from '@/utils/playerStatsHelper';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { supabase } from '@/integrations/supabase/client';
@@ -3141,19 +3142,27 @@ const Roster = () => {
                         return;
                       }
 
-                      // Add the new player
-                      const { success: addSuccess, error: addError } = await LeagueService.addPlayer(
+                      // Add the new player using WaiverService (checks game locks)
+                      const playerIdNum = typeof pendingAddPlayer.id === 'string' ? parseInt(pendingAddPlayer.id, 10) : pendingAddPlayer.id;
+                      const result = await WaiverService.addPlayer(
                         userTeam.league_id,
-                        user.id,
-                        pendingAddPlayer.id,
-                        'Roster Page - After Drop'
+                        userTeam.id,
+                        playerIdNum,
+                        null // No drop player (already dropped above)
                       );
 
-                      if (addSuccess) {
-                        toast({
-                          title: "Success",
-                          description: `Dropped ${player.name} and added ${pendingAddPlayer.name} to your roster.`,
-                        });
+                      if (result.success) {
+                        if (result.isFreeAgent) {
+                          toast({
+                            title: "Success",
+                            description: `Dropped ${player.name} and added ${pendingAddPlayer.name} to your roster.`,
+                          });
+                        } else {
+                          toast({
+                            title: "Waiver Claim Submitted",
+                            description: `Dropped ${player.name}. ${pendingAddPlayer.name} is game-locked - waiver claim submitted and will process at 3:00 AM EST.`,
+                          });
+                        }
                         // Clear query params and close dialog
                         setSearchParams({});
                         setIsDropDialogOpen(false);
@@ -3162,8 +3171,8 @@ const Roster = () => {
                         refreshRoster();
                       } else {
                         toast({
-                          title: "Error",
-                          description: addError?.message || "Failed to add player.",
+                          title: result.isFreeAgent === false ? "Claim Failed" : "Add Failed",
+                          description: result.error || "Failed to add player.",
                           variant: "destructive"
                         });
                       }

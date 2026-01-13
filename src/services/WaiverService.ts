@@ -52,10 +52,10 @@ export class WaiverService {
     leagueId: string
   ): Promise<PlayerAvailability> {
     try {
-      // Get league settings
+      // Get league settings (all waiver-related settings)
       const { data: league } = await supabase
         .from('leagues')
-        .select('waiver_game_lock, waiver_period_hours')
+        .select('waiver_game_lock, waiver_period_hours, waiver_type, waiver_process_time')
         .eq('id', leagueId)
         .single();
 
@@ -132,15 +132,50 @@ export class WaiverService {
         }
       }
 
-      // TODO: Check waiver period for recently dropped players
-      // This would require tracking when players are dropped in a separate table
+      // Check waiver period for recently dropped players (Yahoo/Sleeper style)
+      let isOnWaivers = false;
+      let waiverClearTime: string | null = null;
+      
+      if (league.waiver_period_hours && league.waiver_period_hours > 0) {
+        // Check if player is on waivers using database function
+        const { data: onWaivers, error: waiverError } = await supabase.rpc(
+          'is_player_on_waivers',
+          {
+            p_league_id: leagueId,
+            p_player_id: playerId
+          }
+        );
+        
+        if (!waiverError && onWaivers) {
+          isOnWaivers = true;
+          
+          // Get waiver clear time
+          const { data: clearTime, error: clearTimeError } = await supabase.rpc(
+            'get_player_waiver_clear_time',
+            {
+              p_league_id: leagueId,
+              p_player_id: playerId
+            }
+          );
+          
+          if (!clearTimeError && clearTime) {
+            waiverClearTime = clearTime;
+            lockReason = `Player is on waivers until ${new Date(clearTime).toLocaleString()}`;
+          } else {
+            lockReason = `Player is on waivers for ${league.waiver_period_hours} hours after being dropped`;
+          }
+        }
+      }
+
+      // Player is available if not game-locked AND not on waivers
+      const isAvailable = !isGameLocked && !isOnWaivers;
 
       return {
         player_id: playerId,
-        is_available: !isGameLocked,
+        is_available: isAvailable,
         is_game_locked: isGameLocked,
-        is_on_waivers: false, // TODO: Implement waiver period tracking
-        waiver_clear_time: null,
+        is_on_waivers: isOnWaivers,
+        waiver_clear_time: waiverClearTime,
         lock_reason: lockReason
       };
     } catch (error) {

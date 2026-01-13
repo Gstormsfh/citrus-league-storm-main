@@ -80,7 +80,7 @@ function parseCSV(content: string): CSVRow[] {
     const values = parseCSVLine(lines[i]);
     if (values.length < headers.length) continue; // Skip incomplete rows
     
-    const row: any = {};
+    const row: Record<string, string> = {};
     headers.forEach((header, index) => {
       row[header] = values[index] || '';
     });
@@ -222,7 +222,15 @@ async function importScheduleFromCSV(filePath: string) {
     console.log(`✅ Found ${gamesMap.size} unique games (from ${rows.length} rows)`);
 
     // Transform to database format
-    const games: any[] = [];
+    interface GameRecord {
+      game_id: string;
+      game_date: string;
+      home_team: string;
+      away_team: string;
+      status: string;
+      game_start_utc?: string;
+    }
+    const games: GameRecord[] = [];
     let skipped = 0;
 
     for (const [gameId, gameData] of gamesMap.entries()) {
@@ -344,9 +352,11 @@ async function importScheduleFromCSV(filePath: string) {
     games.slice(0, 5).forEach(game => {
       console.log(`   ${game.game_date}: ${game.away_team} @ ${game.home_team}`);
     });
-  } catch (error: any) {
-    console.error('❌ Error reading CSV file:', error.message);
-    if (error.code === 'ENOENT') {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorCode = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
+    console.error('❌ Error reading CSV file:', errorMessage);
+    if (errorCode === 'ENOENT') {
       console.error(`   File not found: ${filePath}`);
       console.error(`   Please place your CSV file at: ${filePath}`);
     }

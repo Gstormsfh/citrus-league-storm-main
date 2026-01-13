@@ -117,11 +117,11 @@ const FreeAgents = () => {
           const { data: userTeamDataResult } = await supabase
             .from('teams')
             .select('league_id')
-            .eq('owner_id' as any, user.id as any)
+            .eq('owner_id', user.id)
             .maybeSingle();
           
           if (userTeamDataResult) {
-            const userTeamData = userTeamDataResult as any;
+            const userTeamData = userTeamDataResult as { league_id: string };
             currentLeagueId = userTeamData.league_id;
             setLeagueId(currentLeagueId);
           }
@@ -340,8 +340,8 @@ const FreeAgents = () => {
       const { data: teamDataResult } = await supabase
         .from('teams')
         .select('id')
-        .eq('league_id' as any, leagueId as any)
-        .eq('owner_id' as any, user.id as any)
+        .eq('league_id', leagueId)
+        .eq('owner_id', user.id)
         .single();
 
       if (!teamDataResult) {
@@ -352,14 +352,14 @@ const FreeAgents = () => {
         });
         return;
       }
-      const teamData = teamDataResult as any;
+      const teamData = teamDataResult as { id: string };
 
       // Get lineup data (use maybeSingle to handle case where no lineup exists yet)
       const { data: lineupDataResult, error: lineupError } = await supabase
         .from('team_lineups')
         .select('starters, bench, ir')
-        .eq('team_id' as any, teamData.id as any)
-        .eq('league_id' as any, leagueId as any)
+        .eq('team_id', teamData.id)
+        .eq('league_id', leagueId)
         .maybeSingle();
 
       // Check for query errors (not just "no rows found")
@@ -420,31 +420,43 @@ const FreeAgents = () => {
       }
 
       // Roster has space, proceed with adding
-      const { success, error } = await LeagueService.addPlayer(
+      // Use WaiverService.addPlayer which checks game locks and handles waivers properly
+      const playerIdNum = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
+      const result = await WaiverService.addPlayer(
         leagueId,
-        user.id,
-        player.id,
-        'Free Agents Page'
+        teamData.id,
+        playerIdNum,
+        null // No drop player specified
       );
 
-      if (success) {
-        toast({
-          title: "Player Added",
-          description: `${player.full_name} has been added to your roster.`,
-        });
+      if (result.success) {
+        if (result.isFreeAgent) {
+          toast({
+            title: "Player Added",
+            description: `${player.full_name} has been added to your roster immediately.`,
+          });
+        } else {
+          toast({
+            title: "Waiver Claim Submitted",
+            description: `${player.full_name} is game-locked. Waiver claim submitted and will process at 3:00 AM EST.`,
+          });
+        }
         // Refresh the free agents list to remove the added player
         await fetchPlayers();
       } else {
+        // Handle error case - isFreeAgent may be undefined on error
+        const isWaiverClaim = result.isFreeAgent === false;
         toast({
-          title: "Error",
-          description: error?.message || "Failed to add player. Please try again.",
+          title: isWaiverClaim ? "Claim Failed" : "Add Failed",
+          description: result.error || "Failed to add player. Please try again.",
           variant: "destructive"
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to add player. Please try again.";
       toast({
         title: "Error",
-        description: error?.message || "Failed to add player. Please try again.",
+        description: errorMessage,
         variant: "destructive"
       });
     }
@@ -485,8 +497,8 @@ const FreeAgents = () => {
     if (!sortColumn) return playersToSort;
 
     const sorted = [...playersToSort].sort((a, b) => {
-      let aValue: any;
-      let bValue: any;
+      let aValue: string | number;
+      let bValue: string | number;
 
       switch (sortColumn) {
         case 'name':
@@ -571,8 +583,8 @@ const FreeAgents = () => {
     if (!sortColumn) return maximizers;
 
     const sorted = [...maximizers].sort((a, b) => {
-      let aValue: any;
-      let bValue: any;
+      let aValue: string | number;
+      let bValue: string | number;
 
       // Handle gamesThisWeek for schedule maximizers
       if (sortColumn === 'gamesThisWeek') {

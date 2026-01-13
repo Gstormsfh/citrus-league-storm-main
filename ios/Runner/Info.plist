@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Test 20</string>
+	<string>Citrus Fantasy</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Test 20</string>
+	<string>Citrus Fantasy</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 
@@ -26,10 +26,10 @@
         <key>CFBundleTypeRole</key>
         <string>Editor</string>
         <key>CFBundleURLName</key>
-        <string>test20.com</string>
+        <string>com.citrusfantasy.app</string>
         <key>CFBundleURLSchemes</key>
         <array>
-        <string>test20</string>
+        <string>citrusfantasy</string>
         </array>
         </dict>
     </array>
@@ -66,6 +66,22 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
+	
+	<!-- Photo Library Access (Optional - for team logos/avatars) -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Choose a photo to personalize your team logo or avatar</string>
+	
+	<!-- Camera Access (Optional - for team logos/avatars) -->
+	<key>NSCameraUsageDescription</key>
+	<string>Take a photo to personalize your team logo or avatar</string>
+	
+	<!-- App Transport Security -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<false/>
+		<!-- We only use HTTPS connections to Supabase and NHL APIs -->
+	</dict>
 
 </dict>
 </plist>

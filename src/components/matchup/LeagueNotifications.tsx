@@ -161,10 +161,11 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
           loadNotifications(leagueId, user.id);
         }
       }, 300);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error sending chat message:', error);
       // You could add a toast notification here to show the error to the user
-      alert(error.message || 'Failed to send message. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to send message. Please try again.';
+      alert(errorMessage);
     } finally {
       setSendingMessage(false);
     }

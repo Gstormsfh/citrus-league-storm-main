@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useMemo } from "react";
 import { MatchupPlayer } from "./types";
 import { MatchupPositionGroup } from "./MatchupPositionGroup";
 import { organizeMatchupData } from "./matchupUtils";
@@ -12,9 +12,14 @@ interface MatchupComparisonProps {
   opponentSlotAssignments: Record<string, string>;
   onPlayerClick?: (player: MatchupPlayer) => void;
   selectedDate?: string | null; // Optional: show stats for specific date
-  dailyStatsMap?: Map<number, { daily_total_points?: number; [key: string]: any }>; // Optional: daily stats map for the selected date
+  dailyStatsMap?: Map<number, { daily_total_points?: number; [key: string]: unknown }>; // Optional: daily stats map for the selected date
   // Callback to report calculated totals back to parent (for WeeklySchedule sync)
   onTotalsCalculated?: (userTotal: number, opponentTotal: number, date?: string) => void;
+  // For weekly view: use calculated daily totals (same as weekly selector)
+  calculatedDailyTotals?: Map<string, { myTotal: number; oppTotal: number }>;
+  // Pre-calculated weekly totals from parent (ensures consistency with scorecard)
+  weeklyUserTotal?: number;
+  weeklyOpponentTotal?: number;
 }
 
 export const MatchupComparison = ({
@@ -27,7 +32,10 @@ export const MatchupComparison = ({
   onPlayerClick,
   selectedDate,
   dailyStatsMap,
-  onTotalsCalculated
+  onTotalsCalculated,
+  calculatedDailyTotals,
+  weeklyUserTotal,
+  weeklyOpponentTotal
 }: MatchupComparisonProps) => {
   // Organize players by slot order (flattened, no position grouping)
   const positionGroups = organizeMatchupData(
@@ -55,7 +63,34 @@ export const MatchupComparison = ({
   // Calculate daily contribution - handles dropped players with same fallback as PlayerCard
   const isShowingDailyView = selectedDate !== null && selectedDate !== undefined;
   
-  const userTotal = allUserPlayers.reduce((sum, player) => {
+  // For weekly view: Use pre-calculated totals from parent (same as scorecard)
+  // This ensures consistency and fixes demo league 0.0 issue
+  const weeklyTotalFromDaily = useMemo(() => {
+    // Priority 1: Use passed weekly totals (most reliable, matches scorecard exactly)
+    // These come from sum of calculatedDailyTotals or myTeamPoints - always use them when provided
+    if (!isShowingDailyView && weeklyUserTotal !== undefined && weeklyOpponentTotal !== undefined) {
+      return { myTotal: weeklyUserTotal, oppTotal: weeklyOpponentTotal };
+    }
+    
+    // Priority 2: Calculate from calculatedDailyTotals (same as weekly selector)
+    if (!isShowingDailyView && calculatedDailyTotals && calculatedDailyTotals.size >= 7) {
+      let myTotal = 0;
+      let oppTotal = 0;
+      calculatedDailyTotals.forEach((totals) => {
+        myTotal += totals.myTotal;
+        oppTotal += totals.oppTotal;
+      });
+      return { myTotal, oppTotal };
+    }
+    
+    return null;
+  }, [isShowingDailyView, calculatedDailyTotals, weeklyUserTotal, weeklyOpponentTotal]);
+  
+  // For weekly view, use weeklyTotalFromDaily if available (even if 0 - it's the calculated value)
+  // For daily view, calculate from players
+  const userTotal = (!isShowingDailyView && weeklyTotalFromDaily) 
+    ? weeklyTotalFromDaily.myTotal 
+    : allUserPlayers.reduce((sum, player) => {
     if (!player) return sum;
     if (isShowingDailyView) {
       // For dropped players, use the same fallback chain as PlayerCard
@@ -71,14 +106,79 @@ export const MatchupComparison = ({
         // Fallback to player properties (total_points = their daily contribution since dropped mid-game)
         return sum + (player.daily_total_points ?? player.total_points ?? player.points ?? 0);
       }
-      // Non-dropped: use daily_total_points
-      return sum + (player.daily_total_points ?? 0);
+      // Non-dropped: use daily_total_points from dailyStatsMap (single source of truth for daily view)
+      // First check dailyStatsMap (most reliable for selected date)
+      if (dailyStatsMap) {
+        const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
+        const stats = dailyStatsMap.get(playerId);
+        if (stats?.daily_total_points !== undefined && stats.daily_total_points !== null) {
+          return sum + stats.daily_total_points;
+        }
+      }
+      // Fallback to player.daily_total_points (set by enrichment)
+      if (player.daily_total_points !== undefined && player.daily_total_points !== null) {
+        return sum + player.daily_total_points;
+      }
+      // If no daily stats available, return 0 (don't use weekly totals for daily view)
+      return sum + 0;
     }
-    // Weekly view: use weekly points
-    return sum + (player.points || 0);
+    // Weekly view: prefer total_points (matchup week points) over points (season points)
+    // total_points is specifically set for matchup week, so it's more reliable
+    // This ensures demo leagues show correct weekly totals
+    // Also try to calculate from matchupStats if total_points is missing or 0
+    if (player.total_points !== undefined && player.total_points !== null && player.total_points > 0) {
+      return sum + player.total_points;
+    }
+    // Fallback: try to calculate from matchupStats if available (even if total_points is 0)
+    if (player.matchupStats) {
+      const isGoalie = player.position === 'G' || player.position === 'Goalie';
+      if (isGoalie) {
+        const goaliePoints = (player.matchupStats.wins || 0) * 4 + 
+                            (player.matchupStats.saves || 0) * 0.2 + 
+                            (player.matchupStats.shutouts || 0) * 3 - 
+                            (player.matchupStats.goals_against || 0) * 1;
+        return sum + goaliePoints; // Use matchup week stats
+      } else {
+        const skaterPoints = (player.matchupStats.goals || 0) * 3 + 
+                            (player.matchupStats.assists || 0) * 2 + 
+                            ((player.matchupStats.ppp || 0) * 1) +
+                            ((player.matchupStats.shp || 0) * 2) +
+                            (player.matchupStats.sog || 0) * 0.4 + 
+                            ((player.matchupStats.blocks || 0) * 0.5) +
+                            ((player.matchupStats.hits || 0) * 0.2) +
+                            ((player.matchupStats.pim || 0) * 0.5);
+        return sum + skaterPoints; // Use matchup week stats
+      }
+    }
+    // Last resort: For demo leagues, if no matchup stats, use season stats from player.stats
+    // This is a fallback when matchup lines aren't populated yet
+    if (player.stats) {
+      const isGoalie = player.position === 'G' || player.position === 'Goalie';
+      if (isGoalie && player.goalieStats) {
+        const goaliePoints = (player.goalieStats.wins || 0) * 4 + 
+                            (player.goalieStats.saves || 0) * 0.2 + 
+                            (player.goalieStats.shutouts || 0) * 3 - 
+                            (player.goalieStats.goalsAgainst || 0) * 1;
+        return sum + goaliePoints;
+      } else if (!isGoalie) {
+        // Calculate from season stats (approximation for demo when matchup stats unavailable)
+        const skaterPoints = (player.stats.goals || 0) * 3 + 
+                            (player.stats.assists || 0) * 2 + 
+                            ((player.stats.powerPlayPoints || 0) * 1) +
+                            (player.stats.sog || 0) * 0.4 + 
+                            (player.stats.blk || 0) * 0.5;
+        return sum + skaterPoints;
+      }
+    }
+    // Final fallback: use total_points even if 0, or points (season), or 0
+    return sum + (player.total_points ?? player.points ?? 0);
   }, 0);
   
-  const opponentTotal = allOpponentPlayers.reduce((sum, player) => {
+  // For weekly view, use weeklyTotalFromDaily if available (even if 0 - it's the calculated value)
+  // For daily view, calculate from players
+  const opponentTotal = (!isShowingDailyView && weeklyTotalFromDaily) 
+    ? weeklyTotalFromDaily.oppTotal 
+    : allOpponentPlayers.reduce((sum, player) => {
     if (!player) return sum;
     if (isShowingDailyView) {
       // For dropped players, use the same fallback chain as PlayerCard
@@ -94,11 +194,72 @@ export const MatchupComparison = ({
         // Fallback to player properties (total_points = their daily contribution since dropped mid-game)
         return sum + (player.daily_total_points ?? player.total_points ?? player.points ?? 0);
       }
-      // Non-dropped: use daily_total_points
-      return sum + (player.daily_total_points ?? 0);
+      // Non-dropped: use daily_total_points from dailyStatsMap (single source of truth for daily view)
+      // First check dailyStatsMap (most reliable for selected date)
+      if (dailyStatsMap) {
+        const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
+        const stats = dailyStatsMap.get(playerId);
+        if (stats?.daily_total_points !== undefined && stats.daily_total_points !== null) {
+          return sum + stats.daily_total_points;
+        }
+      }
+      // Fallback to player.daily_total_points (set by enrichment)
+      if (player.daily_total_points !== undefined && player.daily_total_points !== null) {
+        return sum + player.daily_total_points;
+      }
+      // If no daily stats available, return 0 (don't use weekly totals for daily view)
+      return sum + 0;
     }
-    // Weekly view: use weekly points
-    return sum + (player.points || 0);
+    // Weekly view: prefer total_points (matchup week points) over points (season points)
+    // total_points is specifically set for matchup week, so it's more reliable
+    // This ensures demo leagues show correct weekly totals
+    // Also try to calculate from matchupStats if total_points is missing or 0
+    if (player.total_points !== undefined && player.total_points !== null && player.total_points > 0) {
+      return sum + player.total_points;
+    }
+    // Fallback: try to calculate from matchupStats if available (even if total_points is 0)
+    if (player.matchupStats) {
+      const isGoalie = player.position === 'G' || player.position === 'Goalie';
+      if (isGoalie) {
+        const goaliePoints = (player.matchupStats.wins || 0) * 4 + 
+                            (player.matchupStats.saves || 0) * 0.2 + 
+                            (player.matchupStats.shutouts || 0) * 3 - 
+                            (player.matchupStats.goals_against || 0) * 1;
+        return sum + goaliePoints; // Use matchup week stats
+      } else {
+        const skaterPoints = (player.matchupStats.goals || 0) * 3 + 
+                            (player.matchupStats.assists || 0) * 2 + 
+                            ((player.matchupStats.ppp || 0) * 1) +
+                            ((player.matchupStats.shp || 0) * 2) +
+                            (player.matchupStats.sog || 0) * 0.4 + 
+                            ((player.matchupStats.blocks || 0) * 0.5) +
+                            ((player.matchupStats.hits || 0) * 0.2) +
+                            ((player.matchupStats.pim || 0) * 0.5);
+        return sum + skaterPoints; // Use matchup week stats
+      }
+    }
+    // Last resort: For demo leagues, if no matchup stats, use season stats from player.stats
+    // This is a fallback when matchup lines aren't populated yet
+    if (player.stats) {
+      const isGoalie = player.position === 'G' || player.position === 'Goalie';
+      if (isGoalie && player.goalieStats) {
+        const goaliePoints = (player.goalieStats.wins || 0) * 4 + 
+                            (player.goalieStats.saves || 0) * 0.2 + 
+                            (player.goalieStats.shutouts || 0) * 3 - 
+                            (player.goalieStats.goalsAgainst || 0) * 1;
+        return sum + goaliePoints;
+      } else if (!isGoalie) {
+        // Calculate from season stats (approximation for demo when matchup stats unavailable)
+        const skaterPoints = (player.stats.goals || 0) * 3 + 
+                            (player.stats.assists || 0) * 2 + 
+                            ((player.stats.powerPlayPoints || 0) * 1) +
+                            (player.stats.sog || 0) * 0.4 + 
+                            (player.stats.blk || 0) * 0.5;
+        return sum + skaterPoints;
+      }
+    }
+    // Final fallback: use total_points even if 0, or points (season), or 0
+    return sum + (player.total_points ?? player.points ?? 0);
   }, 0);
   
   // Track previous values to prevent redundant callbacks
