@@ -4,7 +4,7 @@
 -- ============================================================================
 
 -- 1. Check if Monday roster data exists
-SELECT 'Monday Roster Count' as check_name, COUNT(*) as result
+SELECT 'Monday Roster Count' as check_name, COUNT(*)::TEXT as result
 FROM fantasy_daily_rosters
 WHERE roster_date = '2026-01-13'::DATE
 
