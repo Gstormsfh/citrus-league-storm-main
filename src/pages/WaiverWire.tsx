@@ -14,9 +14,12 @@ import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import { CitrusBackground } from '@/components/CitrusBackground';
 import { CitrusSparkle, CitrusLeaf, CitrusWedge } from '@/components/icons/CitrusIcons';
 import { WaiverService, type WaiverClaim, type WaiverPriority } from '@/services/WaiverService';
-import { PlayerService } from '@/services/PlayerService';
+import { PlayerService, type Player } from '@/services/PlayerService';
+import { LeagueService } from '@/services/LeagueService';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { AdSpace } from '@/components/AdSpace';
+import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 
 const WaiverWire = () => {
   const { user } = useAuth();
@@ -25,14 +28,16 @@ const WaiverWire = () => {
   
   const [loading, setLoading] = useState(true);
   const [waiverClaims, setWaiverClaims] = useState<WaiverClaim[]>([]);
+  const [claimPlayers, setClaimPlayers] = useState<Map<number, Player>>(new Map());
   const [waiverPriority, setWaiverPriority] = useState<WaiverPriority[]>([]);
   const [myTeamId, setMyTeamId] = useState<string | null>(null);
   const [myPriority, setMyPriority] = useState<number | null>(null);
   const [waiverSettings, setWaiverSettings] = useState<any>(null);
+  const [teamCount, setTeamCount] = useState<number>(0);
   
   // Available players search
   const [searchTerm, setSearchTerm] = useState('');
-  const [positionFilter, setPositionFilter] = useState<string>('');
+  const [positionFilter, setPositionFilter] = useState<string>('all');
   const [availablePlayers, setAvailablePlayers] = useState<any[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   
@@ -70,6 +75,31 @@ const WaiverWire = () => {
         const claims = await WaiverService.getTeamWaiverClaims(activeLeagueId, team.id);
         setWaiverClaims(claims);
 
+        // Fetch player details for claims
+        if (claims.length > 0) {
+          const playerIds = new Set<number>();
+          claims.forEach(claim => {
+            playerIds.add(claim.player_id);
+            if (claim.drop_player_id) {
+              playerIds.add(claim.drop_player_id);
+            }
+          });
+
+          if (playerIds.size > 0) {
+            const playerIdStrings = Array.from(playerIds).map(id => String(id));
+            const players = await PlayerService.getPlayersByIds(playerIdStrings);
+            const playerMap = new Map<number, Player>();
+            players.forEach(p => {
+              playerMap.set(Number(p.id), p);
+            });
+            setClaimPlayers(playerMap);
+          } else {
+            setClaimPlayers(new Map());
+          }
+        } else {
+          setClaimPlayers(new Map());
+        }
+
         // Load roster for drop selection (team_lineups uses JSONB arrays)
         const { data: lineup } = await supabase
           .from('team_lineups')
@@ -105,12 +135,80 @@ const WaiverWire = () => {
         }
       }
 
+      // Load league to get team count
+      const { league, error: leagueError } = await LeagueService.getLeague(activeLeagueId);
+      const maxTeams = league?.settings?.teamsCount || 12;
+
+      // Get actual team count from teams table (more reliable than waiver_priority length)
+      const { data: teams, error: teamsError } = await supabase
+        .from('teams')
+        .select('id')
+        .eq('league_id', activeLeagueId);
+      const actualTeamCount = teams?.length || 0;
+      setTeamCount(actualTeamCount);
+
       // Load waiver priority
       const priority = await WaiverService.getWaiverPriority(activeLeagueId);
       setWaiverPriority(priority);
       
+      // Find user's priority
       const myPrio = priority.find(p => p.team_id === team?.id);
-      setMyPriority(myPrio?.priority || null);
+      
+      // If no priority record exists, create one (for existing teams that predate the trigger)
+      if (team && !myPrio && actualTeamCount > 0) {
+        try {
+          console.log('Creating waiver priority for team:', team.id, 'in league:', activeLeagueId);
+          // Use RPC function to create priority (bypasses RLS)
+          const { data: rpcResult, error: rpcError } = await supabase
+            .rpc('create_waiver_priority_for_team', {
+              p_league_id: activeLeagueId,
+              p_team_id: team.id
+            });
+          
+          console.log('RPC result:', rpcResult, 'RPC error:', rpcError);
+          
+          if (!rpcError && rpcResult && rpcResult.length > 0) {
+            const result = rpcResult[0];
+            console.log('RPC result data:', result);
+            if (result.success && result.priority) {
+              // Reload priority after creating
+              const updatedPriority = await WaiverService.getWaiverPriority(activeLeagueId);
+              setWaiverPriority(updatedPriority);
+              const newMyPrio = updatedPriority.find(p => p.team_id === team.id);
+              console.log('New priority after reload:', newMyPrio);
+              if (newMyPrio && newMyPrio.priority > 0 && newMyPrio.priority <= actualTeamCount) {
+                setMyPriority(newMyPrio.priority);
+              } else {
+                console.warn('Created priority but validation failed:', newMyPrio, 'actualTeamCount:', actualTeamCount);
+                setMyPriority(result.priority); // Use the priority from RPC result
+              }
+            } else {
+              console.error('RPC returned error:', result.error_message);
+              setMyPriority(null);
+            }
+          } else {
+            console.error('Error calling create_waiver_priority_for_team:', rpcError);
+            setMyPriority(null);
+          }
+        } catch (error) {
+          console.error('Error creating waiver priority:', error);
+          setMyPriority(null);
+        }
+      } else {
+        console.log('Priority check:', { 
+          hasTeam: !!team, 
+          hasPrio: !!myPrio, 
+          teamCount: actualTeamCount,
+          myPrio 
+        });
+        // Validate priority is within valid range
+        const validPriority = myPrio && 
+          myPrio.priority > 0 && 
+          myPrio.priority <= actualTeamCount 
+          ? myPrio.priority 
+          : null;
+        setMyPriority(validPriority);
+      }
 
       // Load league waiver settings
       const settings = await WaiverService.getLeagueWaiverSettings(activeLeagueId);
@@ -130,7 +228,7 @@ const WaiverWire = () => {
     try {
       const players = await WaiverService.getAvailablePlayers(
         activeLeagueId,
-        positionFilter || undefined,
+        positionFilter === 'all' ? undefined : positionFilter || undefined,
         searchTerm || undefined
       );
       setAvailablePlayers(players);
@@ -199,10 +297,13 @@ const WaiverWire = () => {
       <CitrusBackground density="light" />
       
       <Navbar />
-      <main className="flex-1 pt-24 pb-16 relative z-10">
-        <div className="container mx-auto px-4">
-          <div className="max-w-6xl mx-auto">
-            <div className="text-center mb-12 relative">
+      <main className="w-full pt-28 pb-16 m-0 p-0">
+        <div className="w-full m-0 p-0">
+          {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
+          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
+            {/* Main Content - Scrollable - Appears first on mobile */}
+            <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-4 order-1 lg:order-2">
+              <div className="text-center mb-12 relative">
               <CitrusLeaf className="absolute -top-4 -left-8 w-16 h-16 text-citrus-sage/15 rotate-12" />
               <CitrusWedge className="absolute -top-2 -right-6 w-14 h-14 text-citrus-orange/15 -rotate-45" />
               
@@ -246,7 +347,7 @@ const WaiverWire = () => {
                         #{myPriority}
                       </div>
                       <p className="text-sm font-display text-citrus-charcoal">
-                        of {waiverPriority.length} teams
+                        of {teamCount || waiverPriority.length} teams
                       </p>
                     </div>
                   ) : (
@@ -316,7 +417,7 @@ const WaiverWire = () => {
                       <SelectValue placeholder="All Positions" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All Positions</SelectItem>
+                      <SelectItem value="all">All Positions</SelectItem>
                       <SelectItem value="C">Center</SelectItem>
                       <SelectItem value="LW">Left Wing</SelectItem>
                       <SelectItem value="RW">Right Wing</SelectItem>
@@ -374,29 +475,48 @@ const WaiverWire = () => {
                   </div>
                 ) : waiverClaims.length > 0 ? (
                   <div className="space-y-4">
-                    {waiverClaims.map((claim) => (
-                      <div key={claim.id} className="flex items-center justify-between p-4 bg-gradient-to-r from-citrus-peach/20 to-citrus-orange/20 rounded-varsity border-3 border-citrus-orange/50">
-                        <div className="flex-1">
-                          <div className="font-varsity font-bold text-citrus-forest">Player #{claim.player_id}</div>
-                          <div className="text-sm font-display text-citrus-charcoal">
-                            Priority #{claim.priority}
+                    {waiverClaims.map((claim) => {
+                      const player = claimPlayers.get(claim.player_id);
+                      const dropPlayer = claim.drop_player_id ? claimPlayers.get(claim.drop_player_id) : null;
+                      
+                      return (
+                        <div key={claim.id} className="flex items-center justify-between p-4 bg-gradient-to-r from-citrus-peach/20 to-citrus-orange/20 rounded-varsity border-3 border-citrus-orange/50">
+                          <div className="flex-1">
+                            <div className="font-varsity font-bold text-citrus-forest">
+                              {player?.full_name || `Player #${claim.player_id}`}
+                            </div>
+                            <div className="text-sm font-display text-citrus-charcoal space-y-1">
+                              {player && (
+                                <div>
+                                  {player.position} • {player.team}
+                                </div>
+                              )}
+                              {dropPlayer && (
+                                <div className="text-citrus-orange/80">
+                                  Dropping: {dropPlayer.full_name} ({dropPlayer.position} • {dropPlayer.team})
+                                </div>
+                              )}
+                              <div>
+                                Priority #{claim.priority}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <Badge className="bg-citrus-sage text-citrus-cream font-varsity font-bold">
+                              {claim.status}
+                            </Badge>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleCancelClaim(claim.id)}
+                              className="border-2 border-citrus-forest rounded-varsity font-varsity"
+                            >
+                              Cancel
+                            </Button>
                           </div>
                         </div>
-                        <div className="flex items-center gap-4">
-                          <Badge className="bg-citrus-sage text-citrus-cream font-varsity font-bold">
-                            {claim.status}
-                          </Badge>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleCancelClaim(claim.id)}
-                            className="border-2 border-citrus-forest rounded-varsity font-varsity"
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="text-center py-12">
@@ -406,6 +526,24 @@ const WaiverWire = () => {
                 )}
               </CardContent>
             </Card>
+            </div>
+
+            {/* Left Sidebar - At bottom on mobile, left on desktop */}
+            <aside className="w-full lg:w-auto order-2 lg:order-1">
+              <div className="lg:sticky lg:top-32 space-y-4 lg:space-y-6">
+                <AdSpace size="300x250" label="Waiver Sponsor" />
+                <AdSpace size="300x250" label="Fantasy Partner" />
+              </div>
+            </aside>
+
+            {/* Right Sidebar - Notifications (hidden on mobile) */}
+            {userLeagueState === 'active-user' && activeLeagueId && (
+              <aside className="hidden lg:block order-3">
+                <div className="lg:sticky lg:top-32 h-[calc(100vh-12rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                  <LeagueNotifications leagueId={activeLeagueId} />
+                </div>
+              </aside>
+            )}
           </div>
         </div>
       </main>

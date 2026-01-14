@@ -22,6 +22,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { AdSpace } from '@/components/AdSpace';
 import { CitrusBackground } from '@/components/CitrusBackground';
 import { CitrusSlice, CitrusLeaf, CitrusSparkle } from '@/components/icons/CitrusIcons';
+import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 
 interface StandingsTeam {
   id: string;
@@ -39,7 +40,7 @@ interface StandingsTeam {
 
 const Standings = () => {
   const { user } = useAuth();
-  const { userLeagueState } = useLeague();
+  const { userLeagueState, activeLeagueId } = useLeague();
   const { toast } = useToast();
   const [season, setSeason] = useState("2025");
   const [loading, setLoading] = useState(true);
@@ -328,9 +329,13 @@ const Standings = () => {
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-[hsl(var(--vibrant-green))] rounded-full opacity-10 blur-3xl -z-10"></div>
 
       <Navbar />
-      <main className="pt-28 pb-16" style={{ visibility: 'visible', opacity: 1, zIndex: 1 }}>
-        <div className="container mx-auto px-4" style={{ visibility: 'visible', opacity: 1 }}>
-          <div className="max-w-3xl mx-auto text-center mb-10 animated-element animate relative" style={{ visibility: 'visible', opacity: 1 }}>
+      <main className="w-full pt-28 pb-16 m-0 p-0" style={{ visibility: 'visible', opacity: 1, zIndex: 1 }}>
+        <div className="w-full m-0 p-0" style={{ visibility: 'visible', opacity: 1 }}>
+          {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
+          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px]">
+            {/* Main Content - Scrollable - Appears first on mobile */}
+            <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
+              <div className="max-w-3xl mx-auto text-center mb-10 animated-element animate relative" style={{ visibility: 'visible', opacity: 1 }}>
             {/* Citrus Decorations */}
             <CitrusSlice className="absolute -top-6 -left-6 w-12 h-12 text-citrus-orange/20 rotate-12" />
             <CitrusLeaf className="absolute -top-4 -right-8 w-10 h-10 text-citrus-sage/20 -rotate-45" />
@@ -576,11 +581,25 @@ const Standings = () => {
                 </div>
               </CardContent>
             </Card>
-          </div>
-          
-          {/* Premium Banner Ad - After Standings */}
-          <div className="max-w-5xl mx-auto mt-12 mb-8">
-            <AdSpace size="728x90" label="League Sponsor" />
+              </div>
+              </div>
+
+            {/* Left Sidebar - At bottom on mobile, left on desktop */}
+            <aside className="w-full lg:w-auto order-2 lg:order-1">
+              <div className="lg:sticky lg:top-32 space-y-4 lg:space-y-6">
+                <AdSpace size="300x250" label="Standings Sponsor" />
+                <AdSpace size="300x250" label="Fantasy Partner" />
+              </div>
+            </aside>
+
+            {/* Right Sidebar - Notifications (hidden on mobile) */}
+            {userLeagueState === 'active-user' && activeLeagueId && (
+              <aside className="hidden lg:block order-3">
+                <div className="lg:sticky lg:top-32 h-[calc(100vh-12rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                  <LeagueNotifications leagueId={activeLeagueId} />
+                </div>
+              </aside>
+            )}
           </div>
         </div>
       </main>

@@ -32,6 +32,8 @@ import LoadingScreen from '@/components/LoadingScreen';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
+import { AdSpace } from '@/components/AdSpace';
+import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 
 // DraftPick interface is now imported from DraftService
 // Team interface is now imported from LeagueService
@@ -54,7 +56,7 @@ const DraftRoom = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const { userLeagueState } = useLeague();
+  const { userLeagueState, activeLeagueId } = useLeague();
   const leagueId = searchParams.get('league');
 
   const [loading, setLoading] = useState(true);
@@ -1164,6 +1166,24 @@ const DraftRoom = () => {
     }
   };
 
+  const handleAddAITeams = async () => {
+    if (!leagueId || !isCommissioner || !league) return;
+    
+    try {
+      const maxTeams = league.settings?.teamsCount || 12;
+      const { error } = await LeagueService.simulateLeagueFill(leagueId, maxTeams);
+      if (error) {
+        logger.error('Error adding AI teams:', error);
+        return;
+      }
+      
+      // Reload teams after adding AI teams
+      await loadDraftData();
+    } catch (err) {
+      logger.error('Exception adding AI teams:', err);
+    }
+  };
+
   const handleRandomizeOrder = () => {
     if (!teams || teams.length === 0) return;
     
@@ -1880,7 +1900,12 @@ const DraftRoom = () => {
       </div>
 
 
-      <main className="pt-20 min-h-[80vh]">
+      <main className="w-full pt-28 pb-16 m-0 p-0">
+        <div className="w-full m-0 p-0">
+          {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
+          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px]">
+            {/* Main Content - Scrollable - Appears first on mobile */}
+            <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
         {/* Loading State - Show if loading or auth is loading, but NOT for demo state */}
         {displayLoading && (
           <LoadingScreen
@@ -1937,6 +1962,9 @@ const DraftRoom = () => {
                   }
                 }}
                 leagueDraftRounds={league?.draft_rounds || 21}
+                onAddAITeams={handleAddAITeams}
+                leagueId={leagueId}
+                maxTeams={league?.settings?.teamsCount || 12}
               />
             ) : null}
           </div>
@@ -2371,10 +2399,10 @@ const DraftRoom = () => {
               <p className="text-xl text-muted-foreground mb-6">
                 The draft is complete! Your rosters are now locked and ready for the season.
               </p>
-              {/* Demo State CTA */}
-              {userLeagueState === 'logged-in-no-league' && (
+              {/* Demo State CTA - Hidden from public */}
+              {false && userLeagueState === 'logged-in-no-league' && (
                 <div className="max-w-3xl mx-auto mb-8">
-                  <LeagueCreationCTA 
+                  <LeagueCreationCTA
                     title="Your Draft Awaits"
                     description="Create your league to start drafting players, building your team, and competing with friends."
                   />
@@ -2468,8 +2496,26 @@ const DraftRoom = () => {
             )}
           </div>
         )}
+            </div>
 
+            {/* Left Sidebar - At bottom on mobile, left on desktop */}
+            <aside className="w-full lg:w-auto order-2 lg:order-1">
+              <div className="lg:sticky lg:top-32 space-y-4 lg:space-y-6">
+                <AdSpace size="300x250" label="Draft Sponsor" />
+                <AdSpace size="300x250" label="Fantasy Partner" />
+              </div>
+            </aside>
 
+            {/* Right Sidebar - Notifications (hidden on mobile) */}
+            {userLeagueState === 'active-user' && (activeLeagueId || leagueId) && (
+              <aside className="hidden lg:block order-3">
+                <div className="lg:sticky lg:top-32 h-[calc(100vh-12rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                  <LeagueNotifications leagueId={activeLeagueId || leagueId || ''} />
+                </div>
+              </aside>
+            )}
+          </div>
+        </div>
       </main>
       <Footer />
       

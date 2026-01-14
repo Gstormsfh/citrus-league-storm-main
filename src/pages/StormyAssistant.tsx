@@ -17,6 +17,7 @@ import { isGuestMode } from '@/utils/guestHelpers';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import { CitrusBackground } from '@/components/CitrusBackground';
 import { CitrusSparkle, CitrusLeaf, CitrusWedge } from '@/components/icons/CitrusIcons';
+import { AdSpace } from '@/components/AdSpace';
 
 interface Message {
   id: string;
@@ -83,8 +84,13 @@ const StormyAssistant = () => {
       <CitrusBackground density="light" />
       
       <Navbar />
-      <main className="flex-1 pt-24 pb-8 relative z-10">
-        <div className="container mx-auto px-4 max-w-5xl">
+      <main className="w-full pt-28 pb-16 m-0 p-0 relative z-10">
+        <div className="w-full m-0 p-0">
+          {/* Sidebar and Content Grid */}
+          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr]">
+            {/* Main Content - Scrollable - Appears first on mobile */}
+            <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
+              <div className="max-w-5xl mx-auto">
           <div className="text-center mb-8 relative">
             {/* Decorative citrus icons */}
             <CitrusLeaf className="absolute -top-4 -left-8 w-16 h-16 text-citrus-sage/15 rotate-12" />
@@ -298,6 +304,17 @@ const StormyAssistant = () => {
               </div>
             </TabsContent>
           </Tabs>
+              </div>
+            </div>
+          </div>
+
+            {/* Left Sidebar - At bottom on mobile, left on desktop */}
+            <aside className="w-full lg:w-auto order-2 lg:order-1">
+              <div className="lg:sticky lg:top-32 space-y-4 lg:space-y-6">
+                <AdSpace size="300x250" label="AI Sponsor" />
+              </div>
+            </aside>
+          </div>
         </div>
       </main>
       <Footer />

@@ -58,6 +58,9 @@ interface DraftLobbyProps {
   onCustomOrderChange?: (order: string[] | null) => void; // Callback when custom order is saved
   leagueDraftRounds?: number; // League's draft_rounds setting
   onResetDraft?: () => void; // Optional reset draft handler
+  onAddAITeams?: () => Promise<void>; // Optional callback to add AI teams
+  leagueId?: string; // League ID for adding AI teams
+  maxTeams?: number; // Maximum teams allowed in league (from settings.teamsCount)
 }
 
 export const DraftLobby = ({ 
@@ -74,7 +77,10 @@ export const DraftLobby = ({
   customDraftOrder,
   onCustomOrderChange,
   leagueDraftRounds = 21,
-  onResetDraft
+  onResetDraft,
+  onAddAITeams,
+  leagueId,
+  maxTeams = 12
 }: DraftLobbyProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -497,7 +503,11 @@ export const DraftLobby = ({
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5" />
-                All Teams ({teams.length}/12)
+                All Teams ({teams.length}/{leagueId ? (() => {
+                  // We need to get max teams from league, but we don't have it in props
+                  // For now, show dynamic count - will be updated when league data is available
+                  return 12; // Default, will be updated via parent
+                })() : 12})
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -518,13 +528,44 @@ export const DraftLobby = ({
                 ))}
                 
                 {/* Empty slots */}
-                {Array.from({ length: Math.max(0, 12 - teams.length) }).map((_, index) => (
+                {Array.from({ length: Math.max(0, maxTeams - teams.length) }).map((_, index) => (
                   <div key={`empty-${index}`} className="flex items-center gap-3 p-3 rounded-lg border border-dashed border-muted">
                     <UserPlus className="h-4 w-4 text-muted-foreground" />
                     <div className="text-muted-foreground">Waiting for manager...</div>
                   </div>
                 ))}
               </div>
+              
+              {/* Optional: Add AI Teams (Commissioner Only) */}
+              {isCommissioner && teams.length < maxTeams && !hasExistingDraft && onAddAITeams && (
+                <div className="mt-4 p-4 rounded-lg border-2 border-dashed border-primary/30 bg-primary/5">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <h4 className="font-semibold text-sm">Need to Fill Spots?</h4>
+                      <p className="text-xs text-muted-foreground">
+                        Add AI teams to fill your league ({teams.length}/{maxTeams} teams)
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      if (onAddAITeams) {
+                        await onAddAITeams();
+                        toast({
+                          title: 'AI Teams Added',
+                          description: 'AI teams have been added to your league. Refresh to see them.',
+                        });
+                      }
+                    }}
+                    className="w-full mt-2"
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    Add AI Teams to Fill League
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

@@ -27,6 +27,8 @@ import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import { getPlayerWithSeasonStats } from '@/utils/playerStatsHelper';
 import { CitrusBackground } from '@/components/CitrusBackground';
 import { COLUMNS } from '@/utils/queryColumns';
+import { AdSpace } from '@/components/AdSpace';
+import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 
 // Helper function to format position for display (L -> LW, R -> RW)
 const formatPositionForDisplay = (position: string): string => {
@@ -44,7 +46,7 @@ const formatPositionForDisplay = (position: string): string => {
 const FreeAgents = () => {
   const { toast } = useToast();
   const { user } = useAuth();
-  const { userLeagueState } = useLeague();
+  const { userLeagueState, activeLeagueId } = useLeague();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
@@ -728,8 +730,13 @@ const FreeAgents = () => {
     <div className="min-h-screen bg-background relative overflow-hidden">
       <CitrusBackground density="light" />
       <Navbar />
-      <main className="pt-24 pb-12 container mx-auto px-4">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+      <main className="w-full pt-28 pb-16 m-0 p-0">
+        <div className="w-full m-0 p-0">
+          {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
+          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px]">
+            {/* Main Content - Scrollable - Appears first on mobile */}
+            <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h1 className="text-3xl font-bold">Free Agents</h1>
             <p className="text-muted-foreground">Available players to improve your roster</p>
@@ -1666,6 +1673,26 @@ const FreeAgents = () => {
           isOpen={isPlayerDialogOpen}
           onClose={() => setIsPlayerDialogOpen(false)}
         />
+            </div>
+
+            {/* Left Sidebar - At bottom on mobile, left on desktop */}
+            <aside className="w-full lg:w-auto order-2 lg:order-1">
+              <div className="lg:sticky lg:top-32 space-y-4 lg:space-y-6">
+                <AdSpace size="300x250" label="Free Agents Sponsor" />
+                <AdSpace size="300x250" label="Fantasy Partner" />
+              </div>
+            </aside>
+
+            {/* Right Sidebar - Notifications (hidden on mobile) */}
+            {userLeagueState === 'active-user' && activeLeagueId && (
+              <aside className="hidden lg:block order-3">
+                <div className="lg:sticky lg:top-32 h-[calc(100vh-12rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                  <LeagueNotifications leagueId={activeLeagueId} />
+                </div>
+              </aside>
+            )}
+          </div>
+        </div>
       </main>
       <Footer />
     </div>

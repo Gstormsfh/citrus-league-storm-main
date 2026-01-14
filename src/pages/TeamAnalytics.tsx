@@ -17,6 +17,8 @@ import { isGuestMode } from '@/utils/guestHelpers';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import { CitrusBackground } from '@/components/CitrusBackground';
 import { CitrusSparkle, CitrusBurst } from '@/components/icons/CitrusIcons';
+import { AdSpace } from '@/components/AdSpace';
+import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 
 interface PositionStats {
   position: string;
@@ -43,7 +45,7 @@ interface FreeAgentRec {
 
 const TeamAnalytics = () => {
   const { user } = useAuth();
-  const { userLeagueState } = useLeague();
+  const { userLeagueState, activeLeagueId } = useLeague();
   const [freeAgentTargets, setFreeAgentTargets] = useState<FreeAgentRec[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -219,10 +221,13 @@ const TeamAnalytics = () => {
     <div className="min-h-screen bg-background flex flex-col relative overflow-hidden">
       <CitrusBackground density="light" />
       <Navbar />
-      <main className="flex-1 pt-24 pb-16">
-        <div className="container mx-auto px-4">
-          <div className="max-w-6xl mx-auto">
-            {/* Header Section */}
+      <main className="w-full pt-28 pb-16 m-0 p-0">
+        <div className="w-full m-0 p-0">
+          {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
+          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px]">
+            {/* Main Content - Scrollable - Appears first on mobile */}
+            <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
+              {/* Header Section */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
               <div>
                 <h1 className="text-4xl md:text-5xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-600">
@@ -390,6 +395,24 @@ const TeamAnalytics = () => {
                 </Card>
               </div>
             </div>
+            </div>
+
+            {/* Left Sidebar - At bottom on mobile, left on desktop */}
+            <aside className="w-full lg:w-auto order-2 lg:order-1">
+              <div className="lg:sticky lg:top-32 space-y-4 lg:space-y-6">
+                <AdSpace size="300x250" label="Analytics Sponsor" />
+                <AdSpace size="300x250" label="Fantasy Partner" />
+              </div>
+            </aside>
+
+            {/* Right Sidebar - Notifications (hidden on mobile) */}
+            {userLeagueState === 'active-user' && activeLeagueId && (
+              <aside className="hidden lg:block order-3">
+                <div className="lg:sticky lg:top-32 h-[calc(100vh-12rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                  <LeagueNotifications leagueId={activeLeagueId} />
+                </div>
+              </aside>
+            )}
           </div>
         </div>
       </main>

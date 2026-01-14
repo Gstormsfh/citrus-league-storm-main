@@ -11,8 +11,10 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AdSpace } from '@/components/AdSpace';
 import { Loader2, User, Mail, Lock, Trash2, ExternalLink, Shield, FileText } from 'lucide-react';
 import { logger } from '@/utils/logger';
+import { AdSpace } from '@/components/AdSpace';
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -165,8 +167,13 @@ const Settings = () => {
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-50 via-green-50 to-emerald-50">
       <Navbar />
       
-      <main className="flex-1 container max-w-4xl mx-auto px-4 py-8">
-        <div className="mb-8">
+      <main className="w-full pt-28 pb-16 m-0 p-0">
+        <div className="w-full m-0 p-0">
+          {/* Sidebar and Content Grid */}
+          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr]">
+            {/* Main Content - Scrollable - Appears first on mobile */}
+            <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
+              <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">Account Settings</h1>
           <p className="text-gray-600">Manage your account, security, and preferences</p>
         </div>
@@ -369,6 +376,10 @@ const Settings = () => {
 
         <div className="mt-8 text-center text-sm text-gray-600">
           <p>Need help? Contact us at <a href="mailto:support@citrusfantasy.com" className="text-green-700 hover:underline">support@citrusfantasy.com</a></p>
+        </div>
+              </div>
+            </div>
+          </div>
         </div>
       </main>
 

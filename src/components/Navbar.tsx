@@ -5,7 +5,7 @@ import {
   Menu, X, ChevronRight, User, Bell, Search, 
   Calendar, LineChart, Newspaper, Medal, Users, Settings, 
   LogOut, Home, FileText, Headphones, BookOpen, CircleUser, Sparkles,
-  Trophy, ChevronDown
+  Trophy, ChevronDown, UserPlus
 } from 'lucide-react';
 import { CitrusSlice, CitrusSparkle } from '@/components/icons/CitrusIcons';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -260,6 +260,19 @@ const Navbar = () => {
                     </div>
                   </PopoverContent>
                 </Popover>
+
+                {/* JOIN LEAGUE BUTTON - Always visible when logged in */}
+                <Link to="/create-league?tab=join">
+                  <Button 
+                    variant="ghost" 
+                    className="text-citrus-forest hover:text-citrus-orange hover:bg-citrus-sage/10 h-9 px-3 rounded-lg border-2 border-transparent hover:border-citrus-sage/30 transition-all flex items-center gap-1.5"
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    <span className="text-xs font-varsity font-bold uppercase hidden sm:inline">
+                      Join League
+                    </span>
+                  </Button>
+                </Link>
 
                 {/* LEAGUE SWITCHER - Multi-League Support (Yahoo/Sleeper style) */}
                 {userLeagues.length > 1 && (

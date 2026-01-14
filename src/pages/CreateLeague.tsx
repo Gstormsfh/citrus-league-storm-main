@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { LeagueService } from "@/services/LeagueService";
 import Navbar from "@/components/Navbar";
@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
-import { Trophy, Users, Settings, CheckCircle, AlertCircle, UserPlus, Loader2 } from "lucide-react";
+import { Trophy, Users, Settings, CheckCircle, AlertCircle, UserPlus, Loader2, Copy } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -26,10 +26,12 @@ import { useToast } from "@/hooks/use-toast";
 
 const CreateLeague = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, profile } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [defaultTab, setDefaultTab] = useState<"create" | "join">("create");
 
   // Create League Form State
   const [leagueName, setLeagueName] = useState("");
@@ -42,6 +44,20 @@ const CreateLeague = () => {
   // Join League Form State
   const [joinCode, setJoinCode] = useState("");
   const [teamNameForJoin, setTeamNameForJoin] = useState("");
+
+  // Read query params for tab and pre-filled join code
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    const code = searchParams.get('code');
+    
+    if (tab === 'join') {
+      setDefaultTab('join');
+    }
+    
+    if (code) {
+      setJoinCode(code);
+    }
+  }, [searchParams]);
 
   // Consolidated Stats State (Standard + Fun)
   const [leagueStats, setLeagueStats] = useState([
@@ -229,7 +245,7 @@ const CreateLeague = () => {
 
           <Card className="card-citrus border-none shadow-xl overflow-hidden">
             <CardContent className="p-8">
-              <Tabs defaultValue="create" className="w-full">
+              <Tabs defaultValue={defaultTab} value={defaultTab} onValueChange={(v) => setDefaultTab(v as "create" | "join")} className="w-full">
                 <TabsList className="grid w-full grid-cols-2 mb-8">
                   <TabsTrigger value="create" className="flex items-center gap-2">
                     <Trophy className="w-4 h-4" />
@@ -451,17 +467,34 @@ const CreateLeague = () => {
 
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="join-code" className="text-base">Join Code</Label>
-                    <Input 
-                      id="join-code" 
-                      placeholder="e.g. 550e8400-e29b-41d4-a716-446655440000" 
-                      value={joinCode}
-                      onChange={(e) => setJoinCode(e.target.value)}
-                      disabled={loading}
-                      className="font-mono text-sm"
-                    />
+                    <Label htmlFor="join-code" className="text-base font-semibold">Join Code</Label>
+                    <div className="flex items-center gap-2">
+                      <Input 
+                        id="join-code" 
+                        placeholder="Paste join code here..." 
+                        value={joinCode}
+                        onChange={(e) => setJoinCode(e.target.value)}
+                        disabled={loading}
+                        className="font-mono text-base h-12 text-lg"
+                      />
+                      {joinCode && (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => {
+                            navigator.clipboard.writeText(joinCode);
+                            toast({
+                              title: 'Copied!',
+                              description: 'Join code copied to clipboard',
+                            });
+                          }}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground">
-                      Ask your commissioner for the league join code
+                      Ask your commissioner for the league join code, or paste it from an invite link
                     </p>
                   </div>
 

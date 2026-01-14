@@ -13,6 +13,8 @@ import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import { CitrusBackground } from '@/components/CitrusBackground';
 import { CitrusSectionDivider } from '@/components/CitrusSectionDivider';
 import { CitrusSlice, CitrusSparkle, CitrusLeaf, CitrusWedge, CitrusBurst } from '@/components/icons/CitrusIcons';
+import { AdSpace } from '@/components/AdSpace';
+import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 
 const gmActions = [
   {
@@ -67,26 +69,20 @@ const gmActions = [
 ];
 
 const GMOffice = () => {
-  const { userLeagueState } = useLeague();
+  const { userLeagueState, activeLeagueId } = useLeague();
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
+    <div className="min-h-screen bg-background text-foreground overflow-x-hidden relative">
       {/* Citrus Background */}
       <CitrusBackground density="medium" animated={true} />
       
       <Navbar />
-      <main className="pt-24 pb-16 relative z-10">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col lg:flex-row gap-6">
-            {/* Left Sidebar - Roster Depth Widget */}
-            <aside className="lg:w-64 lg:flex-shrink-0 order-2 lg:order-1">
-              <div className="lg:sticky lg:top-24">
-                <TeamIntelHub />
-              </div>
-            </aside>
-
-            {/* Main Content */}
-            <div className="flex-1 min-w-0 order-1 lg:order-2">
-              <div className="max-w-3xl mx-auto text-center mb-8 relative">
+      <main className="w-full pt-28 pb-16 m-0 p-0 relative z-10">
+        <div className="w-full m-0 p-0">
+          {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
+          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
+            {/* Main Content - Scrollable - Appears first on mobile */}
+            <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
+              <div className="max-w-5xl mx-auto text-center mb-8 relative">
                 {/* Citrus Decorations */}
                 <CitrusSlice className="absolute -top-6 -left-6 w-16 h-16 text-citrus-orange/15 rotate-12" />
                 <CitrusLeaf className="absolute -top-4 -right-8 w-12 h-12 text-citrus-sage/15 -rotate-45" />
@@ -118,7 +114,7 @@ const GMOffice = () => {
               
               <CitrusSectionDivider />
               
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-3xl mx-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
                 {gmActions.map((action, index) => (
                   <Link 
                     key={action.title} 
@@ -154,6 +150,23 @@ const GMOffice = () => {
                 ))}
               </div>
             </div>
+
+            {/* Left Sidebar - At bottom on mobile, left on desktop - Extends to edge */}
+            <aside className="w-full lg:w-auto order-2 lg:order-1">
+              <div className="lg:sticky lg:top-32 space-y-4 lg:space-y-6">
+                <TeamIntelHub />
+                <AdSpace size="300x250" label="GM Sponsor" />
+              </div>
+            </aside>
+
+            {/* Right Sidebar - Notifications (hidden on mobile) - Extends to edge */}
+            {userLeagueState === 'active-user' && activeLeagueId && (
+              <aside className="hidden lg:block order-3">
+                <div className="lg:sticky lg:top-32 h-[calc(100vh-12rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                  <LeagueNotifications leagueId={activeLeagueId} />
+                </div>
+              </aside>
+            )}
           </div>
         </div>
       </main>

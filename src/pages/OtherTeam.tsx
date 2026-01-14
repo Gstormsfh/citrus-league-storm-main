@@ -36,7 +36,7 @@ const OtherTeam = () => {
   const { teamId } = useParams();
   const navigate = useNavigate();
   const { user, profile } = useAuth();
-  const { userLeagueState } = useLeague();
+  const { userLeagueState, activeLeagueId } = useLeague();
   const [loading, setLoading] = useState(true);
   const [roster, setRoster] = useState<{
     starters: HockeyPlayer[];
@@ -542,8 +542,13 @@ const OtherTeam = () => {
     <ErrorBoundary>
     <div className="min-h-screen bg-background">
       <Navbar />
-      <main className="pt-24 pb-16 container mx-auto px-4">
-        <Button 
+      <main className="w-full pt-28 pb-16 m-0 p-0">
+        <div className="w-full m-0 p-0">
+          {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
+          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px]">
+            {/* Main Content - Scrollable - Appears first on mobile */}
+            <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
+              <Button 
           variant="ghost" 
           className="mb-6 hover:bg-muted/50" 
           onClick={() => navigate('/standings')}
@@ -625,6 +630,26 @@ const OtherTeam = () => {
           isOpen={isPlayerDialogOpen}
           onClose={() => setIsPlayerDialogOpen(false)}
         />
+            </div>
+
+            {/* Left Sidebar - At bottom on mobile, left on desktop */}
+            <aside className="w-full lg:w-auto order-2 lg:order-1">
+              <div className="lg:sticky lg:top-32 space-y-4 lg:space-y-6">
+                <AdSpace size="300x250" label="Team Sponsor" />
+                <AdSpace size="300x250" label="Fantasy Partner" />
+              </div>
+            </aside>
+
+            {/* Right Sidebar - Notifications (hidden on mobile) */}
+            {userLeagueState === 'active-user' && activeLeagueId && (
+              <aside className="hidden lg:block order-3">
+                <div className="lg:sticky lg:top-32 h-[calc(100vh-12rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                  <LeagueNotifications leagueId={activeLeagueId} />
+                </div>
+              </aside>
+            )}
+          </div>
+        </div>
       </main>
       <Footer />
     </div>

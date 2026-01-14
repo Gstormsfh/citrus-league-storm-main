@@ -213,17 +213,30 @@ BEGIN
         processed_at = NOW()
     WHERE id = v_claim.id;
     
-    -- Update waiver priority if using rolling waivers
+    -- Update waiver priority based on waiver type (Yahoo/Sleeper compliant)
     IF v_waiver_type = 'rolling' THEN
-      -- Move this team to end of waiver order
+      -- Rolling: successful claimer moves to last (Yahoo/Sleeper standard)
+      -- Step 1: Shift all teams behind the claimer UP by 1 (decrease their priority)
+      UPDATE waiver_priority wp
+      SET priority = priority - 1,
+          updated_at = NOW()
+      WHERE wp.league_id = p_league_id
+        AND wp.priority > (SELECT priority FROM waiver_priority WHERE team_id = v_claim.team_id AND league_id = p_league_id);
+      
+      -- Step 2: Move successful claimer to end (lowest priority = highest number)
       UPDATE waiver_priority
       SET priority = (
         SELECT COALESCE(MAX(priority), 0) + 1
         FROM waiver_priority
         WHERE league_id = p_league_id
-      )
+      ),
+      updated_at = NOW()
       WHERE team_id = v_claim.team_id
         AND league_id = p_league_id;
+    ELSIF v_waiver_type = 'reverse_standings' THEN
+      -- Reverse standings: priority doesn't change on successful claim
+      -- (Priority is based on standings, updated separately)
+      -- No action needed - matches Yahoo/Sleeper behavior
     END IF;
     
     RETURN QUERY SELECT 

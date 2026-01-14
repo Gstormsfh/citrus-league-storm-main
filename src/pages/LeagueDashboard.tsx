@@ -8,12 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Trophy, Users, Calendar, Settings, Play, Copy, CheckCircle, Clock, Shield, RefreshCw } from 'lucide-react';
+import { Loader2, Trophy, Users, Calendar, Settings, Play, Copy, CheckCircle, Clock, Shield, RefreshCw, UserPlus, Crown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { AdSpace } from '@/components/AdSpace';
+import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 
 const LeagueDashboard = () => {
   const { leagueId } = useParams<{ leagueId: string }>();
@@ -287,9 +289,13 @@ const LeagueDashboard = () => {
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
-      <main className="flex-1 pt-24 pb-20 px-4">
-        <div className="container mx-auto max-w-6xl">
-          {/* Header */}
+      <main className="w-full pt-28 pb-16 m-0 p-0">
+        <div className="w-full m-0 p-0">
+          {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
+          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px]">
+            {/* Main Content - Scrollable - Appears first on mobile */}
+            <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
+              {/* Header */}
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -301,7 +307,10 @@ const LeagueDashboard = () => {
                     {league.draft_status === 'completed' && 'Completed'}
                   </Badge>
                   {isCommissioner && (
-                    <Badge variant="outline">Commissioner</Badge>
+                    <Badge variant="default" className="bg-primary text-primary-foreground flex items-center gap-1">
+                      <Crown className="h-3 w-3" />
+                      Commissioner
+                    </Badge>
                   )}
                 </div>
               </div>
@@ -471,8 +480,8 @@ const LeagueDashboard = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{teams.length}</div>
-                <p className="text-xs text-muted-foreground">Total teams in league</p>
+                <div className="text-2xl font-bold">{teams.length}/{league.settings?.teamsCount || 12}</div>
+                <p className="text-xs text-muted-foreground">Teams in league (max: {league.settings?.teamsCount || 12})</p>
               </CardContent>
             </Card>
 
@@ -507,32 +516,94 @@ const LeagueDashboard = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
             {isCommissioner && (
               <>
-                {teams.length < 12 && league.draft_status === 'not_started' && (
+                {/* Invite Friends Card - Show join code prominently */}
+                {league.draft_status === 'not_started' && (
                   <Card>
                     <CardHeader>
-                      <CardTitle>Simulate League Fill</CardTitle>
+                      <CardTitle className="flex items-center gap-2">
+                        <UserPlus className="h-5 w-5" />
+                        Invite Friends
+                      </CardTitle>
                       <CardDescription>
-                        Add simulated teams to fill the league to 12 teams for testing
+                        Share your league join code to invite friends
+                        {(() => {
+                          const maxTeams = league.settings?.teamsCount || 12;
+                          const remaining = maxTeams - teams.length;
+                          return remaining > 0 
+                            ? ` (${remaining} spot${remaining === 1 ? '' : 's'} remaining)`
+                            : ' (League is full)';
+                        })()}
                       </CardDescription>
                     </CardHeader>
-                    <CardContent>
-                      <Button 
-                        onClick={handleSimulateFill} 
-                        disabled={simulating}
-                        className="w-full"
-                      >
-                        {simulating ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                            Creating Teams...
-                          </>
-                        ) : (
-                          <>
-                            <Users className="mr-2 h-4 w-4" />
-                            Fill to 12 Teams
-                          </>
-                        )}
-                      </Button>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-center gap-2">
+                        <Input 
+                          value={league.join_code || ''} 
+                          readOnly 
+                          className="font-mono text-sm"
+                        />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => {
+                            if (league.join_code) {
+                              navigator.clipboard.writeText(league.join_code);
+                              toast({
+                                title: 'Copied!',
+                                description: 'Join code copied to clipboard',
+                              });
+                            }
+                          }}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => {
+                            if (league.join_code) {
+                              const subject = encodeURIComponent(`Join my fantasy league: ${league.name}`);
+                              const body = encodeURIComponent(`Join my fantasy league "${league.name}" using this code: ${league.join_code}\n\nOr use this link: ${window.location.origin}/create-league?tab=join&code=${league.join_code}`);
+                              window.location.href = `mailto:?subject=${subject}&body=${body}`;
+                            }
+                          }}
+                        >
+                          Email
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => {
+                            if (league.join_code) {
+                              const message = encodeURIComponent(`Join my fantasy league "${league.name}" using code: ${league.join_code} or visit: ${window.location.origin}/create-league?tab=join&code=${league.join_code}`);
+                              window.location.href = `sms:?body=${message}`;
+                            }
+                          }}
+                        >
+                          Text
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => {
+                            if (league.join_code) {
+                              const inviteLink = `${window.location.origin}/create-league?tab=join&code=${league.join_code}`;
+                              navigator.clipboard.writeText(inviteLink);
+                              toast({
+                                title: 'Link Copied!',
+                                description: 'Invite link copied to clipboard',
+                              });
+                            }
+                          }}
+                        >
+                          Copy Link
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 )}
@@ -543,10 +614,12 @@ const LeagueDashboard = () => {
                     <CardHeader>
                       <CardTitle>Draft Room</CardTitle>
                       <CardDescription>
-                        {teams.length >= 12 
-                          ? 'All teams are ready. Begin the draft when ready.'
-                          : `Need ${12 - teams.length} more teams to start the draft.`
-                        }
+                        {(() => {
+                          const maxTeams = league.settings?.teamsCount || 12;
+                          return teams.length >= maxTeams
+                            ? 'All teams are ready. Begin the draft when ready.'
+                            : `Need ${maxTeams - teams.length} more team${maxTeams - teams.length === 1 ? '' : 's'} to start the draft.`
+                        })()}
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -568,16 +641,27 @@ const LeagueDashboard = () => {
                         }}
                         className="w-full"
                         disabled={!leagueId}
-                        variant={teams.length >= 12 ? "default" : "outline"}
+                        variant={(() => {
+                          const maxTeams = league.settings?.teamsCount || 12;
+                          return teams.length >= maxTeams ? "default" : "outline";
+                        })()}
                       >
                         <Play className="mr-2 h-4 w-4" />
-                        {teams.length >= 12 ? 'Go to Draft Room' : `Go to Draft Room (${teams.length}/12 teams)`}
+                        {(() => {
+                          const maxTeams = league.settings?.teamsCount || 12;
+                          return teams.length >= maxTeams 
+                            ? 'Go to Draft Room' 
+                            : `Go to Draft Room (${teams.length}/${maxTeams} teams)`;
+                        })()}
                       </Button>
-                      {teams.length < 12 && (
-                        <p className="text-xs text-muted-foreground mt-2 text-center">
-                          You can still access the draft room, but you'll need 12 teams to start
-                        </p>
-                      )}
+                      {(() => {
+                        const maxTeams = league.settings?.teamsCount || 12;
+                        return teams.length < maxTeams && (
+                          <p className="text-xs text-muted-foreground mt-2 text-center">
+                            You can still access the draft room, but you'll need {maxTeams} teams to start
+                          </p>
+                        );
+                      })()}
                     </CardContent>
                   </Card>
                 )}
@@ -648,6 +732,25 @@ const LeagueDashboard = () => {
               )}
             </CardContent>
           </Card>
+            </div>
+
+            {/* Left Sidebar - At bottom on mobile, left on desktop */}
+            <aside className="w-full lg:w-auto order-2 lg:order-1">
+              <div className="lg:sticky lg:top-32 space-y-4 lg:space-y-6">
+                <AdSpace size="300x250" label="League Sponsor" />
+                <AdSpace size="300x250" label="Fantasy Partner" />
+              </div>
+            </aside>
+
+            {/* Right Sidebar - Notifications (hidden on mobile) */}
+            {leagueId && (
+              <aside className="hidden lg:block order-3">
+                <div className="lg:sticky lg:top-32 h-[calc(100vh-12rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                  <LeagueNotifications leagueId={leagueId} />
+                </div>
+              </aside>
+            )}
+          </div>
         </div>
       </main>
       <Footer />

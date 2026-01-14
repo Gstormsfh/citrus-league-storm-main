@@ -10,12 +10,14 @@ import { Calendar, Trophy, Users, ArrowRight, Clock } from 'lucide-react';
 import { CitrusBackground } from '@/components/CitrusBackground';
 import { CitrusSparkle, CitrusLeaf } from '@/components/icons/CitrusIcons';
 import { supabase } from '@/integrations/supabase/client';
+import { AdSpace } from '@/components/AdSpace';
+import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { format } from 'date-fns';
 import { COLUMNS } from '@/utils/queryColumns';
 
 const ScheduleManager = () => {
   const { user } = useAuth();
-  const { activeLeagueId } = useLeague();
+  const { activeLeagueId, userLeagueState } = useLeague();
   const [viewMode, setViewMode] = useState<'summary' | 'full'>('summary');
   const [nhlGames, setNhlGames] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,10 +96,13 @@ const ScheduleManager = () => {
     <div className="min-h-screen bg-background flex flex-col relative overflow-hidden">
       <CitrusBackground density="medium" />
       <Navbar />
-      <main className="flex-1 pt-24 pb-16 relative z-10">
-        <div className="container mx-auto px-4">
-          <div className="max-w-6xl mx-auto">
-            <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 relative">
+      <main className="w-full pt-28 pb-16 m-0 p-0 relative z-10">
+        <div className="w-full m-0 p-0">
+          {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
+          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px]">
+            {/* Main Content - Scrollable - Appears first on mobile */}
+            <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
+              <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 relative">
               <CitrusLeaf className="absolute -top-4 -left-8 w-16 h-16 text-citrus-sage/15 rotate-12" />
               <div className="text-center md:text-left">
                 <div className="flex items-center justify-center md:justify-start gap-3 mb-2">
@@ -294,6 +299,24 @@ const ScheduleManager = () => {
                   </CardContent>
                 </Card>
               </div>
+            )}
+            </div>
+
+            {/* Left Sidebar - At bottom on mobile, left on desktop */}
+            <aside className="w-full lg:w-auto order-2 lg:order-1">
+              <div className="lg:sticky lg:top-32 space-y-4 lg:space-y-6">
+                <AdSpace size="300x250" label="Schedule Sponsor" />
+                <AdSpace size="300x250" label="Fantasy Partner" />
+              </div>
+            </aside>
+
+            {/* Right Sidebar - Notifications (hidden on mobile) */}
+            {userLeagueState === 'active-user' && activeLeagueId && (
+              <aside className="hidden lg:block order-3">
+                <div className="lg:sticky lg:top-32 h-[calc(100vh-12rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                  <LeagueNotifications leagueId={activeLeagueId} />
+                </div>
+              </aside>
             )}
           </div>
         </div>

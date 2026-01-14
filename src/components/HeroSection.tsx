@@ -39,6 +39,11 @@ const HeroSection = () => {
                 Get Started <ArrowRight size={18} className="ml-2" />
               </Button>
             </Link>
+            <Link to="/create-league?tab=join">
+              <Button variant="outline" size="lg" className="text-base">
+                Join League
+              </Button>
+            </Link>
             <Link to="/standings">
               <Button variant="outline" size="lg" className="text-base">
                 View Demo League
