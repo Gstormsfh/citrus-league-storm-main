@@ -19,6 +19,7 @@ import { CitrusBackground } from '@/components/CitrusBackground';
 import { CitrusSparkle, CitrusBurst } from '@/components/icons/CitrusIcons';
 import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
+import LoadingScreen from '@/components/LoadingScreen';
 
 interface PositionStats {
   position: string;
@@ -45,13 +46,18 @@ interface FreeAgentRec {
 
 const TeamAnalytics = () => {
   const { user } = useAuth();
-  const { userLeagueState, activeLeagueId } = useLeague();
+  const { userLeagueState, activeLeagueId, isChangingLeague } = useLeague();
   const [freeAgentTargets, setFreeAgentTargets] = useState<FreeAgentRec[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Skip if league is changing
+    if (isChangingLeague) {
+      return;
+    }
+    
     loadScheduleMaximizers();
-  }, [user, userLeagueState]);
+  }, [user, userLeagueState, activeLeagueId, isChangingLeague]);
 
   const loadScheduleMaximizers = async () => {
     try {
@@ -104,9 +110,11 @@ const TeamAnalytics = () => {
         }
       }
       
-      // Get user's league ID if logged in
-      let currentLeagueId: string | undefined = undefined;
-      if (user) {
+      // Get user's league ID - prioritize activeLeagueId from LeagueContext
+      let currentLeagueId: string | undefined = activeLeagueId || undefined;
+      
+      // Fallback: if no activeLeagueId is set, query for user's first team
+      if (!currentLeagueId && user) {
         try {
           const { data: userTeamData } = await supabase
             .from('teams')

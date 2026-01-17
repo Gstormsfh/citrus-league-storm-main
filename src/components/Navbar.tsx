@@ -299,8 +299,7 @@ const Navbar = () => {
                           key={l.id}
                           onClick={() => {
                             setActiveLeagueId(l.id);
-                            // Optionally navigate to league dashboard
-                            navigate(`/league/${l.id}`);
+                            // Stay on current page - don't navigate
                           }}
                           className={cn(
                             "cursor-pointer",

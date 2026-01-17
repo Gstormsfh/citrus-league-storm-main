@@ -551,8 +551,8 @@ def update_player_game_stats_nhl_columns(
         print(f"    [WARNING] No player stats extracted for game {game_id}")
         return {"updated": 0, "created": 0, "skipped": 0}
     
-    print(f"    [INFO] Processing {len(player_stats)} players for game {game_id}")
-    
+    # Processing {len(player_stats)} players for game {game_id} (logging disabled for cleaner output)
+
     for player_id, stats in player_stats.items():
         # Validate stats dict
         if not isinstance(stats, dict):
@@ -604,11 +604,7 @@ def update_player_game_stats_nhl_columns(
                     ]
                 )
                 updated_count += 1
-                # Log successful update with key stats for verification
-                if not is_goalie:
-                    print(f"    [OK] Updated player {player_id}: G={stats.get('nhl_goals', 0)}, A={stats.get('nhl_assists', 0)}, "
-                          f"SOG={stats.get('nhl_shots_on_goal', 0)}, Hits={stats.get('nhl_hits', 0)}, "
-                          f"Blocks={stats.get('nhl_blocks', 0)}, TOI={stats.get('nhl_toi_seconds', 0)}s")
+                # Verbose logging disabled for cleaner terminal output
             except Exception as e:
                 print(f"    [ERROR] Failed to update player {player_id}: {e}")
                 skipped_count += 1
@@ -718,12 +714,14 @@ def update_player_game_stats_nhl_columns(
             try:
                 db.upsert("player_game_stats", skater_record, on_conflict="season,game_id,player_id")
                 created_count += 1
-                print(f"    [OK] Created skater record for player {player_id}: G={stats.get('nhl_goals', 0)}, A={stats.get('nhl_assists', 0)}, "
-                      f"SOG={stats.get('nhl_shots_on_goal', 0)}, Hits={stats.get('nhl_hits', 0)}, "
-                      f"Blocks={stats.get('nhl_blocks', 0)}, TOI={stats.get('nhl_toi_seconds', 0)}s")
+                # Verbose logging disabled for cleaner terminal output
             except Exception as e:
                 print(f"    [ERROR] Failed to create skater record for {player_id}: {e}")
                 skipped_count += 1
+    
+    # Print clean summary instead of per-player logging
+    if updated_count + created_count > 0:
+        print(f"    [✓] Game {game_id}: {updated_count} updated, {created_count} created, {skipped_count} skipped")
     
     return {
         "updated": updated_count,

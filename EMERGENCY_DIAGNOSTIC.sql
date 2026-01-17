@@ -1,83 +1,149 @@
 -- ============================================================================
--- EMERGENCY DIAGNOSTIC: Monday January 13th Roster Mystery
--- Run this FIRST to understand what's happening
+-- EMERGENCY DIAGNOSTIC: What happened?
 -- ============================================================================
 
--- 1. Check if Monday roster data exists
-SELECT 'Monday Roster Count' as check_name, COUNT(*)::TEXT as result
-FROM fantasy_daily_rosters
-WHERE roster_date = '2026-01-13'::DATE
+-- 1. Check if team_lineups has data
+DO $$
+DECLARE
+  v_lineup_count INTEGER;
+  v_team_record RECORD;
+BEGIN
+  RAISE NOTICE '═══════════════════════════════════════════════════════════════';
+  RAISE NOTICE '1️⃣ CHECKING team_lineups (Source of Truth)';
+  RAISE NOTICE '═══════════════════════════════════════════════════════════════';
+  
+  SELECT COUNT(*) INTO v_lineup_count FROM team_lineups;
+  RAISE NOTICE 'Total team_lineups entries: %', v_lineup_count;
+  RAISE NOTICE '';
+  
+  FOR v_team_record IN
+    SELECT 
+      t.team_name,
+      l.name as league_name,
+      jsonb_array_length(COALESCE(tl.starters, '[]'::jsonb)) as starters,
+      jsonb_array_length(COALESCE(tl.bench, '[]'::jsonb)) as bench,
+      jsonb_array_length(COALESCE(tl.ir, '[]'::jsonb)) as ir,
+      CASE 
+        WHEN tl.starters ? '8478402' THEN 'STARTERS'
+        WHEN tl.bench ? '8478402' THEN 'BENCH'
+        WHEN tl.ir ? '8478402' THEN 'IR'
+        ELSE 'NOT FOUND'
+      END as mcdavid_location
+    FROM team_lineups tl
+    JOIN teams t ON t.id = tl.team_id
+    JOIN leagues l ON l.id = tl.league_id
+    ORDER BY l.name, t.team_name
+  LOOP
+    IF v_team_record.mcdavid_location = 'NOT FOUND' THEN
+      RAISE NOTICE '[%] % : S:% B:% IR:% (McDavid: ❌ %)',
+        v_team_record.league_name,
+        v_team_record.team_name,
+        v_team_record.starters,
+        v_team_record.bench,
+        v_team_record.ir,
+        v_team_record.mcdavid_location;
+    ELSE
+      RAISE NOTICE '[%] % : S:% B:% IR:% (McDavid: ✅ %)',
+        v_team_record.league_name,
+        v_team_record.team_name,
+        v_team_record.starters,
+        v_team_record.bench,
+        v_team_record.ir,
+        v_team_record.mcdavid_location;
+    END IF;
+  END LOOP;
+  
+  RAISE NOTICE '';
+END $$;
 
-UNION ALL
+-- 2. Check fantasy_daily_rosters
+DO $$
+DECLARE
+  v_daily_count INTEGER;
+  v_today_count INTEGER;
+BEGIN
+  RAISE NOTICE '2️⃣ CHECKING fantasy_daily_rosters';
+  RAISE NOTICE '═══════════════════════════════════════════════════════════════';
+  
+  SELECT COUNT(*) INTO v_daily_count FROM fantasy_daily_rosters;
+  SELECT COUNT(*) INTO v_today_count FROM fantasy_daily_rosters WHERE roster_date = CURRENT_DATE;
+  
+  RAISE NOTICE 'Total fantasy_daily_rosters entries: %', v_daily_count;
+  RAISE NOTICE 'Today (%) entries: %', CURRENT_DATE, v_today_count;
+  
+  -- Check if McDavid is in fantasy_daily_rosters today
+  IF EXISTS (
+    SELECT 1 FROM fantasy_daily_rosters 
+    WHERE player_id = 8478402 AND roster_date = CURRENT_DATE
+  ) THEN
+    RAISE NOTICE '✅ McDavid IS in fantasy_daily_rosters for today';
+  ELSE
+    RAISE NOTICE '❌ McDavid is NOT in fantasy_daily_rosters for today';
+  END IF;
+  
+  RAISE NOTICE '';
+END $$;
 
--- 2. Check what dates we have near Monday
-SELECT 'Date Range Available' as check_name, COUNT(DISTINCT roster_date)::TEXT as result
-FROM fantasy_daily_rosters
-WHERE roster_date BETWEEN '2026-01-12'::DATE AND '2026-01-14'::DATE
+-- 3. Check trigger status
+DO $$
+DECLARE
+  v_trigger_exists BOOLEAN;
+BEGIN
+  RAISE NOTICE '3️⃣ CHECKING TRIGGER STATUS';
+  RAISE NOTICE '═══════════════════════════════════════════════════════════════';
+  
+  SELECT EXISTS (
+    SELECT 1 FROM pg_trigger 
+    WHERE tgname = 'trigger_auto_sync_roster_to_daily'
+  ) INTO v_trigger_exists;
+  
+  IF v_trigger_exists THEN
+    RAISE WARNING '⚠️ Trigger is ENABLED (this may be causing deletions!)';
+  ELSE
+    RAISE NOTICE '✅ Trigger is DISABLED (safe)';
+  END IF;
+  
+  RAISE NOTICE '';
+END $$;
 
-UNION ALL
-
--- 3. Check if team_lineups has data
-SELECT 'Teams with Lineups' as check_name, COUNT(*)::TEXT as result
-FROM team_lineups
-
-UNION ALL
-
--- 4. Check if we have starters
-SELECT 'Teams with Starters' as check_name, COUNT(*)::TEXT as result
-FROM team_lineups
-WHERE starters IS NOT NULL AND jsonb_array_length(starters) > 0
-
-UNION ALL
-
--- 5. Check if we have active matchups for this week
-SELECT 'Active Matchups This Week' as check_name, COUNT(*)::TEXT as result
-FROM matchups
-WHERE week_start_date <= '2026-01-13'::DATE 
-  AND week_end_date >= '2026-01-13'::DATE
-  AND status IN ('scheduled', 'in_progress', 'completed');
+-- 4. Check draft_picks (ownership of McDavid)
+DO $$
+BEGIN
+  RAISE NOTICE '4️⃣ CHECKING OWNERSHIP (draft_picks)';
+  RAISE NOTICE '═══════════════════════════════════════════════════════════════';
+  
+  IF EXISTS (
+    SELECT 1 FROM draft_picks 
+    WHERE player_id = '8478402' AND deleted_at IS NULL
+  ) THEN
+    RAISE NOTICE '✅ McDavid ownership record exists in draft_picks';
+    
+    -- Show who owns him
+    PERFORM t.team_name, l.name as league_name
+    FROM draft_picks dp
+    JOIN teams t ON t.id = dp.team_id
+    JOIN leagues l ON l.id = t.league_id
+    WHERE dp.player_id = '8478402' AND dp.deleted_at IS NULL;
+    
+  ELSE
+    RAISE WARNING '❌ McDavid ownership record is MISSING or DELETED from draft_picks!';
+  END IF;
+  
+  RAISE NOTICE '';
+END $$;
 
 -- ============================================================================
--- Show detailed breakdown by date
+-- SUMMARY
 -- ============================================================================
-SELECT 
-  'DATE BREAKDOWN' as section,
-  roster_date::TEXT,
-  COUNT(*) as roster_entries,
-  COUNT(DISTINCT team_id) as teams,
-  COUNT(DISTINCT matchup_id) as matchups,
-  string_agg(DISTINCT slot_type, ', ' ORDER BY slot_type) as slot_types
-FROM fantasy_daily_rosters
-WHERE roster_date BETWEEN '2026-01-10'::DATE AND '2026-01-15'::DATE
-GROUP BY roster_date
-ORDER BY roster_date;
-
--- ============================================================================
--- Show what's in team_lineups (sample 5 teams)
--- ============================================================================
-SELECT 
-  'TEAM LINEUPS SAMPLE' as section,
-  team_id,
-  league_id,
-  jsonb_array_length(starters) as starters_count,
-  jsonb_array_length(bench) as bench_count,
-  jsonb_array_length(ir) as ir_count,
-  updated_at
-FROM team_lineups
-LIMIT 5;
-
--- ============================================================================
--- Check if matchups exist for this week
--- ============================================================================
-SELECT 
-  'MATCHUPS FOR THIS WEEK' as section,
-  id as matchup_id,
-  week_start_date,
-  week_end_date,
-  status,
-  team1_id,
-  team2_id
-FROM matchups
-WHERE week_start_date <= '2026-01-13'::DATE 
-  AND week_end_date >= '2026-01-13'::DATE
-LIMIT 5;
+DO $$
+BEGIN
+  RAISE NOTICE '═══════════════════════════════════════════════════════════════';
+  RAISE NOTICE '📋 DIAGNOSTIC COMPLETE';
+  RAISE NOTICE '═══════════════════════════════════════════════════════════════';
+  RAISE NOTICE '';
+  RAISE NOTICE 'Next steps:';
+  RAISE NOTICE '  1. Run EMERGENCY_DISABLE_TRIGGER.sql if not already done';
+  RAISE NOTICE '  2. If team_lineups is empty, restore from backup';
+  RAISE NOTICE '  3. Investigate why trigger deleted from team_lineups';
+  RAISE NOTICE '';
+END $$;

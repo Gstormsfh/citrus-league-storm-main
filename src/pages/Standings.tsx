@@ -40,12 +40,11 @@ interface StandingsTeam {
 
 const Standings = () => {
   const { user } = useAuth();
-  const { userLeagueState, activeLeagueId } = useLeague();
+  const { userLeagueState, activeLeagueId, isChangingLeague } = useLeague();
   const { toast } = useToast();
   const [season, setSeason] = useState("2025");
   const [loading, setLoading] = useState(true);
   const [leagues, setLeagues] = useState<League[]>([]);
-  const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(null);
   const [teams, setTeams] = useState<StandingsTeam[]>([]);
   const [leagueTeams, setLeagueTeams] = useState<(Team & { owner_name?: string })[]>([]);
   const hasInitializedRef = useRef(false);
@@ -53,6 +52,11 @@ const Standings = () => {
   
   // Auto-complete matchups and load standings
   useEffect(() => {
+    // Skip if league is changing
+    if (isChangingLeague) {
+      return;
+    }
+    
     const loadStandings = async () => {
       // Initialize loading state
       setLoading(true);
@@ -95,13 +99,8 @@ const Standings = () => {
           }
 
           setLeagues(userLeagues);
-          const leagueToUse = selectedLeagueId || userLeagues[0].id;
-          
-          // Only set selectedLeagueId on first initialization to avoid infinite loops
-          if (!hasInitializedRef.current && !selectedLeagueId && userLeagues.length > 0) {
-            setSelectedLeagueId(userLeagues[0].id);
-            hasInitializedRef.current = true;
-          }
+          // Use activeLeagueId from LeagueContext (no local selectedLeagueId state needed)
+          const leagueToUse = activeLeagueId || userLeagues[0].id;
 
           // CRITICAL: Auto-complete matchups and update scores BEFORE calculating standings
           // We MUST wait for scores to be updated before calculating standings
@@ -234,7 +233,7 @@ const Standings = () => {
       // If userLeagueState is still loading, keep loading state
       setLoading(true);
     }
-  }, [user?.id, selectedLeagueId, toast, userLeagueState]);
+  }, [user?.id, toast, userLeagueState, activeLeagueId]);
 
   // Animation observer setup
   // CRITICAL: Force animate class immediately for standings content to ensure visibility
@@ -276,7 +275,7 @@ const Standings = () => {
     return b.points - a.points;
   });
 
-  const selectedLeague = leagues.find(l => l.id === selectedLeagueId);
+  const selectedLeague = leagues.find(l => l.id === activeLeagueId);
   
   // CRITICAL: Debug logging to diagnose visibility issue
   console.log('[Standings] Render decision:', {
@@ -318,7 +317,7 @@ const Standings = () => {
   if (teams.length > 0) {
     console.log('[Standings] Rendering content with', teams.length, 'teams, loading:', loading);
   }
-  
+
   return (
     <div className="min-h-screen bg-background relative overflow-hidden" style={{ visibility: 'visible', opacity: 1 }}>
       {/* Citrus Background - Floating citrus elements */}
@@ -363,20 +362,7 @@ const Standings = () => {
                 {userLeagueState === 'active-user' && selectedLeague ? selectedLeague.name : 'CitrusSports League'}
               </h2>
               <p className="text-muted-foreground">Regular Season Standings</p>
-              {userLeagueState === 'active-user' && leagues.length > 1 && (
-                <Select value={selectedLeagueId || ''} onValueChange={setSelectedLeagueId}>
-                  <SelectTrigger className="w-64 mt-2">
-                    <SelectValue placeholder="Select League" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {leagues.map(league => (
-                      <SelectItem key={league.id} value={league.id}>
-                        {league.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+              {/* League selector removed - use global Navbar selector instead */}
             </div>
             
             <div className="flex items-center space-x-4 animated-element animate">
@@ -402,7 +388,7 @@ const Standings = () => {
                     setLoading(true);
                     try {
                       // Auto-complete matchups
-                      if (selectedLeagueId) {
+                      if (activeLeagueId) {
                         await supabase.rpc('auto_complete_matchups');
                       }
                       // Reload standings

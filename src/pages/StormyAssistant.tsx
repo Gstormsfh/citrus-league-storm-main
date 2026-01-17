@@ -306,7 +306,6 @@ const StormyAssistant = () => {
           </Tabs>
               </div>
             </div>
-          </div>
 
             {/* Left Sidebar - At bottom on mobile, left on desktop */}
             <aside className="w-full lg:w-auto order-2 lg:order-1">

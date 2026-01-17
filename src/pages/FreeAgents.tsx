@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
@@ -46,7 +46,7 @@ const formatPositionForDisplay = (position: string): string => {
 const FreeAgents = () => {
   const { toast } = useToast();
   const { user } = useAuth();
-  const { userLeagueState, activeLeagueId } = useLeague();
+  const { userLeagueState, activeLeagueId, isChangingLeague } = useLeague();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
@@ -57,6 +57,15 @@ const FreeAgents = () => {
   const [watchlist, setWatchlist] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [leagueId, setLeagueId] = useState<string | null>(null);
+  
+  // Tab reset mechanism - reset to default tab when league changes
+  const previousLeagueIdRef = useRef(activeLeagueId);
+  useEffect(() => {
+    if (previousLeagueIdRef.current !== activeLeagueId && previousLeagueIdRef.current !== null) {
+      setActiveTab("available"); // Reset to default tab
+    }
+    previousLeagueIdRef.current = activeLeagueId;
+  }, [activeLeagueId]);
   const [scheduleMaximizers, setScheduleMaximizers] = useState<Array<Player & { gamesThisWeek: number; gameDays: string[] }>>([]);
   const [loadingMaximizers, setLoadingMaximizers] = useState(false);
 
@@ -69,13 +78,18 @@ const FreeAgents = () => {
   const [isPlayerDialogOpen, setIsPlayerDialogOpen] = useState(false);
 
   useEffect(() => {
+    // Skip if league is changing
+    if (isChangingLeague) {
+      return;
+    }
+    
     const tab = searchParams.get('tab');
     if (tab) {
       setActiveTab(tab);
     }
     fetchPlayers();
     setWatchlist(new Set(LeagueService.getWatchlist()));
-  }, [searchParams]);
+  }, [searchParams, activeLeagueId, isChangingLeague]);
 
   // Load schedule maximizers only when the tab is active
   useEffect(() => {
@@ -112,9 +126,11 @@ const FreeAgents = () => {
         }
       }
       
-      // Get user's league ID if logged in
-      let currentLeagueId: string | undefined = undefined;
-      if (user) {
+      // Get user's league ID - prioritize activeLeagueId from LeagueContext
+      let currentLeagueId: string | undefined = activeLeagueId || undefined;
+      
+      // Fallback: if no activeLeagueId is set, query for user's first team
+      if (!currentLeagueId && user) {
         try {
           const { data: userTeamDataResult } = await supabase
             .from('teams')
@@ -125,13 +141,14 @@ const FreeAgents = () => {
           if (userTeamDataResult) {
             const userTeamData = userTeamDataResult as { league_id: string };
             currentLeagueId = userTeamData.league_id;
-            setLeagueId(currentLeagueId);
           }
         } catch (error) {
           console.error('Error fetching user team:', error);
           // Continue without league ID - will show all players
         }
       }
+      
+      setLeagueId(currentLeagueId || null);
       
       // Get all players from our pipeline tables (player_directory + player_season_stats)
       // PlayerService.getAllPlayers() is the ONLY source for player data

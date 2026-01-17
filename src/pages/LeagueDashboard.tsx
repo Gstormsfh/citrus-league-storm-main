@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { LeagueService, League, Team } from '@/services/LeagueService';
+import { WaiverService } from '@/services/WaiverService';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
@@ -32,6 +34,7 @@ const LeagueDashboard = () => {
   // Commissioner Settings State
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [processingWaivers, setProcessingWaivers] = useState(false);
   const [waiverSettings, setWaiverSettings] = useState({
     waiver_process_time: '03:00:00',
     waiver_period_hours: 48,
@@ -256,7 +259,50 @@ const LeagueDashboard = () => {
     }
   };
 
+  // Determine if user is commissioner (needs to be before handler functions that use it)
   const isCommissioner = league?.commissioner_id === user?.id;
+
+  // Process waivers manually (commissioner only)
+  const handleProcessWaivers = async () => {
+    if (!leagueId || !user || !isCommissioner) return;
+
+    setProcessingWaivers(true);
+    try {
+      const result = await WaiverService.processAllPendingWaivers();
+
+      if (!result.success) {
+        toast({
+          title: 'Error',
+          description: result.error || 'Failed to process waivers',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Find results for this league
+      const leagueResult = result.results.find(r => r.league_id === leagueId);
+      
+      if (leagueResult && leagueResult.total_processed > 0) {
+        toast({
+          title: 'Waivers Processed',
+          description: `Processed ${leagueResult.total_processed} claims: ${leagueResult.successful} successful, ${leagueResult.failed} failed`,
+        });
+      } else {
+        toast({
+          title: 'No Pending Claims',
+          description: 'There are no pending waiver claims to process.',
+        });
+      }
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: err.message || 'Failed to process waivers',
+        variant: 'destructive',
+      });
+    } finally {
+      setProcessingWaivers(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -445,6 +491,39 @@ const LeagueDashboard = () => {
                             checked={waiverSettings.allow_trades_during_games}
                             onCheckedChange={(checked) => setWaiverSettings(prev => ({ ...prev, allow_trades_during_games: checked }))}
                           />
+                        </div>
+
+                        {/* Manual Waiver Processing */}
+                        <div className="border-t pt-4 mt-4">
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <Label className="flex items-center gap-2">
+                                <Play className="h-4 w-4" />
+                                Process Waivers Now
+                              </Label>
+                              <p className="text-xs text-muted-foreground">
+                                Manually process all pending waiver claims
+                              </p>
+                            </div>
+                            <Button 
+                              variant="secondary" 
+                              size="sm"
+                              onClick={handleProcessWaivers}
+                              disabled={processingWaivers}
+                            >
+                              {processingWaivers ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Processing...
+                                </>
+                              ) : (
+                                <>
+                                  <RefreshCw className="mr-2 h-4 w-4" />
+                                  Process Now
+                                </>
+                              )}
+                            </Button>
+                          </div>
                         </div>
                       </div>
 

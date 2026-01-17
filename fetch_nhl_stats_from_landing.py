@@ -455,8 +455,11 @@ def main() -> int:
     failed_not_found_players = []  # List of (player_id, player_name, is_goalie) tuples
     
     # Track base delay - optimized for 100-IP proxy rotation
-    # With proxy rotation, we can use minimal delays (citrus_request handles rate limiting)
-    base_delay = 0.1  # 100ms - proxy rotation eliminates need for 3s delays
+    # FIXED: Increased from 0.1s to 0.3s to prevent rapid rotation glitches
+    # Even with proxy rotation, making requests every 100ms can trigger bot detection
+    # Conservative delays prevent the midnight run from rotating too fast
+    base_delay = 0.3  # 300ms - conservative delay to prevent rapid rotation glitches
+    consecutive_errors = 0  # Track consecutive errors to adapt delay
     
     for idx, player in enumerate(players, 1):
         player_id = _safe_int(player.get("player_id"), 0)
@@ -480,13 +483,23 @@ def main() -> int:
         if error_type == "429":
             failed_429_players.append((player_id, player_name, is_goalie))
             rate_limited_429_count += 1
-            # Increase base delay after first 429 (proxy rotation should handle most, but be safe)
-            if base_delay < 0.5:
+            consecutive_errors += 1
+            # Adaptive delay increase on errors - prevents rapid rotation glitches
+            if consecutive_errors >= 3:
+                # Multiple errors in a row - slow down significantly
+                base_delay = min(base_delay * 1.5, 2.0)  # Cap at 2s max
+                print(f"  [RATE LIMIT] {consecutive_errors} consecutive 429 errors, increasing delay to {base_delay:.2f}s")
+            elif base_delay < 0.5:
                 base_delay = 0.5
                 print(f"  [RATE LIMIT] Detected 429 error, increasing delay to 0.5s between requests")
         elif error_type == "not_found":
             failed_not_found_players.append((player_id, player_name, is_goalie))
             not_found_count += 1
+            # Not found errors don't indicate rate limiting, reset error counter
+            consecutive_errors = 0
+        else:
+            # Success - reset error counter
+            consecutive_errors = 0
         
         if landing_data:
             stats = extract_all_official_stats(landing_data, DEFAULT_SEASON, is_goalie=is_goalie)
@@ -620,11 +633,15 @@ def main() -> int:
             print(f"  [PROGRESS] Processed {idx}/{len(players)} players ({updated_count['skaters']} skaters, {updated_count['goalies']} goalies updated, {not_found_count} not found, {error_count} errors)...")
             last_progress_time = current_time
         
-        # Rate limiting - With 100-IP proxy rotation, minimal delay needed
-        # citrus_request handles rate limiting via proxy rotation and exponential backoff
-        # Base delay (0.1s default, 0.5s if 429 detected) = optimized for proxy system
+        # Rate limiting - Conservative delays to prevent rapid rotation glitches
+        # Even with proxy rotation, we need delays to avoid bot detection
+        # Base delay adapts based on errors (0.3s default, up to 2s if many errors)
         if idx < len(players):
             time.sleep(base_delay)
+            
+            # Periodic cooldown every 50 requests to prevent overwhelming the API
+            if idx % 50 == 0:
+                time.sleep(0.5)  # Extra 500ms cooldown every 50 requests
     
     print()
     print("=" * 80)
@@ -811,9 +828,13 @@ def main() -> int:
                         print(f"  [ERROR] Failed to update player {player_id} ({player_name}) in retry: {e}")
                         retry_error_count += 1
             
-            # Rate limiting delay - optimized for proxy rotation
+            # Rate limiting delay - use same adaptive delay as main phase
             if idx < len(players_to_retry):
                 time.sleep(base_delay)
+                
+                # Periodic cooldown every 25 requests during retry (more conservative)
+                if idx % 25 == 0:
+                    time.sleep(0.5)  # Extra 500ms cooldown every 25 retry requests
         
         # Print retry phase summary
         print()

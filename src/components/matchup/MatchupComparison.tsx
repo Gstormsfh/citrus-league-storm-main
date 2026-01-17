@@ -2,6 +2,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { MatchupPlayer } from "./types";
 import { MatchupPositionGroup } from "./MatchupPositionGroup";
 import { organizeMatchupData } from "./matchupUtils";
+import { ScoringCalculator, ScoringSettings } from "@/utils/scoringUtils";
 
 interface MatchupComparisonProps {
   userStarters: MatchupPlayer[];
@@ -20,6 +21,8 @@ interface MatchupComparisonProps {
   // Pre-calculated weekly totals from parent (ensures consistency with scorecard)
   weeklyUserTotal?: number;
   weeklyOpponentTotal?: number;
+  // League scoring settings for dynamic calculations
+  scoringSettings?: ScoringSettings;
 }
 
 export const MatchupComparison = ({
@@ -35,8 +38,11 @@ export const MatchupComparison = ({
   onTotalsCalculated,
   calculatedDailyTotals,
   weeklyUserTotal,
-  weeklyOpponentTotal
+  weeklyOpponentTotal,
+  scoringSettings
 }: MatchupComparisonProps) => {
+  // Create scoring calculator with league-specific settings
+  const scorer = useMemo(() => new ScoringCalculator(scoringSettings), [scoringSettings]);
   // Organize players by slot order (flattened, no position grouping)
   const positionGroups = organizeMatchupData(
     userStarters,
@@ -132,41 +138,19 @@ export const MatchupComparison = ({
     // Fallback: try to calculate from matchupStats if available (even if total_points is 0)
     if (player.matchupStats) {
       const isGoalie = player.position === 'G' || player.position === 'Goalie';
-      if (isGoalie) {
-        const goaliePoints = (player.matchupStats.wins || 0) * 4 + 
-                            (player.matchupStats.saves || 0) * 0.2 + 
-                            (player.matchupStats.shutouts || 0) * 3 - 
-                            (player.matchupStats.goals_against || 0) * 1;
-        return sum + goaliePoints; // Use matchup week stats
-      } else {
-        const skaterPoints = (player.matchupStats.goals || 0) * 3 + 
-                            (player.matchupStats.assists || 0) * 2 + 
-                            ((player.matchupStats.ppp || 0) * 1) +
-                            ((player.matchupStats.shp || 0) * 2) +
-                            (player.matchupStats.sog || 0) * 0.4 + 
-                            ((player.matchupStats.blocks || 0) * 0.5) +
-                            ((player.matchupStats.hits || 0) * 0.2) +
-                            ((player.matchupStats.pim || 0) * 0.5);
-        return sum + skaterPoints; // Use matchup week stats
-      }
+      const calculatedPoints = scorer.calculatePoints(player.matchupStats, isGoalie);
+      return sum + calculatedPoints; // Use matchup week stats with league scoring
     }
     // Last resort: For demo leagues, if no matchup stats, use season stats from player.stats
     // This is a fallback when matchup lines aren't populated yet
     if (player.stats) {
       const isGoalie = player.position === 'G' || player.position === 'Goalie';
       if (isGoalie && player.goalieStats) {
-        const goaliePoints = (player.goalieStats.wins || 0) * 4 + 
-                            (player.goalieStats.saves || 0) * 0.2 + 
-                            (player.goalieStats.shutouts || 0) * 3 - 
-                            (player.goalieStats.goalsAgainst || 0) * 1;
+        const goaliePoints = scorer.calculatePoints(player.goalieStats, true);
         return sum + goaliePoints;
       } else if (!isGoalie) {
         // Calculate from season stats (approximation for demo when matchup stats unavailable)
-        const skaterPoints = (player.stats.goals || 0) * 3 + 
-                            (player.stats.assists || 0) * 2 + 
-                            ((player.stats.powerPlayPoints || 0) * 1) +
-                            (player.stats.sog || 0) * 0.4 + 
-                            (player.stats.blk || 0) * 0.5;
+        const skaterPoints = scorer.calculatePoints(player.stats, false);
         return sum + skaterPoints;
       }
     }
@@ -220,41 +204,19 @@ export const MatchupComparison = ({
     // Fallback: try to calculate from matchupStats if available (even if total_points is 0)
     if (player.matchupStats) {
       const isGoalie = player.position === 'G' || player.position === 'Goalie';
-      if (isGoalie) {
-        const goaliePoints = (player.matchupStats.wins || 0) * 4 + 
-                            (player.matchupStats.saves || 0) * 0.2 + 
-                            (player.matchupStats.shutouts || 0) * 3 - 
-                            (player.matchupStats.goals_against || 0) * 1;
-        return sum + goaliePoints; // Use matchup week stats
-      } else {
-        const skaterPoints = (player.matchupStats.goals || 0) * 3 + 
-                            (player.matchupStats.assists || 0) * 2 + 
-                            ((player.matchupStats.ppp || 0) * 1) +
-                            ((player.matchupStats.shp || 0) * 2) +
-                            (player.matchupStats.sog || 0) * 0.4 + 
-                            ((player.matchupStats.blocks || 0) * 0.5) +
-                            ((player.matchupStats.hits || 0) * 0.2) +
-                            ((player.matchupStats.pim || 0) * 0.5);
-        return sum + skaterPoints; // Use matchup week stats
-      }
+      const calculatedPoints = scorer.calculatePoints(player.matchupStats, isGoalie);
+      return sum + calculatedPoints; // Use matchup week stats with league scoring
     }
     // Last resort: For demo leagues, if no matchup stats, use season stats from player.stats
     // This is a fallback when matchup lines aren't populated yet
     if (player.stats) {
       const isGoalie = player.position === 'G' || player.position === 'Goalie';
       if (isGoalie && player.goalieStats) {
-        const goaliePoints = (player.goalieStats.wins || 0) * 4 + 
-                            (player.goalieStats.saves || 0) * 0.2 + 
-                            (player.goalieStats.shutouts || 0) * 3 - 
-                            (player.goalieStats.goalsAgainst || 0) * 1;
+        const goaliePoints = scorer.calculatePoints(player.goalieStats, true);
         return sum + goaliePoints;
       } else if (!isGoalie) {
         // Calculate from season stats (approximation for demo when matchup stats unavailable)
-        const skaterPoints = (player.stats.goals || 0) * 3 + 
-                            (player.stats.assists || 0) * 2 + 
-                            ((player.stats.powerPlayPoints || 0) * 1) +
-                            (player.stats.sog || 0) * 0.4 + 
-                            (player.stats.blk || 0) * 0.5;
+        const skaterPoints = scorer.calculatePoints(player.stats, false);
         return sum + skaterPoints;
       }
     }

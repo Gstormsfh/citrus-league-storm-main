@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MatchupPlayer } from "./types";
+import { ScoringCalculator, ScoringSettings } from "@/utils/scoringUtils";
 
 interface TeamCardProps {
   title: string;
@@ -9,15 +10,19 @@ interface TeamCardProps {
   gradientClass: string;
   slotAssignments?: Record<string, string>;
   onPlayerClick?: (player: MatchupPlayer) => void;
+  scoringSettings?: ScoringSettings;
 }
 
-export const TeamCard = ({ title, starters, bench, gradientClass, slotAssignments = {}, onPlayerClick }: TeamCardProps) => {
+export const TeamCard = ({ title, starters, bench, gradientClass, slotAssignments = {}, onPlayerClick, scoringSettings }: TeamCardProps) => {
   
-  // Helper to calculate daily points
+  // Create scoring calculator with league-specific settings
+  const scorer = new ScoringCalculator(scoringSettings);
+  
+  // Helper to calculate daily points using league scoring settings
   const getDailyPoints = (stats: { goals?: number; assists?: number; sog?: number; blk?: number }) => {
     if (!stats) return 0;
-    // Simplified calculation for demo: G=3, A=2, SOG=0.4, BLK=0.4
-    return ((stats.goals || 0) * 3 + (stats.assists || 0) * 2 + (stats.sog || 0) * 0.4 + (stats.blk || 0) * 0.4).toFixed(1);
+    // Use scorer for consistent calculation with league settings
+    return scorer.calculatePoints(stats, false).toFixed(1);
   };
 
   // Helper to split player name into first and last name (always 2 lines)

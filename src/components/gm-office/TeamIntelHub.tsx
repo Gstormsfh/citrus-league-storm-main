@@ -299,9 +299,9 @@ export const TeamIntelHub = () => {
 
   // Get heat map color for game count
   const getHeatMapColor = (count: number): string => {
-    if (count >= 4) return '#459345'; // Green
-    if (count >= 2) return '#F9E076'; // Yellow
-    return '#FF6F80'; // Red (off-night)
+    if (count >= 4) return 'hsl(142, 52%, 45%)'; // Green - good day
+    if (count >= 2) return 'hsl(45, 85%, 55%)'; // Amber - moderate day
+    return 'hsl(0, 72%, 58%)'; // Red - off-night
   };
 
   // Generate 7-day calendar (must be before useEffect that uses it)
@@ -568,52 +568,64 @@ export const TeamIntelHub = () => {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Zap className="h-5 w-5 text-citrus-orange" />
+      <Card className="border-border/50">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-semibold flex items-center gap-2 text-foreground">
+            <Zap className="h-4 w-4 text-citrus-orange" />
             Team Intel
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-6 pt-0">
           {/* Component 1: Weekly Schedule Heat Map */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                Games This Week
-              </h3>
-            </div>
-            <div className="grid grid-cols-7 gap-1">
-              {calendarDays.map((day, idx) => {
+          {calendarDays && calendarDays.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <h3 className="text-sm font-semibold text-foreground">Games This Week</h3>
+              </div>
+              <div className="grid grid-cols-7 gap-2">
+                {calendarDays.map((day, idx) => {
                 const isOffNight = day.totalGames <= 3;
                 const heatColor = getHeatMapColor(day.totalGames);
+                const isToday = day.dateStr === new Date().toISOString().split('T')[0];
+                
                 return (
                   <div
                     key={idx}
-                    className="text-center p-2 rounded-lg border-2"
-                    style={{
-                      backgroundColor: `${heatColor}20`,
-                      borderColor: isOffNight ? '#FF6F80' : `${heatColor}40`
-                    }}
+                    className={`
+                      text-center p-3 rounded-lg border transition-all
+                      ${isToday ? 'ring-2 ring-citrus-orange/50 shadow-sm' : ''}
+                      ${isOffNight 
+                        ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800' 
+                        : 'bg-muted/30 border-border hover:bg-muted/50'
+                      }
+                    `}
                   >
-                    <div className="text-xs font-medium mb-1">{day.dayLabel}</div>
-                    <div className="text-lg font-bold" style={{ color: heatColor }}>
+                    <div className="text-[10px] font-medium text-muted-foreground mb-1.5 uppercase tracking-wide">
+                      {day.dayLabel}
+                    </div>
+                    <div 
+                      className="text-2xl font-bold mb-1.5"
+                      style={{ color: heatColor }}
+                    >
                       {day.totalGames}
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      {day.rosterGames} roster
+                    <div className="text-[11px] text-muted-foreground font-medium">
+                      {day.rosterGames} on roster
                     </div>
                     {isOffNight && (
-                      <Badge className="mt-1 text-[8px] px-1 py-0 bg-citrus-orange/20 text-citrus-orange border-citrus-orange/50">
-                        Off-Night
-                      </Badge>
+                      <div className="mt-2 pt-1.5 border-t border-red-200 dark:border-red-800">
+                        <span className="text-[10px] font-semibold text-red-600 dark:text-red-400 uppercase tracking-wide">
+                          Off-Night
+                        </span>
+                      </div>
                     )}
                   </div>
                 );
               })}
             </div>
           </div>
+          )}
 
           {/* Actionable Insights */}
           {actionableInsights.length > 0 && (

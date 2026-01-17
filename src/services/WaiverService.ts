@@ -537,6 +537,99 @@ export class WaiverService {
       return [];
     }
   }
+
+  /**
+   * Process all pending waiver claims across all leagues
+   * This calls the database RPC function that handles the actual processing
+   * Can be called from:
+   * - Commissioner "Process Waivers" button
+   * - Scheduled Edge Function
+   * - Manual admin action
+   */
+  static async processAllPendingWaivers(): Promise<{
+    success: boolean;
+    results: Array<{
+      league_id: string;
+      league_name: string;
+      total_processed: number;
+      successful: number;
+      failed: number;
+      details: any[];
+    }>;
+    error?: string;
+  }> {
+    try {
+      console.log('[WaiverService] Processing all pending waivers...');
+      
+      const { data, error } = await supabase.rpc('process_all_pending_waivers');
+      
+      if (error) {
+        console.error('[WaiverService] Error processing waivers:', error);
+        return {
+          success: false,
+          results: [],
+          error: error.message
+        };
+      }
+      
+      const results = data || [];
+      
+      // Log results
+      let totalProcessed = 0;
+      let totalSuccessful = 0;
+      let totalFailed = 0;
+      
+      results.forEach((r: any) => {
+        totalProcessed += r.total_processed || 0;
+        totalSuccessful += r.successful || 0;
+        totalFailed += r.failed || 0;
+        console.log(`[WaiverService] ${r.league_name}: ${r.successful} successful, ${r.failed} failed`);
+      });
+      
+      console.log(`[WaiverService] Total: ${totalProcessed} processed, ${totalSuccessful} successful, ${totalFailed} failed`);
+      
+      return {
+        success: true,
+        results
+      };
+    } catch (error: any) {
+      console.error('[WaiverService] Error processing waivers:', error);
+      return {
+        success: false,
+        results: [],
+        error: error.message || 'Failed to process waivers'
+      };
+    }
+  }
+
+  /**
+   * Get waiver processing status for all leagues
+   * Shows pending claims count and next processing time
+   */
+  static async getWaiverProcessingStatus(): Promise<{
+    leagues: Array<{
+      league_id: string;
+      league_name: string;
+      pending_claims: number;
+      last_processed: string | null;
+      next_process_time: string | null;
+    }>;
+    error?: string;
+  }> {
+    try {
+      const { data, error } = await supabase.rpc('get_waiver_processing_status');
+      
+      if (error) {
+        console.error('[WaiverService] Error getting waiver status:', error);
+        return { leagues: [], error: error.message };
+      }
+      
+      return { leagues: data || [] };
+    } catch (error: any) {
+      console.error('[WaiverService] Error getting waiver status:', error);
+      return { leagues: [], error: error.message };
+    }
+  }
 }
 
 export default WaiverService;

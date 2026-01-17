@@ -37,6 +37,7 @@ import { CitrusBackground } from '@/components/CitrusBackground';
 import { CitrusSectionDivider } from '@/components/CitrusSectionDivider';
 import { calculateEligibleGamesRemaining } from '@/utils/rosterUtils';
 import { COLUMNS } from '@/utils/queryColumns';
+import { ScoringCalculator } from '@/utils/scoringUtils';
 
 // Debug flag - set to true only when debugging performance issues
 const DEBUG_MATCHUP = false;
@@ -44,7 +45,7 @@ const log = DEBUG_MATCHUP ? console.log.bind(console, '[Matchup]') : () => {};
 
 const Matchup = () => {
   const { user, profile, loading: authLoading } = useAuth();
-  const { userLeagueState, loading: leagueContextLoading } = useLeague();
+  const { userLeagueState, loading: leagueContextLoading, activeLeagueId, isChangingLeague } = useLeague();
   const { leagueId: urlLeagueId, weekId: urlWeekId } = useParams<{ leagueId?: string; weekId?: string }>();
   const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -88,6 +89,7 @@ const Matchup = () => {
   
   // Cache tracking to prevent unnecessary reloads
   const prevLeagueIdRef = useRef<string | undefined>(undefined);
+  const prevActiveLeagueIdRef = useRef<string | null>(null);
   const prevWeekIdRef = useRef<string | undefined>(undefined);
   const prevSelectedMatchupIdRef = useRef<string | null>(null);
   // Note: prevSelectedDateRef removed - date changes handled by separate useEffect using frozenRostersByDate
@@ -739,24 +741,13 @@ const Matchup = () => {
           // Otherwise use the actual daily points from RPC
           if (totalDailyPoints < 0.1 && team1Roster.length > 0) {
             // Try to calculate weekly totals from matchupStats (more reliable than total_points)
+            // Use league scoring settings for accurate calculation
+            const scorer = new ScoringCalculator(scoringSettings);
+            
             const myWeeklyTotal = team1Roster.reduce((sum, p) => {
               if (p.matchupStats) {
                 const isGoalie = p.position === 'G' || p.position === 'Goalie';
-                if (isGoalie) {
-                  return sum + ((p.matchupStats.wins || 0) * 4 + 
-                               (p.matchupStats.saves || 0) * 0.2 + 
-                               (p.matchupStats.shutouts || 0) * 3 - 
-                               (p.matchupStats.goals_against || 0) * 1);
-                } else {
-                  return sum + ((p.matchupStats.goals || 0) * 3 + 
-                               (p.matchupStats.assists || 0) * 2 + 
-                               ((p.matchupStats.ppp || 0) * 1) +
-                               ((p.matchupStats.shp || 0) * 2) +
-                               (p.matchupStats.sog || 0) * 0.4 + 
-                               ((p.matchupStats.blocks || 0) * 0.5) +
-                               ((p.matchupStats.hits || 0) * 0.2) +
-                               ((p.matchupStats.pim || 0) * 0.5));
-                }
+                return sum + scorer.calculatePoints(p.matchupStats, isGoalie);
               }
               // Fallback to total_points or points
               return sum + (p.total_points || p.points || 0);
@@ -765,21 +756,7 @@ const Matchup = () => {
             const oppWeeklyTotal = (team2Roster || []).reduce((sum, p) => {
               if (p.matchupStats) {
                 const isGoalie = p.position === 'G' || p.position === 'Goalie';
-                if (isGoalie) {
-                  return sum + ((p.matchupStats.wins || 0) * 4 + 
-                               (p.matchupStats.saves || 0) * 0.2 + 
-                               (p.matchupStats.shutouts || 0) * 3 - 
-                               (p.matchupStats.goals_against || 0) * 1);
-                } else {
-                  return sum + ((p.matchupStats.goals || 0) * 3 + 
-                               (p.matchupStats.assists || 0) * 2 + 
-                               ((p.matchupStats.ppp || 0) * 1) +
-                               ((p.matchupStats.shp || 0) * 2) +
-                               (p.matchupStats.sog || 0) * 0.4 + 
-                               ((p.matchupStats.blocks || 0) * 0.5) +
-                               ((p.matchupStats.hits || 0) * 0.2) +
-                               ((p.matchupStats.pim || 0) * 0.5));
-                }
+                return sum + scorer.calculatePoints(p.matchupStats, isGoalie);
               }
               // Fallback to total_points or points
               return sum + (p.total_points || p.points || 0);
@@ -851,7 +828,7 @@ const Matchup = () => {
     };
 
     loadGuestMatchup();
-  }, [userLeagueState, urlLeagueId, urlWeekId, leagueContextLoading]);
+  }, [userLeagueState, urlLeagueId, urlWeekId, leagueContextLoading, activeLeagueId]);
 
   const toHockeyPlayer = (p: MatchupPlayer, seasonStats?: any): HockeyPlayer => {
     // Use season-long stats if provided, otherwise fall back to matchup stats (shouldn't happen)
@@ -3138,6 +3115,32 @@ const Matchup = () => {
       return;
     }
     
+    // CRITICAL: Check activeLeagueId vs URL IMMEDIATELY - before any other logic
+    // This ensures league switching works even when navigating to /matchup without leagueId
+    if (activeLeagueId) {
+      // If URL has a leagueId that differs from activeLeagueId, navigate immediately (smooth, no reload)
+      if (urlLeagueId && urlLeagueId !== activeLeagueId) {
+        log(' [EARLY REDIRECT] activeLeagueId differs from URL, navigating immediately:', {
+          activeLeagueId,
+          urlLeagueId,
+          currentPath: window.location.pathname
+        });
+        const weekParam = urlWeekId ? `/${urlWeekId}` : '';
+        navigate(`/matchup/${activeLeagueId}${weekParam}`, { replace: true });
+        return;
+      }
+      // If URL has no leagueId but activeLeagueId is set, navigate to include it
+      if (!urlLeagueId) {
+        log(' [EARLY REDIRECT] activeLeagueId set but URL has no leagueId, navigating:', {
+          activeLeagueId,
+          currentPath: window.location.pathname
+        });
+        const weekParam = urlWeekId ? `/${urlWeekId}` : '';
+        navigate(`/matchup/${activeLeagueId}${weekParam}`, { replace: true });
+        return;
+      }
+    }
+    
     if (!user?.id) {
       log(' No user ID, skipping');
       setLoading(false);
@@ -3181,6 +3184,16 @@ const Matchup = () => {
     const leagueIdChanged = prevLeagueIdRef.current !== urlLeagueId;
     const weekIdChanged = prevWeekIdRef.current !== urlWeekId;
     const selectedMatchupIdChanged = prevSelectedMatchupIdRef.current !== selectedMatchupId;
+    const activeLeagueIdChanged = prevActiveLeagueIdRef.current !== activeLeagueId;
+    
+    // CRITICAL: If activeLeagueId changed, ALWAYS bypass cache and reload
+    // This ensures league switching works even if URL hasn't updated yet
+    if (activeLeagueIdChanged) {
+      log(' activeLeagueId changed, bypassing cache:', {
+        previous: prevActiveLeagueIdRef.current,
+        current: activeLeagueId
+      });
+    }
     
     // If selectedMatchupId changed, ALWAYS bypass cache and reload
     if (selectedMatchupIdChanged) {
@@ -3190,8 +3203,8 @@ const Matchup = () => {
       });
     }
     
-    // If values haven't changed AND selectedMatchupId hasn't changed, check cache
-    if (!leagueIdChanged && !weekIdChanged && !selectedMatchupIdChanged && urlLeagueId && urlWeekId) {
+    // If values haven't changed AND activeLeagueId hasn't changed AND selectedMatchupId hasn't changed, check cache
+    if (!leagueIdChanged && !weekIdChanged && !selectedMatchupIdChanged && !activeLeagueIdChanged && urlLeagueId && urlWeekId) {
       if (loadedMatchupDataRef.current && 
           loadedMatchupDataRef.current.leagueId === urlLeagueId &&
           loadedMatchupDataRef.current.weekId === urlWeekId &&
@@ -3209,6 +3222,7 @@ const Matchup = () => {
     prevLeagueIdRef.current = urlLeagueId;
     prevWeekIdRef.current = urlWeekId;
     prevSelectedMatchupIdRef.current = selectedMatchupId;
+    prevActiveLeagueIdRef.current = activeLeagueId;
     // Note: prevSelectedDateRef removed - date changes handled by separate useEffect
     
     log(' useEffect triggered - starting load', {
@@ -3217,10 +3231,12 @@ const Matchup = () => {
       userLeagueState,
       urlLeagueId,
       urlWeekId,
+      activeLeagueId,
       selectedMatchupId,
       leagueIdChanged,
       weekIdChanged,
       selectedMatchupIdChanged,
+      activeLeagueIdChanged,
       loadingRefCurrent: loadingRef.current
     });
 
@@ -3304,19 +3320,76 @@ const Matchup = () => {
         setLoading(true);
         setError(null);
 
-        // Determine which league to use (from URL or first available)
-        let targetLeagueId = urlLeagueId;
+        // Determine which league to use - PRIORITIZE activeLeagueId from context over URL
+        // This ensures that when user switches leagues, we use the selected league, not the URL
+        let targetLeagueId: string | null = null;
+        let cachedUserLeagues: League[] | null = null;
         
-        if (!targetLeagueId) {
-          log(' No leagueId in URL, fetching user leagues...');
-          // Get user's leagues if no leagueId in URL
+        // Step 1: Always prioritize activeLeagueId from LeagueContext (source of truth)
+        // CRITICAL: If activeLeagueId differs from URL, redirect IMMEDIATELY before any data loading
+        if (activeLeagueId && activeLeagueId !== urlLeagueId) {
+          log(' activeLeagueId differs from URL, redirecting immediately to sync:', {
+            activeLeagueId,
+            urlLeagueId,
+            currentPath: window.location.pathname
+          });
+          const weekParam = urlWeekId ? `/${urlWeekId}` : '';
+          // Use window.location for immediate, hard redirect to ensure URL sync
+          window.location.href = `/matchup/${activeLeagueId}${weekParam}`;
+          return;
+        }
+        
+        // Step 1b: If activeLeagueId matches URL or is set, validate it
+        if (activeLeagueId) {
+          // Validate that activeLeagueId is in user's leagues
           const { leagues: userLeagues, error: leaguesError } = await LeagueService.getUserLeagues(user.id);
+          cachedUserLeagues = userLeagues || [];
+          
           if (leaguesError) {
-            console.error('[MATCHUP] Error fetching user leagues:', leaguesError);
-            throw leaguesError;
+            console.error('[MATCHUP] Error fetching leagues for validation:', leaguesError);
+            log(' Cannot validate activeLeagueId, will fall back to URL league');
+          } else {
+            const isValidLeague = userLeagues?.some(l => l.id === activeLeagueId);
+            if (isValidLeague) {
+              targetLeagueId = activeLeagueId;
+              log(' Using activeLeagueId from LeagueContext:', targetLeagueId);
+            } else {
+              log(' activeLeagueId not found in user leagues, will fall back to URL:', activeLeagueId);
+            }
           }
-
-          if (userLeagues.length === 0) {
+        }
+        
+        // Step 2: Fall back to URL leagueId if activeLeagueId not set or invalid
+        if (!targetLeagueId && urlLeagueId) {
+          targetLeagueId = urlLeagueId;
+          log(' Using leagueId from URL path:', targetLeagueId);
+        }
+        
+        // Step 3: If still no targetLeagueId, check activeLeagueId one more time before falling back
+        if (!targetLeagueId) {
+          // Last chance: if activeLeagueId is set, use it (even if validation failed earlier)
+          if (activeLeagueId) {
+            log(' No targetLeagueId but activeLeagueId is set, using it:', activeLeagueId);
+            targetLeagueId = activeLeagueId;
+            const weekParam = urlWeekId ? `/${urlWeekId}` : '';
+            window.location.href = `/matchup/${targetLeagueId}${weekParam}`;
+            return;
+          }
+          
+          log(' No leagueId available, fetching user leagues to use first league...');
+          
+          // Fetch user's leagues if not already cached
+          if (!cachedUserLeagues) {
+            const { leagues: userLeagues, error: leaguesError } = await LeagueService.getUserLeagues(user.id);
+            cachedUserLeagues = userLeagues || [];
+            
+            if (leaguesError) {
+              console.error('[MATCHUP] Error fetching user leagues:', leaguesError);
+              throw leaguesError;
+            }
+          }
+          
+          if (cachedUserLeagues.length === 0) {
             console.error('[MATCHUP] User has no leagues');
             setError('You are not in any leagues');
             setLoading(false);
@@ -3324,20 +3397,33 @@ const Matchup = () => {
             return;
           }
 
-          // Use first league and redirect to URL with leagueId
-          const currentLeague = userLeagues[0];
+          // Use first league as fallback ONLY if activeLeagueId is not set
+          const currentLeague = cachedUserLeagues[0];
           targetLeagueId = currentLeague.id;
-          log(' Redirecting to league:', targetLeagueId);
+          log(' Using first league as fallback (no activeLeagueId):', targetLeagueId);
           
-          // Redirect to URL with leagueId (and weekId if available) - use window.location to avoid loops
+          // Redirect to URL with leagueId (and weekId if available)
           const weekParam = urlWeekId ? `/${urlWeekId}` : '';
           window.location.href = `/matchup/${targetLeagueId}${weekParam}`;
           return;
         }
 
         log(' LeagueId from URL:', targetLeagueId);
-        // Get league data
-        const { leagues: userLeagues, error: leagueError } = await LeagueService.getUserLeagues(user.id);
+        // Get league data (reuse cached if available)
+        let userLeagues: League[] = [];
+        let leagueError: any = null;
+        
+        if (cachedUserLeagues) {
+          // Reuse leagues fetched during validation
+          userLeagues = cachedUserLeagues;
+          log(' Reusing cached user leagues from validation');
+        } else {
+          // Fetch leagues if not already cached
+          const result = await LeagueService.getUserLeagues(user.id);
+          userLeagues = result.leagues || [];
+          leagueError = result.error;
+        }
+        
         if (leagueError) {
           console.error('[MATCHUP] Error fetching leagues for validation:', leagueError);
           throw leagueError;
@@ -3346,7 +3432,20 @@ const Matchup = () => {
         const currentLeague = userLeagues.find((l: League) => l.id === targetLeagueId);
         if (!currentLeague) {
           console.error('[MATCHUP] League not found in user leagues:', targetLeagueId);
-          setError('League not found');
+          
+          // If activeLeagueId is set and different, try using it
+          if (activeLeagueId && activeLeagueId !== targetLeagueId) {
+            const validLeague = userLeagues.find(l => l.id === activeLeagueId);
+            if (validLeague) {
+              log(' Redirecting to activeLeagueId:', activeLeagueId);
+              const weekParam = urlWeekId ? `/${urlWeekId}` : '';
+              navigate(`/matchup/${activeLeagueId}${weekParam}`, { replace: true });
+              return;
+            }
+          }
+          
+          // If no valid league found, show error but don't redirect to create-league
+          setError('League not found. Please select a valid league.');
           setLoading(false);
           loadingRef.current = false;
           return;
@@ -3358,7 +3457,7 @@ const Matchup = () => {
         // Check if draft is completed
         if (currentLeague.draft_status !== 'completed') {
           log(' Draft not completed, cannot view matchups');
-          setError('Draft must be completed before viewing matchups');
+          setError(`Draft must be completed before viewing matchups. Current status: ${currentLeague.draft_status}. League: ${currentLeague.name}`);
           setLoading(false);
           loadingRef.current = false;
           return;
@@ -4747,6 +4846,7 @@ const Matchup = () => {
                     // Fallback to opponentTeamPoints
                     return parseFloat(opponentTeamPoints || '0');
                   })()}
+                  scoringSettings={scoringSettings}
                 />
               </>
             )}

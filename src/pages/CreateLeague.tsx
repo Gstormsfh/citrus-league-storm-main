@@ -39,7 +39,6 @@ const CreateLeague = () => {
   const [draftRounds, setDraftRounds] = useState("21");
   const [scoringType, setScoringType] = useState("h2h-points");
   const [draftType, setDraftType] = useState("snake");
-  const [isPublic, setIsPublic] = useState(false);
 
   // Join League Form State
   const [joinCode, setJoinCode] = useState("");
@@ -59,31 +58,23 @@ const CreateLeague = () => {
     }
   }, [searchParams]);
 
-  // Consolidated Stats State (Standard + Fun)
+  // Only tracked stats (removed unsupported: fights, hat tricks, broken sticks, etc.)
   const [leagueStats, setLeagueStats] = useState([
-    // Standard Scoring
+    // Skater Stats (actually tracked in database)
     { id: "g", name: "Goals", points: 3, default: true, category: "Offense", enabled: true },
     { id: "a", name: "Assists", points: 2, default: true, category: "Offense", enabled: true },
     { id: "ppp", name: "Power Play Points", points: 1, default: true, category: "Offense", enabled: true },
+    { id: "shg", name: "Shorthanded Points", points: 2, default: true, category: "Offense", enabled: true },
     { id: "sog", name: "Shots on Goal", points: 0.4, default: true, category: "Offense", enabled: true },
     { id: "blk", name: "Blocks", points: 0.5, default: true, category: "Defense", enabled: true },
     { id: "hit", name: "Hits", points: 0.2, default: true, category: "Defense", enabled: true },
+    { id: "pim", name: "Penalty Minutes", points: 0.5, default: false, category: "Defense", enabled: false },
+    
+    // Goalie Stats (actually tracked in database)
     { id: "w", name: "Wins", points: 4, default: true, category: "Goalie", enabled: true },
     { id: "so", name: "Shutouts", points: 3, default: true, category: "Goalie", enabled: true },
     { id: "sv", name: "Saves", points: 0.2, default: true, category: "Goalie", enabled: true },
     { id: "ga", name: "Goals Against", points: -1, default: true, category: "Goalie", enabled: true },
-    
-    // Fun / Extra Stats
-    { id: "pim", name: "Penalty Minutes", points: 0.5, default: false, category: "Fun", enabled: false },
-    { id: "fights", name: "Fights (Majors)", points: 5, default: false, category: "Fun", enabled: false },
-    { id: "hat", name: "Hat Tricks", points: 10, default: false, category: "Fun", enabled: false },
-    { id: "ghg", name: "Gordie Howe Hat Trick", points: 15, default: false, category: "Fun", enabled: false },
-    { id: "shg", name: "Shorthanded Goals", points: 2, default: false, category: "Offense", enabled: false },
-    { id: "gwg", name: "Game Winning Goals", points: 1, default: false, category: "Offense", enabled: false },
-    { id: "otg", name: "OT Goals", points: 2, default: false, category: "Offense", enabled: false },
-    { id: "def_g", name: "Defender Goals", points: 1, default: false, category: "Defense", enabled: false },
-    { id: "goalie_g", name: "Goalie Goals", points: 50, default: false, category: "Goalie", enabled: false },
-    { id: "bs", name: "Broken Sticks", points: 1, default: false, category: "Fun", enabled: false },
   ]);
 
   const handleStatToggle = (id: string) => {
@@ -124,10 +115,29 @@ const CreateLeague = () => {
       const enabledStats = leagueStats.filter(s => s.enabled);
       const settings = {
         teamsCount: parseInt(teamsCount),
-        scoringType,
-        draftType,
-        isPublic,
+        scoringType: "h2h-points", // Only implemented format
+        draftType: "snake", // Only implemented format
         stats: enabledStats,
+      };
+
+      // Transform leagueStats array to scoring_settings JSONB format
+      const scoringSettings = {
+        skater: {
+          goals: leagueStats.find(s => s.id === 'g')?.points || 3,
+          assists: leagueStats.find(s => s.id === 'a')?.points || 2,
+          power_play_points: leagueStats.find(s => s.id === 'ppp')?.points || 1,
+          short_handed_points: leagueStats.find(s => s.id === 'shg')?.points || 2,
+          shots_on_goal: leagueStats.find(s => s.id === 'sog')?.points || 0.4,
+          blocks: leagueStats.find(s => s.id === 'blk')?.points || 0.5,
+          hits: leagueStats.find(s => s.id === 'hit')?.points || 0.2,
+          penalty_minutes: leagueStats.find(s => s.id === 'pim')?.points || 0.5
+        },
+        goalie: {
+          wins: leagueStats.find(s => s.id === 'w')?.points || 4,
+          shutouts: leagueStats.find(s => s.id === 'so')?.points || 3,
+          saves: leagueStats.find(s => s.id === 'sv')?.points || 0.2,
+          goals_against: leagueStats.find(s => s.id === 'ga')?.points || -1
+        }
       };
 
       const { league, team, error: createError } = await LeagueService.createLeague(
@@ -135,7 +145,8 @@ const CreateLeague = () => {
         user.id,
         21, // Roster size per team
         parseInt(draftRounds), // Draft rounds from user selection
-        settings
+        settings,
+        scoringSettings // Pass transformed scoring settings
       );
 
       if (createError) throw createError;
@@ -220,7 +231,6 @@ const CreateLeague = () => {
     Offense: leagueStats.filter(s => s.category === "Offense"),
     Defense: leagueStats.filter(s => s.category === "Defense"),
     Goalie: leagueStats.filter(s => s.category === "Goalie"),
-    Fun: leagueStats.filter(s => s.category === "Fun"),
   };
 
   return (
@@ -315,23 +325,45 @@ const CreateLeague = () => {
 
                     <div className="space-y-3">
                       <Label htmlFor="scoring-type" className="text-base">Scoring Format</Label>
-                      <Select value={scoringType} onValueChange={setScoringType}>
+                      <Select value={scoringType} onValueChange={setScoringType} disabled>
                         <SelectTrigger id="scoring-type" className="h-12">
                           <SelectValue placeholder="Select format" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="h2h-points">Head-to-Head Points</SelectItem>
-                          <SelectItem value="h2h-categories">Head-to-Head Categories</SelectItem>
-                          <SelectItem value="roto">Rotisserie</SelectItem>
-                          <SelectItem value="season-points">Total Season Points</SelectItem>
+                          <SelectItem value="h2h-points">
+                            <div className="flex items-center gap-2">
+                              Head-to-Head Points
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="h2h-categories" disabled>
+                            <div className="flex items-center gap-2">
+                              Head-to-Head Categories
+                              <Badge variant="secondary" className="ml-auto">Coming Soon</Badge>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="roto" disabled>
+                            <div className="flex items-center gap-2">
+                              Rotisserie
+                              <Badge variant="secondary" className="ml-auto">Coming Soon</Badge>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="season-points" disabled>
+                            <div className="flex items-center gap-2">
+                              Total Season Points
+                              <Badge variant="secondary" className="ml-auto">Coming Soon</Badge>
+                            </div>
+                          </SelectItem>
                         </SelectContent>
                       </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Head-to-Head Points is currently available. Other formats coming soon!
+                      </p>
                     </div>
                   </div>
                 </div>
 
-                {/* Draft & Privacy Settings */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-2">
+                {/* Draft Settings */}
+                <div className="pt-2">
                   <div className="space-y-4">
                     <Label className="text-base font-semibold">Draft Type</Label>
                     <RadioGroup value={draftType} onValueChange={setDraftType} className="grid grid-cols-1 gap-3">
@@ -347,33 +379,22 @@ const CreateLeague = () => {
                           </div>
                         </Label>
                       </div>
-                      <div>
-                        <RadioGroupItem value="auction" id="auction" className="peer sr-only" />
+                      <div className="relative">
+                        <RadioGroupItem value="auction" id="auction" className="peer sr-only" disabled />
                         <Label
                           htmlFor="auction"
-                          className="flex items-center justify-between rounded-xl border-2 border-muted bg-transparent p-3 hover:bg-muted/20 hover:border-primary/50 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 cursor-pointer transition-all"
+                          className="flex items-center justify-between rounded-xl border-2 border-muted bg-transparent p-3 opacity-60 cursor-not-allowed transition-all"
                         >
                           <div className="flex items-center gap-3">
-                            <Users className="h-5 w-5 text-muted-foreground peer-data-[state=checked]:text-primary" />
+                            <Users className="h-5 w-5 text-muted-foreground" />
                             <span className="font-semibold">Auction Draft</span>
+                            <Badge variant="secondary" className="ml-auto">Coming Soon</Badge>
                           </div>
                         </Label>
                       </div>
                     </RadioGroup>
                   </div>
 
-                  <div className="space-y-4">
-                    <Label className="text-base font-semibold">Privacy</Label>
-                    <div className="bg-muted/30 p-4 rounded-xl flex items-center justify-between h-[100px] border border-border/50">
-                      <div className="space-y-0.5">
-                        <Label className="text-base">Public League</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Anyone can join this league
-                        </p>
-                      </div>
-                      <Switch checked={isPublic} onCheckedChange={setIsPublic} />
-                    </div>
-                  </div>
                 </div>
 
                 <div className="border-t pt-6">
@@ -391,7 +412,6 @@ const CreateLeague = () => {
                     {Object.entries(statsByCategory).map(([category, stats]) => (
                       <div key={category} className="space-y-3">
                         <h4 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                          {category === 'Fun' && <span className="text-lg">🎉</span>}
                           {category} Stats
                         </h4>
                         <div className="bg-card rounded-xl border shadow-sm overflow-hidden">

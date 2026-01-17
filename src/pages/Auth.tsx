@@ -7,28 +7,72 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Mail, Lock } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Loader2, Mail, Lock, HelpCircle, Chrome, Apple } from 'lucide-react';
+import { PasswordStrength } from '@/components/auth/PasswordStrength';
+import { Separator } from '@/components/ui/separator';
 
 const Auth = () => {
   const navigate = useNavigate();
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, resetPassword, signInWithOAuth } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState(false);
+
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const getBetterErrorMessage = (errorMessage: string): string => {
+    const lower = errorMessage.toLowerCase();
+    
+    if (lower.includes('invalid login') || lower.includes('invalid credentials')) {
+      return 'Invalid email or password. Please check and try again.';
+    }
+    if (lower.includes('email not confirmed') || lower.includes('email not verified')) {
+      return 'Please verify your email address. Check your inbox for the verification link.';
+    }
+    if (lower.includes('too many requests')) {
+      return 'Too many attempts. Please wait a few minutes before trying again.';
+    }
+    if (lower.includes('password')) {
+      return errorMessage;
+    }
+    if (lower.includes('email')) {
+      return 'Invalid email address. Please check and try again.';
+    }
+    
+    return errorMessage;
+  };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (!validateEmail(email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
     setLoading(true);
 
     const { error } = await signIn(email, password);
     
     if (error) {
-      setError(error.message);
+      setError(getBetterErrorMessage(error.message));
       setLoading(false);
     } else {
+      // Navigate to profile setup - it will redirect if profile is already complete
       navigate('/profile-setup');
     }
   };
@@ -36,6 +80,11 @@ const Auth = () => {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (!validateEmail(email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
 
     if (password !== confirmPassword) {
       setError('Passwords do not match');
@@ -53,19 +102,13 @@ const Auth = () => {
       const { data, error } = await signUp(email, password);
       
       if (error) {
-        // Handle specific error cases
-        let errorMessage = error.message || 'An error occurred during signup';
+        let errorMessage = getBetterErrorMessage(error.message || 'An error occurred during signup');
         
-        // Check for existing user errors
         if (error.message?.toLowerCase().includes('already registered') || 
             error.message?.toLowerCase().includes('already exists') ||
             error.message?.toLowerCase().includes('user already registered') ||
             error.message?.toLowerCase().includes('email address is already in use')) {
           errorMessage = 'This email already has an account. Please sign in instead.';
-        } else if (error.message?.includes('Password')) {
-          errorMessage = error.message;
-        } else if (error.message?.includes('email')) {
-          errorMessage = 'Invalid email address. Please check and try again.';
         }
         
         setError(errorMessage);
@@ -75,9 +118,7 @@ const Auth = () => {
       
       // If email confirmation is required, show message
       if (data?.user && !data?.session) {
-        // Show success message (using error state for visibility, but it's actually a success)
-        setError('Please check your email to confirm your account, then sign in.');
-        // Reset form
+        setError('Please check your email to verify your account, then sign in.');
         setEmail('');
         setPassword('');
         setConfirmPassword('');
@@ -86,15 +127,57 @@ const Auth = () => {
         // User is automatically signed in (if email confirmation is disabled)
         navigate('/profile-setup');
       } else {
-        // Fallback - shouldn't happen but handle it
         setError('Account created! Please sign in.');
         setLoading(false);
       }
     } catch (err: unknown) {
-      // Catch any unexpected errors
       const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.';
       setError(errorMessage);
       setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!resetEmail || !validateEmail(resetEmail)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    setResetLoading(true);
+    setError(null);
+
+    try {
+      const { error } = await resetPassword(resetEmail);
+      
+      if (error) {
+        setError(getBetterErrorMessage(error.message || 'Failed to send reset email'));
+      } else {
+        setResetSuccess(true);
+      }
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred.';
+      setError(errorMessage);
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  const handleOAuthSignIn = async (provider: 'google' | 'apple') => {
+    setOauthLoading(provider);
+    setError(null);
+
+    try {
+      const { error } = await signInWithOAuth(provider);
+      
+      if (error) {
+        setError(getBetterErrorMessage(error.message || `Failed to sign in with ${provider}`));
+        setOauthLoading(null);
+      }
+      // OAuth redirects away, so we don't need to handle success here
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred.';
+      setError(errorMessage);
+      setOauthLoading(null);
     }
   };
 
@@ -115,7 +198,48 @@ const Auth = () => {
                 <TabsTrigger value="signup">Sign Up</TabsTrigger>
               </TabsList>
               
-              <TabsContent value="signin">
+              <TabsContent value="signin" className="space-y-4">
+                {/* OAuth Buttons */}
+                <div className="space-y-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => handleOAuthSignIn('google')}
+                    disabled={loading || oauthLoading !== null}
+                  >
+                    {oauthLoading === 'google' ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Chrome className="mr-2 h-4 w-4" />
+                    )}
+                    Sign in with Google
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => handleOAuthSignIn('apple')}
+                    disabled={loading || oauthLoading !== null}
+                  >
+                    {oauthLoading === 'apple' ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Apple className="mr-2 h-4 w-4" />
+                    )}
+                    Sign in with Apple
+                  </Button>
+                </div>
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <Separator />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">Or continue with email</span>
+                  </div>
+                </div>
+
                 <form onSubmit={handleSignIn} className="space-y-4">
                   {error && (
                     <Alert variant="destructive">
@@ -132,7 +256,10 @@ const Auth = () => {
                         type="email"
                         placeholder="you@example.com"
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        onChange={(e) => {
+                          setEmail(e.target.value);
+                          setError(null);
+                        }}
                         className="pl-10"
                         required
                       />
@@ -140,7 +267,75 @@ const Auth = () => {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="signin-password">Password</Label>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="signin-password">Password</Label>
+                      <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+                        <DialogTrigger asChild>
+                          <button
+                            type="button"
+                            className="text-xs text-primary hover:underline flex items-center gap-1"
+                            onClick={() => {
+                              setResetEmail(email);
+                              setResetSuccess(false);
+                              setError(null);
+                            }}
+                          >
+                            <HelpCircle className="h-3 w-3" />
+                            Forgot password?
+                          </button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Reset Password</DialogTitle>
+                            <DialogDescription>
+                              Enter your email address and we'll send you a link to reset your password.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4 py-4">
+                            {resetSuccess ? (
+                              <Alert>
+                                <AlertDescription>
+                                  Password reset email sent! Check your inbox and click the link to reset your password.
+                                </AlertDescription>
+                              </Alert>
+                            ) : (
+                              <>
+                                <div className="space-y-2">
+                                  <Label htmlFor="reset-email">Email</Label>
+                                  <Input
+                                    id="reset-email"
+                                    type="email"
+                                    placeholder="you@example.com"
+                                    value={resetEmail}
+                                    onChange={(e) => setResetEmail(e.target.value)}
+                                    required
+                                  />
+                                </div>
+                                {error && (
+                                  <Alert variant="destructive">
+                                    <AlertDescription>{error}</AlertDescription>
+                                  </Alert>
+                                )}
+                                <Button
+                                  onClick={handleForgotPassword}
+                                  disabled={resetLoading}
+                                  className="w-full"
+                                >
+                                  {resetLoading ? (
+                                    <>
+                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                      Sending...
+                                    </>
+                                  ) : (
+                                    'Send Reset Link'
+                                  )}
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
                     <div className="relative">
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
@@ -148,14 +343,28 @@ const Auth = () => {
                         type="password"
                         placeholder="••••••••"
                         value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        onChange={(e) => {
+                          setPassword(e.target.value);
+                          setError(null);
+                        }}
                         className="pl-10"
                         required
                       />
                     </div>
                   </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="remember-me"
+                      checked={rememberMe}
+                      onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+                    />
+                    <Label htmlFor="remember-me" className="text-sm font-normal cursor-pointer">
+                      Remember me
+                    </Label>
+                  </div>
                   
-                  <Button type="submit" className="w-full" disabled={loading}>
+                  <Button type="submit" className="w-full" disabled={loading || oauthLoading !== null}>
                     {loading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -168,7 +377,48 @@ const Auth = () => {
                 </form>
               </TabsContent>
               
-              <TabsContent value="signup">
+              <TabsContent value="signup" className="space-y-4">
+                {/* OAuth Buttons */}
+                <div className="space-y-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => handleOAuthSignIn('google')}
+                    disabled={loading || oauthLoading !== null}
+                  >
+                    {oauthLoading === 'google' ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Chrome className="mr-2 h-4 w-4" />
+                    )}
+                    Sign up with Google
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => handleOAuthSignIn('apple')}
+                    disabled={loading || oauthLoading !== null}
+                  >
+                    {oauthLoading === 'apple' ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Apple className="mr-2 h-4 w-4" />
+                    )}
+                    Sign up with Apple
+                  </Button>
+                </div>
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <Separator />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">Or continue with email</span>
+                  </div>
+                </div>
+
                 <form onSubmit={handleSignUp} className="space-y-4">
                   {error && (
                     <Alert variant="destructive">
@@ -185,7 +435,10 @@ const Auth = () => {
                         type="email"
                         placeholder="you@example.com"
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        onChange={(e) => {
+                          setEmail(e.target.value);
+                          setError(null);
+                        }}
                         className="pl-10"
                         required
                       />
@@ -201,12 +454,16 @@ const Auth = () => {
                         type="password"
                         placeholder="••••••••"
                         value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        onChange={(e) => {
+                          setPassword(e.target.value);
+                          setError(null);
+                        }}
                         className="pl-10"
                         required
                         minLength={6}
                       />
                     </div>
+                    {password && <PasswordStrength password={password} />}
                   </div>
                   
                   <div className="space-y-2">
@@ -218,14 +475,17 @@ const Auth = () => {
                         type="password"
                         placeholder="••••••••"
                         value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        onChange={(e) => {
+                          setConfirmPassword(e.target.value);
+                          setError(null);
+                        }}
                         className="pl-10"
                         required
                       />
                     </div>
                   </div>
                   
-                  <Button type="submit" className="w-full" disabled={loading}>
+                  <Button type="submit" className="w-full" disabled={loading || oauthLoading !== null}>
                     {loading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -246,4 +506,3 @@ const Auth = () => {
 };
 
 export default Auth;
-

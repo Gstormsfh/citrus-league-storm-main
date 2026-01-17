@@ -9,6 +9,7 @@ import { ScheduleService, NHLGame, GameInfo } from './ScheduleService';
 import { withTimeout } from '@/utils/promiseUtils';
 import { getTodayMST, getTodayMSTDate } from '@/utils/timezoneUtils';
 import { COLUMNS } from '@/utils/queryColumns';
+import { ScoringCalculator, extractScoringSettings } from '@/utils/scoringUtils';
 
 // Roster cache for performance optimization
 interface RosterCacheEntry {
@@ -1721,6 +1722,11 @@ export const MatchupService = {
         };
       }
 
+      // Get league to access scoring settings
+      const { league } = await LeagueService.getLeague(matchup.league_id);
+      const scoringSettings = extractScoringSettings(league);
+      const scorer = new ScoringCalculator(scoringSettings);
+
       // Get week date range
       const weekStart = new Date(matchup.week_start_date);
       const weekEnd = new Date(matchup.week_end_date);
@@ -2140,12 +2146,11 @@ export const MatchupService = {
           // Merge matchup line data if available
           const matchupLine = matchupLines.get(playerId);
           
-          // Helper function to calculate matchup week points from stats
+          // Helper function to calculate matchup week points from stats using league scoring settings
           const calculateMatchupWeekPoints = (stats: any, isGoalie: boolean = false): number => {
             if (!stats) return 0;
             
             if (isGoalie && (stats.wins !== undefined || stats.saves !== undefined)) {
-              // Goalie scoring: Wins=4, Saves=0.2, Shutouts=3, GA=-1
               // Validate that stats are for a week, not season
               const MAX_REASONABLE_WEEK_WINS = 7;
               const MAX_REASONABLE_WEEK_SAVES = 300;
@@ -2156,16 +2161,10 @@ export const MatchupService = {
                 return 0; // Reject season totals from RPC
               }
               
-              // Goalie fantasy scoring using default weights (Wins=4, Saves=0.2, Shutouts=3, GA=-1)
-              return ((stats.wins || 0) * 4) + 
-                      ((stats.saves || 0) * 0.2) + 
-                      ((stats.shutouts || 0) * 3) + 
-                      ((stats.goals_against || 0) * -1);
+              // Use scorer with league-specific settings
+              return scorer.calculatePoints(stats, true);
             } else {
-              // Skater scoring: ALL 8 categories (Goals=3, Assists=2, PPP=1, SHP=2, SOG=0.4, Blocks=0.5, Hits=0.2, PIM=0.5)
-              // CRITICAL: Validate that stats are for a week, not season
-              // For a single week, max should be: ~7 goals, ~10 assists, ~30 SOG (very high week)
-              // If stats are too high, RPC returned season totals - reject them
+              // Validate that stats are for a week, not season
               const MAX_REASONABLE_WEEK_GOALS = 10;
               const MAX_REASONABLE_WEEK_ASSISTS = 15;
               const MAX_REASONABLE_WEEK_SOG = 40;
@@ -2177,17 +2176,8 @@ export const MatchupService = {
                 return 0; // Reject season totals from RPC
               }
               
-              // CRITICAL: Use blocks from matchup week stats, NOT season stats
-              // Skater scoring: ALL 8 categories (default weights match leagues.scoring_settings)
-              const blocks = stats.blocks || 0; // Get from matchup week stats
-              return (stats.goals * 3) + 
-                     (stats.assists * 2) + 
-                     ((stats.ppp || 0) * 1) +        // Power Play Points
-                     ((stats.shp || 0) * 2) +        // Shorthanded Points
-                     (stats.sog * 0.4) + 
-                     (blocks * 0.5) +                // Updated default to 0.5 to match migration
-                     ((stats.hits || 0) * 0.2) +     // Hits
-                     ((stats.pim || 0) * 0.5);       // Penalty Minutes
+              // Use scorer with league-specific settings
+              return scorer.calculatePoints(stats, false);
             }
           };
           
@@ -2329,98 +2319,8 @@ export const MatchupService = {
             if (matchupStats) {
               const isGoaliePlayer = p.position === 'G' || p.position === 'Goalie';
               
-              if (isGoaliePlayer && (matchupStats.wins !== undefined || matchupStats.saves !== undefined)) {
-                // Goalie breakdown
-                const winsPoints = (matchupStats.wins || 0) * 4;
-                const savesPoints = (matchupStats.saves || 0) * 0.2;
-                const shutoutsPoints = (matchupStats.shutouts || 0) * 3;
-                const gaPoints = (matchupStats.goals_against || 0) * -1;
-                
-                transformed.stats_breakdown = {
-                  'Wins': {
-                    count: matchupStats.wins || 0,
-                    points: winsPoints,
-                    logic: `${matchupStats.wins || 0} wins * 4.0 points`
-                  },
-                  'Saves': {
-                    count: matchupStats.saves || 0,
-                    points: savesPoints,
-                    logic: `${matchupStats.saves || 0} saves * 0.2 points`
-                  },
-                  'Shutouts': {
-                    count: matchupStats.shutouts || 0,
-                    points: shutoutsPoints,
-                    logic: `${matchupStats.shutouts || 0} shutouts * 3.0 points`
-                  },
-                  'Goals Against': {
-                    count: matchupStats.goals_against || 0,
-                    points: gaPoints,
-                    logic: `${matchupStats.goals_against || 0} GA * -1.0 points`
-                  }
-                };
-              } else {
-                // Skater breakdown
-                // Calculate points for ALL 8 stat categories
-                const goalsPoints = (matchupStats.goals || 0) * 3;
-                const assistsPoints = (matchupStats.assists || 0) * 2;
-                const pppPoints = ((matchupStats.ppp || 0) * 1);
-                const shpPoints = ((matchupStats.shp || 0) * 2);
-                const sogPoints = (matchupStats.sog || 0) * 0.4;
-                const blocksPoints = (matchupStats.blocks || 0) * 0.5;
-                const hitsPoints = ((matchupStats.hits || 0) * 0.2);
-                const pimPoints = ((matchupStats.pim || 0) * 0.5);
-                
-                transformed.stats_breakdown = {
-                  'Goals': {
-                    count: matchupStats.goals || 0,
-                    points: goalsPoints,
-                    logic: `${matchupStats.goals || 0} goals * 3.0 points`
-                  },
-                  'Assists': {
-                    count: matchupStats.assists || 0,
-                    points: assistsPoints,
-                    logic: `${matchupStats.assists || 0} assists * 2.0 points`
-                  },
-                  ...((matchupStats.ppp || 0) > 0 ? {
-                    'Power Play Points': {
-                      count: matchupStats.ppp || 0,
-                      points: pppPoints,
-                      logic: `${matchupStats.ppp || 0} PPP * 1.0 points`
-                    }
-                  } : {}),
-                  ...((matchupStats.shp || 0) > 0 ? {
-                    'Shorthanded Points': {
-                      count: matchupStats.shp || 0,
-                      points: shpPoints,
-                      logic: `${matchupStats.shp || 0} SHP * 2.0 points`
-                    }
-                  } : {}),
-                  'Shots on Goal': {
-                    count: matchupStats.sog || 0,
-                    points: sogPoints,
-                    logic: `${matchupStats.sog || 0} shots * 0.4 points`
-                  },
-                  'Blocks': {
-                    count: matchupStats.blocks || 0,
-                    points: blocksPoints,
-                    logic: `${matchupStats.blocks || 0} blocks * 0.5 points`
-                  },
-                  ...((matchupStats.hits || 0) > 0 ? {
-                    'Hits': {
-                      count: matchupStats.hits || 0,
-                      points: hitsPoints,
-                      logic: `${matchupStats.hits || 0} hits * 0.2 points`
-                    }
-                  } : {}),
-                  ...((matchupStats.pim || 0) > 0 ? {
-                    'Penalty Minutes': {
-                      count: matchupStats.pim || 0,
-                      points: pimPoints,
-                      logic: `${matchupStats.pim || 0} PIM * 0.5 points`
-                    }
-                  } : {})
-                };
-              }
+              // Use scorer to generate stat breakdown with league-specific settings
+              transformed.stats_breakdown = scorer.getStatBreakdown(matchupStats, isGoaliePlayer);
             } else {
               // No weekly stats - player didn't play, breakdown should be empty/undefined
               transformed.stats_breakdown = undefined;
@@ -2434,100 +2334,9 @@ export const MatchupService = {
             transformed.total_points = calculatedPoints;
             transformed.points = calculatedPoints; // Use matchup week points, not season
             
-            // Calculate stats_breakdown from weekly matchupStats
+            // Calculate stats_breakdown from weekly matchupStats using league scoring settings
             if (matchupStats) {
-              if (isGoaliePlayer && (matchupStats.wins !== undefined || matchupStats.saves !== undefined)) {
-                // Goalie breakdown
-                const winsPoints = (matchupStats.wins || 0) * 4;
-                const savesPoints = (matchupStats.saves || 0) * 0.2;
-                const shutoutsPoints = (matchupStats.shutouts || 0) * 3;
-                const gaPoints = (matchupStats.goals_against || 0) * -1;
-                
-                transformed.stats_breakdown = {
-                  'Wins': {
-                    count: matchupStats.wins || 0,
-                    points: winsPoints,
-                    logic: `${matchupStats.wins || 0} wins * 4.0 points`
-                  },
-                  'Saves': {
-                    count: matchupStats.saves || 0,
-                    points: savesPoints,
-                    logic: `${matchupStats.saves || 0} saves * 0.2 points`
-                  },
-                  'Shutouts': {
-                    count: matchupStats.shutouts || 0,
-                    points: shutoutsPoints,
-                    logic: `${matchupStats.shutouts || 0} shutouts * 3.0 points`
-                  },
-                  'Goals Against': {
-                    count: matchupStats.goals_against || 0,
-                    points: gaPoints,
-                    logic: `${matchupStats.goals_against || 0} GA * -1.0 points`
-                  }
-                };
-              } else {
-                // Skater breakdown
-                // Calculate points for ALL 8 stat categories
-                const goalsPoints = (matchupStats.goals || 0) * 3;
-                const assistsPoints = (matchupStats.assists || 0) * 2;
-                const pppPoints = ((matchupStats.ppp || 0) * 1);
-                const shpPoints = ((matchupStats.shp || 0) * 2);
-                const sogPoints = (matchupStats.sog || 0) * 0.4;
-                const blocksPoints = (matchupStats.blocks || 0) * 0.5;
-                const hitsPoints = ((matchupStats.hits || 0) * 0.2);
-                const pimPoints = ((matchupStats.pim || 0) * 0.5);
-                
-                transformed.stats_breakdown = {
-                  'Goals': {
-                    count: matchupStats.goals || 0,
-                    points: goalsPoints,
-                    logic: `${matchupStats.goals || 0} goals * 3.0 points`
-                  },
-                  'Assists': {
-                    count: matchupStats.assists || 0,
-                    points: assistsPoints,
-                    logic: `${matchupStats.assists || 0} assists * 2.0 points`
-                  },
-                  ...((matchupStats.ppp || 0) > 0 ? {
-                    'Power Play Points': {
-                      count: matchupStats.ppp || 0,
-                      points: pppPoints,
-                      logic: `${matchupStats.ppp || 0} PPP * 1.0 points`
-                    }
-                  } : {}),
-                  ...((matchupStats.shp || 0) > 0 ? {
-                    'Shorthanded Points': {
-                      count: matchupStats.shp || 0,
-                      points: shpPoints,
-                      logic: `${matchupStats.shp || 0} SHP * 2.0 points`
-                    }
-                  } : {}),
-                  'Shots on Goal': {
-                    count: matchupStats.sog || 0,
-                    points: sogPoints,
-                    logic: `${matchupStats.sog || 0} shots * 0.4 points`
-                  },
-                  'Blocks': {
-                    count: matchupStats.blocks || 0,
-                    points: blocksPoints,
-                    logic: `${matchupStats.blocks || 0} blocks * 0.5 points`
-                  },
-                  ...((matchupStats.hits || 0) > 0 ? {
-                    'Hits': {
-                      count: matchupStats.hits || 0,
-                      points: hitsPoints,
-                      logic: `${matchupStats.hits || 0} hits * 0.2 points`
-                    }
-                  } : {}),
-                  ...((matchupStats.pim || 0) > 0 ? {
-                    'Penalty Minutes': {
-                      count: matchupStats.pim || 0,
-                      points: pimPoints,
-                      logic: `${matchupStats.pim || 0} PIM * 0.5 points`
-                    }
-                  } : {})
-                };
-              }
+              transformed.stats_breakdown = scorer.getStatBreakdown(matchupStats, isGoaliePlayer);
             } else {
               transformed.stats_breakdown = undefined;
             }
@@ -2601,12 +2410,11 @@ export const MatchupService = {
           // Merge matchup line data if available
           const matchupLine = matchupLines.get(playerId);
           
-          // Helper function to calculate matchup week points from stats
+          // Helper function to calculate matchup week points from stats using league scoring settings
           const calculateMatchupWeekPoints = (stats: any, isGoalie: boolean = false): number => {
             if (!stats) return 0;
             
             if (isGoalie && (stats.wins !== undefined || stats.saves !== undefined)) {
-              // Goalie scoring: Wins=4, Saves=0.2, Shutouts=3, GA=-1
               // Validate that stats are for a week, not season
               const MAX_REASONABLE_WEEK_WINS = 7;
               const MAX_REASONABLE_WEEK_SAVES = 300;
@@ -2617,16 +2425,10 @@ export const MatchupService = {
                 return 0; // Reject season totals from RPC
               }
               
-              // Goalie fantasy scoring using default weights (Wins=4, Saves=0.2, Shutouts=3, GA=-1)
-              return ((stats.wins || 0) * 4) + 
-                      ((stats.saves || 0) * 0.2) + 
-                      ((stats.shutouts || 0) * 3) + 
-                      ((stats.goals_against || 0) * -1);
+              // Use scorer with league-specific settings
+              return scorer.calculatePoints(stats, true);
             } else {
-              // Skater scoring: ALL 8 categories (Goals=3, Assists=2, PPP=1, SHP=2, SOG=0.4, Blocks=0.5, Hits=0.2, PIM=0.5)
-              // CRITICAL: Validate that stats are for a week, not season
-              // For a single week, max should be: ~7 goals, ~10 assists, ~30 SOG (very high week)
-              // If stats are too high, RPC returned season totals - reject them
+              // Validate that stats are for a week, not season
               const MAX_REASONABLE_WEEK_GOALS = 10;
               const MAX_REASONABLE_WEEK_ASSISTS = 15;
               const MAX_REASONABLE_WEEK_SOG = 40;
@@ -2638,17 +2440,8 @@ export const MatchupService = {
                 return 0; // Reject season totals from RPC
               }
               
-              // CRITICAL: Use blocks from matchup week stats, NOT season stats
-              // Skater scoring: ALL 8 categories (default weights match leagues.scoring_settings)
-              const blocks = stats.blocks || 0; // Get from matchup week stats
-              return (stats.goals * 3) + 
-                     (stats.assists * 2) + 
-                     ((stats.ppp || 0) * 1) +        // Power Play Points
-                     ((stats.shp || 0) * 2) +        // Shorthanded Points
-                     (stats.sog * 0.4) + 
-                     (blocks * 0.5) +                // Updated default to 0.5 to match migration
-                     ((stats.hits || 0) * 0.2) +     // Hits
-                     ((stats.pim || 0) * 0.5);       // Penalty Minutes
+              // Use scorer with league-specific settings
+              return scorer.calculatePoints(stats, false);
             }
           };
           
@@ -2790,98 +2583,8 @@ export const MatchupService = {
             if (matchupStats) {
               const isGoaliePlayer = p.position === 'G' || p.position === 'Goalie';
               
-              if (isGoaliePlayer && (matchupStats.wins !== undefined || matchupStats.saves !== undefined)) {
-                // Goalie breakdown
-                const winsPoints = (matchupStats.wins || 0) * 4;
-                const savesPoints = (matchupStats.saves || 0) * 0.2;
-                const shutoutsPoints = (matchupStats.shutouts || 0) * 3;
-                const gaPoints = (matchupStats.goals_against || 0) * -1;
-                
-                transformed.stats_breakdown = {
-                  'Wins': {
-                    count: matchupStats.wins || 0,
-                    points: winsPoints,
-                    logic: `${matchupStats.wins || 0} wins * 4.0 points`
-                  },
-                  'Saves': {
-                    count: matchupStats.saves || 0,
-                    points: savesPoints,
-                    logic: `${matchupStats.saves || 0} saves * 0.2 points`
-                  },
-                  'Shutouts': {
-                    count: matchupStats.shutouts || 0,
-                    points: shutoutsPoints,
-                    logic: `${matchupStats.shutouts || 0} shutouts * 3.0 points`
-                  },
-                  'Goals Against': {
-                    count: matchupStats.goals_against || 0,
-                    points: gaPoints,
-                    logic: `${matchupStats.goals_against || 0} GA * -1.0 points`
-                  }
-                };
-              } else {
-                // Skater breakdown
-                // Calculate points for ALL 8 stat categories
-                const goalsPoints = (matchupStats.goals || 0) * 3;
-                const assistsPoints = (matchupStats.assists || 0) * 2;
-                const pppPoints = ((matchupStats.ppp || 0) * 1);
-                const shpPoints = ((matchupStats.shp || 0) * 2);
-                const sogPoints = (matchupStats.sog || 0) * 0.4;
-                const blocksPoints = (matchupStats.blocks || 0) * 0.5;
-                const hitsPoints = ((matchupStats.hits || 0) * 0.2);
-                const pimPoints = ((matchupStats.pim || 0) * 0.5);
-                
-                transformed.stats_breakdown = {
-                  'Goals': {
-                    count: matchupStats.goals || 0,
-                    points: goalsPoints,
-                    logic: `${matchupStats.goals || 0} goals * 3.0 points`
-                  },
-                  'Assists': {
-                    count: matchupStats.assists || 0,
-                    points: assistsPoints,
-                    logic: `${matchupStats.assists || 0} assists * 2.0 points`
-                  },
-                  ...((matchupStats.ppp || 0) > 0 ? {
-                    'Power Play Points': {
-                      count: matchupStats.ppp || 0,
-                      points: pppPoints,
-                      logic: `${matchupStats.ppp || 0} PPP * 1.0 points`
-                    }
-                  } : {}),
-                  ...((matchupStats.shp || 0) > 0 ? {
-                    'Shorthanded Points': {
-                      count: matchupStats.shp || 0,
-                      points: shpPoints,
-                      logic: `${matchupStats.shp || 0} SHP * 2.0 points`
-                    }
-                  } : {}),
-                  'Shots on Goal': {
-                    count: matchupStats.sog || 0,
-                    points: sogPoints,
-                    logic: `${matchupStats.sog || 0} shots * 0.4 points`
-                  },
-                  'Blocks': {
-                    count: matchupStats.blocks || 0,
-                    points: blocksPoints,
-                    logic: `${matchupStats.blocks || 0} blocks * 0.5 points`
-                  },
-                  ...((matchupStats.hits || 0) > 0 ? {
-                    'Hits': {
-                      count: matchupStats.hits || 0,
-                      points: hitsPoints,
-                      logic: `${matchupStats.hits || 0} hits * 0.2 points`
-                    }
-                  } : {}),
-                  ...((matchupStats.pim || 0) > 0 ? {
-                    'Penalty Minutes': {
-                      count: matchupStats.pim || 0,
-                      points: pimPoints,
-                      logic: `${matchupStats.pim || 0} PIM * 0.5 points`
-                    }
-                  } : {})
-                };
-              }
+              // Use scorer to generate stat breakdown with league-specific settings
+              transformed.stats_breakdown = scorer.getStatBreakdown(matchupStats, isGoaliePlayer);
             } else {
               // No weekly stats - player didn't play, breakdown should be empty/undefined
               transformed.stats_breakdown = undefined;
@@ -2895,100 +2598,9 @@ export const MatchupService = {
             transformed.total_points = calculatedPoints;
             transformed.points = calculatedPoints; // Use matchup week points, not season
             
-            // Calculate stats_breakdown from weekly matchupStats
+            // Calculate stats_breakdown from weekly matchupStats using league scoring settings
             if (matchupStats) {
-              if (isGoaliePlayer && (matchupStats.wins !== undefined || matchupStats.saves !== undefined)) {
-                // Goalie breakdown
-                const winsPoints = (matchupStats.wins || 0) * 4;
-                const savesPoints = (matchupStats.saves || 0) * 0.2;
-                const shutoutsPoints = (matchupStats.shutouts || 0) * 3;
-                const gaPoints = (matchupStats.goals_against || 0) * -1;
-                
-                transformed.stats_breakdown = {
-                  'Wins': {
-                    count: matchupStats.wins || 0,
-                    points: winsPoints,
-                    logic: `${matchupStats.wins || 0} wins * 4.0 points`
-                  },
-                  'Saves': {
-                    count: matchupStats.saves || 0,
-                    points: savesPoints,
-                    logic: `${matchupStats.saves || 0} saves * 0.2 points`
-                  },
-                  'Shutouts': {
-                    count: matchupStats.shutouts || 0,
-                    points: shutoutsPoints,
-                    logic: `${matchupStats.shutouts || 0} shutouts * 3.0 points`
-                  },
-                  'Goals Against': {
-                    count: matchupStats.goals_against || 0,
-                    points: gaPoints,
-                    logic: `${matchupStats.goals_against || 0} GA * -1.0 points`
-                  }
-                };
-              } else {
-                // Skater breakdown
-                // Calculate points for ALL 8 stat categories
-                const goalsPoints = (matchupStats.goals || 0) * 3;
-                const assistsPoints = (matchupStats.assists || 0) * 2;
-                const pppPoints = ((matchupStats.ppp || 0) * 1);
-                const shpPoints = ((matchupStats.shp || 0) * 2);
-                const sogPoints = (matchupStats.sog || 0) * 0.4;
-                const blocksPoints = (matchupStats.blocks || 0) * 0.5;
-                const hitsPoints = ((matchupStats.hits || 0) * 0.2);
-                const pimPoints = ((matchupStats.pim || 0) * 0.5);
-                
-                transformed.stats_breakdown = {
-                  'Goals': {
-                    count: matchupStats.goals || 0,
-                    points: goalsPoints,
-                    logic: `${matchupStats.goals || 0} goals * 3.0 points`
-                  },
-                  'Assists': {
-                    count: matchupStats.assists || 0,
-                    points: assistsPoints,
-                    logic: `${matchupStats.assists || 0} assists * 2.0 points`
-                  },
-                  ...((matchupStats.ppp || 0) > 0 ? {
-                    'Power Play Points': {
-                      count: matchupStats.ppp || 0,
-                      points: pppPoints,
-                      logic: `${matchupStats.ppp || 0} PPP * 1.0 points`
-                    }
-                  } : {}),
-                  ...((matchupStats.shp || 0) > 0 ? {
-                    'Shorthanded Points': {
-                      count: matchupStats.shp || 0,
-                      points: shpPoints,
-                      logic: `${matchupStats.shp || 0} SHP * 2.0 points`
-                    }
-                  } : {}),
-                  'Shots on Goal': {
-                    count: matchupStats.sog || 0,
-                    points: sogPoints,
-                    logic: `${matchupStats.sog || 0} shots * 0.4 points`
-                  },
-                  'Blocks': {
-                    count: matchupStats.blocks || 0,
-                    points: blocksPoints,
-                    logic: `${matchupStats.blocks || 0} blocks * 0.5 points`
-                  },
-                  ...((matchupStats.hits || 0) > 0 ? {
-                    'Hits': {
-                      count: matchupStats.hits || 0,
-                      points: hitsPoints,
-                      logic: `${matchupStats.hits || 0} hits * 0.2 points`
-                    }
-                  } : {}),
-                  ...((matchupStats.pim || 0) > 0 ? {
-                    'Penalty Minutes': {
-                      count: matchupStats.pim || 0,
-                      points: pimPoints,
-                      logic: `${matchupStats.pim || 0} PIM * 0.5 points`
-                    }
-                  } : {})
-                };
-              }
+              transformed.stats_breakdown = scorer.getStatBreakdown(matchupStats, isGoaliePlayer);
             } else {
               transformed.stats_breakdown = undefined;
             }

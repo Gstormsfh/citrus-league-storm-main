@@ -169,11 +169,8 @@ const Settings = () => {
       
       <main className="w-full pt-28 pb-16 m-0 p-0">
         <div className="w-full m-0 p-0">
-          {/* Sidebar and Content Grid */}
-          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr]">
-            {/* Main Content - Scrollable - Appears first on mobile */}
-            <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
-              <div className="mb-8">
+          <div className="max-w-4xl mx-auto px-2 lg:px-6">
+            <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">Account Settings</h1>
           <p className="text-gray-600">Manage your account, security, and preferences</p>
         </div>
@@ -377,8 +374,6 @@ const Settings = () => {
         <div className="mt-8 text-center text-sm text-gray-600">
           <p>Need help? Contact us at <a href="mailto:support@citrusfantasy.com" className="text-green-700 hover:underline">support@citrusfantasy.com</a></p>
         </div>
-              </div>
-            </div>
           </div>
         </div>
       </main>

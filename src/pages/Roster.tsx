@@ -229,7 +229,7 @@ interface RosterState {
 
 const Roster = () => {
   const { user, profile } = useAuth();
-  const { userLeagueState, loading: leagueLoading, activeLeagueId, demoLeagueId } = useLeague();
+  const { userLeagueState, loading: leagueLoading, activeLeagueId, demoLeagueId, isChangingLeague } = useLeague();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
@@ -240,6 +240,15 @@ const Roster = () => {
   const [activeTab, setActiveTab] = useState("roster");
   const [activeId, setActiveId] = useState<string | number | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Tab reset mechanism - reset to default tab when league changes
+  const previousLeagueIdRef = useRef(activeLeagueId);
+  useEffect(() => {
+    if (previousLeagueIdRef.current !== activeLeagueId && previousLeagueIdRef.current !== null) {
+      setActiveTab("roster"); // Reset to default tab
+    }
+    previousLeagueIdRef.current = activeLeagueId;
+  }, [activeLeagueId]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [statView, setStatView] = useState<'seasonToDate' | 'restOfSeason'>('seasonToDate');
   const [analyticsLoaded, setAnalyticsLoaded] = useState(false);
@@ -533,7 +542,21 @@ const Roster = () => {
             // Map draft picks to players
             const allDraftPicks = (allDraftPicksData || []) as any[];
             const playerIds = allDraftPicks.map((p: any) => p.player_id);
+            
+            // DEBUG LOGGING: Track what draft_picks returned
+            console.log('[Roster] 🔍 draft_picks query returned:', allDraftPicks.length, 'picks');
+            console.log('[Roster] 🔍 Player IDs from draft_picks:', playerIds);
+            
+            // Check if McDavid (8478402) is in draft_picks
+            const MCDAVID_ID = 8478402;
+            const hasMcDavid = playerIds.includes(MCDAVID_ID) || playerIds.includes(String(MCDAVID_ID));
+            console.log('[Roster] 🔍 McDavid (8478402) in draft_picks?', hasMcDavid ? '✅ YES' : '❌ NO');
+            
             dbPlayers = allPlayers.filter(p => playerIds.includes(p.id));
+            
+            // Check if McDavid made it through the filter
+            const mcDavidInDbPlayers = dbPlayers.find(p => p.id === MCDAVID_ID);
+            console.log('[Roster] 🔍 McDavid in dbPlayers after filter?', mcDavidInDbPlayers ? '✅ YES' : '❌ NO');
           }
         }
         
@@ -649,6 +672,11 @@ const Roster = () => {
         
         console.log('[Roster] ✅ Final player roster:', transformedPlayers.length, 'players');
         console.log('[Roster] 🔍 Jimmy Snuggerud check:', transformedPlayers.find(p => p.name.includes('Snuggerud')) ? 'FOUND IN ROSTER' : 'NOT IN ROSTER (correctly dropped)');
+        
+        // DEBUG: Check if McDavid made it through transformation
+        const MCDAVID_ID = 8478402;
+        const mcDavidInTransformed = transformedPlayers.find(p => p.id === MCDAVID_ID);
+        console.log('[Roster] 🔍 McDavid (8478402) in transformedPlayers?', mcDavidInTransformed ? `✅ YES (${mcDavidInTransformed.name})` : '❌ NO');
 
         // Check for saved lineup - but for demo teams, always auto-organize (same as OtherTeam.tsx)
         let savedLineup = null;
@@ -716,70 +744,84 @@ const Roster = () => {
               ir: savedLineup.ir?.length || 0
             });
             
-            // CRITICAL: Validate that all players in saved lineup still exist in transformedPlayers
-            // This prevents showing dropped players that are still in the saved lineup
-            const currentPlayerIds = new Set(transformedPlayers.map(p => String(p.id)));
-            const validStarters = savedLineup.starters?.filter(id => currentPlayerIds.has(String(id))) || [];
-            const validBench = savedLineup.bench?.filter(id => currentPlayerIds.has(String(id))) || [];
-            const validIr = savedLineup.ir?.filter(id => currentPlayerIds.has(String(id))) || [];
-            
-            const removedStarters = (savedLineup.starters?.length || 0) - validStarters.length;
-            const removedBench = (savedLineup.bench?.length || 0) - validBench.length;
-            const removedIr = (savedLineup.ir?.length || 0) - validIr.length;
-            
-            if (removedStarters > 0 || removedBench > 0 || removedIr > 0) {
-              console.warn('[Roster] ⚠️ Removed dropped players from saved lineup:', {
-                removedStarters,
-                removedBench,
-                removedIr,
-                droppedPlayerIds: [
-                  ...(savedLineup.starters?.filter(id => !currentPlayerIds.has(String(id))) || []),
-                  ...(savedLineup.bench?.filter(id => !currentPlayerIds.has(String(id))) || []),
-                  ...(savedLineup.ir?.filter(id => !currentPlayerIds.has(String(id))) || [])
-                ]
-              });
-              
-              // Update savedLineup to only include valid players
-              savedLineup = {
-                ...savedLineup,
-                starters: validStarters,
-                bench: validBench,
-                ir: validIr
-              };
-            }
+            // Trust the saved lineup - the save protection guard prevents bad data from being saved
+            // No filtering needed on load, as lineup integrity is enforced at save time
+            console.log('[Roster] ✅ Using saved lineup as-is (protected by save guard)');
           }
         }
         
         if (savedLineup && (savedLineup.starters?.length || 0) > 0) {
-          // Restore saved lineup (already validated to only include current players)
+          // Restore saved lineup from team_lineups
+          // IMPORTANT: draft_picks (with deleted_at IS NULL) is the SOURCE OF TRUTH for roster membership
+          // team_lineups may contain stale player IDs from old drops - we MUST filter them out
           console.log('[Roster] 🔄 Restoring saved lineup with', savedLineup.starters?.length, 'starters');
-          const playerMap = new Map(transformedPlayers.map(p => [String(p.id), p]));
-          const savedPlayerIds = new Set([
-            ...savedLineup.starters,
-            ...savedLineup.bench,
-            ...savedLineup.ir
-          ]);
           
           // Helper to deduplicate IDs
           const uniqueIds = (ids: string[]) => Array.from(new Set(ids));
-
-          const starters = uniqueIds(savedLineup.starters)
+          
+          // Get current roster player IDs (from draft_picks query)
+          const currentPlayerIds = new Set(transformedPlayers.map(p => String(p.id)));
+          
+          // Check for stale player IDs in saved lineup (indicates team_lineups needs cleanup)
+          const allSavedIds = new Set([
+            ...uniqueIds(savedLineup.starters),
+            ...uniqueIds(savedLineup.bench),
+            ...uniqueIds(savedLineup.ir)
+          ]);
+          const stalePlayerIds = Array.from(allSavedIds).filter(id => !currentPlayerIds.has(id));
+          
+          if (stalePlayerIds.length > 0) {
+            console.warn('[Roster] 🧹 Filtering out', stalePlayerIds.length, 'stale player IDs from team_lineups (dropped players)');
+            console.warn('[Roster] Stale IDs:', stalePlayerIds);
+            console.warn('[Roster] ⚠️ team_lineups table needs cleanup - run CLEANUP_STALE_TEAM_LINEUPS.sql');
+          }
+          
+          // Filter saved lineup to only include current roster players
+          const filteredStarters = uniqueIds(savedLineup.starters).filter(id => currentPlayerIds.has(id));
+          const filteredBench = uniqueIds(savedLineup.bench).filter(id => currentPlayerIds.has(id));
+          const filteredIr = uniqueIds(savedLineup.ir).filter(id => currentPlayerIds.has(id));
+          
+          console.log('[Roster] 📊 After filtering: starters:', filteredStarters.length, 'bench:', filteredBench.length, 'ir:', filteredIr.length);
+          
+          // Build player map from current roster
+          const playerMap = new Map(transformedPlayers.map(p => [String(p.id), p]));
+          
+          // Map filtered IDs to player objects
+          const starters = filteredStarters
             .map(id => {
               const player = playerMap.get(id);
-              if (!player) return null;
+              if (!player) {
+                console.error('[Roster] ❌ Player', id, 'in filtered lineup but not in transformedPlayers!');
+                return null;
+              }
               return { ...player, starter: true };
             })
             .filter((p): p is HockeyPlayer => !!p);
           
-          const bench = uniqueIds(savedLineup.bench)
-            .map(id => playerMap.get(id))
+          const bench = filteredBench
+            .map(id => {
+              const player = playerMap.get(id);
+              if (!player) {
+                console.error('[Roster] ❌ Player', id, 'in filtered lineup but not in transformedPlayers!');
+                return null;
+              }
+              return player;
+            })
             .filter((p): p is HockeyPlayer => !!p);
           
-          const ir = uniqueIds(savedLineup.ir)
-            .map(id => playerMap.get(id))
+          const ir = filteredIr
+            .map(id => {
+              const player = playerMap.get(id);
+              if (!player) {
+                console.error('[Roster] ❌ Player', id, 'in filtered lineup but not in transformedPlayers!');
+                return null;
+              }
+              return player;
+            })
             .filter((p): p is HockeyPlayer => !!p);
           
           // Add any new players (not in saved lineup) to bench
+          const savedPlayerIds = new Set([...filteredStarters, ...filteredBench, ...filteredIr]);
           transformedPlayers.forEach(player => {
             if (!savedPlayerIds.has(String(player.id))) {
               bench.push(player);
@@ -1122,11 +1164,26 @@ const Roster = () => {
 
   // Initial load on mount and when userLeagueState changes
   useEffect(() => {
+    // Skip if league is changing
+    if (isChangingLeague) {
+      return;
+    }
+    
     // For guests, load immediately. For logged-in users, wait for league context
     if (userLeagueState === 'guest' || !leagueLoading) {
-    loadRoster();
+      try {
+        loadRoster();
+      } catch (error) {
+        console.error('[Roster] Error in initial load:', error);
+        setLoading(false);
+        toast({
+          title: 'Error',
+          description: 'Failed to load roster. Please try refreshing the page.',
+          variant: 'destructive'
+        });
+      }
     }
-  }, [loadRoster, userLeagueState, leagueLoading]);
+  }, [loadRoster, userLeagueState, leagueLoading, isChangingLeague, toast]);
 
   // Calculate available weeks and first week start date (similar to Matchup tab)
   useEffect(() => {
@@ -2478,8 +2535,21 @@ const Roster = () => {
     toast({ title: "Lineup Updated", description: "Player moved successfully." });
   };
 
+  // Determine if we should show a loading overlay (but don't unmount the component)
+  const showLoadingOverlay = isChangingLeague || (leagueLoading && userLeagueState === 'active-user');
+
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden relative">
+      {/* Loading overlay during league switch - non-blocking */}
+      {showLoadingOverlay && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[100] flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-citrus-orange mx-auto mb-4"></div>
+            <p className="text-lg font-medium">Switching leagues...</p>
+          </div>
+        </div>
+      )}
+      
       {/* Citrus Background - Floating citrus elements */}
       <CitrusBackground density="medium" animated={true} />
       
@@ -2488,7 +2558,7 @@ const Roster = () => {
       <main className="w-full pt-28 pb-16 m-0 p-0">
         <div className="w-full m-0 p-0">
           {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
-          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] gap-6 lg:gap-8">
+          <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_240px] gap-6 lg:gap-8">
             {/* Main Content - Scrollable - Appears first on mobile */}
             <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-4 order-1 lg:order-2">
               {/* Fantasy Team Header with Citrus Flair */}
@@ -2710,11 +2780,22 @@ const Roster = () => {
                   }
                   
                   if (roster.starters.length === 0 && roster.bench.length === 0 && userLeagueState !== 'guest') {
+                    // Check if draft is not completed
+                    const isPreDraft = userTeam && userTeam.league_id;
                     return (
                       <div className="flex flex-col items-center justify-center py-20 text-center">
                         <Users className="w-16 h-16 text-muted-foreground mb-4 opacity-50" />
                         <h3 className="text-xl font-semibold mb-2">Empty Roster</h3>
-                        <p className="text-muted-foreground mb-4">Your roster is empty. Complete your draft to add players.</p>
+                        <p className="text-muted-foreground mb-4">
+                          {isPreDraft 
+                            ? "Your roster will be populated after the draft is completed. Head to the draft room to start drafting!"
+                            : "Your roster is empty. Complete your draft to add players."}
+                        </p>
+                        {isPreDraft && (
+                          <Button asChild className="mt-4">
+                            <a href={`/draft-room?league=${userTeam.league_id}`}>Go to Draft Room</a>
+                          </Button>
+                        )}
                       </div>
                     );
                   }

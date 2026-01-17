@@ -112,29 +112,27 @@ Process 1 acquires lock for League A waivers
 
 ---
 
-### 6. DRAFT PICK CONCURRENCY PROTECTION ✅
+### 6. DRAFT PICK CONCURRENCY PROTECTION ✅ (Phase 1 Complete, Phase 2 Pending)
 **Before:** Race conditions with poor UX (database constraint error)  
-**After:** Optimistic locking with 30-second reservations
+**After:** Database reservation functions + unique constraints (Phase 1), Frontend integration (Phase 2 pending)
 
 **Migration:** `20260113200003_add_draft_pick_concurrency_protection.sql`
 
 **Changes:**
 - Added `reserved_by`, `reserved_at`, `reservation_expires_at` columns
-- `reserve_draft_pick()` function - 30-second hold
-- `confirm_draft_pick()` function - convert reservation to pick
+- `reserve_draft_pick()` function - 30-second hold (database function exists)
+- `confirm_draft_pick()` function - convert reservation to pick (database function exists)
 - `cleanup_expired_draft_reservations()` function - cleanup job
 
-**User Experience:**
-```
-OLD:
-User A clicks McDavid
-  → Network latency (500ms)
-  → User B clicks McDavid
-  → Both submit picks
-  → User B gets error: "Player already drafted"
-  → Angry user
+**Current Implementation (Phase 1):**
+- ✅ Database functions exist and are ready
+- ✅ Unique constraint prevents duplicate picks
+- ⚠️ Frontend does NOT yet call reservation functions
+- ⚠️ System relies on unique constraint for race condition protection
+- ⚠️ Users may still see "Player already drafted" errors during network latency
 
-NEW:
+**Future Enhancement (Phase 2 - Not Yet Implemented):**
+```
 User A clicks McDavid
   → Instantly reserved (optimistic UI)
   → McDavid grayed out for all users
@@ -142,6 +140,8 @@ User A clicks McDavid
   → User B sees McDavid unavailable immediately
   → No error, smooth UX
 ```
+
+**Note:** The reservation system is built and ready, but frontend integration is Phase 2. Current system works via unique constraints.
 
 ---
 
@@ -192,7 +192,7 @@ User A clicks McDavid
 | **Join League** | ❌ Missing | ✅ Full UI | ✅ Yes | ✅ Yes |
 | **Multi-League** | ⚠️ Backend only | ✅ UI Switcher | ✅ Yes | ✅ Yes |
 | **Data Isolation** | ⚠️ Mostly | ✅ Complete | ✅ Yes | ✅ Yes |
-| **Draft Race Protection** | ❌ None | ✅ Reservations | ✅ Yes | ✅ Yes |
+| **Draft Race Protection** | ❌ None | ⚠️ DB Functions (Frontend Phase 2) | ✅ Yes | ✅ Yes |
 | **Waiver Concurrency** | ❌ None | ✅ Locks | ✅ Yes | ✅ Yes |
 | **RLS Security** | ⚠️ Holes | ✅ Bulletproof | ✅ Yes | ✅ Yes |
 
@@ -327,10 +327,11 @@ Run these in Supabase SQL Editor (in order):
 ## ⚠️ KNOWN LIMITATIONS (NOT BLOCKERS)
 
 ### Phase 2 Improvements (Optional):
-1. **Soft Deletes** - Currently hard deletes leagues (could add archive)
-2. **Rate Limiting** - No client-side rate limits (Supabase handles server-side)
-3. **Advanced Caching** - Could add Redis for hot data (not needed yet)
-4. **Audit Logging** - Could log all roster changes (nice to have)
+1. **Draft Pick Reservations Frontend** - Database functions exist, but frontend doesn't call them yet. System works via unique constraints, but UX could be smoother with optimistic UI updates.
+2. **Soft Deletes** - Currently hard deletes leagues (could add archive)
+3. **Rate Limiting** - No client-side rate limits (Supabase handles server-side)
+4. **Advanced Caching** - Could add Redis for hot data (not needed yet)
+5. **Audit Logging** - Could log all roster changes (nice to have)
 
 **None of these block 100K users.** They're optimizations for 1M+ users.
 

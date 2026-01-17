@@ -245,7 +245,8 @@ export const LeagueService = {
     commissionerId: string,
     rosterSize: number = 21,
     draftRounds: number = 21,
-    settings: Record<string, any> = {}
+    settings: Record<string, any> = {},
+    scoringSettings?: Record<string, any>
   ): Promise<{ league: League | null; team: Team | null; error: any }> {
     try {
       // Create the league
@@ -257,6 +258,7 @@ export const LeagueService = {
           roster_size: rosterSize,
           draft_rounds: draftRounds,
           settings,
+          scoring_settings: scoringSettings,
         })
         .select()
         .single();
@@ -1350,7 +1352,7 @@ export const LeagueService = {
     bench: (string | number)[], 
     ir: (string | number)[], 
     slotAssignments: Record<string, string> 
-  }, targetDate?: string) {
+  }, targetDate?: string, options?: { allowPlayerRemoval?: boolean }) {
     console.log('[LeagueService.saveLineup] Called with teamId:', teamId, 'leagueId:', leagueId, 'lineup:', {
       starters: lineup.starters?.length || 0,
       bench: lineup.bench?.length || 0,
@@ -1385,6 +1387,114 @@ export const LeagueService = {
       ir: lineup.ir.map(id => String(id)),
       slotAssignments: lineup.slotAssignments
     };
+
+    // VALIDATION: Ensure all player IDs in lineup are currently owned (in draft_picks)
+    // This prevents saving stale/dropped player IDs that would resurrect dropped players
+    try {
+      const allLineupPlayerIds = [
+        ...lineupToSave.starters,
+        ...lineupToSave.bench,
+        ...lineupToSave.ir
+      ];
+      
+      if (allLineupPlayerIds.length > 0) {
+        // Query draft_picks to get current roster
+        const { data: currentPicksData, error: picksError } = await supabase
+          .from('draft_picks')
+          .select('player_id')
+          .eq('team_id', String(teamId))
+          .eq('league_id', leagueId)
+          .is('deleted_at', null);
+        
+        if (!picksError && currentPicksData) {
+          const validPlayerIds = new Set(currentPicksData.map((p: any) => String(p.player_id)));
+          const invalidPlayerIds = allLineupPlayerIds.filter(id => !validPlayerIds.has(id));
+          
+          if (invalidPlayerIds.length > 0) {
+            console.error('[LINEUP VALIDATION] ========================================');
+            console.error('[LINEUP VALIDATION] CRITICAL: Lineup contains DROPPED player IDs!');
+            console.error('[LINEUP VALIDATION] Invalid IDs:', invalidPlayerIds);
+            console.error('[LINEUP VALIDATION] These players are not in draft_picks (deleted_at IS NULL)');
+            console.error('[LINEUP VALIDATION] Filtering them out before save...');
+            console.error('[LINEUP VALIDATION] ========================================');
+            
+            // Filter out invalid IDs
+            lineupToSave.starters = lineupToSave.starters.filter(id => validPlayerIds.has(id));
+            lineupToSave.bench = lineupToSave.bench.filter(id => validPlayerIds.has(id));
+            lineupToSave.ir = lineupToSave.ir.filter(id => validPlayerIds.has(id));
+            
+            // Remove invalid IDs from slot assignments
+            Object.keys(lineupToSave.slotAssignments).forEach(playerId => {
+              if (!validPlayerIds.has(playerId)) {
+                delete lineupToSave.slotAssignments[playerId];
+              }
+            });
+            
+            console.log('[LINEUP VALIDATION] ✅ Filtered lineup:', {
+              starters: lineupToSave.starters.length,
+              bench: lineupToSave.bench.length,
+              ir: lineupToSave.ir.length
+            });
+          }
+        }
+      }
+    } catch (validationError) {
+      console.error('[LINEUP VALIDATION] Validation failed:', validationError);
+      // Continue with save - don't block due to validation errors
+    }
+
+    // ROSTER PROTECTION: Validate no players are being accidentally lost
+    // This is the CRITICAL guard against the McDavid disappearing bug
+    const allowPlayerRemoval = options?.allowPlayerRemoval ?? false;
+    
+    try {
+      const currentLineup = await this.getLineup(teamId, leagueId);
+      if (currentLineup) {
+        const currentPlayerIds = new Set([
+          ...(currentLineup.starters || []),
+          ...(currentLineup.bench || []),
+          ...(currentLineup.ir || [])
+        ]);
+        const newPlayerIds = new Set([
+          ...lineupToSave.starters,
+          ...lineupToSave.bench,
+          ...lineupToSave.ir
+        ]);
+        
+        // Check if any players are being removed
+        const removedPlayers = Array.from(currentPlayerIds).filter(id => !newPlayerIds.has(id));
+        
+        if (removedPlayers.length > 0) {
+          console.error('[ROSTER PROTECTION] ========================================');
+          console.error('[ROSTER PROTECTION] CRITICAL: Players would be REMOVED!');
+          console.error('[ROSTER PROTECTION] Removed players:', removedPlayers);
+          console.error('[ROSTER PROTECTION] Team:', teamId, 'League:', leagueId);
+          console.error('[ROSTER PROTECTION] Current roster size:', currentPlayerIds.size);
+          console.error('[ROSTER PROTECTION] New roster size:', newPlayerIds.size);
+          console.error('[ROSTER PROTECTION] allowPlayerRemoval:', allowPlayerRemoval);
+          
+          // Log each removed player for audit trail
+          removedPlayers.forEach(playerId => {
+            console.error(`[ROSTER PROTECTION] WOULD REMOVE: Player ID ${playerId}`);
+          });
+          console.error('[ROSTER PROTECTION] ========================================');
+          
+          // CRITICAL: Block the save if removal wasn't explicitly allowed
+          if (!allowPlayerRemoval) {
+            console.error('[ROSTER PROTECTION] BLOCKED: Save rejected to prevent data loss!');
+            console.error('[ROSTER PROTECTION] To allow player removal, pass { allowPlayerRemoval: true }');
+            // Return early - DO NOT SAVE
+            return;
+          } else {
+            console.warn('[ROSTER PROTECTION] ALLOWED: Player removal explicitly permitted');
+          }
+        }
+      }
+    } catch (validationError) {
+      console.error('[ROSTER PROTECTION] Validation check failed:', validationError);
+      // If we can't validate, be conservative and allow the save
+      // This prevents blocking legitimate saves due to network issues
+    }
 
     try {
       // Try Supabase first (shared database, with league_id for isolation)

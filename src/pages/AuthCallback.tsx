@@ -71,7 +71,7 @@ const AuthCallback = () => {
               await refreshProfile();
             }
             
-            // Redirect to profile setup or home
+            // Redirect to profile setup (it will redirect if profile is already complete)
             setTimeout(() => {
               navigate('/profile-setup');
             }, 1500);

@@ -27,8 +27,7 @@ const ProfileSetup = () => {
       return;
     }
 
-    // Always allow profile setup if username starts with 'user_' (auto-generated)
-    // OR if profile doesn't exist yet
+    // Only redirect if profile is complete (has proper username)
     if (profile?.username && !profile.username.startsWith('user_')) {
       // User already has a proper username, redirect to home
       navigate('/');

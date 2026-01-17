@@ -1,8 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { LeagueService, League } from '@/services/LeagueService';
-import { useSearchParams, useLocation } from 'react-router-dom';
+import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { DEMO_LEAGUE_ID } from '@/services/DemoLeagueService';
+import { MatchupService } from '@/services/MatchupService';
+import { RosterCacheService } from '@/services/RosterCacheService';
+import { PlayerService } from '@/services/PlayerService';
 
 export type UserLeagueState = 'guest' | 'logged-in-no-league' | 'active-user';
 
@@ -19,6 +22,7 @@ interface LeagueContextType {
   userLeagues: League[];
   setActiveLeagueId: (leagueId: string | null) => void;
   loading: boolean;
+  isChangingLeague: boolean;
   error: string | null;
   refreshLeagues: () => Promise<void>;
   userLeagueState: UserLeagueState;
@@ -33,6 +37,7 @@ const defaultContextValue: LeagueContextType = {
   userLeagues: [],
   setActiveLeagueId: () => {},
   loading: true,
+  isChangingLeague: false,
   error: null,
   refreshLeagues: async () => {},
   userLeagueState: 'guest',
@@ -56,11 +61,13 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
+  const navigate = useNavigate();
   
   const [activeLeagueId, setActiveLeagueIdState] = useState<string | null>(null);
   const [activeLeague, setActiveLeague] = useState<League | null>(null);
   const [userLeagues, setUserLeagues] = useState<League[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isChangingLeague, setIsChangingLeague] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Extract league_id from URL params if present
@@ -130,23 +137,53 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
 
   // Set active league and update URL
   const setActiveLeagueId = (leagueId: string | null) => {
+    // Prevent duplicate switches to the same league
+    if (leagueId === activeLeagueId) {
+      return;
+    }
+    
+    // Signal that league is changing (briefly, for UI feedback only)
+    setIsChangingLeague(true);
+    
+    // Clear all caches to prevent data bleeding between leagues
+    MatchupService.clearRosterCache();
+    RosterCacheService.clearCache();
+    PlayerService.clearCache();
+    
+    // Update state synchronously
     setActiveLeagueIdState(leagueId);
     
     if (leagueId) {
       const league = userLeagues.find(l => l.id === leagueId);
       setActiveLeague(league || null);
       
-      // Update URL param
+      // Update URL with new league (NO page reload - smooth transition)
       const newParams = new URLSearchParams(searchParams);
       newParams.set('league', leagueId);
-      setSearchParams(newParams, { replace: true });
+      // Remove tab params to reset tabs on league switch
+      newParams.delete('tab');
+      
+      // Use React Router navigation for smooth transition
+      navigate(`${location.pathname}?${newParams.toString()}`, { replace: true });
     } else {
       setActiveLeague(null);
+      
       // Remove league param from URL
       const newParams = new URLSearchParams(searchParams);
       newParams.delete('league');
-      setSearchParams(newParams, { replace: true });
+      newParams.delete('tab');
+      
+      const newUrl = newParams.toString() 
+        ? `${location.pathname}?${newParams.toString()}`
+        : location.pathname;
+      navigate(newUrl, { replace: true });
     }
+    
+    // Reset immediately after state updates (no delay to prevent hooks issues)
+    // Use requestAnimationFrame to ensure state updates are batched
+    requestAnimationFrame(() => {
+      setIsChangingLeague(false);
+    });
   };
 
   // Refresh leagues list
@@ -199,6 +236,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     userLeagues,
     setActiveLeagueId,
     loading,
+    isChangingLeague,
     error,
     refreshLeagues,
     userLeagueState,

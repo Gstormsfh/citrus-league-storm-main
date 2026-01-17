@@ -69,6 +69,8 @@ const Settings = lazyWithErrorHandling(() => import("./pages/Settings"));
 const Auth = lazyWithErrorHandling(() => import("./pages/Auth"));
 const AuthCallback = lazyWithErrorHandling(() => import("./pages/AuthCallback"));
 const ProfileSetup = lazyWithErrorHandling(() => import("./pages/ProfileSetup"));
+const ResetPassword = lazyWithErrorHandling(() => import("./pages/ResetPassword"));
+const VerifyEmail = lazyWithErrorHandling(() => import("./pages/VerifyEmail"));
 const LeagueDashboard = lazyWithErrorHandling(() => import("./pages/LeagueDashboard"));
 
 // No Suspense fallback - let individual pages handle their own loading states
@@ -125,6 +127,8 @@ const App = () => {
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/auth/callback" element={<AuthCallback />} />
                 <Route path="/profile-setup" element={<ProfileSetup />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/roster" element={<Roster />} />
                 <Route path="/standings" element={<Standings />} />
                 <Route path="/contact" element={<Contact />} />
