@@ -129,7 +129,7 @@ export const RosterDepthWidget = () => {
           // Fallback: try using DraftService
           try {
             const { DraftService } = await import('@/services/DraftService');
-            const { picks: draftPicks } = await DraftService.getDraftPicks(activeLeagueId);
+            const { picks: draftPicks } = await DraftService.getDraftPicks(activeLeagueId, user.id);
             const teamPicks = draftPicks.filter(p => p.team_id === userTeam.id);
             const playerIds = teamPicks.map(p => p.player_id);
             rosterPlayers = allPlayers.filter(p => playerIds.includes(p.id));

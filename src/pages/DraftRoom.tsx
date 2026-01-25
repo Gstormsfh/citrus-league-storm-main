@@ -70,7 +70,7 @@ const DraftRoom = () => {
   const [draftedPlayerIds, setDraftedPlayerIds] = useState<Set<string>>(new Set());
   
   const [draftPhase, setDraftPhase] = useState<DraftPhase>(DraftPhase.LOBBY);
-  const [timeRemaining, setTimeRemaining] = useState(90);
+  const [timeRemaining, setTimeRemaining] = useState(90); // Will be updated from league settings when loaded
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [isCommissioner, setIsCommissioner] = useState(false);
   const [draftSettings, setDraftSettings] = useState<DraftSettings>({
@@ -281,10 +281,15 @@ const DraftRoom = () => {
       setDraftPhase(DraftPhase.LOBBY);
       logger.log('DraftRoom: loadDraftData starting for league:', leagueId);
 
-      // Load league
-      const { league: leagueData, error: leagueError } = await LeagueService.getLeague(leagueId);
+      // Load league (with membership validation)
+      const { league: leagueData, error: leagueError } = await LeagueService.getLeague(leagueId, user.id);
       if (leagueError) {
         logger.error('DraftRoom: Error loading league:', leagueError);
+        // Check if it's an access denied error
+        if (leagueError.message?.includes('Access denied') || leagueError.message?.includes('not a member')) {
+          navigate('/leagues');
+          return;
+        }
         throw leagueError;
       }
       if (!leagueData) {
@@ -295,11 +300,18 @@ const DraftRoom = () => {
       setLeague(leagueData);
       setIsCommissioner(leagueData.commissioner_id === user.id);
       
-      // Update draft settings with league's draft_rounds
+      // Update draft settings with league's draft_rounds and pickTimeLimit
       setDraftSettings(prev => ({
         ...prev,
-        rounds: leagueData.draft_rounds || 21
+        rounds: leagueData.draft_rounds || 21,
+        // Load pickTimeLimit from league settings if available, otherwise use default
+        pickTimeLimit: leagueData.settings?.pickTimeLimit || prev.pickTimeLimit || 90
       }));
+      
+      // Update timeRemaining if draft is in progress and we have a saved pickTimeLimit
+      if (leagueData.draft_status === 'in_progress' && leagueData.settings?.pickTimeLimit) {
+        setTimeRemaining(leagueData.settings.pickTimeLimit);
+      }
 
       // Always start in LOBBY phase to show settings first
       // User can start/continue draft from the lobby
@@ -331,7 +343,7 @@ const DraftRoom = () => {
       // Check if there are actually any active draft picks/orders to determine if draft exists
       let hasActiveDraftData = false;
       if (leagueData.draft_status !== 'not_started') {
-        const { picks } = await DraftService.getDraftPicks(leagueId);
+        const { picks } = await DraftService.getDraftPicks(leagueId, user.id);
         // Filter out any picks that might be soft-deleted
         const activePicks = picks.filter(p => !p.deleted_at);
         if (activePicks.length > 0) {
@@ -447,18 +459,18 @@ const DraftRoom = () => {
 
   // Debounced realtime subscription to reduce lag
   useEffect(() => {
-    if (!leagueId) return;
+    if (!leagueId || !user?.id) return;
 
     let updateTimeout: NodeJS.Timeout;
     
-    const unsubscribe = DraftService.subscribeToDraftPicks(leagueId, async (newPick) => {
+    const unsubscribe = DraftService.subscribeToDraftPicks(leagueId, user.id, async (newPick) => {
       logger.log('DraftRoom: New pick received via realtime:', newPick);
       
       // Debounce rapid updates - wait 300ms for more updates before processing
       clearTimeout(updateTimeout);
       updateTimeout = setTimeout(async () => {
         // Reload all picks to ensure we have the latest state
-        const { picks } = await DraftService.getDraftPicks(leagueId);
+        const { picks } = await DraftService.getDraftPicks(leagueId, user.id);
         const activePicks = picks.filter(p => !p.deleted_at);
         
         setDraftHistory(activePicks);
@@ -473,7 +485,7 @@ const DraftRoom = () => {
       clearTimeout(updateTimeout);
       unsubscribe();
     };
-  }, [leagueId]);
+  }, [leagueId, user?.id]);
 
   // Reload teams when page becomes visible again (e.g., user changed team name in another tab)
   useEffect(() => {
@@ -569,7 +581,7 @@ const DraftRoom = () => {
         logger.warn('loadDraftState: nextTeamId is null, trying to fix...');
         // Try to get the first team from draft order
         try {
-          const { order } = await DraftService.getDraftOrder(leagueId, state.currentRound, state.sessionId);
+          const { order } = await DraftService.getDraftOrder(leagueId, user.id, state.currentRound, state.sessionId);
           if (order && order.team_order && order.team_order.length > 0) {
             const pickIndex = (state.currentPick - 1) % (teams?.length || 1);
             const correctTeamId = order.team_order[pickIndex];
@@ -593,7 +605,7 @@ const DraftRoom = () => {
           });
           // Try to fix by getting the draft order for current round
           try {
-            const { order } = await DraftService.getDraftOrder(leagueId, state.currentRound, state.sessionId);
+            const { order } = await DraftService.getDraftOrder(leagueId, user.id, state.currentRound, state.sessionId);
             if (order && order.team_order && order.team_order.length > 0) {
               // DraftOrder has team_order array with team IDs
               const pickIndex = (state.currentPick - 1) % (teams?.length || 1);
@@ -622,7 +634,7 @@ const DraftRoom = () => {
       // Set up orderedTeamsForBoard based on draft order (round 1)
       if (state && teams && teams.length > 0) {
         try {
-          const { order } = await DraftService.getDraftOrder(leagueId, 1, state.sessionId);
+          const { order } = await DraftService.getDraftOrder(leagueId, user.id, 1, state.sessionId);
           if (order && order.team_order && order.team_order.length > 0) {
             // Map team IDs to team objects in the correct order
             const orderedTeams = order.team_order
@@ -746,7 +758,8 @@ const DraftRoom = () => {
   };
 
   // Unified timer that works for both AI and human players
-  // Timer ALWAYS starts at 90 seconds, but AI teams auto-pick after 2 seconds
+  // Timer starts at the commissioner's configured pickTimeLimit (default 90 seconds)
+  // AI teams auto-pick after 2 seconds
   // Timer only runs when draftTimerStarted is true (commissioner must click "Start Draft Timer")
   useEffect(() => {
     // Cleanup function - always clear any running timers
@@ -1026,7 +1039,7 @@ const DraftRoom = () => {
       setSelectedPlayer(null);
       
       // Reload all picks to ensure sync
-      const { picks } = await DraftService.getDraftPicks(leagueId);
+      const { picks } = await DraftService.getDraftPicks(leagueId, user.id);
       const activePicks = picks.filter(p => !p.deleted_at);
       setDraftHistory(activePicks);
       setDraftedPlayerIds(new Set(activePicks.map(p => p.player_id)));
@@ -1168,7 +1181,7 @@ const DraftRoom = () => {
 
   const handleAddAITeams = async () => {
     if (!leagueId || !isCommissioner || !league) return;
-    
+
     try {
       const maxTeams = league.settings?.teamsCount || 12;
       const { error } = await LeagueService.simulateLeagueFill(leagueId, maxTeams);
@@ -1176,11 +1189,40 @@ const DraftRoom = () => {
         logger.error('Error adding AI teams:', error);
         return;
       }
-      
+
       // Reload teams after adding AI teams
       await loadDraftData();
     } catch (err) {
       logger.error('Exception adding AI teams:', err);
+    }
+  };
+
+  const handleDeleteTeam = async (teamId: string) => {
+    if (!leagueId || !isCommissioner || !user?.id) {
+      console.error('[DraftRoom] Cannot delete team - missing requirements:', { leagueId, isCommissioner, userId: user?.id });
+      throw new Error('Cannot delete team: Missing league ID, commissioner status, or user ID');
+    }
+
+    try {
+      console.log('[DraftRoom] Attempting to delete team:', { teamId, leagueId, userId: user.id });
+      const { success, error } = await LeagueService.deleteTeam(teamId, leagueId, user.id);
+      if (error) {
+        console.error('[DraftRoom] Error from deleteTeam service:', error);
+        logger.error('Error deleting team:', error);
+        throw error;
+      }
+
+      if (success) {
+        // Reload teams after deleting
+        await loadDraftData();
+        logger.log('Team deleted successfully, reloaded draft data');
+      } else {
+        throw new Error('Delete operation returned success=false but no error');
+      }
+    } catch (err) {
+      console.error('[DraftRoom] Exception deleting team:', err);
+      logger.error('Exception deleting team:', err);
+      throw err;
     }
   };
 
@@ -1236,6 +1278,20 @@ const DraftRoom = () => {
       setDraftSettings(settings);
       setTimeRemaining(settings.pickTimeLimit);
 
+      // Save pickTimeLimit to league settings for persistence
+      if (league) {
+        await supabase
+          .from('leagues')
+          .update({
+            settings: {
+              ...(league.settings || {}),
+              pickTimeLimit: settings.pickTimeLimit,
+              draftOrder: settings.draftOrder
+            }
+          })
+          .eq('id', leagueId);
+      }
+
       // Initialize draft order
       const draftRounds = settings.rounds || league?.draft_rounds || 21;
       
@@ -1245,7 +1301,8 @@ const DraftRoom = () => {
           : (customDraftOrder || randomizedTeamOrder || undefined);
         
         const { error: initError } = await DraftService.initializeDraftOrder(
-          leagueId, 
+          leagueId,
+          user.id,
           teams, 
           draftRounds,
           false,
@@ -1261,7 +1318,8 @@ const DraftRoom = () => {
         }
         
         const { error: retryError } = await DraftService.initializeDraftOrder(
-          leagueId, 
+          leagueId,
+          user.id,
           teams, 
           draftRounds,
           true,
@@ -1325,7 +1383,7 @@ const DraftRoom = () => {
 
       // Ensure draft order exists (should be created by prepare)
       const draftRounds = settings.rounds || league?.draft_rounds || 21;
-      const { order: existingOrder } = await DraftService.getDraftOrder(leagueId, 1);
+      const { order: existingOrder } = await DraftService.getDraftOrder(leagueId, user.id, 1);
       
       if (!existingOrder) {
         // Draft order doesn't exist, create it now
@@ -1336,7 +1394,8 @@ const DraftRoom = () => {
           : (customDraftOrder || randomizedTeamOrder || undefined);
         
         const { error: initError } = await DraftService.initializeDraftOrder(
-          leagueId, 
+          leagueId,
+          user.id,
           teams, 
           draftRounds,
           false,
@@ -1349,10 +1408,17 @@ const DraftRoom = () => {
         }
       }
 
-      // Update league status to in_progress
+      // Update league status to in_progress and save draft settings
       const { error: leagueStatusError } = await supabase
         .from('leagues')
-        .update({ draft_status: 'in_progress' })
+        .update({ 
+          draft_status: 'in_progress',
+          settings: {
+            ...(league?.settings || {}),
+            pickTimeLimit: settings.pickTimeLimit,
+            draftOrder: settings.draftOrder
+          }
+        })
         .eq('id', leagueId);
       
       if (leagueStatusError) {
@@ -1361,9 +1427,17 @@ const DraftRoom = () => {
         return;
       }
 
-      // Update local league state
+      // Update local league state with saved settings
       if (league) {
-        setLeague({ ...league, draft_status: 'in_progress' });
+        setLeague({ 
+          ...league, 
+          draft_status: 'in_progress',
+          settings: {
+            ...(league.settings || {}),
+            pickTimeLimit: settings.pickTimeLimit,
+            draftOrder: settings.draftOrder
+          }
+        });
       }
 
       // Set draft phase to active
@@ -1377,7 +1451,7 @@ const DraftRoom = () => {
       const loadStateAfterStart = async (retryCount: number = 0) => {
         try {
           // Verify draft order exists
-          const { order: verifyOrder, error: orderError } = await DraftService.getDraftOrder(leagueId, 1);
+          const { order: verifyOrder, error: orderError } = await DraftService.getDraftOrder(leagueId, user.id, 1);
           
           if (orderError || !verifyOrder) {
             if (retryCount < 10) {
@@ -1650,11 +1724,6 @@ const DraftRoom = () => {
     }
   };
 
-  // Helper to simulate a completed draft for demo purposes
-  const simulateDraftCompletion = () => {
-    setDraftPhase(DraftPhase.COMPLETED);
-  };
-
   // Queue handlers
   const handleAddToQueue = (playerId: string) => {
     if (!draftQueue.includes(playerId)) {
@@ -1802,7 +1871,7 @@ const DraftRoom = () => {
       
       // If still no session ID, try to get active session
       if (!sessionId) {
-        const { sessionId: activeSessionId } = await DraftService.getActiveDraftSession(leagueId);
+        const { sessionId: activeSessionId } = await DraftService.getActiveDraftSession(leagueId, user.id);
         sessionId = activeSessionId;
       }
 
@@ -1883,21 +1952,7 @@ const DraftRoom = () => {
   // ALWAYS render something - never return null
   return (
     <div className="min-h-screen bg-background relative">
-      {/* Debug indicator - always visible */}
-      <div className="fixed top-0 left-0 right-0 bg-red-600 text-white text-xs p-1 z-[9999] font-mono">
-        DR: L={String(loading)} AL={String(authLoading)} U={String(!!user)} E={String(!!error)} P={String(draftPhase)} Lg={String(!!league)} T={String(teams?.length || 0)}
-      </div>
       <Navbar />
-      
-      {/* Dev Tool Toggle */}
-      <div className="fixed bottom-4 right-4 z-50 bg-card border shadow-lg p-3 rounded-lg flex flex-col gap-2">
-         <div className="text-xs font-bold text-muted-foreground mb-1">Developer Tools</div>
-         <div className="flex items-center space-x-2">
-            <Switch id="commissioner-mode" checked={isCommissioner} onCheckedChange={setIsCommissioner} />
-            <Label htmlFor="commissioner-mode">Commissioner Mode</Label>
-         </div>
-         <Button size="sm" variant="outline" onClick={simulateDraftCompletion}>Simulate Completed Draft</Button>
-      </div>
 
 
       <main className="w-full pt-28 pb-16 m-0 p-0">
@@ -1963,8 +2018,11 @@ const DraftRoom = () => {
                 }}
                 leagueDraftRounds={league?.draft_rounds || 21}
                 onAddAITeams={handleAddAITeams}
+                onDeleteTeam={handleDeleteTeam}
                 leagueId={leagueId}
                 maxTeams={league?.settings?.teamsCount || 12}
+                joinCode={league?.join_code}
+                leagueName={league?.name}
               />
             ) : null}
           </div>

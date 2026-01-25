@@ -13,16 +13,18 @@ export const DraftTimer = ({ timeRemaining, isActive, totalTime = 90 }: DraftTim
   const progress = ((totalTime - timeRemaining) / totalTime) * 100;
   const minutes = Math.floor(timeRemaining / 60);
   const seconds = timeRemaining % 60;
+  const totalMinutes = Math.floor(totalTime / 60);
+  const totalSeconds = totalTime % 60;
   
   const getTimerColor = () => {
-    if (timeRemaining > 30) return 'text-green-600';
-    if (timeRemaining > 10) return 'text-orange-600';
+    if (timeRemaining > totalTime * 0.33) return 'text-green-600';
+    if (timeRemaining > totalTime * 0.11) return 'text-orange-600';
     return 'text-red-600';
   };
 
   const getProgressColor = () => {
-    if (timeRemaining > 30) return 'bg-green-500';
-    if (timeRemaining > 10) return 'bg-orange-500';
+    if (timeRemaining > totalTime * 0.33) return 'bg-green-500';
+    if (timeRemaining > totalTime * 0.11) return 'bg-orange-500';
     return 'bg-red-500';
   };
 
@@ -55,7 +57,7 @@ export const DraftTimer = ({ timeRemaining, isActive, totalTime = 90 }: DraftTim
         />
         <div className="flex justify-between text-xs text-muted-foreground">
           <span>0:00</span>
-          <span>1:30</span>
+          <span>{String(totalMinutes).padStart(2, '0')}:{String(totalSeconds).padStart(2, '0')}</span>
         </div>
       </div>
       

@@ -176,7 +176,7 @@ const FreeAgents = () => {
       
       // LeagueService determines free agents - uses real database if leagueId provided
       // Dropped players (with deleted_at) will be included as free agents
-      const freeAgents = await LeagueService.getFreeAgents(allPlayers, currentLeagueId);
+      const freeAgents = await LeagueService.getFreeAgents(allPlayers, currentLeagueId, user.id);
       setPlayers(freeAgents);
       
       // Don't calculate schedule maximizers here - will be lazy loaded when tab is active
@@ -239,7 +239,7 @@ const FreeAgents = () => {
       if (user && leagueId) {
         try {
           // Get league data to calculate proper matchup week
-          const { league: leagueData, error: leagueError } = await LeagueService.getLeague(leagueId);
+          const { league: leagueData, error: leagueError } = await LeagueService.getLeague(leagueId, user.id);
           if (!leagueError && leagueData && leagueData.draft_status === 'completed') {
             const draftCompletionDate = getDraftCompletionDate(leagueData);
             if (draftCompletionDate) {
@@ -345,7 +345,7 @@ const FreeAgents = () => {
 
     try {
       // Check roster size before attempting to add
-      const { league, error: leagueError } = await LeagueService.getLeague(leagueId);
+      const { league, error: leagueError } = await LeagueService.getLeague(leagueId, user.id);
       if (leagueError || !league) {
         toast({
           title: "Error",
@@ -396,7 +396,7 @@ const FreeAgents = () => {
       const lineupData = lineupDataResult as any;
 
       // Calculate current roster size
-      // If lineup exists, use it; otherwise count draft picks
+      // If lineup exists, use it; otherwise count roster_assignments (source of truth)
       let currentRosterSize = 0;
       if (lineupData) {
         // Lineup exists - use lineup data
@@ -405,24 +405,23 @@ const FreeAgents = () => {
           (lineupData.bench?.length || 0) +
           (lineupData.ir?.length || 0);
       } else {
-        // No lineup exists yet - count draft picks instead
-        const { count: draftPicksCount, error: picksError } = await supabase
-          .from('draft_picks')
+        // No lineup exists yet - count roster_assignments instead
+        const { count: rosterCount, error: rosterError } = await supabase
+          .from('roster_assignments')
           .select(COLUMNS.COUNT, { count: 'exact', head: true })
           .eq('team_id' as any, teamData.id as any)
-          .eq('league_id' as any, leagueId as any)
-          .is('deleted_at', null);
+          .eq('league_id' as any, leagueId as any);
         
-        if (picksError) {
-          console.error('Error counting draft picks:', picksError);
+        if (rosterError) {
+          console.error('Error counting roster_assignments:', rosterError);
           toast({
             title: "Error",
-            description: "Could not load draft picks for roster size check.",
+            description: "Could not load roster for size check.",
             variant: "destructive"
           });
           return;
         } else {
-          currentRosterSize = draftPicksCount || 0;
+          currentRosterSize = rosterCount || 0;
         }
       }
 

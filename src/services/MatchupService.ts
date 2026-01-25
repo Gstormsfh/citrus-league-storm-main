@@ -553,8 +553,8 @@ export const MatchupService = {
         return { data: null, error: new Error('Matchup not found') };
       }
 
-      // Get league
-      const { league, error: leagueError } = await LeagueService.getLeague(matchup.league_id);
+      // Get league (with membership validation)
+      const { league, error: leagueError } = await LeagueService.getLeague(matchup.league_id, userId);
       if (leagueError || !league) {
         return { data: null, error: leagueError || new Error('League not found') };
       }
@@ -631,9 +631,9 @@ export const MatchupService = {
       const opponentSlotAssignments = isViewingTeam1 ? team2SlotAssignments : team1SlotAssignments;
 
       // Get records
-      const viewingRecord = await this.getTeamRecord(viewingTeam.id, matchup.league_id);
+      const viewingRecord = await this.getTeamRecord(viewingTeam.id, matchup.league_id, userId);
       const opponentRecord = opponentTeamObj 
-        ? await this.getTeamRecord(opponentTeamObj.id, matchup.league_id)
+        ? await this.getTeamRecord(opponentTeamObj.id, matchup.league_id, userId)
         : { wins: 0, losses: 0 };
 
       // Calculate daily scores
@@ -930,8 +930,8 @@ export const MatchupService = {
       const opponentSlotAssignments = normalizeSlotAssignments(isTeam1 ? team2SlotAssignments : team1SlotAssignments);
 
       // Get team records
-      const userRecord = await this.getTeamRecord(userTeam.id, leagueId);
-      const opponentRecord = opponentTeamObj ? await this.getTeamRecord(opponentTeamObj.id, leagueId) : { wins: 0, losses: 0 };
+      const userRecord = await this.getTeamRecord(userTeam.id, leagueId, userId);
+      const opponentRecord = opponentTeamObj ? await this.getTeamRecord(opponentTeamObj.id, leagueId, userId) : { wins: 0, losses: 0 };
 
       // Calculate daily points
       const matchupStatus = matchup.status;
@@ -1142,7 +1142,7 @@ export const MatchupService = {
       if (picksError) {
         console.error('Error fetching draft picks for team:', picksError);
         // Fallback to old method if direct query fails
-        const { picks: draftPicks } = await DraftService.getDraftPicks(leagueId);
+        const { picks: draftPicks } = await DraftService.getDraftPicks(leagueId, userId);
         const teamPicks = draftPicks.filter(p => p.team_id === teamId);
         const playerIds = teamPicks.map(p => p.player_id);
         const teamPlayers = allPlayers.filter(p => playerIds.includes(p.id));
@@ -1699,6 +1699,7 @@ export const MatchupService = {
   async getMatchupRosters(
     matchup: Matchup,
     allPlayers: Player[],
+    userId: string,
     timezone: string = 'America/Denver',
     targetDate?: string // Optional: if provided and is past date, use frozen roster for that date
   ): Promise<{ 
@@ -1722,8 +1723,8 @@ export const MatchupService = {
         };
       }
 
-      // Get league to access scoring settings
-      const { league } = await LeagueService.getLeague(matchup.league_id);
+      // Get league to access scoring settings (with membership validation)
+      const { league } = await LeagueService.getLeague(matchup.league_id, userId);
       const scoringSettings = extractScoringSettings(league);
       const scorer = new ScoringCalculator(scoringSettings);
 
@@ -2698,12 +2699,12 @@ export const MatchupService = {
    * Get team record (wins/losses) directly from standings calculation
    * This ensures the matchup tab records always match the standings page
    */
-  async getTeamRecord(teamId: string, leagueId: string): Promise<{ wins: number; losses: number }> {
+  async getTeamRecord(teamId: string, leagueId: string, userId: string): Promise<{ wins: number; losses: number }> {
     try {
       // Get all required data for standings calculation
       const [teamsResult, picksResult, playersResult] = await Promise.all([
         LeagueService.getLeagueTeams(leagueId),
-        DraftService.getDraftPicks(leagueId),
+        DraftService.getDraftPicks(leagueId, userId),
         PlayerService.getAllPlayers()
       ]);
 

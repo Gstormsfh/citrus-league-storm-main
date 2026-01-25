@@ -158,8 +158,8 @@ const CreateLeague = () => {
         description: `${league.name} has been created successfully.`,
       });
 
-      // Navigate to league dashboard
-      navigate(`/league/${league.id}`);
+      // Navigate to league dashboard (include query param for LeagueContext)
+      navigate(`/league/${league.id}?league=${league.id}`);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Failed to create league";
       setError(errorMessage);
@@ -211,8 +211,8 @@ const CreateLeague = () => {
         description: `Welcome to ${league.name}! Your team "${team.team_name}" has been created.`,
       });
 
-      // Navigate to league dashboard
-      navigate(`/league/${league.id}`);
+      // Navigate to league dashboard (include query param for LeagueContext)
+      navigate(`/league/${league.id}?league=${league.id}`);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Failed to join league";
       setError(errorMessage);

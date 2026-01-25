@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -16,15 +16,19 @@ import {
   Trophy, 
   Crown,
   UserPlus,
-  Copy,
-  Check,
   Hourglass,
   Shuffle,
   List,
   GripVertical,
   ArrowUp,
   ArrowDown,
-  Edit
+  Edit,
+  Trash2,
+  AlertTriangle,
+  Copy,
+  Check,
+  Mail,
+  Link as LinkIcon
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -59,8 +63,11 @@ interface DraftLobbyProps {
   leagueDraftRounds?: number; // League's draft_rounds setting
   onResetDraft?: () => void; // Optional reset draft handler
   onAddAITeams?: () => Promise<void>; // Optional callback to add AI teams
+  onDeleteTeam?: (teamId: string) => Promise<void>; // Optional callback to delete a team
   leagueId?: string; // League ID for adding AI teams
   maxTeams?: number; // Maximum teams allowed in league (from settings.teamsCount)
+  joinCode?: string; // League join code for inviting managers
+  leagueName?: string; // League name for email template
 }
 
 export const DraftLobby = ({ 
@@ -72,6 +79,7 @@ export const DraftLobby = ({
   isDraftQueued = false,
   currentPick = 0,
   totalPicks = 0,
+  onDeleteTeam,
   onRandomizeOrder,
   randomizedOrder,
   customDraftOrder,
@@ -80,11 +88,15 @@ export const DraftLobby = ({
   onResetDraft,
   onAddAITeams,
   leagueId,
-  maxTeams = 12
+  maxTeams = 12,
+  joinCode,
+  leagueName
 }: DraftLobbyProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [copied, setCopied] = useState(false);
+  const [teamToDelete, setTeamToDelete] = useState<Team | null>(null);
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   const [settings, setSettings] = useState<DraftSettings>({
     rounds: leagueDraftRounds, // Use league's draft_rounds setting
     pickTimeLimit: 90,
@@ -202,16 +214,25 @@ export const DraftLobby = ({
     return teams.map(t => t.id);
   };
 
-  const draftCode = "DRAFT-2024-NHL";
+  const handleDeleteTeam = async () => {
+    if (!teamToDelete || !onDeleteTeam) return;
 
-  const handleCopyCode = () => {
-    navigator.clipboard.writeText(draftCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-    toast({
-      title: "Draft code copied!",
-      description: "Share this code with other managers to join the draft.",
-    });
+    try {
+      await onDeleteTeam(teamToDelete.id);
+      toast({
+        title: "Team Removed",
+        description: `${teamToDelete.name} has been removed from the league.`,
+      });
+      setTeamToDelete(null);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : (typeof error === 'string' ? error : JSON.stringify(error)) || 'Unknown error';
+      console.error('[DraftLobby] Error deleting team:', error);
+      toast({
+        title: "Error",
+        description: `Failed to remove team: ${errorMessage}`,
+        variant: "destructive"
+      });
+    }
   };
 
   const handleStartDraft = () => {
@@ -503,11 +524,7 @@ export const DraftLobby = ({
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5" />
-                All Teams ({teams.length}/{leagueId ? (() => {
-                  // We need to get max teams from league, but we don't have it in props
-                  // For now, show dynamic count - will be updated when league data is available
-                  return 12; // Default, will be updated via parent
-                })() : 12})
+                All Teams ({teams.length}/{maxTeams})
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -524,6 +541,16 @@ export const DraftLobby = ({
                       <div className="font-medium">{team.name}</div>
                       <div className="text-sm text-muted-foreground">{team.owner}</div>
                     </div>
+                    {isCommissioner && onDeleteTeam && !hasExistingDraft && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                        onClick={() => setTeamToDelete(team)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 ))}
                 
@@ -644,26 +671,106 @@ export const DraftLobby = ({
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Join Draft */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Invite Managers</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Draft Code</Label>
-                <div className="flex gap-2">
-                  <Input value={draftCode} readOnly className="font-mono" />
-                  <Button variant="outline" size="icon" onClick={handleCopyCode}>
-                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+          {/* League Invite Code - Commissioner Only */}
+          {isCommissioner && joinCode && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <UserPlus className="h-4 w-4" />
+                  Invite Managers
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {/* Join Code Display - Compact */}
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 px-3 py-2 bg-muted rounded-md border">
+                    <div className="text-lg font-mono font-semibold text-center">{joinCode}</div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9"
+                    onClick={() => {
+                      if (joinCode) {
+                        navigator.clipboard.writeText(joinCode);
+                        setCopiedCode(true);
+                        toast({
+                          title: 'Copied!',
+                          description: 'Join code copied',
+                        });
+                        setTimeout(() => setCopiedCode(false), 2000);
+                      }
+                    }}
+                  >
+                    {copiedCode ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   </Button>
                 </div>
-              </div>
-              <div className="text-sm text-muted-foreground">
-                Share this code with other managers so they can join your draft.
-              </div>
-            </CardContent>
-          </Card>
+
+                {/* Quick Actions - Compact Row */}
+                <div className="flex gap-2">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => {
+                      if (joinCode) {
+                        const inviteLink = `${window.location.origin}/create-league?tab=join&code=${joinCode}`;
+                        const subject = encodeURIComponent(`Join my fantasy league: ${leagueName || 'My League'}`);
+                        const body = encodeURIComponent(`Hi!
+
+I'd like to invite you to join my fantasy hockey league on Citrus League Storm:
+
+League: ${leagueName || 'My League'}
+Join Code: ${joinCode}
+
+You can join in two ways:
+1. Click this link: ${inviteLink}
+2. Or enter the join code manually: ${joinCode}
+
+Looking forward to competing with you!
+
+Best,
+Your Commissioner`);
+                        window.location.href = `mailto:?subject=${subject}&body=${body}`;
+                      }
+                    }}
+                  >
+                    <Mail className="h-3.5 w-3.5 mr-1.5" />
+                    Email
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => {
+                      if (joinCode) {
+                        const inviteLink = `${window.location.origin}/create-league?tab=join&code=${joinCode}`;
+                        navigator.clipboard.writeText(inviteLink);
+                        setCopiedLink(true);
+                        toast({
+                          title: 'Link Copied!',
+                          description: 'Invite link copied',
+                        });
+                        setTimeout(() => setCopiedLink(false), 2000);
+                      }
+                    }}
+                  >
+                    {copiedLink ? (
+                      <>
+                        <Check className="h-3.5 w-3.5 mr-1.5" />
+                        Copied
+                      </>
+                    ) : (
+                      <>
+                        <LinkIcon className="h-3.5 w-3.5 mr-1.5" />
+                        Link
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Start Draft or Waiting Status */}
           {isCommissioner ? (
@@ -675,7 +782,7 @@ export const DraftLobby = ({
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Teams joined:</span>
-                    <span className="font-medium">{teams.length}/12</span>
+                    <span className="font-medium">{teams.length}/{maxTeams}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Minimum required:</span>
@@ -799,6 +906,31 @@ export const DraftLobby = ({
           </Card>
         </div>
       </div>
+
+      {/* Delete Team Confirmation Dialog */}
+      <Dialog open={!!teamToDelete} onOpenChange={() => setTeamToDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Remove Team
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove <span className="font-semibold">{teamToDelete?.name}</span> from this league?
+              This will remove all their draft picks, roster data, and cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTeamToDelete(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteTeam}>
+              <Trash2 className="h-4 w-4 mr-2" />
+              Remove Team
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

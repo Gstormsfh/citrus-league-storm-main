@@ -133,7 +133,7 @@ const TeamAnalytics = () => {
       
       // Get free agents
       const allPlayers = await PlayerService.getAllPlayers();
-      const freeAgents = await LeagueService.getFreeAgents(allPlayers, currentLeagueId);
+      const freeAgents = await LeagueService.getFreeAgents(allPlayers, currentLeagueId, user.id);
       
       // Calculate games this week for each free agent
       const maximizers: FreeAgentRec[] = [];

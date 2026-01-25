@@ -6,6 +6,8 @@ import { DEMO_LEAGUE_ID } from '@/services/DemoLeagueService';
 import { MatchupService } from '@/services/MatchupService';
 import { RosterCacheService } from '@/services/RosterCacheService';
 import { PlayerService } from '@/services/PlayerService';
+import { LeagueMembershipService } from '@/services/LeagueMembershipService';
+import { useToast } from '@/hooks/use-toast';
 
 export type UserLeagueState = 'guest' | 'logged-in-no-league' | 'active-user';
 
@@ -62,6 +64,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const { toast } = useToast();
   
   const [activeLeagueId, setActiveLeagueIdState] = useState<string | null>(null);
   const [activeLeague, setActiveLeague] = useState<League | null>(null);
@@ -219,16 +222,56 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  // Update active league when URL param changes
+  // Update active league when URL param changes (with membership validation)
   useEffect(() => {
-    if (urlLeagueId && urlLeagueId !== activeLeagueId) {
-      const league = userLeagues.find(l => l.id === urlLeagueId);
-      if (league) {
-        setActiveLeagueIdState(urlLeagueId);
-        setActiveLeague(league);
-      }
+    if (urlLeagueId && urlLeagueId !== activeLeagueId && user) {
+      const verifyAndSetLeague = async () => {
+        // First check if league is in user's leagues array
+        const league = userLeagues.find(l => l.id === urlLeagueId);
+        
+        if (!league) {
+          // League not in user's leagues - block access
+          console.warn('[LeagueContext] User attempted to access league not in their list:', urlLeagueId);
+          navigate('/leagues');
+          toast({
+            title: "Access Denied",
+            description: "You are not a member of this league.",
+            variant: "destructive"
+          });
+          return;
+        }
+
+        // Explicitly verify membership (defense in depth)
+        try {
+          const isMember = await LeagueMembershipService.verifyMembership(urlLeagueId, user.id);
+          
+          if (isMember) {
+            setActiveLeagueIdState(urlLeagueId);
+            setActiveLeague(league);
+          } else {
+            // Membership check failed - block access
+            console.error('[LeagueContext] Membership verification failed for league:', urlLeagueId);
+            navigate('/leagues');
+            toast({
+              title: "Access Denied",
+              description: "You are not a member of this league.",
+              variant: "destructive"
+            });
+          }
+        } catch (error) {
+          console.error('[LeagueContext] Error verifying membership:', error);
+          navigate('/leagues');
+          toast({
+            title: "Error",
+            description: "Failed to verify league access.",
+            variant: "destructive"
+          });
+        }
+      };
+
+      verifyAndSetLeague();
     }
-  }, [urlLeagueId, userLeagues]);
+  }, [urlLeagueId, userLeagues, user, activeLeagueId, navigate, toast]);
 
   const value: LeagueContextType = {
     activeLeagueId,

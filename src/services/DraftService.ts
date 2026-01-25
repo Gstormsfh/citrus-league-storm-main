@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
 import { Team, LeagueService } from './LeagueService';
 import { PlayerService } from './PlayerService';
+import { LeagueMembershipService } from './LeagueMembershipService';
 
 export interface DraftPick {
   id: string;
@@ -37,9 +38,13 @@ export interface DraftState {
 export const DraftService = {
   /**
    * Get or create active draft session for a league
+   * REQUIRES: User must be a member of the league
    */
-  async getActiveDraftSession(leagueId: string): Promise<{ sessionId: string; error: any }> {
+  async getActiveDraftSession(leagueId: string, userId: string): Promise<{ sessionId: string; error: any }> {
     try {
+      // CRITICAL: Validate membership BEFORE accessing draft data
+      await LeagueMembershipService.requireMembership(leagueId, userId);
+
       // First, check the league status - only look for active sessions if draft is in progress
       const { data: leagueData } = await supabase
         .from('leagues')
@@ -101,10 +106,11 @@ export const DraftService = {
 
   /**
    * Get all draft picks for a league (active session only)
+   * REQUIRES: User must be a member of the league
    */
-  async getDraftPicks(leagueId: string, sessionId?: string): Promise<{ picks: DraftPick[]; error: any }> {
+  async getDraftPicks(leagueId: string, userId: string, sessionId?: string): Promise<{ picks: DraftPick[]; error: any }> {
     try {
-      const { sessionId: activeSessionId } = await this.getActiveDraftSession(leagueId);
+      const { sessionId: activeSessionId } = await this.getActiveDraftSession(leagueId, userId);
       const targetSessionId = sessionId || activeSessionId;
 
       // If no session ID found, return empty array (no draft data exists)
@@ -129,10 +135,11 @@ export const DraftService = {
 
   /**
    * Get draft order for a specific round (active session only)
+   * REQUIRES: User must be a member of the league
    */
-  async getDraftOrder(leagueId: string, roundNumber: number, sessionId?: string): Promise<{ order: DraftOrder | null; error: any }> {
+  async getDraftOrder(leagueId: string, userId: string, roundNumber: number, sessionId?: string): Promise<{ order: DraftOrder | null; error: any }> {
     try {
-      const { sessionId: activeSessionId } = await this.getActiveDraftSession(leagueId);
+      const { sessionId: activeSessionId } = await this.getActiveDraftSession(leagueId, userId);
       const targetSessionId = sessionId || activeSessionId;
 
       const { data, error } = await supabase
@@ -157,7 +164,8 @@ export const DraftService = {
    * @param customTeamOrder Optional array of team IDs in the desired order. If not provided, uses teams array order.
    */
   async initializeDraftOrder(
-    leagueId: string, 
+    leagueId: string,
+    userId: string,
     teams: Team[], 
     totalRounds: number,
     resetExisting: boolean = false,
@@ -194,7 +202,7 @@ export const DraftService = {
         sessionId = crypto.randomUUID();
       } else {
         // Check if order already exists for this league (in active session)
-        const { order: existingOrder } = await this.getDraftOrder(leagueId, 1);
+        const { order: existingOrder } = await this.getDraftOrder(leagueId, userId, 1);
         if (existingOrder?.draft_session_id && !customTeamOrder) {
           // Use existing session only if no custom order is provided
           sessionId = existingOrder.draft_session_id;
@@ -215,7 +223,7 @@ export const DraftService = {
         }
         
         // Get or create session
-        const { sessionId: activeSessionId } = await this.getActiveDraftSession(leagueId);
+        const { sessionId: activeSessionId } = await this.getActiveDraftSession(leagueId, userId);
         sessionId = customTeamOrder ? crypto.randomUUID() : activeSessionId;
       }
       
@@ -400,7 +408,9 @@ export const DraftService = {
             const { getFirstWeekStartDate, getDraftCompletionDate } = await import('@/utils/weekCalculator');
             
             // Get league data to determine first week start
-            const { league } = await LeagueService.getLeague(leagueId);
+            // Note: This is internal service call, userId should be passed from calling context
+            // For now, we'll skip membership check here since this is called after draft completion
+            const { league } = await LeagueService.getLeague(leagueId, userId);
             if (league) {
               const draftCompletionDate = getDraftCompletionDate(league);
               if (draftCompletionDate) {
@@ -682,16 +692,18 @@ export const DraftService = {
 
   /**
    * Subscribe to draft picks changes (realtime) - active session only
+   * REQUIRES: User must be a member of the league
    */
   subscribeToDraftPicks(
     leagueId: string,
+    userId: string,
     callback: (pick: DraftPick) => void,
     sessionId?: string
   ) {
     let activeSessionId: string | undefined = sessionId;
 
     // Get active session if not provided
-    this.getActiveDraftSession(leagueId).then(({ sessionId }) => {
+    this.getActiveDraftSession(leagueId, userId).then(({ sessionId }) => {
       if (!activeSessionId) {
         activeSessionId = sessionId;
       }
@@ -715,7 +727,7 @@ export const DraftService = {
               callback(pick);
             } else if (!activeSessionId) {
               // If we don't have session yet, check if this is the active one
-              const { sessionId } = await this.getActiveDraftSession(leagueId);
+              const { sessionId } = await this.getActiveDraftSession(leagueId, userId);
               if (pick.draft_session_id === sessionId) {
                 activeSessionId = sessionId;
                 callback(pick);
@@ -764,7 +776,8 @@ export const DraftService = {
           const { lineup, error } = await LeagueService.initializeTeamLineup(
             team.id,
             leagueId,
-            allPlayers
+            allPlayers,
+            userId
           );
           
           if (error) {

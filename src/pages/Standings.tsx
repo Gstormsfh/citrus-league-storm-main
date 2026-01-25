@@ -134,7 +134,7 @@ const Standings = () => {
           }
 
           // Get league to check draft status
-          const { league: leagueData, error: leagueError } = await LeagueService.getLeague(leagueToUse);
+          const { league: leagueData, error: leagueError } = await LeagueService.getLeague(leagueToUse, user.id);
           if (leagueError) throw leagueError;
 
           // Get teams for selected league with owner information
@@ -149,7 +149,7 @@ const Standings = () => {
           
           if (leagueData && leagueData.draft_status === 'completed') {
             // Get draft picks for this league to calculate team stats
-            const { picks: draftPicks } = await DraftService.getDraftPicks(leagueToUse);
+            const { picks: draftPicks } = await DraftService.getDraftPicks(leagueToUse, user.id);
             
             if (draftPicks && draftPicks.length > 0) {
               // Get all players to calculate points

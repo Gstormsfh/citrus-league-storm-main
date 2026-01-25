@@ -111,7 +111,7 @@ export const HeadlinesBanner = () => {
             .maybeSingle();
 
           if (userTeam) {
-            const record = await MatchupService.getTeamRecord(userTeam.id, activeLeagueId);
+            const record = await MatchupService.getTeamRecord(userTeam.id, activeLeagueId, user.id);
             
             // Get recent matchups to calculate streak
             const { data: recentMatchups } = await supabase

@@ -281,7 +281,7 @@ const OtherTeam = () => {
         }
 
         // Check if draft is completed
-        const { league: leagueData, error: leagueError } = await LeagueService.getLeague(teamData.league_id);
+        const { league: leagueData, error: leagueError } = await LeagueService.getLeague(teamData.league_id, user.id);
         if (leagueError || !leagueData || leagueData.draft_status !== 'completed') {
           console.log(`Draft not completed for league ${teamData.league_id}`);
           setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
@@ -293,7 +293,7 @@ const OtherTeam = () => {
         const allPlayers = await PlayerService.getAllPlayers();
         
         // Get draft picks for this team
-        const { picks: draftPicks } = await DraftService.getDraftPicks(teamData.league_id);
+        const { picks: draftPicks } = await DraftService.getDraftPicks(teamData.league_id, user.id);
         const teamPicks = draftPicks.filter(p => p.team_id === teamId);
         
         if (teamPicks.length === 0) {

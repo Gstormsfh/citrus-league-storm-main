@@ -462,7 +462,9 @@ const Roster = () => {
           // Map draft picks to players
           const teamDraftPicks = (teamDraftPicksData || []) as any[];
           const playerIds = teamDraftPicks.map((p: any) => p.player_id);
-          const teamPlayers = allPlayers.filter(p => playerIds.includes(p.id));
+          // CRITICAL FIX: playerIds are STRINGS from DB, but p.id is a NUMBER
+          const playerIdsAsNumbers = playerIds.map((id: any) => typeof id === 'string' ? parseInt(id) : id);
+          const teamPlayers = allPlayers.filter(p => playerIdsAsNumbers.includes(p.id));
           
           if (teamPlayers.length === 0) {
             console.error('[Roster] Demo team has no players in roster');
@@ -500,7 +502,7 @@ const Roster = () => {
           userTeamData = teamDataResult as { id: string; league_id: string; team_name: string };
 
           // Check if draft is completed before loading roster
-          const { league: leagueData, error: leagueError } = await LeagueService.getLeague(userTeamData.league_id);
+          const { league: leagueData, error: leagueError } = await LeagueService.getLeague(userTeamData.league_id, user.id);
           if (leagueError || !leagueData || leagueData.draft_status !== 'completed') {
             // Draft not completed - show empty roster
             setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
@@ -513,50 +515,28 @@ const Roster = () => {
           teamId = userTeamData.id;
           setUserTeamId(teamId);
           setUserTeam(userTeamData);
-          // Draft is completed - get roster from draft picks
-          // Get ALL draft picks for this team (including post-draft adds with round 999)
-          // Don't filter by session to include players added via free agency
-          const { data: allDraftPicksData, error: picksError } = await supabase
-            .from('draft_picks')
-            .select(COLUMNS.DRAFT_PICK)
+          // Draft is completed - get roster from roster_assignments (Source of Truth)
+          const { data: rosterAssignmentsData, error: rosterError } = await supabase
+            .from('roster_assignments')
+            .select(COLUMNS.ROSTER_ASSIGNMENT_SLIM)
             .eq('league_id' as any, userTeamData.league_id as any)
-            .eq('team_id' as any, userTeamData.id as any)
-            .is('deleted_at', null)
-            .order('pick_number', { ascending: true });
+            .eq('team_id' as any, userTeamData.id as any);
           
-          if (picksError) {
-            console.error('Error fetching draft picks directly:', picksError);
-            // Fallback: try using DraftService.getDraftPicks as before
-            const { picks: draftPicks, error: fallbackError } = await DraftService.getDraftPicks(userTeamData.league_id);
-            
-            if (fallbackError || !draftPicks) {
-              console.error('Fallback draft picks loading also failed:', fallbackError);
-              // Last resort: empty roster
-              dbPlayers = [];
-            } else {
-              const teamPicks = draftPicks.filter(p => p.team_id === userTeamData.id);
-              const playerIds = teamPicks.map(p => p.player_id);
-              dbPlayers = allPlayers.filter(p => playerIds.includes(p.id));
-            }
+          if (rosterError) {
+            console.error('[Roster] ❌ Error fetching roster_assignments:', rosterError);
+            // Last resort: empty roster
+            dbPlayers = [];
           } else {
-            // Map draft picks to players
-            const allDraftPicks = (allDraftPicksData || []) as any[];
-            const playerIds = allDraftPicks.map((p: any) => p.player_id);
+            const rosterAssignments = (rosterAssignmentsData || []) as any[];
+            const playerIds = rosterAssignments.map((r: any) => r.player_id);
             
-            // DEBUG LOGGING: Track what draft_picks returned
-            console.log('[Roster] 🔍 draft_picks query returned:', allDraftPicks.length, 'picks');
-            console.log('[Roster] 🔍 Player IDs from draft_picks:', playerIds);
+            console.log('[Roster] ✅ roster_assignments query returned:', rosterAssignments.length, 'players');
             
-            // Check if McDavid (8478402) is in draft_picks
-            const MCDAVID_ID = 8478402;
-            const hasMcDavid = playerIds.includes(MCDAVID_ID) || playerIds.includes(String(MCDAVID_ID));
-            console.log('[Roster] 🔍 McDavid (8478402) in draft_picks?', hasMcDavid ? '✅ YES' : '❌ NO');
-            
+            // CRITICAL: player_id is TEXT in DB, and p.id is STRING in allPlayers (PlayerService line 287)
+            // Compare strings to strings directly - no type conversion needed
             dbPlayers = allPlayers.filter(p => playerIds.includes(p.id));
             
-            // Check if McDavid made it through the filter
-            const mcDavidInDbPlayers = dbPlayers.find(p => p.id === MCDAVID_ID);
-            console.log('[Roster] 🔍 McDavid in dbPlayers after filter?', mcDavidInDbPlayers ? '✅ YES' : '❌ NO');
+            console.log('[Roster] ✅ dbPlayers count after filter:', dbPlayers.length);
           }
         }
         
@@ -1192,7 +1172,7 @@ const Roster = () => {
       
       try {
         // Get league to determine first week start
-        const { league, error: leagueError } = await LeagueService.getLeague(userTeam.league_id);
+        const { league, error: leagueError } = await LeagueService.getLeague(userTeam.league_id, user.id);
         if (leagueError || !league) {
           console.error('[Roster] Error loading league for week calculation:', leagueError);
           return;
@@ -1502,7 +1482,7 @@ const Roster = () => {
 
       try {
         // Get league to check draft status FIRST
-        const { league: leagueData, error: leagueError } = await LeagueService.getLeague(userTeam.league_id);
+        const { league: leagueData, error: leagueError } = await LeagueService.getLeague(userTeam.league_id, user.id);
         if (leagueError || !leagueData || leagueData.draft_status !== 'completed') {
           // Draft not completed - show default stats
           setTeamStats({
@@ -1521,7 +1501,7 @@ const Roster = () => {
         if (teamsError) throw teamsError;
 
         // Get draft picks for this league (only used if draft is completed)
-        const { picks: draftPicks } = await DraftService.getDraftPicks(userTeam.league_id);
+        const { picks: draftPicks } = await DraftService.getDraftPicks(userTeam.league_id, user.id);
         
         // If no draft picks, show default values
         if (!draftPicks || draftPicks.length === 0) {
@@ -3110,7 +3090,7 @@ const Roster = () => {
               // Trigger roster reload by calling loadRoster
               // We'll extract loadRoster to be callable
               const allPlayers = await PlayerService.getAllPlayers();
-              const { picks: draftPicks } = await DraftService.getDraftPicks(userTeam.league_id);
+              const { picks: draftPicks } = await DraftService.getDraftPicks(userTeam.league_id, user.id);
               const teamPicks = draftPicks.filter(p => p.team_id === userTeam.id);
               const playerIds = teamPicks.map(p => p.player_id);
               const dbPlayers = allPlayers.filter(p => playerIds.includes(p.id));

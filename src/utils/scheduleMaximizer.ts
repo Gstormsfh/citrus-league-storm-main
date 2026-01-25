@@ -50,7 +50,7 @@ export async function calculateWeekDates(
   // Try to use matchup week if user is logged in and has a league
   if (userId && leagueId) {
     try {
-      const { league: leagueData, error: leagueError } = await LeagueService.getLeague(leagueId);
+      const { league: leagueData, error: leagueError } = await LeagueService.getLeague(leagueId, userId);
       if (!leagueError && leagueData && leagueData.draft_status === 'completed') {
         const draftCompletionDate = getDraftCompletionDate(leagueData);
         if (draftCompletionDate) {

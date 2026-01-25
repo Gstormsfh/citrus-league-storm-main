@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { PlayerService } from './PlayerService';
 import { COLUMNS } from '@/utils/queryColumns';
 import { GameLockService } from './GameLockService';
+import { LeagueMembershipService } from './LeagueMembershipService';
 
 export interface WaiverClaim {
   id: string;
@@ -46,12 +47,17 @@ export class WaiverService {
   /**
    * Check if a player is available for waiver claim or free agent pickup
    * Respects game lock and waiver period rules
+   * REQUIRES: User must be a member of the league
    */
   static async checkPlayerAvailability(
     playerId: number,
-    leagueId: string
+    leagueId: string,
+    userId: string
   ): Promise<PlayerAvailability> {
     try {
+      // CRITICAL: Validate membership BEFORE checking availability
+      await LeagueMembershipService.requireMembership(leagueId, userId);
+
       // Get league settings (all waiver-related settings)
       const { data: league } = await supabase
         .from('leagues')
@@ -458,9 +464,13 @@ export class WaiverService {
 
   /**
    * Get league waiver settings
+   * REQUIRES: User must be a member of the league
    */
-  static async getLeagueWaiverSettings(leagueId: string): Promise<LeagueWaiverSettings | null> {
+  static async getLeagueWaiverSettings(leagueId: string, userId: string): Promise<LeagueWaiverSettings | null> {
     try {
+      // CRITICAL: Validate membership BEFORE querying (application-level security)
+      await LeagueMembershipService.requireMembership(leagueId, userId);
+
       const { data, error } = await supabase
         .from('leagues')
         .select('waiver_process_time, waiver_period_hours, waiver_game_lock, waiver_type, allow_trades_during_games')

@@ -136,7 +136,7 @@ const WaiverWire = () => {
       }
 
       // Load league to get team count
-      const { league, error: leagueError } = await LeagueService.getLeague(activeLeagueId);
+      const { league, error: leagueError } = await LeagueService.getLeague(activeLeagueId, user.id);
       const maxTeams = league?.settings?.teamsCount || 12;
 
       // Get actual team count from teams table (more reliable than waiver_priority length)
@@ -211,7 +211,7 @@ const WaiverWire = () => {
       }
 
       // Load league waiver settings
-      const settings = await WaiverService.getLeagueWaiverSettings(activeLeagueId);
+      const settings = await WaiverService.getLeagueWaiverSettings(activeLeagueId, user.id);
       setWaiverSettings(settings);
 
     } catch (error) {

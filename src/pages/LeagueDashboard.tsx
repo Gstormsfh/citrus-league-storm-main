@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Trophy, Users, Calendar, Settings, Play, Copy, CheckCircle, Clock, Shield, RefreshCw, UserPlus, Crown } from 'lucide-react';
+import { Loader2, Trophy, Users, Calendar, Settings, Play, Copy, CheckCircle, Clock, Shield, RefreshCw, UserPlus, Crown, Mail } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
@@ -78,9 +78,21 @@ const LeagueDashboard = () => {
       setLoading(true);
       setError(null);
 
-      // Load league
-      const { league: leagueData, error: leagueError } = await LeagueService.getLeague(leagueId);
-      if (leagueError) throw leagueError;
+      // Load league (with membership validation)
+      const { league: leagueData, error: leagueError } = await LeagueService.getLeague(leagueId, user.id);
+      if (leagueError) {
+        // Check if it's an access denied error
+        if (leagueError.message?.includes('Access denied') || leagueError.message?.includes('not a member')) {
+          navigate('/leagues');
+          toast({
+            title: "Access Denied",
+            description: "You are not a member of this league.",
+            variant: "destructive"
+          });
+          return;
+        }
+        throw leagueError;
+      }
       if (!leagueData) throw new Error('League not found');
       setLeague(leagueData);
       
@@ -362,10 +374,6 @@ const LeagueDashboard = () => {
               </div>
               {isCommissioner && (
                 <div className="flex gap-2">
-                  <Button variant="outline" onClick={copyJoinCode}>
-                    <Copy className="mr-2 h-4 w-4" />
-                    Copy Join Code
-                  </Button>
                   <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
                     <DialogTrigger asChild>
                       <Button variant="outline">
@@ -527,6 +535,97 @@ const LeagueDashboard = () => {
                         </div>
                       </div>
 
+                      {/* League Invite Code Section */}
+                      <div className="border-t pt-4 mt-4">
+                        <div className="space-y-3">
+                          <div>
+                            <Label className="text-sm font-semibold flex items-center gap-2">
+                              <UserPlus className="h-3.5 w-3.5" />
+                              League Invite Code
+                            </Label>
+                          </div>
+                          
+                          {/* Join Code Display - Compact */}
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 px-3 py-2 bg-muted rounded-md border">
+                              <div className="text-lg font-mono font-semibold text-center">{league.join_code || 'N/A'}</div>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-9 w-9"
+                              onClick={() => {
+                                if (league.join_code) {
+                                  navigator.clipboard.writeText(league.join_code);
+                                  toast({
+                                    title: 'Copied!',
+                                    description: 'Join code copied',
+                                  });
+                                }
+                              }}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          </div>
+
+                          {/* Invite Actions - Compact Row */}
+                          <div className="flex gap-2">
+                            <Button
+                              variant="default"
+                              size="sm"
+                              className="flex-1"
+                              onClick={() => {
+                                if (league.join_code) {
+                                  const inviteLink = `${window.location.origin}/create-league?tab=join&code=${league.join_code}`;
+                                  const subject = encodeURIComponent(`Join my fantasy league: ${league.name}`);
+                                  const body = encodeURIComponent(`Hi!
+
+I'd like to invite you to join my fantasy hockey league on Citrus League Storm:
+
+League: ${league.name}
+Join Code: ${league.join_code}
+
+You can join in two ways:
+1. Click this link: ${inviteLink}
+2. Or enter the join code manually: ${league.join_code}
+
+League Details:
+- Teams: ${teams.length}/${league.settings?.teamsCount || 12} teams
+- Draft Rounds: ${league.draft_rounds}
+
+Looking forward to competing with you!
+
+Best,
+Your Commissioner`);
+                                  window.location.href = `mailto:?subject=${subject}&body=${body}`;
+                                }
+                              }}
+                            >
+                              <Mail className="h-3.5 w-3.5 mr-1.5" />
+                              Email
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1"
+                              onClick={() => {
+                                if (league.join_code) {
+                                  const inviteLink = `${window.location.origin}/create-league?tab=join&code=${league.join_code}`;
+                                  navigator.clipboard.writeText(inviteLink);
+                                  toast({
+                                    title: 'Link Copied!',
+                                    description: 'Invite link copied',
+                                  });
+                                }
+                              }}
+                            >
+                              <Copy className="h-3.5 w-3.5 mr-1.5" />
+                              Link
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+
                       <DialogFooter>
                         <Button variant="outline" onClick={() => setSettingsOpen(false)}>
                           Cancel
@@ -595,98 +694,6 @@ const LeagueDashboard = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
             {isCommissioner && (
               <>
-                {/* Invite Friends Card - Show join code prominently */}
-                {league.draft_status === 'not_started' && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <UserPlus className="h-5 w-5" />
-                        Invite Friends
-                      </CardTitle>
-                      <CardDescription>
-                        Share your league join code to invite friends
-                        {(() => {
-                          const maxTeams = league.settings?.teamsCount || 12;
-                          const remaining = maxTeams - teams.length;
-                          return remaining > 0 
-                            ? ` (${remaining} spot${remaining === 1 ? '' : 's'} remaining)`
-                            : ' (League is full)';
-                        })()}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex items-center gap-2">
-                        <Input 
-                          value={league.join_code || ''} 
-                          readOnly 
-                          className="font-mono text-sm"
-                        />
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => {
-                            if (league.join_code) {
-                              navigator.clipboard.writeText(league.join_code);
-                              toast({
-                                title: 'Copied!',
-                                description: 'Join code copied to clipboard',
-                              });
-                            }
-                          }}
-                        >
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1"
-                          onClick={() => {
-                            if (league.join_code) {
-                              const subject = encodeURIComponent(`Join my fantasy league: ${league.name}`);
-                              const body = encodeURIComponent(`Join my fantasy league "${league.name}" using this code: ${league.join_code}\n\nOr use this link: ${window.location.origin}/create-league?tab=join&code=${league.join_code}`);
-                              window.location.href = `mailto:?subject=${subject}&body=${body}`;
-                            }
-                          }}
-                        >
-                          Email
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1"
-                          onClick={() => {
-                            if (league.join_code) {
-                              const message = encodeURIComponent(`Join my fantasy league "${league.name}" using code: ${league.join_code} or visit: ${window.location.origin}/create-league?tab=join&code=${league.join_code}`);
-                              window.location.href = `sms:?body=${message}`;
-                            }
-                          }}
-                        >
-                          Text
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1"
-                          onClick={() => {
-                            if (league.join_code) {
-                              const inviteLink = `${window.location.origin}/create-league?tab=join&code=${league.join_code}`;
-                              navigator.clipboard.writeText(inviteLink);
-                              toast({
-                                title: 'Link Copied!',
-                                description: 'Invite link copied to clipboard',
-                              });
-                            }
-                          }}
-                        >
-                          Copy Link
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
                 {/* Always show draft room button if commissioner and draft hasn't started */}
                 {league.draft_status === 'not_started' && (
                   <Card>
