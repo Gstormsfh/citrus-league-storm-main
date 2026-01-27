@@ -511,7 +511,6 @@ const FreeAgents = () => {
         
         // Log first few players for debugging
         if (maximizers.length < 3) {
-          const log = (window as any).__originalConsole?.log || console.log;
           log(`[FreeAgents Schedule] Player ${player.name} (${player.team}): ${count} games in week, ${allGames.length} total fetched`);
         }
         
@@ -531,7 +530,6 @@ const FreeAgents = () => {
         });
       }
       
-      const log = (window as any).__originalConsole?.log || console.log;
       log(`[FreeAgents Schedule] Calculated maximizers for ${maximizers.length} players`);
       
       // Sort by games count (descending), then by points (descending)
