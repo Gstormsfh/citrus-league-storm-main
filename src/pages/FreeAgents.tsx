@@ -402,38 +402,48 @@ const FreeAgents = () => {
       
       // Try to get matchup week from league data (for both logged-in users and guests viewing demo)
       const effectiveLeagueId = leagueId || '750f4e1a-92ae-44cf-a798-2f3e06d0d5c9'; // Demo league ID for guests
+      const log = (window as any).__originalConsole?.log || console.log;
       
+      // EXACT SAME LOGIC AS MATCHUP TAB - Fetch matchup directly from database
       try {
-        // Get league data to calculate proper matchup week
-        const { league: leagueData, error: leagueError } = await LeagueService.getLeague(effectiveLeagueId, user?.id);
-        if (!leagueError && leagueData && leagueData.draft_status === 'completed') {
-          const draftCompletionDate = getDraftCompletionDate(leagueData);
-          if (draftCompletionDate) {
-            const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
-            const currentWeek = getCurrentWeekNumber(firstWeekStart);
-            weekStart = getWeekStartDate(currentWeek, firstWeekStart);
-            weekEnd = getWeekEndDate(currentWeek, firstWeekStart);
-            const log = (window as any).__originalConsole?.log || console.log;
-            log(`[FreeAgents Schedule] Using matchup week from league: ${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`);
-          }
+        const { data: matchups, error: matchupError } = await supabase
+          .from('matchups')
+          .select('week_start_date, week_end_date')
+          .eq('league_id', effectiveLeagueId)
+          .eq('status', 'in_progress')
+          .limit(1);
+        
+        if (!matchupError && matchups && matchups.length > 0) {
+          const matchup = matchups[0];
+          weekStart = new Date(matchup.week_start_date + 'T00:00:00');
+          weekStart.setHours(0, 0, 0, 0);
+          weekEnd = new Date(matchup.week_end_date + 'T23:59:59');
+          weekEnd.setHours(23, 59, 59, 999);
+          log(`[FreeAgents Schedule] Using matchup week from database: ${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`);
+        } else {
+          log('[FreeAgents Schedule] No in_progress matchup found, will calculate from league');
         }
       } catch (error) {
-        // Silently fall back to calendar week if league fetch fails
-        console.warn('[FreeAgents Schedule] Could not fetch league data for matchup week calculation, using calendar week:', error);
+        log('[FreeAgents Schedule] Error fetching matchup:', error);
       }
       
-      // Fallback to calendar week if matchup week calculation failed
+      // If no matchup found, calculate from league draft completion date
       if (!weekStart || !weekEnd) {
-        const dayOfWeek = today.getDay();
-        const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-        weekStart = new Date(today);
-        weekStart.setDate(today.getDate() - daysFromMonday);
-        weekStart.setHours(0, 0, 0, 0);
-        weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekStart.getDate() + 6);
-        weekEnd.setHours(23, 59, 59, 999);
-        const log = (window as any).__originalConsole?.log || console.log;
-        log(`[FreeAgents Schedule] Using calendar week: ${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`);
+        try {
+          const { league: leagueData, error: leagueError } = await LeagueService.getLeague(effectiveLeagueId, user?.id);
+          if (!leagueError && leagueData && leagueData.draft_status === 'completed') {
+            const draftCompletionDate = getDraftCompletionDate(leagueData);
+            if (draftCompletionDate) {
+              const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
+              const currentWeek = getCurrentWeekNumber(firstWeekStart);
+              weekStart = getWeekStartDate(currentWeek, firstWeekStart);
+              weekEnd = getWeekEndDate(currentWeek, firstWeekStart);
+              log(`[FreeAgents Schedule] Calculated week from league: ${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`);
+            }
+          }
+        } catch (error) {
+          log('[FreeAgents Schedule] Error fetching league:', error);
+        }
       }
       
       // Batch fetch games for all teams in parallel
