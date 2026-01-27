@@ -17,6 +17,7 @@ import { PlayerService, Player } from '@/services/PlayerService';
 import { LeagueService, League } from '@/services/LeagueService';
 import { ScheduleService, NHLGame } from '@/services/ScheduleService';
 import { WaiverService } from '@/services/WaiverService';
+import { MatchupService } from '@/services/MatchupService';
 import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -29,6 +30,7 @@ import { CitrusBackground } from '@/components/CitrusBackground';
 import { COLUMNS } from '@/utils/queryColumns';
 import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
+import { GameLogosBar } from '@/components/matchup/GameLogosBar';
 
 // Helper function to format position for display (L -> LW, R -> RW)
 const formatPositionForDisplay = (position: string): string => {
@@ -66,8 +68,12 @@ const FreeAgents = () => {
     }
     previousLeagueIdRef.current = activeLeagueId;
   }, [activeLeagueId]);
-  const [scheduleMaximizers, setScheduleMaximizers] = useState<Array<Player & { gamesThisWeek: number; gameDays: string[] }>>([]);
+  const [scheduleMaximizers, setScheduleMaximizers] = useState<Array<Player & { gamesThisWeek: number; gameDays: string[]; games?: NHLGame[] }>>([]);
   const [loadingMaximizers, setLoadingMaximizers] = useState(false);
+
+  // Weekly projections state (playerId -> total weekly projection)
+  const [weeklyProjections, setWeeklyProjections] = useState<Map<string, number>>(new Map());
+  const [loadingProjections, setLoadingProjections] = useState(false);
 
   // Sorting state
   const [sortColumn, setSortColumn] = useState<string | null>(null);
@@ -98,6 +104,14 @@ const FreeAgents = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, players.length]);
+
+  // Fetch weekly projections for top free agents (for Top Projected list)
+  useEffect(() => {
+    if (players.length > 0 && weeklyProjections.size === 0 && !loadingProjections && !isGuestMode(userLeagueState)) {
+      fetchWeeklyProjections();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [players.length, activeLeagueId]);
 
   const fetchPlayers = async () => {
     try {
@@ -196,10 +210,158 @@ const FreeAgents = () => {
     }
   };
 
+  const fetchWeeklyProjections = async () => {
+    try {
+      setLoadingProjections(true);
+      
+      // Get top 50 free agents to fetch projections for
+      // Include mix of top skaters and top goalies
+      const topSkaters = [...players]
+        .filter(p => p.position !== 'G')
+        .sort((a, b) => (b.points || 0) - (a.points || 0))
+        .slice(0, 40);
+      
+      const topGoalies = [...players]
+        .filter(p => p.position === 'G')
+        .sort((a, b) => {
+          // Sort goalies by wins first, then by points
+          const aWins = a.wins || 0;
+          const bWins = b.wins || 0;
+          if (bWins !== aWins) return bWins - aWins;
+          return (b.points || 0) - (a.points || 0);
+        })
+        .slice(0, 10);
+      
+      const topPlayers = [...topSkaters, ...topGoalies];
+      
+      if (topPlayers.length === 0) {
+        return;
+      }
+
+      // Calculate matchup week dates (same logic as schedule maximizers)
+      const TEST_MODE = import.meta.env.VITE_TEST_MODE === 'true';
+      const TEST_DATE = import.meta.env.VITE_TEST_DATE || '2025-12-08';
+      const getTodayDate = () => {
+        if (TEST_MODE) {
+          const date = new Date(TEST_DATE + 'T00:00:00');
+          date.setHours(0, 0, 0, 0);
+          return date;
+        }
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return today;
+      };
+
+      const today = getTodayDate();
+      const dayOfWeek = today.getDay();
+      const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      let weekStart = new Date(today);
+      weekStart.setDate(today.getDate() - daysFromMonday);
+      weekStart.setHours(0, 0, 0, 0);
+      let weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+
+      // Try to use matchup week if user is logged in and has a league
+      if (user && leagueId) {
+        try {
+          const { league: leagueData, error: leagueError } = await LeagueService.getLeague(leagueId, user.id);
+          if (!leagueError && leagueData && leagueData.draft_status === 'completed') {
+            const draftCompletionDate = getDraftCompletionDate(leagueData);
+            if (draftCompletionDate) {
+              const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
+              const currentWeek = getCurrentWeekNumber(firstWeekStart);
+              weekStart = getWeekStartDate(currentWeek, firstWeekStart);
+              weekEnd = getWeekEndDate(currentWeek, firstWeekStart);
+            }
+          }
+        } catch (error) {
+          // Silently fall back to calendar week
+        }
+      }
+
+      // Get remaining days in the week (today through Sunday)
+      const weekDays: string[] = [];
+      const startDate = today > weekStart ? today : weekStart; // Start from today or week start, whichever is later
+      const currentDate = new Date(startDate);
+      while (currentDate <= weekEnd) {
+        weekDays.push(currentDate.toISOString().split('T')[0]);
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+      
+      console.log(`[FreeAgents] Fetching projections for remaining week: ${weekDays[0]} to ${weekDays[weekDays.length - 1]} (${weekDays.length} days)`);
+
+      // Convert player IDs to numbers
+      const playerIds = topPlayers.map(p => {
+        const id = typeof p.id === 'string' ? parseInt(p.id, 10) : p.id;
+        return isNaN(id) ? 0 : id;
+      }).filter(id => id > 0);
+
+      if (playerIds.length === 0) {
+        return;
+      }
+
+      // Fetch projections for each day of the week and sum them up
+      const weeklyProjectionMap = new Map<string, number>();
+      
+      // Initialize all players with 0
+      topPlayers.forEach(player => {
+        weeklyProjectionMap.set(player.id, 0);
+      });
+
+      // Fetch projections for each day
+      for (const date of weekDays) {
+        try {
+          const dailyProjections = await MatchupService.getDailyProjectionsForMatchup(playerIds, date);
+          
+          // Sum up projections for each player
+          // Note: If a player has multiple games on the same day, the Map will only have one entry per player
+          // But that's fine - we're summing across all days of the week
+          dailyProjections.forEach((projection, playerId) => {
+            // Find player by numeric ID
+            const player = topPlayers.find(p => {
+              const pId = typeof p.id === 'string' ? parseInt(p.id, 10) : p.id;
+              return pId === playerId;
+            });
+            
+            if (player) {
+              const currentTotal = weeklyProjectionMap.get(player.id) || 0;
+              const dailyPoints = Number(projection.total_projected_points || 0);
+              weeklyProjectionMap.set(player.id, currentTotal + dailyPoints);
+            }
+          });
+        } catch (error) {
+          // If one day fails, continue with other days
+          console.warn(`Error fetching projections for ${date}:`, error);
+        }
+      }
+
+      setWeeklyProjections(weeklyProjectionMap);
+      
+      // Debug: Log projection summary by position
+      const goalieProjections = topPlayers
+        .filter(p => p.position === 'G')
+        .map(p => ({
+          name: p.full_name,
+          position: p.position,
+          weeklyProj: weeklyProjectionMap.get(p.id) || 0
+        }));
+      
+      if (goalieProjections.length > 0) {
+        console.log('[FreeAgents] Goalie projections fetched:', goalieProjections);
+      }
+    } catch (error) {
+      console.error('Error fetching weekly projections:', error);
+      // On error, set empty map (will fall back to mock projection)
+    } finally {
+      setLoadingProjections(false);
+    }
+  };
+
   const calculateScheduleMaximizers = async (freeAgents: Player[]) => {
     try {
       setLoadingMaximizers(true);
-      const maximizers: Array<Player & { gamesThisWeek: number; gameDays: string[] }> = [];
+      const maximizers: Array<Player & { gamesThisWeek: number; gameDays: string[]; games?: NHLGame[] }> = [];
       
       // Limit to top 200 players by points to reduce query load
       const topPlayers = [...freeAgents]
@@ -296,7 +458,8 @@ const FreeAgents = () => {
         maximizers.push({
           ...player,
           gamesThisWeek: count,
-          gameDays: [...new Set(gameDays)] // Remove duplicates
+          gameDays: [...new Set(gameDays)], // Remove duplicates
+          games: games // Include full game data for rendering logos
         });
       }
       
@@ -623,7 +786,7 @@ const FreeAgents = () => {
   };
 
   // Sort schedule maximizers (includes gamesThisWeek field)
-  const sortScheduleMaximizers = (maximizers: Array<Player & { gamesThisWeek: number; gameDays: string[] }>) => {
+  const sortScheduleMaximizers = (maximizers: Array<Player & { gamesThisWeek: number; gameDays: string[]; games?: NHLGame[] }>) => {
     if (!sortColumn) return maximizers;
 
     const sorted = [...maximizers].sort((a, b) => {
@@ -763,7 +926,16 @@ const FreeAgents = () => {
     .slice(0, 5);
 
   const topProjected = [...filteredPlayers]
-    .sort((a, b) => ((b.points || 0) / 20) - ((a.points || 0) / 20)) // Mock projection
+    .map(p => {
+      const realProjection = weeklyProjections.get(p.id);
+      // Use real projection if > 0, otherwise fallback to mock
+      const weeklyProjection = (realProjection && realProjection > 0) ? realProjection : ((p.points || 0) / 20);
+      return {
+        ...p,
+        weeklyProjection
+      };
+    })
+    .sort((a, b) => b.weeklyProjection - a.weeklyProjection)
     .slice(0, 5);
 
   const positions = ['ALL', 'C', 'LW', 'RW', 'W', 'D', 'G'];
@@ -928,7 +1100,7 @@ const FreeAgents = () => {
                       <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-lg font-bold flex items-center gap-2">
                           <Calendar className="h-5 w-5 text-blue-500" />
-                          Top Projected (Week)
+                          Top Projected (Remaining Week)
                         </CardTitle>
                         <Button variant="ghost" size="sm" onClick={() => setViewMode('all')}>See All</Button>
                       </CardHeader>
@@ -943,7 +1115,11 @@ const FreeAgents = () => {
                               </div>
                               <div className="flex items-center gap-3">
                                 <div className="text-right">
-                                  <div className="font-bold text-blue-600">{((player.points || 0) / 10).toFixed(1)}</div>
+                                  <div className="font-bold text-blue-600">
+                                    {(player as any).weeklyProjection > 0 
+                                      ? (player as any).weeklyProjection.toFixed(1) 
+                                      : ((player.points || 0) / 10).toFixed(1)}
+                                  </div>
                                   <div className="text-[10px] text-muted-foreground">Proj</div>
                                 </div>
                                 <Button size="default" variant="default" className="h-10 w-10 text-primary font-bold text-xl bg-primary/10 hover:bg-primary/20 border border-primary/30" onClick={() => handleAddPlayer(player)}>
@@ -981,7 +1157,9 @@ const FreeAgents = () => {
                                 </TableCell>
                                 <TableCell className="text-right">{formatPositionForDisplay(player.position)}</TableCell>
                                 <TableCell className="text-right font-bold text-blue-600">
-                                  {((player.points || 0) / 10).toFixed(1)}
+                                  {(player as any).weeklyProjection > 0 
+                                    ? (player as any).weeklyProjection.toFixed(1) 
+                                    : ((player.points || 0) / 10).toFixed(1)}
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex gap-1">
@@ -1422,15 +1600,24 @@ const FreeAgents = () => {
                                  {player.gamesThisWeek}
                                </Badge>
                              </TableCell>
-                             <TableCell className="text-right">
-                               <div className="flex gap-1 justify-end">
-                                 {player.gameDays.map(day => (
-                                   <span key={day} className="px-1.5 py-0.5 bg-muted rounded text-xs font-medium">
-                                     {day}
-                                   </span>
-                                 ))}
-                               </div>
-                             </TableCell>
+                            <TableCell className="text-right">
+                              {player.games && player.games.length > 0 && player.team ? (
+                                <div className="flex justify-end">
+                                  <GameLogosBar 
+                                    games={player.games} 
+                                    playerTeam={player.team}
+                                  />
+                                </div>
+                              ) : (
+                                <div className="flex gap-1 justify-end">
+                                  {player.gameDays.map(day => (
+                                    <span key={day} className="px-1.5 py-0.5 bg-muted rounded text-xs font-medium">
+                                      {day}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </TableCell>
                              <TableCell className="text-right">{player.games_played || 0}</TableCell>
                              {/* Skater Stats - only render for skaters */}
                              {!isGoalie && (
