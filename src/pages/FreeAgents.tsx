@@ -413,7 +413,8 @@ const FreeAgents = () => {
             const currentWeek = getCurrentWeekNumber(firstWeekStart);
             weekStart = getWeekStartDate(currentWeek, firstWeekStart);
             weekEnd = getWeekEndDate(currentWeek, firstWeekStart);
-            console.log(`[FreeAgents Schedule] Using matchup week from league: ${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`);
+            const log = (window as any).__originalConsole?.log || console.log;
+            log(`[FreeAgents Schedule] Using matchup week from league: ${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`);
           }
         }
       } catch (error) {
@@ -431,7 +432,8 @@ const FreeAgents = () => {
         weekEnd = new Date(weekStart);
         weekEnd.setDate(weekStart.getDate() + 6);
         weekEnd.setHours(23, 59, 59, 999);
-        console.log(`[FreeAgents Schedule] Using calendar week: ${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`);
+        const log = (window as any).__originalConsole?.log || console.log;
+        log(`[FreeAgents Schedule] Using calendar week: ${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`);
       }
       
       // Batch fetch games for all teams in parallel
@@ -461,8 +463,25 @@ const FreeAgents = () => {
       const weekStartStr = weekStart.toISOString().split('T')[0];
       const weekEndStr = weekEnd.toISOString().split('T')[0];
       
-      console.log(`[FreeAgents Schedule] Week range: ${weekStartStr} to ${weekEndStr}`);
-      console.log(`[FreeAgents Schedule] Fetched games for ${uniqueTeams.length} teams. Total games before filtering: ${Array.from(teamGamesMap.values()).reduce((sum, games) => sum + games.length, 0)}`);
+      // Use original console for debugging (bypasses silencing)
+      const log = (window as any).__originalConsole?.log || console.log;
+      log(`[FreeAgents Schedule] ==========================================`);
+      log(`[FreeAgents Schedule] Week range: ${weekStartStr} to ${weekEndStr}`);
+      log(`[FreeAgents Schedule] Today: ${today.toISOString().split('T')[0]}`);
+      log(`[FreeAgents Schedule] Day of week: ${today.getDay()} (0=Sun, 1=Mon, 6=Sat)`);
+      log(`[FreeAgents Schedule] Fetched games for ${uniqueTeams.length} teams. Total games before filtering: ${Array.from(teamGamesMap.values()).reduce((sum, games) => sum + games.length, 0)}`);
+      
+      // Log sample team's games for debugging
+      if (teamGamesMap.size > 0) {
+        const sampleTeam = Array.from(teamGamesMap.keys())[0];
+        const sampleGames = teamGamesMap.get(sampleTeam) || [];
+        log(`[FreeAgents Schedule] Sample team ${sampleTeam} games:`, sampleGames.map(g => ({
+          date: g.game_date?.split('T')[0],
+          home: g.home_team,
+          away: g.away_team,
+          status: g.status
+        })));
+      }
       
       for (const player of topPlayers) {
         const allGames = teamGamesMap.get(player.team) || [];
@@ -471,10 +490,30 @@ const FreeAgents = () => {
         const games = allGames.filter(game => {
           if (!game.game_date) return false;
           const gameDateStr = game.game_date.split('T')[0];
-          return gameDateStr >= weekStartStr && gameDateStr <= weekEndStr;
+          const isInRange = gameDateStr >= weekStartStr && gameDateStr <= weekEndStr;
+          
+          // Log first player's filtering for debugging
+          if (player === topPlayers[0]) {
+            const log = (window as any).__originalConsole?.log || console.log;
+            log(`[FreeAgents Schedule] Filtering ${player.name} (${player.team}) games:`, {
+              gameDateStr,
+              weekStartStr,
+              weekEndStr,
+              isInRange,
+              comparison: `${gameDateStr} >= ${weekStartStr} && ${gameDateStr} <= ${weekEndStr}`
+            });
+          }
+          
+          return isInRange;
         });
         
         const count = games.length;
+        
+        // Log first few players for debugging
+        if (maximizers.length < 3) {
+          const log = (window as any).__originalConsole?.log || console.log;
+          log(`[FreeAgents Schedule] Player ${player.name} (${player.team}): ${count} games in week, ${allGames.length} total fetched`);
+        }
         
         // Include all players (no minimum game requirement)
         // Get day abbreviations for each game
@@ -492,7 +531,8 @@ const FreeAgents = () => {
         });
       }
       
-      console.log(`Calculated maximizers for ${maximizers.length} players`);
+      const log = (window as any).__originalConsole?.log || console.log;
+      log(`[FreeAgents Schedule] Calculated maximizers for ${maximizers.length} players`);
       
       // Sort by games count (descending), then by points (descending)
       maximizers.sort((a, b) => {
