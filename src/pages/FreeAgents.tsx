@@ -253,31 +253,40 @@ const FreeAgents = () => {
       };
 
       const today = getTodayDate();
-      const dayOfWeek = today.getDay();
-      const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-      let weekStart = new Date(today);
-      weekStart.setDate(today.getDate() - daysFromMonday);
-      weekStart.setHours(0, 0, 0, 0);
-      let weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekStart.getDate() + 6);
-      weekEnd.setHours(23, 59, 59, 999);
-
-      // Try to use matchup week if user is logged in and has a league
-      if (user && leagueId) {
-        try {
-          const { league: leagueData, error: leagueError } = await LeagueService.getLeague(leagueId, user.id);
-          if (!leagueError && leagueData && leagueData.draft_status === 'completed') {
-            const draftCompletionDate = getDraftCompletionDate(leagueData);
-            if (draftCompletionDate) {
-              const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
-              const currentWeek = getCurrentWeekNumber(firstWeekStart);
-              weekStart = getWeekStartDate(currentWeek, firstWeekStart);
-              weekEnd = getWeekEndDate(currentWeek, firstWeekStart);
-            }
+      let weekStart: Date | null = null;
+      let weekEnd: Date | null = null;
+      
+      // Try to get matchup week from league data (for both logged-in users and guests viewing demo)
+      const effectiveLeagueId = leagueId || '750f4e1a-92ae-44cf-a798-2f3e06d0d5c9'; // Demo league ID for guests
+      
+      try {
+        const { league: leagueData, error: leagueError } = await LeagueService.getLeague(effectiveLeagueId, user?.id);
+        if (!leagueError && leagueData && leagueData.draft_status === 'completed') {
+          const draftCompletionDate = getDraftCompletionDate(leagueData);
+          if (draftCompletionDate) {
+            const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
+            const currentWeek = getCurrentWeekNumber(firstWeekStart);
+            weekStart = getWeekStartDate(currentWeek, firstWeekStart);
+            weekEnd = getWeekEndDate(currentWeek, firstWeekStart);
+            console.log(`[FreeAgents Projections] Using matchup week from league: ${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`);
           }
-        } catch (error) {
-          // Silently fall back to calendar week
         }
+      } catch (error) {
+        // Silently fall back to calendar week
+        console.warn('[FreeAgents Projections] Could not fetch league data, using calendar week:', error);
+      }
+      
+      // Fallback to calendar week if matchup week calculation failed
+      if (!weekStart || !weekEnd) {
+        const dayOfWeek = today.getDay();
+        const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        weekStart = new Date(today);
+        weekStart.setDate(today.getDate() - daysFromMonday);
+        weekStart.setHours(0, 0, 0, 0);
+        weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        weekEnd.setHours(23, 59, 59, 999);
+        console.log(`[FreeAgents Projections] Using calendar week: ${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`);
       }
 
       // Get remaining days in the week (today through Sunday)
@@ -388,33 +397,41 @@ const FreeAgents = () => {
       
       // Default to calendar week, then try to use matchup week if league data is available
       const today = getTodayDate();
-      const dayOfWeek = today.getDay();
-      const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-      let weekStart = new Date(today);
-      weekStart.setDate(today.getDate() - daysFromMonday);
-      weekStart.setHours(0, 0, 0, 0);
-      let weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekStart.getDate() + 6);
-      weekEnd.setHours(23, 59, 59, 999);
+      let weekStart: Date | null = null;
+      let weekEnd: Date | null = null;
       
-      // Try to use matchup week if user is logged in and has a league
-      if (user && leagueId) {
-        try {
-          // Get league data to calculate proper matchup week
-          const { league: leagueData, error: leagueError } = await LeagueService.getLeague(leagueId, user.id);
-          if (!leagueError && leagueData && leagueData.draft_status === 'completed') {
-            const draftCompletionDate = getDraftCompletionDate(leagueData);
-            if (draftCompletionDate) {
-              const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
-              const currentWeek = getCurrentWeekNumber(firstWeekStart);
-              weekStart = getWeekStartDate(currentWeek, firstWeekStart);
-              weekEnd = getWeekEndDate(currentWeek, firstWeekStart);
-            }
+      // Try to get matchup week from league data (for both logged-in users and guests viewing demo)
+      const effectiveLeagueId = leagueId || '750f4e1a-92ae-44cf-a798-2f3e06d0d5c9'; // Demo league ID for guests
+      
+      try {
+        // Get league data to calculate proper matchup week
+        const { league: leagueData, error: leagueError } = await LeagueService.getLeague(effectiveLeagueId, user?.id);
+        if (!leagueError && leagueData && leagueData.draft_status === 'completed') {
+          const draftCompletionDate = getDraftCompletionDate(leagueData);
+          if (draftCompletionDate) {
+            const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
+            const currentWeek = getCurrentWeekNumber(firstWeekStart);
+            weekStart = getWeekStartDate(currentWeek, firstWeekStart);
+            weekEnd = getWeekEndDate(currentWeek, firstWeekStart);
+            console.log(`[FreeAgents Schedule] Using matchup week from league: ${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`);
           }
-        } catch (error) {
-          // Silently fall back to calendar week if league fetch fails
-          console.warn('Could not fetch league data for matchup week calculation, using calendar week:', error);
         }
+      } catch (error) {
+        // Silently fall back to calendar week if league fetch fails
+        console.warn('[FreeAgents Schedule] Could not fetch league data for matchup week calculation, using calendar week:', error);
+      }
+      
+      // Fallback to calendar week if matchup week calculation failed
+      if (!weekStart || !weekEnd) {
+        const dayOfWeek = today.getDay();
+        const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        weekStart = new Date(today);
+        weekStart.setDate(today.getDate() - daysFromMonday);
+        weekStart.setHours(0, 0, 0, 0);
+        weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        weekEnd.setHours(23, 59, 59, 999);
+        console.log(`[FreeAgents Schedule] Using calendar week: ${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`);
       }
       
       // Batch fetch games for all teams in parallel
@@ -439,12 +456,24 @@ const FreeAgents = () => {
         teamGamesMap.set(team, games);
       });
       
-      console.log(`Fetched games for ${uniqueTeams.length} teams. Week: ${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`);
-      console.log(`Total games found: ${Array.from(teamGamesMap.values()).reduce((sum, games) => sum + games.length, 0)}`);
-      
       // Calculate games for each player using cached data
+      // Filter games to only include those within the matchup week (not next week)
+      const weekStartStr = weekStart.toISOString().split('T')[0];
+      const weekEndStr = weekEnd.toISOString().split('T')[0];
+      
+      console.log(`[FreeAgents Schedule] Week range: ${weekStartStr} to ${weekEndStr}`);
+      console.log(`[FreeAgents Schedule] Fetched games for ${uniqueTeams.length} teams. Total games before filtering: ${Array.from(teamGamesMap.values()).reduce((sum, games) => sum + games.length, 0)}`);
+      
       for (const player of topPlayers) {
-        const games = teamGamesMap.get(player.team) || [];
+        const allGames = teamGamesMap.get(player.team) || [];
+        
+        // Filter games to only include those within the matchup week
+        const games = allGames.filter(game => {
+          if (!game.game_date) return false;
+          const gameDateStr = game.game_date.split('T')[0];
+          return gameDateStr >= weekStartStr && gameDateStr <= weekEndStr;
+        });
+        
         const count = games.length;
         
         // Include all players (no minimum game requirement)
@@ -459,7 +488,7 @@ const FreeAgents = () => {
           ...player,
           gamesThisWeek: count,
           gameDays: [...new Set(gameDays)], // Remove duplicates
-          games: games // Include full game data for rendering logos
+          games: games // Include full game data for rendering logos (filtered to week only)
         });
       }
       
@@ -1600,18 +1629,46 @@ const FreeAgents = () => {
                                  {player.gamesThisWeek}
                                </Badge>
                              </TableCell>
-                            <TableCell className="text-right">
+                            <TableCell className="text-right align-middle py-2">
                               {player.games && player.games.length > 0 && player.team ? (
-                                <div className="flex justify-end">
-                                  <GameLogosBar 
-                                    games={player.games} 
-                                    playerTeam={player.team}
-                                  />
+                                <div className="flex justify-end items-center">
+                                  <div className="inline-flex gap-1.5 items-center flex-nowrap">
+                                    {player.games
+                                      .filter(game => game && game.game_date)
+                                      .sort((a, b) => new Date(a.game_date).getTime() - new Date(b.game_date).getTime())
+                                      .map((game, idx) => {
+                                        const playerTeamUpper = (player.team || '').toUpperCase();
+                                        const homeTeamUpper = (game.home_team || '').toUpperCase();
+                                        const isHome = homeTeamUpper === playerTeamUpper;
+                                        const opponent = isHome ? (game.away_team || '') : (game.home_team || '');
+                                        if (!opponent) return null;
+                                        
+                                        const logoUrl = `https://assets.nhle.com/logos/nhl/svg/${opponent.toUpperCase()}_light.svg`;
+                                        const opponentPrefix = isHome ? 'vs' : '@';
+                                        
+                                        return (
+                                          <div 
+                                            key={idx}
+                                            className="flex-shrink-0"
+                                            title={`${opponentPrefix} ${opponent}`}
+                                          >
+                                            <img 
+                                              src={logoUrl} 
+                                              alt={opponent}
+                                              className="w-6 h-6 object-contain opacity-90"
+                                              onError={(e) => {
+                                                (e.target as HTMLImageElement).style.display = 'none';
+                                              }}
+                                            />
+                                          </div>
+                                        );
+                                      })}
+                                  </div>
                                 </div>
                               ) : (
-                                <div className="flex gap-1 justify-end">
+                                <div className="flex gap-1 justify-end flex-wrap">
                                   {player.gameDays.map(day => (
-                                    <span key={day} className="px-1.5 py-0.5 bg-muted rounded text-xs font-medium">
+                                    <span key={day} className="px-1.5 py-0.5 bg-muted rounded text-xs font-medium whitespace-nowrap">
                                       {day}
                                     </span>
                                   ))}
