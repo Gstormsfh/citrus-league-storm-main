@@ -1492,16 +1492,7 @@ const FreeAgents = () => {
                              {getSortIcon('team')}
                            </div>
                          </TableHead>
-                         <TableHead 
-                           className="text-right cursor-pointer hover:bg-muted/50 select-none"
-                           onClick={() => handleSort('gamesThisWeek')}
-                         >
-                           <div className="flex items-center justify-end">
-                             Games
-                             {getSortIcon('gamesThisWeek')}
-                           </div>
-                         </TableHead>
-                         <TableHead className="text-right">Game Days</TableHead>
+                        <TableHead className="text-right">Games This Week</TableHead>
                          <TableHead 
                            className="text-right cursor-pointer hover:bg-muted/50 select-none"
                            onClick={() => handleSort('gp')}
@@ -1624,11 +1615,6 @@ const FreeAgents = () => {
                              </TableCell>
                              <TableCell className="text-right">{formatPositionForDisplay(player.position)}</TableCell>
                              <TableCell className="text-right">{player.team}</TableCell>
-                             <TableCell className="text-right">
-                               <Badge variant="outline" className="bg-green-500/10 text-green-700 border-green-500/30">
-                                 {player.gamesThisWeek}
-                               </Badge>
-                             </TableCell>
                             <TableCell className="text-right align-middle py-2">
                               {player.games && player.games.length > 0 && player.team ? (
                                 <div className="flex justify-end items-center">
