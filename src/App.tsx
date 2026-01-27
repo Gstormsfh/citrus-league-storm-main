@@ -99,17 +99,17 @@ const queryClient = new QueryClient({
 });
 
 const App = () => {
-  // Add timeout to detect if app is hanging
+  // Add timeout to detect if app is hanging (only in dev mode)
   React.useEffect(() => {
-    const timeout = setTimeout(() => {
-      console.warn("⚠️ App has been loading for more than 10 seconds - checking for issues...");
-      // Check if we're stuck on loading
-      const root = document.getElementById('root');
-      if (root && root.textContent?.includes('Loading application...')) {
-        console.error("❌ App appears to be stuck on loading screen");
-      }
-    }, 10000);
-    return () => clearTimeout(timeout);
+    if (import.meta.env.DEV) {
+      const timeout = setTimeout(() => {
+        const root = document.getElementById('root');
+        if (root && root.textContent?.includes('Loading application...')) {
+          console.error("App appears to be stuck on loading screen");
+        }
+      }, 10000);
+      return () => clearTimeout(timeout);
+    }
   }, []);
 
   return (

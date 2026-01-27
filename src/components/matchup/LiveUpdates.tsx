@@ -27,7 +27,7 @@ export const LiveUpdates = ({ updates }: LiveUpdatesProps) => {
           <CitrusSparkle className="w-4 h-4 text-citrus-orange animate-pulse" />
           <span className="font-varsity text-xs font-black text-citrus-forest uppercase tracking-wider">Live:</span>
         </div>
-        <div className="text-sm font-display font-semibold text-citrus-charcoal transition-all duration-500 px-3 py-1 bg-citrus-cream/60 rounded-lg border-2 border-citrus-sage/30">{updates[currentUpdateIndex]}</div>
+        <div className="text-sm font-display font-semibold text-citrus-charcoal transition-all duration-500 px-3 py-1 bg-[#E8EED9]/50 backdrop-blur-sm/60 rounded-lg border-2 border-citrus-sage/30">{updates[currentUpdateIndex]}</div>
         <CitrusSparkle className="w-4 h-4 text-citrus-orange animate-pulse" />
       </div>
     </div>

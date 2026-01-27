@@ -67,7 +67,7 @@ const getActivityIcon = (type: ActivityItem['type']) => {
 
 export const ActivityFeed = () => {
   return (
-    <Card className="bg-citrus-cream corduroy-texture border-4 border-citrus-sage rounded-[2rem] shadow-[0_6px_0_rgba(27,48,34,0.2)] relative overflow-hidden">
+    <Card className="bg-[#E8EED9]/50 backdrop-blur-sm corduroy-texture border-4 border-citrus-sage rounded-[2rem] shadow-[0_6px_0_rgba(27,48,34,0.2)] relative overflow-hidden">
       {/* Decorative citrus leaves */}
       <CitrusLeaf className="absolute top-2 right-2 w-16 h-16 text-citrus-sage opacity-10 rotate-12" />
       <CitrusLeaf className="absolute bottom-4 left-2 w-12 h-12 text-citrus-peach opacity-10 -rotate-45" />
@@ -79,7 +79,7 @@ export const ActivityFeed = () => {
         </div>
         <div className="space-y-4">
           {activities.map((activity) => (
-            <div key={activity.id} className="flex items-start space-x-4 p-4 rounded-xl bg-citrus-cream/60 border-2 border-citrus-sage/30 hover:border-citrus-orange/50 hover:shadow-patch hover:-translate-y-0.5 transition-all">
+            <div key={activity.id} className="flex items-start space-x-4 p-4 rounded-xl bg-[#E8EED9]/50 backdrop-blur-sm/60 border-2 border-citrus-sage/30 hover:border-citrus-orange/50 hover:shadow-patch hover:-translate-y-0.5 transition-all">
               {getActivityIcon(activity.type)}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-varsity font-bold text-citrus-forest uppercase tracking-tight">{activity.title}</p>

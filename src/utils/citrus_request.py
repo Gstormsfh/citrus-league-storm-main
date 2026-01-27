@@ -231,12 +231,12 @@ def citrus_request(
         if _check_circuit_breaker():
             state = _get_circuit_breaker_state()
             logger.critical(
-                f"[Circuit-Breaker] ⚠️ {state['consecutive_failures']} consecutive failures detected! "
+                f"[Circuit-Breaker] ALERT: {state['consecutive_failures']} consecutive failures detected! "
                 f"Pausing {CIRCUIT_BREAKER_PAUSE}s to protect proxy pool..."
             )
             time.sleep(CIRCUIT_BREAKER_PAUSE)
             _reset_circuit_breaker()
-            logger.info("[Circuit-Breaker] ✅ Cooldown complete, resuming operations")
+            logger.info("[Circuit-Breaker] Cooldown complete, resuming operations")
         
         # Get next proxy in rotation
         proxy_url = proxy_manager.get_next_proxy()
@@ -282,7 +282,7 @@ def citrus_request(
                 backoff_time = (BACKOFF_BASE ** attempt) + random.uniform(0, 0.5)
                 
                 logger.warning(
-                    f"[Citrus-IP-Rotator] ⚠️ Rate limited (429), backing off {backoff_time:.1f}s and rotating proxy..."
+                    f"[Citrus-IP-Rotator] Rate limited (429), backing off {backoff_time:.1f}s and rotating proxy..."
                 )
                 
                 _increment_circuit_breaker()
@@ -292,7 +292,7 @@ def citrus_request(
             # Handle proxy authentication errors (403/407)
             if response.status_code in (403, 407) and proxy_url:
                 logger.warning(
-                    f"[Citrus-IP-Rotator] ⚠️ Proxy auth error ({response.status_code}), refreshing proxy list..."
+                    f"[Citrus-IP-Rotator] Proxy auth error ({response.status_code}), refreshing proxy list..."
                 )
                 proxy_manager.force_refresh()
                 _increment_circuit_breaker()
@@ -303,7 +303,7 @@ def citrus_request(
                 # Only retry server errors twice
                 if attempt < 2:
                     logger.warning(
-                        f"[Citrus-IP-Rotator] ⚠️ Server error ({response.status_code}), retrying with new proxy..."
+                        f"[Citrus-IP-Rotator] Server error ({response.status_code}), retrying with new proxy..."
                     )
                     _increment_circuit_breaker()
                     time.sleep(2)
@@ -319,7 +319,7 @@ def citrus_request(
             _reset_circuit_breaker()
             
             logger.info(
-                f"[Citrus-IP-Rotator] ✅ Success ({response.status_code}, {request_duration:.2f}s)"
+                f"[Citrus-IP-Rotator] OK ({response.status_code}, {request_duration:.2f}s)"
             )
             
             return response
@@ -327,7 +327,7 @@ def citrus_request(
         except requests.exceptions.Timeout as e:
             request_duration = time.time() - request_start
             logger.warning(
-                f"[Citrus-IP-Rotator] ⏱️ Timeout after {request_duration:.1f}s via {proxy_ip}, rotating proxy..."
+                f"[Citrus-IP-Rotator] TIMEOUT after {request_duration:.1f}s via {proxy_ip}, rotating proxy..."
             )
             health_monitor.record_request(proxy_ip, success=False, response_time=request_duration)
             _increment_circuit_breaker()
@@ -337,9 +337,18 @@ def citrus_request(
         
         except requests.exceptions.ProxyError as e:
             request_duration = time.time() - request_start
-            logger.warning(
-                f"[Citrus-IP-Rotator] ⚠️ Proxy error via {proxy_ip}, rotating to next proxy..."
-            )
+            
+            # Check if this is a 407 auth error in the tunnel connection
+            if "407" in str(e):
+                logger.warning(
+                    f"[Citrus-IP-Rotator] Proxy tunnel auth error (407) via {proxy_ip}, refreshing proxy list..."
+                )
+                proxy_manager.force_refresh()
+            else:
+                logger.warning(
+                    f"[Citrus-IP-Rotator] Proxy error via {proxy_ip}, rotating to next proxy..."
+                )
+            
             health_monitor.record_request(proxy_ip, success=False, response_time=request_duration)
             _increment_circuit_breaker()
             last_exception = e
@@ -348,7 +357,7 @@ def citrus_request(
         except requests.exceptions.ConnectionError as e:
             request_duration = time.time() - request_start
             logger.warning(
-                f"[Citrus-IP-Rotator] ⚠️ Connection error via {proxy_ip}, rotating proxy..."
+                f"[Citrus-IP-Rotator] Connection error via {proxy_ip}, rotating proxy..."
             )
             health_monitor.record_request(proxy_ip, success=False, response_time=request_duration)
             _increment_circuit_breaker()
@@ -360,7 +369,7 @@ def citrus_request(
             # HTTPError for non-retryable status codes (already handled above)
             request_duration = time.time() - request_start
             logger.error(
-                f"[Citrus-IP-Rotator] ❌ HTTP error {e.response.status_code} ({request_duration:.2f}s)"
+                f"[Citrus-IP-Rotator] HTTP error {e.response.status_code} ({request_duration:.2f}s)"
             )
             _reset_circuit_breaker()
             raise
@@ -368,7 +377,7 @@ def citrus_request(
         except Exception as e:
             request_duration = time.time() - request_start
             logger.error(
-                f"[Citrus-IP-Rotator] ❌ Unexpected error ({request_duration:.2f}s): {e}"
+                f"[Citrus-IP-Rotator] Unexpected error ({request_duration:.2f}s): {e}"
             )
             last_exception = e
             _increment_circuit_breaker()
@@ -380,7 +389,7 @@ def citrus_request(
     
     # All retries exhausted
     logger.error(
-        f"[Citrus-IP-Rotator] ❌ All {retries} retries exhausted for {url}"
+        f"[Citrus-IP-Rotator] All {retries} retries exhausted for {url}"
     )
     
     if last_exception:

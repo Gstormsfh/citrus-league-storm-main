@@ -36,7 +36,7 @@ export const PointsTooltip = ({
         </button>
       </TooltipTrigger>
       <TooltipContent 
-        className="p-0 bg-citrus-cream corduroy-texture rounded-[1.5rem] border-4 border-citrus-forest shadow-[0_6px_0_rgba(27,48,34,0.25)] max-w-md z-[999999]"
+        className="p-0 bg-[#E8EED9]/90 backdrop-blur-md corduroy-texture rounded-[1.5rem] border-4 border-citrus-forest shadow-[0_6px_0_rgba(27,48,34,0.25)] max-w-md z-[999999]"
         side="top"
         align="center"
         sideOffset={10}
@@ -44,7 +44,7 @@ export const PointsTooltip = ({
         {/* Header patch */}
         <div className="bg-gradient-to-r from-citrus-orange via-citrus-peach to-citrus-orange px-5 py-4 rounded-t-[1.25rem] border-b-4 border-citrus-forest relative overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(255,255,255,0.2)_0%,_transparent_60%)]"></div>
-          <h4 className="font-varsity text-base font-black text-citrus-cream uppercase tracking-tight text-center relative z-10">
+          <h4 className="font-varsity text-base font-black text-[#E8EED9] uppercase tracking-tight text-center relative z-10">
             🏒 Scoring Breakdown
           </h4>
         </div>
@@ -55,7 +55,7 @@ export const PointsTooltip = ({
             <div key={stat.label} className="p-3 bg-gradient-to-br from-citrus-orange/10 to-citrus-peach/10 rounded-xl border-3 border-dashed border-citrus-orange/50 shadow-sm hover:shadow-patch transition-all">
               <div className="flex items-baseline justify-between gap-2 mb-1">
                 <span className="font-mono text-xs text-citrus-orange uppercase tracking-wider font-bold">{stat.label}</span>
-                <span className="text-sm font-varsity text-citrus-charcoal bg-citrus-cream/60 px-2 py-0.5 rounded-md border border-citrus-orange/30">×{stat.count}</span>
+                <span className="text-sm font-varsity text-citrus-charcoal bg-[#E8EED9]/90 backdrop-blur-md/60 px-2 py-0.5 rounded-md border border-citrus-orange/30">×{stat.count}</span>
               </div>
               <div className="font-varsity text-2xl font-black text-citrus-forest">+{stat.points.toFixed(1)}</div>
             </div>
@@ -65,8 +65,8 @@ export const PointsTooltip = ({
         {/* Footer patch */}
         <div className="bg-gradient-to-r from-citrus-sage via-[#7CB518] to-citrus-sage px-5 py-4 rounded-b-[1.25rem] border-t-4 border-citrus-forest">
           <div className="flex justify-between items-center">
-            <span className="font-varsity text-sm font-bold text-citrus-cream uppercase tracking-wide">Total Fantasy Points</span>
-            <span className="font-varsity text-3xl font-black text-citrus-cream">{totalPoints.toFixed(1)}</span>
+            <span className="font-varsity text-sm font-bold text-[#E8EED9] uppercase tracking-wide">Total Fantasy Points</span>
+            <span className="font-varsity text-3xl font-black text-[#E8EED9]">{totalPoints.toFixed(1)}</span>
           </div>
         </div>
       </TooltipContent>

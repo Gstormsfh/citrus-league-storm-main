@@ -93,15 +93,15 @@ const ScheduleManager = () => {
   const currentMatchup = upcomingMatchups[0];
 
   return (
-    <div className="min-h-screen bg-background flex flex-col relative overflow-hidden">
+    <div className="min-h-screen bg-[#D4E8B8] flex flex-col relative overflow-hidden">
       <CitrusBackground density="medium" />
       <Navbar />
       <main className="w-full pt-28 pb-16 m-0 p-0 relative z-10">
         <div className="w-full m-0 p-0">
           {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
-          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px]">
-            {/* Main Content - Scrollable - Appears first on mobile */}
-            <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
+          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
+            {/* Main Content - Appears first on mobile */}
+            <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2">
               <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 relative">
               <CitrusLeaf className="absolute -top-4 -left-8 w-16 h-16 text-citrus-sage/15 rotate-12" />
               <div className="text-center md:text-left">

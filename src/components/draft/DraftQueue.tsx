@@ -85,7 +85,7 @@ function SortableQueueItem({
       ref={setNodeRef}
       style={style}
       className={cn(
-        'flex items-center gap-3 p-2 rounded-lg border bg-citrus-cream transition-all',
+        'flex items-center gap-3 p-2 rounded-lg border bg-[#E8EED9]/50 backdrop-blur-sm transition-all',
         isDrafted && 'opacity-50 bg-muted/50',
         isDragging && 'shadow-lg scale-105 z-50',
         index === 0 && isYourTurn && !isDrafted && 'ring-2 ring-fantasy-primary bg-fantasy-primary/5'

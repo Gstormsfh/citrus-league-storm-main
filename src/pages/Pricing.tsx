@@ -53,7 +53,7 @@ const Pricing = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-[#D4E8B8] flex flex-col">
       <Navbar />
       <main className="flex-grow pt-24 px-4">
         <div className="container mx-auto py-12">
@@ -62,7 +62,7 @@ const Pricing = () => {
               Simple, Transparent Pricing
             </h1>
             <p className="text-xl text-muted-foreground">
-              Choose the plan that's right for your fantasy sports journey.
+              Choose the plan that fits your competitive fantasy hockey needs.
             </p>
           </div>
 

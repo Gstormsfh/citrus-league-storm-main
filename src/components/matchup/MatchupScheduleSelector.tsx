@@ -47,7 +47,7 @@ export const MatchupScheduleSelector: React.FC<MatchupScheduleSelectorProps> = (
         size="sm"
         onClick={handlePrevious}
         disabled={isFirstWeek}
-        className="relative z-10 h-9 w-9 p-0 rounded-lg bg-citrus-cream border-2 border-citrus-sage hover:bg-citrus-sage hover:scale-110 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm"
+        className="relative z-10 h-9 w-9 p-0 rounded-lg bg-[#E8EED9]/50 backdrop-blur-sm border-2 border-citrus-sage hover:bg-citrus-sage hover:scale-110 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm"
       >
         <ChevronLeft className="h-5 w-5 text-citrus-forest" />
       </Button>
@@ -61,12 +61,12 @@ export const MatchupScheduleSelector: React.FC<MatchupScheduleSelectorProps> = (
           value={currentWeek.toString()} 
           onValueChange={(value) => onWeekChange(parseInt(value))}
         >
-          <SelectTrigger className="flex-1 h-9 border-2 border-citrus-sage bg-citrus-cream hover:bg-citrus-sage/10 font-display font-bold text-xs rounded-lg shadow-sm">
+          <SelectTrigger className="flex-1 h-9 border-2 border-citrus-sage bg-[#E8EED9]/50 backdrop-blur-sm hover:bg-citrus-sage/10 font-display font-bold text-xs rounded-lg shadow-sm">
             <SelectValue>
               {firstWeekStart ? getWeekDateLabel(currentWeek, firstWeekStart) : `Week ${currentWeek}`}
             </SelectValue>
           </SelectTrigger>
-          <SelectContent className="max-h-[300px] bg-citrus-cream border-2 border-citrus-sage rounded-lg shadow-varsity">
+          <SelectContent className="max-h-[300px] bg-[#E8EED9]/50 backdrop-blur-sm border-2 border-citrus-sage rounded-lg shadow-varsity">
             {availableWeeks.map((week) => (
               <SelectItem 
                 key={week} 
@@ -86,7 +86,7 @@ export const MatchupScheduleSelector: React.FC<MatchupScheduleSelectorProps> = (
         size="sm"
         onClick={handleNext}
         disabled={isLastWeek}
-        className="relative z-10 h-9 w-9 p-0 rounded-lg bg-citrus-cream border-2 border-citrus-sage hover:bg-citrus-sage hover:scale-110 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm"
+        className="relative z-10 h-9 w-9 p-0 rounded-lg bg-[#E8EED9]/50 backdrop-blur-sm border-2 border-citrus-sage hover:bg-citrus-sage hover:scale-110 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm"
       >
         <ChevronRight className="h-5 w-5 text-citrus-forest" />
       </Button>

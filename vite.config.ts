@@ -60,8 +60,17 @@ export default defineConfig(({ mode }) => ({
   },
   build: {
     chunkSizeWarningLimit: 600,
+    // Disable source maps in production (like Sleeper) - makes code harder to inspect
+    // This means you won't see readable file names like "Navbar.tsx" in production
+    sourcemap: false,
+    // Minification is enabled by default (esbuild) - this obfuscates variable names
+    // File names are already hashed (e.g., "bundle-ad5307820ecbf2d14bca028f8b00890f.js")
     rollupOptions: {
       output: {
+        // Obfuscate chunk file names with hashes (already default, but explicit)
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
         manualChunks: (id) => {
           // Don't split React - keep it in main bundle to ensure it loads first
           // This prevents vendor bundles from trying to use React before it's available

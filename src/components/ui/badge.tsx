@@ -13,9 +13,9 @@ const badgeVariants = cva(
         secondary:
           "border-citrus-orange/30 bg-citrus-peach text-citrus-forest hover:bg-citrus-peach/80 shadow-sm",
         destructive:
-          "border-destructive/40 bg-destructive text-citrus-cream hover:bg-destructive/80 shadow-sm",
+          "border-destructive/40 bg-destructive text-[#E8EED9] hover:bg-destructive/80 shadow-sm",
         outline: "text-citrus-forest border-citrus-sage bg-transparent hover:bg-citrus-sage/20",
-        varsity: "border-citrus-forest bg-citrus-orange text-citrus-cream font-varsity shadow-patch hover:translate-y-0.5",
+        varsity: "border-citrus-forest bg-citrus-orange text-[#E8EED9] font-varsity shadow-patch hover:translate-y-0.5",
       },
     },
     defaultVariants: {

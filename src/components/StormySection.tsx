@@ -10,15 +10,15 @@ import { Narwhal } from '@/components/icons/Narwhal';
 const demoMessages = [
   {
     question: "Who should I start at center this week? I have Elias Pettersson vs BOS or Sebastian Aho vs NYR?",
-    answer: "I'd recommend starting Sebastian Aho against New York. The Rangers' defense has been vulnerable against top-line centers, allowing the 5th most fantasy points to Cs this season. Aho has 3+ points in his last four games and faces a tired Rangers team on a back-to-back. Pettersson's matchup with Boston's strong defensive system is tougher."
+    answer: "Start Aho. His xGF% is 58.2% over the last 10 games and he's getting 2:30 of PP1 time per game. Pettersson's deployment dropped after the coaching change—only 18:45 TOI last week. Plus, Aho's line combo with Jarvis has a 62% Corsi together. The Rangers are giving up 3.1 goals/game on the road. Easy call."
   },
   {
-    question: "What's Connor McDavid's outlook for rest of season?",
-    answer: "McDavid's rest-of-season outlook is elite as always. He's entering his prime scoring months (January-March historically his best) and the Oilers' power play is firing on all cylinders. Expect continued dominance with favorable matchups against ARI (Week 18) and CHI (Week 20). He's a lock for 100+ points barring injury."
+    question: "Should I drop my backup goalie for a streaming spot?",
+    answer: "Check your matchup first. If you're up 4-2 going into Saturday, you're probably safe. But if it's tight, keep the goalie. Your backup (Ullmark) has a .925 save% and faces ARI on Saturday—that's a 65% win probability based on our model. Saturday finishes mean every game matters. Don't get cute."
   },
   {
-    question: "Should I trade Auston Matthews for Nathan MacKinnon and Tage Thompson?",
-    answer: "Yes, I would make that trade. While Matthews is a goal-scoring machine, MacKinnon is currently leading the league in points with consistent multi-point games. Adding Thompson gives you a top-line center with elite power play time. The combined value and depth outweighs Matthews alone, especially with his recent injury history."
+    question: "Is this trade fair? I give Matthews, get MacKinnon + a 3rd round pick.",
+    answer: "Take it. MacKinnon's xGF% is 61.4% vs Matthews' 54.8%. MacKinnon also gets 3+ minutes more TOI per game and his line has better zone entry rates. The 3rd rounder is gravy. Our projections have MacKinnon finishing 8-12 points higher ROS. Plus, Matthews' shooting% is unsustainable at 18.2%—regression coming."
   }
 ];
 
@@ -98,18 +98,19 @@ const StormySection = () => {
   };
 
   return (
-    <section id="stormy" ref={sectionRef} className="section-padding bg-gradient-to-br from-citrus-green-light to-citrus-yellow-light">
+    <section id="stormy" ref={sectionRef} className="section-padding bg-[#D4E8B8]">
       <div className="container mx-auto">
         <div className="flex flex-col lg:flex-row items-center gap-12">
           <div className="lg:w-1/2">
             <div className="mb-8 animated-element animate">
-              <div className="inline-flex items-center bg-citrus-cream/70 backdrop-blur-sm rounded-full px-4 py-2 mb-4">
+              <div className="inline-flex items-center bg-[#E8EED9]/60 backdrop-blur-sm/70 backdrop-blur-sm rounded-full px-4 py-2 mb-4">
                 <Narwhal className="h-5 w-5 text-primary mr-2" />
                 <span className="text-sm font-medium">Powered by Advanced AI</span>
               </div>
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">Meet Stormy, Your AI Assistant GM</h2>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">Meet Stormy: Your AI GM Who Actually Watches Hockey</h2>
               <p className="text-lg text-foreground/80 max-w-xl">
-                Get personalized fantasy advice, lineup recommendations, and trade analysis from your AI assistant that learns your preferences and league dynamics.
+                Ask Stormy anything. Start or sit decisions. Trade analysis. Who to grab off waivers. 
+                Unlike those garbage generic AI tools, Stormy knows hockey—and won't tell you to start a healthy scratch.
               </p>
             </div>
 
@@ -119,8 +120,8 @@ const StormySection = () => {
                   <Zap size={20} className="text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-lg">Instant Analysis</h3>
-                  <p className="text-sm text-foreground/70">Get immediate answers to your fantasy hockey questions, 24/7</p>
+                  <h3 className="font-semibold text-lg">Actually Helpful Advice</h3>
+                  <p className="text-sm text-foreground/70">Real analysis based on actual hockey. Not generic BS that tells you to "monitor the situation"</p>
                 </div>
               </div>
               
@@ -129,8 +130,8 @@ const StormySection = () => {
                   <Sparkles size={20} className="text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-lg">Personalized Insights</h3>
-                  <p className="text-sm text-foreground/70">Learns your league settings, roster, and preferences to give tailored advice</p>
+                  <h3 className="font-semibold text-lg">Knows Your League</h3>
+                  <p className="text-sm text-foreground/70">Understands your scoring settings, roster construction, and why you keep refusing to drop that 4th liner</p>
                 </div>
               </div>
             </div>
@@ -145,7 +146,7 @@ const StormySection = () => {
           </div>
 
           <div className="lg:w-1/2 animated-element animate">
-            <div className="bg-citrus-cream/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden">
+            <div className="bg-[#E8EED9]/60 backdrop-blur-sm/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden">
               <div className="bg-primary/10 p-4 flex items-center">
                 <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
                   <Narwhal className="w-6 h-6 text-white" />
@@ -169,7 +170,7 @@ const StormySection = () => {
                       <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0 mt-1">
                         <Narwhal className="w-5 h-5 text-white" />
                       </div>
-                      <div className="bg-citrus-cream rounded-lg rounded-tl-none p-4 max-w-[85%] shadow-sm border border-border">
+                      <div className="bg-[#E8EED9]/60 backdrop-blur-sm rounded-lg rounded-tl-none p-4 max-w-[85%] shadow-sm border border-border">
                         <p className="text-sm leading-relaxed">{displayedAnswer}</p>
                         {isAnimating && (
                           <span className="inline-block w-1.5 h-4 bg-primary animate-pulse ml-1 align-middle"></span>
@@ -182,7 +183,7 @@ const StormySection = () => {
                     <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0 mt-1">
                       <Narwhal className="w-5 h-5 text-white" />
                     </div>
-                    <div className="bg-citrus-cream rounded-lg rounded-tl-none p-4 max-w-[85%] shadow-sm border border-border">
+                    <div className="bg-[#E8EED9]/60 backdrop-blur-sm rounded-lg rounded-tl-none p-4 max-w-[85%] shadow-sm border border-border">
                       <p className="text-sm leading-relaxed">{displayedAnswer}</p>
                       {isAnimating && (
                         <span className="inline-block w-1.5 h-4 bg-primary animate-pulse ml-1 align-middle"></span>

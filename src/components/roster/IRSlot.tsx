@@ -48,8 +48,8 @@ const IndividualIRSlot = ({
         "p-2 transition-all rounded-lg min-h-[110px] w-full",
         "border-2",
         isOver && "border-red-500 bg-red-500/10 shadow-lg",
-        isEmpty && !isOver && "border-dashed border-red-400/30 bg-citrus-cream/50",
-        !isEmpty && !isOver && "border-red-400/30 bg-citrus-cream shadow-sm"
+        isEmpty && !isOver && "border-dashed border-red-400/30 bg-[#E8EED9]/50 backdrop-blur-sm/50",
+        !isEmpty && !isOver && "border-red-400/30 bg-[#E8EED9]/50 backdrop-blur-sm shadow-sm"
       )}
     >
       {/* Slot Header */}

@@ -73,40 +73,83 @@ const OtherTeam = () => {
           && teamIdNum >= 1 && teamIdNum <= 10;
         
         if (isDemoTeam) {
-          // Load demo team data
-          const demoTeam = LEAGUE_TEAMS_DATA.find(t => t.id === teamIdNum);
-          if (!demoTeam) {
-            console.error(`Demo team ${teamIdNum} not found in LEAGUE_TEAMS_DATA`);
+          console.log('[OtherTeam] Loading REAL demo team from database:', teamIdNum);
+          
+          // Import DEMO_LEAGUE_ID_FOR_GUESTS
+          const { DEMO_LEAGUE_ID_FOR_GUESTS } = await import('@/services/DemoLeagueService');
+          const { COLUMNS } = await import('@/utils/queryColumns');
+          
+          // Get the demo league from database
+          const { data: demoLeagueData, error: leagueError } = await supabase
+            .from('leagues')
+            .select(COLUMNS.LEAGUE)
+            .eq('id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
+            .maybeSingle();
+          
+          if (leagueError || !demoLeagueData) {
+            console.error('[OtherTeam] Error loading demo league:', leagueError);
             setLoading(false);
             return;
           }
           
-          // Create a Team-like object for demo teams
-          const demoTeamData: Team = {
-            id: String(teamIdNum),
-            league_id: 'demo-league-id',
-            team_name: demoTeam.name,
-            owner_id: null, // Demo teams don't have real owners
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          };
+          // Get all teams from the demo league
+          const { data: demoTeamsData, error: teamsError } = await supabase
+            .from('teams')
+            .select(COLUMNS.TEAM)
+            .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
+            .order('created_at', { ascending: true });
           
-          setTeam(demoTeamData);
-          setOwnerName(demoTeam.owner);
+          if (teamsError || !demoTeamsData || demoTeamsData.length === 0) {
+            console.error('[OtherTeam] Error loading demo teams:', teamsError);
+            setLoading(false);
+            return;
+          }
           
-          // Get all players and initialize demo league
-          const allPlayers = await PlayerService.getAllPlayers();
-          await LeagueService.initializeLeague(allPlayers);
+          // Find the specific team by index (teamIdNum is 1-10, array is 0-indexed)
+          const demoTeamFromDb = (demoTeamsData as any[])[teamIdNum - 1];
+          if (!demoTeamFromDb) {
+            console.error(`[OtherTeam] Demo team ${teamIdNum} not found in database`);
+            setLoading(false);
+            return;
+          }
           
-          // Get demo team roster from cachedLeagueState
-          const demoRoster = await LeagueService.getTeamRoster(teamIdNum, allPlayers);
+          // Get owner name from LEAGUE_TEAMS_DATA
+          const demoTeamMetadata = LEAGUE_TEAMS_DATA.find(t => t.id === teamIdNum);
           
-          if (demoRoster.length === 0) {
-            console.error(`Demo team ${teamIdNum} has no players in roster`);
+          setTeam(demoTeamFromDb);
+          setOwnerName(demoTeamMetadata?.owner || 'Demo Owner');
+          
+          console.log('[OtherTeam] Demo team loaded:', demoTeamFromDb.team_name);
+          
+          // Get draft picks for this team
+          const { data: draftPicksData, error: picksError } = await supabase
+            .from('draft_picks')
+            .select('player_id')
+            .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
+            .eq('team_id' as any, demoTeamFromDb.id as any)
+            .is('deleted_at', null);
+          
+          if (picksError) {
+            console.error('[OtherTeam] Error loading draft picks:', picksError);
+            setLoading(false);
+            return;
+          }
+          
+          const playerIds = (draftPicksData || []).map((p: any) => p.player_id);
+          console.log('[OtherTeam] Found', playerIds.length, 'players for team');
+          
+          if (playerIds.length === 0) {
+            console.error(`[OtherTeam] Demo team ${teamIdNum} has no players in roster`);
             setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
             setLoading(false);
             return;
           }
+          
+          // Get all players
+          const allPlayers = await PlayerService.getAllPlayers();
+          
+          // Filter to get only the players on this team's roster
+          const demoRoster = allPlayers.filter(p => playerIds.includes(p.id));
           
           // Transform demo players to HockeyPlayer format
           const transformedPlayers: HockeyPlayer[] = demoRoster.map((p) => ({
@@ -398,7 +441,6 @@ const OtherTeam = () => {
           // Fall through to auto-assignment below - don't use the invalid lineup
           // The auto-assignment will create a proper lineup and save it (same logic as team 2)
         } else if (isValidLineup) {
-          console.log(`OtherTeam: Team ${teamId} - ✅ Valid lineup found, using saved lineup`);
           // Restore saved lineup for this team
           const playerMap = new Map(transformedPlayers.map(p => [String(p.id), p]));
           const savedPlayerIds = new Set([
@@ -502,7 +544,6 @@ const OtherTeam = () => {
                 ir: ir.map(p => String(p.id)),
                 slotAssignments: assignments
               });
-              console.log(`OtherTeam: Team ${teamId} - ✅ Successfully saved fixed lineup to database`);
             } catch (err) {
               console.error(`OtherTeam: Team ${teamId} - ❌ FAILED to save lineup:`, err);
             }
@@ -524,7 +565,7 @@ const OtherTeam = () => {
 
   if (!team) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-[#D4E8B8] flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Team Not Found</h1>
           <Button onClick={() => navigate('/standings')}>Back to Standings</Button>
@@ -540,12 +581,12 @@ const OtherTeam = () => {
 
   return (
     <ErrorBoundary>
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#D4E8B8]">
       <Navbar />
       <main className="w-full pt-28 pb-16 m-0 p-0">
         <div className="w-full m-0 p-0">
           {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
-          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px]">
+          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             {/* Main Content - Scrollable - Appears first on mobile */}
             <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
               <Button 

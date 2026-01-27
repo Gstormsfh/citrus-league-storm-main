@@ -30,7 +30,7 @@ export const MatchupTotalBar = ({
   return (
     <div className="w-full rounded-[2rem] overflow-hidden border-4 border-citrus-forest shadow-[0_6px_0_rgba(27,48,34,0.2)]">
       {/* Scoreboard Header - Like patch on jacket */}
-      <div className="relative bg-citrus-cream corduroy-texture p-4 border-b-4 border-citrus-forest">
+      <div className="relative bg-[#E8EED9]/50 backdrop-blur-sm corduroy-texture p-4 border-b-4 border-citrus-forest">
         {/* Radial texture overlay */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_2px_2px,_rgba(0,0,0,0.02)_1px,_transparent_1px)] bg-[length:20px_20px]"></div>
         
@@ -44,7 +44,7 @@ export const MatchupTotalBar = ({
               {team1Score.toFixed(1)}
             </div>
             {/* Games Remaining Badge */}
-            <div className="mt-2 flex items-center justify-center gap-1 bg-citrus-cream/50 px-2 py-1 rounded-lg border border-citrus-sage/40">
+            <div className="mt-2 flex items-center justify-center gap-1 bg-[#E8EED9]/50 backdrop-blur-sm/50 px-2 py-1 rounded-lg border border-citrus-sage/40">
               <Calendar className="w-3 h-3 text-citrus-forest" />
               <span className="text-[10px] font-varsity font-bold text-citrus-forest uppercase tracking-wide">
                 {team1GamesRemaining}
@@ -70,7 +70,7 @@ export const MatchupTotalBar = ({
               {team2Score.toFixed(1)}
             </div>
             {/* Games Remaining Badge */}
-            <div className="mt-2 flex items-center justify-center gap-1 bg-citrus-cream/50 px-2 py-1 rounded-lg border border-citrus-peach/40">
+            <div className="mt-2 flex items-center justify-center gap-1 bg-[#E8EED9]/50 backdrop-blur-sm/50 px-2 py-1 rounded-lg border border-citrus-peach/40">
               <Calendar className="w-3 h-3 text-citrus-forest" />
               <span className="text-[10px] font-varsity font-bold text-citrus-forest uppercase tracking-wide">
                 {team2GamesRemaining}
@@ -85,10 +85,10 @@ export const MatchupTotalBar = ({
       </div>
       
       {/* Progress Bar - Thick embroidered stripe */}
-      <div className="h-6 flex bg-citrus-cream relative">
+      <div className="h-6 flex bg-[#E8EED9]/50 backdrop-blur-sm relative">
         {isTied && (
           <div className="absolute inset-0 flex items-center justify-center z-10">
-            <div className="text-xs font-bold text-citrus-forest bg-citrus-cream/80 px-2 py-0.5 rounded-lg shadow-sm">
+            <div className="text-xs font-bold text-citrus-forest bg-[#E8EED9]/50 backdrop-blur-sm/80 px-2 py-0.5 rounded-lg shadow-sm">
               TIED
             </div>
           </div>

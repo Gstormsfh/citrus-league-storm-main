@@ -227,7 +227,7 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
       WAIVER: 'bg-citrus-peach/20 border-citrus-peach/40',
       CHAT: 'bg-citrus-sage/10 border-citrus-sage/30',
       TRADE: 'bg-citrus-orange/10 border-citrus-orange/30',
-      SYSTEM: 'bg-citrus-cream border-citrus-sage/30',
+      SYSTEM: 'bg-[#E8EED9]/50 backdrop-blur-sm border-citrus-sage/30',
     };
 
     const color = baseColors[type] || baseColors.SYSTEM;
@@ -277,7 +277,7 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
   }
 
   return (
-    <div className="h-full flex flex-col bg-citrus-cream corduroy-texture relative">
+    <div className="h-full flex flex-col bg-[#E8EED9]/50 backdrop-blur-sm corduroy-texture relative">
       {/* Decorative citrus leaves */}
       <CitrusLeaf className="absolute top-4 right-2 w-16 h-16 text-citrus-sage opacity-5 rotate-12 pointer-events-none" />
       <CitrusLeaf className="absolute bottom-20 left-2 w-12 h-12 text-citrus-peach opacity-5 -rotate-45 pointer-events-none" />
@@ -292,7 +292,7 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
           {unreadCount > 0 && (
             <button
               onClick={handleMarkAllAsRead}
-              className="text-xs font-display font-semibold text-citrus-forest hover:text-citrus-orange flex items-center gap-1 transition-colors bg-citrus-cream/60 px-2 py-1 rounded-lg border border-citrus-sage/30"
+              className="text-xs font-display font-semibold text-citrus-forest hover:text-citrus-orange flex items-center gap-1 transition-colors bg-[#E8EED9]/50 backdrop-blur-sm/60 px-2 py-1 rounded-lg border border-citrus-sage/30"
               title="Mark all as read"
             >
               <CheckCheck className="w-3.5 h-3.5" />
@@ -359,8 +359,8 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
                         <div
                           className={`p-2.5 rounded-xl text-xs leading-snug shadow-sm font-display ${
                             isOwnMessage
-                              ? 'bg-gradient-to-br from-citrus-orange to-citrus-peach text-citrus-cream border-2 border-citrus-orange rounded-tr-none'
-                              : 'bg-citrus-cream border-2 border-citrus-sage/40 rounded-tl-none text-citrus-forest'
+                              ? 'bg-gradient-to-br from-citrus-orange to-citrus-peach text-[#E8EED9] border-2 border-citrus-orange rounded-tr-none'
+                              : 'bg-[#E8EED9]/50 backdrop-blur-sm border-2 border-citrus-sage/40 rounded-tl-none text-citrus-forest'
                           } ${notification.read_status ? 'opacity-90' : ''}`}
                         >
                           {notification.message}
@@ -423,20 +423,20 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
       </div>
 
       {/* Chat Input - Fixed at bottom */}
-      <div className="px-3 py-2.5 border-t-4 border-citrus-forest bg-citrus-cream backdrop-blur-sm sticky bottom-0 shadow-[0_-4px_10px_rgba(27,48,34,0.1)]">
+      <div className="px-3 py-2.5 border-t-4 border-citrus-forest bg-[#E8EED9]/50 backdrop-blur-sm backdrop-blur-sm sticky bottom-0 shadow-[0_-4px_10px_rgba(27,48,34,0.1)]">
         <form onSubmit={handleSendChatMessage} className="flex items-center gap-2">
           <input
             type="text"
             value={chatMessage}
             onChange={(e) => setChatMessage(e.target.value)}
             placeholder="Type a message..."
-            className="flex-1 px-4 py-2.5 text-xs font-display bg-citrus-cream/50 border-2 border-citrus-sage/40 rounded-full focus:outline-none focus:ring-2 focus:ring-citrus-orange/30 focus:border-citrus-orange placeholder:text-citrus-charcoal/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-citrus-forest"
+            className="flex-1 px-4 py-2.5 text-xs font-display bg-[#E8EED9]/50 backdrop-blur-sm/50 border-2 border-citrus-sage/40 rounded-full focus:outline-none focus:ring-2 focus:ring-citrus-orange/30 focus:border-citrus-orange placeholder:text-citrus-charcoal/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-citrus-forest"
             disabled={sendingMessage || !user}
           />
           <button
             type="submit"
             disabled={!chatMessage.trim() || sendingMessage || !user}
-            className="h-9 w-9 bg-gradient-to-br from-citrus-sage to-citrus-orange border-3 border-citrus-forest text-citrus-cream rounded-varsity hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center flex-shrink-0 shadow-patch hover:shadow-varsity active:scale-95"
+            className="h-9 w-9 bg-gradient-to-br from-citrus-sage to-citrus-orange border-3 border-citrus-forest text-[#E8EED9] rounded-varsity hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center flex-shrink-0 shadow-patch hover:shadow-varsity active:scale-95"
             title="Send message"
           >
             {sendingMessage ? (

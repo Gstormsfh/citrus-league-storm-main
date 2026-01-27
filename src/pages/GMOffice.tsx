@@ -22,7 +22,7 @@ const gmActions = [
     description: "Get personalized advice and insights from your AI GM",
     icon: Narwhal,
     citrusIcon: CitrusSparkle,
-    gradient: "from-citrus-sage to-citrus-orange",
+    gradient: "from-citrus-sage to-citrus-green-medium",
     link: "/gm-office/stormy",
     hasNewInsight: false // Will be dynamic later
   },
@@ -31,7 +31,7 @@ const gmActions = [
     description: "Propose, negotiate, and view pending offers with league managers.",
     icon: ArrowLeftRight,
     citrusIcon: CitrusWedge,
-    gradient: "from-citrus-peach to-citrus-orange",
+    gradient: "from-citrus-green-light to-citrus-sage",
     link: "/trade-analyzer"
   },
   {
@@ -39,7 +39,7 @@ const gmActions = [
     description: "Browse and claim players. View Top 5 Adds.",
     icon: Users,
     citrusIcon: CitrusSlice,
-    gradient: "from-citrus-sage to-citrus-peach",
+    gradient: "from-citrus-sage to-citrus-green-light",
     link: "/free-agents"
   },
   {
@@ -47,7 +47,7 @@ const gmActions = [
     description: "Deep dive into your team's performance metrics",
     icon: BarChart3,
     citrusIcon: CitrusBurst,
-    gradient: "from-citrus-orange to-citrus-sage",
+    gradient: "from-citrus-sage to-citrus-green-medium",
     link: "/team-analytics"
   },
   {
@@ -55,7 +55,7 @@ const gmActions = [
     description: "Manage waiver claims and priorities",
     icon: TrendingUp,
     citrusIcon: CitrusLeaf,
-    gradient: "from-citrus-sage to-citrus-orange",
+    gradient: "from-citrus-sage to-citrus-green-medium",
     link: "/waiver-wire"
   },
   {
@@ -71,35 +71,35 @@ const gmActions = [
 const GMOffice = () => {
   const { userLeagueState, activeLeagueId } = useLeague();
   return (
-    <div className="min-h-screen bg-background text-foreground overflow-x-hidden relative">
+    <div className="min-h-screen bg-[#D4E8B8] text-foreground overflow-x-hidden relative">
       {/* Citrus Background */}
       <CitrusBackground density="medium" animated={true} />
       
       <Navbar />
-      <main className="w-full pt-28 pb-16 m-0 p-0 relative z-10">
+      <main className="w-full pt-20 pb-16 m-0 p-0 relative z-10">
         <div className="w-full m-0 p-0">
           {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
           <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
-            {/* Main Content - Scrollable - Appears first on mobile */}
-            <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
-              <div className="max-w-5xl mx-auto text-center mb-8 relative">
+            {/* Main Content - Appears first on mobile */}
+            <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2">
+              <div className="max-w-5xl mx-auto text-center mb-4 relative">
                 {/* Citrus Decorations */}
-                <CitrusSlice className="absolute -top-6 -left-6 w-16 h-16 text-citrus-orange/15 rotate-12" />
+                <CitrusSlice className="absolute -top-6 -left-6 w-16 h-16 text-citrus-sage/15 rotate-12" />
                 <CitrusLeaf className="absolute -top-4 -right-8 w-12 h-12 text-citrus-sage/15 -rotate-45" />
                 
-                <div className="flex items-center justify-center gap-3 mb-4">
-                  <CitrusSparkle className="w-10 h-10 text-citrus-orange animate-pulse" />
+                <div className="flex items-center justify-center gap-3 mb-2">
+                  <CitrusSparkle className="w-10 h-10 text-citrus-sage animate-pulse" />
                   <h1 className="text-4xl md:text-5xl font-varsity font-black text-citrus-forest uppercase tracking-tight">GM's Office</h1>
                   <CitrusSparkle className="w-10 h-10 text-citrus-sage animate-pulse" style={{ animationDelay: '0.3s' }} />
                 </div>
-                <p className="text-lg font-display text-citrus-charcoal">
+                <p className="text-lg font-display text-citrus-forest">
                   Your command center for team management and strategy
                 </p>
               </div>
               
               {/* Demo Mode Banner */}
               {isGuestMode(userLeagueState) && (
-                <div className="max-w-3xl mx-auto mb-8">
+                <div className="max-w-3xl mx-auto mb-4">
                   <LeagueCreationCTA 
                     title="You're viewing demo GM Office"
                     description="Sign up to access all GM tools and manage your team."
@@ -108,13 +108,13 @@ const GMOffice = () => {
                 </div>
               )}
               
-              <div className="max-w-3xl mx-auto mb-8">
+              <div className="max-w-3xl mx-auto mb-4">
                 <HeadlinesBanner />
               </div>
               
               <CitrusSectionDivider />
               
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto mt-4">
                 {gmActions.map((action, index) => (
                   <Link 
                     key={action.title} 

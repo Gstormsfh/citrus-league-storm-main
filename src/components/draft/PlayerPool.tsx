@@ -257,14 +257,14 @@ export const PlayerPool = ({
             placeholder="Search players or teams..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9 bg-citrus-cream border-fantasy-border"
+            className="pl-9 bg-[#E8EED9]/50 backdrop-blur-sm border-fantasy-border"
           />
         </div>
         
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Position</Label>
           <Select value={selectedPosition} onValueChange={setSelectedPosition}>
-            <SelectTrigger className="bg-citrus-cream border-fantasy-border">
+            <SelectTrigger className="bg-[#E8EED9]/50 backdrop-blur-sm border-fantasy-border">
               <SelectValue placeholder="Position" />
             </SelectTrigger>
             <SelectContent>
@@ -285,7 +285,7 @@ export const PlayerPool = ({
             setSortBy(value);
             setSortDirection('desc');
           }}>
-            <SelectTrigger className="bg-citrus-cream border-fantasy-border">
+            <SelectTrigger className="bg-[#E8EED9]/50 backdrop-blur-sm border-fantasy-border">
               <SelectValue placeholder="Sort by" />
             </SelectTrigger>
             <SelectContent>
@@ -327,7 +327,7 @@ export const PlayerPool = ({
       </div>
 
       {/* Player List Table */}
-      <div className="border border-fantasy-border rounded-lg overflow-hidden bg-citrus-cream">
+      <div className="border border-fantasy-border rounded-lg overflow-hidden bg-[#E8EED9]/50 backdrop-blur-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-fantasy-light/50 border-b border-fantasy-border">

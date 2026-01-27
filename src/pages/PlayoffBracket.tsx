@@ -79,12 +79,12 @@ const PlayoffBracket = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-[#D4E8B8]">
         <Navbar />
         <main className="w-full pt-28 pb-16 m-0 p-0">
           <div className="w-full m-0 p-0">
             {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
-            <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px]">
+            <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
               {/* Main Content - Scrollable - Appears first on mobile */}
               <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
                 <div className="text-center py-20">
@@ -119,7 +119,7 @@ const PlayoffBracket = () => {
 
   if (!bracketData || bracketData.rounds.length === 0) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-[#D4E8B8]">
         <Navbar />
         <main className="w-full pt-28 pb-16 m-0 p-0">
           <div className="w-full m-0 p-0">

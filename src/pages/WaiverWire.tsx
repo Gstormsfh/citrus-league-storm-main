@@ -242,6 +242,32 @@ const WaiverWire = () => {
   const handleSubmitClaim = async () => {
     if (!selectedPlayer || !myTeamId || !activeLeagueId) return;
 
+    // Check draft status FIRST - must complete draft before adding players
+    try {
+      const { data: leagueData } = await supabase
+        .from('leagues')
+        .select('draft_status')
+        .eq('id', activeLeagueId)
+        .single();
+      
+      if (leagueData && leagueData.draft_status !== 'completed') {
+        toast({
+          title: "Draft Required",
+          description: "You must complete the draft before adding players via waivers.",
+          variant: "destructive"
+        });
+        return;
+      }
+    } catch (error) {
+      console.error("[WaiverWire] Error checking draft status:", error);
+      toast({
+        title: "Error",
+        description: "Could not verify draft status.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     // Use smart addPlayer function that handles both free agent and waiver claims
     const result = await WaiverService.addPlayer(
       activeLeagueId,
@@ -293,7 +319,7 @@ const WaiverWire = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col relative overflow-hidden">
+    <div className="min-h-screen bg-[#D4E8B8] flex flex-col relative overflow-hidden">
       <CitrusBackground density="light" />
       
       <Navbar />

@@ -4,7 +4,6 @@ import Navbar from '../components/Navbar';
 import HeroSection from '../components/HeroSection';
 import FeaturesSection from '../components/FeaturesSection';
 import StormySection from '../components/StormySection';
-import TestimonialsSection from '../components/TestimonialsSection';
 import CtaSection from '../components/CtaSection';
 import Footer from '../components/Footer';
 import { AdSpace } from '@/components/AdSpace';
@@ -12,11 +11,8 @@ import { CitrusBackground } from '@/components/CitrusBackground';
 import { CitrusSectionDivider } from '@/components/CitrusSectionDivider';
 
 const Index = () => {
-  console.log("✅ Index component rendering");
-  
   // Animation observer setup
   useEffect(() => {
-    console.log("✅ Index useEffect running");
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach(entry => {
@@ -46,7 +42,7 @@ const Index = () => {
 
   try {
     return (
-      <div className="min-h-screen relative overflow-hidden">
+      <div className="min-h-screen relative overflow-hidden bg-[#D4E8B8]">
         {/* Citrus Background - Floating citrus elements */}
         <CitrusBackground density="medium" animated={true} />
         
@@ -67,11 +63,6 @@ const Index = () => {
             </section>
             
             <StormySection />
-            
-            {/* Citrus Divider */}
-            <CitrusSectionDivider />
-            
-            <TestimonialsSection />
             
             {/* Premium Banner Ad - Before CTA */}
             <section className="w-full max-w-7xl mx-auto px-4 py-8">

@@ -81,8 +81,8 @@ export const MatchupBadge = ({
         "inline-flex items-center gap-1.5 rounded-varsity font-display font-bold transition-all duration-200 hover:scale-105",
         sizeClasses[size],
         showLabel 
-          ? `${config.color} text-citrus-cream border-2 border-citrus-forest/20 shadow-patch` 
-          : `border-2 ${config.borderColor} bg-citrus-cream/80 backdrop-blur-sm`,
+          ? `${config.color} text-[#E8EED9] border-2 border-citrus-forest/20 shadow-patch` 
+          : `border-2 ${config.borderColor} bg-[#E8EED9]/50 backdrop-blur-sm/80 backdrop-blur-sm`,
         className
       )}
     >
@@ -115,7 +115,7 @@ export const MatchupBadge = ({
         </TooltipTrigger>
         <TooltipContent 
           side="top" 
-          className="bg-citrus-forest text-citrus-cream p-3 rounded-varsity shadow-varsity border-2 border-citrus-sage"
+          className="bg-citrus-forest text-[#E8EED9] p-3 rounded-varsity shadow-varsity border-2 border-citrus-sage"
         >
           <div className="text-xs space-y-1.5">
             <div className="font-varsity flex items-center gap-2">
@@ -123,7 +123,7 @@ export const MatchupBadge = ({
               <span className="uppercase tracking-wide">{config.label} Matchup</span>
               {opponent && <span className="text-citrus-sage font-display">vs {opponent}</span>}
             </div>
-            <div className="text-citrus-cream/90 font-display">{config.description}</div>
+            <div className="text-[#E8EED9]/90 font-display">{config.description}</div>
             <div className="text-citrus-sage text-[10px] font-display">
               Difficulty: {difficulty.toFixed(2)}
             </div>

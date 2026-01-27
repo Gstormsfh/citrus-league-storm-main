@@ -36,12 +36,17 @@ class ProxyManager:
     """
     
     def __init__(self):
-        self.username = os.getenv("CITRUS_PROXY_USERNAME", "wtkvqebq")
-        self.password = os.getenv("CITRUS_PROXY_PASSWORD", "e2o3t90lka78")
-        self.api_url = os.getenv(
-            "CITRUS_PROXY_API_URL",
-            "https://proxy.webshare.io/api/v2/proxy/list/download/vttnipddbxwfvslipogsgpzsneeydesmgtnfohbk/-/any/username/direct/-/?plan_id=12559674"
-        )
+        # SECURITY: No default values - credentials must be in environment
+        self.username = os.getenv("CITRUS_PROXY_USERNAME")
+        self.password = os.getenv("CITRUS_PROXY_PASSWORD")
+        self.api_url = os.getenv("CITRUS_PROXY_API_URL")
+        
+        # Validate required credentials are set
+        if not self.username or not self.password or not self.api_url:
+            raise ValueError(
+                "CITRUS_PROXY_USERNAME, CITRUS_PROXY_PASSWORD, and CITRUS_PROXY_API_URL "
+                "must be set in environment variables. See .env.example for template."
+            )
         
         self.proxy_list: List[str] = []
         self.proxy_cycle: Optional[itertools.cycle] = None
@@ -90,17 +95,17 @@ class ProxyManager:
                     })
             
             if proxies:
-                logger.info(f"[ProxyManager] ✅ Fetched {len(proxies)} proxies from API")
+                logger.info(f"[ProxyManager] Fetched {len(proxies)} proxies from API")
                 return proxies
             else:
-                logger.error("[ProxyManager] ❌ No proxies parsed from API response")
+                logger.error("[ProxyManager] No proxies parsed from API response")
                 return []
                 
         except requests.exceptions.RequestException as e:
-            logger.error(f"[ProxyManager] ❌ Failed to fetch proxy list: {e}")
+            logger.error(f"[ProxyManager] Failed to fetch proxy list: {e}")
             return []
         except Exception as e:
-            logger.error(f"[ProxyManager] ❌ Unexpected error fetching proxies: {e}")
+            logger.error(f"[ProxyManager] Unexpected error fetching proxies: {e}")
             return []
     
     def _format_proxy(self, proxy_dict: Dict) -> str:
@@ -133,7 +138,7 @@ class ProxyManager:
             raw_proxies = self._fetch_proxy_list_from_api()
             
             if not raw_proxies:
-                logger.warning("[ProxyManager] ⚠️ No proxies fetched, keeping existing cache if available")
+                logger.warning("[ProxyManager] No proxies fetched, keeping existing cache if available")
                 return False
             
             # Format all proxies
@@ -144,7 +149,7 @@ class ProxyManager:
                     formatted_proxies.append(formatted)
             
             if not formatted_proxies:
-                logger.error("[ProxyManager] ❌ No valid proxies after formatting")
+                logger.error("[ProxyManager] No valid proxies after formatting")
                 return False
             
             # Update cache
@@ -152,7 +157,7 @@ class ProxyManager:
             self.proxy_cycle = itertools.cycle(self.proxy_list)
             self.cache_time = time.time()
             
-            logger.info(f"[ProxyManager] ✅ Proxy cache refreshed: {len(self.proxy_list)} proxies available")
+            logger.info(f"[ProxyManager] Proxy cache refreshed: {len(self.proxy_list)} proxies available")
             return True
     
     def _is_cache_expired(self) -> bool:
@@ -184,7 +189,7 @@ class ProxyManager:
                     return next(self.proxy_cycle)
                 except StopIteration:
                     # Should never happen with itertools.cycle, but safety fallback
-                    logger.warning("[ProxyManager] ⚠️ Proxy cycle exhausted unexpectedly, refreshing...")
+                    logger.warning("[ProxyManager] Proxy cycle exhausted unexpectedly, refreshing...")
                     self._refresh_proxy_list()
                     if self.proxy_cycle:
                         return next(self.proxy_cycle)

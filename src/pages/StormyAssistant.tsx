@@ -18,6 +18,7 @@ import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import { CitrusBackground } from '@/components/CitrusBackground';
 import { CitrusSparkle, CitrusLeaf, CitrusWedge } from '@/components/icons/CitrusIcons';
 import { AdSpace } from '@/components/AdSpace';
+import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 
 interface Message {
   id: string;
@@ -27,7 +28,7 @@ interface Message {
 }
 
 const StormyAssistant = () => {
-  const { userLeagueState } = useLeague();
+  const { userLeagueState, activeLeagueId } = useLeague();
   const [activeTab, setActiveTab] = useState("chat");
   const [inputValue, setInputValue] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -79,17 +80,17 @@ const StormyAssistant = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col relative overflow-hidden">
+    <div className="min-h-screen bg-[#D4E8B8] flex flex-col relative overflow-hidden">
       {/* Citrus Background */}
       <CitrusBackground density="light" />
       
       <Navbar />
       <main className="w-full pt-28 pb-16 m-0 p-0 relative z-10">
         <div className="w-full m-0 p-0">
-          {/* Sidebar and Content Grid */}
-          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr]">
-            {/* Main Content - Scrollable - Appears first on mobile */}
-            <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
+          {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
+          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
+            {/* Main Content - Appears first on mobile */}
+            <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2">
               <div className="max-w-5xl mx-auto">
           <div className="text-center mb-8 relative">
             {/* Decorative citrus icons */}
@@ -313,6 +314,15 @@ const StormyAssistant = () => {
                 <AdSpace size="300x250" label="AI Sponsor" />
               </div>
             </aside>
+
+            {/* Right Sidebar - Notifications (hidden on mobile) */}
+            {userLeagueState === 'active-user' && activeLeagueId && (
+              <aside className="hidden lg:block order-3">
+                <div className="lg:sticky lg:top-32 h-[calc(100vh-12rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                  <LeagueNotifications leagueId={activeLeagueId} />
+                </div>
+              </aside>
+            )}
           </div>
         </div>
       </main>

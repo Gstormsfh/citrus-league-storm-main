@@ -4,6 +4,8 @@ import { DraftService } from "./DraftService";
 import { MatchupService } from "./MatchupService";
 import { RosterCacheService } from "./RosterCacheService";
 import { LeagueMembershipService } from "./LeagueMembershipService";
+import { DEMO_LEAGUE_ID_FOR_GUESTS } from "./DemoLeagueService";
+import { logger } from "@/utils/logger";
 
 export interface League {
   id: string;
@@ -433,18 +435,15 @@ async updateWaiverSettings(
    */
   async getUserLeagues(userId: string): Promise<{ leagues: League[]; error: any }> {
     try {
-      console.log('[LeagueService] getUserLeagues called for userId:', userId);
-      
       // Get leagues where user is commissioner (exclude demo league)
       const { data: commissionerLeagues, error: commError } = await supabase
         .from('leagues')
         .select('*')
         .eq('commissioner_id', userId)
-        .neq('id', '00000000-0000-0000-0000-000000000001') // Exclude demo league
+        .neq('id', DEMO_LEAGUE_ID_FOR_GUESTS) // Exclude demo league - guests only
         .order('created_at', { ascending: false });
 
       if (commError) throw commError;
-      console.log('[LeagueService] Commissioner leagues:', commissionerLeagues?.map(l => l.name));
 
       // Get leagues where user owns a team (exclude demo league teams)
       // CRITICAL: RLS policies filter this automatically, but we add explicit validation
@@ -452,7 +451,7 @@ async updateWaiverSettings(
         .from('teams')
         .select('id, league_id, team_name, owner_id')
         .eq('owner_id', userId)
-        .neq('league_id', '00000000-0000-0000-0000-000000000001'); // Exclude demo league
+        .neq('league_id', DEMO_LEAGUE_ID_FOR_GUESTS); // Exclude demo league - guests only
 
       if (teamsError) {
         console.error('[LeagueService] Error fetching user teams:', teamsError);
@@ -470,8 +469,6 @@ async updateWaiverSettings(
         });
       }
 
-      console.log('[LeagueService] User teams:', validTeams.map(t => ({ leagueId: t.league_id, teamName: t.team_name })));
-
       const leagueIds = validTeams.map(t => t.league_id);
       
       let ownerLeagues: League[] = [];
@@ -480,12 +477,11 @@ async updateWaiverSettings(
           .from('leagues')
           .select('*')
           .in('id', leagueIds)
-          .neq('id', '00000000-0000-0000-0000-000000000001') // Exclude demo league
+          .neq('id', DEMO_LEAGUE_ID_FOR_GUESTS) // Exclude demo league - guests only
           .order('created_at', { ascending: false });
 
         if (ownerError) throw ownerError;
         ownerLeagues = data || [];
-        console.log('[LeagueService] Owner leagues:', ownerLeagues.map(l => l.name));
       }
 
       // Combine and deduplicate
@@ -493,8 +489,6 @@ async updateWaiverSettings(
       const uniqueLeagues = Array.from(
         new Map(allLeagues.map(l => [l.id, l])).values()
       );
-
-      console.log('[LeagueService] Final leagues:', uniqueLeagues.map(l => l.name));
       return { leagues: uniqueLeagues, error: null };
     } catch (error) {
       console.error('[LeagueService] Error in getUserLeagues:', error);
@@ -508,7 +502,7 @@ async updateWaiverSettings(
    */
   async getLeagueTeams(leagueId: string): Promise<{ teams: Team[]; error: any }> {
     try {
-      console.log('Fetching teams for league:', leagueId);
+      logger.debug('Fetching teams for league:', leagueId);
       
       // Use RPC function to bypass RLS infinite recursion issue
       const { data, error } = await supabase
@@ -532,7 +526,7 @@ async updateWaiverSettings(
    */
   async deleteTeam(teamId: string, leagueId: string, userId: string): Promise<{ success: boolean; error: any }> {
     try {
-      console.log(`[LeagueService] Deleting team ${teamId} from league ${leagueId}`);
+      logger.debug(`[LeagueService] Deleting team ${teamId} from league ${leagueId}`);
       
       // CRITICAL: Verify user is the commissioner (application-level security)
       await LeagueMembershipService.requireCommissioner(leagueId, userId);
@@ -546,7 +540,7 @@ async updateWaiverSettings(
 
       if (deleteError) throw deleteError;
 
-      console.log(`[LeagueService] Successfully deleted team ${teamId}`);
+      logger.debug(`[LeagueService] Successfully deleted team ${teamId}`);
       return { success: true, error: null };
     } catch (error) {
       console.error('[LeagueService] Error deleting team:', error);
@@ -559,7 +553,7 @@ async updateWaiverSettings(
    */
   async getLeagueTeamsWithOwners(leagueId: string): Promise<{ teams: (Team & { owner_name?: string })[]; error: any }> {
     try {
-      console.log('Fetching teams with owners for league:', leagueId);
+      logger.debug('Fetching teams with owners for league:', leagueId);
       
       // Use RPC function to bypass RLS infinite recursion issue
       // This function checks that the user is in the league, then returns all teams
@@ -612,7 +606,7 @@ async updateWaiverSettings(
         return { ...team, owner_name: 'User' };
       });
 
-      console.log('Fetched teams with owners:', teamsWithOwners);
+      logger.debug('Fetched teams with owners:', teamsWithOwners);
       return { teams: teamsWithOwners, error: null };
     } catch (error) {
       console.error('Exception in getLeagueTeamsWithOwners:', error);
@@ -749,22 +743,22 @@ async updateWaiverSettings(
       // Always verify and fix lineups - this catches invalid lineups (e.g., all players on bench)
       // The initializeDefaultLineups function will skip teams with valid lineups, so it's safe to call multiple times
       if (!cachedLineupsInitialized) {
-        console.log('initializeLeague: Starting async lineup initialization for all 10 demo teams (non-blocking)...');
+        logger.debug('initializeLeague: Starting async lineup initialization for all 10 demo teams (non-blocking)...');
         cachedLineupsInitialized = true; // Mark immediately to prevent blocking
         // Run asynchronously - don't block roster loading
         // This processes ALL 10 teams (1-10), ensuring each has a valid lineup
         this.initializeDefaultLineups().then(() => {
-          console.log('initializeLeague: ✅ All 10 demo team lineups initialized successfully');
+          logger.debug('initializeLeague: All 10 demo team lineups initialized successfully');
         }).catch(err => {
           console.error('initializeLeague: Error initializing lineups (non-critical):', err);
         });
       } else {
         // Even if initialized before, verify and fix any invalid lineups
         // This is important for fixing corrupted lineups (e.g., teams 1, 4, 6 with all players on bench)
-        console.log('initializeLeague: Verifying all 10 demo team lineups are valid (fixing any invalid ones, non-blocking)...');
+        logger.debug('initializeLeague: Verifying all 10 demo team lineups are valid (fixing any invalid ones, non-blocking)...');
         // Run asynchronously - don't block
         this.initializeDefaultLineups().then(() => {
-          console.log('initializeLeague: ✅ All 10 demo team lineups verified');
+          logger.debug('initializeLeague: All 10 demo team lineups verified');
         }).catch(err => {
           console.error('initializeLeague: Error verifying lineups (non-critical):', err);
         });
@@ -975,12 +969,12 @@ async updateWaiverSettings(
     // This ensures all 10 demo teams have full starting lineups for non-logged-in users
     // NOTE: Do this asynchronously so it doesn't block roster loading
     if (!cachedLineupsInitialized) {
-      console.log('initializeLeague: Starting async lineup initialization for all 10 demo teams (non-blocking)...');
+      logger.debug('initializeLeague: Starting async lineup initialization for all 10 demo teams (non-blocking)...');
       cachedLineupsInitialized = true; // Mark immediately to prevent blocking
       // Run lineup initialization in background - don't await
       // This processes ALL 10 teams (1-10), not just Team 3
       this.initializeDefaultLineups().then(() => {
-        console.log('initializeLeague: ✅ All 10 demo team lineups initialized successfully');
+        logger.debug('initializeLeague: All 10 demo team lineups initialized successfully');
       }).catch((error) => {
         console.error('initializeLeague: Error initializing lineups (non-critical):', error);
         // This is non-critical - rosters are already available in cachedLeagueState
@@ -1139,7 +1133,7 @@ async updateWaiverSettings(
             ir,
             slotAssignments
           });
-          console.log(`Team ${teamIdNum}: ✅ Lineup saved successfully (${starters.length} starters, ${bench.length} bench, ${ir.length} IR)`);
+          logger.debug(`Team ${teamIdNum}: Lineup saved successfully (${starters.length} starters, ${bench.length} bench, ${ir.length} IR)`);
         } catch (error) {
           console.error(`Team ${teamIdNum}: ❌ FAILED to save lineup:`, error);
         }
@@ -1378,7 +1372,7 @@ async updateWaiverSettings(
     ir: (string | number)[], 
     slotAssignments: Record<string, string> 
   }, targetDate?: string, options?: { allowPlayerRemoval?: boolean }) {
-    console.log('[LeagueService.saveLineup] Called with teamId:', teamId, 'leagueId:', leagueId, 'lineup:', {
+    logger.debug('[LeagueService.saveLineup] Called with teamId:', teamId, 'leagueId:', leagueId, 'lineup:', {
       starters: lineup.starters?.length || 0,
       bench: lineup.bench?.length || 0,
       ir: lineup.ir?.length || 0,
@@ -1387,7 +1381,7 @@ async updateWaiverSettings(
     
     // Read-only guard: Block all lineup saves for demo league EXCEPT during initialization
     // Check if this is initialization (no lineup exists yet) vs user modification (lineup exists)
-    if (leagueId === '00000000-0000-0000-0000-000000000001') {
+    if (leagueId === DEMO_LEAGUE_ID_FOR_GUESTS) {
       // Check if lineup already exists - if yes, block (user trying to modify)
       // If no, allow (initialization)
       const { data: existingLineup } = await supabase
@@ -1738,7 +1732,7 @@ async updateWaiverSettings(
     errors: any[] 
   }> {
     try {
-      console.log('[LeagueService] Starting backfill for ALL matchups in league:', leagueId);
+      logger.debug('[LeagueService] Starting backfill for ALL matchups in league:', leagueId);
       
       // Get all matchups for this league
       const { data: matchups, error: matchupsError } = await supabase
@@ -1752,17 +1746,17 @@ async updateWaiverSettings(
       }
       
       if (!matchups || matchups.length === 0) {
-        console.log('[LeagueService] No matchups found for league:', leagueId);
+        logger.debug('[LeagueService] No matchups found for league:', leagueId);
         return { totalBackfilled: 0, matchupsProcessed: 0, errors: [] };
       }
       
-      console.log(`[LeagueService] Found ${matchups.length} matchups to backfill`);
+      logger.debug(`[LeagueService] Found ${matchups.length} matchups to backfill`);
       
       let totalBackfilled = 0;
       const errors: any[] = [];
       
       for (const matchup of matchups) {
-        console.log(`[LeagueService] Processing matchup ${matchup.id}...`);
+        logger.debug(`[LeagueService] Processing matchup ${matchup.id}...`);
         
         // Backfill team1
         if (matchup.team1_id) {
@@ -1799,7 +1793,7 @@ async updateWaiverSettings(
         }
       }
       
-      console.log(`[LeagueService] Backfill complete: ${totalBackfilled} records for ${matchups.length} matchups`);
+      logger.debug(`[LeagueService] Backfill complete: ${totalBackfilled} records for ${matchups.length} matchups`);
       if (errors.length > 0) {
         console.error('[LeagueService] Errors during backfill:', errors);
       }
@@ -2426,7 +2420,7 @@ async updateWaiverSettings(
     const now = Date.now();
     
     if (cached && now - cached.timestamp < 60000) {
-      console.log('[LeagueService] Using CACHED team standings (age:', Math.round((now - cached.timestamp) / 1000), 'seconds)');
+      logger.debug('[LeagueService] Using CACHED team standings (age:', Math.round((now - cached.timestamp) / 1000), 'seconds)');
       return cached.data;
     }
     
@@ -2894,7 +2888,7 @@ async updateWaiverSettings(
     source: string = 'Roster Tab'
   ): Promise<{ success: boolean; error: any }> {
     // Read-only guard: Block all drops for demo league
-    if (leagueId === '00000000-0000-0000-0000-000000000001') {
+    if (leagueId === DEMO_LEAGUE_ID_FOR_GUESTS) {
       return {
         success: false,
         error: new Error('Demo league is read-only. Sign up to create your own league!')
@@ -2948,7 +2942,7 @@ async updateWaiverSettings(
     source: string = 'Roster Tab'
   ): Promise<{ success: boolean; error: any }> {
     // Read-only guard: Block all adds for demo league
-    if (leagueId === '00000000-0000-0000-0000-000000000001') {
+    if (leagueId === DEMO_LEAGUE_ID_FOR_GUESTS) {
       return { 
         success: false, 
         error: new Error('Demo league is read-only. Sign up to create your own league!') 

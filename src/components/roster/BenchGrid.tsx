@@ -67,7 +67,7 @@ const BenchGrid = ({ players, onPlayerClick, className, lockedPlayerIds = new Se
           "p-3 transition-all rounded-lg",
           "border-2",
           isOver && "border-citrus-sage bg-citrus-sage/10 shadow-lg",
-          !isOver && "border-citrus-sage/30 bg-citrus-cream shadow-sm"
+          !isOver && "border-citrus-sage/30 bg-[#E8EED9]/50 backdrop-blur-sm shadow-sm"
         )}
       >
         {players.length > 0 ? (
@@ -92,7 +92,7 @@ const BenchGrid = ({ players, onPlayerClick, className, lockedPlayerIds = new Se
         ) : (
           <div className={cn(
             "flex items-center justify-center h-64 rounded-lg border-2 border-dashed relative overflow-hidden",
-            isOver ? "border-citrus-sage bg-citrus-sage/10" : "border-citrus-sage/30 bg-citrus-cream/50"
+            isOver ? "border-citrus-sage bg-citrus-sage/10" : "border-citrus-sage/30 bg-[#E8EED9]/50 backdrop-blur-sm/50"
           )}>
             {/* Decorative citrus slices in background */}
             <CitrusLeaf className="absolute top-4 left-4 w-16 h-16 text-citrus-sage opacity-10 rotate-12" />

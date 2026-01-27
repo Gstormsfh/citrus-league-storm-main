@@ -37,7 +37,7 @@ const Careers = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-[#D4E8B8] flex flex-col">
       <Navbar />
       <main className="flex-grow pt-24 px-4">
         <div className="container mx-auto max-w-5xl py-12">

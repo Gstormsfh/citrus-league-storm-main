@@ -14,6 +14,7 @@ import { PlayerService, Player } from './PlayerService';
 import { DraftService } from './DraftService';
 import { MatchupService } from './MatchupService';
 import { COLUMNS } from '@/utils/queryColumns';
+import { logger } from '@/utils/logger';
 
 // Static demo league ID (old approach - not used anymore)
 export const DEMO_LEAGUE_ID = '00000000-0000-0000-0000-000000000001';
@@ -670,14 +671,14 @@ export const DemoLeagueService = {
   },
 };
 
-// Expose for manual initialization (for debugging)
-if (typeof window !== 'undefined') {
+// Expose for manual initialization (for debugging - dev mode only)
+if (typeof window !== 'undefined' && import.meta.env.DEV) {
   (window as any).initDemoLeague = async () => {
-    console.log('Manually initializing demo league...');
+    logger.debug('Manually initializing demo league...');
     const result = await DemoLeagueService.forceReinitialize();
-    console.log('Result:', result);
+    logger.debug('Result:', result);
     return result;
   };
-  console.log('Demo league initialization available at: window.initDemoLeague()');
+  logger.debug('Demo league initialization available at: window.initDemoLeague()');
 }
 

@@ -67,14 +67,14 @@ export const AdSpace = ({ size = '300x250', className, label = 'Featured Sponsor
           "mb-4 inline-block px-4 py-1.5 bg-citrus-orange border-3 border-citrus-forest rounded-varsity shadow-patch",
           isHorizontal && "mb-0"
         )}>
-          <span className="font-varsity text-xs text-citrus-cream uppercase tracking-wider whitespace-nowrap">
+          <span className="font-varsity text-xs text-[#E8EED9] uppercase tracking-wider whitespace-nowrap">
             ⭐ {label}
           </span>
         </div>
         
         {/* Main Ad Container */}
         <div className={cn(
-          "w-full bg-citrus-cream/80 backdrop-blur-sm rounded-xl border-3 border-citrus-sage shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)] flex flex-col items-center justify-center",
+          "w-full bg-[#E8EED9]/50 backdrop-blur-sm/80 backdrop-blur-sm rounded-xl border-3 border-citrus-sage shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)] flex flex-col items-center justify-center",
           config.inner,
           isHorizontal ? "mb-0" : "mb-3"
         )}>
@@ -83,7 +83,7 @@ export const AdSpace = ({ size = '300x250', className, label = 'Featured Sponsor
             config.icon,
             isHorizontal ? "mb-0" : "mb-3"
           )}>
-            <CitrusSlice className={cn("text-citrus-cream", config.iconInner)} />
+            <CitrusSlice className={cn("text-[#E8EED9]", config.iconInner)} />
           </div>
           <div className={cn(
             isHorizontal && "ml-4 text-left flex-1"

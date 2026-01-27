@@ -3,7 +3,7 @@ import Footer from "@/components/Footer";
 
 const About = () => {
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-[#D4E8B8] flex flex-col">
       <Navbar />
       <main className="flex-grow pt-24 px-4">
         <div className="container mx-auto max-w-4xl py-12">
@@ -11,25 +11,27 @@ const About = () => {
           
           <div className="prose dark:prose-invert max-w-none space-y-8 text-lg text-muted-foreground">
             <p>
-              CitrusSports was born from a simple frustration: fantasy sports platforms were stuck in the past. 
-              Clunky interfaces, outdated stats, and a lack of innovation made managing leagues a chore rather than a joy.
+              We built Citrus because every other fantasy hockey platform feels like it was designed by people who don't actually watch hockey. 
+              Laggy live scoring. Terrible projections. Sunday finishes when nobody plays. We got tired of it.
             </p>
             
             <p>
-              We set out to build a platform that puts the user experience first. By combining modern design principles 
-              with powerful AI technology, we're redefining how fantasy sports are played.
+              So we made something better. Saturday finishes when the entire league is playing. AI that actually understands hockey context. 
+              Post-game writeups for every player so you know why your sleeper pick got 0.2 points. A clean interface that doesn't make you feel like you're using AOL.
             </p>
 
-            <h2 className="text-2xl font-bold text-foreground mt-12 mb-4">Our Mission</h2>
+            <h2 className="text-2xl font-bold text-foreground mt-12 mb-4">Why Saturday?</h2>
             <p>
-              To create the most immersive, intuitive, and intelligent fantasy sports experience on the planet. 
-              We believe that fantasy sports should be accessible to everyone, from the casual fan to the hardcore data analyst.
+              Because that's when hockey happens. 12 games. Maximum chaos. Your matchup is decided when it actually matters, 
+              not on Sunday morning when 3 teams are playing and your opponent already won. Saturday night is peak hockey. 
+              Your fantasy week should end then too.
             </p>
 
-            <h2 className="text-2xl font-bold text-foreground mt-12 mb-4">The Team</h2>
+            <h2 className="text-2xl font-bold text-foreground mt-12 mb-4">Built Different</h2>
             <p>
-              We are a passionate team of sports fans, developers, and designers based in sunny places. 
-              We eat, sleep, and breathe fantasy sports, and we're dedicated to building the tools we want to use ourselves.
+              We're not trying to be Yahoo or ESPN. We're building the platform we actually want to use. 
+              Fast. Clean. Smart. No ads cluttering your dashboard. No features you'll never touch. 
+              Just the tools you need to dominate your league and talk trash in the group chat.
             </p>
           </div>
         </div>

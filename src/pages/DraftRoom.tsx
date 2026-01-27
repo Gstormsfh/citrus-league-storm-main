@@ -184,58 +184,98 @@ const DraftRoom = () => {
   // Memoize loadDraftData to prevent infinite loops
   const loadDraftData = useCallback(async () => {
     // ═══════════════════════════════════════════════════════════════════
-    // DEMO STATE: Load demo draft room
+    // DEMO STATE: Load REAL demo league from database (read-only)
+    // Same approach as Matchup and Roster pages
     // ═══════════════════════════════════════════════════════════════════
     if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
       try {
         setLoading(true);
         setError(null);
         
-        // Create demo league
-        const demoLeague: League = {
-          id: 'demo-league-id',
-          name: 'Demo League',
-          commissioner_id: 'demo-commissioner',
-          draft_status: 'completed',
-          join_code: 'DEMO123',
-          roster_size: 21,
-          draft_rounds: 21,
-          settings: {},
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
+        logger.debug('[DraftRoom] Loading REAL demo league for guest/no-league user');
+        
+        // Import DEMO_LEAGUE_ID_FOR_GUESTS
+        const { DEMO_LEAGUE_ID_FOR_GUESTS } = await import('@/services/DemoLeagueService');
+        const { COLUMNS } = await import('@/utils/queryColumns');
+        
+        // Get the demo league from database
+        const { data: demoLeagueData, error: leagueError } = await supabase
+          .from('leagues')
+          .select(COLUMNS.LEAGUE)
+          .eq('id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
+          .maybeSingle();
+        
+        if (leagueError || !demoLeagueData) {
+          logger.error('[DraftRoom] Error loading demo league:', leagueError);
+          setError('Failed to load demo league. Please try again.');
+          setLoading(false);
+          return;
+        }
+        
+        const demoLeague = demoLeagueData as League;
+        logger.debug('[DraftRoom] Demo league loaded:', demoLeague.id);
         setLeague(demoLeague);
         setIsCommissioner(false); // Guests are never commissioners
         
-        // Create demo teams from LEAGUE_TEAMS_DATA
-        const demoTeams: (Team & { owner_name?: string })[] = LEAGUE_TEAMS_DATA.map(team => ({
-          id: String(team.id),
-          league_id: 'demo-league-id',
-          team_name: team.name,
-          owner_id: null,
-          owner_name: team.owner,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }));
-        setTeams(demoTeams);
+        // Get teams from the demo league
+        const { data: demoTeamsData, error: teamsError } = await supabase
+          .from('teams')
+          .select(COLUMNS.TEAM)
+          .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
+          .order('created_at', { ascending: true });
         
-        // Set user team to Team 3 (Citrus Crushers)
-        const userDemoTeam = demoTeams.find(t => t.id === '3') || null;
+        if (teamsError || !demoTeamsData || demoTeamsData.length === 0) {
+          logger.error('[DraftRoom] Error loading demo teams:', teamsError);
+          setError('Failed to load demo teams. Please try again.');
+          setLoading(false);
+          return;
+        }
+        
+        // Map database teams and add owner names from LEAGUE_TEAMS_DATA
+        const demoTeams: (Team & { owner_name?: string })[] = (demoTeamsData as any[]).map((team, index) => {
+          const teamData = LEAGUE_TEAMS_DATA[index];
+          return {
+            ...team,
+            owner_name: teamData?.owner || 'Demo Owner'
+          };
+        });
+        
+        setTeams(demoTeams);
+        logger.debug('[DraftRoom] Loaded', demoTeams.length, 'demo teams');
+        
+        // Set user team to first team (or Team 3 if we can identify it)
+        const userDemoTeam = demoTeams[0] || null;
         setUserTeam(userDemoTeam);
         
-        // Generate demo draft picks
-        const demoPicks = await generateDemoDraftPicks();
+        // Get REAL draft picks from database
+        const { data: draftPicksData, error: picksError } = await supabase
+          .from('draft_picks')
+          .select('*')
+          .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
+          .is('deleted_at', null)
+          .order('pick_number', { ascending: true });
+        
+        if (picksError) {
+          logger.error('[DraftRoom] Error loading demo draft picks:', picksError);
+          setError('Failed to load demo draft picks. Please try again.');
+          setLoading(false);
+          return;
+        }
+        
+        const demoPicks: DraftPick[] = (draftPicksData || []) as DraftPick[];
+        logger.debug('[DraftRoom] Loaded', demoPicks.length, 'demo draft picks');
+        
         setDraftHistory(demoPicks);
         setDraftedPlayerIds(new Set(demoPicks.map(p => p.player_id)));
         
         // Create demo draft state (completed)
         const demoDraftState: DraftState = {
-          currentRound: 21,
-          currentPick: 210, // 10 teams * 21 rounds
-          totalPicks: 210,
+          currentRound: demoLeague.draft_rounds || 21,
+          currentPick: demoPicks.length,
+          totalPicks: demoTeams.length * (demoLeague.draft_rounds || 21),
           nextTeamId: null,
           isComplete: true,
-          sessionId: 'demo-session-id'
+          sessionId: demoPicks[0]?.draft_session_id || 'demo-session-id'
         };
         setDraftState(demoDraftState);
         setDraftPhase(DraftPhase.COMPLETED);
@@ -246,16 +286,17 @@ const DraftRoom = () => {
         
         // Set draft settings
         setDraftSettings({
-          rounds: 21,
+          rounds: demoLeague.draft_rounds || 21,
           pickTimeLimit: 90,
           draftOrder: 'serpentine',
           scoringFormat: 'standard'
         });
         
+        logger.debug('[DraftRoom] Demo draft loaded successfully');
         setLoading(false);
         return;
       } catch (error: unknown) {
-        logger.error('DraftRoom: Error loading demo draft:', error);
+        logger.error('[DraftRoom] Error loading demo draft:', error);
         setError('Failed to load demo draft. Please try again.');
         setLoading(false);
         return;
@@ -266,7 +307,7 @@ const DraftRoom = () => {
     // ACTIVE USER STATE: Load real draft data
     // ═══════════════════════════════════════════════════════════════════
     if (!leagueId || !user) {
-      logger.log('DraftRoom: Cannot load draft data - missing leagueId or user', { leagueId, hasUser: !!user });
+      logger.debug('DraftRoom: Cannot load draft data - missing leagueId or user', { leagueId, hasUser: !!user });
       setLoading(false);
       if (!leagueId) {
         setError('No league ID provided. Please select a league.');
@@ -279,7 +320,7 @@ const DraftRoom = () => {
       setError(null);
       // CRITICAL: Set draftPhase immediately to ensure it's always initialized
       setDraftPhase(DraftPhase.LOBBY);
-      logger.log('DraftRoom: loadDraftData starting for league:', leagueId);
+      logger.debug('DraftRoom: loadDraftData starting for league:', leagueId);
 
       // Load league (with membership validation)
       const { league: leagueData, error: leagueError } = await LeagueService.getLeague(leagueId, user.id);
@@ -287,7 +328,7 @@ const DraftRoom = () => {
         logger.error('DraftRoom: Error loading league:', leagueError);
         // Check if it's an access denied error
         if (leagueError.message?.includes('Access denied') || leagueError.message?.includes('not a member')) {
-          navigate('/leagues');
+          navigate('/gm-office');
           return;
         }
         throw leagueError;
@@ -296,7 +337,7 @@ const DraftRoom = () => {
         logger.error('DraftRoom: League not found');
         throw new Error('League not found');
       }
-      logger.log('DraftRoom: League loaded:', leagueData);
+      logger.debug('DraftRoom: League loaded:', leagueData);
       setLeague(leagueData);
       setIsCommissioner(leagueData.commissioner_id === user.id);
       
@@ -318,12 +359,12 @@ const DraftRoom = () => {
       // IMPORTANT: Set draftPhase IMMEDIATELY and synchronously
       if (leagueData.draft_status === 'completed') {
         setDraftPhase(DraftPhase.COMPLETED);
-        logger.log('DraftRoom: Draft is completed, setting phase to COMPLETED');
+        logger.debug('DraftRoom: Draft is completed, setting phase to COMPLETED');
       } else {
         // Always show lobby first, even if draft is in progress
         // This allows users to see settings and choose to continue
         setDraftPhase(DraftPhase.LOBBY);
-        logger.log('DraftRoom: Setting phase to LOBBY');
+        logger.debug('DraftRoom: Setting phase to LOBBY');
       }
 
       // Load teams with owner information
@@ -332,7 +373,7 @@ const DraftRoom = () => {
         logger.error('DraftRoom: Error loading teams:', teamsError);
         throw teamsError;
       }
-      logger.log('DraftRoom: Teams loaded:', teamsData?.length || 0, 'teams');
+      logger.debug('DraftRoom: Teams loaded:', teamsData?.length || 0, 'teams');
       setTeams(teamsData || []);
 
       // Load user's team
@@ -350,10 +391,10 @@ const DraftRoom = () => {
           hasActiveDraftData = true;
           setDraftHistory(activePicks);
           setDraftedPlayerIds(new Set(activePicks.map(p => p.player_id)));
-          logger.log('DraftRoom: Loaded', activePicks.length, 'active draft picks');
+          logger.debug('DraftRoom: Loaded', activePicks.length, 'active draft picks');
         } else {
           // Status says in_progress/completed but no picks exist - likely stale status
-          logger.log('DraftRoom: Draft status is', leagueData.draft_status, 'but no active picks found - treating as not started');
+          logger.debug('DraftRoom: Draft status is', leagueData.draft_status, 'but no active picks found - treating as not started');
           setDraftHistory([]);
           setDraftedPlayerIds(new Set());
           // Reset status to not_started since we're inside the block where status is not 'not_started'
@@ -367,7 +408,7 @@ const DraftRoom = () => {
         // Draft not started - ensure no picks are loaded
         setDraftHistory([]);
         setDraftedPlayerIds(new Set());
-        logger.log('DraftRoom: Draft not started, cleared draft history');
+        logger.debug('DraftRoom: Draft not started, cleared draft history');
       }
 
       // Only initialize draft order or load draft state if draft is actually in progress or completed
@@ -392,7 +433,7 @@ const DraftRoom = () => {
         // If status is incorrectly set but no data exists, reset it
         // Only reset if status is in_progress or completed but no picks exist
         if ((leagueData.draft_status === 'in_progress' || leagueData.draft_status === 'completed') && !hasActiveDraftData) {
-          logger.log('DraftRoom: Resetting incorrect draft status (no active data found)');
+          logger.debug('DraftRoom: Resetting incorrect draft status (no active data found)');
           await supabase
             .from('leagues')
             .update({ draft_status: 'not_started' })
@@ -405,7 +446,7 @@ const DraftRoom = () => {
       const allPlayers = await PlayerService.getAllPlayers();
       setAvailablePlayers(allPlayers);
       
-      logger.log('DraftRoom: All data loaded successfully', {
+      logger.debug('DraftRoom: All data loaded successfully', {
         draftPhase,
         teamsCount: teams.length,
         hasLeague: !!leagueData
@@ -464,7 +505,7 @@ const DraftRoom = () => {
     let updateTimeout: NodeJS.Timeout;
     
     const unsubscribe = DraftService.subscribeToDraftPicks(leagueId, user.id, async (newPick) => {
-      logger.log('DraftRoom: New pick received via realtime:', newPick);
+      logger.debug('DraftRoom: New pick received via realtime:', newPick);
       
       // Debounce rapid updates - wait 300ms for more updates before processing
       clearTimeout(updateTimeout);
@@ -491,11 +532,11 @@ const DraftRoom = () => {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && leagueId && user) {
-        logger.log('DraftRoom: Page visible again, reloading teams');
+        logger.debug('DraftRoom: Page visible again, reloading teams');
         // Reload teams to get updated team names
         LeagueService.getLeagueTeamsWithOwners(leagueId).then(({ teams: teamsData, error: teamsError }) => {
           if (!teamsError && teamsData) {
-            logger.log('DraftRoom: Teams reloaded:', teamsData.length, 'teams');
+            logger.debug('DraftRoom: Teams reloaded:', teamsData.length, 'teams');
             setTeams(teamsData);
           }
         });
@@ -1951,14 +1992,14 @@ const DraftRoom = () => {
 
   // ALWAYS render something - never return null
   return (
-    <div className="min-h-screen bg-background relative">
+    <div className="min-h-screen bg-[#D4E8B8] relative">
       <Navbar />
 
 
       <main className="w-full pt-28 pb-16 m-0 p-0">
         <div className="w-full m-0 p-0">
           {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
-          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px]">
+          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             {/* Main Content - Scrollable - Appears first on mobile */}
             <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
         {/* Loading State - Show if loading or auth is loading, but NOT for demo state */}

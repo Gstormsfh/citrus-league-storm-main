@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLeague } from "@/contexts/LeagueContext";
 import { LeagueService } from "@/services/LeagueService";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -28,6 +29,7 @@ const CreateLeague = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, profile } = useAuth();
+  const { refreshLeagues } = useLeague();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -108,6 +110,11 @@ const CreateLeague = () => {
       return;
     }
 
+    // Prevent duplicate submissions
+    if (loading) {
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -143,7 +150,7 @@ const CreateLeague = () => {
       const { league, team, error: createError } = await LeagueService.createLeague(
         leagueName.trim(),
         user.id,
-        21, // Roster size per team
+        parseInt(draftRounds), // Roster size per team (matches draft rounds)
         parseInt(draftRounds), // Draft rounds from user selection
         settings,
         scoringSettings // Pass transformed scoring settings
@@ -151,6 +158,9 @@ const CreateLeague = () => {
 
       if (createError) throw createError;
       if (!league) throw new Error("Failed to create league");
+
+      // Refresh leagues list to include the newly created league
+      await refreshLeagues();
 
       // Show success message
       toast({
@@ -205,6 +215,9 @@ const CreateLeague = () => {
       if (joinError) throw joinError;
       if (!league || !team) throw new Error("Failed to join league");
 
+      // Refresh leagues list to include the newly joined league
+      await refreshLeagues();
+
       // Show success message
       toast({
         title: "Joined League!",
@@ -234,7 +247,7 @@ const CreateLeague = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
+    <div className="min-h-screen bg-[#D4E8B8] relative overflow-hidden">
       {/* Decorative Background */}
       <div className="absolute top-0 right-0 w-96 h-96 bg-[hsl(var(--vibrant-yellow))] rounded-full opacity-10 blur-3xl -z-10"></div>
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-[hsl(var(--vibrant-green))] rounded-full opacity-10 blur-3xl -z-10"></div>

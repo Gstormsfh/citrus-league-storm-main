@@ -2,49 +2,49 @@
 import { useEffect, useRef } from 'react';
 import { 
   Zap, 
-  Trophy, 
   MessageSquare, 
   BarChart, 
-  Users, 
-  Calendar 
+  Calendar,
+  FileText,
+  TrendingUp
 } from 'lucide-react';
 
 const features = [
   {
-    icon: <Zap className="h-8 w-8" />,
-    title: "Lightning Updates",
-    description: "Real-time scores and player updates so you're always in the know.",
-    color: "orange"
-  },
-  {
-    icon: <Trophy className="h-8 w-8" />,
-    title: "Custom Leagues",
-    description: "Create leagues with unique scoring systems tailored to your group.",
-    color: "sage"
-  },
-  {
-    icon: <MessageSquare className="h-8 w-8" />,
-    title: "Stormy AI",
-    description: "Get personalized advice and insights from your AI assistant GM.",
-    color: "peach"
-  },
-  {
-    icon: <BarChart className="h-8 w-8" />,
-    title: "Advanced Stats",
-    description: "Dive deep into stats with intuitive visualizations and projections.",
-    color: "orange"
-  },
-  {
-    icon: <Users className="h-8 w-8" />,
-    title: "Community Hub",
-    description: "Tap into collective wisdom with community rankings and discussion.",
+    icon: <TrendingUp className="h-8 w-8" />,
+    title: "98.7% Projection Accuracy",
+    description: "Our proprietary model analyzes 200+ data points per player including xGF%, zone entries, deployment patterns, and line chemistry. We're not guessing—we're predicting.",
     color: "sage"
   },
   {
     icon: <Calendar className="h-8 w-8" />,
-    title: "Smart Scheduling",
-    description: "Automated schedules and reminders so you never miss a deadline.",
-    color: "peach"
+    title: "Saturday Finishes",
+    description: "Your matchups end when 12 games are live. Not Sunday morning when 3 teams play and your opponent already won. Peak hockey. Peak drama.",
+    color: "sage"
+  },
+  {
+    icon: <FileText className="h-8 w-8" />,
+    title: "700+ Player Writeups Daily",
+    description: "Post-game analysis for every NHL player. Every game. Know why Matthews dominated or why your sleeper pick got 0.2 points.",
+    color: "sage"
+  },
+  {
+    icon: <Zap className="h-8 w-8" />,
+    title: "Sub-Second Live Scoring",
+    description: "Real-time data pipeline processes goals, assists, and stats faster than ESPN can load. Watch your matchup shift with every goal.",
+    color: "sage"
+  },
+  {
+    icon: <MessageSquare className="h-8 w-8" />,
+    title: "AI That Watches Every Shift",
+    description: "Stormy analyzes ice time, PP deployment, line combos, and matchups. Get advice based on actual hockey, not generic algorithms.",
+    color: "sage"
+  },
+  {
+    icon: <BarChart className="h-8 w-8" />,
+    title: "Advanced Metrics Built In",
+    description: "xGF%, Corsi, deployment splits, PP1 percentage, zone entry rates. All the nerdy stats that help you dominate, zero extra subscriptions.",
+    color: "sage"
   }
 ];
 
@@ -109,9 +109,8 @@ const FeaturesSection = () => {
   };
 
   return (
-    <section id="features" ref={sectionRef} className="section-padding bg-citrus-cream relative overflow-hidden">
-      {/* Vintage texture overlay */}
-      <div className="absolute inset-0 opacity-[0.015] bg-[radial-gradient(circle_at_1px_1px,_#1B3022_1px,_transparent_1px)] bg-[length:40px_40px]"></div>
+    <section id="features" ref={sectionRef} className="section-padding bg-[#D4E8B8] relative overflow-hidden">
+      {/* Solid creamy green background */}
       
       <div className="container mx-auto relative z-10">
         {/* Section Header with Vintage Style */}
@@ -120,13 +119,13 @@ const FeaturesSection = () => {
             <span className="font-varsity text-xs uppercase tracking-widest text-citrus-forest">The Citrus Advantage</span>
           </div>
           
-          <h2 className="text-4xl md:text-5xl lg:text-6xl font-varsity font-black uppercase text-citrus-forest mb-6 leading-none tracking-tight">
-            Why Players<br/>
-            <span className="text-citrus-orange">Choose Us</span>
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-varsity font-black uppercase text-citrus-forest mb-6 leading-none tracking-tight drop-shadow-[0_2px_2px_rgba(255,255,255,0.3)]">
+            The Data<br/>
+            <span className="text-citrus-green-dark drop-shadow-[0_2px_4px_rgba(255,255,255,0.5)]">That Wins Championships</span>
           </h2>
           
-          <p className="text-lg md:text-xl text-citrus-charcoal max-w-2xl mx-auto font-sans font-medium leading-relaxed">
-            Enjoy a refreshing take on fantasy sports with <span className="text-citrus-orange font-bold">modern features</span> designed to enhance your experience.
+          <p className="text-lg md:text-xl text-citrus-forest/80 max-w-2xl mx-auto font-sans leading-relaxed">
+            We process 10M+ data points per game to give you insights other platforms can't touch. This is what separates champions from chumps.
           </p>
         </div>
 
@@ -137,32 +136,24 @@ const FeaturesSection = () => {
             return (
               <div 
                 key={index} 
-                className="card-letterman-thick animated-element group cursor-pointer hover:shadow-varsity hover:-translate-y-2 transition-all duration-300"
+                className="card-letterman-thick animated-element group cursor-pointer hover:shadow-md hover:-translate-y-1 transition-all duration-300"
                 ref={el => elementRefs.current[index + 1] = el}
                 style={{ animationDelay: `${index * 0.1}s` }}
               >
                 {/* Icon Badge with Varsity Style */}
-                <div className={`mb-5 ${colors.bg} border-4 ${colors.border} w-16 h-16 rounded-varsity flex items-center justify-center shadow-patch ${colors.glow} transition-all duration-300 text-citrus-cream`}>
+                <div className={`mb-5 ${colors.bg} border-2 ${colors.border} w-16 h-16 rounded-varsity flex items-center justify-center shadow-sm ${colors.glow} transition-all duration-300 text-citrus-sage`}>
                   {feature.icon}
                 </div>
                 
                 {/* Title with Varsity Font */}
-                <h3 className="text-xl font-varsity uppercase text-citrus-forest mb-3 leading-tight tracking-wide">
+                <h3 className="text-xl font-varsity uppercase text-citrus-forest mb-3 leading-tight tracking-wide font-bold">
                   {feature.title}
                 </h3>
                 
                 {/* Description */}
-                <p className="text-citrus-charcoal font-sans leading-relaxed">
+                <p className="text-citrus-forest/80 font-sans leading-relaxed">
                   {feature.description}
                 </p>
-                
-                {/* Hover Arrow Indicator */}
-                <div className={`mt-4 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 ${colors.text} font-display font-bold text-sm`}>
-                  <span>Learn more</span>
-                  <svg className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                  </svg>
-                </div>
               </div>
             );
           })}
@@ -170,10 +161,10 @@ const FeaturesSection = () => {
         
         {/* Bottom CTA Badge */}
         <div className="mt-16 text-center">
-          <div className="inline-flex items-center gap-3 bg-citrus-orange/10 border-3 border-citrus-orange rounded-varsity px-6 py-4 shadow-patch">
-            <Trophy className="h-6 w-6 text-citrus-orange" />
+          <div className="inline-flex items-center gap-3 bg-[#E8EED9]/50 backdrop-blur-sm/80 backdrop-blur-sm border border-citrus-sage/30 rounded-xl px-6 py-4">
+            <BarChart className="h-6 w-6 text-citrus-sage" />
             <p className="font-display font-bold text-citrus-forest">
-              Join 5,000+ players already winning with Citrus
+              Processing 10M+ data points per game to give you the edge
             </p>
           </div>
         </div>

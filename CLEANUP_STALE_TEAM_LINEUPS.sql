@@ -1,159 +1,156 @@
 -- ============================================================================
--- CLEANUP STALE PLAYER IDS FROM TEAM_LINEUPS
+-- CLEANUP STALE TEAM_LINEUPS DATA
 -- ============================================================================
--- Problem: team_lineups may contain player IDs from players that were dropped
--- Solution: Filter each lineup array to only include players in draft_picks (deleted_at IS NULL)
--- Run this script when: You see warnings about "stale player IDs" in console logs
+-- Removes player IDs from team_lineups that don't exist in roster_assignments
+-- This fixes the issue where dropped players remain in team_lineups causing
+-- "frozen roster" and wrong player display bugs
 -- ============================================================================
 
-BEGIN;
-
--- Show current state before cleanup
-SELECT 
-  tl.league_id,
-  tl.team_id,
-  t.team_name,
-  jsonb_array_length(tl.starters) as starters_count,
-  jsonb_array_length(tl.bench) as bench_count,
-  jsonb_array_length(tl.ir) as ir_count,
-  (
-    SELECT COUNT(*)
-    FROM jsonb_array_elements_text(tl.starters || tl.bench || tl.ir) player_id
-    WHERE NOT EXISTS (
-      SELECT 1 FROM draft_picks dp
-      WHERE dp.team_id = tl.team_id
-        AND dp.league_id = tl.league_id
-        AND dp.player_id = player_id::text
-        AND dp.deleted_at IS NULL
+-- Show affected teams before cleanup
+DO $$
+DECLARE
+  v_team RECORD;
+  v_stale_count INTEGER := 0;
+BEGIN
+  RAISE NOTICE '═══════════════════════════════════════════════════════════════';
+  RAISE NOTICE 'PRE-CLEANUP DIAGNOSTIC';
+  RAISE NOTICE '═══════════════════════════════════════════════════════════════';
+  
+  FOR v_team IN
+    WITH stale_players AS (
+      SELECT 
+        tl.team_id,
+        t.team_name,
+        l.name as league_name,
+        jsonb_array_length(tl.starters) + 
+        jsonb_array_length(tl.bench) + 
+        jsonb_array_length(tl.ir) as total_in_lineup,
+        (
+          SELECT COUNT(*)
+          FROM roster_assignments ra
+          WHERE ra.team_id = tl.team_id
+        ) as total_in_roster,
+        jsonb_array_length(tl.starters) + 
+        jsonb_array_length(tl.bench) + 
+        jsonb_array_length(tl.ir) - 
+        (
+          SELECT COUNT(*)
+          FROM roster_assignments ra
+          WHERE ra.team_id = tl.team_id
+        ) as stale_count
+      FROM team_lineups tl
+      JOIN teams t ON t.id = tl.team_id
+      JOIN leagues l ON l.id = tl.league_id
     )
-  ) as stale_players_count
-FROM team_lineups tl
-JOIN teams t ON t.id = tl.team_id
-WHERE (
-  SELECT COUNT(*)
-  FROM jsonb_array_elements_text(tl.starters || tl.bench || tl.ir) player_id
-  WHERE NOT EXISTS (
-    SELECT 1 FROM draft_picks dp
-    WHERE dp.team_id = tl.team_id
-      AND dp.league_id = tl.league_id
-      AND dp.player_id = player_id::text
-      AND dp.deleted_at IS NULL
-  )
-) > 0
-ORDER BY tl.league_id, t.team_name;
+    SELECT * FROM stale_players WHERE stale_count > 0
+  LOOP
+    v_stale_count := v_stale_count + 1;
+    RAISE NOTICE '[%] %: % in lineup, % in roster, % STALE', 
+      v_team.league_name,
+      v_team.team_name,
+      v_team.total_in_lineup,
+      v_team.total_in_roster,
+      v_team.stale_count;
+  END LOOP;
+  
+  IF v_stale_count = 0 THEN
+    RAISE NOTICE '✅ No stale data found - all team_lineups are clean';
+  ELSE
+    RAISE NOTICE '⚠️  Found % team(s) with stale data', v_stale_count;
+  END IF;
+  
+  RAISE NOTICE '';
+END $$;
 
--- Update team_lineups to remove stale player IDs
+-- Perform the cleanup
 UPDATE team_lineups tl
 SET 
   starters = (
     SELECT COALESCE(jsonb_agg(player_id), '[]'::jsonb)
     FROM jsonb_array_elements_text(tl.starters) player_id
     WHERE EXISTS (
-      SELECT 1 FROM draft_picks dp
-      WHERE dp.team_id = tl.team_id
-        AND dp.league_id = tl.league_id
-        AND dp.player_id = player_id::text
-        AND dp.deleted_at IS NULL
+      SELECT 1 FROM roster_assignments ra 
+      WHERE ra.player_id = player_id AND ra.team_id = tl.team_id
     )
   ),
   bench = (
     SELECT COALESCE(jsonb_agg(player_id), '[]'::jsonb)
     FROM jsonb_array_elements_text(tl.bench) player_id
     WHERE EXISTS (
-      SELECT 1 FROM draft_picks dp
-      WHERE dp.team_id = tl.team_id
-        AND dp.league_id = tl.league_id
-        AND dp.player_id = player_id::text
-        AND dp.deleted_at IS NULL
+      SELECT 1 FROM roster_assignments ra 
+      WHERE ra.player_id = player_id AND ra.team_id = tl.team_id
     )
   ),
   ir = (
     SELECT COALESCE(jsonb_agg(player_id), '[]'::jsonb)
     FROM jsonb_array_elements_text(tl.ir) player_id
     WHERE EXISTS (
-      SELECT 1 FROM draft_picks dp
-      WHERE dp.team_id = tl.team_id
-        AND dp.league_id = tl.league_id
-        AND dp.player_id = player_id::text
-        AND dp.deleted_at IS NULL
+      SELECT 1 FROM roster_assignments ra 
+      WHERE ra.player_id = player_id AND ra.team_id = tl.team_id
     )
   ),
-  slot_assignments = (
-    SELECT COALESCE(
-      jsonb_object_agg(key, value),
-      '{}'::jsonb
-    )
-    FROM jsonb_each(tl.slot_assignments)
-    WHERE EXISTS (
-      SELECT 1 FROM draft_picks dp
-      WHERE dp.team_id = tl.team_id
-        AND dp.league_id = tl.league_id
-        AND dp.player_id = key::text
-        AND dp.deleted_at IS NULL
-    )
-  ),
-  updated_at = NOW()
-WHERE EXISTS (
-  -- Only update rows that have stale player IDs
-  SELECT 1
-  FROM jsonb_array_elements_text(tl.starters || tl.bench || tl.ir) player_id
-  WHERE NOT EXISTS (
-    SELECT 1 FROM draft_picks dp
-    WHERE dp.team_id = tl.team_id
-      AND dp.league_id = tl.league_id
-      AND dp.player_id = player_id::text
-      AND dp.deleted_at IS NULL
-  )
-);
+  updated_at = NOW();
 
--- Show results after cleanup
-SELECT 
-  tl.league_id,
-  tl.team_id,
-  t.team_name,
-  jsonb_array_length(tl.starters) as starters_count_after,
-  jsonb_array_length(tl.bench) as bench_count_after,
-  jsonb_array_length(tl.ir) as ir_count_after,
-  (
-    SELECT COUNT(*)
-    FROM jsonb_array_elements_text(tl.starters || tl.bench || tl.ir) player_id
-    WHERE NOT EXISTS (
-      SELECT 1 FROM draft_picks dp
-      WHERE dp.team_id = tl.team_id
-        AND dp.league_id = tl.league_id
-        AND dp.player_id = player_id::text
-        AND dp.deleted_at IS NULL
+-- Verify the cleanup
+DO $$
+DECLARE
+  v_team RECORD;
+  v_mismatch_count INTEGER := 0;
+BEGIN
+  RAISE NOTICE '═══════════════════════════════════════════════════════════════';
+  RAISE NOTICE 'POST-CLEANUP VERIFICATION';
+  RAISE NOTICE '═══════════════════════════════════════════════════════════════';
+  
+  FOR v_team IN
+    WITH lineup_counts AS (
+      SELECT 
+        tl.team_id,
+        t.team_name,
+        l.name as league_name,
+        jsonb_array_length(COALESCE(tl.starters, '[]'::jsonb)) +
+        jsonb_array_length(COALESCE(tl.bench, '[]'::jsonb)) +
+        jsonb_array_length(COALESCE(tl.ir, '[]'::jsonb)) as total_in_lineup,
+        (
+          SELECT COUNT(*)
+          FROM roster_assignments ra
+          WHERE ra.team_id = tl.team_id
+        ) as total_in_roster
+      FROM team_lineups tl
+      JOIN teams t ON t.id = tl.team_id
+      JOIN leagues l ON l.id = tl.league_id
     )
-  ) as stale_players_remaining
-FROM team_lineups tl
-JOIN teams t ON t.id = tl.team_id
-ORDER BY tl.league_id, t.team_name;
-
--- Verify: Should return 0 rows (no stale players remaining)
-SELECT 
-  tl.team_id,
-  t.team_name,
-  COUNT(*) as stale_count
-FROM team_lineups tl
-JOIN teams t ON t.id = tl.team_id
-CROSS JOIN LATERAL (
-  SELECT player_id
-  FROM jsonb_array_elements_text(tl.starters || tl.bench || tl.ir) player_id
-  WHERE NOT EXISTS (
-    SELECT 1 FROM draft_picks dp
-    WHERE dp.team_id = tl.team_id
-      AND dp.league_id = tl.league_id
-      AND dp.player_id = player_id::text
-      AND dp.deleted_at IS NULL
-  )
-) stale
-GROUP BY tl.team_id, t.team_name;
-
-COMMIT;
+    SELECT * FROM lineup_counts WHERE total_in_lineup != total_in_roster
+  LOOP
+    v_mismatch_count := v_mismatch_count + 1;
+    RAISE WARNING '⚠️  [%] %: % in lineup vs % in roster (STILL MISMATCH!)', 
+      v_team.league_name,
+      v_team.team_name,
+      v_team.total_in_lineup,
+      v_team.total_in_roster;
+  END LOOP;
+  
+  IF v_mismatch_count = 0 THEN
+    RAISE NOTICE '✅ SUCCESS: All team_lineups now match roster_assignments';
+    RAISE NOTICE '✅ No stale player IDs remain';
+  ELSE
+    RAISE WARNING '❌ Found % team(s) still with mismatches after cleanup!', v_mismatch_count;
+  END IF;
+  
+  RAISE NOTICE '';
+END $$;
 
 -- ============================================================================
--- EXPECTED RESULTS:
--- - "stale_players_count" column should show how many dropped players were in each team's lineup
--- - "stale_players_remaining" should be 0 for all teams after cleanup
--- - Final verification query should return 0 rows
+-- FINAL SUMMARY
 -- ============================================================================
+DO $$
+BEGIN
+  RAISE NOTICE '═══════════════════════════════════════════════════════════════';
+  RAISE NOTICE 'CLEANUP COMPLETE';
+  RAISE NOTICE '═══════════════════════════════════════════════════════════════';
+  RAISE NOTICE '';
+  RAISE NOTICE 'Next steps:';
+  RAISE NOTICE '  1. Hard refresh your browser (Ctrl+Shift+R)';
+  RAISE NOTICE '  2. Check that roster displays correctly';
+  RAISE NOTICE '  3. Verify no "frozen roster" appears after drops';
+  RAISE NOTICE '';
+END $$;

@@ -38,52 +38,52 @@
 
 @layer base {
   :root {
-  /* Vintage Varsity Color System - No Pure White/Black */
-  --background: 48 100% 98.2%; /* Citrus Cream #FFFDF2 */
-  --foreground: 146 30% 13%; /* Forest Green #1B3022 */
+  /* Green & Cream Color System - PASTEL CREAMY VERSION */
+  --background: 85 40% 90%; /* Greenish Cream #E8EED9 - blends with bg */
+  --foreground: 146 18% 35%; /* Soft Forest #4A5F4D - gentle */
 
-  --card: 48 100% 98.2%; /* Citrus Cream for cards */
-  --card-foreground: 146 30% 13%;
+  --card: 85 40% 90%; /* Greenish Cream for cards #E8EED9 */
+  --card-foreground: 146 18% 35%; /* Soft green text */
 
-  --popover: 48 100% 98.2%;
-  --popover-foreground: 146 30% 13%;
+  --popover: 85 40% 90%;
+  --popover-foreground: 146 18% 35%;
 
-  --primary: 113 34% 72%; /* Sage Green #AAD1A3 */
-  --primary-foreground: 146 30% 13%;
+  --primary: 110 20% 69%; /* Soft Pastel Sage #A4C4A0 - CREAMY */
+  --primary-foreground: 146 18% 35%; /* Soft forest on sage */
 
-  --secondary: 12 57% 85%; /* Peach #EFCCC6 */
-  --secondary-foreground: 146 30% 13%;
+  --secondary: 105 30% 74%; /* Pastel Green #B8D4A8 - SOFT */
+  --secondary-foreground: 146 18% 35%;
 
-  --muted: 113 34% 88%; /* Lighter sage for backgrounds */
-  --muted-foreground: 0 0% 20%; /* Charcoal #333333 */
+  --muted: 113 40% 95%; /* Very light green tint */
+  --muted-foreground: 146 18% 45%; /* Soft muted text */
 
-  --accent: 22 70% 54%; /* Miami Orange #DF7536 */
-  --accent-foreground: 48 100% 98.2%;
+  --accent: 28 89% 67%; /* Sandy Orange #F4A460 - SOFT */
+  --accent-foreground: 146 18% 35%;
 
   --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 48 100% 98.2%;
 
-  --border: 113 34% 80%; /* Sage border */
-  --input: 113 34% 80%;
-  --ring: 22 70% 54%; /* Orange ring for focus */
+  --border: 110 20% 69%; /* Soft sage for borders - GENTLE */
+  --input: 110 20% 69%;
+  --ring: 110 20% 69%; /* Soft sage ring for focus - GENTLE */
 
   --radius: 1rem; /* Increased base radius for vintage feel */
 
-  --sidebar-background: 48 100% 96%;
+  --sidebar-background: 113 40% 94%; /* Green-tinted cream */
   --sidebar-foreground: 146 30% 13%;
-  --sidebar-primary: 113 34% 72%;
-  --sidebar-primary-foreground: 146 30% 13%;
-  --sidebar-accent: 22 70% 54%;
+  --sidebar-primary: 113 34% 55%; /* Sage green */
+  --sidebar-primary-foreground: 48 100% 98.2%; /* Cream */
+  --sidebar-accent: 22 70% 54%; /* Orange for highlights only */
   --sidebar-accent-foreground: 48 100% 98.2%;
-  --sidebar-border: 113 34% 80%;
-  --sidebar-ring: 22 70% 54%;
+  --sidebar-border: 113 34% 70%; /* Green border */
+  --sidebar-ring: 113 34% 55%; /* Green ring */
   
-  /* Vibrant accent colors - Vintage Sports Palette */
-  --vibrant-orange: 22 70% 54%;  /* Varsity Orange */
-  --vibrant-peach: 12 57% 85%;   /* Coral Peach */
-  --vibrant-green: 113 34% 72%;  /* Sage Green */
-  --vibrant-yellow: 39 70% 72%;  /* Muted Gold */
-  --vibrant-lime: 113 40% 65%;   /* Citrus Lime */
+  /* Vibrant accent colors - Green & Cream Focused */
+  --vibrant-orange: 22 70% 54%;  /* Varsity Orange - highlights only */
+  --vibrant-peach: 12 57% 85%;   /* Coral Peach - minimize */
+  --vibrant-green: 113 34% 55%;  /* Sage Green - primary */
+  --vibrant-yellow: 39 70% 72%;  /* Muted Gold - minimize */
+  --vibrant-lime: 113 40% 65%;   /* Citrus Lime - secondary green */
   }
 
   .dark {
@@ -149,12 +149,18 @@
   @apply border-border;
   }
   
+  html {
+  background: #D4E8B8; /* Beautiful pastel green from loading screen */
+  }
+  
   body {
   overflow-x: hidden;
-  @apply bg-citrus-cream text-citrus-forest font-sans corduroy-texture;
+  background: #D4E8B8; /* Beautiful pastel green from loading screen */
+  @apply text-citrus-forest font-sans corduroy-texture;
   margin: 0;
   padding: 0;
   width: 100%;
+  min-height: 100vh;
   font-feature-settings: "kern" 1;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -249,12 +255,12 @@
   
   /* Letterman Card - Heavy Cotton Feel */
   .card-letterman {
-  @apply bg-citrus-cream border-2 border-citrus-sage rounded-2xl p-6 shadow-sm;
-  @apply transition-all duration-300 hover:shadow-varsity hover:-translate-y-1;
+  @apply bg-[#E8EED9]/60 backdrop-blur-sm border-2 border-citrus-sage/40 rounded-2xl p-6 shadow-sm;
+  @apply transition-all duration-300 hover:shadow-md hover:-translate-y-1;
   }
   
   .card-letterman-thick {
-  @apply bg-citrus-cream border-4 border-citrus-forest rounded-2xl p-6 shadow-varsity;
+  @apply bg-[#E8EED9]/60 backdrop-blur-sm border-2 border-citrus-sage/40 rounded-2xl p-6 shadow-sm;
   }
   
   /* Premium navigation buttons with vintage underline */
@@ -266,7 +272,7 @@
   }
   
   .nav-button::after {
-  @apply content-[''] absolute -bottom-1 left-0 w-0 h-1 bg-citrus-orange rounded-full transition-all duration-300 opacity-0;
+  @apply content-[''] absolute -bottom-1 left-0 w-0 h-1 bg-citrus-sage rounded-full transition-all duration-300 opacity-0;
   }
   
   .nav-button:hover::after {
@@ -303,8 +309,8 @@
   }
   
   .btn-citrus-secondary {
-  @apply px-6 py-3 font-display font-semibold rounded-2xl bg-citrus-peach text-citrus-forest border-2 border-citrus-orange/20;
-  @apply hover:bg-citrus-peach/80 hover:border-citrus-orange/40 transition-all shadow-md hover:shadow-patch;
+  @apply px-6 py-3 font-display font-semibold rounded-2xl bg-citrus-cream text-citrus-forest border-2 border-citrus-sage/40;
+  @apply hover:bg-citrus-sage/10 hover:border-citrus-sage/60 transition-all shadow-md hover:shadow-patch;
   }
   
   .btn-vibrant-orange {
@@ -472,7 +478,7 @@
   }
   
   .card-premium {
-  @apply bg-white/70 backdrop-blur-md rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border border-white/20;
+  @apply bg-[#E8EED9]/50 backdrop-blur-md rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300 border border-citrus-sage/30;
   }
   
   /* Premium section padding */
@@ -513,7 +519,7 @@
 
   /* Premium UI glass effect */
   .glass-panel {
-  @apply bg-white/30 backdrop-blur-md border border-white/20 shadow-lg;
+  @apply bg-[#E8EED9]/40 backdrop-blur-md border border-citrus-sage/30 shadow-sm;
   }
   
   .dark .glass-panel {

@@ -394,7 +394,7 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
           // CASE 1: Show daily total points (game is FINAL and data exists)
           <div className="player-projection-bar-container relative bg-gradient-to-br from-citrus-sage/10 via-citrus-cream/30 to-citrus-peach/10 p-1 rounded border border-citrus-sage/30 shadow-sm">
             {/* Label - Varsity Badge Style - COMPACT */}
-            <div className="text-[7px] font-varsity font-bold text-citrus-forest uppercase tracking-wider mb-0.5 flex items-center gap-0.5 bg-citrus-cream/70 px-1 py-0 rounded border border-citrus-sage/30 w-fit">
+            <div className="text-[7px] font-varsity font-bold text-citrus-forest uppercase tracking-wider mb-0.5 flex items-center gap-0.5 bg-[#E8EED9]/50 backdrop-blur-sm/70 px-1 py-0 rounded border border-citrus-sage/30 w-fit">
               <span className="w-1 h-1 rounded-full bg-citrus-sage animate-pulse" />
               Daily Points
             </div>
@@ -422,8 +422,8 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
                     key={i}
                     className={`flex-1 h-2 rounded overflow-hidden transition-all duration-300
                       ${!isFilled && !isPartialFilled 
-                        ? 'border-2 border-dashed border-citrus-sage/30 bg-citrus-cream/50' 
-                        : 'bg-citrus-cream border-2 border-citrus-sage/40'
+                        ? 'border-2 border-dashed border-citrus-sage/30 bg-[#E8EED9]/50 backdrop-blur-sm/50' 
+                        : 'bg-[#E8EED9]/50 backdrop-blur-sm border-2 border-citrus-sage/40'
                       }`}
                   >
                     {/* Actual points fill (green gradient) */}
@@ -444,7 +444,7 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
         ) : !hasGameOnDate ? (
           // CASE 2: NO GAME scheduled for this date - Varsity Badge Message - COMPACT
           <div className="player-projection-bar-container">
-            <div className="w-full py-1 text-center font-display text-xs text-citrus-charcoal/60 bg-citrus-cream/50 rounded border border-dashed border-citrus-sage/30 italic">
+            <div className="w-full py-1 text-center font-display text-xs text-citrus-charcoal/60 bg-[#E8EED9]/50 backdrop-blur-sm/50 rounded border border-dashed border-citrus-sage/30 italic">
               No game {isInDailyViewMode ? 'this day' : 'today'}
             </div>
           </div>
@@ -452,7 +452,7 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
           // CASE 3: Show projection bar (game not final yet) - VARSITY SCOREBOARD - COMPACT
           <div className="player-projection-bar-container relative bg-gradient-to-br from-citrus-peach/10 via-citrus-cream/30 to-citrus-sage/10 p-1 rounded border border-citrus-peach/40 shadow-sm">
             {/* Label - Varsity Badge Style - COMPACT */}
-            <div className="text-[7px] font-varsity font-bold text-citrus-forest uppercase tracking-wider mb-0.5 flex items-center gap-0.5 bg-citrus-cream/70 px-1 py-0 rounded border border-citrus-peach/40 w-fit">
+            <div className="text-[7px] font-varsity font-bold text-citrus-forest uppercase tracking-wider mb-0.5 flex items-center gap-0.5 bg-[#E8EED9]/50 backdrop-blur-sm/70 px-1 py-0 rounded border border-citrus-peach/40 w-fit">
               <span className="w-1 h-1 rounded-full bg-citrus-orange animate-pulse" />
               Projected
             </div>
@@ -485,8 +485,8 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
                       key={i}
                       className={`flex-1 h-2 rounded overflow-hidden transition-all duration-300
                         ${!isFilled && !isPartial 
-                          ? 'border-2 border-dashed border-citrus-peach/30 bg-citrus-cream/50' 
-                          : 'bg-citrus-cream border-2 border-citrus-peach/40'
+                          ? 'border-2 border-dashed border-citrus-peach/30 bg-[#E8EED9]/50 backdrop-blur-sm/50' 
+                          : 'bg-[#E8EED9]/50 backdrop-blur-sm border-2 border-citrus-peach/40'
                         }`}
                     >
                       {isFilled && (
@@ -507,7 +507,7 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
                 {Array.from({ length: maxBarPoints }, (_, i) => (
                   <div 
                     key={i}
-                    className="flex-1 h-2 rounded border border-dashed border-citrus-peach/30 bg-citrus-cream/50 animate-pulse"
+                    className="flex-1 h-2 rounded border border-dashed border-citrus-peach/30 bg-[#E8EED9]/50 backdrop-blur-sm/50 animate-pulse"
                   />
                 ))}
               </div>
@@ -516,7 +516,7 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
                 {Array.from({ length: maxBarPoints }, (_, i) => (
                   <div 
                     key={i}
-                    className="flex-1 h-2 rounded border border-dashed border-citrus-peach/30 bg-citrus-cream/50"
+                    className="flex-1 h-2 rounded border border-dashed border-citrus-peach/30 bg-[#E8EED9]/50 backdrop-blur-sm/50"
                   />
                 ))}
               </div>

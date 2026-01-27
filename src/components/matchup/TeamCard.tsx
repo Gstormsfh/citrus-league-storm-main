@@ -232,7 +232,7 @@ export const TeamCard = ({ title, starters, bench, gradientClass, slotAssignment
 
   return (
     <Card className="card-citrus matchup-team-card p-0 border-none shadow-md" style={{ width: '100%', minWidth: 0, maxWidth: '100%' }}>
-      <CardHeader className={`${gradientClass} py-4 border-b bg-citrus-cream flex-shrink-0`}>
+      <CardHeader className={`${gradientClass} py-4 border-b bg-[#E8EED9]/50 backdrop-blur-sm flex-shrink-0`}>
         <CardTitle className="text-lg font-bold tracking-tight">{title}</CardTitle>
       </CardHeader>
       <CardContent className="p-0 flex flex-col w-full">

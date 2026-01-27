@@ -617,7 +617,7 @@ export const MatchupService = {
       // Get matchup rosters using existing function
       // Pass targetDate to load frozen roster for past dates (if provided)
       const { team1Roster, team2Roster, team1SlotAssignments, team2SlotAssignments, error: rostersError } = 
-        await this.getMatchupRosters(matchup, allPlayers, timezone, targetDate || undefined);
+        await this.getMatchupRosters(matchup, allPlayers, timezone, userId, targetDate || undefined);
 
       if (rostersError) {
         return { data: null, error: rostersError };
@@ -908,7 +908,7 @@ export const MatchupService = {
         team1SlotAssignments,
         team2SlotAssignments,
         error: rostersError
-      } = await this.getMatchupRosters(matchup, rosterPlayers, timezone, targetDate);
+      } = await this.getMatchupRosters(matchup, rosterPlayers, timezone, userId, targetDate);
 
       if (rostersError) {
         return { data: null, error: rostersError };
@@ -1142,10 +1142,12 @@ export const MatchupService = {
       if (picksError) {
         console.error('Error fetching draft picks for team:', picksError);
         // Fallback to old method if direct query fails
-        const { picks: draftPicks } = await DraftService.getDraftPicks(leagueId, userId);
+        const { picks: draftPicks } = await DraftService.getDraftPicks(leagueId, userId || '');
         const teamPicks = draftPicks.filter(p => p.team_id === teamId);
         const playerIds = teamPicks.map(p => p.player_id);
-        const teamPlayers = allPlayers.filter(p => playerIds.includes(p.id));
+        // Convert string IDs to numbers for matching
+        const playerIdsAsNumbers = playerIds.map((id: any) => typeof id === 'string' ? parseInt(id) || 0 : id || 0).filter(id => id > 0);
+        const teamPlayers = allPlayers.filter(p => playerIdsAsNumbers.includes(Number(p.id)));
         
         const roster = teamPlayers.map((p) => this.transformToHockeyPlayer(p));
         
@@ -1155,8 +1157,52 @@ export const MatchupService = {
       }
       
       // Map draft picks to players
+      // CRITICAL: draft_picks.player_id might be UUID (from old migrations) or numeric NHL ID (from new migrations)
       const playerIds = (teamDraftPicks || []).map(p => p.player_id);
-      const teamPlayers = allPlayers.filter(p => playerIds.includes(p.id));
+      
+      // First, try direct numeric ID matching (for new migrations using NHL IDs)
+      const numericIds: number[] = [];
+      const uuidIds: string[] = [];
+      
+      playerIds.forEach((id: any) => {
+        if (typeof id === 'string') {
+          // Check if it's a numeric string (NHL ID) or UUID
+          const numId = parseInt(id);
+          if (!isNaN(numId) && numId > 0 && !id.includes('-')) {
+            // Numeric NHL ID (no dashes)
+            numericIds.push(numId);
+          } else if (id.includes('-')) {
+            // UUID format
+            uuidIds.push(id);
+          }
+        } else if (typeof id === 'number' && id > 0) {
+          numericIds.push(id);
+        }
+      });
+      
+      // Match numeric IDs directly
+      let teamPlayers = allPlayers.filter(p => numericIds.includes(Number(p.id)));
+      
+      // If we have UUIDs, look them up in players table and match by name/team
+      if (uuidIds.length > 0) {
+        const { data: uuidPlayers, error: uuidError } = await supabase
+          .from('players')
+          .select('id, full_name, team')
+          .in('id', uuidIds);
+        
+        if (!uuidError && uuidPlayers) {
+          // Match UUID players to allPlayers by name and team
+          uuidPlayers.forEach((uuidPlayer: any) => {
+            const matched = allPlayers.find(p => 
+              p.full_name === uuidPlayer.full_name && 
+              p.team === uuidPlayer.team
+            );
+            if (matched && !teamPlayers.find(tp => tp.id === matched.id)) {
+              teamPlayers.push(matched);
+            }
+          });
+        }
+      }
 
       // Transform to HockeyPlayer format
       const roster = teamPlayers.map((p) => this.transformToHockeyPlayer(p));
@@ -1699,8 +1745,8 @@ export const MatchupService = {
   async getMatchupRosters(
     matchup: Matchup,
     allPlayers: Player[],
-    userId: string,
     timezone: string = 'America/Denver',
+    userId?: string, // Optional: required for logged-in users, not needed for guests viewing demo league
     targetDate?: string // Optional: if provided and is past date, use frozen roster for that date
   ): Promise<{ 
     team1Roster: MatchupPlayer[]; 
@@ -1723,8 +1769,27 @@ export const MatchupService = {
         };
       }
 
-      // Get league to access scoring settings (with membership validation)
-      const { league } = await LeagueService.getLeague(matchup.league_id, userId);
+      // Get league to access scoring settings
+      // For demo league, bypass membership check (guests can view)
+      let league: League | null = null;
+      const isDemoLeague = matchup.league_id === '750f4e1a-92ae-44cf-a798-2f3e06d0d5c9';
+      if (isDemoLeague && !userId) {
+        // Guest viewing demo league - use public read
+        const { data, error } = await supabase
+          .from('leagues')
+          .select('*')
+          .eq('id', matchup.league_id)
+          .single();
+        if (error) throw error;
+        league = data;
+      } else if (userId) {
+        // Logged-in user - use membership check
+        const result = await LeagueService.getLeague(matchup.league_id, userId);
+        league = result.league;
+        if (result.error) throw result.error;
+      } else {
+        throw new Error('userId required for non-demo leagues');
+      }
       const scoringSettings = extractScoringSettings(league);
       const scorer = new ScoringCalculator(scoringSettings);
 
@@ -1904,7 +1969,8 @@ export const MatchupService = {
 
       // Auto-initialize missing lineups for opponent teams
       // This ensures all teams have lineups for future week matchups
-      if (!team1Lineup && team1Roster.length > 0) {
+      // SKIP for demo league - guests can't write, and lineups should already exist from migration
+      if (!isDemoLeague && !team1Lineup && team1Roster.length > 0) {
         console.log(`[MatchupService] Auto-initializing default lineup for Team1 (${matchup.team1_id})`);
         const defaultLineup = organizeRosterIntoLineup(team1Roster);
         team1Lineup = defaultLineup;
@@ -1913,7 +1979,7 @@ export const MatchupService = {
         console.log(`[MatchupService] Saved default lineup for Team1: ${defaultLineup.starters.length} starters`);
       }
 
-      if (matchup.team2_id && !team2Lineup && team2Roster.length > 0) {
+      if (!isDemoLeague && matchup.team2_id && !team2Lineup && team2Roster.length > 0) {
         console.log(`[MatchupService] Auto-initializing default lineup for Team2 (${matchup.team2_id})`);
         const defaultLineup = organizeRosterIntoLineup(team2Roster);
         team2Lineup = defaultLineup;
@@ -1950,26 +2016,216 @@ export const MatchupService = {
         };
       }
 
-      // Use saved lineups (strict - no auto-assignment fallback)
-      const team1Starters = new Set((team1Lineup.starters || []).map(id => String(id)));
+      // Helper function to convert lineup IDs (UUIDs or numeric) to numeric NHL IDs
+      // Lineups might have UUIDs from old migrations, but players have numeric NHL IDs
+      const convertLineupIdsToNumeric = async (lineupIds: (string | number)[], teamId: string): Promise<Set<number>> => {
+        const numericIds = new Set<number>();
+        const uuidIds: string[] = [];
+        
+        // Separate numeric IDs from UUIDs
+        lineupIds.forEach((id: any) => {
+          if (typeof id === 'string') {
+            const numId = parseInt(id);
+            if (!isNaN(numId) && numId > 0 && !id.includes('-')) {
+              // Numeric NHL ID (no dashes)
+              numericIds.add(numId);
+            } else if (id.includes('-')) {
+              // UUID format - need to look up
+              uuidIds.push(id);
+            }
+          } else if (typeof id === 'number' && id > 0) {
+            numericIds.add(id);
+          }
+        });
+        
+        // If we have UUIDs, look them up via draft_picks (more reliable than players table)
+        // draft_picks.player_id is the UUID, and we can match to roster players
+        if (uuidIds.length > 0) {
+          // Get the full roster's draft picks to match by order
+          // The roster was built from draft_picks in the same order, so we can match UUIDs by index
+          const { data: allTeamDraftPicks } = await supabase
+            .from('draft_picks')
+            .select('player_id, pick_number')
+            .eq('league_id', matchup.league_id)
+            .eq('team_id', teamId)
+            .is('deleted_at', null)
+            .order('pick_number', { ascending: true });
+          
+          if (allTeamDraftPicks) {
+            // Match UUIDs from lineup to draft picks, then get corresponding roster player by index
+            const roster = teamId === matchup.team1_id ? team1Roster : team2Roster;
+            
+            console.log(`[MatchupService.convertLineupIdsToNumeric] Converting UUIDs for team ${teamId}:`, {
+              uuidIdsCount: uuidIds.length,
+              draftPicksCount: allTeamDraftPicks.length,
+              rosterLength: roster.length,
+              sampleUuids: uuidIds.slice(0, 3),
+              sampleDraftPicks: allTeamDraftPicks.slice(0, 3).map((p: any) => ({ player_id: p.player_id, pick_number: p.pick_number })),
+              sampleRosterIds: roster.slice(0, 3).map((p: any) => p.id)
+            });
+            
+            uuidIds.forEach((uuid: string) => {
+              const pickIndex = allTeamDraftPicks.findIndex((p: any) => p.player_id === uuid);
+              if (pickIndex >= 0 && pickIndex < roster.length) {
+                const rosterPlayer = roster[pickIndex];
+                if (rosterPlayer && rosterPlayer.id) {
+                  const numericId = Number(rosterPlayer.id);
+                  numericIds.add(numericId);
+                  console.log(`[MatchupService.convertLineupIdsToNumeric] ✅ Matched UUID ${uuid} → index ${pickIndex} → player ${rosterPlayer.name} (ID: ${numericId})`);
+                } else {
+                  console.warn(`[MatchupService.convertLineupIdsToNumeric] ⚠️ Roster player at index ${pickIndex} has no ID`);
+                }
+              } else {
+                console.warn(`[MatchupService.convertLineupIdsToNumeric] ⚠️ UUID ${uuid} not found in draft picks (index: ${pickIndex})`);
+              }
+            });
+            
+            console.log(`[MatchupService.convertLineupIdsToNumeric] Conversion result:`, {
+              inputUuids: uuidIds.length,
+              convertedIds: numericIds.size,
+              convertedIdsList: Array.from(numericIds).slice(0, 10)
+            });
+          } else {
+            console.error(`[MatchupService.convertLineupIdsToNumeric] ❌ Failed to get draft picks for team ${teamId}`);
+          }
+          
+          // If we still have unmatched UUIDs, try fallback to players table
+          if (numericIds.size < uuidIds.length) {
+            const unmatchedUuids = uuidIds.filter(uuid => {
+              const pickIndex = allTeamDraftPicks?.findIndex((p: any) => p.player_id === uuid) ?? -1;
+              return pickIndex < 0;
+            });
+            
+            if (unmatchedUuids.length > 0) {
+              // Fallback: try players table lookup
+              const { data: uuidPlayers, error: uuidError } = await supabase
+                .from('players')
+                .select('id, full_name, team')
+                .in('id', unmatchedUuids);
+              
+              if (!uuidError && uuidPlayers) {
+                uuidPlayers.forEach((uuidPlayer: any) => {
+                  const matched = allPlayers.find(p => 
+                    p.full_name === uuidPlayer.full_name && 
+                    p.team === uuidPlayer.team
+                  );
+                  if (matched) {
+                    numericIds.add(Number(matched.id));
+                  }
+                });
+              }
+            }
+          }
+        }
+        
+        return numericIds;
+      };
       
-      // Normalize slot assignment keys to strings for consistency
-      const rawTeam1SlotAssignments = team1Lineup.slotAssignments || {};
-      const team1SlotAssignments: Record<string, string> = {};
-      Object.entries(rawTeam1SlotAssignments).forEach(([playerId, slotId]) => {
-        team1SlotAssignments[String(playerId)] = slotId;
+      // Convert lineup starter IDs to numeric NHL IDs for matching
+      const team1StartersNumeric = await convertLineupIdsToNumeric(team1Lineup.starters || [], matchup.team1_id);
+      const team1Starters = new Set(Array.from(team1StartersNumeric).map(id => String(id)));
+      
+      // Debug: Log conversion results
+      console.log(`[MatchupService] Team1 lineup conversion:`, {
+        originalLineupIds: team1Lineup.starters?.slice(0, 5),
+        originalLineupIdsCount: team1Lineup.starters?.length || 0,
+        convertedNumericIds: Array.from(team1StartersNumeric).slice(0, 10),
+        convertedNumericIdsCount: team1StartersNumeric.size,
+        startersSetSize: team1Starters.size,
+        sampleStartersSet: Array.from(team1Starters).slice(0, 10),
+        allStartersSet: Array.from(team1Starters)
       });
       
+      // Normalize slot assignment keys to numeric NHL IDs (convert UUIDs if needed)
+      const rawTeam1SlotAssignments = team1Lineup.slotAssignments || {};
+      const team1SlotAssignments: Record<string, string> = {};
+      
+      // Build UUID to numeric ID mapping for slot assignments
+      // Reuse the lookup from convertLineupIdsToNumeric by checking which UUIDs were converted
+      const uuidToNumericMap = new Map<string, number>();
+      const team1LineupIds = team1Lineup.starters || [];
+      const slotUuidIds = Object.keys(rawTeam1SlotAssignments).filter(id => id.includes('-'));
+      const allUuidIds = [
+        ...team1LineupIds.filter((id: any) => typeof id === 'string' && id.includes('-')),
+        ...slotUuidIds
+      ];
+      
+      if (allUuidIds.length > 0) {
+        const { data: uuidPlayers } = await supabase
+          .from('players')
+          .select('id, full_name, team')
+          .in('id', allUuidIds);
+        
+        if (uuidPlayers) {
+          uuidPlayers.forEach((uuidPlayer: any) => {
+            const matched = allPlayers.find(p => 
+              p.full_name === uuidPlayer.full_name && 
+              p.team === uuidPlayer.team
+            );
+            if (matched) {
+              uuidToNumericMap.set(uuidPlayer.id, Number(matched.id));
+            }
+          });
+        }
+      }
+      
+      Object.entries(rawTeam1SlotAssignments).forEach(([playerId, slotId]) => {
+        // Convert UUID to numeric ID if needed, otherwise use as-is
+        const numericId = uuidToNumericMap.get(playerId) || 
+          (typeof playerId === 'string' && !playerId.includes('-') ? parseInt(playerId) : Number(playerId));
+        if (numericId && !isNaN(numericId) && numericId > 0) {
+          team1SlotAssignments[String(numericId)] = slotId;
+        }
+      });
+      
+      const team2StartersNumeric = matchup.team2_id && team2Lineup
+        ? await convertLineupIdsToNumeric(team2Lineup.starters || [], matchup.team2_id)
+        : new Set<number>();
       const team2Starters = matchup.team2_id && team2Lineup
-        ? new Set((team2Lineup.starters || []).map(id => String(id)))
+        ? new Set(Array.from(team2StartersNumeric).map(id => String(id)))
         : new Set();
       
       const rawTeam2SlotAssignments = matchup.team2_id && team2Lineup
         ? (team2Lineup.slotAssignments || {})
         : {};
       const team2SlotAssignments: Record<string, string> = {};
+      
+      // Same UUID to numeric mapping for team2
+      const team2UuidToNumericMap = new Map<string, number>();
+      if (matchup.team2_id && team2Lineup) {
+        const team2LineupIds = team2Lineup.starters || [];
+        const slotUuidIds2 = Object.keys(rawTeam2SlotAssignments).filter(id => id.includes('-'));
+        const allUuidIds2 = [
+          ...team2LineupIds.filter((id: any) => typeof id === 'string' && id.includes('-')),
+          ...slotUuidIds2
+        ];
+        
+        if (allUuidIds2.length > 0) {
+          const { data: uuidPlayers2 } = await supabase
+            .from('players')
+            .select('id, full_name, team')
+            .in('id', allUuidIds2);
+          
+          if (uuidPlayers2) {
+            uuidPlayers2.forEach((uuidPlayer: any) => {
+              const matched = allPlayers.find(p => 
+                p.full_name === uuidPlayer.full_name && 
+                p.team === uuidPlayer.team
+              );
+              if (matched) {
+                team2UuidToNumericMap.set(uuidPlayer.id, Number(matched.id));
+              }
+            });
+          }
+        }
+      }
+      
       Object.entries(rawTeam2SlotAssignments).forEach(([playerId, slotId]) => {
-        team2SlotAssignments[String(playerId)] = slotId;
+        const numericId = team2UuidToNumericMap.get(playerId) || 
+          (typeof playerId === 'string' && !playerId.includes('-') ? parseInt(playerId) : Number(playerId));
+        if (numericId && !isNaN(numericId) && numericId > 0) {
+          team2SlotAssignments[String(numericId)] = slotId;
+        }
       });
 
       // Batch schedule queries: Get all unique teams from both rosters
@@ -2119,9 +2375,28 @@ export const MatchupService = {
             });
           }
           
+          // Check if player is a starter (convert ID to string for Set lookup)
+          const isStarter = team1Starters.has(String(p.id));
+          
+          // Debug first few players to verify starter detection
+          if (team1Roster.indexOf(p) < 5) {
+            const playerIdStr = String(p.id);
+            const isInSet = team1Starters.has(playerIdStr);
+            console.log(`[MatchupService] Team1 player ${p.name} (ID: ${p.id}, String: "${playerIdStr}"):`, {
+              isStarter,
+              inStartersSet: isInSet,
+              playerIdType: typeof p.id,
+              playerIdString: playerIdStr,
+              startersSetSize: team1Starters.size,
+              sampleStarters: Array.from(team1Starters).slice(0, 5),
+              isInSetCheck: team1Starters.has(playerIdStr),
+              setContains: Array.from(team1Starters).includes(playerIdStr)
+            });
+          }
+          
           const transformed = this.transformToMatchupPlayerWithGames(
             p,
-            team1Starters.has(String(p.id)),
+            isStarter,
             weekStart,
             weekEnd,
             timezone,

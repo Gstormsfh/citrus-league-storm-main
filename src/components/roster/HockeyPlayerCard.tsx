@@ -359,7 +359,7 @@ const HockeyPlayerCardContent = ({
         {isLocked && (
           <Badge 
             variant="secondary"
-            className="absolute top-1 left-1 text-[7px] font-bold h-5 px-1.5 z-10 gap-0.5 flex items-center bg-citrus-orange/30 text-citrus-forest border-2 border-citrus-orange rounded-lg shadow-sm"
+            className="absolute top-1 left-1 text-[7px] font-bold h-5 px-1.5 z-10 gap-0.5 flex items-center bg-citrus-sage/30 text-citrus-forest border-2 border-citrus-sage rounded-lg shadow-sm"
             title="Player's game has started - cannot be moved"
           >
             <Lock className="w-3 h-3" />
@@ -383,7 +383,7 @@ const HockeyPlayerCardContent = ({
         {/* Player Name and Team - Varsity Typography */}
         <div className="flex-1 min-w-0 pr-5">
           <h3 
-            className="font-display font-bold text-[11px] leading-tight line-clamp-2 cursor-pointer hover:text-citrus-orange transition-colors text-citrus-forest"
+            className="font-display font-bold text-[11px] leading-tight line-clamp-2 cursor-pointer hover:text-citrus-sage transition-colors text-citrus-forest"
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
@@ -432,7 +432,7 @@ const HockeyPlayerCardContent = ({
                   </div>
                 </div>
               </TooltipTrigger>
-              <TooltipContent className="p-3 bg-citrus-cream border-2 border-citrus-sage rounded-varsity shadow-varsity z-[9999] max-w-xs">
+              <TooltipContent className="p-3 bg-[#E8EED9]/50 backdrop-blur-sm border-2 border-citrus-sage rounded-varsity shadow-varsity z-[9999] max-w-xs">
                 <h4 className="font-varsity text-sm text-citrus-forest border-b-2 border-citrus-sage/30 pb-1 mb-2">Projected Stats</h4>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                   <div className="flex justify-between"><span className="text-citrus-charcoal font-display">Wins:</span><span className="font-varsity text-citrus-forest">{player.goalieProjection.projected_wins?.toFixed(2)}</span></div>
@@ -440,7 +440,7 @@ const HockeyPlayerCardContent = ({
                   <div className="flex justify-between"><span className="text-citrus-charcoal font-display">Shutouts:</span><span className="font-varsity text-citrus-forest">{player.goalieProjection.projected_shutouts?.toFixed(2)}</span></div>
                   <div className="flex justify-between"><span className="text-citrus-charcoal font-display">GA:</span><span className="font-varsity text-citrus-forest">{player.goalieProjection.projected_goals_against?.toFixed(2)}</span></div>
                 </div>
-                <div className="mt-2 pt-1 border-t-2 border-citrus-sage/30 text-xs font-varsity font-bold text-citrus-orange">
+                <div className="mt-2 pt-1 border-t-2 border-citrus-sage/30 text-xs font-varsity font-bold text-citrus-sage">
                   Total: {player.goalieProjection.total_projected_points?.toFixed(1)} pts
                 </div>
               </TooltipContent>
@@ -488,7 +488,7 @@ const HockeyPlayerCardContent = ({
                   </div>
                 </div>
               </TooltipTrigger>
-              <TooltipContent className="p-3 bg-citrus-cream border-2 border-citrus-sage rounded-varsity shadow-varsity z-[9999] max-w-xs">
+              <TooltipContent className="p-3 bg-[#E8EED9]/50 backdrop-blur-sm border-2 border-citrus-sage rounded-varsity shadow-varsity z-[9999] max-w-xs">
                 <h4 className="font-varsity text-sm text-citrus-forest border-b-2 border-citrus-sage/30 pb-1 mb-2">Projected Stats</h4>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                   <div className="flex justify-between"><span className="text-citrus-charcoal font-display">Goals:</span><span className="font-varsity text-citrus-forest">{player.daily_projection.projected_goals?.toFixed(2)}</span></div>
@@ -500,7 +500,7 @@ const HockeyPlayerCardContent = ({
                   <div className="flex justify-between"><span className="text-citrus-charcoal font-display">Hits:</span><span className="font-varsity text-citrus-forest">{player.daily_projection.projected_hits?.toFixed(2) || '0.00'}</span></div>
                   <div className="flex justify-between"><span className="text-citrus-charcoal font-display">PIM:</span><span className="font-varsity text-citrus-forest">{player.daily_projection.projected_pim?.toFixed(2) || '0.00'}</span></div>
                 </div>
-                <div className="mt-2 pt-1 border-t-2 border-citrus-sage/30 text-xs font-varsity font-bold text-citrus-orange">
+                <div className="mt-2 pt-1 border-t-2 border-citrus-sage/30 text-xs font-varsity font-bold text-citrus-sage">
                   Total: {player.daily_projection.total_projected_points?.toFixed(1)} pts
                 </div>
               </TooltipContent>
@@ -564,7 +564,7 @@ const HockeyPlayerCardContent = ({
         </div>
         
         {/* Collegiate Progress Bar with Stitching */}
-        <div className="relative h-2 bg-citrus-cream rounded-full overflow-hidden border-2 border-dashed border-citrus-sage/40 w-full shadow-[inset_0_1px_3px_rgba(0,0,0,0.15)]">
+        <div className="relative h-2 bg-[#E8EED9]/50 backdrop-blur-sm rounded-full overflow-hidden border-2 border-dashed border-citrus-sage/40 w-full shadow-[inset_0_1px_3px_rgba(0,0,0,0.15)]">
           <div 
             className={cn(
               "h-full rounded-full transition-all duration-700 ease-out relative", 

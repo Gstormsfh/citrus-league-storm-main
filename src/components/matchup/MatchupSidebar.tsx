@@ -83,7 +83,7 @@ export const MatchupSidebar: React.FC<MatchupSidebarProps> = ({
   return (
     <div className="space-y-4">
       {/* Top Performers Card */}
-      <Card className="overflow-hidden bg-citrus-cream corduroy-texture border-4 border-citrus-forest rounded-[1.5rem] shadow-[0_4px_0_rgba(27,48,34,0.2)] relative">
+      <Card className="overflow-hidden bg-[#E8EED9]/50 backdrop-blur-sm corduroy-texture border-4 border-citrus-forest rounded-[1.5rem] shadow-[0_4px_0_rgba(27,48,34,0.2)] relative">
         <CitrusSlice className="absolute bottom-2 left-2 w-12 h-12 text-citrus-orange opacity-10 pointer-events-none" />
         
         <CardHeader className="pb-3 relative z-10 bg-gradient-to-r from-citrus-sage/20 via-citrus-sage/10 to-citrus-cream border-b-3 border-citrus-sage/30">
@@ -116,9 +116,9 @@ export const MatchupSidebar: React.FC<MatchupSidebarProps> = ({
                     {/* Rank badge */}
                     <div className={cn(
                       "w-6 h-6 rounded-full flex items-center justify-center border-2 font-varsity text-xs font-black shadow-sm",
-                      index === 0 ? "bg-citrus-orange border-citrus-forest text-citrus-cream" :
-                      index === 1 ? "bg-citrus-sage border-citrus-forest text-citrus-cream" :
-                      "bg-citrus-peach border-citrus-forest text-citrus-cream"
+                      index === 0 ? "bg-citrus-orange border-citrus-forest text-[#E8EED9]" :
+                      index === 1 ? "bg-citrus-sage border-citrus-forest text-[#E8EED9]" :
+                      "bg-citrus-peach border-citrus-forest text-[#E8EED9]"
                     )}>
                       {index + 1}
                     </div>

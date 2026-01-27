@@ -8,7 +8,6 @@ import { DEMO_LEAGUE_ID } from '@/services/DemoLeagueService';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { LeagueCreationCTA, InlineCTA } from '@/components/LeagueCreationCTA';
-import { DemoDataService } from '@/services/DemoDataService';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -530,13 +529,11 @@ const Roster = () => {
             const rosterAssignments = (rosterAssignmentsData || []) as any[];
             const playerIds = rosterAssignments.map((r: any) => r.player_id);
             
-            console.log('[Roster] ✅ roster_assignments query returned:', rosterAssignments.length, 'players');
             
             // CRITICAL: player_id is TEXT in DB, and p.id is STRING in allPlayers (PlayerService line 287)
             // Compare strings to strings directly - no type conversion needed
             dbPlayers = allPlayers.filter(p => playerIds.includes(p.id));
             
-            console.log('[Roster] ✅ dbPlayers count after filter:', dbPlayers.length);
           }
         }
         
@@ -650,13 +647,10 @@ const Roster = () => {
           return idA - idB;
         });
         
-        console.log('[Roster] ✅ Final player roster:', transformedPlayers.length, 'players');
-        console.log('[Roster] 🔍 Jimmy Snuggerud check:', transformedPlayers.find(p => p.name.includes('Snuggerud')) ? 'FOUND IN ROSTER' : 'NOT IN ROSTER (correctly dropped)');
         
         // DEBUG: Check if McDavid made it through transformation
         const MCDAVID_ID = 8478402;
         const mcDavidInTransformed = transformedPlayers.find(p => p.id === MCDAVID_ID);
-        console.log('[Roster] 🔍 McDavid (8478402) in transformedPlayers?', mcDavidInTransformed ? `✅ YES (${mcDavidInTransformed.name})` : '❌ NO');
 
         // Check for saved lineup - but for demo teams, always auto-organize (same as OtherTeam.tsx)
         let savedLineup = null;
@@ -682,11 +676,6 @@ const Roster = () => {
           );
           
           if (dailyRoster) {
-            console.log('[Roster] ✅ Frozen roster loaded:', {
-              starters: dailyRoster.starters.length,
-              bench: dailyRoster.bench.length,
-              droppedPlayers: dailyRoster.missingPlayerIds?.length || 0
-            });
             
             // Transform to HockeyPlayer format with starter flag
             const starters = dailyRoster.starters.map(p => ({ ...p, starter: true }));
@@ -702,10 +691,8 @@ const Roster = () => {
             setLoading(false);
             return; // Exit early - we've loaded from daily roster
           } else {
-            console.log('[Roster] ⚠️ No frozen roster found for past date - falling back to saved lineup');
           }
         } else if (selectedDate) {
-          console.log('[Roster] 📝 Date is TODAY/FUTURE (' + selectedDate + ') - using SAVED LINEUP, not frozen roster');
         }
         
         // Regular lineup loading (from team_lineups or default)
@@ -717,16 +704,8 @@ const Roster = () => {
           savedLineup = await LeagueService.getLineup(teamId, leagueIdForLineup);
           
           if (savedLineup) {
-            console.log('[Roster] 📋 Loaded saved lineup:', {
-              starters: savedLineup.starters?.length || 0,
-              starterIds: savedLineup.starters,
-              bench: savedLineup.bench?.length || 0,
-              ir: savedLineup.ir?.length || 0
-            });
-            
             // Trust the saved lineup - the save protection guard prevents bad data from being saved
             // No filtering needed on load, as lineup integrity is enforced at save time
-            console.log('[Roster] ✅ Using saved lineup as-is (protected by save guard)');
           }
         }
         
@@ -734,7 +713,6 @@ const Roster = () => {
           // Restore saved lineup from team_lineups
           // IMPORTANT: draft_picks (with deleted_at IS NULL) is the SOURCE OF TRUTH for roster membership
           // team_lineups may contain stale player IDs from old drops - we MUST filter them out
-          console.log('[Roster] 🔄 Restoring saved lineup with', savedLineup.starters?.length, 'starters');
           
           // Helper to deduplicate IDs
           const uniqueIds = (ids: string[]) => Array.from(new Set(ids));
@@ -2519,10 +2497,10 @@ const Roster = () => {
   const showLoadingOverlay = isChangingLeague || (leagueLoading && userLeagueState === 'active-user');
 
   return (
-    <div className="min-h-screen bg-background text-foreground overflow-x-hidden relative">
+    <div className="min-h-screen bg-[#D4E8B8] text-foreground overflow-x-hidden relative">
       {/* Loading overlay during league switch - non-blocking */}
       {showLoadingOverlay && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[100] flex items-center justify-center">
+        <div className="fixed inset-0 bg-[#D4E8B8]/90 backdrop-blur-lg z-[100] flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-citrus-orange mx-auto mb-4"></div>
             <p className="text-lg font-medium">Switching leagues...</p>
@@ -2538,11 +2516,11 @@ const Roster = () => {
       <main className="w-full pt-28 pb-16 m-0 p-0">
         <div className="w-full m-0 p-0">
           {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
-          <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_240px] gap-6 lg:gap-8">
+          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             {/* Main Content - Scrollable - Appears first on mobile */}
             <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-4 order-1 lg:order-2">
               {/* Fantasy Team Header with Citrus Flair */}
-              <div className="bg-card rounded-lg shadow-md border p-4 mb-6 relative overflow-hidden">
+              <div className="bg-card rounded-lg shadow-md border p-4 mb-4 relative overflow-hidden">
                 {/* Decorative citrus leaves in background */}
                 <CitrusLeaf className="absolute top-2 right-2 w-16 h-16 text-citrus-sage opacity-10 rotate-12" />
                 <CitrusLeaf className="absolute bottom-2 left-1/4 w-12 h-12 text-citrus-peach opacity-10 -rotate-45" />
@@ -2784,7 +2762,7 @@ const Roster = () => {
                   return (
                   // Disable drag-and-drop for demo league
                   userTeam && isDemoLeague(userTeam.league_id) ? (
-                    <div className="space-y-8">
+                    <div className="space-y-6">
                       <StartersGrid 
                         players={displayRoster.starters}
                         slotAssignments={displayRoster.slotAssignments}
@@ -2811,7 +2789,7 @@ const Roster = () => {
                     onDragStart={(userLeagueState === 'guest' || (userLeagueState as string) === 'logged-in-no-league') ? undefined : handleDragStart}
                     onDragEnd={(userLeagueState === 'guest' || (userLeagueState as string) === 'logged-in-no-league') ? undefined : handleDragEnd}
                   >
-                    <div className="space-y-8">
+                    <div className="space-y-6">
                       <StartersGrid 
                         players={displayRoster.starters}
                         slotAssignments={displayRoster.slotAssignments}
@@ -3184,6 +3162,32 @@ const Roster = () => {
                 {[...displayRoster.starters, ...displayRoster.bench, ...displayRoster.ir].map((player) => (
                   <Card key={player.id} className="p-4 hover:border-primary cursor-pointer transition-colors" onClick={async () => {
                     if (!user || !userTeam?.league_id || !pendingAddPlayer) return;
+                    
+                    // Check draft status FIRST - must complete draft before adding players
+                    try {
+                      const { data: leagueData } = await supabase
+                        .from('leagues')
+                        .select('draft_status')
+                        .eq('id', userTeam.league_id)
+                        .single();
+                      
+                      if (leagueData && leagueData.draft_status !== 'completed') {
+                        toast({
+                          title: "Draft Required",
+                          description: "You must complete the draft before adding free agents.",
+                          variant: "destructive"
+                        });
+                        return;
+                      }
+                    } catch (error) {
+                      console.error("[Roster] Error checking draft status:", error);
+                      toast({
+                        title: "Error",
+                        description: "Could not verify draft status.",
+                        variant: "destructive"
+                      });
+                      return;
+                    }
                     
                     try {
                       // Drop the selected player

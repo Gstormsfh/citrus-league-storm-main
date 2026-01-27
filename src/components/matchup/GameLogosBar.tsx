@@ -149,7 +149,7 @@ export const GameLogosBar = ({ games, playerTeam, selectedDate }: GameLogosBarPr
           
           // PREMIUM DESIGN: Compact logos with surfer varsity styling
           // Base container - COMPACT (8x8 instead of 12x12)
-          let containerClasses = 'relative w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-300 bg-citrus-cream/50 backdrop-blur-sm';
+          let containerClasses = 'relative w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-300 bg-[#E8EED9]/50 backdrop-blur-sm/50 backdrop-blur-sm';
           let borderStyle: React.CSSProperties | undefined;
           let glowEffect = '';
           
@@ -272,7 +272,7 @@ export const GameLogosBar = ({ games, playerTeam, selectedDate }: GameLogosBarPr
                   <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-gradient-to-br from-citrus-orange via-citrus-orange to-red-500 rounded border border-citrus-cream shadow-sm animate-pulse">
                     <div className="absolute inset-0 bg-citrus-orange rounded animate-ping opacity-75"></div>
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-[6px] font-varsity font-black text-citrus-cream relative z-10">L</span>
+                      <span className="text-[6px] font-varsity font-black text-[#E8EED9] relative z-10">L</span>
                     </div>
                     <span className="sr-only">Live</span>
                   </div>

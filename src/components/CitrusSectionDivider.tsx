@@ -14,7 +14,7 @@ export const CitrusSectionDivider = ({ className = '' }: CitrusSectionDividerPro
       </div>
       
       {/* Center citrus slice */}
-      <div className="relative z-10 bg-citrus-cream rounded-varsity p-3 border-3 border-citrus-sage/30 shadow-patch">
+      <div className="relative z-10 bg-[#E8EED9]/50 backdrop-blur-sm rounded-varsity p-3 border-3 border-citrus-sage/30 shadow-patch">
         <CitrusSlice className="w-8 h-8 text-citrus-orange" />
       </div>
       

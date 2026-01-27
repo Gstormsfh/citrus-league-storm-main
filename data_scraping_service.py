@@ -53,7 +53,7 @@ class PerformanceTracker:
         success_rate = 100 * (1 - self.failed_syncs / max(1, self.total_syncs))
         game_success_rate = 100 * (1 - self.games_failed / max(1, self.games_processed))
         
-        logger.info(f"💚 HEALTH: {uptime} uptime | "
+        logger.info(f"[HEALTH] {uptime} uptime | "
                    f"Syncs: {self.total_syncs} ({success_rate:.1f}% success) | "
                    f"Games: {self.games_processed} ({game_success_rate:.1f}% success) | "
                    f"Last sync: {self.last_sync_duration:.1f}s")
@@ -70,7 +70,7 @@ def signal_handler(signum, frame):
     """Handle shutdown signals gracefully"""
     global shutdown_requested
     shutdown_requested = True
-    logger.info("🛑 Shutdown signal received, finishing current sync...")
+    logger.info("[SHUTDOWN] Signal received, finishing current sync...")
 
 # Register signal handlers (works on Unix/Linux, safe on Windows)
 try:
@@ -95,7 +95,7 @@ def safe_api_call(url: str, max_retries: int = 3, reuse_session: bool = False) -
             r = citrus_request(url, timeout=15)  # 100-IP proxy rotation
             if r.status_code == 429:
                 wait = (attempt + 1) * 10
-                logger.warning(f"🛑 [429 LIMIT] Resting {wait}s...")
+                logger.warning(f"[429-LIMIT] Resting {wait}s...")
                 time.sleep(wait)
                 continue
             r.raise_for_status()
@@ -104,7 +104,7 @@ def safe_api_call(url: str, max_retries: int = 3, reuse_session: bool = False) -
             if attempt < max_retries - 1:
                 time.sleep(2)  # Brief retry delay
             else:
-                logger.error(f"❌ API Error after {max_retries} attempts: {e}")
+                logger.error(f"[ERROR] API Error after {max_retries} attempts: {e}")
     return None
 
 # --- IP-EFFICIENT BATCH CALLER ---
@@ -131,7 +131,7 @@ def safe_api_call_batch(urls: List[str], max_retries: int = 3) -> List[Optional[
     
     if not proxy_url:
         # Fallback: No proxy available, use individual calls
-        logger.warning("⚠️ No proxy available, falling back to individual calls")
+        logger.warning("[WARN] No proxy available, falling back to individual calls")
         return [safe_api_call(url, max_retries) for url in urls]
     
     # Use same proxy for all URLs in batch
@@ -149,20 +149,20 @@ def safe_api_call_batch(urls: List[str], max_retries: int = 3) -> List[Optional[
                 
                 if r.status_code == 429:
                     wait = (attempt + 1) * 10
-                    logger.warning(f"🛑 [429 LIMIT] Resting {wait}s...")
+                    logger.warning(f"[429-LIMIT] Resting {wait}s...")
                     time.sleep(wait)
                     continue
                     
                 r.raise_for_status()
                 response_data = r.json()
-                logger.info(f"[Batch-Call] ✅ Success (200)")
+                logger.info(f"[Batch-Call] OK (200)")
                 break
                 
             except Exception as e:
                 if attempt < max_retries - 1:
                     time.sleep(2)
                 else:
-                    logger.error(f"❌ Batch call error: {e}")
+                    logger.error(f"[ERROR] Batch call error: {e}")
         
         results.append(response_data)
     
@@ -279,7 +279,7 @@ def run_unified_loop() -> Tuple[str, int]:
         games = db.select("nhl_games", filters=[("game_date", "eq", today)])
         
         if not games:
-            logger.warning("⚠️ No games found in DB schedule.")
+            logger.warning("[WARN] No games found in DB schedule.")
             # Clear cache if no games today
             if game_state_cache:
                 game_state_cache.clear()
@@ -297,7 +297,7 @@ def run_unified_loop() -> Tuple[str, int]:
 
         logger.info(f"📋 Found {len(games)} games in slate. Processing ALL IN PARALLEL...")
     except Exception as e:
-        logger.error(f"❌ CRITICAL: Failed to fetch schedule from DB: {e}")
+        logger.error(f"[CRITICAL] Failed to fetch schedule from DB: {e}")
         tracker.failed_syncs += 1
         return ("ERROR", 0)
 
@@ -331,22 +331,22 @@ def run_unified_loop() -> Tuple[str, int]:
                     
                     # Log result
                     state = result.get("state", "UNKNOWN")
-                    success = "✅" if result.get("success") else "❌"
+                    success = "[OK]" if result.get("success") else "[FAIL]"
                     is_cached = result.get("cached", False)
                     cached_tag = " [CACHED]" if is_cached else ""
                     
                     if state in ("LIVE", "CRIT"):
                         live_count += 1
-                        logger.info(f"🔴 LIVE: [{result['game_id']}] {success}")
+                        logger.info(f"[LIVE] [{result['game_id']}] {success}")
                     elif state == "INTERMISSION":
-                        logger.info(f"⏸️  INT: [{result['game_id']}] {success}")
+                        logger.info(f"[INT] [{result['game_id']}] {success}")
                     elif state in ("FINAL", "OFF"):
-                        logger.info(f"🏁 FINAL: [{result['game_id']}] {success}{cached_tag}")
+                        logger.info(f"[FINAL] [{result['game_id']}] {success}{cached_tag}")
                     else:
-                        logger.info(f"📅 {state}: [{result['game_id']}] {success}")
+                        logger.info(f"[{state}] [{result['game_id']}] {success}")
                         
                 except Exception as e:
-                    logger.error(f"❌ Game {game['game_id']} failed: {e}")
+                    logger.error(f"[ERROR] Game {game['game_id']} failed: {e}")
                     tracker.games_failed += 1
         
         # All games processed in parallel! Total time = slowest game (not sum of all games)
@@ -361,7 +361,7 @@ def run_unified_loop() -> Tuple[str, int]:
                    f"💰 IPs: {ips_used} used, {ips_saved} saved")
         
     except Exception as e:
-        logger.error(f"❌ CRITICAL: Parallel processing failed: {e}")
+        logger.error(f"[CRITICAL] Parallel processing failed: {e}")
         tracker.failed_syncs += 1
         return ("ERROR", 0)
 
@@ -371,7 +371,7 @@ def run_unified_loop() -> Tuple[str, int]:
         update_active_matchup_scores(db)
         logger.info("🏆 [MATCHUPS] Scoreboard Balanced.")
     except Exception as e:
-        logger.error(f"⚠️ Matchup update failed (non-critical): {e}")
+        logger.error(f"[WARN] Matchup update failed (non-critical): {e}")
     
     # 4. Determine game state from results
     game_states = [r.get("state", "SCHEDULED") for r in results]
@@ -395,27 +395,77 @@ def run_unified_loop() -> Tuple[str, int]:
     # 5. NIGHTLY PBP AUDIT - FIXED: Must run BEFORE return statement!
     now = dt.datetime.now()
     if now.hour == 23 and now.minute >= 50:
-        logger.info("🌙 END OF NIGHT DETECTED. Starting Deep PBP Audit...")
+        logger.info("[NIGHTLY] END OF NIGHT DETECTED. Starting Deep PBP Audit...")
         try:
             from run_daily_pbp_processing import process_all_unprocessed_games
             process_all_unprocessed_games()
-            logger.info("✅ Nightly PBP processing complete.")
+            logger.info("[NIGHTLY] PBP processing complete.")
         except Exception as e: 
-            logger.error(f"❌ Nightly PBP Error: {e}")
+            logger.error(f"[NIGHTLY] PBP Error: {e}")
 
-    # 6. NIGHTLY LANDING STATS UPDATE (PPP/SHP Season Totals)
-    # Run at midnight MT (00:00-00:05) to update season totals after all games are final
-    if now.hour == 0 and now.minute < 5:
-        logger.info("🌙 MIDNIGHT MT - Starting Nightly Landing Stats Update (PPP/SHP)...")
+    # =========================================================================
+    # BULLETPROOF DATA INTEGRITY PIPELINE (Midnight MT)
+    # Sequential execution ensures data accuracy:
+    #   1. Reconcile recent games (catch NHL stat corrections)
+    #   2. Re-aggregate season stats from per-game data
+    #   3. Update PPP/SHP from Landing Endpoint (authoritative source)
+    # =========================================================================
+    
+    # 6. DATA RECONCILIATION (00:00-00:03)
+    # Validate recent games against NHL API, auto-fix discrepancies
+    if now.hour == 0 and 0 <= now.minute < 3:
+        logger.info("[RECONCILE] Starting Data Reconciliation (Last 7 Days)...")
+        try:
+            import subprocess
+            result = subprocess.run(
+                [sys.executable, "reconcile_player_stats.py", "--recent", "--auto-fix"],
+                capture_output=True,
+                text=True,
+                timeout=1800  # 30 min timeout
+            )
+            if result.returncode == 0:
+                logger.info("[RECONCILE] Complete.")
+                # Log summary
+                if result.stdout:
+                    for line in result.stdout.strip().split('\n')[-5:]:
+                        if line.strip():
+                            logger.info(f"  {line}")
+            else:
+                logger.error(f"[RECONCILE] FAILED with code {result.returncode}")
+                if result.stderr:
+                    logger.error(f"  Error: {result.stderr[:500]}")
+        except subprocess.TimeoutExpired:
+            logger.error("[RECONCILE] TIMEOUT after 30 minutes")
+        except Exception as e:
+            logger.error(f"[RECONCILE] Error: {e}")
+
+    # 7. RE-AGGREGATE SEASON STATS (00:03-00:06)
+    # Rebuild player_season_stats from corrected per-game data
+    if now.hour == 0 and 3 <= now.minute < 6:
+        logger.info("[AGGREGATE] Re-building player_season_stats from per-game data...")
+        try:
+            from build_player_season_stats import main as build_season_stats
+            result = build_season_stats()
+            if result == 0:
+                logger.info("[AGGREGATE] Season stats rebuilt successfully.")
+            else:
+                logger.error(f"[AGGREGATE] FAILED with code {result}")
+        except Exception as e:
+            logger.error(f"[AGGREGATE] Error: {e}")
+
+    # 8. LANDING STATS UPDATE - PPP/SHP (00:06-00:10)
+    # Fetch authoritative PPP/SHP from NHL Landing Endpoint
+    if now.hour == 0 and 6 <= now.minute < 10:
+        logger.info("[LANDING] Fetching PPP/SHP from NHL Landing Endpoint...")
         try:
             from fetch_nhl_stats_from_landing import main as fetch_landing_stats
             result = fetch_landing_stats()
             if result == 0:
-                logger.info("✅ Nightly landing stats update complete.")
+                logger.info("[LANDING] PPP/SHP update complete.")
             else:
-                logger.error(f"❌ Nightly landing stats update failed with code {result}")
+                logger.error(f"[LANDING] FAILED with code {result}")
         except Exception as e:
-            logger.error(f"❌ Nightly Landing Stats Error: {e}")
+            logger.error(f"[LANDING] Error: {e}")
 
     # Track performance metrics
     tracker.total_syncs += 1
@@ -459,53 +509,53 @@ if __name__ == "__main__":
             
             # LIVE GAME MODE - Ultra-safe aggressive refresh (30 seconds)
             if game_state == "LIVE" and live_count > 0:
-                sleep_time = 30  # 🔥 30s refresh - bulletproof against rate limits!
-                logger.info(f"🔴 {live_count} LIVE GAMES - Aggressive Mode (30s refresh)...")
+                sleep_time = 30  # 30s refresh - bulletproof against rate limits!
+                logger.info(f"[LIVE] {live_count} LIVE GAMES - Aggressive Mode (30s refresh)...")
             
             # INTERMISSION MODE - Moderate refresh (60 seconds)
             elif game_state == "INTERMISSION" and is_game_hours:
                 sleep_time = 60  # Games on break, check every minute
-                logger.info("⏸️  Intermission - checking every 60s...")
+                logger.info("[INT] Intermission - checking every 60s...")
             
             # ALL FINAL CACHED MODE - All games cached within TTL (30 minutes)
             elif game_state == "ALL_FINAL_CACHED":
                 sleep_time = 1800  # 30 minutes - all cached, minimal monitoring
-                logger.info("✅ All games FINAL (all cached) - extended sleep (30 min)...")
+                logger.info("[FINAL] All games FINAL (all cached) - extended sleep (30 min)...")
             
             # ALL FINAL MODE - Some games needed TTL refresh (10 minutes)
             elif game_state == "ALL_FINAL":
                 sleep_time = 600  # 10 minutes - checking for stat corrections
-                logger.info("✅ All games FINAL - checking for stat corrections (10 min)...")
+                logger.info("[FINAL] All games FINAL - checking for stat corrections (10 min)...")
             
             # SCHEDULED MODE - Games haven't started yet (2 minutes)
             elif game_state == "SCHEDULED" and is_game_hours:
                 sleep_time = 120  # Check every 2 min for game start
-                logger.info("📅 Pre-game - checking every 2 min...")
+                logger.info("[SCHED] Pre-game - checking every 2 min...")
             
             # ERROR MODE - Back off exponentially
             elif game_state == "ERROR":
                 sleep_time = min(300, 30 * (2 ** consecutive_failures))  # Max 5 min
-                logger.warning(f"⚠️ ERROR recovery mode - waiting {sleep_time}s...")
+                logger.warning(f"[RECOVERY] ERROR recovery mode - waiting {sleep_time}s...")
             
             # OFF HOURS - Save bandwidth (5 minutes)
             else:
                 sleep_time = 300  # 5 minutes when no games
-                logger.info("😴 Off hours - resting 5 min to save bandwidth...")
+                logger.info("[IDLE] Off hours - resting 5 min to save bandwidth...")
             
             time.sleep(sleep_time)
             
         except KeyboardInterrupt:
-            logger.info("🛑 Shutdown requested by user...")
-            logger.info(f"📊 Final stats: {tracker.total_syncs} syncs, {tracker.games_processed} games processed")
+            logger.info("[SHUTDOWN] Requested by user...")
+            logger.info(f"[STATS] Final: {tracker.total_syncs} syncs, {tracker.games_processed} games processed")
             tracker.log_health_check()
             sys.exit(0)
             
         except Exception as e:
             consecutive_failures += 1
-            logger.error(f"❌ FATAL ERROR ({consecutive_failures}/{max_consecutive_failures}): {e}")
+            logger.error(f"[FATAL] ERROR ({consecutive_failures}/{max_consecutive_failures}): {e}")
             
             if consecutive_failures >= max_consecutive_failures:
-                logger.critical("🆘 TOO MANY CONSECUTIVE FAILURES! Service requires attention!")
+                logger.critical("[ALERT] TOO MANY CONSECUTIVE FAILURES! Service requires attention!")
                 logger.critical("Service will continue but may be degraded...")
                 consecutive_failures = 0  # Reset to avoid spam
             

@@ -44,9 +44,19 @@ export const TEAM_COLUMNS = 'id, league_id, owner_id, team_name, created_at, upd
 export const TEAM_COLUMNS_SLIM = 'id, league_id, owner_id, team_name';
 
 // ============================================================================
-// DRAFT PICKS TABLE COLUMNS
+// ROSTER ASSIGNMENTS TABLE COLUMNS (Source of Truth for Rosters)
+// ============================================================================
+// Replaces draft_picks queries for roster membership (Jan 17, 2026)
+export const ROSTER_ASSIGNMENT_COLUMNS = 'id, league_id, team_id, player_id, acquired_at, created_at, updated_at';
+
+// Slim version - just what's needed for roster building
+export const ROSTER_ASSIGNMENT_COLUMNS_SLIM = 'id, player_id, team_id';
+
+// ============================================================================
+// DRAFT PICKS TABLE COLUMNS (DEPRECATED for roster queries)
 // ============================================================================
 // Note: draft_picks table has 'picked_at', NOT 'created_at'
+// ⚠️ DEPRECATED: Use roster_assignments for current roster membership
 export const DRAFT_PICK_COLUMNS = 'id, league_id, team_id, player_id, pick_number, round_number, draft_session_id, picked_at, deleted_at';
 
 // Slim version - just what's needed for roster building
@@ -117,6 +127,7 @@ export const COLUMNS = {
   MATCHUP: MATCHUP_COLUMNS,
   LEAGUE: LEAGUE_COLUMNS,
   TEAM: TEAM_COLUMNS,
+  ROSTER_ASSIGNMENT: ROSTER_ASSIGNMENT_COLUMNS,
   DRAFT_PICK: DRAFT_PICK_COLUMNS,
   DRAFT_ORDER: DRAFT_ORDER_COLUMNS,
   NHL_GAME: NHL_GAME_COLUMNS,
@@ -131,6 +142,7 @@ export const COLUMNS = {
   MATCHUP_LINES_SLIM: MATCHUP_LINES_COLUMNS_SLIM,
   LEAGUE_SLIM: LEAGUE_COLUMNS_SLIM,
   TEAM_SLIM: TEAM_COLUMNS_SLIM,
+  ROSTER_ASSIGNMENT_SLIM: ROSTER_ASSIGNMENT_COLUMNS_SLIM,
   DRAFT_PICK_SLIM: DRAFT_PICK_COLUMNS_SLIM,
   NHL_GAME_SLIM: NHL_GAME_COLUMNS_SLIM,
   NHL_GAME_MINIMAL: NHL_GAME_COLUMNS_MINIMAL,

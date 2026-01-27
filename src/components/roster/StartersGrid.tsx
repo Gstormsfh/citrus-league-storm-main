@@ -134,7 +134,7 @@ const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, className,
           <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
             Defense
           </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 lg:w-2/3 lg:mx-auto gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 gap-2">
             {defenseRow.map(slot => renderSlot(slot))}
           </div>
         </div>
@@ -144,7 +144,7 @@ const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, className,
           <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
             Goalies & Utility
           </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:w-1/2 lg:mx-auto gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 gap-2">
             {bottomRow.map(slot => {
               // Add colored left border for Utility
               if (slot.position === 'UTIL') {
@@ -209,11 +209,12 @@ const PositionSlot = ({
     <Card
       ref={setNodeRef}
       className={cn(
-        "p-2 transition-all rounded-lg min-h-[110px] w-full", 
+        "p-2 transition-all rounded-lg w-full", 
         "border-2",
+        "min-h-[154px]", // Fixed: Accommodate 130px card + 24px padding (12px top + 12px bottom)
         isOver && "border-citrus-sage bg-citrus-sage/10 shadow-lg",
-        isEmpty && "border-dashed border-citrus-charcoal/20 bg-citrus-cream/50",
-        isFull && !isOver && "border-citrus-sage/30 bg-citrus-cream shadow-sm"
+        isEmpty && "border-dashed border-citrus-charcoal/20 bg-[#E8EED9]/50 backdrop-blur-sm/50",
+        isFull && !isOver && "border-citrus-sage/30 bg-[#E8EED9]/50 backdrop-blur-sm shadow-sm"
       )}
     >
       {/* Compact Slot Header */}
@@ -247,7 +248,7 @@ const PositionSlot = ({
         </SortableContext>
       ) : (
         <div className={cn(
-          "flex items-center justify-center h-[80px] rounded border border-dashed transition-all",
+          "flex items-center justify-center h-[130px] rounded border border-dashed transition-all",
           isOver ? "border-primary bg-primary/10 border-2" : "border-muted-foreground/20 bg-muted/5"
         )}>
           <div className="text-center">

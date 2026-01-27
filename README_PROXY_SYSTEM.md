@@ -18,9 +18,9 @@
 
 Add to `.env`:
 ```bash
-CITRUS_PROXY_USERNAME=wtkvqebq
-CITRUS_PROXY_PASSWORD=e2o3t90lka78
-CITRUS_PROXY_API_URL=https://proxy.webshare.io/api/v2/proxy/list/download/vttnipddbxwfvslipogsgpzsneeydesmgtnfohbk/-/any/username/direct/-/?plan_id=12559674
+CITRUS_PROXY_USERNAME=your_webshare_username
+CITRUS_PROXY_PASSWORD=your_webshare_password
+CITRUS_PROXY_API_URL=your_webshare_api_url
 CITRUS_PROXY_ENABLED=true
 CITRUS_CIRCUIT_BREAKER_THRESHOLD=3
 CITRUS_CIRCUIT_BREAKER_PAUSE=60

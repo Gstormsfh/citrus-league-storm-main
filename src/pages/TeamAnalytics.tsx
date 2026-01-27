@@ -226,15 +226,15 @@ const TeamAnalytics = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col relative overflow-hidden">
+    <div className="min-h-screen bg-[#D4E8B8] flex flex-col relative overflow-hidden">
       <CitrusBackground density="light" />
       <Navbar />
       <main className="w-full pt-28 pb-16 m-0 p-0">
         <div className="w-full m-0 p-0">
           {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
-          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px]">
-            {/* Main Content - Scrollable - Appears first on mobile */}
-            <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
+          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
+            {/* Main Content - Appears first on mobile */}
+            <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2">
               {/* Header Section */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
               <div>
@@ -334,7 +334,7 @@ const TeamAnalytics = () => {
                   <CardContent>
                     <div className="space-y-4">
                       {freeAgentTargets.filter(p => p.position === 'G').map(player => (
-                         <div key={player.id} className="bg-white/5 p-3 rounded-lg border border-white/10">
+                         <div key={player.id} className="bg-[#E8EED9]/50 backdrop-blur-sm/20 p-3 rounded-lg border border-citrus-sage/20">
                            <div className="flex justify-between items-start mb-2">
                              <div>
                                <div className="font-bold text-base">{player.name}</div>

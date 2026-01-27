@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { useAuth } from './AuthContext';
 import { LeagueService, League } from '@/services/LeagueService';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
-import { DEMO_LEAGUE_ID } from '@/services/DemoLeagueService';
+import { DEMO_LEAGUE_ID, DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeagueService';
 import { MatchupService } from '@/services/MatchupService';
 import { RosterCacheService } from '@/services/RosterCacheService';
 import { PlayerService } from '@/services/PlayerService';
@@ -99,7 +99,10 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       }
 
       // Exclude demo league from user's leagues (pillar of isolation)
-      const filteredLeagues = (leagues || []).filter(l => l.id !== DEMO_LEAGUE_ID);
+      // Filter out demo league (guests only) - double check even though getUserLeagues excludes it
+      const filteredLeagues = (leagues || []).filter(l => 
+        l.id !== DEMO_LEAGUE_ID && l.id !== DEMO_LEAGUE_ID_FOR_GUESTS
+      );
       setUserLeagues(filteredLeagues);
 
       // Determine active league:
@@ -224,21 +227,50 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
 
   // Update active league when URL param changes (with membership validation)
   useEffect(() => {
-    if (urlLeagueId && urlLeagueId !== activeLeagueId && user) {
+    // Don't verify until leagues have finished loading
+    if (urlLeagueId && urlLeagueId !== activeLeagueId && user && !loading) {
       const verifyAndSetLeague = async () => {
         // First check if league is in user's leagues array
         const league = userLeagues.find(l => l.id === urlLeagueId);
         
         if (!league) {
-          // League not in user's leagues - block access
-          console.warn('[LeagueContext] User attempted to access league not in their list:', urlLeagueId);
-          navigate('/leagues');
-          toast({
-            title: "Access Denied",
-            description: "You are not a member of this league.",
-            variant: "destructive"
-          });
-          return;
+          // League not in user's leagues - verify membership directly (might be newly joined)
+          try {
+            const isMember = await LeagueMembershipService.verifyMembership(urlLeagueId, user.id);
+            
+            if (isMember) {
+              // User is a member but league not in cache - refresh and set
+              await loadUserLeagues();
+              // After refresh, try to find the league again
+              const refreshedLeagues = await LeagueService.getUserLeagues(user.id);
+              const refreshedLeague = refreshedLeagues.leagues?.find(l => l.id === urlLeagueId);
+              
+              if (refreshedLeague) {
+                setActiveLeagueIdState(urlLeagueId);
+                setActiveLeague(refreshedLeague);
+                return;
+              }
+            }
+            
+            // Not a member or refresh didn't find it - block access
+            console.warn('[LeagueContext] User attempted to access league not in their list:', urlLeagueId);
+            navigate('/gm-office');
+            toast({
+              title: "Access Denied",
+              description: "You are not a member of this league.",
+              variant: "destructive"
+            });
+            return;
+          } catch (error) {
+            console.error('[LeagueContext] Error verifying membership:', error);
+            navigate('/gm-office');
+            toast({
+              title: "Error",
+              description: "Failed to verify league access.",
+              variant: "destructive"
+            });
+            return;
+          }
         }
 
         // Explicitly verify membership (defense in depth)
@@ -251,7 +283,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
           } else {
             // Membership check failed - block access
             console.error('[LeagueContext] Membership verification failed for league:', urlLeagueId);
-            navigate('/leagues');
+            navigate('/gm-office');
             toast({
               title: "Access Denied",
               description: "You are not a member of this league.",
@@ -260,7 +292,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
           }
         } catch (error) {
           console.error('[LeagueContext] Error verifying membership:', error);
-          navigate('/leagues');
+          navigate('/gm-office');
           toast({
             title: "Error",
             description: "Failed to verify league access.",
@@ -271,7 +303,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
 
       verifyAndSetLeague();
     }
-  }, [urlLeagueId, userLeagues, user, activeLeagueId, navigate, toast]);
+  }, [urlLeagueId, userLeagues, user, activeLeagueId, loading, navigate, toast]);
 
   const value: LeagueContextType = {
     activeLeagueId,

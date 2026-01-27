@@ -7,7 +7,7 @@ import { CitrusSparkle, CitrusLeaf } from '@/components/icons/CitrusIcons';
 
 export const ActionsSidebar = () => {
   return (
-    <Card className="animated-element bg-citrus-cream corduroy-texture border-4 border-citrus-sage rounded-[2rem] shadow-[0_6px_0_rgba(27,48,34,0.2)] relative overflow-hidden">
+    <Card className="animated-element bg-[#E8EED9]/50 backdrop-blur-sm corduroy-texture border-4 border-citrus-sage rounded-[2rem] shadow-[0_6px_0_rgba(27,48,34,0.2)] relative overflow-hidden">
       {/* Decorative citrus leaves */}
       <CitrusLeaf className="absolute top-2 right-2 w-12 h-12 text-citrus-sage opacity-10 rotate-12" />
       <CitrusLeaf className="absolute bottom-4 left-2 w-10 h-10 text-citrus-peach opacity-10 -rotate-45" />
@@ -20,19 +20,19 @@ export const ActionsSidebar = () => {
       </CardHeader>
       <CardContent className="space-y-4 relative z-10">
         <Link to="/roster" className="w-full">
-          <Button className="w-full bg-gradient-to-br from-citrus-sage to-citrus-orange border-4 border-citrus-forest rounded-varsity shadow-[inset_0_2px_4px_rgba(0,0,0,0.1),0_4px_0_rgba(27,48,34,0.2)] hover:-translate-y-0.5 transition-all text-citrus-cream font-varsity font-bold uppercase tracking-wide group">
+          <Button className="w-full bg-gradient-to-br from-citrus-sage to-citrus-orange border-4 border-citrus-forest rounded-varsity shadow-[inset_0_2px_4px_rgba(0,0,0,0.1),0_4px_0_rgba(27,48,34,0.2)] hover:-translate-y-0.5 transition-all text-[#E8EED9] font-varsity font-bold uppercase tracking-wide group">
             <Users className="w-4 h-4 mr-2 transition-transform group-hover:scale-110" />
             Manage Team
           </Button>
         </Link>
         <Link to="/trade-analyzer" className="w-full">
-          <Button className="w-full bg-gradient-to-br from-citrus-peach to-citrus-orange border-4 border-citrus-forest rounded-varsity shadow-[inset_0_2px_4px_rgba(0,0,0,0.1),0_4px_0_rgba(27,48,34,0.2)] hover:-translate-y-0.5 transition-all text-citrus-cream font-varsity font-bold uppercase tracking-wide group">
+          <Button className="w-full bg-gradient-to-br from-citrus-peach to-citrus-orange border-4 border-citrus-forest rounded-varsity shadow-[inset_0_2px_4px_rgba(0,0,0,0.1),0_4px_0_rgba(27,48,34,0.2)] hover:-translate-y-0.5 transition-all text-[#E8EED9] font-varsity font-bold uppercase tracking-wide group">
             <Briefcase className="w-4 h-4 mr-2 transition-transform group-hover:scale-110" />
             Trade Center
           </Button>
         </Link>
         <Link to="/profile" className="w-full">
-          <Button variant="outline" className="w-full border-2 border-citrus-sage/60 bg-citrus-cream/50 hover:bg-citrus-sage/20 text-citrus-forest font-display font-semibold rounded-xl group">
+          <Button variant="outline" className="w-full border-2 border-citrus-sage/60 bg-[#E8EED9]/50 backdrop-blur-sm/50 hover:bg-citrus-sage/20 text-citrus-forest font-display font-semibold rounded-xl group">
             <Settings className="w-4 h-4 mr-2 transition-transform group-hover:scale-110" />
             Team Settings
           </Button>

@@ -9,12 +9,12 @@ const Features = () => {
     {
       icon: Narwhal,
       title: "Stormy AI Assistant",
-      description: "Get real-time draft advice, trade analysis, and lineup optimization from our advanced AI."
+      description: "Data-driven draft advice, trade analysis, and lineup optimization powered by advanced AI and industry-leading projections."
     },
     {
       icon: Zap,
       title: "Live Scoring Updates",
-      description: "Experience the fastest live scoring in the industry with instant notifications."
+      description: "Real-time scoring updates with live stats and advanced metrics during games."
     },
     {
       icon: Users,
@@ -39,7 +39,7 @@ const Features = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-[#D4E8B8] flex flex-col">
       <Navbar />
       <main className="flex-grow pt-24 px-4">
         <div className="container mx-auto py-12">
@@ -48,7 +48,7 @@ const Features = () => {
               Platform Features
             </h1>
             <p className="text-xl text-muted-foreground">
-              Discover why CitrusSports is the fastest growing fantasy sports platform.
+              Professional-grade analytics and data-driven insights for competitive fantasy hockey managers.
             </p>
           </div>
 

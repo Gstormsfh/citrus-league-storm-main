@@ -13,11 +13,13 @@ Add these to your `.env` file:
 # ===================================================================
 
 # Proxy Authentication (Webshare credentials)
-CITRUS_PROXY_USERNAME=wtkvqebq
-CITRUS_PROXY_PASSWORD=e2o3t90lka78
+# Get these from your Webshare dashboard
+CITRUS_PROXY_USERNAME=your_webshare_username
+CITRUS_PROXY_PASSWORD=your_webshare_password
 
 # Proxy API Endpoint (Webshare proxy list download)
-CITRUS_PROXY_API_URL=https://proxy.webshare.io/api/v2/proxy/list/download/vttnipddbxwfvslipogsgpzsneeydesmgtnfohbk/-/any/username/direct/-/?plan_id=12559674
+# Get this from your Webshare dashboard
+CITRUS_PROXY_API_URL=your_webshare_api_url
 
 # Enable/Disable Proxy Rotation (set to "false" to disable for testing)
 CITRUS_PROXY_ENABLED=true

@@ -63,14 +63,18 @@ export default {
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
 				},
-				// Digital Starter Jacket - Physical Vintage Artifact Colors
+				// Digital Starter Jacket - Physical Vintage Artifact Colors - PASTEL CREAMY VIBES
 				citrus: {
-					cream: '#FFFDF2',       // Warm Cream (base) - Pure white FORBIDDEN
-					sage: '#789561',        // Vintage Apple/Sage (primary green)
-					peach: '#E6A99F',       // Muted Coral (secondary)
-					orange: '#DF7536',      // Miami Varsity Orange (accents)
-					charcoal: '#333333',    // Warm soft dark
-					forest: '#1B3022',      // Deep Forest Green (text anchor)
+					cream: '#E8EED9',       // Greenish cream - blends with background
+					sage: '#A4C4A0',        // Soft Pastel Sage - CREAMY
+					'sage-light': '#C8DCC4', // Very light sage for subtle elements
+					'green-light': '#B8D4A8',  // Pastel green - SOFT
+					'green-medium': '#98BA88', // Muted medium green - CREAMY
+					'green-dark': '#7A9E73',   // Soft darker green - still pastel
+					peach: '#F5D5C8',       // Super light peachy cream
+					orange: '#F4A460',      // Sandy Orange - softer
+					charcoal: '#5C5C5C',    // Soft charcoal
+					forest: '#4A5F4D',      // Soft forest - NOT too dark
 				},
 				// Citrus fantasy sports theme colors - High-Contrast Citrus Palette
 				fantasy: {

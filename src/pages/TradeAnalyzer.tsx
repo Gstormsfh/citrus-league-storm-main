@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
@@ -44,13 +44,14 @@ import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 const TradeAnalyzer = () => {
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
-  const { userLeagueState, activeLeagueId } = useLeague();
+  const { userLeagueState, activeLeagueId, activeLeague } = useLeague();
   const { toast } = useToast();
   
   const [selectedTeamId, setSelectedTeamId] = useState<string | number>("");
   const [myTeamRoster, setMyTeamRoster] = useState<Player[]>([]);
   const [opponentTeams, setOpponentTeams] = useState<LeagueTeam[]>([]);
   const [loading, setLoading] = useState(true);
+  const [draftNotCompleted, setDraftNotCompleted] = useState(false);
   
   // State for Player Stats Modal
   const [selectedPlayerForStats, setSelectedPlayerForStats] = useState<HockeyPlayer | null>(null);
@@ -62,11 +63,48 @@ const TradeAnalyzer = () => {
   const [activeTab, setActiveTab] = useState('propose');
   const [tradeMessage, setTradeMessage] = useState('');
 
+  const loadTradeOffers = useCallback(async (teamId: string) => {
+    if (!activeLeagueId) return;
+    
+    try {
+      const offers = await TradeService.getTeamTradeOffers(activeLeagueId, teamId);
+      setTradeOffers(offers);
+    } catch (error) {
+      console.error("Failed to load trade offers", error);
+      setTradeOffers([]);
+    }
+  }, [activeLeagueId]);
+
   useEffect(() => {
+    // Guard: Don't run if user is still loading or league context is not ready
+    if (user === undefined || activeLeagueId === undefined) {
+      return;
+    }
+
+    let isMounted = true;
+    
     const fetchData = async () => {
       setLoading(true);
+      
       try {
-        // Get user's team ID if logged in
+        // STEP 1: Check draft status FIRST - if not completed, show message and STOP
+        if (activeLeagueId) {
+          const { data: leagueData } = await supabase
+            .from('leagues')
+            .select('draft_status')
+            .eq('id', activeLeagueId)
+            .single();
+          
+          if (leagueData && leagueData.draft_status !== 'completed') {
+            if (isMounted) {
+              setDraftNotCompleted(true);
+              setLoading(false);
+            }
+            return; // STOP - don't do anything else
+          }
+        }
+        
+        // STEP 2: Only if draft is completed, load the rest
         if (user && activeLeagueId) {
           const { data: team } = await supabase
             .from('teams')
@@ -75,41 +113,45 @@ const TradeAnalyzer = () => {
             .eq('owner_id', user.id)
             .maybeSingle();
           
-          if (team) {
+          if (team && isMounted) {
             setMyTeamId(team.id);
-            // Load trade offers
-            await loadTradeOffers(team.id);
+            loadTradeOffers(team.id).catch(() => {});
           }
         }
         
-        // Get all players from our pipeline tables (player_directory + player_season_stats)
-        // PlayerService.getAllPlayers() is the ONLY source for player data
         const allPlayers = await PlayerService.getAllPlayers();
-        // LeagueService distributes players to teams (independent of staging)
+        if (!isMounted) return;
+        
         const teams = await LeagueService.getAllTeamsWithRosters(allPlayers);
+        if (!isMounted) return;
         
-        // For non-logged-in users, show demo team (Team 3)
-        // For logged-in users, get their actual team
         const myTeam = await LeagueService.getMyTeam(allPlayers);
-        setMyTeamRoster(myTeam);
+        if (!isMounted) return;
         
-        // Exclude my team (ID 3) from opponents
+        setMyTeamRoster(myTeam);
         setOpponentTeams(teams.filter(t => t.id !== 3));
       } catch (error) {
-        console.error("Failed to load trade data", error);
+        console.error("[TradeAnalyzer] Error:", error);
+        if (isMounted) {
+          toast({
+            title: "Error",
+            description: "Failed to load trade data.",
+            variant: "destructive"
+          });
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
-    fetchData();
-  }, [user, activeLeagueId]);
-
-  const loadTradeOffers = async (teamId: string) => {
-    if (!activeLeagueId) return;
     
-    const offers = await TradeService.getTeamTradeOffers(activeLeagueId, teamId);
-    setTradeOffers(offers);
-  };
+    fetchData();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, activeLeagueId, loadTradeOffers, toast]);
 
   const handleProposeTrade = async () => {
     if (!myTeamId || !activeLeagueId || !selectedTeamId || 
@@ -357,9 +399,58 @@ const TradeAnalyzer = () => {
       <main className="w-full pt-28 pb-16 m-0 p-0">
         <div className="w-full m-0 p-0">
           {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
-          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px]">
-            {/* Main Content - Scrollable - Appears first on mobile */}
-            <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
+          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
+            {/* Main Content - Appears first on mobile */}
+            <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2">
+              {/* Loading State */}
+              {loading && (
+                <div className="flex items-center justify-center py-20">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-muted-foreground">Loading trade analyzer...</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Draft Not Completed Message */}
+              {!loading && draftNotCompleted && (
+                <div className="flex flex-col items-center justify-center py-20 text-center">
+                  <Card className="max-w-2xl w-full border-4 border-citrus-orange shadow-[0_8px_0_rgba(223,117,54,0.4)]">
+                    <CardHeader>
+                      <CardTitle className="text-2xl font-varsity font-black text-citrus-forest uppercase flex items-center justify-center gap-3">
+                        <ShieldAlert className="w-8 h-8 text-citrus-orange" />
+                        Draft Not Completed
+                      </CardTitle>
+                      <CardDescription className="text-lg mt-4">
+                        The league draft must be completed before you can use the Trade Analyzer.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <p className="text-muted-foreground">
+                        Once the draft is finished and rosters are populated, you'll be able to:
+                      </p>
+                      <ul className="list-disc list-inside space-y-2 text-left max-w-md mx-auto">
+                        <li>Analyze trades with other teams</li>
+                        <li>Get AI-powered trade recommendations</li>
+                        <li>View trade offers and proposals</li>
+                      </ul>
+                      {activeLeagueId && (
+                        <div className="pt-4">
+                          <Button asChild className="bg-gradient-to-r from-citrus-orange to-citrus-peach">
+                            <a href={`/draft-room?league=${activeLeagueId}`}>
+                              Go to Draft Room
+                            </a>
+                          </Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
+              {/* Main Trade Analyzer Content */}
+              {!loading && !draftNotCompleted && (
+                <>
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60">
@@ -667,6 +758,8 @@ const TradeAnalyzer = () => {
           isOpen={isPlayerDialogOpen}
           onClose={() => setIsPlayerDialogOpen(false)}
         />
+                </>
+              )}
               </div>
 
             {/* Left Sidebar - At bottom on mobile, left on desktop */}

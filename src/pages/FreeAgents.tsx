@@ -343,6 +343,32 @@ const FreeAgents = () => {
       return;
     }
 
+    // Check draft status FIRST - must complete draft before adding free agents
+    try {
+      const { data: leagueData } = await supabase
+        .from('leagues')
+        .select('draft_status')
+        .eq('id', leagueId)
+        .single();
+      
+      if (leagueData && leagueData.draft_status !== 'completed') {
+        toast({
+          title: "Draft Required",
+          description: "You must complete the draft before adding free agents.",
+          variant: "destructive"
+        });
+        return;
+      }
+    } catch (error) {
+      console.error("[FreeAgents] Error checking draft status:", error);
+      toast({
+        title: "Error",
+        description: "Could not verify draft status.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       // Check roster size before attempting to add
       const { league, error: leagueError } = await LeagueService.getLeague(leagueId, user.id);
@@ -743,15 +769,15 @@ const FreeAgents = () => {
   const positions = ['ALL', 'C', 'LW', 'RW', 'W', 'D', 'G'];
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
+    <div className="min-h-screen bg-[#D4E8B8] relative overflow-hidden">
       <CitrusBackground density="light" />
       <Navbar />
       <main className="w-full pt-28 pb-16 m-0 p-0">
         <div className="w-full m-0 p-0">
           {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
-          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px]">
-            {/* Main Content - Scrollable - Appears first on mobile */}
-            <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
+          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
+            {/* Main Content - Appears first on mobile */}
+            <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h1 className="text-3xl font-bold">Free Agents</h1>

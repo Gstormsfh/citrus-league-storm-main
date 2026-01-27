@@ -32,7 +32,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useNotificationStore } from '@/stores/notificationStore';
 
 const Navbar = () => {
-  console.log("✅ Navbar component rendering");
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
@@ -105,8 +104,8 @@ const Navbar = () => {
       className={cn(
         "fixed top-0 left-0 right-0 w-full z-50 transition-all duration-500", 
         isScrolled ? 
-          "py-3 bg-citrus-cream/95 backdrop-blur-lg shadow-varsity border-b-4 border-citrus-sage/30" : 
-          "py-5 bg-citrus-cream/90 backdrop-blur-sm border-b-2 border-citrus-sage/20"
+          "py-3 bg-[#D4E8B8]/95 backdrop-blur-lg shadow-sm border-b-2 border-citrus-sage/30" : 
+          "py-5 bg-[#D4E8B8]/90 backdrop-blur-sm border-b border-citrus-sage/20"
       )}
     >
       <div className="container mx-auto px-4 max-w-full">
@@ -114,20 +113,20 @@ const Navbar = () => {
         <div className="flex items-center justify-between">
           {/* Logo with Citrus Slice - Vintage Varsity Style */}
           <Link to="/" className="flex items-center gap-3 group relative">
-            <div className="w-11 h-11 rounded-varsity bg-gradient-to-br from-citrus-sage to-citrus-orange border-3 border-citrus-forest/20 flex items-center justify-center shadow-patch group-hover:shadow-varsity group-hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden">
+            <div className="w-11 h-11 rounded-varsity bg-gradient-to-br from-citrus-sage to-citrus-green-medium border-3 border-citrus-forest/20 flex items-center justify-center shadow-patch group-hover:shadow-varsity group-hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden">
               {/* Background pattern */}
               <div className="absolute inset-0 opacity-20">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(255,255,255,0.3)_0%,_transparent_60%)]"></div>
               </div>
               {/* Citrus Slice Icon */}
-              <CitrusSlice className="w-7 h-7 relative z-10 text-citrus-cream group-hover:rotate-12 transition-transform duration-300" />
+              <CitrusSlice className="w-7 h-7 relative z-10 text-[#E8EED9] group-hover:rotate-12 transition-transform duration-300" />
             </div>
             <div className="flex flex-col">
               <div className="flex items-center gap-1.5">
-                <span className="font-varsity font-black text-lg uppercase text-citrus-forest group-hover:text-citrus-orange transition-colors duration-300 tracking-tight">
+                <span className="font-varsity font-black text-lg uppercase text-citrus-forest group-hover:text-citrus-sage transition-colors duration-300 tracking-tight">
                   Citrus
                 </span>
-                <CitrusSparkle className="w-3 h-3 text-citrus-orange opacity-60 group-hover:opacity-100 transition-opacity" />
+                <CitrusSparkle className="w-3 h-3 text-citrus-sage opacity-60 group-hover:opacity-100 transition-opacity" />
               </div>
               <span className="text-[10px] text-citrus-charcoal font-display tracking-widest uppercase">Fantasy League</span>
             </div>
@@ -139,20 +138,20 @@ const Navbar = () => {
                 <NavigationMenuList>
                   <NavigationMenuItem>
                     <NavigationMenuTrigger className={cn(
-                      "text-sm font-varsity font-bold text-citrus-forest uppercase tracking-wide hover:text-citrus-orange transition-colors",
-                      (isActive("/roster") || isActive("/gm-office")) && "text-citrus-orange"
+                      "text-sm font-varsity font-bold text-citrus-forest uppercase tracking-wide hover:text-citrus-sage transition-colors",
+                      (isActive("/roster") || isActive("/gm-office")) && "text-citrus-sage"
                     )}>My Team</NavigationMenuTrigger>
                     <NavigationMenuContent>
-                      <div className="w-[340px] p-3 grid gap-3 grid-cols-2 bg-citrus-cream corduroy-texture border-4 border-citrus-forest rounded-[1.5rem] shadow-[0_6px_0_rgba(27,48,34,0.25)]">
+                      <div className="w-[340px] p-3 grid gap-3 grid-cols-2 bg-[#E8EED9]/60 backdrop-blur-sm corduroy-texture border-4 border-citrus-forest rounded-[1.5rem] shadow-[0_6px_0_rgba(27,48,34,0.25)]">
                         <Link to="/roster" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-xl bg-gradient-to-br from-citrus-sage/20 to-citrus-sage/10 p-4 no-underline outline-none border-3 border-citrus-sage/40 hover:shadow-patch hover:-translate-y-1 transition-all duration-200">
                           <div className="mb-1 mt-2 text-base font-varsity font-black text-citrus-forest uppercase">Roster</div>
                           <p className="text-xs leading-tight font-display text-citrus-charcoal">Manage your team's lineup</p>
-                          <ChevronRight className="h-4 w-4 mt-2 text-citrus-orange" />
+                          <ChevronRight className="h-4 w-4 mt-2 text-citrus-sage" />
                         </Link>
                         <Link to="/gm-office" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-xl bg-gradient-to-br from-citrus-peach/20 to-citrus-orange/10 p-4 no-underline outline-none border-3 border-citrus-peach/40 hover:shadow-patch hover:-translate-y-1 transition-all duration-200">
                           <div className="mb-1 mt-2 text-base font-varsity font-black text-citrus-forest uppercase">GM's Office</div>
                           <p className="text-xs leading-tight font-display text-citrus-charcoal">Team operations center</p>
-                          <ChevronRight className="h-4 w-4 mt-2 text-citrus-orange" />
+                          <ChevronRight className="h-4 w-4 mt-2 text-citrus-sage" />
                         </Link>
                       </div>
                     </NavigationMenuContent>
@@ -160,12 +159,12 @@ const Navbar = () => {
                 
                 <NavigationMenuItem>
                   <NavigationMenuTrigger className={cn(
-                    "text-sm font-varsity font-bold text-citrus-forest uppercase tracking-wide hover:text-citrus-orange transition-colors",
-                    (isActive("/matchup") || isActive("/standings") || isActive("/free-agents") || isActive("/draft")) && "text-citrus-orange"
+                    "text-sm font-varsity font-bold text-citrus-forest uppercase tracking-wide hover:text-citrus-sage transition-colors",
+                    (isActive("/matchup") || isActive("/standings") || isActive("/free-agents") || isActive("/draft")) && "text-citrus-sage"
                   )}>League</NavigationMenuTrigger>
                   <NavigationMenuContent>
-                    <div className="w-[340px] p-3 grid gap-3 grid-cols-2 bg-citrus-cream corduroy-texture border-4 border-citrus-forest rounded-[1.5rem] shadow-[0_6px_0_rgba(27,48,34,0.25)]">
-                      <Link to="/matchup" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-xl bg-gradient-to-br from-citrus-orange/20 to-citrus-peach/10 p-4 no-underline outline-none border-3 border-citrus-orange/40 hover:shadow-patch hover:-translate-y-1 transition-all duration-200">
+                    <div className="w-[340px] p-3 grid gap-3 grid-cols-2 bg-[#E8EED9]/60 backdrop-blur-sm corduroy-texture border-4 border-citrus-forest rounded-[1.5rem] shadow-[0_6px_0_rgba(27,48,34,0.25)]">
+                      <Link to="/matchup" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-xl bg-gradient-to-br from-citrus-sage/20 to-citrus-green-light/10 p-4 no-underline outline-none border-3 border-citrus-sage/40 hover:shadow-patch hover:-translate-y-1 transition-all duration-200">
                         <div className="mb-1 mt-2 text-base font-varsity font-black text-citrus-forest uppercase">Matchup</div>
                         <p className="text-xs leading-tight font-display text-citrus-charcoal">Current matchups</p>
                         <ChevronRight className="h-4 w-4 mt-2 text-citrus-orange" />
@@ -191,12 +190,12 @@ const Navbar = () => {
                 
                 <NavigationMenuItem>
                   <NavigationMenuTrigger className={cn(
-                    "text-sm font-varsity font-bold text-citrus-forest uppercase tracking-wide hover:text-citrus-orange transition-colors",
-                    (isActive("/blog") || isActive("/podcasts") || isActive("/guides") || isActive("/news")) && "text-citrus-orange"
+                    "text-sm font-varsity font-bold text-citrus-forest uppercase tracking-wide hover:text-citrus-sage transition-colors",
+                    (isActive("/blog") || isActive("/podcasts") || isActive("/guides") || isActive("/news")) && "text-citrus-sage"
                   )}>Resources</NavigationMenuTrigger>
                   <NavigationMenuContent>
-                    <div className="w-[340px] p-3 grid gap-3 grid-cols-2 bg-citrus-cream corduroy-texture border-4 border-citrus-forest rounded-[1.5rem] shadow-[0_6px_0_rgba(27,48,34,0.25)]">
-                      <Link to="/news" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-xl bg-gradient-to-br from-citrus-orange/20 to-citrus-peach/10 p-4 no-underline outline-none border-3 border-citrus-orange/40 hover:shadow-patch hover:-translate-y-1 transition-all duration-200">
+                    <div className="w-[340px] p-3 grid gap-3 grid-cols-2 bg-[#E8EED9]/60 backdrop-blur-sm corduroy-texture border-4 border-citrus-forest rounded-[1.5rem] shadow-[0_6px_0_rgba(27,48,34,0.25)]">
+                      <Link to="/news" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-xl bg-gradient-to-br from-citrus-sage/20 to-citrus-green-light/10 p-4 no-underline outline-none border-3 border-citrus-sage/40 hover:shadow-patch hover:-translate-y-1 transition-all duration-200">
                         <div className="mb-1 mt-2 text-base font-varsity font-black text-citrus-forest uppercase">News</div>
                         <p className="text-xs leading-tight font-display text-citrus-charcoal">Latest fantasy updates</p>
                         <ChevronRight className="h-4 w-4 mt-2 text-citrus-orange" />
@@ -223,8 +222,8 @@ const Navbar = () => {
                 <NavigationMenuItem>
                   <NavigationMenuLink asChild>
                     <Link to="/contact" className={cn(
-                      "inline-flex items-center justify-center rounded-varsity h-9 px-4 py-1.5 text-sm font-varsity font-bold text-citrus-forest uppercase tracking-wide hover:text-citrus-cream hover:bg-citrus-orange border-2 border-transparent hover:border-citrus-forest transition-all",
-                      isActive("/contact") && "text-citrus-cream bg-citrus-orange border-citrus-forest"
+                      "inline-flex items-center justify-center rounded-varsity h-9 px-4 py-1.5 text-sm font-varsity font-bold text-citrus-forest uppercase tracking-wide hover:text-[#E8EED9] hover:bg-citrus-sage border-2 border-transparent hover:border-citrus-forest transition-all",
+                      isActive("/contact") && "text-[#E8EED9] bg-citrus-sage border-citrus-forest"
                     )}>
                       Contact
                     </Link>
@@ -240,7 +239,7 @@ const Navbar = () => {
               <>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="ghost" size="icon" className="text-citrus-forest hover:text-citrus-orange hover:bg-citrus-sage/10 h-9 w-9 rounded-lg border-2 border-transparent hover:border-citrus-sage/30 transition-all">
+                    <Button variant="ghost" size="icon" className="text-citrus-forest hover:text-citrus-sage hover:bg-citrus-sage/10 h-9 w-9 rounded-lg border-2 border-transparent hover:border-citrus-sage/30 transition-all">
                       <Search className="h-4 w-4" />
                     </Button>
                   </PopoverTrigger>
@@ -265,7 +264,7 @@ const Navbar = () => {
                 <Link to="/create-league?tab=join">
                   <Button 
                     variant="ghost" 
-                    className="text-citrus-forest hover:text-citrus-orange hover:bg-citrus-sage/10 h-9 px-3 rounded-lg border-2 border-transparent hover:border-citrus-sage/30 transition-all flex items-center gap-1.5"
+                    className="text-citrus-forest hover:text-citrus-sage hover:bg-citrus-sage/10 h-9 px-3 rounded-lg border-2 border-transparent hover:border-citrus-sage/30 transition-all flex items-center gap-1.5"
                   >
                     <UserPlus className="h-4 w-4" />
                     <span className="text-xs font-varsity font-bold uppercase hidden sm:inline">
@@ -275,12 +274,12 @@ const Navbar = () => {
                 </Link>
 
                 {/* LEAGUE SWITCHER - Multi-League Support (Yahoo/Sleeper style) */}
-                {userLeagues.length > 1 && (
+                {userLeagues.length > 0 && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button 
                         variant="ghost" 
-                        className="text-citrus-forest hover:text-citrus-orange hover:bg-citrus-sage/10 h-9 px-3 rounded-lg border-2 border-transparent hover:border-citrus-sage/30 transition-all flex items-center gap-1.5"
+                        className="text-citrus-forest hover:text-citrus-sage hover:bg-citrus-sage/10 h-9 px-3 rounded-lg border-2 border-transparent hover:border-citrus-sage/30 transition-all flex items-center gap-1.5"
                       >
                         <Trophy className="h-4 w-4" />
                         <span className="text-xs font-varsity font-bold uppercase max-w-[120px] truncate">
@@ -303,7 +302,7 @@ const Navbar = () => {
                           }}
                           className={cn(
                             "cursor-pointer",
-                            activeLeagueId === l.id && "bg-citrus-sage/10 text-citrus-orange font-semibold"
+                            activeLeagueId === l.id && "bg-citrus-sage/20 text-citrus-forest font-semibold"
                           )}
                         >
                           <Trophy className="h-4 w-4 mr-2" />
@@ -318,7 +317,7 @@ const Navbar = () => {
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         onClick={() => navigate('/create-league')}
-                        className="text-citrus-orange font-medium"
+                        className="text-citrus-sage font-medium"
                       >
                         <Trophy className="h-4 w-4 mr-2" />
                         Create/Join League
@@ -332,7 +331,7 @@ const Navbar = () => {
                     <Button 
                       variant="ghost" 
                       size="icon" 
-                      className="text-citrus-forest hover:text-citrus-orange hover:bg-citrus-sage/10 relative h-9 w-9 rounded-lg border-2 border-transparent hover:border-citrus-sage/30 transition-all"
+                      className="text-citrus-forest hover:text-citrus-sage hover:bg-citrus-sage/10 relative h-9 w-9 rounded-lg border-2 border-transparent hover:border-citrus-sage/30 transition-all"
                       onClick={() => {
                         // Navigate to matchup page with notifications panel visible
                         if (activeLeagueId) {
@@ -342,7 +341,7 @@ const Navbar = () => {
                     >
                       <Bell className="h-4 w-4" />
                       {unreadCount > 0 && (
-                        <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-citrus-orange border-2 border-citrus-cream text-[9px] font-varsity font-bold text-citrus-cream shadow-patch">
+                        <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-citrus-orange border-2 border-[#F2EDE1] text-[9px] font-varsity font-bold text-[#E8EED9] shadow-patch">
                           {unreadCount > 9 ? '9+' : unreadCount}
                         </span>
                       )}
@@ -436,7 +435,7 @@ const Navbar = () => {
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button className="bg-citrus-sage border-3 border-citrus-forest/20 rounded-xl flex gap-2 pl-2 pr-4 h-10 hover:shadow-patch hover:-translate-y-0.5 transition-all">
-                      <div className="h-6 w-6 rounded-full bg-citrus-orange border-2 border-citrus-charcoal/20 flex items-center justify-center text-citrus-cream text-xs font-varsity font-bold shadow-sm">
+                      <div className="h-6 w-6 rounded-full bg-citrus-orange border-2 border-citrus-charcoal/20 flex items-center justify-center text-[#E8EED9] text-xs font-varsity font-bold shadow-sm">
                         {userInitial}
                       </div>
                       <span className="text-xs font-display font-bold text-citrus-forest">{displayName}</span>

@@ -5,7 +5,6 @@ import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
-import { DemoDataService } from '@/services/DemoDataService';
 import { TeamCard } from "@/components/matchup/TeamCard";
 import { MatchupComparison } from "@/components/matchup/MatchupComparison";
 import { MatchupScheduleSelector } from "@/components/matchup/MatchupScheduleSelector";
@@ -170,9 +169,13 @@ const Matchup = () => {
     const runBackfillAndCalculate = async () => {
       log(' Starting data integrity check for matchup:', currentMatchup.id);
       
+      // Skip backfill for demo league - guests can't write, and data should already exist from migration
+      const isDemoLeague = currentMatchup.league_id === DEMO_LEAGUE_ID_FOR_GUESTS;
+      
       // Step 1: Backfill missing daily roster records for both teams
       // This ensures fantasy_daily_rosters has complete data
-      if (currentMatchup.team1_id) {
+      // SKIP for demo league - guests can't write
+      if (!isDemoLeague && currentMatchup.team1_id) {
         try {
           log(' Running backfill for team1:', currentMatchup.team1_id);
           const result = await LeagueService.backfillMissingDailyRosters(
@@ -193,7 +196,7 @@ const Matchup = () => {
         }
       }
       
-      if (currentMatchup.team2_id) {
+      if (!isDemoLeague && currentMatchup.team2_id) {
         try {
           log(' Running backfill for team2:', currentMatchup.team2_id);
           const result = await LeagueService.backfillMissingDailyRosters(
@@ -527,9 +530,34 @@ const Matchup = () => {
         
         if (matchupsError) throw matchupsError;
         
-        const weekMatchups = weekMatchupsData as any[];
+        let weekMatchups = weekMatchupsData as any[];
+        
+        // If no matchups found for calculated week, try to find ANY matchup
         if (!weekMatchups || weekMatchups.length === 0) {
-          throw new Error(`No matchups found for week ${weekToShow}`);
+          log(' No matchups found for week', weekToShow, '- trying to find any matchup in demo league');
+          
+          // Get ANY matchup from the demo league (fallback)
+          const { data: anyMatchupsData, error: anyMatchupsError } = await supabase
+            .from('matchups')
+            .select(COLUMNS.MATCHUP)
+            .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
+            .order('week_number', { ascending: true })
+            .limit(1);
+          
+          if (anyMatchupsError) {
+            log(' Error fetching any matchups:', anyMatchupsError);
+            throw new Error(`Failed to load matchups: ${anyMatchupsError.message}`);
+          }
+          
+          if (anyMatchupsData && anyMatchupsData.length > 0) {
+            // Use the first available matchup and update weekToShow
+            weekMatchups = anyMatchupsData;
+            weekToShow = anyMatchupsData[0].week_number;
+            setSelectedWeek(weekToShow);
+            log(' Using fallback matchup from week', weekToShow);
+          } else {
+            throw new Error(`No matchups found in demo league. Please verify the migration ran successfully.`);
+          }
         }
         
         // Use the first matchup (guests see the first matchup in the league)
@@ -614,9 +642,41 @@ const Matchup = () => {
         const allPlayers = await PlayerService.getAllPlayers();
         
         const { team1Roster, team2Roster, team1SlotAssignments, team2SlotAssignments, error: rosterError } = 
-          await MatchupService.getMatchupRosters(guestMatchup as MatchupType, allPlayers, 'America/Denver');
+          await MatchupService.getMatchupRosters(guestMatchup as MatchupType, allPlayers, 'America/Denver', undefined);
         
         if (rosterError) throw rosterError;
+        
+        // Debug: Verify isStarter flags and slot assignments before setting state
+        const team1StartersCount = team1Roster.filter(p => p.isStarter).length;
+        const team2StartersCount = (team2Roster || []).filter(p => p.isStarter).length;
+        const team1SlotKeys = Object.keys(team1SlotAssignments);
+        const team1RosterIds = team1Roster.map(p => String(p.id));
+        const slotMatches = team1SlotKeys.filter(key => team1RosterIds.includes(key));
+        
+        log(' Setting demo teams with isStarter flags:', {
+          team1Total: team1Roster.length,
+          team1Starters: team1StartersCount,
+          team1Bench: team1Roster.length - team1StartersCount,
+          team2Total: (team2Roster || []).length,
+          team2Starters: team2StartersCount,
+          team2Bench: (team2Roster || []).length - team2StartersCount,
+          slotAssignmentsCount: team1SlotKeys.length,
+          slotMatchesCount: slotMatches.length,
+          sampleSlotKeys: team1SlotKeys.slice(0, 5),
+          sampleRosterIds: team1RosterIds.slice(0, 5),
+          sampleTeam1Starters: team1Roster.filter(p => p.isStarter).slice(0, 3).map(p => ({ 
+            name: p.name, 
+            id: p.id, 
+            idString: String(p.id),
+            isStarter: p.isStarter,
+            hasSlot: team1SlotKeys.includes(String(p.id))
+          })),
+          sampleTeam1Bench: team1Roster.filter(p => !p.isStarter).slice(0, 3).map(p => ({ 
+            name: p.name, 
+            id: p.id, 
+            isStarter: p.isStarter 
+          }))
+        });
         
         // Set demo state (but using real data)
         setDemoMyTeam(team1Roster);
@@ -790,7 +850,7 @@ const Matchup = () => {
         // Get all week matchups for dropdown (same week as selected)
         const { data: allMatchups } = await supabase
           .from('matchups')
-          .select('*, teams!matchups_team1_id_fkey(team_name), teams!matchups_team2_id_fkey(team_name)')
+          .select(COLUMNS.MATCHUP)
           .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
           .eq('week_number' as any, weekToShow as any)
           .order('created_at', { ascending: true });
@@ -4622,7 +4682,7 @@ const Matchup = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden w-full">
+    <div className="min-h-screen bg-[#D4E8B8] relative overflow-hidden w-full">
       {/* Citrus Background - Floating citrus elements */}
       <CitrusBackground density="light" animated={true} />
       
@@ -4634,7 +4694,7 @@ const Matchup = () => {
       <main className="w-full pt-28 pb-16 m-0 p-0">
         <div className="w-full m-0 p-0">
           {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
-          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] gap-6 lg:gap-8">
+          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             {/* Main Content - Scrollable - Full Width - Appears first on mobile */}
             <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-4 order-1 lg:order-2">
               {/* Header Section - Clean and Professional with Citrus Colors */}

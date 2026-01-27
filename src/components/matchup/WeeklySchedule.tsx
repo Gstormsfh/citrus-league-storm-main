@@ -138,7 +138,7 @@ export const WeeklySchedule = ({
             onClick={() => onDayClick(null)}
             className="px-3 py-1.5 text-xs font-varsity font-bold uppercase rounded-xl 
               bg-citrus-sage/20 hover:bg-citrus-sage 
-              text-citrus-forest border-2 border-citrus-sage hover:text-citrus-cream
+              text-citrus-forest border-2 border-citrus-sage hover:text-[#E8EED9]
               transition-all flex items-center gap-1 shadow-sm hover:shadow-patch hover:-translate-y-0.5"
           >
             <span>←</span>
@@ -161,7 +161,7 @@ export const WeeklySchedule = ({
             <Card
               key={date}
               className={cn(
-                "cursor-pointer transition-all hover:shadow-patch hover:-translate-y-1 border-3 rounded-xl overflow-hidden bg-citrus-cream",
+                "cursor-pointer transition-all hover:shadow-patch hover:-translate-y-1 border-3 rounded-xl overflow-hidden bg-[#E8EED9]/50 backdrop-blur-sm",
                 isSelectedDate && "ring-4 ring-citrus-sage shadow-varsity border-citrus-sage",
                 isTodayDate && !isSelectedDate && "ring-3 ring-citrus-orange border-citrus-orange",
                 !isSelectedDate && !isTodayDate && "border-citrus-sage/40",
@@ -192,7 +192,7 @@ export const WeeklySchedule = ({
 
                   {/* Status Indicator - Minimal */}
                   {isTodayDate && !isPastDate && (
-                    <Badge variant="default" className="text-[8px] py-0.5 px-1.5 h-4 bg-citrus-orange border-2 border-citrus-forest text-citrus-cream leading-none font-varsity font-bold shadow-sm">
+                    <Badge variant="default" className="text-[8px] py-0.5 px-1.5 h-4 bg-citrus-orange border-2 border-citrus-forest text-[#E8EED9] leading-none font-varsity font-bold shadow-sm">
                       Today
                     </Badge>
                   )}

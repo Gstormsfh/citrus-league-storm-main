@@ -84,7 +84,7 @@ export const StatsOverviewCards = () => {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-      <Card className="relative overflow-hidden bg-citrus-cream corduroy-texture border-4 border-citrus-sage rounded-varsity shadow-[0_6px_0_rgba(27,48,34,0.2)] hover:-translate-y-1 transition-all">
+      <Card className="relative overflow-hidden bg-[#E8EED9]/50 backdrop-blur-sm corduroy-texture border-4 border-citrus-sage rounded-varsity shadow-[0_6px_0_rgba(27,48,34,0.2)] hover:-translate-y-1 transition-all">
         <div className="absolute inset-0 bg-gradient-to-br from-citrus-sage/10 to-transparent"></div>
         <CitrusBurst className="absolute top-2 right-2 w-16 h-16 text-citrus-sage/10" />
         <CardContent className="p-6 relative z-10">
@@ -101,7 +101,7 @@ export const StatsOverviewCards = () => {
         </CardContent>
       </Card>
 
-      <Card className="relative overflow-hidden bg-citrus-cream corduroy-texture border-4 border-citrus-orange rounded-varsity shadow-[0_6px_0_rgba(27,48,34,0.2)] hover:-translate-y-1 transition-all">
+      <Card className="relative overflow-hidden bg-[#E8EED9]/50 backdrop-blur-sm corduroy-texture border-4 border-citrus-orange rounded-varsity shadow-[0_6px_0_rgba(27,48,34,0.2)] hover:-translate-y-1 transition-all">
         <div className="absolute inset-0 bg-gradient-to-br from-citrus-orange/10 to-transparent"></div>
         <CitrusSparkle className="absolute top-2 right-2 w-16 h-16 text-citrus-orange/10" />
         <CardContent className="p-6 relative z-10">
@@ -120,7 +120,7 @@ export const StatsOverviewCards = () => {
         </CardContent>
       </Card>
 
-      <Card className="relative overflow-hidden bg-citrus-cream corduroy-texture border-4 border-citrus-peach rounded-varsity shadow-[0_6px_0_rgba(27,48,34,0.2)] hover:-translate-y-1 transition-all">
+      <Card className="relative overflow-hidden bg-[#E8EED9]/50 backdrop-blur-sm corduroy-texture border-4 border-citrus-peach rounded-varsity shadow-[0_6px_0_rgba(27,48,34,0.2)] hover:-translate-y-1 transition-all">
         <div className="absolute inset-0 bg-gradient-to-br from-citrus-peach/10 to-transparent"></div>
         <CitrusLeaf className="absolute top-2 right-2 w-16 h-16 text-citrus-peach/10 rotate-45" />
         <CardContent className="p-6 relative z-10">

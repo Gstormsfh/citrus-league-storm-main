@@ -5,7 +5,6 @@ import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
-import { DemoDataService } from '@/services/DemoDataService';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -62,24 +61,108 @@ const Standings = () => {
       setLoading(true);
       
       try {
-        // State 1: Guest - show demo data
-        // State 2: Logged in, no league - show demo data (will show CTAs in UI)
+        // State 1: Guest - show REAL demo league data from database
+        // State 2: Logged in, no league - show REAL demo league data (will show CTAs in UI)
         if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
-          const demoTeams = DemoDataService.getDemoTeams();
-          const standingsTeams: StandingsTeam[] = demoTeams.map(t => ({
-            id: String(t.id),
-            name: t.name,
-            owner: t.owner,
-            logo: t.logo,
-            record: t.record,
-            points: t.points,
-            pointsFor: t.points, // Using points as pointsFor for demo
-            pointsAgainst: Math.floor(t.points * 0.85), // Demo calculation
-            streak: t.streak,
-            winPercentage: 0,
-            last5: { wins: 0, losses: 0 },
-          }));
+          console.log('[Standings] Loading REAL demo league for guest/no-league user');
+          
+          // Import DEMO_LEAGUE_ID_FOR_GUESTS
+          const { DEMO_LEAGUE_ID_FOR_GUESTS } = await import('@/services/DemoLeagueService');
+          const { COLUMNS } = await import('@/utils/queryColumns');
+          
+          // Get the demo league from database
+          const { data: demoLeagueData, error: leagueError } = await supabase
+            .from('leagues')
+            .select(COLUMNS.LEAGUE)
+            .eq('id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
+            .maybeSingle();
+          
+          if (leagueError || !demoLeagueData) {
+            console.error('[Standings] Error loading demo league:', leagueError);
+            // Fallback to empty teams
+            setTeams([]);
+            setLoading(false);
+            return;
+          }
+          
+          const demoLeague = demoLeagueData as League;
+          console.log('[Standings] Demo league loaded:', demoLeague.id);
+          
+          // Get teams from the demo league
+          const { data: demoTeamsData, error: teamsError } = await supabase
+            .from('teams')
+            .select(COLUMNS.TEAM)
+            .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
+            .order('created_at', { ascending: true });
+          
+          if (teamsError || !demoTeamsData || demoTeamsData.length === 0) {
+            console.error('[Standings] Error loading demo teams:', teamsError);
+            setTeams([]);
+            setLoading(false);
+            return;
+          }
+          
+          const demoTeamsFromDb = demoTeamsData as any[];
+          console.log('[Standings] Loaded', demoTeamsFromDb.length, 'demo teams');
+          
+          // Get draft picks for calculating team stats
+          const { data: draftPicksData } = await supabase
+            .from('draft_picks')
+            .select('*')
+            .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
+            .is('deleted_at', null);
+          
+          const draftPicks = (draftPicksData || []) as any[];
+          
+          // Get all players
+          const allPlayers = await PlayerService.getAllPlayers();
+          
+          // Calculate team standings from real data
+          const teamStats = await LeagueService.calculateTeamStandings(
+            DEMO_LEAGUE_ID_FOR_GUESTS,
+            demoTeamsFromDb,
+            draftPicks,
+            allPlayers
+          );
+          
+          // Get owner names from LEAGUE_TEAMS_DATA
+          const { LEAGUE_TEAMS_DATA } = await import('@/services/LeagueService');
+          
+          // Convert to standings format with real calculated stats
+          const standingsTeams: StandingsTeam[] = demoTeamsFromDb.map((team, index) => {
+            const stats = teamStats[team.id] || { 
+              pointsFor: 0, 
+              pointsAgainst: 0, 
+              wins: 0, 
+              losses: 0,
+              streak: '-',
+              last5: { wins: 0, losses: 0 }
+            };
+            
+            const teamData = LEAGUE_TEAMS_DATA[index];
+            
+            const totalGames = (stats.wins || 0) + (stats.losses || 0);
+            const winPercentage = totalGames > 0 
+              ? ((stats.wins || 0) / totalGames) * 100 
+              : 0;
+            
+            return {
+              id: team.id,
+              name: team.team_name,
+              owner: teamData?.owner || 'Demo Owner',
+              logo: team.team_name.substring(0, 2).toUpperCase(),
+              record: { wins: stats.wins, losses: stats.losses },
+              points: stats.pointsFor,
+              pointsFor: parseFloat((stats.pointsFor || 0).toFixed(1)),
+              pointsAgainst: parseFloat((stats.pointsAgainst || 0).toFixed(1)),
+              streak: stats.streak || '-',
+              winPercentage: winPercentage !== undefined && !isNaN(winPercentage) ? parseFloat(winPercentage.toFixed(1)) : 0,
+              last5: stats.last5 || { wins: 0, losses: 0 },
+            };
+          });
+          
           setTeams(standingsTeams);
+          console.log('[Standings] Demo standings loaded with', standingsTeams.length, 'teams');
           setLoading(false);
           return;
         }
@@ -319,7 +402,7 @@ const Standings = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden" style={{ visibility: 'visible', opacity: 1 }}>
+    <div className="min-h-screen bg-[#D4E8B8] relative overflow-hidden" style={{ visibility: 'visible', opacity: 1 }}>
       {/* Citrus Background - Floating citrus elements */}
       <CitrusBackground density="light" animated={true} />
       
@@ -331,7 +414,7 @@ const Standings = () => {
       <main className="w-full pt-28 pb-16 m-0 p-0" style={{ visibility: 'visible', opacity: 1, zIndex: 1 }}>
         <div className="w-full m-0 p-0" style={{ visibility: 'visible', opacity: 1 }}>
           {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
-          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px]">
+          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             {/* Main Content - Scrollable - Appears first on mobile */}
             <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
               <div className="max-w-3xl mx-auto text-center mb-10 animated-element animate relative" style={{ visibility: 'visible', opacity: 1 }}>
@@ -529,7 +612,7 @@ const Standings = () => {
                         </div>
                         <div className="font-semibold text-sm">{team.name}</div>
                       </div>
-                      <div className="text-xs font-bold bg-white px-2 py-1 rounded-md shadow-sm border border-border/20">
+                      <div className="text-xs font-bold bg-[#E8EED9]/60 backdrop-blur-sm px-2 py-1 rounded-md shadow-sm border border-citrus-sage/20">
                         {team.record.wins}-{team.record.losses}
                       </div>
                     </div>

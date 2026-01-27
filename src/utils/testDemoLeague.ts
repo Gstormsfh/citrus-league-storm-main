@@ -5,9 +5,10 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { DEMO_LEAGUE_ID } from '@/services/DemoLeagueService';
+import { logger } from '@/utils/logger';
 
 export const testDemoLeague = async () => {
-  console.log('=== Testing Demo League ===');
+  logger.debug('=== Testing Demo League ===');
   
   // Check if league exists
   const { data: league, error: leagueError } = await supabase
@@ -16,7 +17,7 @@ export const testDemoLeague = async () => {
     .eq('id', DEMO_LEAGUE_ID)
     .single();
   
-  console.log('League:', league ? 'EXISTS' : 'NOT FOUND', leagueError);
+  logger.debug('League:', league ? 'EXISTS' : 'NOT FOUND', leagueError);
   
   // Check teams
   const { data: teams, error: teamsError } = await supabase
@@ -24,9 +25,9 @@ export const testDemoLeague = async () => {
     .select('id, team_name')
     .eq('league_id', DEMO_LEAGUE_ID);
   
-  console.log(`Teams: ${teams?.length || 0} found`, teamsError);
+  logger.debug(`Teams: ${teams?.length || 0} found`, teamsError);
   if (teams && teams.length > 0) {
-    console.log('Team IDs:', teams.map(t => t.id));
+    logger.debug('Team IDs:', teams.map(t => t.id));
   }
   
   // Check draft picks
@@ -37,9 +38,9 @@ export const testDemoLeague = async () => {
     .is('deleted_at', null)
     .limit(10);
   
-  console.log(`Draft Picks: ${picks?.length || 0} found (showing first 10)`, picksError);
+  logger.debug(`Draft Picks: ${picks?.length || 0} found (showing first 10)`, picksError);
   if (picks && picks.length > 0) {
-    console.log('Sample picks:', picks.slice(0, 3));
+    logger.debug('Sample picks:', picks.slice(0, 3));
   }
   
   // Check lineups
@@ -49,14 +50,14 @@ export const testDemoLeague = async () => {
     .eq('league_id', DEMO_LEAGUE_ID)
     .limit(5);
   
-  console.log(`Lineups: ${lineups?.length || 0} found`, lineupsError);
+  logger.debug(`Lineups: ${lineups?.length || 0} found`, lineupsError);
   
   return { league, teams, picks: picks?.length || 0, lineups: lineups?.length || 0 };
 };
 
-// Expose globally
-if (typeof window !== 'undefined') {
+// Expose globally (only in dev mode)
+if (typeof window !== 'undefined' && import.meta.env.DEV) {
   (window as any).testDemoLeague = testDemoLeague;
-  console.log('Test function available: window.testDemoLeague()');
+  console.debug('Test function available: window.testDemoLeague()');
 }
 
