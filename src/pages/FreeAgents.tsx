@@ -864,7 +864,10 @@ const FreeAgents = () => {
 
   // Sort schedule maximizers (includes gamesThisWeek field)
   const sortScheduleMaximizers = (maximizers: Array<Player & { gamesThisWeek: number; gameDays: string[]; games?: NHLGame[] }>) => {
-    if (!sortColumn) return maximizers;
+    // Default sort: most games remaining (descending)
+    if (!sortColumn) {
+      return [...maximizers].sort((a, b) => (b.gamesThisWeek || 0) - (a.gamesThisWeek || 0));
+    }
 
     const sorted = [...maximizers].sort((a, b) => {
       let aValue: string | number;
@@ -1193,9 +1196,7 @@ const FreeAgents = () => {
                               <div className="flex items-center gap-3">
                                 <div className="text-right">
                                   <div className="font-bold text-blue-600">
-                                    {(player as any).weeklyProjection > 0 
-                                      ? (player as any).weeklyProjection.toFixed(1) 
-                                      : ((player.points || 0) / 10).toFixed(1)}
+                                    {((player as any).weeklyProjection || 0).toFixed(1)}
                                   </div>
                                   <div className="text-[10px] text-muted-foreground">Proj</div>
                                 </div>
@@ -1234,9 +1235,7 @@ const FreeAgents = () => {
                                 </TableCell>
                                 <TableCell className="text-right">{formatPositionForDisplay(player.position)}</TableCell>
                                 <TableCell className="text-right font-bold text-blue-600">
-                                  {(player as any).weeklyProjection > 0 
-                                    ? (player as any).weeklyProjection.toFixed(1) 
-                                    : ((player.points || 0) / 10).toFixed(1)}
+                                  {((player as any).weeklyProjection || 0).toFixed(1)}
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex gap-1">
