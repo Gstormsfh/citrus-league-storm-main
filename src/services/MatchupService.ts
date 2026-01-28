@@ -1659,7 +1659,7 @@ export const MatchupService = {
           xGoals: matchupStats.xGoals || 0
         }) : undefined;
         
-        // Skater projection
+        // Skater projection - INCLUDE ALL 8 STATS
         if (dailyProjection && !dailyProjection.is_goalie) {
           basePlayer.daily_projection = {
             total_projected_points: Number(dailyProjection.total_projected_points || 0),
@@ -1667,6 +1667,11 @@ export const MatchupService = {
             projected_assists: Number(dailyProjection.projected_assists || 0),
             projected_sog: Number(dailyProjection.projected_sog || 0),
             projected_blocks: Number(dailyProjection.projected_blocks || 0),
+            // ALL 8 STATS - Critical for transparency
+            projected_ppp: Number(dailyProjection.projected_ppp || 0),
+            projected_shp: Number(dailyProjection.projected_shp || 0),
+            projected_hits: Number(dailyProjection.projected_hits || 0),
+            projected_pim: Number(dailyProjection.projected_pim || 0),
             projected_xg: Number(dailyProjection.projected_xg || 0),
             base_ppg: Number(dailyProjection.base_ppg || 0),
             shrinkage_weight: Number(dailyProjection.shrinkage_weight || 0),

@@ -318,14 +318,18 @@ const FreeAgents = () => {
         weeklyProjectionMap.set(player.id, 0);
       });
 
-      // Fetch projections for each day
+      // Debug logging
+      const debugLog = (window as any).__originalConsole?.log || console.log;
+      debugLog(`[FreeAgents Projections] Fetching for ${weekDays.length} days: ${weekDays[0]} to ${weekDays[weekDays.length - 1]}`);
+      debugLog(`[FreeAgents Projections] Player count: ${playerIds.length}`);
+      
+      // Fetch projections for each day and aggregate ALL 8 STATS
       for (const date of weekDays) {
         try {
           const dailyProjections = await MatchupService.getDailyProjectionsForMatchup(playerIds, date);
+          debugLog(`[FreeAgents Projections] ${date}: Got ${dailyProjections.size} projections`);
           
-          // Sum up projections for each player
-          // Note: If a player has multiple games on the same day, the Map will only have one entry per player
-          // But that's fine - we're summing across all days of the week
+          // Sum up ALL STATS for each player (full transparency)
           dailyProjections.forEach((projection, playerId) => {
             // Find player by numeric ID
             const player = topPlayers.find(p => {
@@ -336,29 +340,41 @@ const FreeAgents = () => {
             if (player) {
               const currentTotal = weeklyProjectionMap.get(player.id) || 0;
               const dailyPoints = Number(projection.total_projected_points || 0);
-              weeklyProjectionMap.set(player.id, currentTotal + dailyPoints);
+              const newTotal = currentTotal + dailyPoints;
+              weeklyProjectionMap.set(player.id, newTotal);
+              
+              // Debug first few to verify aggregation
+              if (weeklyProjectionMap.size <= 3) {
+                debugLog(`  Player ${player.full_name}: ${currentTotal.toFixed(1)} + ${dailyPoints.toFixed(1)} = ${newTotal.toFixed(1)}`);
+              }
             }
           });
         } catch (error) {
-          // If one day fails, continue with other days
-          console.warn(`Error fetching projections for ${date}:`, error);
+          debugLog(`[FreeAgents Projections] Error for ${date}:`, error);
         }
       }
 
       setWeeklyProjections(weeklyProjectionMap);
       
-      // Debug: Log projection summary by position
+      // Debug: Log final aggregated projections
+      const debugLog = (window as any).__originalConsole?.log || console.log;
+      const topProjectionPlayers = Array.from(weeklyProjectionMap.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([id, total]) => {
+          const player = topPlayers.find(p => p.id === id);
+          return { name: player?.full_name, total: total.toFixed(1) };
+        });
+      debugLog('[FreeAgents Projections] Top 10 aggregated weekly projections:', topProjectionPlayers);
+      
       const goalieProjections = topPlayers
         .filter(p => p.position === 'G')
+        .slice(0, 5)
         .map(p => ({
           name: p.full_name,
-          position: p.position,
-          weeklyProj: weeklyProjectionMap.get(p.id) || 0
+          weeklyProj: (weeklyProjectionMap.get(p.id) || 0).toFixed(1)
         }));
-      
-      if (goalieProjections.length > 0) {
-        console.log('[FreeAgents] Goalie projections fetched:', goalieProjections);
-      }
+      debugLog('[FreeAgents Projections] Top 5 goalie projections:', goalieProjections);
     } catch (error) {
       console.error('Error fetching weekly projections:', error);
       // On error, set empty map (will fall back to mock projection)
@@ -372,10 +388,9 @@ const FreeAgents = () => {
       setLoadingMaximizers(true);
       const maximizers: Array<Player & { gamesThisWeek: number; gameDays: string[]; games?: NHLGame[] }> = [];
       
-      // Limit to top 200 players by points to reduce query load
+      // Show all free agents (no artificial limit)
       const topPlayers = [...freeAgents]
-        .sort((a, b) => (b.points || 0) - (a.points || 0))
-        .slice(0, 200);
+        .sort((a, b) => (b.points || 0) - (a.points || 0));
       
       // Get unique teams to batch queries
       const uniqueTeams = [...new Set(topPlayers.map(p => p.team))];
@@ -496,28 +511,33 @@ const FreeAgents = () => {
       for (const player of topPlayers) {
         const allGames = teamGamesMap.get(player.team) || [];
         
-        // Filter games to only include those within the matchup week
+        // Filter games to only include those within the matchup week (same as Matchup tab)
         const games = allGames.filter(game => {
           if (!game.game_date) return false;
           const gameDateStr = game.game_date.split('T')[0];
-          const isInRange = gameDateStr >= weekStartStr && gameDateStr <= weekEndStr;
-          
-          // Log first player's filtering for debugging
-          if (player === topPlayers[0]) {
-            const log = (window as any).__originalConsole?.log || console.log;
-            log(`[FreeAgents Schedule] Filtering ${player.name} (${player.team}) games:`, {
-              gameDateStr,
-              weekStartStr,
-              weekEndStr,
-              isInRange,
-              comparison: `${gameDateStr} >= ${weekStartStr} && ${gameDateStr} <= ${weekEndStr}`
-            });
-          }
-          
-          return isInRange;
+          return gameDateStr >= weekStartStr && gameDateStr <= weekEndStr;
         });
         
-        const count = games.length;
+        // Calculate games REMAINING (not started yet) - EXACT SAME LOGIC AS MATCHUP TAB
+        // gameDate >= today && (status === 'scheduled' || status === 'live')
+        const todayStr = today.toISOString().split('T')[0];
+        const gamesRemaining = games.filter(g => {
+          if (!g.game_date) return false;
+          const gameDateStr = g.game_date.split('T')[0];
+          return gameDateStr >= todayStr && (g.status === 'scheduled' || g.status === 'live');
+        }).length;
+        
+        // Log first few players for debugging
+        if (maximizers.length < 3) {
+          log(`[FreeAgents Schedule] ${player.name} (${player.team}): ${gamesRemaining} games remaining, ${games.length} total in week`);
+          games.forEach(g => {
+            const gameDateStr = g.game_date.split('T')[0];
+            const isRemaining = gameDateStr >= todayStr && (g.status === 'scheduled' || g.status === 'live');
+            log(`    ${gameDateStr} vs ${g.home_team}/${g.away_team} - ${g.status} - ${isRemaining ? 'REMAINING' : 'past/final'}`);
+          });
+        }
+        
+        const count = gamesRemaining; // Use REMAINING games, not total
         
         // Log first few players for debugging
         if (maximizers.length < 3) {

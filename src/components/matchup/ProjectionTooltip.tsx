@@ -14,32 +14,19 @@ interface ProjectionTooltipProps {
 export const ProjectionTooltip = ({ projection }: ProjectionTooltipProps) => {
   if (!projection) return null;
 
-  // Collect all stats into an array
+  // ALWAYS show ALL 8 STATS for full transparency (even if 0)
   const stats = [
-    { label: 'GOALS', value: projection.projected_goals.toFixed(2) },
-    { label: 'ASSISTS', value: projection.projected_assists.toFixed(2) },
-    { label: 'SOG', value: projection.projected_sog.toFixed(2) },
-    { label: 'BLOCKS', value: projection.projected_blocks.toFixed(2) },
+    { label: 'GOALS', value: (projection.projected_goals || 0).toFixed(2) },
+    { label: 'ASSISTS', value: (projection.projected_assists || 0).toFixed(2) },
+    { label: 'SOG', value: (projection.projected_sog || 0).toFixed(2) },
+    { label: 'BLOCKS', value: (projection.projected_blocks || 0).toFixed(2) },
+    { label: 'PPP', value: (projection.projected_ppp || 0).toFixed(2) },
+    { label: 'SHP', value: (projection.projected_shp || 0).toFixed(2) },
+    { label: 'HITS', value: (projection.projected_hits || 0).toFixed(2) },
+    { label: 'PIM', value: (projection.projected_pim || 0).toFixed(2) },
   ];
 
-  // Add optional stats if they exist
-  if (projection.projected_ppp !== undefined && projection.projected_ppp > 0) {
-    stats.push({ label: 'PPP', value: projection.projected_ppp.toFixed(2) });
-  }
-  if (projection.projected_shp !== undefined && projection.projected_shp > 0) {
-    stats.push({ label: 'SHP', value: projection.projected_shp.toFixed(2) });
-  }
-  if (projection.projected_hits !== undefined && projection.projected_hits > 0) {
-    stats.push({ label: 'HITS', value: projection.projected_hits.toFixed(2) });
-  }
-  if (projection.projected_pim !== undefined && projection.projected_pim > 0) {
-    stats.push({ label: 'PIM', value: projection.projected_pim.toFixed(2) });
-  }
-
-  // Split into two columns
-  const midPoint = Math.ceil(stats.length / 2);
-  const leftColumn = stats.slice(0, midPoint);
-  const rightColumn = stats.slice(midPoint);
+  // 8 stats = 4 per column for perfect grid
 
   return (
     <Tooltip>
