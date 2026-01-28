@@ -487,8 +487,7 @@ const FreeAgents = () => {
       const weekStartStr = weekStart.toISOString().split('T')[0];
       const weekEndStr = weekEnd.toISOString().split('T')[0];
       
-      // Use original console for debugging (bypasses silencing)
-      const log = (window as any).__originalConsole?.log || console.log;
+      // Use log from above (already declared)
       log(`[FreeAgents Schedule] ==========================================`);
       log(`[FreeAgents Schedule] Week range: ${weekStartStr} to ${weekEndStr}`);
       log(`[FreeAgents Schedule] Today: ${today.toISOString().split('T')[0]}`);
