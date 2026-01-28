@@ -246,71 +246,18 @@ const FreeAgents = () => {
       const todayMSTStr = getTodayMST(); // Returns 'YYYY-MM-DD' in MST
       const today = new Date(todayMSTStr + 'T00:00:00');
       today.setHours(0, 0, 0, 0);
+      
       let weekStart: Date | null = null;
       let weekEnd: Date | null = null;
       
-      // Try to get matchup week from league data (for both logged-in users and guests viewing demo)
       const effectiveLeagueId = leagueId || '750f4e1a-92ae-44cf-a798-2f3e06d0d5c9'; // Demo league ID for guests
+      const isDemo = !leagueId || effectiveLeagueId === '750f4e1a-92ae-44cf-a798-2f3e06d0d5c9';
       const debugLog = (window as any).__originalConsole?.log || console.log;
+      const formatDateLocalHelper = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       
-      // EXACT SAME LOGIC AS MATCHUP TAB - Fetch matchup directly from database first
-      try {
-        const { data: matchups, error: matchupError } = await supabase
-          .from('matchups')
-          .select('week_start_date, week_end_date')
-          .eq('league_id', effectiveLeagueId)
-          .eq('status', 'in_progress')
-          .limit(1);
-        
-        if (!matchupError && matchups && matchups.length > 0) {
-          const matchup = matchups[0];
-          weekStart = new Date(matchup.week_start_date + 'T00:00:00');
-          weekStart.setHours(0, 0, 0, 0);
-          weekEnd = new Date(matchup.week_end_date + 'T23:59:59');
-          weekEnd.setHours(23, 59, 59, 999);
-          // Use local date format to avoid timezone issues
-          const formatDateLocal = (d: Date) => {
-            const year = d.getFullYear();
-            const month = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-          };
-          debugLog(`[FreeAgents Projections] Using matchup week from database: ${formatDateLocal(weekStart)} to ${formatDateLocal(weekEnd)}`);
-        } else {
-          debugLog('[FreeAgents Projections] No in_progress matchup found, will calculate from league');
-        }
-      } catch (error) {
-        debugLog('[FreeAgents Projections] Error fetching matchup:', error);
-      }
-      
-      // If no matchup found, calculate from league draft completion date
-      if (!weekStart || !weekEnd) {
-        try {
-          const { league: leagueData, error: leagueError } = await LeagueService.getLeague(effectiveLeagueId, user?.id);
-          if (!leagueError && leagueData && leagueData.draft_status === 'completed') {
-            const draftCompletionDate = getDraftCompletionDate(leagueData);
-            if (draftCompletionDate) {
-              const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
-              const currentWeek = getCurrentWeekNumber(firstWeekStart);
-              weekStart = getWeekStartDate(currentWeek, firstWeekStart);
-              weekEnd = getWeekEndDate(currentWeek, firstWeekStart);
-              // Use local date format to avoid timezone issues
-              const formatDateLocal = (d: Date) => {
-                const year = d.getFullYear();
-                const month = String(d.getMonth() + 1).padStart(2, '0');
-                const day = String(d.getDate()).padStart(2, '0');
-                return `${year}-${month}-${day}`;
-              };
-              debugLog(`[FreeAgents Projections] Calculated week from league: ${formatDateLocal(weekStart)} to ${formatDateLocal(weekEnd)}`);
-            }
-          }
-        } catch (error) {
-          debugLog('[FreeAgents Projections] Could not fetch league data, will fall back to calendar week:', error);
-        }
-      }
-      
-      // FALLBACK: If still no week dates, use current calendar week (Monday-Sunday)
-      if (!weekStart || !weekEnd) {
+      // CRITICAL FIX: For DEMO mode, ALWAYS use current calendar week (Monday-Sunday)
+      // The demo league's DB dates are stale and don't represent the actual current week.
+      if (isDemo) {
         const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
         const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
         
@@ -322,7 +269,65 @@ const FreeAgents = () => {
         weekEnd.setDate(weekStart.getDate() + 6);
         weekEnd.setHours(23, 59, 59, 999);
         
-        debugLog(`[FreeAgents Projections] FALLBACK: Using calendar week`);
+        debugLog(`[FreeAgents Projections] DEMO MODE: Using current calendar week ${formatDateLocalHelper(weekStart)} to ${formatDateLocalHelper(weekEnd)}`);
+      } else {
+        // For logged-in users with real leagues, try to get matchup week from database
+        try {
+          const { data: matchups, error: matchupError } = await supabase
+            .from('matchups')
+            .select('week_start_date, week_end_date')
+            .eq('league_id', effectiveLeagueId)
+            .eq('status', 'in_progress')
+            .limit(1);
+          
+          if (!matchupError && matchups && matchups.length > 0) {
+            const matchup = matchups[0];
+            weekStart = new Date(matchup.week_start_date + 'T00:00:00');
+            weekStart.setHours(0, 0, 0, 0);
+            weekEnd = new Date(matchup.week_end_date + 'T23:59:59');
+            weekEnd.setHours(23, 59, 59, 999);
+            debugLog(`[FreeAgents Projections] Using matchup week from database: ${formatDateLocalHelper(weekStart)} to ${formatDateLocalHelper(weekEnd)}`);
+          } else {
+            debugLog('[FreeAgents Projections] No in_progress matchup found, will calculate from league');
+          }
+        } catch (error) {
+          debugLog('[FreeAgents Projections] Error fetching matchup:', error);
+        }
+        
+        // If no matchup found, calculate from league draft completion date
+        if (!weekStart || !weekEnd) {
+          try {
+            const { league: leagueData, error: leagueError } = await LeagueService.getLeague(effectiveLeagueId, user?.id);
+            if (!leagueError && leagueData && leagueData.draft_status === 'completed') {
+              const draftCompletionDate = getDraftCompletionDate(leagueData);
+              if (draftCompletionDate) {
+                const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
+                const currentWeek = getCurrentWeekNumber(firstWeekStart);
+                weekStart = getWeekStartDate(currentWeek, firstWeekStart);
+                weekEnd = getWeekEndDate(currentWeek, firstWeekStart);
+                debugLog(`[FreeAgents Projections] Calculated week from league: ${formatDateLocalHelper(weekStart)} to ${formatDateLocalHelper(weekEnd)}`);
+              }
+            }
+          } catch (error) {
+            debugLog('[FreeAgents Projections] Error fetching league:', error);
+          }
+        }
+        
+        // FALLBACK: If still no week dates, use current calendar week (Monday-Sunday)
+        if (!weekStart || !weekEnd) {
+          const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+          const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+          
+          weekStart = new Date(today);
+          weekStart.setDate(today.getDate() - daysFromMonday);
+          weekStart.setHours(0, 0, 0, 0);
+          
+          weekEnd = new Date(weekStart);
+          weekEnd.setDate(weekStart.getDate() + 6);
+          weekEnd.setHours(23, 59, 59, 999);
+          
+          debugLog(`[FreeAgents Projections] FALLBACK: Using calendar week`);
+        }
       }
 
       // Get remaining days in the week (today through Sunday)
@@ -454,62 +459,18 @@ const FreeAgents = () => {
       const today = new Date(todayMSTStr + 'T00:00:00');
       today.setHours(0, 0, 0, 0);
       
-      // Default to calendar week, then try to use matchup week if league data is available
       let weekStart: Date | null = null;
       let weekEnd: Date | null = null;
       
-      // Try to get matchup week from league data (for both logged-in users and guests viewing demo)
       const effectiveLeagueId = leagueId || '750f4e1a-92ae-44cf-a798-2f3e06d0d5c9'; // Demo league ID for guests
+      const isDemo = !leagueId || effectiveLeagueId === '750f4e1a-92ae-44cf-a798-2f3e06d0d5c9';
       const log = (window as any).__originalConsole?.log || console.log;
+      const formatLocalDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       
-      // EXACT SAME LOGIC AS MATCHUP TAB - Fetch matchup directly from database
-      try {
-        const { data: matchups, error: matchupError } = await supabase
-          .from('matchups')
-          .select('week_start_date, week_end_date')
-          .eq('league_id', effectiveLeagueId)
-          .eq('status', 'in_progress')
-          .limit(1);
-        
-        if (!matchupError && matchups && matchups.length > 0) {
-          const matchup = matchups[0];
-          weekStart = new Date(matchup.week_start_date + 'T00:00:00');
-          weekStart.setHours(0, 0, 0, 0);
-          weekEnd = new Date(matchup.week_end_date + 'T23:59:59');
-          weekEnd.setHours(23, 59, 59, 999);
-          // Use local date format to avoid timezone issues
-          const formatLocalDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-          log(`[FreeAgents Schedule] Using matchup week from database: ${formatLocalDate(weekStart)} to ${formatLocalDate(weekEnd)}`);
-        } else {
-          log('[FreeAgents Schedule] No in_progress matchup found, will calculate from league');
-        }
-      } catch (error) {
-        log('[FreeAgents Schedule] Error fetching matchup:', error);
-      }
-      
-      // If no matchup found, calculate from league draft completion date
-      if (!weekStart || !weekEnd) {
-        try {
-          const { league: leagueData, error: leagueError } = await LeagueService.getLeague(effectiveLeagueId, user?.id);
-          if (!leagueError && leagueData && leagueData.draft_status === 'completed') {
-            const draftCompletionDate = getDraftCompletionDate(leagueData);
-            if (draftCompletionDate) {
-              const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
-              const currentWeek = getCurrentWeekNumber(firstWeekStart);
-              weekStart = getWeekStartDate(currentWeek, firstWeekStart);
-              weekEnd = getWeekEndDate(currentWeek, firstWeekStart);
-              // Use local date format to avoid timezone issues
-              const formatLocalDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-              log(`[FreeAgents Schedule] Calculated week from league: ${formatLocalDate(weekStart)} to ${formatLocalDate(weekEnd)}`);
-            }
-          }
-        } catch (error) {
-          log('[FreeAgents Schedule] Error fetching league:', error);
-        }
-      }
-      
-      // FALLBACK: If still no week dates, use current calendar week (Monday-Sunday)
-      if (!weekStart || !weekEnd) {
+      // CRITICAL FIX: For DEMO mode, ALWAYS use current calendar week (Monday-Sunday)
+      // The demo league's DB dates are stale and don't represent the actual current week.
+      // This matches what the Matchup tab does - it recalculates dates, not trusts DB dates.
+      if (isDemo) {
         const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
         const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
         
@@ -521,7 +482,65 @@ const FreeAgents = () => {
         weekEnd.setDate(weekStart.getDate() + 6);
         weekEnd.setHours(23, 59, 59, 999);
         
-        log(`[FreeAgents Schedule] FALLBACK: Using calendar week ${weekStart.toLocaleDateString()} to ${weekEnd.toLocaleDateString()}`);
+        log(`[FreeAgents Schedule] DEMO MODE: Using current calendar week ${formatLocalDate(weekStart)} to ${formatLocalDate(weekEnd)}`);
+      } else {
+        // For logged-in users with real leagues, try to get matchup week from database
+        try {
+          const { data: matchups, error: matchupError } = await supabase
+            .from('matchups')
+            .select('week_start_date, week_end_date')
+            .eq('league_id', effectiveLeagueId)
+            .eq('status', 'in_progress')
+            .limit(1);
+          
+          if (!matchupError && matchups && matchups.length > 0) {
+            const matchup = matchups[0];
+            weekStart = new Date(matchup.week_start_date + 'T00:00:00');
+            weekStart.setHours(0, 0, 0, 0);
+            weekEnd = new Date(matchup.week_end_date + 'T23:59:59');
+            weekEnd.setHours(23, 59, 59, 999);
+            log(`[FreeAgents Schedule] Using matchup week from database: ${formatLocalDate(weekStart)} to ${formatLocalDate(weekEnd)}`);
+          } else {
+            log('[FreeAgents Schedule] No in_progress matchup found, will calculate from league');
+          }
+        } catch (error) {
+          log('[FreeAgents Schedule] Error fetching matchup:', error);
+        }
+        
+        // If no matchup found, calculate from league draft completion date
+        if (!weekStart || !weekEnd) {
+          try {
+            const { league: leagueData, error: leagueError } = await LeagueService.getLeague(effectiveLeagueId, user?.id);
+            if (!leagueError && leagueData && leagueData.draft_status === 'completed') {
+              const draftCompletionDate = getDraftCompletionDate(leagueData);
+              if (draftCompletionDate) {
+                const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
+                const currentWeek = getCurrentWeekNumber(firstWeekStart);
+                weekStart = getWeekStartDate(currentWeek, firstWeekStart);
+                weekEnd = getWeekEndDate(currentWeek, firstWeekStart);
+                log(`[FreeAgents Schedule] Calculated week from league: ${formatLocalDate(weekStart)} to ${formatLocalDate(weekEnd)}`);
+              }
+            }
+          } catch (error) {
+            log('[FreeAgents Schedule] Error fetching league:', error);
+          }
+        }
+        
+        // FALLBACK: If still no week dates, use current calendar week (Monday-Sunday)
+        if (!weekStart || !weekEnd) {
+          const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+          const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+          
+          weekStart = new Date(today);
+          weekStart.setDate(today.getDate() - daysFromMonday);
+          weekStart.setHours(0, 0, 0, 0);
+          
+          weekEnd = new Date(weekStart);
+          weekEnd.setDate(weekStart.getDate() + 6);
+          weekEnd.setHours(23, 59, 59, 999);
+          
+          log(`[FreeAgents Schedule] FALLBACK: Using calendar week ${formatLocalDate(weekStart)} to ${formatLocalDate(weekEnd)}`);
+        }
       }
       
       // Batch fetch games for all teams in parallel
