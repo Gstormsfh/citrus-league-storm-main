@@ -356,8 +356,7 @@ const FreeAgents = () => {
 
       setWeeklyProjections(weeklyProjectionMap);
       
-      // Debug: Log final aggregated projections
-      const debugLog = (window as any).__originalConsole?.log || console.log;
+      // Debug: Log final aggregated projections (reuse debugLog from above)
       const topProjectionPlayers = Array.from(weeklyProjectionMap.entries())
         .sort((a, b) => b[1] - a[1])
         .slice(0, 10)
@@ -417,7 +416,7 @@ const FreeAgents = () => {
       
       // Try to get matchup week from league data (for both logged-in users and guests viewing demo)
       const effectiveLeagueId = leagueId || '750f4e1a-92ae-44cf-a798-2f3e06d0d5c9'; // Demo league ID for guests
-      const debugLog = (window as any).__originalConsole?.log || console.log;
+      const log = (window as any).__originalConsole?.log || console.log;
       
       // EXACT SAME LOGIC AS MATCHUP TAB - Fetch matchup directly from database
       try {
@@ -434,12 +433,12 @@ const FreeAgents = () => {
           weekStart.setHours(0, 0, 0, 0);
           weekEnd = new Date(matchup.week_end_date + 'T23:59:59');
           weekEnd.setHours(23, 59, 59, 999);
-          debugLog(`[FreeAgents Schedule] Using matchup week from database: ${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`);
+          log(`[FreeAgents Schedule] Using matchup week from database: ${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`);
         } else {
-          debugLog('[FreeAgents Schedule] No in_progress matchup found, will calculate from league');
+          log('[FreeAgents Schedule] No in_progress matchup found, will calculate from league');
         }
       } catch (error) {
-        debugLog('[FreeAgents Schedule] Error fetching matchup:', error);
+        log('[FreeAgents Schedule] Error fetching matchup:', error);
       }
       
       // If no matchup found, calculate from league draft completion date
@@ -453,11 +452,11 @@ const FreeAgents = () => {
               const currentWeek = getCurrentWeekNumber(firstWeekStart);
               weekStart = getWeekStartDate(currentWeek, firstWeekStart);
               weekEnd = getWeekEndDate(currentWeek, firstWeekStart);
-              debugLog(`[FreeAgents Schedule] Calculated week from league: ${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`);
+              log(`[FreeAgents Schedule] Calculated week from league: ${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`);
             }
           }
         } catch (error) {
-          debugLog('[FreeAgents Schedule] Error fetching league:', error);
+          log('[FreeAgents Schedule] Error fetching league:', error);
         }
       }
       
