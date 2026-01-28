@@ -53,10 +53,19 @@ class PerformanceTracker:
         success_rate = 100 * (1 - self.failed_syncs / max(1, self.total_syncs))
         game_success_rate = 100 * (1 - self.games_failed / max(1, self.games_processed))
         
+        # Calculate failure details for context
+        total_games = self.games_processed
+        failed_games = self.games_failed
+        failed_percentage = (self.games_failed / max(1, self.games_processed)) * 100
+        
         logger.info(f"[HEALTH] {uptime} uptime | "
                    f"Syncs: {self.total_syncs} ({success_rate:.1f}% success) | "
-                   f"Games: {self.games_processed} ({game_success_rate:.1f}% success) | "
+                   f"Games: {total_games} processed, {failed_games} failed ({game_success_rate:.1f}% success) | "
                    f"Last sync: {self.last_sync_duration:.1f}s")
+        
+        # Alert if failure rate is concerning (more than 1% failure rate)
+        if failed_percentage > 1.0:
+            logger.warning(f"[HEALTH ALERT] Game failure rate is {failed_percentage:.2f}% - check logs for recent [FAIL] entries")
 
 tracker = PerformanceTracker()
 

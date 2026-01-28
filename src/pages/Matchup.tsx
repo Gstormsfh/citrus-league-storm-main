@@ -1022,12 +1022,22 @@ const Matchup = () => {
   // CRITICAL: Also runs for guests/demo to use REAL NHL data
   // Extract to useCallback so it can be reused for live game refreshes
   const fetchAllDailyStats = React.useCallback(async () => {
+      // DEBUG: Log entry into function
+      (window as any).__originalConsole?.log('[DEBUG fetchAllDailyStats] ENTERING function', {
+        statsLoadingRefCurrent: statsLoadingRef.current,
+        hasCurrentMatchup: !!currentMatchup,
+        currentMatchupId: currentMatchup?.id,
+        userLeagueState
+      });
+      
       // Prevent concurrent fetches that cause score flashing
       if (statsLoadingRef.current) {
+        (window as any).__originalConsole?.log('[DEBUG fetchAllDailyStats] EARLY RETURN: statsLoadingRef is true');
         return;
       }
       
       if (!currentMatchup) {
+        (window as any).__originalConsole?.log('[DEBUG fetchAllDailyStats] EARLY RETURN: no currentMatchup');
         setDailyStatsByDate(new Map());
         return;
       }
@@ -1050,8 +1060,21 @@ const Matchup = () => {
       // Combine and dedupe
       const allPlayerIds = [...new Set([...currentRosterIds, ...starterIds])];
       
+      // DEBUG: Log player IDs
+      (window as any).__originalConsole?.log('[DEBUG fetchAllDailyStats] Player IDs:', {
+        userLeagueState,
+        currentRosterIdsCount: currentRosterIds.length,
+        starterIdsCount: starterIds.length,
+        allPlayerIdsCount: allPlayerIds.length,
+        myTeamPlayerIdsRefCount: myTeamPlayerIdsRef.current.length,
+        opponentTeamPlayerIdsRefCount: opponentTeamPlayerIdsRef.current.length,
+        firstFewIds: allPlayerIds.slice(0, 5)
+      });
+      
       if (allPlayerIds.length === 0) {
+        (window as any).__originalConsole?.log('[DEBUG fetchAllDailyStats] EARLY RETURN: no player IDs');
         setDailyStatsByDate(new Map());
+        statsLoadingRef.current = false;
         return;
       }
 
@@ -1081,6 +1104,33 @@ const Matchup = () => {
           if (error) {
             log(`WARN: Error fetching stats for ${date}:`, error);
             return;
+          }
+
+          // DEBUG: Log raw RPC data for today (ALWAYS log for today, even if empty)
+          if (date === todayStr) {
+            (window as any).__originalConsole?.log('[DEBUG fetchAllDailyStats] Raw RPC data for TODAY:', {
+              date,
+              todayMST: todayStr,
+              rowCount: data?.length || 0,
+              isEmpty: !data || data.length === 0,
+              requestedPlayerCount: allPlayerIds.length,
+              requestedPlayerIds: allPlayerIds.slice(0, 10), // First 10 for debugging
+              firstFewRows: (data || []).slice(0, 5).map((r: any) => ({
+                player_id: r.player_id,
+                is_goalie: r.is_goalie,
+                goals: r.goals,
+                assists: r.assists,
+                shots_on_goal: r.shots_on_goal,
+                blocks: r.blocks,
+                ppp: r.ppp,
+                shp: r.shp,
+                hits: r.hits,
+                pim: r.pim,
+                wins: r.wins,
+                saves: r.saves,
+                game_id: r.game_id
+              }))
+            });
           }
 
           // Create map of player_id -> daily stats for this date
@@ -1238,7 +1288,34 @@ const Matchup = () => {
               daily_total_points: isPastDate ? dailyTotalPoints : (dailyTotalPoints > 0 ? dailyTotalPoints : undefined),
               daily_stats_breakdown,
             });
+            
+            // DEBUG: Log breakdown for today if player has stats
+            if (date === todayStr && dailyTotalPoints > 0) {
+              (window as any).__originalConsole?.log('[DEBUG fetchAllDailyStats] Built breakdown for player:', {
+                player_id: row.player_id,
+                date,
+                aggregated,
+                dailyTotalPoints,
+                daily_stats_breakdown,
+                breakdownKeys: Object.keys(daily_stats_breakdown)
+              });
+            }
           });
+
+          // DEBUG: Log what's stored for today
+          if (date === todayStr && dayStatsMap.size > 0) {
+            const entries = Array.from(dayStatsMap.entries()).slice(0, 3);
+            (window as any).__originalConsole?.log('[DEBUG fetchAllDailyStats] Stored in dayStatsMap for TODAY:', {
+              date,
+              mapSize: dayStatsMap.size,
+              sampleEntries: entries.map(([id, stats]) => ({
+                player_id: id,
+                daily_total_points: stats.daily_total_points,
+                hasBreakdown: !!stats.daily_stats_breakdown,
+                breakdownKeys: stats.daily_stats_breakdown ? Object.keys(stats.daily_stats_breakdown) : []
+              }))
+            });
+          }
 
           statsByDate.set(date, dayStatsMap);
         }));
@@ -1317,6 +1394,7 @@ const Matchup = () => {
   }
 
   // Fetch projections for a specific date - memoized to prevent recreation
+  // CRITICAL: Works for BOTH active users AND demo/guest users
   const fetchProjectionsForDate = useCallback(async (date: string) => {
     // Check cache first - if we have projections (even if empty), don't re-fetch
     if (projectionsByDate.has(date)) {
@@ -1328,24 +1406,42 @@ const Matchup = () => {
       return;
     }
 
-    if (!currentMatchup || userLeagueState !== 'active-user') {
+    if (!currentMatchup) {
       return;
     }
 
-    // Get player IDs from refs (stable references)
-    const allPlayerIds = [
-      ...myTeamPlayerIdsRef.current,
-      ...opponentTeamPlayerIdsRef.current
-    ];
+    // Get player IDs - from refs for active users, from demo teams for guests
+    const allPlayerIds = userLeagueState === 'active-user'
+      ? [
+          ...myTeamPlayerIdsRef.current,
+          ...opponentTeamPlayerIdsRef.current
+        ]
+      : [
+          ...demoMyTeam.map(p => typeof p.id === 'string' ? parseInt(p.id) : p.id),
+          ...demoOpponentTeam.map(p => typeof p.id === 'string' ? parseInt(p.id) : p.id)
+        ];
 
     if (allPlayerIds.length === 0) {
+      (window as any).__originalConsole?.log('[DEBUG fetchProjectionsForDate] No player IDs, returning early');
       return;
     }
 
     projectionsLoadingRef.current = true;
+    
+    (window as any).__originalConsole?.log('[DEBUG fetchProjectionsForDate] Fetching projections:', {
+      date,
+      playerCount: allPlayerIds.length,
+      userLeagueState,
+      firstFewIds: allPlayerIds.slice(0, 5)
+    });
 
     try {
       const projectionMap = await MatchupService.getDailyProjectionsForMatchup(allPlayerIds, date);
+      
+      (window as any).__originalConsole?.log('[DEBUG fetchProjectionsForDate] Got projections:', {
+        date,
+        projectionMapSize: projectionMap.size
+      });
       
       setProjectionsByDate(prev => {
         const newMap = new Map(prev);
@@ -1353,13 +1449,34 @@ const Matchup = () => {
         return newMap;
       });
     } catch (error) {
+      (window as any).__originalConsole?.log('[DEBUG fetchProjectionsForDate] Error:', error);
       // Don't cache errors - allow retry
     } finally {
       projectionsLoadingRef.current = false;
     }
-  }, [projectionsByDate, currentMatchup, userLeagueState]);
+  }, [projectionsByDate, currentMatchup, userLeagueState, demoMyTeam, demoOpponentTeam]);
 
   // Fetch detailed stats for selected date (or today) - for PlayerCard display
+  // Sync dailyStatsMap from dailyStatsByDate when viewing today (so live stats show in daily breakdown)
+  useEffect(() => {
+    const todayStr = getTodayMST();
+    const viewingToday = !selectedDate || selectedDate === todayStr;
+    
+    if (viewingToday && currentMatchup) {
+      const weekStart = currentMatchup.week_start_date;
+      const weekEnd = currentMatchup.week_end_date;
+      
+      // Only sync if today is in the matchup week
+      if (todayStr >= weekStart && todayStr <= weekEnd) {
+        const todayStats = dailyStatsByDate.get(todayStr);
+        if (todayStats) {
+          setDailyStatsMap(todayStats);
+          log('[Matchup] Synced dailyStatsMap from dailyStatsByDate for today (live stats update)');
+        }
+      }
+    }
+  }, [dailyStatsByDate, selectedDate, currentMatchup]);
+
   useEffect(() => {
     const fetchDailyStats = async () => {
       // Prevent concurrent fetches
@@ -2363,6 +2480,20 @@ const Matchup = () => {
     // When selectedDate is set, use dailyStatsByDate.get(selectedDate), otherwise use dailyStatsMap
     const statsMapForDate = selectedDate ? dailyStatsByDate.get(selectedDate) : dailyStatsMap;
     
+    // DEBUG: Log stats map status for my team transform
+    const todayDebug = getTodayMST();
+    if (selectedDate === todayDebug) {
+      (window as any).__originalConsole?.log('[DEBUG displayMyTeam] Stats map status:', {
+        selectedDate,
+        todayDebug,
+        hasStatsMapForDate: !!statsMapForDate,
+        statsMapSize: statsMapForDate?.size || 0,
+        dailyStatsByDateHasToday: dailyStatsByDate.has(todayDebug),
+        dailyStatsByDateKeys: Array.from(dailyStatsByDate.keys()),
+        baseTeamCount: baseTeam.length
+      });
+    }
+    
     return baseTeam.map(player => {
       // CRITICAL: Convert player.id to number to match Map<number, any> keys
       // Match MatchupComparison's conversion logic (line 61)
@@ -2370,6 +2501,41 @@ const Matchup = () => {
       const dailyStats = statsMapForDate?.get(playerId);
       const projection = dateProjections?.get(player.id);
       const isGoalie = player.isGoalie || player.position === 'G' || player.position === 'Goalie';
+      
+      // DEBUG: Log dailyStats lookup for ALL players with stats (for today only)
+      if (selectedDate === todayDebug && dailyStats && (dailyStats.goals > 0 || dailyStats.assists > 0 || dailyStats.wins > 0 || dailyStats.saves > 0)) {
+        (window as any).__originalConsole?.log('[DEBUG displayMyTeam] Player with stats found:', {
+          playerName: player.name,
+          playerId,
+          daily_total_points: dailyStats.daily_total_points,
+          hasBreakdown: !!dailyStats.daily_stats_breakdown,
+          breakdownKeys: dailyStats.daily_stats_breakdown ? Object.keys(dailyStats.daily_stats_breakdown) : [],
+          rawStats: {
+            goals: dailyStats.goals,
+            assists: dailyStats.assists,
+            shots_on_goal: dailyStats.shots_on_goal,
+            blocks: dailyStats.blocks,
+            wins: dailyStats.wins,
+            saves: dailyStats.saves
+          }
+        });
+      }
+      
+      // DEBUG: Log first player stats lookup always
+      if (player.id === baseTeam[0]?.id && selectedDate === todayDebug) {
+        (window as any).__originalConsole?.log('[DEBUG displayMyTeam] First player stats lookup:', {
+          playerName: player.name,
+          playerId,
+          foundDailyStats: !!dailyStats,
+          dailyStats: dailyStats ? {
+            daily_total_points: dailyStats.daily_total_points,
+            hasBreakdown: !!dailyStats.daily_stats_breakdown,
+            breakdownKeys: dailyStats.daily_stats_breakdown ? Object.keys(dailyStats.daily_stats_breakdown) : [],
+            goals: dailyStats.goals,
+            assists: dailyStats.assists
+          } : null
+        });
+      }
       
       // CRITICAL: Capture games array from original player before any transformations
       // Always preserve games - use player.games if it exists and is an array
@@ -4552,6 +4718,7 @@ const Matchup = () => {
     };
     
     // Refresh stats, game statuses, AND matchup scores immediately
+    // Note: dailyStatsMap will be synced from dailyStatsByDate via useEffect above
     Promise.all([
       fetchAllDailyStats(),
       refreshGameStatuses(),

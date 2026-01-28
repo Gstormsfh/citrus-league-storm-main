@@ -60,8 +60,16 @@ export const ScheduleService = {
     endDate: Date
   ): Promise<{ games: NHLGame[]; error: any }> {
     try {
-      const startStr = startDate.toISOString().split('T')[0];
-      const endStr = endDate.toISOString().split('T')[0];
+      // Helper to format date in local timezone (avoids UTC shift issues with toISOString)
+      const formatDateLocal = (d: Date) => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+      
+      const startStr = formatDateLocal(startDate);
+      const endStr = formatDateLocal(endDate);
       
       const { data, error } = await supabase
         .from('nhl_games')
@@ -110,6 +118,14 @@ export const ScheduleService = {
         .map(team => `home_team.eq.${team},away_team.eq.${team}`)
         .join(',');
 
+      // Helper to format date in local timezone (avoids UTC shift issues with toISOString)
+      const formatDateLocal = (d: Date) => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+      
       let query = supabase
         .from('nhl_games')
         .select(COLUMNS.NHL_GAME)
@@ -118,10 +134,10 @@ export const ScheduleService = {
         .order('game_time', { ascending: true });
 
       if (startDate) {
-        query = query.gte('game_date', startDate.toISOString().split('T')[0]);
+        query = query.gte('game_date', formatDateLocal(startDate));
       }
       if (endDate) {
-        query = query.lte('game_date', endDate.toISOString().split('T')[0]);
+        query = query.lte('game_date', formatDateLocal(endDate));
       }
 
       let data: any = null;
@@ -182,6 +198,14 @@ export const ScheduleService = {
     endDate?: Date
   ): Promise<{ games: NHLGame[]; error: any }> {
     try {
+      // Helper to format date in local timezone (avoids UTC shift issues with toISOString)
+      const formatDateLocal = (d: Date) => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+      
       let query = supabase
         .from('nhl_games')
         .select(COLUMNS.NHL_GAME)
@@ -190,10 +214,10 @@ export const ScheduleService = {
         .order('game_time', { ascending: true });
 
       if (startDate) {
-        query = query.gte('game_date', startDate.toISOString().split('T')[0]);
+        query = query.gte('game_date', formatDateLocal(startDate));
       }
       if (endDate) {
-        query = query.lte('game_date', endDate.toISOString().split('T')[0]);
+        query = query.lte('game_date', formatDateLocal(endDate));
       }
 
       const { data, error } = await query;
