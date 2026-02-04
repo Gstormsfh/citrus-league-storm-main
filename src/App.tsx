@@ -10,6 +10,7 @@ import { LeagueProvider } from "@/contexts/LeagueContext";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { StormyChatBubble } from "./components/StormyChatBubble";
+import MobileBottomNav from "./components/MobileBottomNav";
 import LoadingScreen from "./components/LoadingScreen";
 import "./App.css";
 
@@ -164,6 +165,7 @@ const App = () => {
               </Routes>
             </Suspense>
             <StormyChatBubble />
+            <MobileBottomNav />
           </LeagueProvider>
         </BrowserRouter>
       </TooltipProvider>

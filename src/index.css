@@ -1251,3 +1251,140 @@
     justify-content: center;
     padding: 0;
   }
+
+/* ========== iOS MOBILE STYLES ========== */
+/* Only applies on screens smaller than 1024px */
+@media (max-width: 1023px) {
+  /* Hide desktop navbar and footer on mobile */
+  header.fixed { display: none !important; }
+  footer { display: none !important; }
+  
+  /* Adjust page padding for mobile (no top navbar) */
+  main { 
+    padding-top: 1rem !important; 
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom)) !important;
+  }
+  
+  /* Safe area support for notched devices */
+  .mobile-safe-bottom {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+  }
+  
+  /* iOS-style touch feedback */
+  button, a, [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Minimum 44px touch targets (iOS HIG requirement) */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* ===== MATCHUP PAGE MOBILE STYLES ===== */
+  
+  /* Hide sidebars on mobile - show only main content */
+  aside {
+    display: none !important;
+  }
+  
+  /* Full width content on mobile */
+  .lg\:grid-cols-\[240px_1fr_300px\] {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  
+  /* Remove height constraints on mobile for natural scrolling */
+  .max-h-\[calc\(100vh-12rem\)\] {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  
+  /* Matchup score card - make it prominent and beautiful */
+  .matchup-total-card {
+    padding: 12px 16px !important;
+    background: linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--background)) 100%) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+  }
+  
+  .matchup-total-score {
+    font-size: 2rem !important;
+    font-weight: 800 !important;
+  }
+  
+  /* Weekly schedule - more compact and touch-friendly */
+  .weekly-schedule-container {
+    padding: 8px !important;
+    gap: 4px !important;
+  }
+  
+  /* Make day buttons larger for touch */
+  .weekly-schedule-container button,
+  .weekly-schedule-container a {
+    min-height: 60px !important;
+    padding: 8px 4px !important;
+    border-radius: 12px !important;
+  }
+  
+  /* Matchup comparison grid - single column on mobile */
+  .matchup-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+  
+  /* Player cards - more compact on mobile */
+  .matchup-wrapper {
+    padding: 0 8px !important;
+  }
+  
+  /* Team comparison - stack vertically with clear separation */
+  .matchup-comparison {
+    gap: 24px !important;
+  }
+  
+  /* Player rows - more readable on mobile */
+  .player-row {
+    padding: 12px 8px !important;
+    border-radius: 12px !important;
+    margin-bottom: 8px !important;
+    background: hsl(var(--card)) !important;
+  }
+  
+  /* Hide decorative blurs on mobile for performance */
+  .blur-3xl {
+    display: none !important;
+  }
+  
+  /* Compact headers on mobile */
+  h1 {
+    font-size: 1.5rem !important;
+  }
+  
+  h2 {
+    font-size: 1.25rem !important;
+  }
+  
+  /* Better spacing for mobile content */
+  .mb-6 {
+    margin-bottom: 1rem !important;
+  }
+  
+  .mb-8 {
+    margin-bottom: 1.5rem !important;
+  }
+  
+  /* Cards - iOS-style rounded corners */
+  .rounded-lg {
+    border-radius: 16px !important;
+  }
+  
+  .rounded-xl {
+    border-radius: 20px !important;
+  }
+  
+  /* Shadows - subtle iOS-style */
+  .shadow-lg {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+  }
+}
