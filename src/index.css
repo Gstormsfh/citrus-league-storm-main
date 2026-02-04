@@ -1348,13 +1348,40 @@
     border-left: 4px solid #FF6B35 !important;
   }
   
-  /* Hide ALL decorative elements */
+  /* Hide decorative elements - keep essential info */
   .player-card-bg-text,
   .player-card-bg-number,
-  .player-projection-bar-container,
+  .player-projection-bar-container {
+    display: none !important;
+  }
+  
+  /* Game schedule logos - show compact row */
   .game-logos-bar,
   .player-card > div:has(> .game-logos-bar),
   .player-card-content > div:has(> .game-logos-bar) {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    gap: 2px !important;
+    padding: 2px 0 !important;
+    margin: 2px 0 !important;
+    overflow-x: auto !important;
+    background: transparent !important;
+    border: none !important;
+  }
+  
+  /* Compact game logo icons */
+  .game-logos-bar > div {
+    flex-shrink: 0 !important;
+  }
+  
+  .game-logos-bar img {
+    width: 16px !important;
+    height: 16px !important;
+  }
+  
+  /* Hide date labels under icons on mobile */
+  .game-logos-bar > div > span:last-child,
+  .game-logos-bar .game-score-display {
     display: none !important;
   }
   

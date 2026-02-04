@@ -1381,15 +1381,23 @@ export const MatchupService = {
       
       // CRITICAL: Filter games to ONLY matchup week (weekStart to weekEnd)
       // This prevents showing season totals instead of week totals
+      // FIX: Use string comparison to avoid timezone issues with Date objects
+      // Format weekStart/weekEnd as YYYY-MM-DD strings for comparison
+      const formatDateStr = (d: Date) => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+      const weekStartStr = formatDateStr(weekStart);
+      const weekEndStr = formatDateStr(weekEnd);
+      
       const weekGames = games.filter(g => {
         if (!g || !g.game_date) return false;
-        const gameDate = new Date(g.game_date);
-        gameDate.setHours(0, 0, 0, 0);
-        const weekStartDate = new Date(weekStart);
-        weekStartDate.setHours(0, 0, 0, 0);
-        const weekEndDate = new Date(weekEnd);
-        weekEndDate.setHours(23, 59, 59, 999);
-        return gameDate >= weekStartDate && gameDate <= weekEndDate;
+        // Extract just the date part (YYYY-MM-DD) for comparison
+        const gameDateStr = g.game_date.split('T')[0];
+        // String comparison works correctly for YYYY-MM-DD format
+        return gameDateStr >= weekStartStr && gameDateStr <= weekEndStr;
       });
       
       // Calculate games remaining from week games only
