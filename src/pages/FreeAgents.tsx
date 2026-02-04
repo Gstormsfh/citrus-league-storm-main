@@ -1667,19 +1667,19 @@ const FreeAgents = () => {
             })()}
           </TabsContent>
           <TabsContent value="schedule" className="space-y-4">
-             <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-lg mb-4 flex items-start gap-3">
+             <div className="bg-gradient-to-r from-blue-500/10 to-green-500/10 border border-blue-500/20 p-4 rounded-lg mb-4 flex items-start gap-3">
                 <Calendar className="h-5 w-5 text-blue-500 mt-1 shrink-0" />
                 <div>
-                  <h3 className="font-semibold text-blue-700 dark:text-blue-400">Schedule Maximizers</h3>
-                  <p className="text-sm text-muted-foreground">Players with the most games this week, sorted by games played and points.</p>
+                  <h3 className="font-semibold text-blue-700 dark:text-blue-400">Top Projected Free Agents (Rest of Week)</h3>
+                  <p className="text-sm text-muted-foreground">Sorted by projected fantasy points for remaining games this matchup week.</p>
                 </div>
              </div>
 
-             {loading || loadingMaximizers ? (
+             {loading || loadingMaximizers || loadingProjections ? (
                <div className="p-12 text-center">
                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                  <p className="text-muted-foreground mt-4">
-                   {loading ? 'Loading players...' : 'Calculating schedule maximizers...'}
+                   {loading ? 'Loading players...' : loadingProjections ? 'Calculating projections...' : 'Calculating schedule...'}
                  </p>
                </div>
              ) : scheduleMaximizers.length === 0 ? (
@@ -1692,7 +1692,7 @@ const FreeAgents = () => {
                  <div className="overflow-x-auto">
                    <Table>
                      <TableHeader>
-                       <TableRow>
+                       <TableRow className="bg-muted/30">
                          <TableHead 
                            className="cursor-pointer hover:bg-muted/50 select-none"
                            onClick={() => handleSort('name')}
@@ -1703,269 +1703,168 @@ const FreeAgents = () => {
                            </div>
                          </TableHead>
                          <TableHead 
-                           className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                           className="text-center cursor-pointer hover:bg-muted/50 select-none"
                            onClick={() => handleSort('position')}
                          >
-                           <div className="flex items-center justify-end">
+                           <div className="flex items-center justify-center">
                              Pos
                              {getSortIcon('position')}
                            </div>
                          </TableHead>
-                         <TableHead 
-                           className="text-right cursor-pointer hover:bg-muted/50 select-none"
-                           onClick={() => handleSort('team')}
-                         >
-                           <div className="flex items-center justify-end">
-                             Team
-                             {getSortIcon('team')}
+                         <TableHead className="text-center">
+                           <div className="flex items-center justify-center">
+                             Schedule
                            </div>
                          </TableHead>
-                        <TableHead className="text-right">Games This Week</TableHead>
                          <TableHead 
-                           className="text-right cursor-pointer hover:bg-muted/50 select-none"
-                           onClick={() => handleSort('gp')}
+                           className="text-center cursor-pointer hover:bg-muted/50 select-none bg-blue-500/10"
+                           onClick={() => handleSort('weeklyProjection')}
                          >
-                           <div className="flex items-center justify-end">
-                             GP
-                             {getSortIcon('gp')}
+                           <div className="flex items-center justify-center gap-1 font-bold text-blue-700">
+                             <TrendingUp className="h-4 w-4" />
+                             Rest of Week
+                             {getSortIcon('weeklyProjection')}
                            </div>
                          </TableHead>
-                         {/* Skater Stats - only show if there are skaters */}
-                         {scheduleMaximizers.some(p => p.position !== 'G') && (
-                           <>
-                             <TableHead 
-                               className="text-right cursor-pointer hover:bg-muted/50 select-none"
-                               onClick={() => handleSort('goals')}
-                             >
-                               <div className="flex items-center justify-end">
-                                 G
-                                 {getSortIcon('goals')}
-                               </div>
-                             </TableHead>
-                             <TableHead 
-                               className="text-right cursor-pointer hover:bg-muted/50 select-none"
-                               onClick={() => handleSort('assists')}
-                             >
-                               <div className="flex items-center justify-end">
-                                 A
-                                 {getSortIcon('assists')}
-                               </div>
-                             </TableHead>
-                             <TableHead 
-                               className="text-right cursor-pointer hover:bg-muted/50 select-none"
-                               onClick={() => handleSort('points')}
-                             >
-                               <div className="flex items-center justify-end">
-                                 P
-                                 {getSortIcon('points')}
-                               </div>
-                             </TableHead>
-                             <TableHead 
-                               className="text-right cursor-pointer hover:bg-muted/50 select-none"
-                               onClick={() => handleSort('shots')}
-                             >
-                               <div className="flex items-center justify-end">
-                                 SOG
-                                 {getSortIcon('shots')}
-                               </div>
-                             </TableHead>
-                             <TableHead 
-                               className="text-right cursor-pointer hover:bg-muted/50 select-none"
-                               onClick={() => handleSort('hits')}
-                             >
-                               <div className="flex items-center justify-end">
-                                 HIT
-                                 {getSortIcon('hits')}
-                               </div>
-                             </TableHead>
-                             <TableHead 
-                               className="text-right cursor-pointer hover:bg-muted/50 select-none"
-                               onClick={() => handleSort('blocks')}
-                             >
-                               <div className="flex items-center justify-end">
-                                 BLK
-                                 {getSortIcon('blocks')}
-                               </div>
-                             </TableHead>
-                             <TableHead className="text-right">Pts/Gm</TableHead>
-                           </>
-                         )}
-                         {/* Goalie Stats - only show if there are goalies */}
-                         {scheduleMaximizers.some(p => p.position === 'G') && (
-                           <>
-                             <TableHead 
-                               className="text-right cursor-pointer hover:bg-muted/50 select-none"
-                               onClick={() => handleSort('wins')}
-                             >
-                               <div className="flex items-center justify-end">
-                                 W
-                                 {getSortIcon('wins')}
-                               </div>
-                             </TableHead>
-                             <TableHead 
-                               className="text-right cursor-pointer hover:bg-muted/50 select-none"
-                               onClick={() => handleSort('gaa')}
-                             >
-                               <div className="flex items-center justify-end">
-                                 GAA
-                                 {getSortIcon('gaa')}
-                               </div>
-                             </TableHead>
-                             <TableHead 
-                               className="text-right cursor-pointer hover:bg-muted/50 select-none"
-                               onClick={() => handleSort('savePct')}
-                             >
-                               <div className="flex items-center justify-end">
-                                 SV%
-                                 {getSortIcon('savePct')}
-                               </div>
-                             </TableHead>
-                             <TableHead className="text-right">Pts/Gm</TableHead>
-                           </>
-                         )}
-                         <TableHead className="w-[120px]"></TableHead>
+                         <TableHead className="w-[100px]"></TableHead>
                        </TableRow>
                      </TableHeader>
                      <TableBody>
-                       {sortScheduleMaximizers(scheduleMaximizers).map((player) => {
-                         const isGoalie = player.position === 'G';
-                         return (
-                           <TableRow key={player.id} className="hover:bg-muted/50">
-                             <TableCell className="font-medium">
-                               <div className="flex flex-col">
-                                 <span 
-                                   className="hover:underline hover:text-primary cursor-pointer"
-                                   onClick={() => handlePlayerClick(player)}
-                                 >
-                                   {player.full_name}
+                       {(() => {
+                         // Sort by weekly projection (highest first) by default
+                         const sorted = [...scheduleMaximizers].map(player => {
+                           const numericId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
+                           const realProjection = weeklyProjections.get(numericId);
+                           const weeklyProjection = (realProjection && realProjection > 0) ? realProjection : ((player.points || 0) / 20);
+                           return { ...player, weeklyProjection };
+                         }).sort((a, b) => {
+                           if (sortColumn === 'weeklyProjection' || !sortColumn) {
+                             return b.weeklyProjection - a.weeklyProjection;
+                           }
+                           // Handle other sort columns
+                           if (sortColumn === 'name') {
+                             return sortDirection === 'asc' 
+                               ? a.full_name.localeCompare(b.full_name)
+                               : b.full_name.localeCompare(a.full_name);
+                           }
+                           if (sortColumn === 'position') {
+                             return sortDirection === 'asc' 
+                               ? a.position.localeCompare(b.position)
+                               : b.position.localeCompare(a.position);
+                           }
+                           return b.weeklyProjection - a.weeklyProjection;
+                         });
+                         
+                         return sorted.map((player, index) => {
+                           const isGoalie = player.position === 'G';
+                           const isTopPick = index < 3; // Highlight top 3
+                           return (
+                             <TableRow key={player.id} className={`hover:bg-muted/50 ${isTopPick ? 'bg-green-500/5' : ''}`}>
+                               <TableCell className="font-medium">
+                                 <div className="flex items-center gap-2">
+                                   {isTopPick && (
+                                     <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
+                                       index === 0 ? 'bg-yellow-500 text-white' :
+                                       index === 1 ? 'bg-gray-400 text-white' :
+                                       'bg-amber-700 text-white'
+                                     }`}>
+                                       {index + 1}
+                                     </span>
+                                   )}
+                                   <div className="flex flex-col">
+                                     <span 
+                                       className="hover:underline hover:text-primary cursor-pointer font-semibold"
+                                       onClick={() => handlePlayerClick(player)}
+                                     >
+                                       {player.full_name}
+                                     </span>
+                                     <span className="text-xs text-muted-foreground">{player.team} • {isGoalie ? `W: ${player.wins || 0}` : `P: ${player.points || 0}`}</span>
+                                   </div>
+                                 </div>
+                               </TableCell>
+                               <TableCell className="text-center">
+                                 <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                   isGoalie ? 'bg-purple-500/20 text-purple-700' : 'bg-blue-500/20 text-blue-700'
+                                 }`}>
+                                   {formatPositionForDisplay(player.position)}
                                  </span>
-                               </div>
-                             </TableCell>
-                             <TableCell className="text-right">{formatPositionForDisplay(player.position)}</TableCell>
-                             <TableCell className="text-right">{player.team}</TableCell>
-                            <TableCell className="text-right align-middle py-2">
-                              {player.games && player.games.length > 0 && player.team ? (
-                                <div className="flex justify-end items-center">
-                                  <div className="inline-flex gap-1.5 items-center flex-nowrap overflow-x-auto">
-                                    {(() => {
-                                      // Use MST timezone - EXACT SAME as GameLogosBar and Matchup tab
-                                      const todayMST = getTodayMST();
-                                      
-                                      return player.games
-                                        .filter(game => game && game.game_date)
-                                        .sort((a, b) => new Date(a.game_date).getTime() - new Date(b.game_date).getTime())
-                                        .map((game, idx) => {
-                                          const gameDateStr = game.game_date.split('T')[0];
-                                          
-                                          // EXACT SAME LOGIC AS GameLogosBar
-                                          const isToday = gameDateStr === todayMST;
-                                          const gameStatusLower = (game.status || '').toLowerCase();
-                                          const isLive = (gameStatusLower === 'live' || gameStatusLower === 'intermission' || gameStatusLower === 'crit') && isToday;
-                                          
-                                          // Check if game is in the past (SAME as GameLogosBar)
-                                          const isPastDate = gameDateStr < todayMST;
-                                          const effectiveStatus = (isPastDate && game.status === 'scheduled') ? 'final' : game.status;
-                                          const isPast = !isLive && (effectiveStatus === 'final' || isPastDate);
-                                          const isUpcoming = !isPast && !isLive;
-                                          
-                                          const playerTeamUpper = (player.team || '').toUpperCase();
-                                          const homeTeamUpper = (game.home_team || '').toUpperCase();
-                                          const isHome = homeTeamUpper === playerTeamUpper;
-                                          const opponent = isHome ? (game.away_team || '') : (game.home_team || '');
-                                          if (!opponent) return null;
-                                          
-                                          const logoUrl = `https://assets.nhle.com/logos/nhl/svg/${opponent.toUpperCase()}_light.svg`;
-                                          const opponentPrefix = isHome ? 'vs' : '@';
-                                          
-                                          // Build tooltip - SAME as GameLogosBar
-                                          let tooltipText = `${opponentPrefix} ${opponent} - ${gameDateStr}`;
-                                          if (isLive) tooltipText += ' (LIVE)';
-                                          else if (isPast) tooltipText += ' (Final)';
-                                          else if (isToday) tooltipText += ' (Today)';
-                                          
-                                          return (
-                                            <div 
-                                              key={idx}
-                                              className={`relative flex-shrink-0 w-7 h-7 rounded flex items-center justify-center border ${
-                                                isPast ? 'opacity-40 grayscale border-gray-300' : 
-                                                isLive ? 'border-2 border-orange-500 animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.6)]' : 
-                                                isToday ? 'border-2 border-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]' :
-                                                'opacity-100 border-orange-300'
-                                              }`}
-                                              title={tooltipText}
-                                            >
-                                              <img 
-                                                src={logoUrl} 
-                                                alt={opponent}
-                                                className="w-5 h-5 object-contain"
-                                                onError={(e) => {
-                                                  (e.target as HTMLImageElement).style.display = 'none';
-                                                }}
-                                              />
-                                              {/* Live badge */}
-                                              {isLive && (
-                                                <div className="absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full animate-ping" />
-                                              )}
-                                            </div>
-                                          );
-                                        });
-                                    })()}
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="flex gap-1 justify-end flex-wrap">
-                                  {player.gameDays.map(day => (
-                                    <span key={day} className="px-1.5 py-0.5 bg-muted rounded text-xs font-medium whitespace-nowrap">
-                                      {day}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-                            </TableCell>
-                             <TableCell className="text-right">{player.games_played || 0}</TableCell>
-                             {/* Skater Stats - only render for skaters */}
-                             {!isGoalie && (
-                               <>
-                                 <TableCell className="text-right">{player.goals || 0}</TableCell>
-                                 <TableCell className="text-right">{player.assists || 0}</TableCell>
-                                 <TableCell className="text-right font-bold">{player.points || 0}</TableCell>
-                                 <TableCell className="text-right">{player.shots || 0}</TableCell>
-                                 <TableCell className="text-right">{player.hits || 0}</TableCell>
-                                 <TableCell className="text-right">{player.blocks || 0}</TableCell>
-                                 <TableCell className="text-right font-medium">
-                                   {((player.points || 0) / Math.max(1, player.games_played || 1)).toFixed(2)}
-                                 </TableCell>
-                               </>
-                             )}
-                             {/* Goalie Stats - only render for goalies */}
-                             {isGoalie && (
-                               <>
-                                 <TableCell className="text-right">{player.wins || 0}</TableCell>
-                                 <TableCell className="text-right">{typeof player.goals_against_average === 'number' ? player.goals_against_average.toFixed(2) : '-'}</TableCell>
-                                 <TableCell className="text-right">{typeof player.save_percentage === 'number' ? (player.save_percentage * 100).toFixed(1) : '-'}%</TableCell>
-                                 <TableCell className="text-right font-medium">
-                                   {((player.points || 0) / Math.max(1, player.games_played || 1)).toFixed(2)}
-                                 </TableCell>
-                               </>
-                             )}
-                             <TableCell>
-                               <div className="flex gap-1 justify-end">
-                                 <Button 
-                                   size="icon" 
-                                   variant="ghost" 
-                                   className={`h-8 w-8 ${watchlist.has(player.id) ? 'text-yellow-500' : 'text-muted-foreground'}`}
-                                   onClick={() => toggleWatchlist(player)}
-                                 >
-                                   <Star className={`h-4 w-4 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
-                                 </Button>
-                                 <Button size="default" variant="default" className="h-10 w-10 text-primary font-bold text-xl bg-primary/10 hover:bg-primary/20 border border-primary/30" onClick={() => handleAddPlayer(player)}>
-                                   +
-                                 </Button>
-                               </div>
-                             </TableCell>
-                           </TableRow>
-                         );
-                       })}
+                               </TableCell>
+                               <TableCell className="text-center">
+                                 {player.games && player.games.length > 0 && player.team ? (
+                                   <div className="flex justify-center items-center">
+                                     <div className="inline-flex gap-1 items-center flex-nowrap">
+                                       {(() => {
+                                         const todayMST = getTodayMST();
+                                         return player.games
+                                           .filter(game => game && game.game_date)
+                                           .sort((a, b) => new Date(a.game_date).getTime() - new Date(b.game_date).getTime())
+                                           .map((game, idx) => {
+                                             const gameDateStr = game.game_date.split('T')[0];
+                                             const isPastDate = gameDateStr < todayMST;
+                                             const isToday = gameDateStr === todayMST;
+                                             const playerTeamUpper = (player.team || '').toUpperCase();
+                                             const homeTeamUpper = (game.home_team || '').toUpperCase();
+                                             const isHome = homeTeamUpper === playerTeamUpper;
+                                             const opponent = isHome ? (game.away_team || '') : (game.home_team || '');
+                                             if (!opponent) return null;
+                                             
+                                             return (
+                                               <div 
+                                                 key={idx}
+                                                 className={`relative flex-shrink-0 w-6 h-6 rounded flex items-center justify-center border ${
+                                                   isPastDate ? 'opacity-30 grayscale border-gray-300' : 
+                                                   isToday ? 'border-2 border-green-500' :
+                                                   'border-orange-300'
+                                                 }`}
+                                                 title={`${isHome ? 'vs' : '@'} ${opponent} - ${gameDateStr}`}
+                                               >
+                                                 <img 
+                                                   src={`https://assets.nhle.com/logos/nhl/svg/${opponent.toUpperCase()}_light.svg`}
+                                                   alt={opponent}
+                                                   className="w-4 h-4 object-contain"
+                                                   onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                                 />
+                                               </div>
+                                             );
+                                           });
+                                       })()}
+                                     </div>
+                                   </div>
+                                 ) : (
+                                   <span className="text-xs text-muted-foreground">-</span>
+                                 )}
+                               </TableCell>
+                               <TableCell className="text-center bg-blue-500/5">
+                                 <div className="flex flex-col items-center">
+                                   <span className={`text-lg font-bold ${
+                                     isTopPick ? 'text-green-600' : 'text-blue-600'
+                                   }`}>
+                                     {player.weeklyProjection.toFixed(1)}
+                                   </span>
+                                   <span className="text-[10px] text-muted-foreground">
+                                     {player.gamesThisWeek || 0} game{(player.gamesThisWeek || 0) !== 1 ? 's' : ''} left
+                                   </span>
+                                 </div>
+                               </TableCell>
+                               <TableCell>
+                                 <div className="flex gap-1 justify-end">
+                                   <Button 
+                                     size="icon" 
+                                     variant="ghost" 
+                                     className={`h-8 w-8 ${watchlist.has(player.id) ? 'text-yellow-500' : 'text-muted-foreground'}`}
+                                     onClick={() => toggleWatchlist(player)}
+                                   >
+                                     <Star className={`h-4 w-4 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
+                                   </Button>
+                                   <Button size="sm" variant="default" className="h-8 px-3 text-primary font-bold bg-primary/10 hover:bg-primary/20 border border-primary/30" onClick={() => handleAddPlayer(player)}>
+                                     + Add
+                                   </Button>
+                                 </div>
+                               </TableCell>
+                             </TableRow>
+                           );
+                         });
+                       })()}
                      </TableBody>
                    </Table>
                  </div>
