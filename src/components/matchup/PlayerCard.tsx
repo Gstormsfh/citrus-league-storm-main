@@ -1,6 +1,6 @@
 /**
- * PlayerCard - NFL-Style Layout with Citrus Theme
- * Exact structure matching the screenshot
+ * PlayerCard - NFL-Style COMPACT Layout with Citrus Theme
+ * TIGHT spacing, NO wasted space
  */
 
 import { MatchupPlayer } from "./types";
@@ -19,14 +19,13 @@ interface PlayerCardProps {
 }
 
 export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick, selectedDate }: PlayerCardProps) => {
-  // Empty slot
   if (!player) {
     return (
       <div className={cn(
-        "player-card-nfl player-card-nfl-empty",
-        isUserTeam ? "player-card-nfl-user" : "player-card-nfl-opponent"
+        "nfl-card nfl-card-empty",
+        isUserTeam ? "nfl-card-user" : "nfl-card-opponent"
       )}>
-        <span className="text-citrus-charcoal/50 text-sm">Empty Slot</span>
+        <span className="text-citrus-charcoal/50 text-xs">Empty Slot</span>
       </div>
     );
   }
@@ -34,12 +33,12 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
   const todayStr = getTodayMST();
   const isGoalie = player.isGoalie || player.position === 'G' || player.position === 'Goalie';
   
-  // Projection logic
+  // Projection
   const dailyProjection = isGoalie ? player.goalieProjection : player.daily_projection;
   const projectedPoints = dailyProjection?.total_projected_points || 0;
   const dailyTotalPoints = player.daily_total_points || 0;
   
-  // Game status for selected date
+  // Game status
   const dateToCheck = selectedDate || todayStr;
   const dateGames = player.games?.filter(g => g?.game_date?.split('T')[0] === dateToCheck) || [];
   const hasGameOnDate = dateGames.length > 0;
@@ -49,209 +48,141 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
   const isGameLive = gameStatus === 'live' || gameStatus === 'intermission';
   const isViewingPastDate = selectedDate ? selectedDate < todayStr : false;
   
-  // Should show actual points vs projection
   const shouldShowDailyPoints = isViewingPastDate || isGameFinal || isGameLive || player.daily_total_points !== undefined;
-  
-  // Points to display in progress bar
   const displayPoints = shouldShowDailyPoints ? dailyTotalPoints : projectedPoints;
   const maxPoints = 10;
   const fillPercentage = Math.min((displayPoints / maxPoints) * 100, 100);
   
-  // Fantasy points for stats box
+  // Stats
   const fantasyPoints = player.total_points ?? 0;
   const xGoals = player.stats?.xGoals ?? 0;
   
-  // Get live game info
-  const getLiveGameInfo = () => {
+  // Live game info
+  const getGameText = () => {
     if (!currentGame) return null;
-    
     const playerTeamUpper = player.team?.toUpperCase() || '';
     const isHome = currentGame.home_team?.toUpperCase() === playerTeamUpper;
-    const homeScore = currentGame.home_score || 0;
-    const awayScore = currentGame.away_score || 0;
     
     if (isGameLive) {
       const period = currentGame.period || '1st';
-      const periodTime = currentGame.period_time || '';
-      return {
-        text: `LIVE: ${awayScore}-${homeScore} (${period}${periodTime ? ' ' + periodTime : ''})`,
-        isLive: true
-      };
+      return `LIVE: ${currentGame.away_score}-${currentGame.home_score} (${period})`;
     }
-    
     if (isGameFinal) {
-      return {
-        text: `Final: ${awayScore}-${homeScore}`,
-        isLive: false
-      };
+      return `Final: ${currentGame.away_score}-${currentGame.home_score}`;
     }
-    
-    // Upcoming game
-    const gameTime = currentGame.game_time || 'TBD';
     const opponent = isHome ? currentGame.away_team : currentGame.home_team;
     const prefix = isHome ? 'vs' : '@';
-    return {
-      text: `${prefix} ${opponent} ${gameTime}`,
-      isLive: false
-    };
+    return `${prefix} ${opponent} ${currentGame.game_time || ''}`;
   };
   
-  const gameInfo = getLiveGameInfo();
-  
-  // Schedule icons - get games for the week (max 5)
+  // Schedule games (max 5)
   const scheduleGames = (player.games || [])
     .filter(g => g && g.game_date)
     .sort((a, b) => a.game_date.localeCompare(b.game_date))
     .slice(0, 5);
 
+  const gameText = getGameText();
+
   return (
     <div 
       className={cn(
-        "player-card-nfl",
-        isUserTeam ? "player-card-nfl-user" : "player-card-nfl-opponent",
-        isBench && "player-card-nfl-bench",
-        isGameLive && "player-card-nfl-live"
+        "nfl-card",
+        isUserTeam ? "nfl-card-user" : "nfl-card-opponent",
+        isBench && "nfl-card-bench",
+        isGameLive && "nfl-card-live"
       )}
       onClick={() => onPlayerClick?.(player)}
     >
-      {/* ROW 1: Player Name + Stats Box */}
-      <div className="nfl-row-1">
-        <div className="nfl-name-section">
-          <span className="nfl-player-name">
+      {/* TOP ROW: Name + Stats Box */}
+      <div className="nfl-top">
+        <div className="nfl-left">
+          {/* Name */}
+          <div className="nfl-name">
             {player.name}
-          </span>
-          {(player.roster_status && player.roster_status !== 'ACT') && (
-            <Badge variant="destructive" className="nfl-badge">IR</Badge>
-          )}
-          {player.wasDropped && (
-            <Badge className="nfl-badge nfl-badge-dropped">Dropped</Badge>
-          )}
+            {(player.roster_status && player.roster_status !== 'ACT') && (
+              <Badge variant="destructive" className="nfl-ir">IR</Badge>
+            )}
+          </div>
+          {/* Stats line - tight under name */}
+          <div className="nfl-stats-line">
+            {isGoalie ? (
+              `${player.goalieStats?.wins || 0} W, ${((player.goalieStats?.savePct || 0) * 100).toFixed(1)}% SV, ${(player.goalieStats?.gaa || 0).toFixed(2)} GAA`
+            ) : (
+              `${player.stats?.goals ?? 0} G, ${player.stats?.assists ?? 0} A, ${player.stats?.sog ?? 0} SOG, ${player.stats?.powerPlayPoints ?? 0} PPP`
+            )}
+          </div>
+          {/* Game status + Schedule Icons */}
+          <div className="nfl-game-row">
+            <span className={cn("nfl-game-text", isGameLive && "nfl-live-text")}>
+              {gameText || 'No game'}
+            </span>
+            {/* SCHEDULE ICONS - RIGHT */}
+            <div className="nfl-icons">
+              {scheduleGames.map((game, idx) => {
+                const gameDateStr = game.game_date.split('T')[0];
+                const isToday = gameDateStr === todayStr;
+                const isPast = gameDateStr < todayStr;
+                const live = game.status === 'live' || game.status === 'intermission';
+                
+                const playerTeamUpper = player.team?.toUpperCase() || '';
+                const isHome = game.home_team?.toUpperCase() === playerTeamUpper;
+                const opponent = isHome ? game.away_team : game.home_team;
+                if (!opponent) return null;
+                
+                const logoUrl = `https://assets.nhle.com/logos/nhl/svg/${opponent.toUpperCase()}_light.svg`;
+                
+                return (
+                  <div 
+                    key={idx} 
+                    className={cn(
+                      "nfl-icon",
+                      live && "nfl-icon-live",
+                      isToday && !live && "nfl-icon-today",
+                      (isPast || game.status === 'final') && "nfl-icon-past"
+                    )}
+                    title={`${isHome ? 'vs' : '@'} ${opponent}`}
+                  >
+                    <img src={logoUrl} alt={opponent} className="nfl-logo" />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
         
-        {/* Stats Box - Top Right */}
-        <div className="nfl-stats-box">
-          <div className="nfl-stat-row">
-            <span className="nfl-stat-label">F Pts</span>
-            <span className="nfl-stat-value nfl-stat-highlight">
+        {/* STATS BOX - Right */}
+        <div className="nfl-box">
+          <div className="nfl-box-row">
+            <span className="nfl-box-label">F Pts</span>
+            <span className="nfl-box-value nfl-fpts">
               {player.stats_breakdown ? (
                 <PointsTooltip breakdown={player.stats_breakdown} totalPoints={fantasyPoints} />
-              ) : (
-                fantasyPoints.toFixed(1)
-              )}
+              ) : fantasyPoints.toFixed(1)}
             </span>
           </div>
-          <div className="nfl-stat-row">
-            <span className="nfl-stat-label">xG</span>
-            <span className="nfl-stat-value">{xGoals.toFixed(1)}</span>
+          <div className="nfl-box-row">
+            <span className="nfl-box-label">xG</span>
+            <span className="nfl-box-value">{xGoals.toFixed(1)}</span>
           </div>
         </div>
       </div>
       
-      {/* ROW 2: Stats Line */}
-      <div className="nfl-row-2">
-        {isGoalie ? (
-          <span className="nfl-stats-text">
-            {player.goalieStats?.wins || 0} W, {((player.goalieStats?.savePct || 0) * 100).toFixed(1)}% SV, {(player.goalieStats?.gaa || 0).toFixed(2)} GAA, {player.goalieStats?.shutouts || 0} SO
-          </span>
-        ) : (
-          <span className="nfl-stats-text">
-            {player.stats?.goals ?? 0} G, {player.stats?.assists ?? 0} A, {player.stats?.sog ?? 0} SOG, {player.stats?.powerPlayPoints ?? 0} PPP
-          </span>
-        )}
-      </div>
-      
-      {/* ROW 3: Game Status + Schedule Icons (RIGHT) */}
-      <div className="nfl-row-3">
-        <span className={cn("nfl-game-status", gameInfo?.isLive && "nfl-game-live")}>
-          {gameInfo?.text || 'No game'}
-        </span>
-        
-        {/* Schedule Icons - RIGHT SIDE */}
-        <div className="nfl-schedule-icons">
-          {scheduleGames.map((game, idx) => {
-            const gameDateStr = game.game_date.split('T')[0];
-            const isToday = gameDateStr === todayStr;
-            const isPast = gameDateStr < todayStr;
-            const isLive = game.status === 'live' || game.status === 'intermission';
-            const isFinal = game.status === 'final' || isPast;
-            
-            const playerTeamUpper = player.team?.toUpperCase() || '';
-            const isHome = game.home_team?.toUpperCase() === playerTeamUpper;
-            const opponent = isHome ? game.away_team : game.home_team;
-            
-            if (!opponent) return null;
-            
-            const logoUrl = `https://assets.nhle.com/logos/nhl/svg/${opponent.toUpperCase()}_light.svg`;
-            
-            return (
-              <div 
-                key={idx} 
-                className={cn(
-                  "nfl-schedule-icon",
-                  isLive && "nfl-icon-live",
-                  isToday && !isLive && "nfl-icon-today",
-                  isFinal && "nfl-icon-past"
-                )}
-                title={`${isHome ? 'vs' : '@'} ${opponent} - ${gameDateStr}`}
-              >
-                <img
-                  src={logoUrl}
-                  alt={opponent}
-                  className="nfl-icon-logo"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = 'none';
-                  }}
-                />
-              </div>
-            );
-          })}
-        </div>
-      </div>
-      
-      {/* ROW 4: Projection/Daily Points Bar */}
-      <div className="nfl-row-4">
-        <div className="nfl-progress-track">
+      {/* BOTTOM: Progress Bar */}
+      <div className="nfl-bar-row">
+        <div className="nfl-bar-track">
           <div 
-            className={cn(
-              "nfl-progress-fill",
-              shouldShowDailyPoints ? "nfl-fill-actual" : "nfl-fill-projected"
-            )}
+            className={cn("nfl-bar-fill", shouldShowDailyPoints ? "nfl-bar-actual" : "nfl-bar-proj")}
             style={{ width: `${fillPercentage}%` }}
           />
         </div>
-        <span className="nfl-progress-label">
-          {shouldShowDailyPoints 
-            ? `${dailyTotalPoints.toFixed(1)} pts` 
-            : hasGameOnDate 
-              ? `Proj: ${projectedPoints.toFixed(1)}`
-              : 'No game'
-          }
+        <span className="nfl-bar-label">
+          {shouldShowDailyPoints ? `${dailyTotalPoints.toFixed(1)} pts` : hasGameOnDate ? `Proj: ${projectedPoints.toFixed(1)}` : 'No game'}
         </span>
-      </div>
-      
-      {/* ROW 5: Last 10 Games - Placeholder for now */}
-      <div className="nfl-row-5">
-        <span className="nfl-last10-label">Last 10:</span>
-        <div className="nfl-last10-dots">
-          {/* Will populate with actual game data - placeholder dots for now */}
-          {[...Array(10)].map((_, i) => (
-            <div 
-              key={i} 
-              className={cn(
-                "nfl-dot",
-                i < 3 ? "nfl-dot-high" : i < 6 ? "nfl-dot-med" : "nfl-dot-low"
-              )}
-            />
-          ))}
-        </div>
       </div>
       
       {/* Bench overlay */}
       {isBench && (
-        <div className="nfl-bench-overlay">
-          <span>BENCH</span>
-        </div>
+        <div className="nfl-bench">BENCH</div>
       )}
     </div>
   );
