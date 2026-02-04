@@ -1343,126 +1343,172 @@
     gap: 24px !important;
   }
   
-  /* ===== MOBILE PLAYER CARDS - HORIZONTAL COMPACT LAYOUT ===== */
+  /* ===== NFL-STYLE MOBILE PLAYER CARDS ===== */
+  /* Clean, horizontal, gorgeous cards like the NFL fantasy reference */
   
-  /* Player card - horizontal layout on mobile */
+  /* Reset the player card completely for mobile */
   .player-card {
-    padding: 6px 8px !important;
-    min-height: 44px !important;
-    max-height: 52px !important;
-    border-radius: 8px !important;
-    margin-bottom: 2px !important;
+    all: unset !important;
+    display: block !important;
+    background: #f8f8f8 !important;
+    border: 2px solid #2a2a2a !important;
+    border-radius: 6px !important;
+    padding: 8px 10px !important;
+    margin-bottom: 4px !important;
+    position: relative !important;
+    overflow: hidden !important;
+    min-height: auto !important;
+    max-height: none !important;
   }
   
-  /* Card content - horizontal flex */
+  .player-card.user-team {
+    border-left: 4px solid #4CAF50 !important;
+  }
+  
+  .player-card.opponent-team {
+    border-left: 4px solid #FF9800 !important;
+  }
+  
+  /* Hide all decorative elements */
+  .player-card-bg-text,
+  .player-card-bg-number,
+  .player-projection-bar-container,
+  .game-logos-bar {
+    display: none !important;
+  }
+  
+  /* Card content - grid layout like NFL cards */
   .player-card-content {
-    flex-direction: row !important;
-    align-items: center !important;
-    justify-content: space-between !important;
+    display: grid !important;
+    grid-template-columns: 1fr auto !important;
     gap: 8px !important;
+    align-items: start !important;
   }
   
-  /* Header section - horizontal on mobile */
+  /* Header section - contains name and stats */
   .player-card-header {
     display: flex !important;
-    flex-direction: row !important;
-    align-items: center !important;
-    gap: 8px !important;
-    flex: 1 !important;
+    flex-direction: column !important;
+    gap: 2px !important;
     min-width: 0 !important;
   }
   
-  /* Left side - name and team inline */
+  /* Left side - stacked vertically */
   .player-header-left {
-    flex-direction: row !important;
-    align-items: center !important;
-    gap: 6px !important;
-    flex: 1 !important;
-    min-width: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 1px !important;
   }
   
-  /* Player name - full width, no truncation issues */
+  /* Player name - BOLD and prominent */
   .player-name {
-    font-size: 12px !important;
-    font-weight: 700 !important;
+    font-family: 'Arial Black', 'Helvetica Neue', sans-serif !important;
+    font-size: 14px !important;
+    font-weight: 900 !important;
+    color: #1a1a1a !important;
+    line-height: 1.2 !important;
+    margin: 0 !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
-    max-width: 100% !important;
-    flex-shrink: 1 !important;
   }
   
-  /* Team name - compact */
+  /* Team and position line */
   .player-team-name {
-    font-size: 9px !important;
-    opacity: 0.7 !important;
-    white-space: nowrap !important;
-    flex-shrink: 0 !important;
-  }
-  
-  /* Hide verbose stats on mobile */
-  .player-key-stats {
-    display: none !important;
-  }
-  
-  /* Unique stats box - compact on mobile */
-  .player-unique-stats-box {
-    padding: 2px 6px !important;
-    min-width: 36px !important;
-    flex-shrink: 0 !important;
-  }
-  
-  .unique-stat-label {
-    font-size: 7px !important;
-  }
-  
-  .unique-stat-value {
-    font-size: 11px !important;
-  }
-  
-  /* Hide background decorations on mobile */
-  .player-card-bg-text,
-  .player-card-bg-number {
-    display: none !important;
-  }
-  
-  /* Projection bar - smaller on mobile */
-  .player-projection-bar-container {
-    display: none !important;
-  }
-  
-  /* Game logos - smaller on mobile */
-  .game-logos-bar {
-    gap: 2px !important;
-  }
-  
-  .game-logos-bar img {
-    width: 16px !important;
-    height: 16px !important;
-  }
-  
-  /* Matchup comparison row - tighter on mobile */
-  .matchup-comparison-row {
-    grid-template-columns: 44% 12% 44% !important;
-    gap: 0 !important;
-  }
-  
-  /* Center column - more compact */
-  .matchup-center-column {
-    padding: 2px !important;
+    font-family: Arial, sans-serif !important;
     font-size: 10px !important;
+    color: #666 !important;
+    font-style: italic !important;
+    margin: 0 !important;
+  }
+  
+  /* Key stats line - show it! */
+  .player-key-stats {
+    display: block !important;
+    font-family: Arial, sans-serif !important;
+    font-size: 10px !important;
+    color: #444 !important;
+    margin-top: 2px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+  
+  /* Unique stats box - RIGHT SIDE GRID */
+  .player-unique-stats-box {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 1px !important;
+    background: linear-gradient(135deg, #e8e8e8 0%, #d0d0d0 100%) !important;
+    border: 1px solid #999 !important;
+    border-radius: 4px !important;
+    padding: 4px 6px !important;
+    min-width: 55px !important;
+    align-items: flex-end !important;
+  }
+  
+  .player-unique-stats-box .unique-stat-item {
+    display: flex !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+    gap: 4px !important;
+  }
+  
+  .player-unique-stats-box .unique-stat-label {
+    font-family: Arial, sans-serif !important;
+    font-size: 8px !important;
+    color: #666 !important;
+    text-transform: uppercase !important;
+  }
+  
+  .player-unique-stats-box .unique-stat-value {
+    font-family: 'Arial Black', sans-serif !important;
+    font-size: 11px !important;
+    font-weight: 900 !important;
+    color: #1a1a1a !important;
+  }
+  
+  /* F Pts highlight - green for good scores */
+  .player-unique-stats-box .unique-stat-item:first-child .unique-stat-value {
+    color: #2e7d32 !important;
+  }
+  
+  /* Matchup comparison row - give cards more room */
+  .matchup-comparison-row {
+    grid-template-columns: 46% 8% 46% !important;
+    gap: 0 !important;
+    align-items: stretch !important;
+  }
+  
+  /* Center column - slim and clean */
+  .matchup-center-column {
+    background: linear-gradient(180deg, #e0e0e0 0%, #c0c0c0 100%) !important;
+    padding: 4px 2px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 9px !important;
+    border-left: 1px solid #999 !important;
+    border-right: 1px solid #999 !important;
   }
   
   .matchup-center-column .projected-score,
   .matchup-center-column .projected-score-user,
   .matchup-center-column .projected-score-opponent {
-    font-size: 10px !important;
+    font-size: 9px !important;
+    font-weight: bold !important;
   }
   
-  /* Position group headers - smaller */
+  /* Position group headers - clean dividers */
   .matchup-position-group-header {
+    background: #2a2a2a !important;
+    color: #fff !important;
     padding: 4px 8px !important;
     font-size: 11px !important;
+    font-weight: bold !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1px !important;
   }
   
   /* Hide decorative blurs on mobile for performance */
