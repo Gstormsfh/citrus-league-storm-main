@@ -7,7 +7,7 @@ import { getFirstWeekStartDate, getWeekStartDate, getWeekEndDate, getAvailableWe
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { ScheduleService, NHLGame, GameInfo } from './ScheduleService';
 import { withTimeout } from '@/utils/promiseUtils';
-import { getTodayMST, getTodayMSTDate } from '@/utils/timezoneUtils';
+import { getTodayMST, getTodayMSTDate, formatDateToString, isDateInRange } from '@/utils/timezoneUtils';
 import { COLUMNS } from '@/utils/queryColumns';
 import { ScoringCalculator, extractScoringSettings } from '@/utils/scoringUtils';
 

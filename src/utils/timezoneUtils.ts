@@ -100,3 +100,57 @@ export function formatTimeMST(timeStr: string, options?: Intl.DateTimeFormatOpti
     ...options
   });
 }
+
+/**
+ * CRITICAL: Parse a date string (YYYY-MM-DD) without timezone interpretation issues
+ * This avoids the bug where new Date("2026-02-02") creates UTC midnight which is Feb 1st in MST
+ * Returns a Date object at local midnight for the given date
+ */
+export function parseDateStringLocal(dateStr: string): Date {
+  if (!dateStr) return new Date(NaN);
+  
+  // Split the date string and create date with explicit components
+  // This avoids UTC interpretation
+  const parts = dateStr.split('T')[0].split('-');
+  if (parts.length !== 3) return new Date(NaN);
+  
+  const year = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
+  const day = parseInt(parts[2], 10);
+  
+  // Create date at local midnight - NOT UTC
+  return new Date(year, month, day, 0, 0, 0, 0);
+}
+
+/**
+ * Format a Date object to YYYY-MM-DD string (local timezone, no UTC shift)
+ */
+export function formatDateToString(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Compare two date strings (YYYY-MM-DD format)
+ * Returns: -1 if a < b, 0 if a === b, 1 if a > b
+ */
+export function compareDateStrings(a: string, b: string): number {
+  const dateA = a.split('T')[0];
+  const dateB = b.split('T')[0];
+  if (dateA < dateB) return -1;
+  if (dateA > dateB) return 1;
+  return 0;
+}
+
+/**
+ * Check if a date string is within a range (inclusive)
+ * All parameters should be YYYY-MM-DD format
+ */
+export function isDateInRange(dateStr: string, startStr: string, endStr: string): boolean {
+  const date = dateStr.split('T')[0];
+  const start = startStr.split('T')[0];
+  const end = endStr.split('T')[0];
+  return date >= start && date <= end;
+}
