@@ -403,21 +403,35 @@ const Standings = () => {
 
   return (
     <div className="min-h-screen bg-[#D4E8B8] relative overflow-hidden" style={{ visibility: 'visible', opacity: 1 }}>
-      {/* Citrus Background - Floating citrus elements */}
-      <CitrusBackground density="light" animated={true} />
+      {/* Citrus Background - Hidden on mobile */}
+      <div className="hidden lg:block">
+        <CitrusBackground density="light" animated={true} />
+      </div>
       
-      {/* Decorative elements to match Home page */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-[hsl(var(--vibrant-yellow))] rounded-full opacity-10 blur-3xl -z-10"></div>
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-[hsl(var(--vibrant-green))] rounded-full opacity-10 blur-3xl -z-10"></div>
+      {/* Decorative elements - Hidden on mobile */}
+      <div className="hidden lg:block absolute top-0 right-0 w-96 h-96 bg-[hsl(var(--vibrant-yellow))] rounded-full opacity-10 blur-3xl -z-10"></div>
+      <div className="hidden lg:block absolute bottom-0 left-0 w-96 h-96 bg-[hsl(var(--vibrant-green))] rounded-full opacity-10 blur-3xl -z-10"></div>
 
-      <Navbar />
-      <main className="w-full pt-28 pb-16 m-0 p-0" style={{ visibility: 'visible', opacity: 1, zIndex: 1 }}>
+      {/* Desktop Navbar - Hidden on mobile */}
+      <div className="hidden lg:block">
+        <Navbar />
+      </div>
+      
+      {/* MOBILE: Compact header */}
+      <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
+        <div className="flex items-center justify-center h-12 px-4">
+          <h1 className="text-lg font-varsity font-bold text-citrus-forest">Standings</h1>
+        </div>
+      </div>
+
+      <main className="w-full lg:pt-28 lg:pb-16 pb-[calc(5rem+env(safe-area-inset-bottom))]" style={{ visibility: 'visible', opacity: 1, zIndex: 1 }}>
         <div className="w-full m-0 p-0" style={{ visibility: 'visible', opacity: 1 }}>
-          {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
+          {/* Desktop: Grid / Mobile: Single column */}
           <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
-            {/* Main Content - Scrollable - Appears first on mobile */}
-            <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
-              <div className="max-w-3xl mx-auto text-center mb-10 animated-element animate relative" style={{ visibility: 'visible', opacity: 1 }}>
+            {/* Main Content */}
+            <div className="min-w-0 lg:max-h-[calc(100vh-12rem)] overflow-y-auto ios-scroll px-3 lg:px-6 order-1 lg:order-2">
+              {/* Desktop: Large hero header / Mobile: Hidden (using compact sticky header) */}
+              <div className="hidden lg:block max-w-3xl mx-auto text-center mb-10 animated-element animate relative" style={{ visibility: 'visible', opacity: 1 }}>
             {/* Citrus Decorations */}
             <CitrusSlice className="absolute -top-6 -left-6 w-12 h-12 text-citrus-orange/20 rotate-12" />
             <CitrusLeaf className="absolute -top-4 -right-8 w-10 h-10 text-citrus-sage/20 -rotate-45" />
@@ -653,8 +667,8 @@ const Standings = () => {
               </div>
               </div>
 
-            {/* Left Sidebar - At bottom on mobile, left on desktop */}
-            <aside className="w-full lg:w-auto order-2 lg:order-1">
+            {/* Left Sidebar - Hidden on mobile */}
+            <aside className="hidden lg:block w-full lg:w-auto order-2 lg:order-1">
               <div className="lg:sticky lg:top-32 space-y-4 lg:space-y-6">
                 <AdSpace size="300x250" label="Standings Sponsor" />
                 <AdSpace size="300x250" label="Fantasy Partner" />
@@ -672,7 +686,10 @@ const Standings = () => {
           </div>
         </div>
       </main>
-      <Footer />
+      {/* Footer - Hidden on mobile */}
+      <div className="hidden lg:block">
+        <Footer />
+      </div>
     </div>
   );
 };

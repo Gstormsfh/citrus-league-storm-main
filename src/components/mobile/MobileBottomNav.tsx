@@ -65,9 +65,6 @@ const MobileBottomNav = () => {
 
   return (
     <>
-      {/* Spacer to prevent content from being hidden behind nav */}
-      <div className="h-[calc(4.5rem+env(safe-area-inset-bottom))] lg:hidden" />
-      
       {/* Bottom Navigation Bar */}
       <nav 
         className={cn(

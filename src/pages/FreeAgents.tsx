@@ -1238,15 +1238,39 @@ const FreeAgents = () => {
 
   return (
     <div className="min-h-screen bg-[#D4E8B8] relative overflow-hidden">
-      <CitrusBackground density="light" />
-      <Navbar />
-      <main className="w-full pt-28 pb-16 m-0 p-0">
+      {/* Citrus Background - Hidden on mobile */}
+      <div className="hidden lg:block">
+        <CitrusBackground density="light" />
+      </div>
+      
+      {/* Desktop Navbar - Hidden on mobile */}
+      <div className="hidden lg:block">
+        <Navbar />
+      </div>
+      
+      {/* MOBILE: Compact header with search */}
+      <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
+        <div className="px-4 py-2">
+          <div className="flex items-center justify-between h-10 mb-2">
+            <h1 className="text-lg font-varsity font-bold text-citrus-forest">Free Agents</h1>
+          </div>
+          <Input 
+            placeholder="Search players..." 
+            className="h-9 text-sm bg-white/80"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <main className="w-full lg:pt-28 lg:pb-16 pb-[calc(5rem+env(safe-area-inset-bottom))]">
         <div className="w-full m-0 p-0">
-          {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
+          {/* Desktop: Grid / Mobile: Single column */}
           <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
-            {/* Main Content - Appears first on mobile */}
-            <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+            {/* Main Content */}
+            <div className="min-w-0 ios-scroll px-3 lg:px-6 order-1 lg:order-2">
+              {/* Desktop header - hidden on mobile */}
+              <div className="hidden lg:flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h1 className="text-3xl font-bold">Free Agents</h1>
             <p className="text-muted-foreground">Available players to improve your roster</p>
@@ -2276,8 +2300,8 @@ const FreeAgents = () => {
         />
             </div>
 
-            {/* Left Sidebar - At bottom on mobile, left on desktop */}
-            <aside className="w-full lg:w-auto order-2 lg:order-1">
+            {/* Left Sidebar - Hidden on mobile */}
+            <aside className="hidden lg:block w-full lg:w-auto order-2 lg:order-1">
               <div className="lg:sticky lg:top-32 space-y-4 lg:space-y-6">
                 <AdSpace size="300x250" label="Free Agents Sponsor" />
                 <AdSpace size="300x250" label="Fantasy Partner" />
@@ -2295,7 +2319,10 @@ const FreeAgents = () => {
           </div>
         </div>
       </main>
-      <Footer />
+      {/* Footer - Hidden on mobile */}
+      <div className="hidden lg:block">
+        <Footer />
+      </div>
     </div>
   );
 };

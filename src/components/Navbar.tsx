@@ -103,13 +103,15 @@ const Navbar = () => {
     <header 
       className={cn(
         "fixed top-0 left-0 right-0 w-full z-50 transition-all duration-500", 
+        // MOBILE: Hide the full navbar - use bottom nav instead
+        // Only show the compact mobile header bar
+        "lg:block",
         // Desktop styling
-        "lg:py-3",
         isScrolled ? 
-          "lg:py-3 bg-[#D4E8B8]/95 backdrop-blur-lg shadow-sm border-b-2 border-citrus-sage/30" : 
-          "lg:py-5 bg-[#D4E8B8]/90 backdrop-blur-sm border-b border-citrus-sage/20",
-        // Mobile: Compact iOS-style header with safe area
-        "py-2 pt-[calc(0.5rem+env(safe-area-inset-top))]"
+          "py-3 bg-[#D4E8B8]/95 backdrop-blur-lg shadow-sm border-b-2 border-citrus-sage/30" : 
+          "py-5 bg-[#D4E8B8]/90 backdrop-blur-sm border-b border-citrus-sage/20",
+        // Mobile: Ultra-compact header
+        "max-lg:py-2 max-lg:pt-[calc(0.5rem+env(safe-area-inset-top))]"
       )}
     >
       <div className="container mx-auto px-4 max-w-full">
