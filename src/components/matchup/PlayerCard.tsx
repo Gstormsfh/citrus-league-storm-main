@@ -1,12 +1,11 @@
 /**
- * PlayerCard - NFL-Style Clean Horizontal Card
- * ~65px height, dense layout, citrus themed
+ * PlayerCard - NFL-Style Layout with Citrus Theme
+ * Exact structure matching the screenshot
  */
 
 import { MatchupPlayer } from "./types";
 import { cn } from "@/lib/utils";
 import { PointsTooltip } from "./PointsTooltip";
-import { MiniScheduleIcons } from "./MiniScheduleIcons";
 import { getTodayMST } from "@/utils/timezoneUtils";
 import { Badge } from "@/components/ui/badge";
 
@@ -24,12 +23,10 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
   if (!player) {
     return (
       <div className={cn(
-        "nfl-card nfl-card-empty",
-        isUserTeam ? "nfl-card-user" : "nfl-card-opponent"
+        "player-card-nfl player-card-nfl-empty",
+        isUserTeam ? "player-card-nfl-user" : "player-card-nfl-opponent"
       )}>
-        <div className="nfl-card-left">
-          <span className="nfl-player-name text-gray-400">Empty Slot</span>
-        </div>
+        <span className="text-citrus-charcoal/50 text-sm">Empty Slot</span>
       </div>
     );
   }
@@ -42,11 +39,12 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
   const projectedPoints = dailyProjection?.total_projected_points || 0;
   const dailyTotalPoints = player.daily_total_points || 0;
   
-  // Game status
+  // Game status for selected date
   const dateToCheck = selectedDate || todayStr;
   const dateGames = player.games?.filter(g => g?.game_date?.split('T')[0] === dateToCheck) || [];
   const hasGameOnDate = dateGames.length > 0;
-  const gameStatus = (dateGames[0]?.status || 'scheduled').toLowerCase();
+  const currentGame = dateGames[0];
+  const gameStatus = (currentGame?.status || 'scheduled').toLowerCase();
   const isGameFinal = gameStatus === 'final';
   const isGameLive = gameStatus === 'live' || gameStatus === 'intermission';
   const isViewingPastDate = selectedDate ? selectedDate < todayStr : false;
@@ -56,81 +54,85 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
   
   // Points to display in progress bar
   const displayPoints = shouldShowDailyPoints ? dailyTotalPoints : projectedPoints;
-  const maxPoints = 15;
+  const maxPoints = 10;
   const fillPercentage = Math.min((displayPoints / maxPoints) * 100, 100);
   
-  // Stats for right box
+  // Fantasy points for stats box
   const fantasyPoints = player.total_points ?? 0;
-  const ppp = player.stats?.powerPlayPoints ?? 0;
   const xGoals = player.stats?.xGoals ?? 0;
-  const savePct = player.goalieStats?.savePct ?? 0;
-  const gsax = player.goalieStats?.goalsSavedAboveExpected ?? 0;
+  
+  // Get live game info
+  const getLiveGameInfo = () => {
+    if (!currentGame) return null;
+    
+    const playerTeamUpper = player.team?.toUpperCase() || '';
+    const isHome = currentGame.home_team?.toUpperCase() === playerTeamUpper;
+    const homeScore = currentGame.home_score || 0;
+    const awayScore = currentGame.away_score || 0;
+    
+    if (isGameLive) {
+      const period = currentGame.period || '1st';
+      const periodTime = currentGame.period_time || '';
+      return {
+        text: `LIVE: ${awayScore}-${homeScore} (${period}${periodTime ? ' ' + periodTime : ''})`,
+        isLive: true
+      };
+    }
+    
+    if (isGameFinal) {
+      return {
+        text: `Final: ${awayScore}-${homeScore}`,
+        isLive: false
+      };
+    }
+    
+    // Upcoming game
+    const gameTime = currentGame.game_time || 'TBD';
+    const opponent = isHome ? currentGame.away_team : currentGame.home_team;
+    const prefix = isHome ? 'vs' : '@';
+    return {
+      text: `${prefix} ${opponent} ${gameTime}`,
+      isLive: false
+    };
+  };
+  
+  const gameInfo = getLiveGameInfo();
+  
+  // Schedule icons - get games for the week (max 5)
+  const scheduleGames = (player.games || [])
+    .filter(g => g && g.game_date)
+    .sort((a, b) => a.game_date.localeCompare(b.game_date))
+    .slice(0, 5);
 
   return (
     <div 
       className={cn(
-        "nfl-card",
-        isUserTeam ? "nfl-card-user" : "nfl-card-opponent",
-        isBench && "nfl-card-bench",
-        player.isToday && "nfl-card-today",
-        isGameLive && "nfl-card-live"
+        "player-card-nfl",
+        isUserTeam ? "player-card-nfl-user" : "player-card-nfl-opponent",
+        isBench && "player-card-nfl-bench",
+        isGameLive && "player-card-nfl-live"
       )}
       onClick={() => onPlayerClick?.(player)}
     >
-      {/* MAIN ROW: Left info + Right stats box */}
-      <div className="nfl-card-main">
-        {/* LEFT SIDE: Name, Team, Stats + Icons */}
-        <div className="nfl-card-left">
-          {/* Line 1: Player Name + Badges */}
-          <div className="nfl-player-name">
+      {/* ROW 1: Player Name + Stats Box */}
+      <div className="nfl-row-1">
+        <div className="nfl-name-section">
+          <span className="nfl-player-name">
             {player.name}
-            {(player.roster_status && player.roster_status !== 'ACT') && (
-              <Badge variant="destructive" className="nfl-badge-ir">IR</Badge>
-            )}
-            {player.wasDropped && (
-              <Badge variant="secondary" className="nfl-badge-dropped">Dropped</Badge>
-            )}
-          </div>
-          
-          {/* Line 2: Team */}
-          <div className="nfl-player-team">{player.team}</div>
-          
-          {/* Line 3: Stats + Mini Schedule Icons */}
-          <div className="nfl-player-stats-row">
-            <span className="nfl-player-stats">
-              {isGoalie ? (
-                <>W: {player.goalieStats?.wins || 0}, SV%: {((savePct) * 100).toFixed(1)}%, GAA: {(player.goalieStats?.gaa || 0).toFixed(2)}</>
-              ) : (
-                <>{player.stats?.goals ?? 0} G, {player.stats?.assists ?? 0} A, {player.stats?.sog ?? 0} SOG</>
-              )}
-            </span>
-            {/* Mini schedule icons - inline, max 5 */}
-            {player.games && player.team && (
-              <MiniScheduleIcons 
-                games={player.games} 
-                playerTeam={player.team}
-                maxIcons={5}
-              />
-            )}
-          </div>
-          
-          {/* Line 4: Status (if live or today) */}
-          {(isGameLive || player.isToday) && (
-            <div className="nfl-player-status">
-              {isGameLive ? (
-                <span className="nfl-status-live">● LIVE</span>
-              ) : player.isToday ? (
-                <span className="nfl-status-today">Game Today</span>
-              ) : null}
-            </div>
+          </span>
+          {(player.roster_status && player.roster_status !== 'ACT') && (
+            <Badge variant="destructive" className="nfl-badge">IR</Badge>
+          )}
+          {player.wasDropped && (
+            <Badge className="nfl-badge nfl-badge-dropped">Dropped</Badge>
           )}
         </div>
         
-        {/* RIGHT SIDE: Stats Box */}
+        {/* Stats Box - Top Right */}
         <div className="nfl-stats-box">
           <div className="nfl-stat-row">
-            <span className="nfl-stat-label">F PTS:</span>
-            <span className="nfl-stat-value nfl-stat-fpts">
+            <span className="nfl-stat-label">F Pts</span>
+            <span className="nfl-stat-value nfl-stat-highlight">
               {player.stats_breakdown ? (
                 <PointsTooltip breakdown={player.stats_breakdown} totalPoints={fantasyPoints} />
               ) : (
@@ -138,39 +140,82 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
               )}
             </span>
           </div>
-          {isGoalie ? (
-            <>
-              <div className="nfl-stat-row">
-                <span className="nfl-stat-label">SV%:</span>
-                <span className="nfl-stat-value">{(savePct * 100).toFixed(1)}%</span>
-              </div>
-              <div className="nfl-stat-row">
-                <span className="nfl-stat-label">GSAx:</span>
-                <span className="nfl-stat-value">{gsax >= 0 ? '+' : ''}{gsax.toFixed(1)}</span>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="nfl-stat-row">
-                <span className="nfl-stat-label">PPP:</span>
-                <span className="nfl-stat-value">{ppp}</span>
-              </div>
-              <div className="nfl-stat-row">
-                <span className="nfl-stat-label">xG:</span>
-                <span className="nfl-stat-value">{xGoals.toFixed(1)}</span>
-              </div>
-            </>
-          )}
+          <div className="nfl-stat-row">
+            <span className="nfl-stat-label">xG</span>
+            <span className="nfl-stat-value">{xGoals.toFixed(1)}</span>
+          </div>
         </div>
       </div>
       
-      {/* BOTTOM: Thin Progress Bar */}
-      <div className="nfl-progress-container">
-        <div className="nfl-progress-bar">
+      {/* ROW 2: Stats Line */}
+      <div className="nfl-row-2">
+        {isGoalie ? (
+          <span className="nfl-stats-text">
+            {player.goalieStats?.wins || 0} W, {((player.goalieStats?.savePct || 0) * 100).toFixed(1)}% SV, {(player.goalieStats?.gaa || 0).toFixed(2)} GAA, {player.goalieStats?.shutouts || 0} SO
+          </span>
+        ) : (
+          <span className="nfl-stats-text">
+            {player.stats?.goals ?? 0} G, {player.stats?.assists ?? 0} A, {player.stats?.sog ?? 0} SOG, {player.stats?.powerPlayPoints ?? 0} PPP
+          </span>
+        )}
+      </div>
+      
+      {/* ROW 3: Game Status + Schedule Icons (RIGHT) */}
+      <div className="nfl-row-3">
+        <span className={cn("nfl-game-status", gameInfo?.isLive && "nfl-game-live")}>
+          {gameInfo?.text || 'No game'}
+        </span>
+        
+        {/* Schedule Icons - RIGHT SIDE */}
+        <div className="nfl-schedule-icons">
+          {scheduleGames.map((game, idx) => {
+            const gameDateStr = game.game_date.split('T')[0];
+            const isToday = gameDateStr === todayStr;
+            const isPast = gameDateStr < todayStr;
+            const isLive = game.status === 'live' || game.status === 'intermission';
+            const isFinal = game.status === 'final' || isPast;
+            
+            const playerTeamUpper = player.team?.toUpperCase() || '';
+            const isHome = game.home_team?.toUpperCase() === playerTeamUpper;
+            const opponent = isHome ? game.away_team : game.home_team;
+            
+            if (!opponent) return null;
+            
+            const logoUrl = `https://assets.nhle.com/logos/nhl/svg/${opponent.toUpperCase()}_light.svg`;
+            
+            return (
+              <div 
+                key={idx} 
+                className={cn(
+                  "nfl-schedule-icon",
+                  isLive && "nfl-icon-live",
+                  isToday && !isLive && "nfl-icon-today",
+                  isFinal && "nfl-icon-past"
+                )}
+                title={`${isHome ? 'vs' : '@'} ${opponent} - ${gameDateStr}`}
+              >
+                <img
+                  src={logoUrl}
+                  alt={opponent}
+                  className="nfl-icon-logo"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                  }}
+                />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      
+      {/* ROW 4: Projection/Daily Points Bar */}
+      <div className="nfl-row-4">
+        <div className="nfl-progress-track">
           <div 
             className={cn(
               "nfl-progress-fill",
-              shouldShowDailyPoints ? "nfl-progress-actual" : "nfl-progress-projected"
+              shouldShowDailyPoints ? "nfl-fill-actual" : "nfl-fill-projected"
             )}
             style={{ width: `${fillPercentage}%` }}
           />
@@ -179,17 +224,33 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
           {shouldShowDailyPoints 
             ? `${dailyTotalPoints.toFixed(1)} pts` 
             : hasGameOnDate 
-              ? `Proj: ${projectedPoints.toFixed(1)} pts`
+              ? `Proj: ${projectedPoints.toFixed(1)}`
               : 'No game'
           }
         </span>
       </div>
       
+      {/* ROW 5: Last 10 Games - Placeholder for now */}
+      <div className="nfl-row-5">
+        <span className="nfl-last10-label">Last 10:</span>
+        <div className="nfl-last10-dots">
+          {/* Will populate with actual game data - placeholder dots for now */}
+          {[...Array(10)].map((_, i) => (
+            <div 
+              key={i} 
+              className={cn(
+                "nfl-dot",
+                i < 3 ? "nfl-dot-high" : i < 6 ? "nfl-dot-med" : "nfl-dot-low"
+              )}
+            />
+          ))}
+        </div>
+      </div>
+      
       {/* Bench overlay */}
-      {isBench && dailyTotalPoints > 0 && (
+      {isBench && (
         <div className="nfl-bench-overlay">
           <span>BENCH</span>
-          <span className="text-xs">{dailyTotalPoints.toFixed(1)} pts (not counted)</span>
         </div>
       )}
     </div>
