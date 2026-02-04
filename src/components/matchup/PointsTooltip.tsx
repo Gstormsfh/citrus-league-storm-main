@@ -1,6 +1,6 @@
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { StatBreakdown } from "./types";
-import { cn } from "@/lib/utils";
+import { useState } from "react";
 
 export const PointsTooltip = ({ 
   breakdown, 
@@ -9,10 +9,12 @@ export const PointsTooltip = ({
   breakdown: StatBreakdown | undefined;
   totalPoints: number;
 }) => {
+  const [open, setOpen] = useState(false);
+  
   if (!breakdown || Object.keys(breakdown).length === 0) {
     return (
       <span className="font-varsity font-black text-citrus-orange">
-        {totalPoints.toFixed(1)} pts
+        {totalPoints.toFixed(1)}
       </span>
     );
   }
@@ -25,14 +27,17 @@ export const PointsTooltip = ({
   }));
   
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <button className="text-citrus-orange hover:text-citrus-forest active:scale-95 cursor-pointer font-bold text-base font-varsity px-2 py-1 rounded bg-citrus-orange/10 border border-citrus-orange/30 transition-all touch-manipulation">
-          {totalPoints.toFixed(1)} pts
-          <span className="ml-1 text-[10px] opacity-60">ⓘ</span>
+    <Tooltip open={open} onOpenChange={setOpen}>
+      <TooltipTrigger asChild>
+        <button 
+          className="text-citrus-orange hover:text-citrus-forest cursor-pointer font-bold font-varsity transition-all touch-manipulation"
+          onClick={() => setOpen(!open)}
+          onTouchStart={() => setOpen(true)}
+        >
+          {totalPoints.toFixed(1)}
         </button>
-      </PopoverTrigger>
-      <PopoverContent 
+      </TooltipTrigger>
+      <TooltipContent 
         className="p-0 bg-[#E8EED9]/95 backdrop-blur-md rounded-xl border-2 border-citrus-forest shadow-lg w-[280px] z-[999999]"
         side="top"
         align="center"
@@ -45,7 +50,7 @@ export const PointsTooltip = ({
           </h4>
         </div>
 
-        {/* Stats grid - compact for mobile */}
+        {/* Stats grid */}
         <div className="p-3 grid grid-cols-2 gap-2 max-h-[50vh] overflow-y-auto">
           {breakdownArray.map((stat) => (
             <div key={stat.label} className="p-2 bg-white/50 rounded-lg border border-citrus-orange/30">
@@ -65,7 +70,7 @@ export const PointsTooltip = ({
             <span className="font-black text-2xl text-white">{totalPoints.toFixed(1)}</span>
           </div>
         </div>
-      </PopoverContent>
-    </Popover>
+      </TooltipContent>
+    </Tooltip>
   );
 };

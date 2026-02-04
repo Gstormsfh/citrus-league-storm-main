@@ -1261,8 +1261,10 @@
   
   /* Adjust page padding for mobile (no top navbar) */
   main { 
-    padding-top: 1rem !important; 
+    padding-top: 0.5rem !important; 
     padding-bottom: calc(5rem + env(safe-area-inset-bottom)) !important;
+    padding-left: 4px !important;
+    padding-right: 4px !important;
   }
   
   /* Safe area support for notched devices */
@@ -1275,18 +1277,10 @@
     -webkit-tap-highlight-color: transparent;
   }
   
-  /* Minimum 44px touch targets (iOS HIG requirement) */
-  .touch-target {
-    min-height: 44px;
-    min-width: 44px;
-  }
-  
   /* ===== MATCHUP PAGE MOBILE STYLES ===== */
   
   /* Hide sidebars on mobile - show only main content */
-  aside {
-    display: none !important;
-  }
+  aside { display: none !important; }
   
   /* Full width content on mobile */
   .lg\:grid-cols-\[240px_1fr_300px\] {
@@ -1294,351 +1288,275 @@
     flex-direction: column !important;
   }
   
-  /* Remove height constraints on mobile for natural scrolling */
+  /* Remove height constraints */
   .max-h-\[calc\(100vh-12rem\)\] {
     max-height: none !important;
     overflow: visible !important;
   }
   
-  /* Matchup score card - make it prominent and beautiful */
+  /* Matchup total scores - keep CITRUS colors */
   .matchup-total-card {
-    padding: 12px 16px !important;
-    background: linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--background)) 100%) !important;
-    border-radius: 16px !important;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
-  }
-  
-  .matchup-total-score {
-    font-size: 2rem !important;
-    font-weight: 800 !important;
-  }
-  
-  /* Weekly schedule - more compact and touch-friendly */
-  .weekly-schedule-container {
-    padding: 8px !important;
-    gap: 4px !important;
-  }
-  
-  /* Make day buttons larger for touch */
-  .weekly-schedule-container button,
-  .weekly-schedule-container a {
-    min-height: 60px !important;
-    padding: 8px 4px !important;
+    padding: 8px 12px !important;
+    background: linear-gradient(135deg, #E8EED9 0%, #D4E8B8 100%) !important;
+    border: 2px solid #789561 !important;
     border-radius: 12px !important;
   }
   
-  /* Matchup comparison grid - single column on mobile */
-  .matchup-grid {
-    grid-template-columns: 1fr !important;
-    gap: 16px !important;
+  .matchup-total-score {
+    font-size: 1.75rem !important;
+    font-weight: 800 !important;
+    color: #1B3022 !important;
   }
   
-  /* Player cards - more compact on mobile */
-  .matchup-wrapper {
-    padding: 0 8px !important;
+  .matchup-total-user .matchup-total-score {
+    color: #4CAF50 !important;
   }
   
-  /* Team comparison - stack vertically with clear separation */
-  .matchup-comparison {
-    gap: 24px !important;
+  .matchup-total-opponent .matchup-total-score {
+    color: #FF6B35 !important;
   }
   
-  /* ===== NFL-STYLE MOBILE PLAYER CARDS ===== */
-  /* Clean, horizontal, gorgeous cards like the NFL fantasy reference */
+  /* ============================================ */
+  /* 🏈 NFL-STYLE HORIZONTAL PLAYER CARDS 🏈 */
+  /* EXACTLY like the screenshot reference */
+  /* ============================================ */
   
-  /* Reset the player card completely for mobile */
+  /* PLAYER CARD - Thin horizontal rectangle */
   .player-card {
     all: unset !important;
-    display: block !important;
-    background: #f8f8f8 !important;
-    border: 2px solid #2a2a2a !important;
-    border-radius: 6px !important;
-    padding: 8px 10px !important;
-    margin-bottom: 4px !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    background: linear-gradient(180deg, #fafafa 0%, #f0f0f0 100%) !important;
+    border: 1px solid #ccc !important;
+    border-bottom: 2px solid #999 !important;
+    padding: 6px 8px !important;
+    margin-bottom: 2px !important;
+    min-height: 52px !important;
+    max-height: 60px !important;
     position: relative !important;
     overflow: hidden !important;
-    min-height: auto !important;
-    max-height: none !important;
+    box-sizing: border-box !important;
   }
   
+  /* Position color stripe on left - like NFL cards */
   .player-card.user-team {
     border-left: 4px solid #4CAF50 !important;
   }
   
   .player-card.opponent-team {
-    border-left: 4px solid #FF9800 !important;
+    border-left: 4px solid #FF6B35 !important;
   }
   
-  /* Hide decorative elements but KEEP projection/daily points */
+  /* Hide ALL decorative elements */
   .player-card-bg-text,
-  .player-card-bg-number {
+  .player-card-bg-number,
+  .player-projection-bar-container,
+  .game-logos-bar,
+  .player-card > div:has(> .game-logos-bar),
+  .player-card-content > div:has(> .game-logos-bar) {
     display: none !important;
   }
   
-  /* Show projection bar in compact form - TAPPABLE for breakdown */
-  .player-projection-bar-container {
-    display: block !important;
-    grid-column: 1 / -1 !important;
-    margin-top: 6px !important;
-    padding: 6px 8px !important;
-    background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%) !important;
-    border: 2px solid #ff9800 !important;
-    border-radius: 8px !important;
-    position: relative !important;
-  }
-  
-  .player-projection-bar-container > div:first-child {
-    font-size: 10px !important;
-    margin-bottom: 4px !important;
-    font-weight: 700 !important;
-    color: #e65100 !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.5px !important;
-  }
-  
-  /* Hide the battery bar chunks on mobile - just show the tappable score */
-  .player-projection-bar-container .flex.gap-0\.5 {
-    display: none !important;
-  }
-  
-  /* Center the tappable points button */
-  .player-projection-bar-container .flex.justify-center {
-    display: flex !important;
-    justify-content: center !important;
-    gap: 8px !important;
-    align-items: center !important;
-  }
-  
-  /* Make the points badge PROMINENT and TAPPABLE */
-  .player-projection-bar-container button {
-    font-size: 16px !important;
-    font-weight: 900 !important;
-    padding: 6px 12px !important;
-    min-height: 36px !important;
-    min-width: 80px !important;
-    background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%) !important;
-    color: white !important;
-    border: none !important;
-    border-radius: 6px !important;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
-    touch-action: manipulation !important;
-  }
-  
-  /* Static points text */
-  .player-projection-bar-container > .flex.justify-center > span {
-    font-size: 16px !important;
-    font-weight: 900 !important;
-    padding: 6px 12px !important;
-    background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%) !important;
-    color: white !important;
-    border-radius: 6px !important;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
-  }
-  
-  /* Info button next to points */
-  .player-projection-bar-container button.w-6 {
-    min-width: 28px !important;
-    min-height: 28px !important;
-    padding: 0 !important;
-    background: #4caf50 !important;
-    font-size: 12px !important;
-  }
-  
-  /* Game logos - compact row */
-  .game-logos-bar {
-    display: none !important;
-  }
-  
-  /* Card content - grid layout like NFL cards */
+  /* Card content - horizontal flex */
   .player-card-content {
-    display: grid !important;
-    grid-template-columns: 1fr auto !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    width: 100% !important;
     gap: 8px !important;
-    align-items: start !important;
   }
   
-  /* Header section - contains name and stats */
+  /* Header (left side) - name, team, stats */
   .player-card-header {
     display: flex !important;
-    flex-direction: column !important;
-    gap: 2px !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    flex: 1 !important;
     min-width: 0 !important;
+    gap: 0 !important;
   }
   
-  /* Left side - stacked vertically */
   .player-header-left {
     display: flex !important;
     flex-direction: column !important;
-    gap: 1px !important;
+    gap: 0 !important;
+    min-width: 0 !important;
+    flex: 1 !important;
   }
   
-  /* Player name - BOLD and prominent */
+  /* Player name - BOLD like NFL */
   .player-name {
     font-family: 'Arial Black', 'Helvetica Neue', sans-serif !important;
-    font-size: 14px !important;
+    font-size: 13px !important;
     font-weight: 900 !important;
     color: #1a1a1a !important;
-    line-height: 1.2 !important;
+    line-height: 1.1 !important;
     margin: 0 !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
+    max-width: 100% !important;
   }
   
-  /* Team and position line */
+  /* Team name - grey italic like NFL */
   .player-team-name {
     font-family: Arial, sans-serif !important;
-    font-size: 10px !important;
+    font-size: 9px !important;
+    font-weight: 400 !important;
     color: #666 !important;
     font-style: italic !important;
+    line-height: 1.2 !important;
     margin: 0 !important;
   }
   
-  /* Key stats line - show it! */
+  /* Key stats - grey, compact */
   .player-key-stats {
     display: block !important;
     font-family: Arial, sans-serif !important;
-    font-size: 10px !important;
-    color: #444 !important;
-    margin-top: 2px !important;
+    font-size: 9px !important;
+    font-weight: 500 !important;
+    color: #555 !important;
+    line-height: 1.2 !important;
+    margin: 1px 0 0 0 !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
   }
   
-  /* Unique stats box - RIGHT SIDE GRID with TAPPABLE TOOLTIPS */
+  /* ====== RIGHT SIDE STATS BOX - NFL STYLE ====== */
+  /* Like the "1 TE: 24%" boxes in the screenshot */
   .player-unique-stats-box {
     display: flex !important;
     flex-direction: column !important;
-    gap: 2px !important;
-    background: linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%) !important;
-    border: 2px solid #666 !important;
-    border-radius: 6px !important;
-    padding: 6px 8px !important;
-    min-width: 65px !important;
-    align-items: flex-end !important;
-    box-shadow: inset 0 1px 2px rgba(0,0,0,0.1) !important;
+    gap: 1px !important;
+    background: linear-gradient(135deg, #E8EED9 0%, #D4E8B8 100%) !important;
+    border: 2px solid #789561 !important;
+    border-radius: 4px !important;
+    padding: 4px 6px !important;
+    min-width: 58px !important;
+    max-width: 70px !important;
+    flex-shrink: 0 !important;
   }
   
   .player-unique-stats-box .unique-stat-item {
     display: flex !important;
     justify-content: space-between !important;
-    width: 100% !important;
-    gap: 6px !important;
     align-items: center !important;
+    gap: 4px !important;
+    line-height: 1.1 !important;
   }
   
   .player-unique-stats-box .unique-stat-label {
     font-family: Arial, sans-serif !important;
-    font-size: 9px !important;
-    color: #444 !important;
+    font-size: 8px !important;
+    font-weight: 700 !important;
+    color: #4A5F4D !important;
     text-transform: uppercase !important;
-    font-weight: 600 !important;
   }
   
   .player-unique-stats-box .unique-stat-value {
     font-family: 'Arial Black', sans-serif !important;
-    font-size: 12px !important;
+    font-size: 11px !important;
     font-weight: 900 !important;
-    color: #1a1a1a !important;
+    color: #1B3022 !important;
   }
   
-  /* F Pts - special tappable tooltip button */
+  /* F Pts row - ORANGE highlight like screenshot */
   .player-unique-stats-box .unique-stat-item:first-child .unique-stat-value,
   .player-unique-stats-box .unique-stat-item:first-child .unique-stat-value button {
-    color: #1565c0 !important;
-    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%) !important;
-    border: 1px solid #64b5f6 !important;
-    border-radius: 4px !important;
-    padding: 2px 6px !important;
-    font-size: 13px !important;
+    color: #FF6B35 !important;
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    font-size: 12px !important;
     font-weight: 900 !important;
-    min-height: 28px !important;
-    touch-action: manipulation !important;
+    min-height: auto !important;
   }
   
-  /* Hint that F Pts is tappable */
-  .player-unique-stats-box .unique-stat-item:first-child::after {
-    content: "tap" !important;
-    font-size: 7px !important;
-    color: #999 !important;
-    position: absolute !important;
-    bottom: -8px !important;
-    right: 0 !important;
-  }
-  
-  /* Matchup comparison row - give cards more room */
+  /* ====== MATCHUP COMPARISON GRID ====== */
   .matchup-comparison-row {
     grid-template-columns: 46% 8% 46% !important;
     gap: 0 !important;
     align-items: stretch !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
   
-  /* Center column - slim and clean */
+  /* Center column - slim divider */
   .matchup-center-column {
-    background: linear-gradient(180deg, #e0e0e0 0%, #c0c0c0 100%) !important;
-    padding: 4px 2px !important;
+    background: linear-gradient(180deg, #D4E8B8 0%, #B8D4A8 100%) !important;
+    border-left: 1px solid #789561 !important;
+    border-right: 1px solid #789561 !important;
+    padding: 2px !important;
     display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
     justify-content: center !important;
-    font-size: 9px !important;
-    border-left: 1px solid #999 !important;
-    border-right: 1px solid #999 !important;
+    gap: 1px !important;
+    min-width: 28px !important;
+  }
+  
+  .matchup-center-column .position-label {
+    font-size: 8px !important;
+    font-weight: 800 !important;
+    color: #4A5F4D !important;
   }
   
   .matchup-center-column .projected-score,
   .matchup-center-column .projected-score-user,
   .matchup-center-column .projected-score-opponent {
-    font-size: 9px !important;
-    font-weight: bold !important;
+    font-size: 8px !important;
+    font-weight: 700 !important;
   }
   
-  /* Position group headers - clean dividers */
-  .matchup-position-group-header {
-    background: #2a2a2a !important;
-    color: #fff !important;
-    padding: 4px 8px !important;
-    font-size: 11px !important;
-    font-weight: bold !important;
+  .matchup-center-column .projected-score-user {
+    color: #4CAF50 !important;
+  }
+  
+  .matchup-center-column .projected-score-opponent {
+    color: #FF6B35 !important;
+  }
+  
+  /* Position group headers - CITRUS green */
+  .matchup-position-group-header,
+  .position-group-header {
+    background: linear-gradient(90deg, #789561 0%, #4A5F4D 100%) !important;
+    color: #E8EED9 !important;
+    padding: 3px 8px !important;
+    font-size: 10px !important;
+    font-weight: 800 !important;
     text-transform: uppercase !important;
-    letter-spacing: 1px !important;
+    letter-spacing: 0.5px !important;
+    margin-top: 4px !important;
   }
   
-  /* Hide decorative blurs on mobile for performance */
-  .blur-3xl {
-    display: none !important;
+  /* Matchup total row */
+  .matchup-total-row {
+    grid-template-columns: 46% 8% 46% !important;
+    margin-top: 8px !important;
+    padding-top: 8px !important;
+    border-top: 2px solid #789561 !important;
   }
   
-  /* Compact headers on mobile */
-  h1 {
-    font-size: 1.5rem !important;
+  /* Hide blur decorations for performance */
+  .blur-3xl { display: none !important; }
+  
+  /* Compact headers */
+  h1 { font-size: 1.25rem !important; }
+  h2 { font-size: 1.1rem !important; }
+  
+  /* Weekly schedule - compact */
+  .weekly-schedule-container {
+    padding: 4px !important;
+    gap: 2px !important;
   }
   
-  h2 {
-    font-size: 1.25rem !important;
-  }
-  
-  /* Better spacing for mobile content */
-  .mb-6 {
-    margin-bottom: 1rem !important;
-  }
-  
-  .mb-8 {
-    margin-bottom: 1.5rem !important;
-  }
-  
-  /* Cards - iOS-style rounded corners */
-  .rounded-lg {
-    border-radius: 12px !important;
-  }
-  
-  .rounded-xl {
-    border-radius: 16px !important;
-  }
-  
-  /* Shadows - subtle iOS-style */
-  .shadow-lg {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+  .weekly-schedule-container button,
+  .weekly-schedule-container a {
+    min-height: 44px !important;
+    padding: 4px 2px !important;
+    font-size: 11px !important;
   }
 }

@@ -2,17 +2,20 @@
  * GoalieProjectionTooltip Component
  * Shows "Performance Outlook" for goalies - clean projected stat lines
  * Displays: GP, Wins, Saves, Shutouts, GAA, SV%
- * Now uses Popover for better mobile support (tap to view, tap elsewhere to close)
+ * Works on hover (desktop) and tap (mobile)
  */
 
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { MatchupPlayer } from "./types";
+import { useState } from "react";
 
 interface GoalieProjectionTooltipProps {
   projection: MatchupPlayer['goalieProjection'];
 }
 
 export const GoalieProjectionTooltip = ({ projection }: GoalieProjectionTooltipProps) => {
+  const [open, setOpen] = useState(false);
+  
   if (!projection) return null;
 
   // Goalie stats - flat array for grid
@@ -26,13 +29,17 @@ export const GoalieProjectionTooltip = ({ projection }: GoalieProjectionTooltipP
   ];
 
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <button className="w-6 h-6 rounded-full bg-citrus-sage border-2 border-citrus-forest flex items-center justify-center active:scale-95 transition-all touch-manipulation">
-          <span className="text-[10px] font-bold text-citrus-forest">i</span>
+    <Tooltip open={open} onOpenChange={setOpen}>
+      <TooltipTrigger asChild>
+        <button 
+          className="w-5 h-5 rounded-lg bg-citrus-sage border-2 border-citrus-forest shadow-patch flex items-center justify-center hover:scale-110 transition-all touch-manipulation"
+          onClick={() => setOpen(!open)}
+          onTouchStart={() => setOpen(true)}
+        >
+          <span className="text-[10px] font-varsity font-black text-citrus-forest">i</span>
         </button>
-      </PopoverTrigger>
-      <PopoverContent 
+      </TooltipTrigger>
+      <TooltipContent 
         className="p-0 bg-[#E8EED9]/95 backdrop-blur-md rounded-xl border-2 border-citrus-forest shadow-lg w-[280px] z-[999999]"
         side="top"
         align="end"
@@ -45,7 +52,7 @@ export const GoalieProjectionTooltip = ({ projection }: GoalieProjectionTooltipP
           </h4>
         </div>
 
-        {/* Stats grid - compact for mobile */}
+        {/* Stats grid */}
         <div className="p-3 grid grid-cols-2 gap-2 max-h-[50vh] overflow-y-auto">
           {stats.map((stat) => (
             <div key={stat.label} className="p-2 bg-white/50 rounded-lg border border-citrus-sage/30">
@@ -73,7 +80,7 @@ export const GoalieProjectionTooltip = ({ projection }: GoalieProjectionTooltipP
             <span className="font-black text-2xl text-citrus-orange">{projection.total_projected_points.toFixed(1)}</span>
           </div>
         </div>
-      </PopoverContent>
-    </Popover>
+      </TooltipContent>
+    </Tooltip>
   );
 };
