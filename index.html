@@ -3,10 +3,29 @@
 <html lang="en" style="background: #D4E8B8;">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- iOS-optimized viewport with safe area support -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>CitrusSports - A Fresh Take on Fantasy Sports</title>
     <meta name="description" content="Join CitrusSports, the fantasy sports platform with a refreshing UI and Stormy AI assistant to help you win your leagues." />
     <meta name="author" content="CitrusSports" />
+
+    <!-- iOS Web App Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="CitrusSports" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="theme-color" content="#D4E8B8" />
+    <meta name="format-detection" content="telephone=no" />
+    
+    <!-- iOS Icons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/apple-touch-icon-152.png" />
+    <link rel="apple-touch-icon" sizes="120x120" href="/apple-touch-icon-120.png" />
+    
+    <!-- Splash screens for iOS -->
+    <link rel="apple-touch-startup-image" href="/splash-2048x2732.png" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)" />
+    <link rel="apple-touch-startup-image" href="/splash-1170x2532.png" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)" />
+    <link rel="apple-touch-startup-image" href="/splash-1125x2436.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)" />
 
     <meta property="og:title" content="CitrusSports - A Fresh Take on Fantasy Sports" />
     <meta property="og:description" content="Join CitrusSports, the fantasy sports platform with a refreshing UI and Stormy AI assistant to help you win your leagues." />
@@ -19,6 +38,57 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@CitrusSports" />
     <meta name="twitter:image" content="https://citrus-fantasy-sports.web.app/og-image.png" />
+    
+    <!-- iOS-specific styles for safe areas and touch optimization -->
+    <style>
+      /* iOS Safe Area Support */
+      :root {
+        --sat: env(safe-area-inset-top);
+        --sar: env(safe-area-inset-right);
+        --sab: env(safe-area-inset-bottom);
+        --sal: env(safe-area-inset-left);
+      }
+      
+      /* Prevent text selection and callouts on touch */
+      * {
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      
+      /* Allow text selection where needed */
+      input, textarea, [contenteditable="true"] {
+        -webkit-user-select: text;
+        user-select: text;
+      }
+      
+      /* Smooth scrolling with momentum */
+      .ios-scroll {
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+      }
+      
+      /* iOS-style active states */
+      .ios-pressable:active {
+        opacity: 0.7;
+        transform: scale(0.98);
+      }
+      
+      /* Prevent bounce on body */
+      html, body {
+        overscroll-behavior: none;
+        position: fixed;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+      
+      #root {
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+    </style>
   </head>
 
   <body>

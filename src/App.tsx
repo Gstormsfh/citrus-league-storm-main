@@ -10,6 +10,7 @@ import { LeagueProvider } from "@/contexts/LeagueContext";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { StormyChatBubble } from "./components/StormyChatBubble";
+import { AppShell } from "./components/mobile";
 import LoadingScreen from "./components/LoadingScreen";
 import "./App.css";
 
@@ -121,50 +122,55 @@ const App = () => {
             <Sonner position="top-right" closeButton />
             <BrowserRouter>
               <LeagueProvider>
-                <Suspense fallback={<PageLoader />}>
-                  <Routes>
-                    <Route path="/" element={<Index />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/auth/callback" element={<AuthCallback />} />
-                <Route path="/profile-setup" element={<ProfileSetup />} />
-                <Route path="/reset-password" element={<ResetPassword />} />
-                <Route path="/verify-email" element={<VerifyEmail />} />
-                <Route path="/roster" element={<Roster />} />
-                <Route path="/standings" element={<Standings />} />
-                <Route path="/contact" element={<Contact />} />
-                <Route path="/blog" element={<Blog />} />
-                <Route path="/podcasts" element={<Podcasts />} />
-                <Route path="/guides" element={<Guides />} />
-                    <Route path="/matchup/:leagueId/:weekId?" element={<Matchup />} />
-                    <Route path="/matchup" element={<Matchup />} /> {/* Fallback for /matchup without params */}
-                    <Route path="/league/:leagueId/playoffs" element={<ProtectedRoute><PlayoffBracket /></ProtectedRoute>} />
-                <Route path="/free-agents" element={<FreeAgents />} />
-                <Route path="/gm-office" element={<GMOffice />} />
-                <Route path="/gm-office/stormy" element={<StormyAssistant />} />
-                <Route path="/news" element={<News />} />
-                <Route path="/draft-room" element={<ErrorBoundary><DraftRoom /></ErrorBoundary>} />
-                <Route path="/draft" element={<ErrorBoundary><DraftRoom /></ErrorBoundary>} /> {/* Fallback route */}
-                <Route path="/create-league" element={<ProtectedRoute requireProfile><CreateLeague /></ProtectedRoute>} />
-                <Route path="/league/:leagueId" element={<ProtectedRoute><LeagueDashboard /></ProtectedRoute>} />
-                <Route path="/profile" element={<Profile />} />
-                <Route path="/team-analytics" element={<TeamAnalytics />} />
-                <Route path="/waiver-wire" element={<WaiverWire />} />
-                <Route path="/schedule-manager" element={<ScheduleManager />} />
-                <Route path="/trade-analyzer" element={<TradeAnalyzer />} />
-                <Route path="/team/:teamId" element={<OtherTeam />} />
-                <Route path="/features" element={<Features />} />
-                <Route path="/pricing" element={<Pricing />} />
-                <Route path="/about" element={<About />} />
-                <Route path="/careers" element={<Careers />} />
-                <Route path="/privacy" element={<Privacy />} />
-                <Route path="/terms" element={<Terms />} />
-                <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Suspense>
-            <StormyChatBubble />
-          </LeagueProvider>
+                <AppShell>
+                  <Suspense fallback={<PageLoader />}>
+                    <Routes>
+                      <Route path="/" element={<Index />} />
+                      <Route path="/auth" element={<Auth />} />
+                      <Route path="/auth/callback" element={<AuthCallback />} />
+                      <Route path="/profile-setup" element={<ProfileSetup />} />
+                      <Route path="/reset-password" element={<ResetPassword />} />
+                      <Route path="/verify-email" element={<VerifyEmail />} />
+                      <Route path="/roster" element={<Roster />} />
+                      <Route path="/roster/:leagueId" element={<Roster />} />
+                      <Route path="/standings" element={<Standings />} />
+                      <Route path="/standings/:leagueId" element={<Standings />} />
+                      <Route path="/contact" element={<Contact />} />
+                      <Route path="/blog" element={<Blog />} />
+                      <Route path="/podcasts" element={<Podcasts />} />
+                      <Route path="/guides" element={<Guides />} />
+                      <Route path="/matchup/:leagueId/:weekId?" element={<Matchup />} />
+                      <Route path="/matchup" element={<Matchup />} />
+                      <Route path="/league/:leagueId/playoffs" element={<ProtectedRoute><PlayoffBracket /></ProtectedRoute>} />
+                      <Route path="/free-agents" element={<FreeAgents />} />
+                      <Route path="/free-agents/:leagueId" element={<FreeAgents />} />
+                      <Route path="/gm-office" element={<GMOffice />} />
+                      <Route path="/gm-office/stormy" element={<StormyAssistant />} />
+                      <Route path="/news" element={<News />} />
+                      <Route path="/draft-room" element={<ErrorBoundary><DraftRoom /></ErrorBoundary>} />
+                      <Route path="/draft" element={<ErrorBoundary><DraftRoom /></ErrorBoundary>} />
+                      <Route path="/create-league" element={<ProtectedRoute requireProfile><CreateLeague /></ProtectedRoute>} />
+                      <Route path="/league/:leagueId" element={<ProtectedRoute><LeagueDashboard /></ProtectedRoute>} />
+                      <Route path="/profile" element={<Profile />} />
+                      <Route path="/team-analytics" element={<TeamAnalytics />} />
+                      <Route path="/waiver-wire" element={<WaiverWire />} />
+                      <Route path="/schedule-manager" element={<ScheduleManager />} />
+                      <Route path="/trade-analyzer" element={<TradeAnalyzer />} />
+                      <Route path="/team/:teamId" element={<OtherTeam />} />
+                      <Route path="/features" element={<Features />} />
+                      <Route path="/pricing" element={<Pricing />} />
+                      <Route path="/about" element={<About />} />
+                      <Route path="/careers" element={<Careers />} />
+                      <Route path="/privacy" element={<Privacy />} />
+                      <Route path="/terms" element={<Terms />} />
+                      <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </Suspense>
+                  <StormyChatBubble />
+                </AppShell>
+              </LeagueProvider>
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>

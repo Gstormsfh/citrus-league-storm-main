@@ -34,6 +34,197 @@
   .animate-float {
     animation: float ease-in-out infinite;
   }
+  
+  /* ===== iOS MOBILE UTILITIES ===== */
+  
+  /* Safe area padding utilities */
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pl-safe {
+    padding-left: env(safe-area-inset-left);
+  }
+  .pr-safe {
+    padding-right: env(safe-area-inset-right);
+  }
+  .px-safe {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+  .py-safe {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .p-safe {
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  
+  /* iOS-style scroll container */
+  .ios-scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+  
+  /* iOS-style pressable button effect */
+  .ios-pressable {
+    transition: transform 0.1s ease, opacity 0.1s ease;
+    cursor: pointer;
+  }
+  .ios-pressable:active {
+    transform: scale(0.97);
+    opacity: 0.8;
+  }
+  
+  /* iOS-style card with subtle shadow */
+  .ios-card {
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 16px;
+    box-shadow: 
+      0 2px 8px rgba(0, 0, 0, 0.04),
+      0 4px 16px rgba(0, 0, 0, 0.06);
+  }
+  
+  /* iOS-style list item */
+  .ios-list-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    min-height: 44px;
+    background: white;
+    border-bottom: 0.5px solid rgba(0, 0, 0, 0.1);
+  }
+  .ios-list-item:first-child {
+    border-radius: 12px 12px 0 0;
+  }
+  .ios-list-item:last-child {
+    border-radius: 0 0 12px 12px;
+    border-bottom: none;
+  }
+  .ios-list-item:only-child {
+    border-radius: 12px;
+    border-bottom: none;
+  }
+  
+  /* iOS-style section header */
+  .ios-section-header {
+    font-size: 13px;
+    font-weight: 400;
+    color: rgba(60, 60, 67, 0.6);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    padding: 8px 16px 6px;
+    margin-top: 24px;
+  }
+  
+  /* iOS-style toggle/switch container */
+  .ios-toggle-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    min-height: 44px;
+  }
+  
+  /* Touch-friendly minimum tap target (44x44 as per iOS HIG) */
+  .touch-target {
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  /* iOS-style blur header/footer */
+  .ios-blur-bg {
+    background: rgba(249, 249, 249, 0.94);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+  }
+  
+  /* iOS-style pill button */
+  .ios-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 16px;
+    border-radius: 9999px;
+    font-size: 15px;
+    font-weight: 600;
+    transition: all 0.15s ease;
+  }
+  .ios-pill-primary {
+    background: #007AFF;
+    color: white;
+  }
+  .ios-pill-secondary {
+    background: rgba(120, 120, 128, 0.12);
+    color: #007AFF;
+  }
+  
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* iOS-style segmented control */
+  .ios-segmented {
+    display: flex;
+    background: rgba(118, 118, 128, 0.12);
+    border-radius: 9px;
+    padding: 2px;
+  }
+  .ios-segmented-item {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 7px;
+    transition: all 0.15s ease;
+  }
+  .ios-segmented-item-active {
+    background: white;
+    box-shadow: 
+      0 3px 8px rgba(0, 0, 0, 0.12),
+      0 3px 1px rgba(0, 0, 0, 0.04);
+  }
+  
+  /* Mobile-optimized grid layouts */
+  @media (max-width: 1023px) {
+    .mobile-grid-1 {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+    .mobile-grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+  }
+  
+  /* Stack on mobile, row on desktop */
+  .mobile-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  @media (min-width: 1024px) {
+    .mobile-stack {
+      flex-direction: row;
+    }
+  }
 }
 
 @layer base {

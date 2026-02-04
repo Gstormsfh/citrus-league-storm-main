@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Calendar, TrendingUp, Filter, List, Grid, Star, Info, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Calendar, TrendingUp, Filter, List, Grid, Star, Info, ArrowUpDown, ArrowUp, ArrowDown, ArrowRight } from 'lucide-react';
 import LoadingScreen from '@/components/LoadingScreen';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { PlayerService, Player } from '@/services/PlayerService';
@@ -77,6 +77,14 @@ const FreeAgents = () => {
   const [weeklyProjections, setWeeklyProjections] = useState<Map<number, number>>(new Map());
   const [loadingProjections, setLoadingProjections] = useState(false);
 
+  // Weekly adds tracking state (playerId -> adds count in past 7 days)
+  const [weeklyAdds, setWeeklyAdds] = useState<Map<string | number, number>>(new Map());
+  const [loadingAdds, setLoadingAdds] = useState(false);
+
+  // Games data for top projected players (playerId -> games array)
+  const [topProjectedGames, setTopProjectedGames] = useState<Map<string | number, NHLGame[]>>(new Map());
+  const [loadingTopProjectedGames, setLoadingTopProjectedGames] = useState(false);
+
   // Sorting state
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
@@ -99,19 +107,27 @@ const FreeAgents = () => {
     setWatchlist(new Set(LeagueService.getWatchlist()));
   }, [searchParams, activeLeagueId, isChangingLeague]);
 
-  // Load schedule maximizers only when the tab is active
+  // Load schedule maximizers when players are loaded (needed for summary view)
   useEffect(() => {
-    if (activeTab === 'schedule' && players.length > 0 && scheduleMaximizers.length === 0 && !loadingMaximizers) {
+    if (players.length > 0 && scheduleMaximizers.length === 0 && !loadingMaximizers) {
       calculateScheduleMaximizers(players);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, players.length]);
+  }, [players.length]);
 
   // Fetch weekly projections for top free agents (for Top Projected list)
   // CRITICAL: Works for BOTH active users AND demo/guest users (EXACT SAME WAY)
   useEffect(() => {
     if (players.length > 0 && weeklyProjections.size === 0 && !loadingProjections) {
       fetchWeeklyProjections();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [players.length, activeLeagueId]);
+
+  // Fetch weekly adds for trending players
+  useEffect(() => {
+    if (players.length > 0 && weeklyAdds.size === 0 && !loadingAdds && !isGuestMode(userLeagueState)) {
+      fetchWeeklyAdds();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [players.length, activeLeagueId]);
@@ -217,27 +233,11 @@ const FreeAgents = () => {
     try {
       setLoadingProjections(true);
       
-      // Get top 50 free agents to fetch projections for
-      // Include mix of top skaters and top goalies
-      const topSkaters = [...players]
-        .filter(p => p.position !== 'G')
-        .sort((a, b) => (b.points || 0) - (a.points || 0))
-        .slice(0, 40);
+      // Fetch projections for ALL free agents (not just top 50)
+      // This ensures the Schedule Maximizers table has projections for all players
+      const allPlayers = [...players];
       
-      const topGoalies = [...players]
-        .filter(p => p.position === 'G')
-        .sort((a, b) => {
-          // Sort goalies by wins first, then by points
-          const aWins = a.wins || 0;
-          const bWins = b.wins || 0;
-          if (bWins !== aWins) return bWins - aWins;
-          return (b.points || 0) - (a.points || 0);
-        })
-        .slice(0, 10);
-      
-      const topPlayers = [...topSkaters, ...topGoalies];
-      
-      if (topPlayers.length === 0) {
+      if (allPlayers.length === 0) {
         return;
       }
 
@@ -350,7 +350,7 @@ const FreeAgents = () => {
       debugLog(`[FreeAgents Projections] Fetching projections for remaining week: ${weekDays[0]} to ${weekDays[weekDays.length - 1]} (${weekDays.length} days)`);
 
       // Convert player IDs to numbers
-      const playerIds = topPlayers.map(p => {
+      const playerIds = allPlayers.map(p => {
         const id = typeof p.id === 'string' ? parseInt(p.id, 10) : p.id;
         return isNaN(id) ? 0 : id;
       }).filter(id => id > 0);
@@ -364,7 +364,7 @@ const FreeAgents = () => {
       const weeklyProjectionMap = new Map<number, number>();
       
       // Initialize all players with 0 using NUMERIC IDs
-      topPlayers.forEach(player => {
+      allPlayers.forEach(player => {
         const numericId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
         if (!isNaN(numericId) && numericId > 0) {
           weeklyProjectionMap.set(numericId, 0);
@@ -375,32 +375,34 @@ const FreeAgents = () => {
       debugLog(`[FreeAgents Projections] Fetching for ${weekDays.length} days: ${weekDays[0]} to ${weekDays[weekDays.length - 1]}`);
       debugLog(`[FreeAgents Projections] Player count: ${playerIds.length}`);
       
+      // Batch player IDs to avoid overwhelming the database (500 per batch)
+      const BATCH_SIZE = 500;
+      const playerIdBatches: number[][] = [];
+      for (let i = 0; i < playerIds.length; i += BATCH_SIZE) {
+        playerIdBatches.push(playerIds.slice(i, i + BATCH_SIZE));
+      }
+      debugLog(`[FreeAgents Projections] Split into ${playerIdBatches.length} batches`);
+      
       // Fetch projections for each day and aggregate ALL 8 STATS
       for (const date of weekDays) {
         try {
-          const dailyProjections = await MatchupService.getDailyProjectionsForMatchup(playerIds, date);
-          debugLog(`[FreeAgents Projections] ${date}: Got ${dailyProjections.size} projections`);
-          
-          // Sum up ALL STATS for each player (full transparency)
-          // CRITICAL: Use playerId directly (numeric) as Map key to ensure proper accumulation
-          dailyProjections.forEach((projection, playerId) => {
-            // Use playerId directly as key (it's already a number from the Map)
-            const currentTotal = weeklyProjectionMap.get(playerId) || 0;
-            const dailyPoints = Number(projection.total_projected_points || 0);
-            const newTotal = currentTotal + dailyPoints;
-            weeklyProjectionMap.set(playerId, newTotal);
+          // Process all batches for this date
+          let totalForDate = 0;
+          for (const batch of playerIdBatches) {
+            const dailyProjections = await MatchupService.getDailyProjectionsForMatchup(batch, date);
+            totalForDate += dailyProjections.size;
             
-            // Debug first few to verify aggregation
-            if (weeklyProjectionMap.size <= 5) {
-              const player = topPlayers.find(p => {
-                const pId = typeof p.id === 'string' ? parseInt(p.id, 10) : p.id;
-                return pId === playerId;
-              });
-              if (player) {
-                debugLog(`  [${date}] Player ${player.full_name} (ID: ${playerId}): ${currentTotal.toFixed(1)} + ${dailyPoints.toFixed(1)} = ${newTotal.toFixed(1)}`);
-              }
-            }
-          });
+            // Sum up ALL STATS for each player (full transparency)
+            // CRITICAL: Use playerId directly (numeric) as Map key to ensure proper accumulation
+            dailyProjections.forEach((projection, playerId) => {
+              // Use playerId directly as key (it's already a number from the Map)
+              const currentTotal = weeklyProjectionMap.get(playerId) || 0;
+              const dailyPoints = Number(projection.total_projected_points || 0);
+              const newTotal = currentTotal + dailyPoints;
+              weeklyProjectionMap.set(playerId, newTotal);
+            });
+          }
+          debugLog(`[FreeAgents Projections] ${date}: Got ${totalForDate} projections`);
         } catch (error) {
           debugLog(`[FreeAgents Projections] Error for ${date}:`, error);
         }
@@ -408,36 +410,106 @@ const FreeAgents = () => {
 
       setWeeklyProjections(weeklyProjectionMap);
       
-      // Debug: Log final aggregated projections (reuse debugLog from above)
-      const topProjectionPlayers = Array.from(weeklyProjectionMap.entries())
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10)
-        .map(([numericId, total]) => {
-          const player = topPlayers.find(p => {
-            const pId = typeof p.id === 'string' ? parseInt(p.id, 10) : p.id;
-            return pId === numericId;
-          });
-          return { name: player?.full_name, id: numericId, total: total.toFixed(1) };
-        });
-      debugLog('[FreeAgents Projections] Top 10 aggregated weekly projections:', topProjectionPlayers);
-      
-      const goalieProjections = topPlayers
-        .filter(p => p.position === 'G')
-        .slice(0, 5)
-        .map(p => {
-          const numericId = typeof p.id === 'string' ? parseInt(p.id, 10) : p.id;
-          return {
-            name: p.full_name,
-            id: numericId,
-            weeklyProj: (weeklyProjectionMap.get(numericId) || 0).toFixed(1)
-          };
-        });
-      debugLog('[FreeAgents Projections] Top 5 goalie projections:', goalieProjections);
+      // Debug: Log final aggregated projections count
+      const totalWithProjections = Array.from(weeklyProjectionMap.values()).filter(v => v > 0).length;
+      debugLog(`[FreeAgents Projections] Total players with projections: ${totalWithProjections} / ${allPlayers.length}`);
     } catch (error) {
       console.error('Error fetching weekly projections:', error);
       // On error, set empty map (will fall back to mock projection)
     } finally {
       setLoadingProjections(false);
+    }
+  };
+
+  const fetchWeeklyAdds = async () => {
+    try {
+      setLoadingAdds(true);
+      
+      // Query roster_transactions for ADD transactions in the past 7 days
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const sevenDaysAgoStr = sevenDaysAgo.toISOString();
+      
+      const { data: transactions, error } = await supabase
+        .from('roster_transactions')
+        .select('player_id')
+        .eq('type', 'ADD')
+        .gte('created_at', sevenDaysAgoStr);
+      
+      if (error) {
+        console.error('Error fetching weekly adds:', error);
+        return;
+      }
+      
+      // Count adds per player_id
+      const addsMap = new Map<string | number, number>();
+      (transactions || []).forEach(tx => {
+        const playerId = tx.player_id;
+        const currentCount = addsMap.get(playerId) || 0;
+        addsMap.set(playerId, currentCount + 1);
+      });
+      
+      setWeeklyAdds(addsMap);
+    } catch (error) {
+      console.error('Error fetching weekly adds:', error);
+    } finally {
+      setLoadingAdds(false);
+    }
+  };
+
+  const fetchTopProjectedGames = async (topProjectedPlayers: Player[]) => {
+    try {
+      setLoadingTopProjectedGames(true);
+      
+      if (topProjectedPlayers.length === 0) {
+        return;
+      }
+      
+      // Get unique teams from top projected players
+      const uniqueTeams = [...new Set(topProjectedPlayers.map(p => p.team).filter(Boolean))];
+      
+      if (uniqueTeams.length === 0) {
+        return;
+      }
+      
+      // Calculate current week dates (same logic as Schedule Maximizer)
+      const todayMSTStr = getTodayMST();
+      const today = new Date(todayMSTStr + 'T00:00:00');
+      today.setHours(0, 0, 0, 0);
+      
+      const dayOfWeek = today.getDay();
+      const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      
+      const weekStart = new Date(today);
+      weekStart.setDate(today.getDate() - daysFromMonday);
+      weekStart.setHours(0, 0, 0, 0);
+      
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+      
+      // Fetch games for all teams in parallel
+      const { gamesByTeam, error } = await ScheduleService.getGamesForTeams(uniqueTeams, weekStart, weekEnd);
+      
+      if (error) {
+        console.error('Error fetching games for top projected players:', error);
+        return;
+      }
+      
+      // Map games to players by team
+      const gamesMap = new Map<string | number, NHLGame[]>();
+      topProjectedPlayers.forEach(player => {
+        if (player.team) {
+          const teamGames = gamesByTeam.get(player.team.toUpperCase()) || [];
+          gamesMap.set(player.id, teamGames);
+        }
+      });
+      
+      setTopProjectedGames(gamesMap);
+    } catch (error) {
+      console.error('Error fetching top projected games:', error);
+    } finally {
+      setLoadingTopProjectedGames(false);
     }
   };
 
@@ -979,17 +1051,29 @@ const FreeAgents = () => {
 
   // Sort schedule maximizers (includes gamesThisWeek field)
   const sortScheduleMaximizers = (maximizers: Array<Player & { gamesThisWeek: number; gameDays: string[]; games?: NHLGame[] }>) => {
-    // Default sort: most games remaining (descending)
+    // Default sort: highest projected points (descending)
     if (!sortColumn) {
-      return [...maximizers].sort((a, b) => (b.gamesThisWeek || 0) - (a.gamesThisWeek || 0));
+      return [...maximizers].sort((a, b) => {
+        const aId = typeof a.id === 'string' ? parseInt(a.id, 10) : a.id;
+        const bId = typeof b.id === 'string' ? parseInt(b.id, 10) : b.id;
+        const aProj = weeklyProjections.get(aId) || 0;
+        const bProj = weeklyProjections.get(bId) || 0;
+        return bProj - aProj;
+      });
     }
 
     const sorted = [...maximizers].sort((a, b) => {
       let aValue: string | number;
       let bValue: string | number;
 
+      // Handle projected points
+      if (sortColumn === 'weeklyProjection') {
+        const aId = typeof a.id === 'string' ? parseInt(a.id, 10) : a.id;
+        const bId = typeof b.id === 'string' ? parseInt(b.id, 10) : b.id;
+        aValue = weeklyProjections.get(aId) || 0;
+        bValue = weeklyProjections.get(bId) || 0;
       // Handle gamesThisWeek for schedule maximizers
-      if (sortColumn === 'gamesThisWeek') {
+      } else if (sortColumn === 'gamesThisWeek') {
         aValue = a.gamesThisWeek || 0;
         bValue = b.gamesThisWeek || 0;
       } else {
@@ -1113,10 +1197,14 @@ const FreeAgents = () => {
 
   // Derived lists for Summary View
   const topTrending = [...filteredPlayers]
-    .map(p => ({
-      ...p,
-      adds: Math.floor((p.points || 0) * 15 + (p.full_name.length * 10)) // Mock adds count
-    }))
+    .map(p => {
+      // Use real adds count from weeklyAdds map, fallback to 0 if not found
+      const addsCount = weeklyAdds.get(p.id) || 0;
+      return {
+        ...p,
+        adds: addsCount
+      };
+    })
     .sort((a, b) => b.adds - a.adds)
     .slice(0, 5);
 
@@ -1127,13 +1215,24 @@ const FreeAgents = () => {
       const realProjection = weeklyProjections.get(numericId);
       // Use real projection if > 0, otherwise fallback to mock
       const weeklyProjection = (realProjection && realProjection > 0) ? realProjection : ((p.points || 0) / 20);
+      // Get games for this player
+      const games = topProjectedGames.get(p.id) || [];
       return {
         ...p,
-        weeklyProjection
+        weeklyProjection,
+        games
       };
     })
     .sort((a, b) => b.weeklyProjection - a.weeklyProjection)
     .slice(0, 5);
+
+  // Fetch games for top projected players when they change
+  useEffect(() => {
+    if (topProjected.length > 0 && topProjectedGames.size === 0 && !loadingTopProjectedGames) {
+      fetchTopProjectedGames(topProjected);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topProjected.length, weeklyProjections.size]);
 
   const positions = ['ALL', 'C', 'LW', 'RW', 'W', 'D', 'G'];
 
@@ -1292,88 +1391,104 @@ const FreeAgents = () => {
                       </CardContent>
                     </Card>
 
-                    {/* Top Projected Table */}
+                    {/* Top Projected Points Card - sorted by highest projected points */}
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-lg font-bold flex items-center gap-2">
                           <Calendar className="h-5 w-5 text-blue-500" />
-                          Top Projected (Remaining Week)
+                          Top Projected (Week)
                         </CardTitle>
-                        <Button variant="ghost" size="sm" onClick={() => setViewMode('all')}>See All</Button>
+                        <Button variant="ghost" size="sm" onClick={() => setActiveTab('schedule')}>See All</Button>
                       </CardHeader>
                       <CardContent className="p-0">
-                        {/* Mobile List View */}
-                        <div className="md:hidden">
-                          {topProjected.map(player => (
-                            <div key={player.id} className="p-3 border-b flex items-center justify-between">
-                              <div className="flex flex-col">
-                                <span className="font-medium">{player.full_name}</span>
-                                <span className="text-xs text-muted-foreground">{formatPositionForDisplay(player.position)} • {player.team}</span>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                <div className="text-right">
-                                  <div className="font-bold text-blue-600">
-                                    {((player as any).weeklyProjection || 0).toFixed(1)}
-                                  </div>
-                                  <div className="text-[10px] text-muted-foreground">Proj</div>
-                                </div>
-                                <Button size="default" variant="default" className="h-10 w-10 text-primary font-bold text-xl bg-primary/10 hover:bg-primary/20 border border-primary/30" onClick={() => handleAddPlayer(player)}>
-                                  +
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Desktop Table View */}
-                        <div className="hidden md:block">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Player</TableHead>
-                                <TableHead className="text-right">Pos</TableHead>
-                                <TableHead className="text-right">Proj</TableHead>
-                                <TableHead className="w-[50px]"></TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {topProjected.map(player => (
-                              <TableRow key={player.id}>
-                                <TableCell className="font-medium">
-                                  <div className="flex flex-col">
-                                    <span 
-                                      className="hover:underline hover:text-primary cursor-pointer"
-                                      onClick={() => handlePlayerClick(player)}
-                                    >
-                                      {player.full_name}
-                                    </span>
-                                    <span className="text-xs text-muted-foreground">{player.team}</span>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-right">{formatPositionForDisplay(player.position)}</TableCell>
-                                <TableCell className="text-right font-bold text-blue-600">
-                                  {((player as any).weeklyProjection || 0).toFixed(1)}
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex gap-1">
-                                    <Button 
-                                      size="icon" 
-                                      variant="ghost" 
-                                      className={`h-8 w-8 ${watchlist.has(player.id) ? 'text-yellow-500' : 'text-muted-foreground'}`}
-                                      onClick={() => toggleWatchlist(player)}
-                                    >
-                                      <Star className={`h-4 w-4 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
-                                    </Button>
-                                    <Button size="default" variant="default" className="h-10 w-10 text-primary font-bold text-xl bg-primary/10 hover:bg-primary/20 border border-primary/30" onClick={() => handleAddPlayer(player)}>
-                                      +
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </div>
+                        {loadingMaximizers || loadingProjections ? (
+                          <div className="p-8 text-center">
+                            <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                            <p className="text-sm text-muted-foreground mt-2">Loading projections...</p>
+                          </div>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Player</TableHead>
+                                  <TableHead className="text-right">Pos</TableHead>
+                                  <TableHead className="text-right">Games</TableHead>
+                                  <TableHead className="text-right">Proj</TableHead>
+                                  <TableHead className="w-[50px]"></TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {/* Get top 5 by projection, including games data */}
+                                {(() => {
+                                  // Create top projected list with games data from scheduleMaximizers
+                                  const topByProjection = scheduleMaximizers
+                                    .map(p => {
+                                      const numericId = typeof p.id === 'string' ? parseInt(p.id, 10) : p.id;
+                                      const weeklyProj = weeklyProjections.get(numericId) || 0;
+                                      return { ...p, weeklyProjection: weeklyProj };
+                                    })
+                                    .filter(p => p.weeklyProjection > 0) // Only show players with actual projections
+                                    .sort((a, b) => b.weeklyProjection - a.weeklyProjection)
+                                    .slice(0, 5);
+                                  
+                                  if (topByProjection.length === 0) {
+                                    return (
+                                      <TableRow>
+                                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                                          No projection data available
+                                        </TableCell>
+                                      </TableRow>
+                                    );
+                                  }
+                                  
+                                  return topByProjection.map(player => (
+                                    <TableRow key={player.id}>
+                                      <TableCell className="font-medium">
+                                        <div className="flex flex-col">
+                                          <span 
+                                            className="hover:underline hover:text-primary cursor-pointer"
+                                            onClick={() => handlePlayerClick(player)}
+                                          >
+                                            {player.full_name}
+                                          </span>
+                                          <span className="text-xs text-muted-foreground">{player.team}</span>
+                                        </div>
+                                      </TableCell>
+                                      <TableCell className="text-right">{formatPositionForDisplay(player.position)}</TableCell>
+                                      <TableCell className="text-right">
+                                        <span className="text-muted-foreground">{player.gamesThisWeek}</span>
+                                      </TableCell>
+                                      <TableCell className="text-right font-bold text-blue-600">
+                                        {player.weeklyProjection.toFixed(1)}
+                                      </TableCell>
+                                      <TableCell>
+                                        <div className="flex gap-1">
+                                          <Button 
+                                            size="icon" 
+                                            variant="ghost" 
+                                            className={`h-8 w-8 ${watchlist.has(player.id) ? 'text-yellow-500' : 'text-muted-foreground'}`}
+                                            onClick={(e) => { e.stopPropagation(); toggleWatchlist(player); }}
+                                          >
+                                            <Star className={`h-4 w-4 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
+                                          </Button>
+                                          <Button 
+                                            size="default" 
+                                            variant="default" 
+                                            className="h-10 w-10 text-primary font-bold text-xl bg-primary/10 hover:bg-primary/20 border border-primary/30" 
+                                            onClick={(e) => { e.stopPropagation(); handleAddPlayer(player); }}
+                                          >
+                                            +
+                                          </Button>
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  ));
+                                })()}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   </div>
@@ -1606,8 +1721,8 @@ const FreeAgents = () => {
              <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-lg mb-4 flex items-start gap-3">
                 <Calendar className="h-5 w-5 text-blue-500 mt-1 shrink-0" />
                 <div>
-                  <h3 className="font-semibold text-blue-700 dark:text-blue-400">Schedule Maximizers</h3>
-                  <p className="text-sm text-muted-foreground">Players with the most games this week, sorted by games played and points.</p>
+                  <h3 className="font-semibold text-blue-700 dark:text-blue-400">Schedule Maximizers + Projections</h3>
+                  <p className="text-sm text-muted-foreground">Players with the most games this week, including their projected fantasy points for the remaining week.</p>
                 </div>
              </div>
 
@@ -1756,15 +1871,27 @@ const FreeAgents = () => {
                                  {getSortIcon('savePct')}
                                </div>
                              </TableHead>
-                             <TableHead className="text-right">Pts/Gm</TableHead>
-                           </>
-                         )}
+                            <TableHead className="text-right">Pts/Gm</TableHead>
+                          </>
+                        )}
+                         <TableHead 
+                           className="text-right cursor-pointer hover:bg-muted/50 select-none font-bold text-blue-600"
+                           onClick={() => handleSort('weeklyProjection')}
+                         >
+                           <div className="flex items-center justify-end">
+                             Proj (Week)
+                             {getSortIcon('weeklyProjection')}
+                           </div>
+                         </TableHead>
                          <TableHead className="w-[120px]"></TableHead>
                        </TableRow>
                      </TableHeader>
                      <TableBody>
                        {sortScheduleMaximizers(scheduleMaximizers).map((player) => {
                          const isGoalie = player.position === 'G';
+                         // Get weekly projection for this player
+                         const numericId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
+                         const weeklyProj = weeklyProjections.get(numericId) || 0;
                          return (
                            <TableRow key={player.id} className="hover:bg-muted/50">
                              <TableCell className="font-medium">
@@ -1884,6 +2011,11 @@ const FreeAgents = () => {
                                  </TableCell>
                                </>
                              )}
+                             <TableCell className="text-right">
+                               <div className="font-bold text-blue-600 text-lg">
+                                 {weeklyProj > 0 ? weeklyProj.toFixed(1) : '-'}
+                               </div>
+                             </TableCell>
                              <TableCell>
                                <div className="flex gap-1 justify-end">
                                  <Button 
