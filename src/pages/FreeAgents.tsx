@@ -99,13 +99,13 @@ const FreeAgents = () => {
     setWatchlist(new Set(LeagueService.getWatchlist()));
   }, [searchParams, activeLeagueId, isChangingLeague]);
 
-  // Load schedule maximizers only when the tab is active
+  // Load schedule maximizers when players are loaded (needed for Top Projected combined view)
   useEffect(() => {
-    if (activeTab === 'schedule' && players.length > 0 && scheduleMaximizers.length === 0 && !loadingMaximizers) {
+    if (players.length > 0 && scheduleMaximizers.length === 0 && !loadingMaximizers) {
       calculateScheduleMaximizers(players);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, players.length]);
+  }, [players.length]);
 
   // Fetch weekly projections for top free agents (for Top Projected list)
   // CRITICAL: Works for BOTH active users AND demo/guest users (EXACT SAME WAY)
@@ -1120,6 +1120,7 @@ const FreeAgents = () => {
     .sort((a, b) => b.adds - a.adds)
     .slice(0, 5);
 
+  // Combined Top Projected with Schedule Icons - merges projections + schedule data
   const topProjected = [...filteredPlayers]
     .map(p => {
       // Use numeric ID to match Map key type
@@ -1127,13 +1128,20 @@ const FreeAgents = () => {
       const realProjection = weeklyProjections.get(numericId);
       // Use real projection if > 0, otherwise fallback to mock
       const weeklyProjection = (realProjection && realProjection > 0) ? realProjection : ((p.points || 0) / 20);
+      
+      // Find matching schedule data for this player
+      const scheduleData = scheduleMaximizers.find(sm => sm.id === p.id);
+      
       return {
         ...p,
-        weeklyProjection
+        weeklyProjection,
+        gamesThisWeek: scheduleData?.gamesThisWeek || 0,
+        gameDays: scheduleData?.gameDays || [],
+        games: scheduleData?.games || []
       };
     })
     .sort((a, b) => b.weeklyProjection - a.weeklyProjection)
-    .slice(0, 5);
+    .slice(0, 10); // Show top 10 instead of 5
 
   const positions = ['ALL', 'C', 'LW', 'RW', 'W', 'D', 'G'];
 
@@ -1292,32 +1300,58 @@ const FreeAgents = () => {
                       </CardContent>
                     </Card>
 
-                    {/* Top Projected Table */}
+                    {/* Top Projected + Schedule Combined Table */}
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-lg font-bold flex items-center gap-2">
                           <Calendar className="h-5 w-5 text-blue-500" />
                           Top Projected (Remaining Week)
                         </CardTitle>
-                        <Button variant="ghost" size="sm" onClick={() => setViewMode('all')}>See All</Button>
+                        <Button variant="ghost" size="sm" onClick={() => setActiveTab('schedule')}>See All</Button>
                       </CardHeader>
                       <CardContent className="p-0">
-                        {/* Mobile List View */}
+                        {/* Mobile List View - Compact with Schedule Icons */}
                         <div className="md:hidden">
                           {topProjected.map(player => (
-                            <div key={player.id} className="p-3 border-b flex items-center justify-between">
-                              <div className="flex flex-col">
-                                <span className="font-medium">{player.full_name}</span>
-                                <span className="text-xs text-muted-foreground">{formatPositionForDisplay(player.position)} • {player.team}</span>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                <div className="text-right">
-                                  <div className="font-bold text-blue-600">
-                                    {((player as any).weeklyProjection || 0).toFixed(1)}
-                                  </div>
-                                  <div className="text-[10px] text-muted-foreground">Proj</div>
+                            <div key={player.id} className="p-2 border-b flex items-center gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-sm truncate">{player.full_name}</span>
+                                  <span className="text-[10px] text-muted-foreground shrink-0">{formatPositionForDisplay(player.position)}</span>
                                 </div>
-                                <Button size="default" variant="default" className="h-10 w-10 text-primary font-bold text-xl bg-primary/10 hover:bg-primary/20 border border-primary/30" onClick={() => handleAddPlayer(player)}>
+                                {/* Schedule Icons Row */}
+                                {player.games && player.games.length > 0 && (
+                                  <div className="flex gap-1 mt-1">
+                                    {player.games
+                                      .filter((game: NHLGame) => game && game.game_date)
+                                      .sort((a: NHLGame, b: NHLGame) => new Date(a.game_date).getTime() - new Date(b.game_date).getTime())
+                                      .slice(0, 4)
+                                      .map((game: NHLGame, idx: number) => {
+                                        const isHome = game.home_team_abbrev === player.team;
+                                        const opponentAbbrev = isHome ? game.away_team_abbrev : game.home_team_abbrev;
+                                        return (
+                                          <div key={idx} className="flex items-center gap-0.5 bg-muted/50 rounded px-1 py-0.5">
+                                            <span className="text-[8px] text-muted-foreground">{isHome ? 'vs' : '@'}</span>
+                                            <img 
+                                              src={`https://assets.nhle.com/logos/nhl/svg/${opponentAbbrev}_light.svg`}
+                                              alt={opponentAbbrev}
+                                              className="w-4 h-4"
+                                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                            />
+                                          </div>
+                                        );
+                                      })}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <div className="text-right">
+                                  <div className="font-bold text-blue-600 text-sm">
+                                    {(player.weeklyProjection || 0).toFixed(1)}
+                                  </div>
+                                  <div className="text-[9px] text-muted-foreground">{player.gamesThisWeek || 0}G</div>
+                                </div>
+                                <Button size="sm" variant="default" className="h-8 w-8 text-primary font-bold bg-primary/10 hover:bg-primary/20 border border-primary/30 p-0" onClick={() => handleAddPlayer(player)}>
                                   +
                                 </Button>
                               </div>
@@ -1332,8 +1366,9 @@ const FreeAgents = () => {
                               <TableRow>
                                 <TableHead>Player</TableHead>
                                 <TableHead className="text-right">Pos</TableHead>
+                                <TableHead className="text-center">Schedule</TableHead>
                                 <TableHead className="text-right">Proj</TableHead>
-                                <TableHead className="w-[50px]"></TableHead>
+                                <TableHead className="w-[80px]"></TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -1351,8 +1386,37 @@ const FreeAgents = () => {
                                   </div>
                                 </TableCell>
                                 <TableCell className="text-right">{formatPositionForDisplay(player.position)}</TableCell>
-                                <TableCell className="text-right font-bold text-blue-600">
-                                  {((player as any).weeklyProjection || 0).toFixed(1)}
+                                <TableCell className="text-center">
+                                  {player.games && player.games.length > 0 ? (
+                                    <div className="flex justify-center gap-1">
+                                      {player.games
+                                        .filter((game: NHLGame) => game && game.game_date)
+                                        .sort((a: NHLGame, b: NHLGame) => new Date(a.game_date).getTime() - new Date(b.game_date).getTime())
+                                        .map((game: NHLGame, idx: number) => {
+                                          const isHome = game.home_team_abbrev === player.team;
+                                          const opponentAbbrev = isHome ? game.away_team_abbrev : game.home_team_abbrev;
+                                          return (
+                                            <div key={idx} className="flex items-center gap-0.5 bg-muted/30 rounded px-1.5 py-0.5">
+                                              <span className="text-[9px] text-muted-foreground">{isHome ? 'vs' : '@'}</span>
+                                              <img 
+                                                src={`https://assets.nhle.com/logos/nhl/svg/${opponentAbbrev}_light.svg`}
+                                                alt={opponentAbbrev}
+                                                className="w-5 h-5"
+                                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                              />
+                                            </div>
+                                          );
+                                        })}
+                                    </div>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground">-</span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex flex-col items-end">
+                                    <span className="font-bold text-blue-600">{(player.weeklyProjection || 0).toFixed(1)}</span>
+                                    <span className="text-[10px] text-muted-foreground">{player.gamesThisWeek || 0} games</span>
+                                  </div>
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex gap-1">
@@ -1364,7 +1428,7 @@ const FreeAgents = () => {
                                     >
                                       <Star className={`h-4 w-4 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
                                     </Button>
-                                    <Button size="default" variant="default" className="h-10 w-10 text-primary font-bold text-xl bg-primary/10 hover:bg-primary/20 border border-primary/30" onClick={() => handleAddPlayer(player)}>
+                                    <Button size="sm" variant="default" className="h-8 w-8 text-primary font-bold bg-primary/10 hover:bg-primary/20 border border-primary/30 p-0" onClick={() => handleAddPlayer(player)}>
                                       +
                                     </Button>
                                   </div>
