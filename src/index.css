@@ -1369,10 +1369,82 @@
     border-left: 4px solid #FF9800 !important;
   }
   
-  /* Hide all decorative elements */
+  /* Hide decorative elements but KEEP projection/daily points */
   .player-card-bg-text,
-  .player-card-bg-number,
-  .player-projection-bar-container,
+  .player-card-bg-number {
+    display: none !important;
+  }
+  
+  /* Show projection bar in compact form - TAPPABLE for breakdown */
+  .player-projection-bar-container {
+    display: block !important;
+    grid-column: 1 / -1 !important;
+    margin-top: 6px !important;
+    padding: 6px 8px !important;
+    background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%) !important;
+    border: 2px solid #ff9800 !important;
+    border-radius: 8px !important;
+    position: relative !important;
+  }
+  
+  .player-projection-bar-container > div:first-child {
+    font-size: 10px !important;
+    margin-bottom: 4px !important;
+    font-weight: 700 !important;
+    color: #e65100 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+  }
+  
+  /* Hide the battery bar chunks on mobile - just show the tappable score */
+  .player-projection-bar-container .flex.gap-0\.5 {
+    display: none !important;
+  }
+  
+  /* Center the tappable points button */
+  .player-projection-bar-container .flex.justify-center {
+    display: flex !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    align-items: center !important;
+  }
+  
+  /* Make the points badge PROMINENT and TAPPABLE */
+  .player-projection-bar-container button {
+    font-size: 16px !important;
+    font-weight: 900 !important;
+    padding: 6px 12px !important;
+    min-height: 36px !important;
+    min-width: 80px !important;
+    background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 6px !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+    touch-action: manipulation !important;
+  }
+  
+  /* Static points text */
+  .player-projection-bar-container > .flex.justify-center > span {
+    font-size: 16px !important;
+    font-weight: 900 !important;
+    padding: 6px 12px !important;
+    background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%) !important;
+    color: white !important;
+    border-radius: 6px !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+  }
+  
+  /* Info button next to points */
+  .player-projection-bar-container button.w-6 {
+    min-width: 28px !important;
+    min-height: 28px !important;
+    padding: 0 !important;
+    background: #4caf50 !important;
+    font-size: 12px !important;
+  }
+  
+  /* Game logos - compact row */
   .game-logos-bar {
     display: none !important;
   }
@@ -1434,43 +1506,65 @@
     text-overflow: ellipsis !important;
   }
   
-  /* Unique stats box - RIGHT SIDE GRID */
+  /* Unique stats box - RIGHT SIDE GRID with TAPPABLE TOOLTIPS */
   .player-unique-stats-box {
     display: flex !important;
     flex-direction: column !important;
-    gap: 1px !important;
-    background: linear-gradient(135deg, #e8e8e8 0%, #d0d0d0 100%) !important;
-    border: 1px solid #999 !important;
-    border-radius: 4px !important;
-    padding: 4px 6px !important;
-    min-width: 55px !important;
+    gap: 2px !important;
+    background: linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%) !important;
+    border: 2px solid #666 !important;
+    border-radius: 6px !important;
+    padding: 6px 8px !important;
+    min-width: 65px !important;
     align-items: flex-end !important;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.1) !important;
   }
   
   .player-unique-stats-box .unique-stat-item {
     display: flex !important;
     justify-content: space-between !important;
     width: 100% !important;
-    gap: 4px !important;
+    gap: 6px !important;
+    align-items: center !important;
   }
   
   .player-unique-stats-box .unique-stat-label {
     font-family: Arial, sans-serif !important;
-    font-size: 8px !important;
-    color: #666 !important;
+    font-size: 9px !important;
+    color: #444 !important;
     text-transform: uppercase !important;
+    font-weight: 600 !important;
   }
   
   .player-unique-stats-box .unique-stat-value {
     font-family: 'Arial Black', sans-serif !important;
-    font-size: 11px !important;
+    font-size: 12px !important;
     font-weight: 900 !important;
     color: #1a1a1a !important;
   }
   
-  /* F Pts highlight - green for good scores */
-  .player-unique-stats-box .unique-stat-item:first-child .unique-stat-value {
-    color: #2e7d32 !important;
+  /* F Pts - special tappable tooltip button */
+  .player-unique-stats-box .unique-stat-item:first-child .unique-stat-value,
+  .player-unique-stats-box .unique-stat-item:first-child .unique-stat-value button {
+    color: #1565c0 !important;
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%) !important;
+    border: 1px solid #64b5f6 !important;
+    border-radius: 4px !important;
+    padding: 2px 6px !important;
+    font-size: 13px !important;
+    font-weight: 900 !important;
+    min-height: 28px !important;
+    touch-action: manipulation !important;
+  }
+  
+  /* Hint that F Pts is tappable */
+  .player-unique-stats-box .unique-stat-item:first-child::after {
+    content: "tap" !important;
+    font-size: 7px !important;
+    color: #999 !important;
+    position: absolute !important;
+    bottom: -8px !important;
+    right: 0 !important;
   }
   
   /* Matchup comparison row - give cards more room */

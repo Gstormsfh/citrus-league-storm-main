@@ -2,9 +2,10 @@
  * ProjectionTooltip Component
  * Shows "Performance Outlook" - clean projected stat lines without math breakdown
  * Full traceability remains in backend logs (debug_projection.py)
+ * Now uses Popover for better mobile support (tap to view, tap elsewhere to close)
  */
 
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { MatchupPlayer } from "./types";
 
 interface ProjectionTooltipProps {
@@ -26,47 +27,44 @@ export const ProjectionTooltip = ({ projection }: ProjectionTooltipProps) => {
     { label: 'PIM', value: (projection.projected_pim || 0).toFixed(2) },
   ];
 
-  // 8 stats = 4 per column for perfect grid
-
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button className="w-5 h-5 rounded-lg bg-citrus-sage border-2 border-citrus-forest shadow-patch flex items-center justify-center hover:scale-110 hover:shadow-varsity transition-all group">
-          <span className="text-[10px] font-varsity font-black text-citrus-forest group-hover:text-[#E8EED9] transition-colors">i</span>
+    <Popover>
+      <PopoverTrigger asChild>
+        <button className="w-6 h-6 rounded-full bg-citrus-sage border-2 border-citrus-forest flex items-center justify-center active:scale-95 transition-all touch-manipulation">
+          <span className="text-[10px] font-bold text-citrus-forest">i</span>
         </button>
-      </TooltipTrigger>
-      <TooltipContent 
-        className="p-0 bg-[#E8EED9]/90 backdrop-blur-md corduroy-texture rounded-[1.5rem] border-4 border-citrus-forest shadow-[0_6px_0_rgba(27,48,34,0.25)] max-w-md z-[999999]"
+      </PopoverTrigger>
+      <PopoverContent 
+        className="p-0 bg-[#E8EED9]/95 backdrop-blur-md rounded-xl border-2 border-citrus-forest shadow-lg w-[280px] z-[999999]"
         side="top"
         align="end"
-        sideOffset={10}
+        sideOffset={8}
       >
-        {/* Header patch */}
-        <div className="bg-gradient-to-r from-citrus-sage via-[#7CB518] to-citrus-sage px-5 py-4 rounded-t-[1.25rem] border-b-4 border-citrus-forest relative overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(255,255,255,0.2)_0%,_transparent_60%)]"></div>
-          <h4 className="font-varsity text-base font-black text-[#E8EED9] uppercase tracking-tight text-center relative z-10">
-            🏒 Performance Outlook
+        {/* Header */}
+        <div className="bg-gradient-to-r from-citrus-sage via-[#7CB518] to-citrus-sage px-4 py-3 rounded-t-xl border-b-2 border-citrus-forest">
+          <h4 className="font-bold text-sm text-white uppercase tracking-tight text-center">
+            🏒 Projected Stats
           </h4>
         </div>
 
-        {/* Stats grid with stitched borders */}
-        <div className="p-5 grid grid-cols-2 gap-4">
+        {/* Stats grid - compact for mobile */}
+        <div className="p-3 grid grid-cols-2 gap-2 max-h-[50vh] overflow-y-auto">
           {stats.map((stat) => (
-            <div key={stat.label} className="p-3 bg-gradient-to-br from-citrus-sage/10 to-citrus-sage/5 rounded-xl border-3 border-dashed border-citrus-sage/50 shadow-sm hover:shadow-patch transition-all">
-              <div className="font-mono text-xs text-citrus-sage uppercase tracking-wider mb-1">{stat.label}</div>
-              <div className="font-varsity text-2xl font-black text-citrus-forest">{stat.value}</div>
+            <div key={stat.label} className="p-2 bg-white/50 rounded-lg border border-citrus-sage/30">
+              <div className="text-[10px] text-citrus-sage uppercase font-bold mb-0.5">{stat.label}</div>
+              <div className="font-bold text-lg text-citrus-forest">{stat.value}</div>
             </div>
           ))}
         </div>
 
-        {/* Footer patch */}
-        <div className="bg-gradient-to-r from-citrus-peach via-citrus-orange/50 to-citrus-peach px-5 py-4 rounded-b-[1.25rem] border-t-4 border-citrus-forest">
+        {/* Footer */}
+        <div className="bg-gradient-to-r from-citrus-peach via-citrus-orange/50 to-citrus-peach px-4 py-3 rounded-b-xl border-t-2 border-citrus-forest">
           <div className="flex justify-between items-center">
-            <span className="font-varsity text-sm font-bold text-citrus-forest uppercase tracking-wide">Total Fantasy Points</span>
-            <span className="font-varsity text-3xl font-black text-citrus-orange">{projection.total_projected_points.toFixed(1)}</span>
+            <span className="font-bold text-xs text-citrus-forest uppercase">Projected Total</span>
+            <span className="font-black text-2xl text-citrus-orange">{projection.total_projected_points.toFixed(1)}</span>
           </div>
         </div>
-      </TooltipContent>
-    </Tooltip>
+      </PopoverContent>
+    </Popover>
   );
 };
