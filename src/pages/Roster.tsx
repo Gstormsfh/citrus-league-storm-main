@@ -2508,17 +2508,35 @@ const Roster = () => {
         </div>
       )}
       
-      {/* Citrus Background - Floating citrus elements */}
-      <CitrusBackground density="medium" animated={true} />
+      {/* Citrus Background - Hidden on mobile for performance */}
+      <div className="hidden lg:block">
+        <CitrusBackground density="medium" animated={true} />
+      </div>
       
-      <Navbar />
+      {/* Desktop Navbar - Hidden on mobile */}
+      <div className="hidden lg:block">
+        <Navbar />
+      </div>
       
-      <main className="w-full pt-28 pb-16 m-0 p-0">
+      {/* MOBILE: Compact sticky header */}
+      <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
+        <div className="flex items-center justify-between h-12 px-4">
+          <h1 className="text-lg font-varsity font-bold text-citrus-forest">
+            {userLeagueState === 'guest' ? 'Citrus Crushers' : (userTeam?.team_name || 'My Roster')}
+          </h1>
+          <div className="text-xs font-display text-citrus-charcoal/60">
+            {teamStats.record}
+          </div>
+        </div>
+      </div>
+      
+      {/* MOBILE: Full-screen scrollable content / DESKTOP: Grid layout */}
+      <main className="w-full lg:pt-28 lg:pb-16 pb-[calc(5rem+env(safe-area-inset-bottom))]">
         <div className="w-full m-0 p-0">
-          {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
+          {/* Desktop: 3-column grid / Mobile: Single column */}
           <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
-            {/* Main Content - Scrollable - Appears first on mobile */}
-            <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-4 order-1 lg:order-2">
+            {/* Main Content - MOBILE: Full width / DESKTOP: Scrollable panel */}
+            <div className="min-w-0 lg:max-h-[calc(100vh-12rem)] overflow-y-auto ios-scroll px-3 lg:px-4 order-1 lg:order-2">
               {/* Fantasy Team Header with Citrus Flair */}
               <div className="bg-card rounded-lg shadow-md border p-4 mb-4 relative overflow-hidden">
                 {/* Decorative citrus leaves in background */}
@@ -3282,8 +3300,8 @@ const Roster = () => {
         </Dialog>
             </div>
 
-            {/* Left Sidebar - At bottom on mobile, left on desktop - World-Class Ad Space */}
-            <aside className="w-full lg:w-auto order-2 lg:order-1">
+            {/* Left Sidebar - Hidden on mobile, left on desktop */}
+            <aside className="hidden lg:block w-full lg:w-auto order-2 lg:order-1">
               <div className="lg:sticky lg:top-32 space-y-4 lg:space-y-6">
                 {/* Roster Depth Widget */}
                 <TeamIntelHub />
@@ -3296,7 +3314,7 @@ const Roster = () => {
               </div>
             </aside>
 
-            {/* Right Sidebar - Notifications/Chat Panel - Right side on desktop, hidden on mobile */}
+            {/* Right Sidebar - Notifications/Chat Panel - Hidden on mobile */}
             {userLeagueState === 'active-user' && userTeam?.league_id && (
               <aside className="hidden lg:block order-3">
                 <div className="lg:sticky lg:top-32 h-[calc(100vh-12rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
@@ -3308,7 +3326,10 @@ const Roster = () => {
         </div>
       </main>
       
-      <Footer />
+      {/* Footer - Hidden on mobile */}
+      <div className="hidden lg:block">
+        <Footer />
+      </div>
     </div>
   );
 };

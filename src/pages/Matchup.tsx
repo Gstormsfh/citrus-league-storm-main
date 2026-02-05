@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
+import { cn } from '@/lib/utils';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
@@ -4850,20 +4851,43 @@ const Matchup = () => {
 
   return (
     <div className="min-h-screen bg-[#D4E8B8] relative overflow-hidden w-full">
-      {/* Citrus Background - Floating citrus elements */}
-      <CitrusBackground density="light" animated={true} />
+      {/* Citrus Background - Floating citrus elements - Hidden on mobile for performance */}
+      <div className="hidden lg:block">
+        <CitrusBackground density="light" animated={true} />
+      </div>
       
-      {/* Decorative elements to match Home page */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-[hsl(var(--vibrant-yellow))] rounded-full opacity-10 blur-3xl -z-10"></div>
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-[hsl(var(--vibrant-green))] rounded-full opacity-10 blur-3xl -z-10"></div>
+      {/* Decorative elements to match Home page - Hidden on mobile */}
+      <div className="hidden lg:block absolute top-0 right-0 w-96 h-96 bg-[hsl(var(--vibrant-yellow))] rounded-full opacity-10 blur-3xl -z-10"></div>
+      <div className="hidden lg:block absolute bottom-0 left-0 w-96 h-96 bg-[hsl(var(--vibrant-green))] rounded-full opacity-10 blur-3xl -z-10"></div>
 
-      <Navbar />
-      <main className="w-full pt-28 pb-16 m-0 p-0">
+      {/* Desktop Navbar - Hidden on mobile */}
+      <div className="hidden lg:block">
+        <Navbar />
+      </div>
+      
+      {/* MOBILE: Compact sticky header */}
+      <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
+        <div className="flex items-center justify-between h-12 px-4">
+          <h1 className="text-lg font-varsity font-bold text-citrus-forest">Matchup</h1>
+          <div className="text-xs font-display text-citrus-charcoal/60">
+            {currentMatchup ? `Week ${selectedWeek}` : ''}
+          </div>
+        </div>
+      </div>
+
+      {/* MOBILE: Full-screen scrollable content / DESKTOP: Grid layout */}
+      <main className={cn(
+        "w-full",
+        // Mobile: Full height scrollable, no padding for navbar
+        "lg:pt-28 lg:pb-16",
+        // Mobile: Account for bottom nav
+        "pb-[calc(5rem+env(safe-area-inset-bottom))]"
+      )}>
         <div className="w-full m-0 p-0">
-          {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
+          {/* Desktop: 3-column grid / Mobile: Single column, content only */}
           <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
-            {/* Main Content - Scrollable - Full Width - Appears first on mobile */}
-            <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-4 order-1 lg:order-2">
+            {/* Main Content - MOBILE: Full width, full height / DESKTOP: Scrollable panel */}
+            <div className="min-w-0 lg:max-h-[calc(100vh-12rem)] overflow-y-auto ios-scroll px-3 lg:px-4 order-1 lg:order-2">
               {/* Header Section - Clean and Professional with Citrus Colors */}
               <div className="mb-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
@@ -5127,8 +5151,8 @@ const Matchup = () => {
           )}
             </div>
 
-            {/* Dynamic Matchup Sidebar - World-Class Yahoo/Sleeper Style */}
-            <aside className="w-full lg:w-auto order-2 lg:order-1">
+            {/* Dynamic Matchup Sidebar - Hidden on mobile, shown on desktop */}
+            <aside className="hidden lg:block w-full lg:w-auto order-2 lg:order-1">
               <div className="lg:sticky lg:top-32">
                 <MatchupSidebar
                   myStarters={weeklyMyStarters}
@@ -5164,7 +5188,10 @@ const Matchup = () => {
           onClose={() => setIsPlayerDialogOpen(false)}
         />
       </main>
-      <Footer />
+      {/* Footer - Hidden on mobile */}
+      <div className="hidden lg:block">
+        <Footer />
+      </div>
     </div>
   );
 };
