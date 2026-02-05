@@ -10,6 +10,20 @@ import { X, MessageSquare, Send, Sparkles, Minimize2, Maximize2 } from 'lucide-r
 import { Narwhal } from '@/components/icons/Narwhal';
 import { CitrusSparkle, CitrusLeaf } from '@/components/icons/CitrusIcons';
 
+// Hook to detect mobile
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+  
+  return isMobile;
+};
+
 interface Message {
   id: string;
   text: string;
@@ -19,6 +33,7 @@ interface Message {
 
 export const StormyChatBubble = () => {
   const location = useLocation();
+  const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [inputValue, setInputValue] = useState('');
@@ -99,7 +114,14 @@ export const StormyChatBubble = () => {
     return (
       <Button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-36 right-6 left-auto md:bottom-6 md:left-6 md:right-auto h-14 w-14 rounded-varsity shadow-[0_6px_0_rgba(27,48,34,0.2)] bg-gradient-to-br from-citrus-sage to-citrus-orange border-4 border-citrus-forest hover:scale-105 hover:-translate-y-1 transition-all z-[100] p-0 overflow-hidden"
+        className="fixed h-14 w-14 rounded-varsity shadow-[0_6px_0_rgba(27,48,34,0.2)] bg-gradient-to-br from-citrus-sage to-citrus-orange border-4 border-citrus-forest hover:scale-105 hover:-translate-y-1 transition-all z-[100] p-0 overflow-hidden"
+        style={{ 
+          position: 'fixed',
+          bottom: isMobile ? 'calc(3.5rem + env(safe-area-inset-bottom) + 2rem)' : '1.5rem',
+          right: isMobile ? '1.5rem' : 'auto',
+          left: isMobile ? 'auto' : '1.5rem',
+          zIndex: 100
+        }}
       >
         {/* Corduroy texture */}
         <div className="absolute inset-0 opacity-20 corduroy-texture pointer-events-none" />
@@ -112,7 +134,14 @@ export const StormyChatBubble = () => {
 
   return (
     <Card 
-      className={`fixed bottom-36 right-6 left-auto md:bottom-6 md:left-6 md:right-auto w-[calc(100vw-3rem)] md:w-[380px] shadow-[0_8px_0_rgba(27,48,34,0.2)] z-[100] border-4 border-citrus-forest rounded-[2rem] overflow-hidden flex flex-col transition-all duration-300 bg-[#E8EED9]/60 backdrop-blur-sm corduroy-texture ${isMinimized ? 'h-[70px]' : 'h-[600px]'}`}
+      className={`fixed w-[calc(100vw-3rem)] md:w-[380px] shadow-[0_8px_0_rgba(27,48,34,0.2)] border-4 border-citrus-forest rounded-[2rem] overflow-hidden flex flex-col transition-all duration-300 bg-[#E8EED9]/60 backdrop-blur-sm corduroy-texture ${isMinimized ? 'h-[70px]' : 'h-[600px]'}`}
+      style={{
+        position: 'fixed',
+        bottom: isMobile ? 'calc(3.5rem + env(safe-area-inset-bottom) + 2rem)' : '1.5rem',
+        right: isMobile ? '1.5rem' : 'auto',
+        left: isMobile ? 'auto' : '1.5rem',
+        zIndex: 100
+      }}
     >
       <CardHeader className="p-4 bg-gradient-to-r from-citrus-sage/20 via-citrus-sage/10 to-citrus-peach/10 border-b-4 border-citrus-forest flex flex-row items-center justify-between shrink-0 relative">
         {/* Decorative citrus leaf */}
