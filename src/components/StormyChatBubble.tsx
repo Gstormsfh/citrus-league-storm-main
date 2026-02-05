@@ -99,7 +99,7 @@ export const StormyChatBubble = () => {
     return (
       <Button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-36 right-6 md:bottom-6 md:right-auto md:left-6 h-14 w-14 rounded-varsity shadow-[0_6px_0_rgba(27,48,34,0.2)] bg-gradient-to-br from-citrus-sage to-citrus-orange border-4 border-citrus-forest hover:scale-105 hover:-translate-y-1 transition-all z-[9999] p-0 overflow-hidden"
+        className="fixed bottom-36 right-6 left-auto md:bottom-6 md:left-6 md:right-auto h-14 w-14 rounded-varsity shadow-[0_6px_0_rgba(27,48,34,0.2)] bg-gradient-to-br from-citrus-sage to-citrus-orange border-4 border-citrus-forest hover:scale-105 hover:-translate-y-1 transition-all z-[100] p-0 overflow-hidden"
       >
         {/* Corduroy texture */}
         <div className="absolute inset-0 opacity-20 corduroy-texture pointer-events-none" />
@@ -112,7 +112,7 @@ export const StormyChatBubble = () => {
 
   return (
     <Card 
-      className={`fixed bottom-36 right-6 md:bottom-6 md:right-auto md:left-6 w-[calc(100vw-3rem)] md:w-[380px] shadow-[0_8px_0_rgba(27,48,34,0.2)] z-[9999] border-4 border-citrus-forest rounded-[2rem] overflow-hidden flex flex-col transition-all duration-300 bg-[#E8EED9]/60 backdrop-blur-sm corduroy-texture ${isMinimized ? 'h-[70px]' : 'h-[600px]'}`}
+      className={`fixed bottom-36 right-6 left-auto md:bottom-6 md:left-6 md:right-auto w-[calc(100vw-3rem)] md:w-[380px] shadow-[0_8px_0_rgba(27,48,34,0.2)] z-[100] border-4 border-citrus-forest rounded-[2rem] overflow-hidden flex flex-col transition-all duration-300 bg-[#E8EED9]/60 backdrop-blur-sm corduroy-texture ${isMinimized ? 'h-[70px]' : 'h-[600px]'}`}
     >
       <CardHeader className="p-4 bg-gradient-to-r from-citrus-sage/20 via-citrus-sage/10 to-citrus-peach/10 border-b-4 border-citrus-forest flex flex-row items-center justify-between shrink-0 relative">
         {/* Decorative citrus leaf */}

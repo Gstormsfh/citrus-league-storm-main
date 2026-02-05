@@ -46,13 +46,61 @@ export const ScoreCard = ({
   const isTied = Math.abs(myPointsNum - oppPointsNum) < 0.01;
   
   return (
-    <div className="mb-6 rounded-[2rem] bg-[#E8EED9]/50 backdrop-blur-sm corduroy-texture border-4 border-citrus-forest shadow-[0_8px_0_rgba(27,48,34,0.2)] overflow-hidden relative">
-      {/* Floating Citrus Decorations */}
-      <CitrusSlice className="absolute top-3 right-3 w-8 h-8 text-citrus-sage/10 rotate-12" />
-      <CitrusBurst className="absolute bottom-3 left-3 w-10 h-10 text-citrus-sage/10" />
+    <div className="mb-4 md:mb-6 rounded-xl md:rounded-[2rem] bg-[#E8EED9]/50 backdrop-blur-sm corduroy-texture border-2 md:border-4 border-citrus-forest shadow-[0_4px_0_rgba(27,48,34,0.15)] md:shadow-[0_8px_0_rgba(27,48,34,0.2)] overflow-hidden relative">
+      {/* Floating Citrus Decorations - Hidden on mobile */}
+      <CitrusSlice className="hidden md:block absolute top-3 right-3 w-8 h-8 text-citrus-sage/10 rotate-12" />
+      <CitrusBurst className="hidden md:block absolute bottom-3 left-3 w-10 h-10 text-citrus-sage/10" />
       
-      {/* Header with team badges */}
-      <div className="relative px-4 py-4 md:px-6 md:py-5 bg-[#E8EED9]/50 backdrop-blur-sm border-b-4 border-citrus-forest">
+      {/* Mobile: Compact single-row layout */}
+      <div className="md:hidden px-3 py-2">
+        <div className="flex items-center justify-between gap-2">
+          {/* Team 1 - Compact */}
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="w-8 h-8 rounded-full bg-citrus-sage border-2 border-citrus-forest flex items-center justify-center flex-shrink-0">
+              <span className="font-varsity text-xs text-[#E8EED9]">H</span>
+            </div>
+            <div className="min-w-0">
+              <div className="font-varsity text-[10px] text-citrus-sage uppercase truncate">{myTeamName}</div>
+              <div className="font-mono text-[9px] text-citrus-forest">{myTeamRecord.wins}-{myTeamRecord.losses}</div>
+            </div>
+          </div>
+          
+          {/* Scores - Compact */}
+          <div className="flex items-center gap-2">
+            <div className={`font-varsity text-2xl ${isWinning ? 'text-citrus-sage' : 'text-citrus-forest'}`}>{myTeamPoints}</div>
+            <span className="text-xs text-citrus-forest font-bold">vs</span>
+            <div className={`font-varsity text-2xl ${isLosing ? 'text-citrus-green-medium' : 'text-citrus-forest'}`}>{opponentTeamPoints}</div>
+          </div>
+          
+          {/* Team 2 - Compact */}
+          <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
+            <div className="min-w-0 text-right">
+              <div className="font-varsity text-[10px] text-citrus-sage uppercase truncate">{opponentTeamName}</div>
+              <div className="font-mono text-[9px] text-citrus-forest">{opponentTeamRecord.wins}-{opponentTeamRecord.losses}</div>
+            </div>
+            <div className="w-8 h-8 rounded-full bg-citrus-peach border-2 border-citrus-forest flex items-center justify-center flex-shrink-0">
+              <span className="font-varsity text-xs text-[#E8EED9]">A</span>
+            </div>
+          </div>
+        </div>
+        
+        {/* Win probability - Compact */}
+        <div className="mt-2">
+          <div className="flex justify-between items-center mb-1">
+            <span className="font-varsity text-[9px] text-citrus-forest uppercase">Win Prob</span>
+            <span className="font-display font-bold text-xs text-citrus-forest">{winProbability}%</span>
+          </div>
+          <div className="h-3 rounded-full overflow-hidden border border-citrus-forest bg-[#E8EED9]/50">
+            <div className="flex h-full">
+              <div className="bg-citrus-sage" style={{ width: `${winProbability}%` }} />
+              <div className="bg-citrus-peach flex-grow" />
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Desktop: Full layout */}
+      <div className="hidden md:block relative px-4 py-4 md:px-6 md:py-5 bg-[#E8EED9]/50 backdrop-blur-sm border-b-4 border-citrus-forest">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           {/* Team 1 Badge - Embroidered patch */}
           <div className="flex items-center gap-3 p-3 bg-citrus-sage/15 rounded-2xl border-3 border-citrus-sage">
@@ -118,8 +166,8 @@ export const ScoreCard = ({
         </div>
       </div>
       
-      {/* Win probability - embroidered bar */}
-      <div className="px-6 pb-6">
+      {/* Win probability - Desktop only */}
+      <div className="hidden md:block px-6 pb-6">
         <div className="mb-2 flex justify-between items-center">
           <span className="font-varsity text-xs text-citrus-forest uppercase">Win Probability</span>
           <span className="font-display font-bold text-citrus-forest">{winProbability}%</span>
