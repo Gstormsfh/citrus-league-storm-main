@@ -47,10 +47,25 @@ const getPositionColorClasses = (position: string): string => {
   return '';
 };
 
-// Use full name (no abbreviation)
-const formatPlayerName = (name: string): string => {
+// Format name as "F. LastName" for mobile compactness
+const formatPlayerName = (name: string, compact: boolean = false): string => {
   if (!name) return '';
-  return name.trim();
+  const trimmed = name.trim();
+  
+  // Always use compact format on mobile (First Initial + Last Name)
+  // Check if we're on mobile using window width
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
+  
+  if (isMobile || compact) {
+    const parts = trimmed.split(' ');
+    if (parts.length >= 2) {
+      const firstInitial = parts[0].charAt(0);
+      const lastName = parts.slice(1).join(' ');
+      return `${firstInitial}. ${lastName}`;
+    }
+  }
+  
+  return trimmed;
 };
 
 // Calculate percentages for data bars (mock calculations based on available stats)
@@ -263,11 +278,32 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
               ) : null}
             </div>
             {/* Team Name - Below player name */}
-            {player.team && (
-              <div className="player-team-name" title={player.team}>
-                {player.team}
-              </div>
-            )}
+            <div className="flex items-center gap-1">
+              {player.team && (
+                <span className="player-team-name" title={player.team}>
+                  {player.team}
+                </span>
+              )}
+              {/* Today's Game Icon - MOBILE ONLY - Show if player has game today */}
+              {(() => {
+                const todayStr = getTodayMST();
+                const todaysGame = player.games?.find(g => g.game_date?.split('T')[0] === todayStr);
+                if (!todaysGame) return null;
+                const isHome = todaysGame.home_team?.toUpperCase() === player.team?.toUpperCase();
+                const opponent = isHome ? todaysGame.away_team : todaysGame.home_team;
+                const logoUrl = `https://assets.nhle.com/logos/nhl/svg/${opponent?.toUpperCase()}_light.svg`;
+                return (
+                  <div className="lg:hidden flex items-center gap-0.5">
+                    <div className="relative w-5 h-5 rounded bg-[#E8EED9]/70 border border-citrus-sage flex items-center justify-center">
+                      <img src={logoUrl} alt={opponent || ''} className="w-3.5 h-3.5 object-contain" />
+                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-gradient-to-br from-citrus-sage to-citrus-sage/80 rounded-full border border-citrus-forest flex items-center justify-center">
+                        <span className="text-[6px] font-bold text-citrus-forest">T</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
             {/* Key Stats Below Name - Show DAILY stats when date selected, season stats otherwise */}
             <div className="player-key-stats">
               {isGoalie ? (
@@ -378,9 +414,9 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
           )}
         </div>
 
-        {/* Game Logos Bar - PREMIUM SHOWCASE - COMPACT WITH OVERLAP */}
+        {/* Game Logos Bar - HIDDEN ON MOBILE */}
         {player.games && Array.isArray(player.games) && player.games.length > 0 && player.team && (
-          <div className="-mt-1 mb-0 px-0.5 py-0 bg-gradient-to-r from-citrus-sage/5 via-citrus-peach/5 to-citrus-sage/5 rounded border border-citrus-sage/20">
+          <div className="hidden lg:block -mt-1 mb-0 px-0.5 py-0 bg-gradient-to-r from-citrus-sage/5 via-citrus-peach/5 to-citrus-sage/5 rounded border border-citrus-sage/20">
             <GameLogosBar 
               games={player.games} 
               playerTeam={player.team}
@@ -390,11 +426,23 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
         )}
 
         {/* Daily Points Bar OR Projection Bar - VARSITY SCOREBOARD STYLE - COMPACT */}
-        {shouldShowDailyPoints ? (
-          // CASE 1: Show daily total points (game is FINAL and data exists)
+        {!hasGameOnDate ? (
+          // CASE 1: NO GAME scheduled for this date - Show "No game today" on mobile
+          <div className="player-projection-bar-container">
+            <div className="w-full py-1 text-center font-display text-xs text-citrus-charcoal/60 bg-[#E8EED9]/50 backdrop-blur-sm/50 rounded border border-dashed border-citrus-sage/30 italic">
+              No game {isInDailyViewMode ? 'this day' : 'today'}
+            </div>
+          </div>
+        ) : shouldShowDailyPoints ? (
+          // CASE 2: Show daily total points (game is FINAL and data exists)
           <div className="player-projection-bar-container relative bg-gradient-to-br from-citrus-sage/10 via-citrus-cream/30 to-citrus-peach/10 p-1 rounded border border-citrus-sage/30 shadow-sm">
-            {/* Label - Varsity Badge Style - COMPACT */}
-            <div className="text-[7px] font-varsity font-bold text-citrus-forest uppercase tracking-wider mb-0.5 flex items-center gap-0.5 bg-[#E8EED9]/50 backdrop-blur-sm/70 px-1 py-0 rounded border border-citrus-sage/30 w-fit">
+            {/* Label - Varsity Badge Style - HIDDEN ON DESKTOP, SHOWN ON MOBILE */}
+            <div className="lg:hidden flex text-[8px] font-varsity font-bold text-citrus-forest uppercase tracking-wider mb-0.5 items-center gap-0.5 bg-[#E8EED9]/50 backdrop-blur-sm/70 px-1 py-0 rounded border border-citrus-sage/30 w-fit mx-auto">
+              <span className="w-1 h-1 rounded-full bg-citrus-sage animate-pulse" />
+              Daily Points
+            </div>
+            {/* Label - Varsity Badge Style - HIDDEN ON MOBILE */}
+            <div className="hidden lg:flex text-[7px] font-varsity font-bold text-citrus-forest uppercase tracking-wider mb-0.5 items-center gap-0.5 bg-[#E8EED9]/50 backdrop-blur-sm/70 px-1 py-0 rounded border border-citrus-sage/30 w-fit">
               <span className="w-1 h-1 rounded-full bg-citrus-sage animate-pulse" />
               Daily Points
             </div>
@@ -441,18 +489,11 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
               })}
             </div>
           </div>
-        ) : !hasGameOnDate ? (
-          // CASE 2: NO GAME scheduled for this date - Varsity Badge Message - COMPACT
-          <div className="player-projection-bar-container">
-            <div className="w-full py-1 text-center font-display text-xs text-citrus-charcoal/60 bg-[#E8EED9]/50 backdrop-blur-sm/50 rounded border border-dashed border-citrus-sage/30 italic">
-              No game {isInDailyViewMode ? 'this day' : 'today'}
-            </div>
-          </div>
         ) : (
           // CASE 3: Show projection bar (game not final yet) - VARSITY SCOREBOARD - COMPACT
           <div className="player-projection-bar-container relative bg-gradient-to-br from-citrus-peach/10 via-citrus-cream/30 to-citrus-sage/10 p-1 rounded border border-citrus-peach/40 shadow-sm">
-            {/* Label - Varsity Badge Style - COMPACT */}
-            <div className="text-[7px] font-varsity font-bold text-citrus-forest uppercase tracking-wider mb-0.5 flex items-center gap-0.5 bg-[#E8EED9]/50 backdrop-blur-sm/70 px-1 py-0 rounded border border-citrus-peach/40 w-fit">
+            {/* Label - Varsity Badge Style - HIDDEN ON MOBILE */}
+            <div className="hidden lg:flex text-[7px] font-varsity font-bold text-citrus-forest uppercase tracking-wider mb-0.5 items-center gap-0.5 bg-[#E8EED9]/50 backdrop-blur-sm/70 px-1 py-0 rounded border border-citrus-peach/40 w-fit">
               <span className="w-1 h-1 rounded-full bg-citrus-orange animate-pulse" />
               Projected
             </div>

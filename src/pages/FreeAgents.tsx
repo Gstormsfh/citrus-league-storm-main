@@ -81,6 +81,10 @@ const FreeAgents = () => {
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
+  // Platform-wide trending data (real add counts from database)
+  const [trendingData, setTrendingData] = useState<Map<number, { addCount: number; netAdds: number }>>(new Map());
+  const [loadingTrending, setLoadingTrending] = useState(false);
+
   // Player Stats Modal State
   const [selectedPlayer, setSelectedPlayer] = useState<HockeyPlayer | null>(null);
   const [isPlayerDialogOpen, setIsPlayerDialogOpen] = useState(false);
@@ -115,6 +119,49 @@ const FreeAgents = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [players.length, activeLeagueId]);
+
+  // Fetch platform-wide trending data (real add counts)
+  useEffect(() => {
+    if (players.length > 0 && trendingData.size === 0 && !loadingTrending) {
+      fetchTrendingData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [players.length]);
+
+  const fetchTrendingData = async () => {
+    try {
+      setLoadingTrending(true);
+      
+      // Call the RPC to get platform-wide trending data
+      const { data, error } = await supabase.rpc('get_trending_players', {
+        days_back: 7,
+        limit_count: 50
+      });
+      
+      if (error) {
+        console.warn('[FreeAgents] Trending RPC not available yet, using fallback:', error.message);
+        // Fallback: trending data will remain empty, topTrending will use mock data
+        return;
+      }
+      
+      if (data && Array.isArray(data)) {
+        const trendingMap = new Map<number, { addCount: number; netAdds: number }>();
+        data.forEach((item: { player_id: number; add_count: number; net_adds: number }) => {
+          trendingMap.set(item.player_id, {
+            addCount: item.add_count,
+            netAdds: item.net_adds
+          });
+        });
+        setTrendingData(trendingMap);
+        console.log(`[FreeAgents] Loaded trending data for ${trendingMap.size} players`);
+      }
+    } catch (error) {
+      console.warn('[FreeAgents] Error fetching trending data:', error);
+      // Non-critical error - fallback to mock data
+    } finally {
+      setLoadingTrending(false);
+    }
+  };
 
   const fetchPlayers = async () => {
     try {
@@ -829,6 +876,23 @@ const FreeAgents = () => {
       );
 
       if (result.success) {
+        // Record the transaction for platform-wide trending analytics
+        try {
+          await supabase.rpc('record_player_transaction', {
+            p_player_id: playerIdNum,
+            p_league_id: leagueId,
+            p_team_id: teamData.id,
+            p_transaction_type: 'add',
+            p_source: result.isFreeAgent ? 'free_agent' : 'waiver',
+            p_player_name: player.full_name,
+            p_player_team: player.team,
+            p_player_position: player.position
+          });
+        } catch (transactionError) {
+          // Non-critical - don't fail the add if transaction recording fails
+          console.warn('[FreeAgents] Failed to record transaction:', transactionError);
+        }
+
         if (result.isFreeAgent) {
           toast({
             title: "Player Added",
@@ -842,6 +906,8 @@ const FreeAgents = () => {
         }
         // Refresh the free agents list to remove the added player
         await fetchPlayers();
+        // Refresh trending data to show updated counts
+        await fetchTrendingData();
       } else {
         // Handle error case - isFreeAgent may be undefined on error
         const isWaiverClaim = result.isFreeAgent === false;
@@ -1112,13 +1178,20 @@ const FreeAgents = () => {
   };
 
   // Derived lists for Summary View
+  // Use real trending data when available, fallback to estimated adds based on points
   const topTrending = [...filteredPlayers]
-    .map(p => ({
-      ...p,
-      adds: Math.floor((p.points || 0) * 15 + (p.full_name.length * 10)) // Mock adds count
-    }))
+    .map(p => {
+      const playerId = typeof p.id === 'string' ? parseInt(p.id, 10) : p.id;
+      const realData = trendingData.get(playerId);
+      return {
+        ...p,
+        adds: realData?.addCount ?? Math.floor((p.points || 0) * 12 + Math.random() * 50), // Real data or estimate
+        netAdds: realData?.netAdds ?? 0,
+        hasRealData: !!realData
+      };
+    })
     .sort((a, b) => b.adds - a.adds)
-    .slice(0, 5);
+    .slice(0, 10);
 
   // Combined Top Projected with Schedule Icons - merges projections + schedule data
   const topProjected = [...filteredPlayers]
@@ -1675,6 +1748,20 @@ const FreeAgents = () => {
                 </div>
              </div>
 
+             {/* Position Filter for Schedule Tab */}
+             <div className="flex flex-wrap gap-2 mb-4">
+               {positions.map((pos) => (
+                 <Badge
+                   key={pos}
+                   variant={positionFilter === pos ? "default" : "outline"}
+                   className="cursor-pointer hover:bg-primary/90 px-4 py-1 text-sm transition-all"
+                   onClick={() => setPositionFilter(pos)}
+                 >
+                   {pos === 'W' ? 'Wingers' : (pos === 'ALL' ? 'All Positions' : pos)}
+                 </Badge>
+               ))}
+             </div>
+
              {loading || loadingMaximizers || loadingProjections ? (
                <div className="p-12 text-center">
                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -1716,46 +1803,62 @@ const FreeAgents = () => {
                              Schedule
                            </div>
                          </TableHead>
-                         <TableHead 
-                           className="text-center cursor-pointer hover:bg-muted/50 select-none bg-blue-500/10"
-                           onClick={() => handleSort('weeklyProjection')}
-                         >
-                           <div className="flex items-center justify-center gap-1 font-bold text-blue-700">
-                             <TrendingUp className="h-4 w-4" />
-                             Rest of Week
-                             {getSortIcon('weeklyProjection')}
-                           </div>
-                         </TableHead>
-                         <TableHead className="w-[100px]"></TableHead>
+                        <TableHead 
+                          className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                          onClick={() => handleSort('points')}
+                        >
+                          <div className="flex items-center justify-end text-xs">
+                            Stats
+                            {getSortIcon('points')}
+                          </div>
+                        </TableHead>
+                        <TableHead 
+                          className="text-center cursor-pointer hover:bg-muted/50 select-none bg-blue-500/10"
+                          onClick={() => handleSort('weeklyProjection')}
+                        >
+                          <div className="flex items-center justify-center gap-1 font-bold text-blue-700">
+                            <TrendingUp className="h-4 w-4" />
+                            Rest of Week
+                            {getSortIcon('weeklyProjection')}
+                          </div>
+                        </TableHead>
+                        <TableHead className="w-[100px]"></TableHead>
                        </TableRow>
                      </TableHeader>
-                     <TableBody>
-                       {(() => {
-                         // Sort by weekly projection (highest first) by default
-                         const sorted = [...scheduleMaximizers].map(player => {
-                           const numericId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
-                           const realProjection = weeklyProjections.get(numericId);
-                           const weeklyProjection = (realProjection && realProjection > 0) ? realProjection : ((player.points || 0) / 20);
-                           return { ...player, weeklyProjection };
-                         }).sort((a, b) => {
-                           if (sortColumn === 'weeklyProjection' || !sortColumn) {
-                             return b.weeklyProjection - a.weeklyProjection;
-                           }
-                           // Handle other sort columns
-                           if (sortColumn === 'name') {
-                             return sortDirection === 'asc' 
-                               ? a.full_name.localeCompare(b.full_name)
-                               : b.full_name.localeCompare(a.full_name);
-                           }
-                           if (sortColumn === 'position') {
-                             return sortDirection === 'asc' 
-                               ? a.position.localeCompare(b.position)
-                               : b.position.localeCompare(a.position);
-                           }
-                           return b.weeklyProjection - a.weeklyProjection;
-                         });
-                         
-                         return sorted.map((player, index) => {
+                    <TableBody>
+                      {(() => {
+                        // Filter by position first
+                        const positionFiltered = scheduleMaximizers.filter(player => {
+                          const normalizedPos = formatPositionForDisplay(player.position);
+                          return positionFilter === 'ALL' || 
+                            (positionFilter === 'W' ? (normalizedPos === 'LW' || normalizedPos === 'RW') : normalizedPos === positionFilter);
+                        });
+                        
+                        // Sort by weekly projection (highest first) by default
+                        const sorted = [...positionFiltered].map(player => {
+                          const numericId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
+                          const realProjection = weeklyProjections.get(numericId);
+                          const weeklyProjection = (realProjection && realProjection > 0) ? realProjection : ((player.points || 0) / 20);
+                          return { ...player, weeklyProjection };
+                        }).sort((a, b) => {
+                          if (sortColumn === 'weeklyProjection' || !sortColumn) {
+                            return b.weeklyProjection - a.weeklyProjection;
+                          }
+                          // Handle other sort columns
+                          if (sortColumn === 'name') {
+                            return sortDirection === 'asc' 
+                              ? a.full_name.localeCompare(b.full_name)
+                              : b.full_name.localeCompare(a.full_name);
+                          }
+                          if (sortColumn === 'position') {
+                            return sortDirection === 'asc' 
+                              ? a.position.localeCompare(b.position)
+                              : b.position.localeCompare(a.position);
+                          }
+                          return b.weeklyProjection - a.weeklyProjection;
+                        });
+                        
+                        return sorted.map((player, index) => {
                            const isGoalie = player.position === 'G';
                            const isTopPick = index < 3; // Highlight top 3
                            return (
@@ -1834,18 +1937,30 @@ const FreeAgents = () => {
                                    <span className="text-xs text-muted-foreground">-</span>
                                  )}
                                </TableCell>
-                               <TableCell className="text-center bg-blue-500/5">
-                                 <div className="flex flex-col items-center">
-                                   <span className={`text-lg font-bold ${
-                                     isTopPick ? 'text-green-600' : 'text-blue-600'
-                                   }`}>
-                                     {player.weeklyProjection.toFixed(1)}
-                                   </span>
-                                   <span className="text-[10px] text-muted-foreground">
-                                     {player.gamesThisWeek || 0} game{(player.gamesThisWeek || 0) !== 1 ? 's' : ''} left
-                                   </span>
-                                 </div>
-                               </TableCell>
+                              <TableCell className="text-right">
+                                {isGoalie ? (
+                                  <div className="flex flex-col text-xs">
+                                    <span><b>{player.wins || 0}</b>W</span>
+                                    <span>{typeof player.save_percentage === 'number' ? (player.save_percentage * 100).toFixed(1) : '-'}%</span>
+                                  </div>
+                                ) : (
+                                  <div className="text-xs">
+                                    <span>{player.goals || 0}G-{player.assists || 0}A-<b>{player.points || 0}P</b></span>
+                                  </div>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-center bg-blue-500/5">
+                                <div className="flex flex-col items-center">
+                                  <span className={`text-lg font-bold ${
+                                    isTopPick ? 'text-green-600' : 'text-blue-600'
+                                  }`}>
+                                    {player.weeklyProjection.toFixed(1)}
+                                  </span>
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {player.gamesThisWeek || 0} game{(player.gamesThisWeek || 0) !== 1 ? 's' : ''} left
+                                  </span>
+                                </div>
+                              </TableCell>
                                <TableCell>
                                  <div className="flex gap-1 justify-end">
                                    <Button 

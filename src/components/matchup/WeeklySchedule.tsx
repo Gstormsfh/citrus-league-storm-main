@@ -118,25 +118,25 @@ export const WeeklySchedule = ({
   return (
     <div className="w-full">
       {/* Header row with view indicator and Full Week button */}
-      <div className="flex items-center justify-between mb-3 p-2 bg-gradient-to-r from-citrus-sage/10 via-citrus-cream to-citrus-peach/10 rounded-xl border-2 border-citrus-sage/30">
-        <div className="text-sm font-varsity font-bold text-citrus-forest flex items-center gap-2">
+      <div className="flex items-center justify-between mb-1.5 md:mb-3 p-1 md:p-2 bg-gradient-to-r from-citrus-sage/10 via-citrus-cream to-citrus-peach/10 rounded-xl border-2 border-citrus-sage/30">
+        <div className="text-[9px] md:text-sm font-varsity font-bold text-citrus-forest flex items-center gap-1 md:gap-2">
           {selectedDate ? (
-            <span className="flex items-center gap-2">
-              <CitrusSparkle className="w-4 h-4 text-citrus-orange" />
-              <span className="text-xs uppercase tracking-wide">Viewing:</span>
+            <span className="flex items-center gap-1 md:gap-2">
+              <CitrusSparkle className="w-3 h-3 md:w-4 md:h-4 text-citrus-orange" />
+              <span className="text-[9px] md:text-xs uppercase tracking-wide">Viewing:</span>
               <span className="text-citrus-orange">{formatDateLabel(selectedDate)}</span>
             </span>
           ) : (
-            <span className="flex items-center gap-2">
-              <CitrusSparkle className="w-4 h-4 text-citrus-orange" />
-              <span className="text-xs uppercase tracking-wide">Week Overview</span>
+            <span className="flex items-center gap-1 md:gap-2">
+              <CitrusSparkle className="w-3 h-3 md:w-4 md:h-4 text-citrus-orange" />
+              <span className="text-[9px] md:text-xs uppercase tracking-wide">Week Overview</span>
             </span>
           )}
         </div>
         {selectedDate && (
           <button
             onClick={() => onDayClick(null)}
-            className="px-3 py-1.5 text-xs font-varsity font-bold uppercase rounded-xl 
+            className="px-2 py-1 md:px-3 md:py-1.5 text-[9px] md:text-xs font-varsity font-bold uppercase rounded-xl 
               bg-citrus-sage/20 hover:bg-citrus-sage 
               text-citrus-forest border-2 border-citrus-sage hover:text-[#E8EED9]
               transition-all flex items-center gap-1 shadow-sm hover:shadow-patch hover:-translate-y-0.5"
@@ -146,7 +146,7 @@ export const WeeklySchedule = ({
           </button>
         )}
       </div>
-      <div className="grid grid-cols-7 gap-1.5 md:gap-2">
+      <div className="grid grid-cols-7 gap-1 md:gap-1.5 lg:gap-2">
         {dates.map((date, index) => {
           const isTodayDate = isToday(date);
           const isPastDate = isPast(date);
@@ -169,14 +169,14 @@ export const WeeklySchedule = ({
               )}
               onClick={() => onDayClick(date)}
             >
-              <CardContent className="p-2 relative">
+              <CardContent className="p-1 md:p-2 relative">
                 {/* Subtle corduroy texture */}
                 <div className="absolute inset-0 opacity-10 corduroy-texture pointer-events-none"></div>
                 
-                <div className="flex flex-col items-center gap-1 relative z-10">
+                <div className="flex flex-col items-center gap-0.5 md:gap-1 relative z-10">
                   {/* Day Label - Ultra Compact */}
                   <div className={cn(
-                    "text-[10px] font-varsity font-black uppercase tracking-wider leading-none",
+                    "text-[8px] md:text-[10px] font-varsity font-black uppercase tracking-wider leading-none",
                     isTodayDate ? "text-citrus-orange" : "text-citrus-charcoal"
                   )}>
                     {formatDayLabel(date)}
@@ -184,7 +184,7 @@ export const WeeklySchedule = ({
 
                   {/* Date - Compact */}
                   <div className={cn(
-                    "text-xs font-varsity font-bold leading-tight",
+                    "text-[9px] md:text-xs font-varsity font-bold leading-tight",
                     isTodayDate ? "text-citrus-orange" : "text-citrus-forest"
                   )}>
                     {formatDateLabel(date)}
@@ -192,21 +192,21 @@ export const WeeklySchedule = ({
 
                   {/* Status Indicator - Minimal */}
                   {isTodayDate && !isPastDate && (
-                    <Badge variant="default" className="text-[8px] py-0.5 px-1.5 h-4 bg-citrus-orange border-2 border-citrus-forest text-[#E8EED9] leading-none font-varsity font-bold shadow-sm">
+                    <Badge variant="default" className="text-[6px] md:text-[8px] py-0 md:py-0.5 px-1 md:px-1.5 h-3 md:h-4 bg-citrus-orange border-2 border-citrus-forest text-[#E8EED9] leading-none font-varsity font-bold shadow-sm">
                       Today
                     </Badge>
                   )}
 
                   {/* Points Display - Streamlined (hidden if hideScores is true) */}
                   {!hideScores && (
-                    <div className="w-full mt-1.5 space-y-1">
+                    <div className="w-full mt-1 md:mt-1.5 space-y-0.5 md:space-y-1">
                       {/* Team 1 */}
-                      <div className="flex flex-col gap-0.5 p-1 bg-citrus-sage/10 rounded-md border border-citrus-sage/30">
-                        <div className="text-[8px] font-display font-semibold text-citrus-charcoal leading-tight line-clamp-1 text-center px-0.5" title={team1Name || 'My Team'}>
+                      <div className="flex flex-col gap-0 md:gap-0.5 p-0.5 md:p-1 bg-citrus-sage/10 rounded-md border border-citrus-sage/30">
+                        <div className="text-[7px] md:text-[8px] font-display font-semibold text-citrus-charcoal leading-tight line-clamp-1 text-center px-0.5" title={team1Name || 'My Team'}>
                           {team1Name || 'My'}
                         </div>
                         <div className={cn(
-                          "text-sm font-varsity font-black text-center leading-tight",
+                          "text-[10px] md:text-sm font-varsity font-black text-center leading-tight",
                           myDailyPointsForDay !== undefined && myDailyPointsForDay > 0 ? "text-citrus-sage" : "text-citrus-charcoal/50"
                         )}>
                           {myDailyPointsForDay !== undefined ? myDailyPointsForDay.toFixed(1) : '-'}
@@ -217,12 +217,12 @@ export const WeeklySchedule = ({
                       <div className="h-[1px] bg-citrus-sage/20 w-full"></div>
                       
                       {/* Team 2 */}
-                      <div className="flex flex-col gap-0.5 p-1 bg-citrus-peach/10 rounded-md border border-citrus-peach/30">
-                        <div className="text-[8px] font-display font-semibold text-citrus-charcoal leading-tight line-clamp-1 text-center px-0.5" title={team2Name || 'Opponent'}>
+                      <div className="flex flex-col gap-0 md:gap-0.5 p-0.5 md:p-1 bg-citrus-peach/10 rounded-md border border-citrus-peach/30">
+                        <div className="text-[7px] md:text-[8px] font-display font-semibold text-citrus-charcoal leading-tight line-clamp-1 text-center px-0.5" title={team2Name || 'Opponent'}>
                           {team2Name || 'Opp'}
                         </div>
                         <div className={cn(
-                          "text-sm font-varsity font-black text-center leading-tight",
+                          "text-[10px] md:text-sm font-varsity font-black text-center leading-tight",
                           oppDailyPointsForDay !== undefined && oppDailyPointsForDay > 0 ? "text-citrus-peach" : "text-citrus-charcoal/50"
                         )}>
                           {oppDailyPointsForDay !== undefined ? oppDailyPointsForDay.toFixed(1) : '-'}

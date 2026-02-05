@@ -4850,7 +4850,7 @@ const Matchup = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#D4E8B8] relative overflow-hidden w-full">
+    <div className="min-h-screen bg-[#D4E8B8] relative overflow-x-hidden overflow-y-auto w-full">
       {/* Citrus Background - Floating citrus elements - Hidden on mobile for performance */}
       <div className="hidden lg:block">
         <CitrusBackground density="light" animated={true} />
@@ -4887,7 +4887,7 @@ const Matchup = () => {
           {/* Desktop: 3-column grid / Mobile: Single column, content only */}
           <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             {/* Main Content - MOBILE: Full width, full height / DESKTOP: Scrollable panel */}
-            <div className="min-w-0 lg:max-h-[calc(100vh-12rem)] overflow-y-auto ios-scroll px-3 lg:px-4 order-1 lg:order-2">
+            <div className="min-w-0 lg:max-h-[calc(100vh-12rem)] overflow-y-auto ios-scroll px-0 lg:px-4 order-1 lg:order-2">
               {/* Header Section - Clean and Professional with Citrus Colors */}
               <div className="mb-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">

@@ -32,10 +32,17 @@ const MobileBottomNav = () => {
 
   return (
     <nav 
-      className="fixed bottom-0 left-0 right-0 z-50 bg-background/90 backdrop-blur-md border-t border-border/50"
+      className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border/50"
       style={{ 
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
         paddingBottom: 'env(safe-area-inset-bottom)',
-        boxShadow: '0 -2px 10px rgba(0, 0, 0, 0.1)'
+        boxShadow: '0 -2px 10px rgba(0, 0, 0, 0.1)',
+        transform: 'translateZ(0)',
+        willChange: 'transform',
+        WebkitTransform: 'translateZ(0)',
       }}
     >
       <div className="flex h-14 items-center justify-around px-4">
