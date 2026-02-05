@@ -254,13 +254,13 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
         {/* Header Section with Unique Stats in Top Right */}
         <div className="player-card-header">
           <div className="player-header-left">
-            <div className="player-name lg:text-[16px] lg:font-bold lg:mb-1" title={player.name}>
+            <div className="player-name" title={player.name}>
               {displayName}
               {/* IR Badge - Display if roster_status is not ACT */}
               {(player.roster_status && player.roster_status !== 'ACT') || player.is_ir_eligible ? (
                 <Badge 
                   variant="destructive" 
-                  className="ml-1 text-[9px] lg:text-[11px] px-1 lg:px-1.5 py-0 lg:py-0.5"
+                  className="ml-1 text-[9px] px-1 py-0"
                   title={`Roster Status: ${player.roster_status || 'IR'}`}
                 >
                   IR
@@ -278,9 +278,9 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
               ) : null}
             </div>
             {/* Team Name - Below player name */}
-            <div className="flex items-center gap-1 lg:gap-2">
+            <div className="flex items-center gap-1">
               {player.team && (
-                <span className="player-team-name lg:text-[12px] lg:tracking-wider" title={player.team}>
+                <span className="player-team-name" title={player.team}>
                   {player.team}
                 </span>
               )}
@@ -305,7 +305,7 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
               })()}
             </div>
             {/* Key Stats Below Name - Show DAILY stats when date selected, season stats otherwise */}
-            <div className="player-key-stats lg:text-[14px] lg:mt-2">
+            <div className="player-key-stats">
               {isGoalie ? (
                 // Goalie: ALWAYS show SEASON TOTALS
                 <>
@@ -382,15 +382,15 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
           </div>
           {/* Unique Stats Box - Top Right Corner */}
           {uniqueStats.length > 0 && (
-            <div className="player-unique-stats-box lg:p-3 lg:min-w-[100px] lg:gap-2">
+            <div className="player-unique-stats-box">
               {uniqueStats.map((stat, idx) => {
                 // Use PointsTooltip for F Pts if stats_breakdown is available
                 if (stat.label === 'F Pts' && player.stats_breakdown && typeof player.stats_breakdown === 'object') {
                   const totalPoints = typeof player.total_points === 'number' ? player.total_points : 0;
                   return (
-                    <div key={idx} className="unique-stat-item lg:gap-3 lg:py-1">
-                      <span className="unique-stat-label lg:text-[12px]">{stat.label}:</span>
-                      <span className="unique-stat-value lg:text-[18px]">
+                    <div key={idx} className="unique-stat-item">
+                      <span className="unique-stat-label">{stat.label}:</span>
+                      <span className="unique-stat-value">
                         <PointsTooltip 
                           breakdown={player.stats_breakdown} 
                           totalPoints={totalPoints}
@@ -402,9 +402,9 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
                 // Use high-contrast color for F Pts (season total in mini stats)
                 const isFpts = stat.label === 'F Pts';
                 return (
-                  <div key={idx} className="unique-stat-item lg:gap-3 lg:py-1">
-                    <span className="unique-stat-label lg:text-[12px]">{stat.label}:</span>
-                    <span className={`unique-stat-value lg:text-[18px] ${isFpts ? 'text-orange-500 font-bold' : ''}`}>
+                  <div key={idx} className="unique-stat-item">
+                    <span className="unique-stat-label">{stat.label}:</span>
+                    <span className={`unique-stat-value ${isFpts ? 'text-orange-500 font-bold' : ''}`}>
                       {stat.value}
                     </span>
                   </div>
@@ -414,9 +414,9 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
           )}
         </div>
 
-        {/* Game Logos Bar - HIDDEN ON MOBILE, PROMINENT ON DESKTOP */}
+        {/* Game Logos Bar - HIDDEN ON MOBILE */}
         {player.games && Array.isArray(player.games) && player.games.length > 0 && player.team && (
-          <div className="hidden lg:block mt-2 mb-2 px-2 py-2 bg-gradient-to-r from-citrus-sage/10 via-citrus-peach/10 to-citrus-sage/10 rounded-lg border border-citrus-sage/30">
+          <div className="hidden lg:block -mt-1 mb-0 px-0.5 py-0 bg-gradient-to-r from-citrus-sage/5 via-citrus-peach/5 to-citrus-sage/5 rounded border border-citrus-sage/20">
             <GameLogosBar 
               games={player.games} 
               playerTeam={player.team}
@@ -425,42 +425,42 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
           </div>
         )}
 
-        {/* Daily Points Bar OR Projection Bar - VARSITY SCOREBOARD STYLE - COMPACT on mobile, LARGER on desktop */}
+        {/* Daily Points Bar OR Projection Bar - VARSITY SCOREBOARD STYLE - COMPACT */}
         {!hasGameOnDate ? (
-          // CASE 1: NO GAME scheduled for this date - Show "No game today"
-          <div className="player-projection-bar-container lg:mt-3">
-            <div className="w-full py-1 lg:py-3 text-center font-display text-xs lg:text-base text-citrus-charcoal/60 bg-[#E8EED9]/50 backdrop-blur-sm/50 rounded lg:rounded-lg border border-dashed border-citrus-sage/30 italic">
+          // CASE 1: NO GAME scheduled for this date - Show "No game today" on mobile
+          <div className="player-projection-bar-container">
+            <div className="w-full py-1 text-center font-display text-xs text-citrus-charcoal/60 bg-[#E8EED9]/50 backdrop-blur-sm/50 rounded border border-dashed border-citrus-sage/30 italic">
               No game {isInDailyViewMode ? 'this day' : 'today'}
             </div>
           </div>
         ) : shouldShowDailyPoints ? (
           // CASE 2: Show daily total points (game is FINAL and data exists)
-          <div className="player-projection-bar-container lg:mt-3 relative bg-gradient-to-br from-citrus-sage/10 via-citrus-cream/30 to-citrus-peach/10 p-1 lg:p-3 rounded lg:rounded-lg border border-citrus-sage/30 lg:border-2 shadow-sm">
+          <div className="player-projection-bar-container relative bg-gradient-to-br from-citrus-sage/10 via-citrus-cream/30 to-citrus-peach/10 p-1 rounded border border-citrus-sage/30 shadow-sm">
             {/* Label - Varsity Badge Style - HIDDEN ON DESKTOP, SHOWN ON MOBILE */}
             <div className="lg:hidden flex text-[8px] font-varsity font-bold text-citrus-forest uppercase tracking-wider mb-0.5 items-center gap-0.5 bg-[#E8EED9]/50 backdrop-blur-sm/70 px-1 py-0 rounded border border-citrus-sage/30 w-fit mx-auto">
               <span className="w-1 h-1 rounded-full bg-citrus-sage animate-pulse" />
               Daily Points
             </div>
-            {/* Label - Varsity Badge Style - DESKTOP VERSION */}
-            <div className="hidden lg:flex text-[10px] font-varsity font-bold text-citrus-forest uppercase tracking-wider mb-2 items-center gap-1.5 bg-[#E8EED9]/70 px-2 py-1 rounded-md border border-citrus-sage/40 w-fit">
-              <span className="w-2 h-2 rounded-full bg-citrus-sage animate-pulse" />
+            {/* Label - Varsity Badge Style - HIDDEN ON MOBILE */}
+            <div className="hidden lg:flex text-[7px] font-varsity font-bold text-citrus-forest uppercase tracking-wider mb-0.5 items-center gap-0.5 bg-[#E8EED9]/50 backdrop-blur-sm/70 px-1 py-0 rounded border border-citrus-sage/30 w-fit">
+              <span className="w-1 h-1 rounded-full bg-citrus-sage animate-pulse" />
               Daily Points
             </div>
-            {/* Centered total above bar - Premium Badge - COMPACT on mobile, LARGER on desktop */}
-            <div className="flex justify-center mb-0.5 lg:mb-2">
+            {/* Centered total above bar - Premium Badge - COMPACT */}
+            <div className="flex justify-center mb-0.5">
               {player.daily_stats_breakdown && Object.keys(player.daily_stats_breakdown).length > 0 ? (
                 <PointsTooltip 
                   breakdown={player.daily_stats_breakdown} 
                   totalPoints={dailyTotalPoints}
                 />
               ) : (
-                <span className="text-xs lg:text-lg font-varsity font-black text-citrus-orange bg-citrus-peach/30 px-1.5 lg:px-3 py-0.5 lg:py-1 rounded lg:rounded-md border border-citrus-peach/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)]">
+                <span className="text-xs font-varsity font-black text-citrus-orange bg-citrus-peach/30 px-1.5 py-0.5 rounded border border-citrus-peach/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)]">
                   {dailyTotalPoints.toFixed(1)} pts
                 </span>
               )}
             </div>
-            {/* Collegiate Battery Bar with Stitched Style - COMPACT on mobile, LARGER on desktop */}
-            <div className="flex gap-0.5 lg:gap-1 w-full">
+            {/* Collegiate Battery Bar with Stitched Style - COMPACT */}
+            <div className="flex gap-0.5 w-full">
               {Array.from({ length: maxBarPoints }, (_, i) => {
                 const isFilled = i < dailyFilledChunks;
                 const isPartialFilled = i === dailyFilledChunks && dailyPartialChunk > 0;
@@ -468,7 +468,7 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
                 return (
                   <div 
                     key={i}
-                    className={`flex-1 h-2 lg:h-4 rounded lg:rounded-md overflow-hidden transition-all duration-300
+                    className={`flex-1 h-2 rounded overflow-hidden transition-all duration-300
                       ${!isFilled && !isPartialFilled 
                         ? 'border-2 border-dashed border-citrus-sage/30 bg-[#E8EED9]/50 backdrop-blur-sm/50' 
                         : 'bg-[#E8EED9]/50 backdrop-blur-sm border-2 border-citrus-sage/40'
@@ -490,16 +490,16 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
             </div>
           </div>
         ) : (
-          // CASE 3: Show projection bar (game not final yet) - VARSITY SCOREBOARD - COMPACT on mobile, LARGER on desktop
-          <div className="player-projection-bar-container lg:mt-3 relative bg-gradient-to-br from-citrus-peach/10 via-citrus-cream/30 to-citrus-sage/10 p-1 lg:p-3 rounded lg:rounded-lg border border-citrus-peach/40 lg:border-2 shadow-sm">
+          // CASE 3: Show projection bar (game not final yet) - VARSITY SCOREBOARD - COMPACT
+          <div className="player-projection-bar-container relative bg-gradient-to-br from-citrus-peach/10 via-citrus-cream/30 to-citrus-sage/10 p-1 rounded border border-citrus-peach/40 shadow-sm">
             {/* Label - Varsity Badge Style - HIDDEN ON MOBILE */}
-            <div className="hidden lg:flex text-[10px] font-varsity font-bold text-citrus-forest uppercase tracking-wider mb-2 items-center gap-1.5 bg-[#E8EED9]/70 px-2 py-1 rounded-md border border-citrus-peach/50 w-fit">
-              <span className="w-2 h-2 rounded-full bg-citrus-orange animate-pulse" />
+            <div className="hidden lg:flex text-[7px] font-varsity font-bold text-citrus-forest uppercase tracking-wider mb-0.5 items-center gap-0.5 bg-[#E8EED9]/50 backdrop-blur-sm/70 px-1 py-0 rounded border border-citrus-peach/40 w-fit">
+              <span className="w-1 h-1 rounded-full bg-citrus-orange animate-pulse" />
               Projected
             </div>
-            {/* Centered total above bar - Premium Badge - COMPACT on mobile, LARGER on desktop */}
-            <div className="flex justify-center items-center gap-1 lg:gap-2 mb-0.5 lg:mb-2">
-              <span className="text-xs lg:text-lg font-varsity font-black text-citrus-orange bg-citrus-peach/30 px-1.5 lg:px-3 py-0.5 lg:py-1 rounded lg:rounded-md border border-citrus-peach/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)]">
+            {/* Centered total above bar - Premium Badge - COMPACT */}
+            <div className="flex justify-center items-center gap-1 mb-0.5">
+              <span className="text-xs font-varsity font-black text-citrus-orange bg-citrus-peach/30 px-1.5 py-0.5 rounded border border-citrus-peach/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)]">
                 {hasProjection && isStarterConfirmed
                   ? `${projectedPoints.toFixed(1)} pts`
                   : showTBD 
@@ -515,16 +515,16 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
                 )
               )}
             </div>
-            {/* Collegiate Battery Bar with Stitched Style - COMPACT on mobile, LARGER on desktop */}
+            {/* Collegiate Battery Bar with Stitched Style - COMPACT */}
             {hasProjection && isStarterConfirmed ? (
-              <div className="flex gap-0.5 lg:gap-1 w-full">
+              <div className="flex gap-0.5 w-full">
                 {Array.from({ length: maxBarPoints }, (_, i) => {
                   const isFilled = i < projectionFilledChunks;
                   const isPartial = i === projectionFilledChunks && projectionPartialChunk > 0;
                   return (
                     <div 
                       key={i}
-                      className={`flex-1 h-2 lg:h-4 rounded lg:rounded-md overflow-hidden transition-all duration-300
+                      className={`flex-1 h-2 rounded overflow-hidden transition-all duration-300
                         ${!isFilled && !isPartial 
                           ? 'border-2 border-dashed border-citrus-peach/30 bg-[#E8EED9]/50 backdrop-blur-sm/50' 
                           : 'bg-[#E8EED9]/50 backdrop-blur-sm border-2 border-citrus-peach/40'
@@ -544,20 +544,20 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
                 })}
               </div>
             ) : showTBD ? (
-              <div className="flex gap-0.5 lg:gap-1 w-full">
+              <div className="flex gap-0.5 w-full">
                 {Array.from({ length: maxBarPoints }, (_, i) => (
                   <div 
                     key={i}
-                    className="flex-1 h-2 lg:h-4 rounded lg:rounded-md border border-dashed border-citrus-peach/30 bg-[#E8EED9]/50 backdrop-blur-sm/50 animate-pulse"
+                    className="flex-1 h-2 rounded border border-dashed border-citrus-peach/30 bg-[#E8EED9]/50 backdrop-blur-sm/50 animate-pulse"
                   />
                 ))}
               </div>
             ) : (
-              <div className="flex gap-0.5 lg:gap-1 w-full">
+              <div className="flex gap-0.5 w-full">
                 {Array.from({ length: maxBarPoints }, (_, i) => (
                   <div 
                     key={i}
-                    className="flex-1 h-2 lg:h-4 rounded lg:rounded-md border border-dashed border-citrus-peach/30 bg-[#E8EED9]/50 backdrop-blur-sm/50"
+                    className="flex-1 h-2 rounded border border-dashed border-citrus-peach/30 bg-[#E8EED9]/50 backdrop-blur-sm/50"
                   />
                 ))}
               </div>

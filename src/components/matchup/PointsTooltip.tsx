@@ -119,7 +119,7 @@ export const PointsTooltip = ({
     <Tooltip open={open} onOpenChange={setOpen}>
       <TooltipTrigger asChild>
         <button 
-          className="text-citrus-orange hover:text-citrus-forest cursor-pointer font-bold font-varsity transition-all text-lg bg-citrus-peach/30 px-3 py-1 rounded-md border border-citrus-peach/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)]"
+          className="text-xs font-varsity font-black text-citrus-orange bg-citrus-peach/30 px-1.5 py-0.5 rounded border border-citrus-peach/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)] hover:text-citrus-forest cursor-pointer transition-all"
           onClick={(e) => {
             e.stopPropagation();
             e.preventDefault();

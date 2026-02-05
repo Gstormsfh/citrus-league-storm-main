@@ -1777,149 +1777,49 @@
   }
 }
 
+
 /* ==========================================
-   DESKTOP ENHANCEMENT - FILL THE SPACE
-   Make everything larger and more prominent on desktop
+   DESKTOP - Fill existing space, NO card size changes
    ========================================== */
 @media (min-width: 1024px) {
-  /* Player cards - MORE PADDING, MORE SPACE */
-  .player-card {
-    padding: 12px 14px !important;
-    min-height: 160px !important;
-    border-radius: 0.75rem !important;
-    border: 2px solid rgba(120, 149, 97, 0.5) !important;
-    border-bottom: 4px solid rgba(120, 149, 97, 0.7) !important;
-  }
-  
-  /* Empty cards match height */
-  .player-card-empty {
-    min-height: 160px !important;
-  }
-  
-  /* Background position text - LARGER */
-  .player-card .player-card-bg-text {
-    font-size: 4rem !important;
-    top: 8px !important;
-    left: 12px !important;
-    opacity: 0.06 !important;
-  }
-  
-  /* Player name - MUCH BIGGER */
-  .player-card .player-name {
-    font-size: 15px !important;
-    font-weight: 700 !important;
-    line-height: 1.3 !important;
-    margin-bottom: 4px !important;
-  }
-  
-  /* Team name - Bigger */
-  .player-card .player-team-name {
-    font-size: 12px !important;
-    margin-top: 2px !important;
-    letter-spacing: 0.08em !important;
-  }
-  
-  /* Key stats - Bigger and more readable */
-  .player-card .player-key-stats {
-    font-size: 13px !important;
-    line-height: 1.4 !important;
-    margin-top: 6px !important;
-    color: #555 !important;
-  }
-  
-  /* Unique stats box - MUCH LARGER */
-  .player-card .player-unique-stats-box {
-    padding: 8px 12px !important;
-    min-width: 85px !important;
+  /* Keep card size but reduce internal gaps */
+  .player-card .player-card-content {
     gap: 4px !important;
-    border-radius: 0.5rem !important;
-    border-width: 2px !important;
+  }
+
+  /* Slightly larger player name */
+  .player-card .player-name {
+    font-size: 14px !important;
   }
   
-  .player-card .player-unique-stats-box::before {
-    width: 10px !important;
-    height: 10px !important;
-    top: 6px !important;
-    right: 6px !important;
-  }
-  
-  /* Stat items - Larger */
-  .player-card .unique-stat-item {
-    gap: 8px !important;
-    padding: 3px 0 !important;
-  }
-  
-  .player-card .unique-stat-label {
+  /* Slightly larger team name */
+  .player-card .player-team-name {
     font-size: 11px !important;
+  }
+  
+  /* Larger key stats */
+  .player-card .player-key-stats {
+    font-size: 12px !important;
+  }
+  
+  /* Stats box - slightly larger text */
+  .player-card .unique-stat-label {
+    font-size: 10px !important;
   }
   
   .player-card .unique-stat-value {
-    font-size: 16px !important;
-  }
-  
-  /* Game logos bar - BIGGER ICONS */
-  .player-card .game-logos-bar {
-    gap: 8px !important;
-    padding: 8px 4px !important;
-  }
-  
-  .player-card .game-logo-item {
-    width: 48px !important;
-    min-width: 48px !important;
-  }
-  
-  .player-card .game-logo-item img {
-    width: 36px !important;
-    height: 36px !important;
-  }
-  
-  .player-card .game-logo-date {
-    font-size: 10px !important;
-  }
-  
-  .player-card .game-logo-score {
-    font-size: 11px !important;
-  }
-  
-  /* Projection/Daily Points Bar - BIGGER */
-  .player-card .player-projection-bar-container {
-    margin-top: 10px !important;
-    padding: 10px !important;
-  }
-  
-  /* Daily Points label - Bigger */
-  .player-card .player-projection-bar-container > div:first-child {
-    font-size: 10px !important;
-    padding: 3px 8px !important;
-    margin-bottom: 6px !important;
-  }
-  
-  /* Points badge - MUCH BIGGER */
-  .player-card .player-projection-bar-container .text-xs {
-    font-size: 16px !important;
-    padding: 4px 12px !important;
-  }
-  
-  /* Battery bar chunks - BIGGER */
-  .player-card .player-projection-bar-container .flex.gap-0\.5 > div {
-    height: 12px !important;
-    border-radius: 3px !important;
-  }
-  
-  /* Card header grid - more gap */
-  .player-card .player-card-header {
-    gap: 12px !important;
-    margin-bottom: 8px !important;
-  }
-  
-  /* Header left section */
-  .player-card .player-header-left {
-    gap: 2px !important;
-  }
-  
-  /* No game today message - Bigger */
-  .player-card .player-projection-bar-container .italic {
     font-size: 14px !important;
-    padding: 12px !important;
+  }
+  
+  /* Projection bar - less whitespace, tighter */
+  .player-card .player-projection-bar-container {
+    padding: 6px !important;
+    margin-top: 4px !important;
+  }
+  
+  /* Battery bar - slightly taller */
+  .player-card .player-projection-bar-container .flex.gap-0\.5 > div,
+  .player-card .player-projection-bar-container .flex.gap-1 > div {
+    height: 10px !important;
   }
 }
