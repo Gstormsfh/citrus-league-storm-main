@@ -38,7 +38,7 @@ export const GameLogosBar = ({ games, playerTeam, selectedDate }: GameLogosBarPr
   }
   
   return (
-    <div className="flex gap-1.5 items-center flex-wrap justify-center py-0.5 -mt-1">
+    <div className="flex gap-1.5 lg:gap-3 items-center flex-wrap justify-center py-0.5 lg:py-2 -mt-1 lg:mt-0">
       {sortedGames.map((game, idx) => {
         try {
           const gameDateStr = game.game_date.split('T')[0];
@@ -148,8 +148,8 @@ export const GameLogosBar = ({ games, playerTeam, selectedDate }: GameLogosBarPr
           }
           
           // PREMIUM DESIGN: Compact logos with surfer varsity styling
-          // Base container - COMPACT (8x8 instead of 12x12)
-          let containerClasses = 'relative w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-300 bg-[#E8EED9]/50 backdrop-blur-sm/50 backdrop-blur-sm';
+          // Base container - COMPACT on mobile (8x8), LARGER on desktop (12x12)
+          let containerClasses = 'relative w-8 h-8 lg:w-12 lg:h-12 rounded-lg flex items-center justify-center transition-all duration-300 bg-[#E8EED9]/50 backdrop-blur-sm/50 backdrop-blur-sm';
           let borderStyle: React.CSSProperties | undefined;
           let glowEffect = '';
           
@@ -238,7 +238,7 @@ export const GameLogosBar = ({ games, playerTeam, selectedDate }: GameLogosBarPr
           }
           
           return (
-            <div key={idx} className="flex flex-col items-center gap-0.5">
+            <div key={idx} className="flex flex-col items-center gap-0.5 lg:gap-1">
               <div
                 className={`${containerClasses} ${glowEffect} group cursor-pointer`}
                 style={borderStyle}
@@ -247,11 +247,11 @@ export const GameLogosBar = ({ games, playerTeam, selectedDate }: GameLogosBarPr
                 {/* Premium Gradient Overlay on Hover */}
                 <div className="absolute inset-0 rounded-lg bg-gradient-to-br from-citrus-sage/0 to-citrus-orange/0 group-hover:from-citrus-sage/10 group-hover:to-citrus-orange/10 transition-all duration-300"></div>
                 
-                {/* Team Logo - COMPACT */}
+                {/* Team Logo - COMPACT on mobile, LARGER on desktop */}
                 <img
                   src={logoUrl}
                   alt={opponent}
-                  className={`w-6 h-6 object-contain relative z-10 transition-transform duration-300 group-hover:scale-110 ${isLive ? 'brightness-110' : ''}`}
+                  className={`w-6 h-6 lg:w-9 lg:h-9 object-contain relative z-10 transition-transform duration-300 group-hover:scale-110 ${isLive ? 'brightness-110' : ''}`}
                   onError={(e) => {
                     // Fallback to text abbreviation if logo fails to load
                     const target = e.target as HTMLImageElement;
@@ -267,44 +267,44 @@ export const GameLogosBar = ({ games, playerTeam, selectedDate }: GameLogosBarPr
                   }}
                 />
                 
-                {/* Live Badge - COMPACT */}
+                {/* Live Badge - COMPACT on mobile, LARGER on desktop */}
                 {isLive && (
-                  <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-gradient-to-br from-citrus-orange via-citrus-orange to-red-500 rounded border border-citrus-cream shadow-sm animate-pulse">
+                  <div className="absolute -top-1 -right-1 lg:-top-1.5 lg:-right-1.5 w-3.5 h-3.5 lg:w-5 lg:h-5 bg-gradient-to-br from-citrus-orange via-citrus-orange to-red-500 rounded border border-citrus-cream shadow-sm animate-pulse">
                     <div className="absolute inset-0 bg-citrus-orange rounded animate-ping opacity-75"></div>
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-[6px] font-varsity font-black text-[#E8EED9] relative z-10">L</span>
+                      <span className="text-[6px] lg:text-[8px] font-varsity font-black text-[#E8EED9] relative z-10">L</span>
                     </div>
                     <span className="sr-only">Live</span>
                   </div>
                 )}
                 
-                {/* Selected Date Badge - COMPACT */}
+                {/* Selected Date Badge - COMPACT on mobile, LARGER on desktop */}
                 {isSelectedDateScheduled && (
-                  <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-gradient-to-br from-citrus-sage to-citrus-sage/80 rounded border border-citrus-forest shadow-sm">
+                  <div className="absolute -top-1 -right-1 lg:-top-1.5 lg:-right-1.5 w-3.5 h-3.5 lg:w-5 lg:h-5 bg-gradient-to-br from-citrus-sage to-citrus-sage/80 rounded border border-citrus-forest shadow-sm">
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-[6px] font-varsity font-black text-citrus-forest">T</span>
+                      <span className="text-[6px] lg:text-[8px] font-varsity font-black text-citrus-forest">T</span>
                     </div>
                     <span className="sr-only">{isToday ? 'Today' : 'Scheduled'}</span>
                   </div>
                 )}
               </div>
               
-              {/* Game Score Display - COMPACT */}
+              {/* Game Score Display - COMPACT on mobile, LARGER on desktop */}
               {gameScore && (
-                <span className="game-score-display text-[7px] leading-tight whitespace-nowrap text-citrus-forest font-display font-bold">
+                <span className="game-score-display text-[7px] lg:text-[10px] leading-tight whitespace-nowrap text-citrus-forest font-display font-bold">
                   {gameScore}
                 </span>
               )}
               
-              {/* Live Game Period & Time - COMPACT */}
+              {/* Live Game Period & Time - COMPACT on mobile, LARGER on desktop */}
               {isLive && game.period && (
-                <span className="text-[7px] leading-tight whitespace-nowrap text-citrus-orange font-varsity font-black animate-pulse">
+                <span className="text-[7px] lg:text-[10px] leading-tight whitespace-nowrap text-citrus-orange font-varsity font-black animate-pulse">
                   {game.period}{game.period_time ? ` ${game.period_time}` : ''}
                 </span>
               )}
               
-              {/* Date Display - COMPACT */}
-              <span className={`text-[8px] leading-tight whitespace-nowrap font-display font-semibold ${
+              {/* Date Display - COMPACT on mobile, LARGER on desktop */}
+              <span className={`text-[8px] lg:text-[11px] leading-tight whitespace-nowrap font-display font-semibold ${
                 isPlayed 
                   ? 'text-citrus-charcoal/40' 
                   : isSelectedDate && (isSelectedDateScheduled || isLive)

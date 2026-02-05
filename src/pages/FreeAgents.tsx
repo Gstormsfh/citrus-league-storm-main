@@ -153,7 +153,11 @@ const FreeAgents = () => {
           });
         });
         setTrendingData(trendingMap);
-        console.log(`[FreeAgents] Loaded trending data for ${trendingMap.size} players`);
+        if (trendingMap.size > 0) {
+          console.log(`[FreeAgents] ✅ Loaded REAL trending data for ${trendingMap.size} players`);
+        } else {
+          console.log('[FreeAgents] ⚠️ No trending data yet (table empty). Using estimated adds until users start adding players.');
+        }
       }
     } catch (error) {
       console.warn('[FreeAgents] Error fetching trending data:', error);
@@ -1296,6 +1300,16 @@ const FreeAgents = () => {
                         <CardTitle className="text-lg font-bold flex items-center gap-2">
                           <TrendingUp className="h-5 w-5 text-green-500" />
                           Top Trending
+                          {trendingData.size === 0 && (
+                            <Badge variant="outline" className="text-[10px] ml-2">
+                              Estimated
+                            </Badge>
+                          )}
+                          {trendingData.size > 0 && (
+                            <Badge className="text-[10px] ml-2 bg-green-500">
+                              Live Data
+                            </Badge>
+                          )}
                         </CardTitle>
                         <Button variant="ghost" size="sm" onClick={() => setViewMode('all')}>See All</Button>
                       </CardHeader>

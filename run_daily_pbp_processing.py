@@ -88,6 +88,13 @@ def process_single_game(game_id: int, raw_json: dict) -> bool:
     """
     try:
         # Import the processing function from process_xg_stats
+        # The file is in scripts/utilities/, so we need to add it to the path
+        import sys
+        import os
+        scripts_path = os.path.join(os.path.dirname(__file__), 'scripts', 'utilities')
+        if scripts_path not in sys.path:
+            sys.path.insert(0, scripts_path)
+        
         from process_xg_stats import process_single_game_json
         
         result = process_single_game_json(raw_json, game_id)
@@ -98,6 +105,10 @@ def process_single_game(game_id: int, raw_json: dict) -> bool:
             print(f"[run_daily_pbp_processing] Game {game_id}: Processing returned None (may have no shots)")
             return False
             
+    except ImportError as e:
+        print(f"[run_daily_pbp_processing] Import error for process_xg_stats: {e}")
+        print("[run_daily_pbp_processing] Make sure scripts/utilities/process_xg_stats.py exists")
+        return False
     except Exception as e:
         print(f"[run_daily_pbp_processing] Error processing game {game_id}: {e}")
         import traceback
@@ -278,22 +289,31 @@ def process_all_unprocessed_games() -> Dict[str, int]:
     failed_count = 0
     skipped_count = 0
     retry_map = {}  # game_id -> retry_count
+    permanently_failed_ids = set()  # Track games that exceeded retries - mark them as processed to stop infinite loop
     
-    offset = 0
     batch_num = 1
     start_time = time.time()
+    max_batches = (total_unprocessed // BATCH_SIZE) + 10  # Safety limit to prevent infinite loops
     
-    while True:
+    while batch_num <= max_batches:
         # Fetch batch
         games = get_unprocessed_games(db, limit=BATCH_SIZE)
         
         if not games:
+            print("[run_daily_pbp_processing] No more unprocessed games found.")
+            break
+        
+        # Filter out games we've already permanently failed (they should be marked but just in case)
+        games = [g for g in games if g.get("game_id") not in permanently_failed_ids]
+        
+        if not games:
+            print("[run_daily_pbp_processing] All remaining games have permanently failed. Exiting.")
             break
         
         print(f"[run_daily_pbp_processing] Processing batch {batch_num} ({len(games)} games)...")
         
-        batch_start_time = time.time()
         batch_processed = 0
+        batch_any_progress = False  # Track if we made any progress this batch
         
         for idx, game in enumerate(games, 1):
             game_id = game.get("game_id")
@@ -303,19 +323,33 @@ def process_all_unprocessed_games() -> Dict[str, int]:
             if not game_id or not raw_json:
                 print(f"[run_daily_pbp_processing] Skipping invalid game record: {game_id}")
                 skipped_count += 1
+                batch_any_progress = True
                 continue
             
             # Check retry count
             retry_count = retry_map.get(game_id, 0)
             if retry_count >= MAX_RETRIES:
-                print(f"[run_daily_pbp_processing] Game {game_id} exceeded max retries, skipping")
+                print(f"[run_daily_pbp_processing] Game {game_id} exceeded max retries, marking as processed to prevent re-fetching")
                 failed_count += 1
+                permanently_failed_ids.add(game_id)
+                batch_any_progress = True
+                
+                # CRITICAL FIX: Mark the game as processed so it doesn't get fetched again!
+                try:
+                    db.update(
+                        "raw_nhl_data",
+                        {"processed": True},  # Mark as processed even though it failed
+                        filters=[("game_id", "eq", game_id)]
+                    )
+                    print(f"[run_daily_pbp_processing] ✗ Game {game_id} marked as processed (failed permanently)")
+                except Exception as e:
+                    print(f"[run_daily_pbp_processing] ERROR: Could not mark failed game {game_id} as processed: {e}")
                 continue
             
             # Progress tracking
             total_processed_so_far = processed_count + batch_processed
             percent = (total_processed_so_far / total_unprocessed * 100) if total_unprocessed > 0 else 0
-            elapsed = time.time() - start_time if 'start_time' in locals() else 0
+            elapsed = time.time() - start_time
             avg_time = elapsed / total_processed_so_far if total_processed_so_far > 0 else 0
             remaining = avg_time * (total_unprocessed - total_processed_so_far)
             
@@ -333,11 +367,11 @@ def process_all_unprocessed_games() -> Dict[str, int]:
             if success:
                 processed_count += 1
                 batch_processed += 1
+                batch_any_progress = True
                 print(f"[run_daily_pbp_processing] ✓ Game {game_id} processed successfully ({game_time:.2f}s)")
                 
                 # Verify it was marked as processed
                 try:
-                    # Check if processed flag was set (process_xg_stats should do this)
                     check = db.select(
                         "raw_nhl_data",
                         select="processed",
@@ -359,13 +393,30 @@ def process_all_unprocessed_games() -> Dict[str, int]:
                 if retry_map[game_id] < MAX_RETRIES:
                     print(f"[run_daily_pbp_processing] Game {game_id} failed, will retry (attempt {retry_map[game_id]}/{MAX_RETRIES})")
                 else:
-                    print(f"[run_daily_pbp_processing] ✗ Game {game_id} failed after {MAX_RETRIES} attempts")
+                    print(f"[run_daily_pbp_processing] ✗ Game {game_id} failed after {MAX_RETRIES} attempts, marking as processed")
                     failed_count += 1
+                    permanently_failed_ids.add(game_id)
+                    batch_any_progress = True
+                    
+                    # CRITICAL FIX: Mark the game as processed so it doesn't get fetched again!
+                    try:
+                        db.update(
+                            "raw_nhl_data",
+                            {"processed": True},
+                            filters=[("game_id", "eq", game_id)]
+                        )
+                    except Exception as e:
+                        print(f"[run_daily_pbp_processing] ERROR: Could not mark failed game {game_id} as processed: {e}")
             
             # Small delay between games
             time.sleep(0.5)
         
         batch_num += 1
+        
+        # SAFETY: If we made no progress this batch (all games already failed), exit
+        if not batch_any_progress:
+            print("[run_daily_pbp_processing] No progress made in this batch - all games may have failed. Exiting.")
+            break
         
         # Check if we've processed all games (stop if batch was smaller than batch size)
         if len(games) < BATCH_SIZE:
@@ -374,6 +425,10 @@ def process_all_unprocessed_games() -> Dict[str, int]:
         # Progress update
         print(f"[run_daily_pbp_processing] Progress: {processed_count} processed, {failed_count} failed, {skipped_count} skipped")
         print()
+    
+    # Safety check: if we hit max batches, log it
+    if batch_num > max_batches:
+        print(f"[run_daily_pbp_processing] WARNING: Hit max batch limit ({max_batches}). May indicate an issue.")
     
     print("=" * 80)
     print(f"[run_daily_pbp_processing] Processing completed:")
