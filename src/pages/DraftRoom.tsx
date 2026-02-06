@@ -470,9 +470,21 @@ const DraftRoom = () => {
           logger.error('DraftRoom: Error pre-loading draft state:', draftStateError);
         }
 
-        // Always show LOBBY - user clicks "Join Draft" to enter ACTIVE phase
-        setDraftPhase(DraftPhase.LOBBY);
-        logger.debug('DraftRoom: Showing LOBBY with join banner for user:', user.id);
+        // Check if user was previously in ACTIVE phase (returning from another page/tab)
+        const cachedPhase = sessionStorage.getItem(`draft_phase_${leagueId}`);
+        if (cachedPhase === DraftPhase.ACTIVE) {
+          // Auto-resume to ACTIVE phase without requiring lobby click
+          setDraftPhase(DraftPhase.ACTIVE);
+          if (hasActiveDraftData) {
+            setDraftTimerStarted(true);
+            draftTimerStartedRef.current = true;
+          }
+          logger.debug('DraftRoom: Auto-resuming to ACTIVE phase from sessionStorage');
+        } else {
+          // Show LOBBY - user clicks "Join Draft" to enter ACTIVE phase
+          setDraftPhase(DraftPhase.LOBBY);
+          logger.debug('DraftRoom: Showing LOBBY with join banner for user:', user.id);
+        }
       } else if (leagueData.draft_status === 'completed') {
         // Draft completed
         if (hasActiveDraftData) {
@@ -507,6 +519,9 @@ const DraftRoom = () => {
           }
         }
         setDraftPhase(DraftPhase.COMPLETED);
+        // Clear cached phase on completion
+        sessionStorage.removeItem(`draft_phase_${leagueId}`);
+        sessionStorage.removeItem(`draft_timer_${leagueId}`);
         logger.debug('DraftRoom: Draft completed, showing COMPLETED phase');
       } else {
         // Unknown status - default to lobby
@@ -590,9 +605,11 @@ const DraftRoom = () => {
         setDraftHistory(activePicks);
         setDraftedPlayerIds(new Set(activePicks.map(p => p.player_id)));
 
-        // Start timer automatically if this is the first pick
-        if (activePicks.length >= 1 && !draftTimerStarted) {
+        // Start timer automatically when picks exist (for ALL users, not just commissioner)
+        // Uses ref to avoid stale closure reading initial false value
+        if (activePicks.length >= 1 && !draftTimerStartedRef.current) {
           setDraftTimerStarted(true);
+          draftTimerStartedRef.current = true;
         }
 
         // CRITICAL: Reset timer for next pick so all users see fresh countdown
@@ -607,7 +624,8 @@ const DraftRoom = () => {
         }
         timerRunningRef.current = false;
         lastPickNumberRef.current = 0;
-        setTimeRemaining(draftSettings.pickTimeLimit);
+        // Use ref to get current pickTimeLimit (avoids stale closure)
+        setTimeRemaining(pickTimeLimitRef.current);
 
         // Reload draft state to update current pick/round/nextTeam
         await loadDraftState();
@@ -638,6 +656,22 @@ const DraftRoom = () => {
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [leagueId, user]);
+
+  // Keep refs in sync with state for realtime callbacks (avoids stale closures)
+  useEffect(() => { pickTimeLimitRef.current = draftSettings.pickTimeLimit; }, [draftSettings.pickTimeLimit]);
+  useEffect(() => { draftTimerStartedRef.current = draftTimerStarted; }, [draftTimerStarted]);
+
+  // Persist draft phase and timer state to sessionStorage for tab/page navigation resilience
+  useEffect(() => {
+    if (leagueId && draftPhase) {
+      sessionStorage.setItem(`draft_phase_${leagueId}`, draftPhase);
+    }
+  }, [draftPhase, leagueId]);
+  useEffect(() => {
+    if (leagueId) {
+      sessionStorage.setItem(`draft_timer_${leagueId}`, String(draftTimerStarted));
+    }
+  }, [draftTimerStarted, leagueId]);
 
   // Real-time subscription to league status changes
   // This allows non-commissioner members to auto-transition when the draft starts
@@ -718,6 +752,8 @@ const DraftRoom = () => {
           if (updatedLeague.draft_status === 'completed' && draftPhase !== DraftPhase.COMPLETED) {
             logger.debug('DraftRoom: Draft completed via realtime');
             setDraftPhase(DraftPhase.COMPLETED);
+            sessionStorage.removeItem(`draft_phase_${leagueId}`);
+            sessionStorage.removeItem(`draft_timer_${leagueId}`);
           }
         }
       )
@@ -917,6 +953,9 @@ const DraftRoom = () => {
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   // Track the current auto-pick timeout ID for cleanup
   const autoPickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Refs for stale closure prevention in realtime subscription callbacks
+  const pickTimeLimitRef = useRef(draftSettings.pickTimeLimit);
+  const draftTimerStartedRef = useRef(false);
 
   // Handler to start the draft timer (commissioner only)
   const handleBeginDraft = async () => {
@@ -1131,7 +1170,7 @@ const DraftRoom = () => {
     return cleanup;
     // Reduced dependencies - only essential ones
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftPhase, draftState?.currentPick, draftTimerStarted, draftState?.nextTeamId, currentTeam?.id]);
+  }, [draftPhase, draftState?.currentPick, draftTimerStarted, draftState?.nextTeamId, currentTeam?.id, draftSettings.pickTimeLimit]);
 
   // Note: Timer auto-start removed - users must manually click "Continue Draft" button
   // This gives explicit control over when the timer starts/stops
@@ -1753,9 +1792,48 @@ const DraftRoom = () => {
             }
           }
         }
+        // Auto-start timer if picks already exist
+        const { picks: rejoinPicks } = await DraftService.getDraftPicks(leagueId, user.id);
+        const activeRejoinPicks = rejoinPicks.filter((p: DraftPick) => !p.deleted_at);
+        if (activeRejoinPicks.length > 0) {
+          setDraftTimerStarted(true);
+          draftTimerStartedRef.current = true;
+        }
         return;
       }
       // Non-commissioners can't start a new draft
+      return;
+    }
+
+    // Commissioner rejoining an in-progress draft (not starting a new one)
+    if (league?.draft_status === 'in_progress') {
+      logger.log('Commissioner rejoining in-progress draft');
+      setDraftPhase(DraftPhase.ACTIVE);
+      // Load draft state
+      const { state: rejoinState } = await DraftService.getDraftState(
+        leagueId, teams, league.draft_rounds || 21, user?.id
+      );
+      if (rejoinState) {
+        setDraftState(rejoinState);
+        if (rejoinState.sessionId) {
+          const { order: rejoinOrder } = await DraftService.getDraftOrder(leagueId, user.id, 1, rejoinState.sessionId);
+          if (rejoinOrder && rejoinOrder.team_order) {
+            const orderedTeams = rejoinOrder.team_order
+              .map((teamId: string) => teams.find(t => t.id === teamId))
+              .filter((t: any): t is (Team & { owner_name?: string }) => t !== undefined);
+            if (orderedTeams.length === teams.length) {
+              setOrderedTeamsForBoard(orderedTeams);
+            }
+          }
+        }
+      }
+      // Auto-start timer if picks already exist (otherwise commissioner sees "Start Draft Timer" button)
+      const { picks: rejoinPicks } = await DraftService.getDraftPicks(leagueId, user.id);
+      const activeRejoinPicks = rejoinPicks.filter((p: DraftPick) => !p.deleted_at);
+      if (activeRejoinPicks.length > 0) {
+        setDraftTimerStarted(true);
+        draftTimerStartedRef.current = true;
+      }
       return;
     }
 
@@ -1792,11 +1870,12 @@ const DraftRoom = () => {
         }
       }
 
-      // Update league status to in_progress and save draft settings
+      // Update league status to in_progress and save draft settings + rounds
       const { error: leagueStatusError } = await supabase
         .from('leagues')
-        .update({ 
+        .update({
           draft_status: 'in_progress',
+          draft_rounds: settings.rounds,
           settings: {
             ...(league?.settings || {}),
             pickTimeLimit: settings.pickTimeLimit,
@@ -1811,11 +1890,12 @@ const DraftRoom = () => {
         return;
       }
 
-      // Update local league state with saved settings
+      // Update local league state with saved settings and rounds
       if (league) {
-        setLeague({ 
-          ...league, 
+        setLeague({
+          ...league,
           draft_status: 'in_progress',
+          draft_rounds: settings.rounds,
           settings: {
             ...(league.settings || {}),
             pickTimeLimit: settings.pickTimeLimit,
