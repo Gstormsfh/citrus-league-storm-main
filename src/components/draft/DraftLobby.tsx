@@ -63,6 +63,7 @@ interface DraftLobbyProps {
   customDraftOrder?: string[] | null; // Custom order from the Custom Order button
   onCustomOrderChange?: (order: string[] | null) => void; // Callback when custom order is saved
   leagueDraftRounds?: number; // League's draft_rounds setting
+  leaguePickTimeLimit?: number; // League's saved pickTimeLimit from settings
   onResetDraft?: () => void; // Optional reset draft handler
   onAddAITeams?: () => Promise<void>; // Optional callback to add AI teams
   onDeleteTeam?: (teamId: string) => Promise<void>; // Optional callback to delete a team
@@ -89,6 +90,7 @@ export const DraftLobby = ({
   customDraftOrder,
   onCustomOrderChange,
   leagueDraftRounds = 21,
+  leaguePickTimeLimit,
   onResetDraft,
   onAddAITeams,
   leagueId,
@@ -108,7 +110,7 @@ export const DraftLobby = ({
   const [scheduleTimeInput, setScheduleTimeInput] = useState('');
   const [settings, setSettings] = useState<DraftSettings>({
     rounds: leagueDraftRounds, // Use league's draft_rounds setting
-    pickTimeLimit: 90,
+    pickTimeLimit: leaguePickTimeLimit || 90, // Use league's saved pickTimeLimit
     draftOrder: 'serpentine',
     scoringFormat: 'standard'
   });
@@ -124,13 +126,14 @@ export const DraftLobby = ({
       : (teams && Array.isArray(teams) ? teams.map(t => t.id) : [])
   );
 
-  // Update settings when leagueDraftRounds changes
+  // Sync settings from league data when props change
   useEffect(() => {
     setSettings(prev => ({
       ...prev,
-      rounds: leagueDraftRounds
+      rounds: leagueDraftRounds,
+      ...(leaguePickTimeLimit ? { pickTimeLimit: leaguePickTimeLimit } : {})
     }));
-  }, [leagueDraftRounds]);
+  }, [leagueDraftRounds, leaguePickTimeLimit]);
 
   // Initialize custom order when teams change
   useEffect(() => {

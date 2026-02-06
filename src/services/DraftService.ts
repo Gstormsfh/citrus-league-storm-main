@@ -330,6 +330,7 @@ export const DraftService = {
           round_number: roundNumber,
           pick_number: pickNumber,
           draft_session_id: targetSessionId,
+          picked_at: new Date().toISOString(),
         })
         .select()
         .single();
