@@ -316,10 +316,12 @@ const DraftRoom = () => {
     }
 
     try {
-      setLoading(true);
+      // Only show loading screen on initial load, not on return visits
+      const isReturnVisit = sessionStorage.getItem(`draft_phase_${leagueId}`);
+      if (!isReturnVisit) {
+        setLoading(true);
+      }
       setError(null);
-      // Don't prematurely set draftPhase here — phase is determined AFTER loading data
-      // The default state is already LOBBY from useState initialization
       logger.debug('DraftRoom: loadDraftData starting for league:', leagueId);
 
       // Load league (with membership validation)
