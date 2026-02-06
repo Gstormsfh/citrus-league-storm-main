@@ -1663,6 +1663,11 @@ const DraftRoom = () => {
       // Start loading state immediately
       setTimeout(() => loadStateAfterStart(0), 500);
 
+      // SOC 2 CC7.2: Audit log draft start
+      import('@/services/AuditService').then(({ AuditService }) => 
+        AuditService.logDraftEvent('DRAFT_START', leagueId, { teamsCount: teams.length, rounds: settings.rounds })
+      ).catch(() => {});
+
       logger.log('handleStartDraft: Draft started successfully');
     } catch (error: unknown) {
       logger.error('handleStartDraft: Error starting draft', error);

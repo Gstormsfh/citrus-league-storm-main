@@ -126,6 +126,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       email,
       password,
     });
+    // SOC 2 CC7.2: Audit log auth events (fire-and-forget)
+    if (!error) {
+      import('@/services/AuditService').then(({ AuditService }) => AuditService.logLogin()).catch(() => {});
+    } else {
+      import('@/services/AuditService').then(({ AuditService }) => 
+        AuditService.log('AUTH_FAILED', null, { email, error: error.message }, 'WARN')
+      ).catch(() => {});
+    }
     return { error };
   };
 
@@ -144,6 +152,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
+    // SOC 2 CC7.2: Audit log logout (fire-and-forget, before clearing session)
+    import('@/services/AuditService').then(({ AuditService }) => AuditService.logLogout()).catch(() => {});
     await supabase.auth.signOut();
     setProfile(null);
   };
