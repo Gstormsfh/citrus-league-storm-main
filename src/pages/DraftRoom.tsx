@@ -1060,6 +1060,8 @@ const DraftRoom = () => {
   const autoPickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // Guard against concurrent auto-draft calls (race condition prevention)
   const autoPickInProgressRef = useRef<boolean>(false);
+  // Track which pick number we last auto-drafted for to prevent duplicate attempts
+  const lastAutoPickedNumberRef = useRef<number>(0);
   // Refs for stale closure prevention in realtime subscription callbacks
   const pickTimeLimitRef = useRef(draftSettings.pickTimeLimit);
   const draftTimerStartedRef = useRef(false);
@@ -1182,14 +1184,18 @@ const DraftRoom = () => {
       }, 2000);
     }
 
+    // Track if we already triggered auto-draft for this timer cycle
+    let autoTriggered = false;
+
     // Calculate remaining time from server timestamp every second
     const updateTimer = () => {
       const elapsedSec = Math.floor((Date.now() - timerStartMs) / 1000);
       const remaining = Math.max(0, timeLimit - elapsedSec);
       setTimeRemaining(remaining);
 
-      if (remaining <= 0 && !isAITeam) {
-        // Time expired for human team - auto-draft
+      if (remaining <= 0 && !isAITeam && !autoTriggered) {
+        // Time expired for human team - auto-draft (only once per timer cycle)
+        autoTriggered = true;
         cleanup();
         handleAutoDraftRef.current();
       }
@@ -1414,13 +1420,12 @@ const DraftRoom = () => {
     } catch (error: unknown) {
       logger.error('handlePlayerDraft error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      // Silently handle "already taken" errors during auto-draft - means another client handled it
-      const isAlreadyTaken = errorMessage.includes('already taken') || errorMessage.includes('already drafted');
-      if (isAlreadyTaken) {
-        logger.log('handlePlayerDraft: Pick already handled by another client, reloading state');
+      // Silently handle race condition errors - another client/trigger already handled this pick
+      const isRaceCondition = errorMessage.includes('already taken') || errorMessage.includes('already drafted');
+      if (isRaceCondition) {
+        logger.log('handlePlayerDraft: Pick already handled, reloading state');
         await loadDraftState();
       } else if (!isAutoDraft) {
-        // Only show alert for manual picks, not auto-draft race conditions
         alert(`Failed to draft player: ${errorMessage}`);
       }
       // Don't throw - let draft continue
@@ -1440,12 +1445,19 @@ const DraftRoom = () => {
         return;
       }
 
+      // Skip if we already attempted this exact pick number (timer effect fires multiple times per pick)
+      if (draftState.currentPick === lastAutoPickedNumberRef.current) {
+        logger.log('handleAutoDraft: Skipping - already attempted pick #' + draftState.currentPick);
+        return;
+      }
+
       // Prevent concurrent auto-draft calls (race condition guard)
       if (autoPickInProgressRef.current) {
         logger.log('handleAutoDraft: Skipping - auto-pick already in progress');
         return;
       }
       autoPickInProgressRef.current = true;
+      lastAutoPickedNumberRef.current = draftState.currentPick;
 
     // Get available (undrafted) players
     const undraftedPlayers = availablePlayers.filter(
@@ -1646,6 +1658,8 @@ const DraftRoom = () => {
       }
       timerRunningRef.current = false;
       lastPickNumberRef.current = 0;
+      lastAutoPickedNumberRef.current = 0;
+      autoPickInProgressRef.current = false;
 
       // Clear sessionStorage
       sessionStorage.removeItem(`draft_phase_${leagueId}`);
