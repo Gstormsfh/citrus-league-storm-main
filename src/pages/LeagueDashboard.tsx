@@ -692,66 +692,72 @@ Your Commissioner`);
 
           {/* Actions */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-            {isCommissioner && (
-              <>
-                {/* Always show draft room button if commissioner and draft hasn't started */}
-                {league.draft_status === 'not_started' && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Draft Room</CardTitle>
-                      <CardDescription>
-                        {(() => {
-                          const maxTeams = league.settings?.teamsCount || 12;
-                          return teams.length >= maxTeams
-                            ? 'All teams are ready. Begin the draft when ready.'
-                            : `Need ${maxTeams - teams.length} more team${maxTeams - teams.length === 1 ? '' : 's'} to start the draft.`
-                        })()}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <Button 
-                        onClick={() => {
-                          if (!leagueId) {
-                            console.error('LeagueDashboard: No leagueId available!');
-                            toast({
-                              title: 'Error',
-                              description: 'League ID is missing. Please refresh the page.',
-                              variant: 'destructive',
-                            });
-                            return;
-                          }
-                          console.log('LeagueDashboard: Navigating to draft room with leagueId:', leagueId);
-                          const draftUrl = `/draft-room?league=${leagueId}`;
-                          console.log('LeagueDashboard: Draft URL:', draftUrl);
-                          navigate(draftUrl);
-                        }}
-                        className="w-full"
-                        disabled={!leagueId}
-                        variant={(() => {
-                          const maxTeams = league.settings?.teamsCount || 12;
-                          return teams.length >= maxTeams ? "default" : "outline";
-                        })()}
-                      >
-                        <Play className="mr-2 h-4 w-4" />
-                        {(() => {
-                          const maxTeams = league.settings?.teamsCount || 12;
-                          return teams.length >= maxTeams 
-                            ? 'Go to Draft Room' 
-                            : `Go to Draft Room (${teams.length}/${maxTeams} teams)`;
-                        })()}
-                      </Button>
-                      {(() => {
+            {/* Draft Room - visible to ALL league members based on draft status */}
+            {league.draft_status !== 'completed' && (
+              <Card className={league.draft_status === 'in_progress' ? 'border-primary/30 bg-primary/5' : ''}>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    {league.draft_status === 'in_progress' ? (
+                      <><Play className="h-5 w-5 text-primary" /> Draft In Progress</>
+                    ) : league.scheduled_draft_time ? (
+                      <><Clock className="h-5 w-5" /> Draft Scheduled</>
+                    ) : (
+                      <>Draft Room</>
+                    )}
+                  </CardTitle>
+                  <CardDescription>
+                    {(() => {
+                      if (league.draft_status === 'in_progress') {
+                        return 'The draft is live! Join the draft room to make your picks.';
+                      }
+                      if (league.scheduled_draft_time) {
+                        const scheduledDate = new Date(league.scheduled_draft_time);
+                        const now = new Date();
+                        if (scheduledDate > now) {
+                          return `Draft scheduled for ${scheduledDate.toLocaleDateString()} at ${scheduledDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                        }
+                      }
+                      if (isCommissioner) {
                         const maxTeams = league.settings?.teamsCount || 12;
-                        return teams.length < maxTeams && (
-                          <p className="text-xs text-muted-foreground mt-2 text-center">
-                            You can still access the draft room, but you'll need {maxTeams} teams to start
-                          </p>
-                        );
-                      })()}
-                    </CardContent>
-                  </Card>
-                )}
-              </>
+                        return teams.length >= maxTeams
+                          ? 'All teams are ready. Set up and start the draft.'
+                          : `Need ${maxTeams - teams.length} more team${maxTeams - teams.length === 1 ? '' : 's'} to start the draft.`;
+                      }
+                      return 'The commissioner will start the draft when all teams are ready. Join the lobby to wait.';
+                    })()}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button
+                    onClick={() => {
+                      if (!leagueId) {
+                        toast({
+                          title: 'Error',
+                          description: 'League ID is missing. Please refresh the page.',
+                          variant: 'destructive',
+                        });
+                        return;
+                      }
+                      navigate(`/draft-room?league=${leagueId}`);
+                    }}
+                    className="w-full"
+                    disabled={!leagueId}
+                    variant={league.draft_status === 'in_progress' ? 'default' : 'outline'}
+                  >
+                    <Play className="mr-2 h-4 w-4" />
+                    {league.draft_status === 'in_progress'
+                      ? 'Join Draft Room'
+                      : isCommissioner
+                        ? 'Go to Draft Room'
+                        : 'Enter Draft Lobby'}
+                  </Button>
+                  {!isCommissioner && league.draft_status === 'not_started' && (
+                    <p className="text-xs text-muted-foreground mt-2 text-center">
+                      You'll be able to participate once the commissioner starts the draft
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
             )}
 
             {userTeam && (

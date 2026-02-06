@@ -28,7 +28,9 @@ import {
   Copy,
   Check,
   Mail,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Calendar,
+  X
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -68,11 +70,13 @@ interface DraftLobbyProps {
   maxTeams?: number; // Maximum teams allowed in league (from settings.teamsCount)
   joinCode?: string; // League join code for inviting managers
   leagueName?: string; // League name for email template
+  scheduledDraftTime?: string | null; // Scheduled draft time (ISO string)
+  onScheduleDraft?: (scheduledTime: string | null) => void; // Callback to set/clear scheduled draft time
 }
 
-export const DraftLobby = ({ 
-  teams, 
-  onStartDraft, 
+export const DraftLobby = ({
+  teams,
+  onStartDraft,
   onPrepareDraft,
   isCommissioner,
   hasExistingDraft = false,
@@ -90,13 +94,18 @@ export const DraftLobby = ({
   leagueId,
   maxTeams = 12,
   joinCode,
-  leagueName
+  leagueName,
+  scheduledDraftTime,
+  onScheduleDraft
 }: DraftLobbyProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [teamToDelete, setTeamToDelete] = useState<Team | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [showScheduleDialog, setShowScheduleDialog] = useState(false);
+  const [scheduleDateInput, setScheduleDateInput] = useState('');
+  const [scheduleTimeInput, setScheduleTimeInput] = useState('');
   const [settings, setSettings] = useState<DraftSettings>({
     rounds: leagueDraftRounds, // Use league's draft_rounds setting
     pickTimeLimit: 90,
@@ -772,6 +781,51 @@ Your Commissioner`);
             </Card>
           )}
 
+          {/* Scheduled Draft Time Display - visible to all members */}
+          {scheduledDraftTime && (
+            <Card className="border-primary/20 bg-primary/5">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-primary" />
+                  Scheduled Draft
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center space-y-2">
+                  <div className="text-lg font-bold text-primary">
+                    {new Date(scheduledDraftTime).toLocaleDateString(undefined, {
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric'
+                    })}
+                  </div>
+                  <div className="text-2xl font-bold">
+                    {new Date(scheduledDraftTime).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </div>
+                  {new Date(scheduledDraftTime) > new Date() && (
+                    <p className="text-xs text-muted-foreground">
+                      Draft room will open at this time
+                    </p>
+                  )}
+                  {isCommissioner && onScheduleDraft && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs"
+                      onClick={() => onScheduleDraft(null)}
+                    >
+                      <X className="h-3 w-3 mr-1" />
+                      Clear Schedule
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Start Draft or Waiting Status */}
           {isCommissioner ? (
             <Card>
@@ -797,9 +851,9 @@ Your Commissioner`);
                     </div>
                   )}
                 </div>
-                
+
                 {hasExistingDraft ? (
-                  <Button 
+                  <Button
                     onClick={handleStartDraft}
                     className="w-full"
                   >
@@ -808,7 +862,7 @@ Your Commissioner`);
                   </Button>
                 ) : isDraftQueued ? (
                   <>
-                    <Button 
+                    <Button
                       onClick={handleStartDraft}
                       className="w-full bg-primary hover:bg-primary/90"
                       size="lg"
@@ -822,8 +876,9 @@ Your Commissioner`);
                   </>
                 ) : (
                   <>
+                    {/* Impromptu Draft - Start immediately */}
                     {onPrepareDraft && (
-                      <Button 
+                      <Button
                         onClick={() => onPrepareDraft?.(settings)}
                         className="w-full"
                         disabled={teams.length < 4}
@@ -832,15 +887,37 @@ Your Commissioner`);
                         Prepare Draft
                       </Button>
                     )}
-                    <Button 
+                    <Button
                       onClick={handleStartDraft}
                       className="w-full"
                       disabled={teams.length < 4}
                       variant={onPrepareDraft ? "outline" : "default"}
                     >
                       <Play className="h-4 w-4 mr-2" />
-                      Start Draft
+                      Start Draft Now
                     </Button>
+
+                    {/* Schedule Draft - Set a future time */}
+                    {onScheduleDraft && !scheduledDraftTime && (
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        disabled={teams.length < 4}
+                        onClick={() => {
+                          // Default to tomorrow at 8 PM
+                          const tomorrow = new Date();
+                          tomorrow.setDate(tomorrow.getDate() + 1);
+                          tomorrow.setHours(20, 0, 0, 0);
+                          setScheduleDateInput(tomorrow.toISOString().split('T')[0]);
+                          setScheduleTimeInput('20:00');
+                          setShowScheduleDialog(true);
+                        }}
+                      >
+                        <Calendar className="h-4 w-4 mr-2" />
+                        Schedule Draft Time
+                      </Button>
+                    )}
+
                     {teams.length < 4 && (
                       <p className="text-xs text-muted-foreground text-center">
                         Need at least 4 teams to start
@@ -867,7 +944,7 @@ Your Commissioner`);
                     <p className="text-sm font-medium">
                       Pick {currentPick} of {totalPicks}
                     </p>
-                    <Button 
+                    <Button
                       onClick={handleStartDraft}
                       className="w-full bg-primary hover:bg-primary/90"
                       size="lg"
@@ -882,12 +959,14 @@ Your Commissioner`);
                   <CardHeader>
                     <CardTitle className="text-primary flex items-center gap-2">
                       <Hourglass className="h-5 w-5" />
-                      Waiting to Start
+                      {scheduledDraftTime ? 'Draft Scheduled' : 'Waiting for Draft'}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <p className="text-sm text-muted-foreground mb-4">
-                      The commissioner will start the draft once all teams have joined.
+                      {scheduledDraftTime
+                        ? 'The draft is scheduled. You\'ll be able to join the draft room when it starts.'
+                        : 'The commissioner will start the draft once all teams are ready. Stay in the lobby to join automatically.'}
                     </p>
                     <div className="flex items-center justify-center">
                       <div className="animate-pulse flex space-x-2">
@@ -954,6 +1033,77 @@ Your Commissioner`);
             <Button variant="destructive" onClick={handleDeleteTeam}>
               <Trash2 className="h-4 w-4 mr-2" />
               Remove Team
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Schedule Draft Time Dialog - Commissioner Only */}
+      <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              Schedule Draft Time
+            </DialogTitle>
+            <DialogDescription>
+              Set a date and time for the draft. All league members will see when the draft is scheduled and can join the draft room at that time.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="draft-date">Date</Label>
+              <Input
+                id="draft-date"
+                type="date"
+                value={scheduleDateInput}
+                min={new Date().toISOString().split('T')[0]}
+                onChange={(e) => setScheduleDateInput(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="draft-time">Time</Label>
+              <Input
+                id="draft-time"
+                type="time"
+                value={scheduleTimeInput}
+                onChange={(e) => setScheduleTimeInput(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowScheduleDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (!scheduleDateInput || !scheduleTimeInput) {
+                  toast({
+                    title: 'Missing Information',
+                    description: 'Please select both a date and time.',
+                    variant: 'destructive',
+                  });
+                  return;
+                }
+                const scheduledTime = new Date(`${scheduleDateInput}T${scheduleTimeInput}`);
+                if (scheduledTime <= new Date()) {
+                  toast({
+                    title: 'Invalid Time',
+                    description: 'Scheduled time must be in the future.',
+                    variant: 'destructive',
+                  });
+                  return;
+                }
+                onScheduleDraft?.(scheduledTime.toISOString());
+                setShowScheduleDialog(false);
+                toast({
+                  title: 'Draft Scheduled',
+                  description: `Draft scheduled for ${scheduledTime.toLocaleDateString()} at ${scheduledTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+                });
+              }}
+            >
+              <Calendar className="h-4 w-4 mr-2" />
+              Schedule Draft
             </Button>
           </DialogFooter>
         </DialogContent>

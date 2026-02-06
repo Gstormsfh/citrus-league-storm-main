@@ -39,6 +39,7 @@ export interface League {
     };
     [key: string]: any;
   };
+  scheduled_draft_time?: string | null;
   created_at: string;
   updated_at: string;
 }

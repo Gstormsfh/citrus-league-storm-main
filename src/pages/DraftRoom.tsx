@@ -647,6 +647,100 @@ const DraftRoom = () => {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [leagueId, user]);
 
+  // Real-time subscription to league status changes
+  // This allows non-commissioner members to auto-transition when the draft starts
+  useEffect(() => {
+    if (!leagueId || !user?.id) return;
+
+    const channel = supabase
+      .channel(`league_status:${leagueId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'leagues',
+          filter: `id=eq.${leagueId}`
+        },
+        async (payload) => {
+          const updatedLeague = payload.new as any;
+          logger.debug('DraftRoom: League status changed via realtime:', updatedLeague.draft_status);
+
+          // Update local league state
+          if (league) {
+            setLeague({
+              ...league,
+              draft_status: updatedLeague.draft_status,
+              settings: updatedLeague.settings || league.settings,
+              scheduled_draft_time: updatedLeague.scheduled_draft_time ?? league.scheduled_draft_time
+            });
+          }
+
+          // Auto-transition to active draft when status changes to 'in_progress'
+          if (updatedLeague.draft_status === 'in_progress' && draftPhase !== DraftPhase.ACTIVE) {
+            logger.debug('DraftRoom: Draft started by commissioner, auto-joining...');
+
+            // Load draft state for this user
+            try {
+              const { state: joinState, error: stateError } = await DraftService.getDraftState(
+                leagueId,
+                teams,
+                updatedLeague.draft_rounds || league?.draft_rounds || 21,
+                user.id
+              );
+
+              if (!stateError && joinState) {
+                setDraftState(joinState);
+                // Set up ordered teams for board
+                if (joinState.sessionId) {
+                  try {
+                    const { order: joinOrder } = await DraftService.getDraftOrder(
+                      leagueId, user.id, 1, joinState.sessionId
+                    );
+                    if (joinOrder && joinOrder.team_order && joinOrder.team_order.length > 0) {
+                      const orderedTeams = joinOrder.team_order
+                        .map((teamId: string) => teams.find(t => t.id === teamId))
+                        .filter((t: any): t is (Team & { owner_name?: string }) => t !== undefined);
+                      if (orderedTeams.length === teams.length) {
+                        setOrderedTeamsForBoard(orderedTeams);
+                      }
+                    }
+                  } catch (orderErr) {
+                    logger.error('DraftRoom: Error loading draft order during auto-join:', orderErr);
+                  }
+                }
+              }
+
+              // Update time remaining from settings
+              if (updatedLeague.settings?.pickTimeLimit) {
+                setTimeRemaining(updatedLeague.settings.pickTimeLimit);
+                setDraftSettings(prev => ({
+                  ...prev,
+                  pickTimeLimit: updatedLeague.settings.pickTimeLimit
+                }));
+              }
+
+              setDraftPhase(DraftPhase.ACTIVE);
+            } catch (joinError) {
+              logger.error('DraftRoom: Error auto-joining draft:', joinError);
+              // Reload all data as fallback
+              loadDraftData();
+            }
+          }
+
+          // Handle draft completion
+          if (updatedLeague.draft_status === 'completed' && draftPhase !== DraftPhase.COMPLETED) {
+            logger.debug('DraftRoom: Draft completed via realtime');
+            setDraftPhase(DraftPhase.COMPLETED);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [leagueId, user?.id, draftPhase, teams, league]);
 
   const loadDraftState = async (retryCount: number = 0): Promise<DraftState | null> => {
     if (!leagueId || !league) {
@@ -1398,6 +1492,35 @@ const DraftRoom = () => {
       return prev;
     });
     logger.log('handleRandomizeOrder: Randomized order', shuffled);
+  };
+
+  // Schedule draft - commissioner sets a future time for the draft
+  const handleScheduleDraft = async (scheduledTime: string | null) => {
+    if (!leagueId || !isCommissioner) return;
+
+    try {
+      const { error: updateError } = await supabase
+        .from('leagues')
+        .update({ scheduled_draft_time: scheduledTime } as any)
+        .eq('id', leagueId);
+
+      if (updateError) {
+        logger.error('Error updating scheduled draft time:', updateError);
+        alert(`Failed to schedule draft: ${updateError.message || 'Unknown error'}`);
+        return;
+      }
+
+      // Update local league state
+      if (league) {
+        setLeague({ ...league, scheduled_draft_time: scheduledTime });
+      }
+
+      logger.log('handleScheduleDraft: Draft time updated to', scheduledTime);
+    } catch (error: unknown) {
+      logger.error('handleScheduleDraft: Error scheduling draft', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to schedule draft: ${errorMessage}`);
+    }
   };
 
   // Prepare draft - initializes draft order but doesn't start yet
@@ -2183,7 +2306,7 @@ const DraftRoom = () => {
                 onPrepareDraft={handlePrepareDraft}
                 isCommissioner={isCommissioner}
                 isDraftQueued={league?.draft_status === 'queued'}
-                hasExistingDraft={league?.draft_status === 'in_progress' && (draftHistory?.length || 0) > 0}
+                hasExistingDraft={league?.draft_status === 'in_progress'}
                 currentPick={draftState?.currentPick || 0}
                 totalPicks={(teams?.length || 0) * (league?.draft_rounds || 21)}
                 onRandomizeOrder={handleRandomizeOrder}
@@ -2204,6 +2327,8 @@ const DraftRoom = () => {
                 maxTeams={league?.settings?.teamsCount || 12}
                 joinCode={league?.join_code}
                 leagueName={league?.name}
+                scheduledDraftTime={league?.scheduled_draft_time}
+                onScheduleDraft={isCommissioner ? handleScheduleDraft : undefined}
               />
             ) : null}
           </div>

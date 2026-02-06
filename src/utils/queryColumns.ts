@@ -29,10 +29,10 @@ export const MATCHUP_COLUMNS_SLIM = 'id, league_id, week_number, team1_id, team2
 // LEAGUE TABLE COLUMNS  
 // ============================================================================
 // Based on League interface in LeagueService.ts
-export const LEAGUE_COLUMNS = 'id, name, commissioner_id, draft_status, join_code, roster_size, draft_rounds, settings, scoring_settings, created_at, updated_at';
+export const LEAGUE_COLUMNS = 'id, name, commissioner_id, draft_status, join_code, roster_size, draft_rounds, settings, scoring_settings, scheduled_draft_time, created_at, updated_at';
 
 // Slim version for list views
-export const LEAGUE_COLUMNS_SLIM = 'id, name, commissioner_id, draft_status, roster_size, settings, scoring_settings';
+export const LEAGUE_COLUMNS_SLIM = 'id, name, commissioner_id, draft_status, roster_size, settings, scoring_settings, scheduled_draft_time';
 
 // ============================================================================
 // TEAM TABLE COLUMNS
