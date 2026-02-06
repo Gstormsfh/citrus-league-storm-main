@@ -43,35 +43,34 @@ try {
   }
 }
 
+// Auto-reload once on chunk load failures (stale cache after deploy)
+function handleChunkError(errorMsg: string): boolean {
+  const isChunkError = errorMsg.includes('Failed to fetch dynamically imported module')
+    || errorMsg.includes('Unexpected token')
+    || errorMsg.includes('Loading chunk')
+    || errorMsg.includes('Loading CSS chunk');
+
+  if (isChunkError) {
+    const lastReload = sessionStorage.getItem('chunk_reload');
+    const now = Date.now();
+    // Only auto-reload once per 30 seconds to avoid infinite loops
+    if (!lastReload || now - parseInt(lastReload) > 30000) {
+      sessionStorage.setItem('chunk_reload', String(now));
+      window.location.reload();
+      return true;
+    }
+  }
+  return false;
+}
+
 // Global error handler for uncaught errors
 window.addEventListener('error', (event) => {
-  // Silent - no console output (Sleeper-style)
-  if (rootElement && rootElement.innerHTML.includes('Loading application...')) {
-    rootElement.innerHTML = `
-      <div style="padding: 20px; font-family: sans-serif; background: white; min-height: 100vh;">
-        <h1 style="color: red; font-size: 24px; margin-bottom: 16px;">JavaScript Error</h1>
-        <p style="color: #666; margin-bottom: 16px;">An error occurred while loading the application.</p>
-        <pre style="background: #f5f5f5; padding: 16px; border-radius: 4px; overflow: auto; border: 1px solid #ddd;">
-          <strong>Error:</strong> ${event.error?.message || event.message || 'Unknown error'}
-          ${event.error?.stack ? `\n\n<strong>Stack:</strong>\n${event.error.stack}` : ''}
-        </pre>
-      </div>
-    `;
-  }
+  const msg = event.error?.message || event.message || '';
+  if (handleChunkError(msg)) return;
 });
 
-// Handle unhandled promise rejections
+// Handle unhandled promise rejections (dynamic imports fail as rejected promises)
 window.addEventListener('unhandledrejection', (event) => {
-  // Silent - no console output (Sleeper-style)
-  if (rootElement && rootElement.innerHTML.includes('Loading application...')) {
-    rootElement.innerHTML = `
-      <div style="padding: 20px; font-family: sans-serif; background: white; min-height: 100vh;">
-        <h1 style="color: red; font-size: 24px; margin-bottom: 16px;">Loading Error</h1>
-        <p style="color: #666; margin-bottom: 16px;">A module failed to load. This might be a network issue.</p>
-        <pre style="background: #f5f5f5; padding: 16px; border-radius: 4px; overflow: auto; border: 1px solid #ddd;">
-          <strong>Error:</strong> ${event.reason?.message || String(event.reason) || 'Unknown error'}
-        </pre>
-      </div>
-    `;
-  }
+  const msg = event.reason?.message || String(event.reason) || '';
+  if (handleChunkError(msg)) return;
 });

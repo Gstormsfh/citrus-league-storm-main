@@ -15,20 +15,36 @@ import LoadingScreen from "./components/LoadingScreen";
 import "./App.css";
 
 
-// Helper to add error handling to lazy imports
+// Helper to add error handling to lazy imports - auto-reloads on stale chunks after deploy
 const lazyWithErrorHandling = (importFn: () => Promise<{ default: React.ComponentType }>) => {
   return lazy(() =>
     importFn().catch((error) => {
-      console.error("Failed to load component:", error);
-      // Return a fallback component
+      const msg = error?.message || String(error);
+      const isChunkError = msg.includes('Failed to fetch dynamically imported module')
+        || msg.includes('Unexpected token')
+        || msg.includes('Loading chunk')
+        || msg.includes('Loading CSS chunk');
+
+      if (isChunkError) {
+        const lastReload = sessionStorage.getItem('chunk_reload');
+        const now = Date.now();
+        if (!lastReload || now - parseInt(lastReload) > 30000) {
+          sessionStorage.setItem('chunk_reload', String(now));
+          window.location.reload();
+        }
+      }
+
       return {
         default: () => (
           <div style={{ padding: "40px", textAlign: "center" }}>
             <h1 style={{ color: "#dc2626", marginBottom: "16px" }}>⚠️ Component Failed to Load</h1>
-            <p style={{ color: "#666" }}>This page could not be loaded. Please try refreshing.</p>
-            <pre style={{ marginTop: "20px", textAlign: "left", background: "#f5f5f5", padding: "16px", borderRadius: "4px" }}>
-              {error.message || String(error)}
-            </pre>
+            <p style={{ color: "#666", marginBottom: "16px" }}>This page could not be loaded.</p>
+            <button
+              onClick={() => window.location.reload()}
+              style={{ padding: "8px 24px", background: "#2563eb", color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "14px" }}
+            >
+              Reload Page
+            </button>
           </div>
         ),
       };
