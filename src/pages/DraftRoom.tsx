@@ -712,6 +712,19 @@ const DraftRoom = () => {
             setDraftTimerStarted(true);
             draftTimerStartedRef.current = true;
           }
+
+          // Detect draft reset during active phase (nuclear delete by commissioner)
+          if (freshLeague.draft_status === 'not_started') {
+            logger.log('Polling: Draft was reset, returning to lobby');
+            setDraftPhase(DraftPhase.LOBBY);
+            setDraftState(null);
+            setDraftHistory([]);
+            setDraftedPlayerIds(new Set());
+            setDraftTimerStarted(false);
+            draftTimerStartedRef.current = false;
+            sessionStorage.removeItem(`draft_phase_${leagueId}`);
+            return; // Skip further processing
+          }
         }
 
         // Reload draft state to keep pick/round/team current
@@ -805,6 +818,19 @@ const DraftRoom = () => {
               ...prev,
               pickTimeLimit: updatedLeague.settings.pickTimeLimit
             }));
+          }
+
+          // Handle draft reset (nuclear delete by commissioner)
+          if (updatedLeague.draft_status === 'not_started' && draftPhase !== DraftPhase.LOBBY) {
+            logger.debug('DraftRoom: Draft was reset, returning to lobby');
+            setDraftPhase(DraftPhase.LOBBY);
+            setDraftState(null);
+            setDraftHistory([]);
+            setDraftedPlayerIds(new Set());
+            setDraftTimerStarted(false);
+            draftTimerStartedRef.current = false;
+            sessionStorage.removeItem(`draft_phase_${leagueId}`);
+            sessionStorage.removeItem(`draft_timer_${leagueId}`);
           }
 
           // When draft starts, pre-load state but stay in LOBBY with join banner
@@ -1209,8 +1235,28 @@ const DraftRoom = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftPhase, draftState?.currentPick, draftState?.nextTeamId, currentTeam?.id, draftSettings.pickTimeLimit, league?.settings?.timerStartedAt]);
 
-  // Note: Timer auto-start removed - users must manually click "Continue Draft" button
-  // This gives explicit control over when the timer starts/stops
+  // Auto-start draft at scheduled time (commissioner only)
+  // Checks every 5 seconds if the scheduled draft time has arrived
+  useEffect(() => {
+    if (!isCommissioner || !league?.scheduled_draft_time || draftPhase !== DraftPhase.LOBBY) return;
+    if (league?.draft_status === 'in_progress' || league?.draft_status === 'completed') return;
+
+    const checkSchedule = () => {
+      const scheduledTime = new Date(league.scheduled_draft_time!).getTime();
+      const now = Date.now();
+      if (now >= scheduledTime) {
+        logger.log('Scheduled draft time reached, auto-starting draft');
+        // Use current draft settings to start
+        handleStartDraft(draftSettings);
+      }
+    };
+
+    // Check immediately, then every 5 seconds
+    checkSchedule();
+    const interval = setInterval(checkSchedule, 5000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCommissioner, league?.scheduled_draft_time, league?.draft_status, draftPhase]);
 
   const handlePlayerDraft = async (player: Player, isAutoDraft: boolean = false) => {
     // ⚠️ DEMO STATE: Disable all draft actions
@@ -1664,6 +1710,16 @@ const DraftRoom = () => {
       // Clear sessionStorage
       sessionStorage.removeItem(`draft_phase_${leagueId}`);
       sessionStorage.removeItem(`draft_timer_${leagueId}`);
+
+      // Update local league state to reflect the reset
+      if (league) {
+        setLeague({
+          ...league,
+          draft_status: 'not_started',
+          scheduled_draft_time: null,
+          settings: { ...(league.settings || {}), timerStartedAt: null }
+        });
+      }
 
       // Go back to lobby
       setDraftPhase(DraftPhase.LOBBY);
