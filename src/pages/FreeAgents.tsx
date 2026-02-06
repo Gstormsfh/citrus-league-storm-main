@@ -75,6 +75,7 @@ const FreeAgents = () => {
   // Weekly projections state (playerId -> total weekly projection)
   // Use numeric IDs to match RPC return type
   const [weeklyProjections, setWeeklyProjections] = useState<Map<number, number>>(new Map());
+  const [weeklyGameCounts, setWeeklyGameCounts] = useState<Map<number, number>>(new Map());
   const [loadingProjections, setLoadingProjections] = useState(false);
 
   // Sorting state
@@ -455,12 +456,14 @@ const FreeAgents = () => {
       // Fetch projections for each day of the week and sum them up
       // Use numeric IDs to match RPC return type (Map<number, any>)
       const weeklyProjectionMap = new Map<number, number>();
-      
+      const gameCountMap = new Map<number, number>();
+
       // Initialize all players with 0 using NUMERIC IDs
       topPlayers.forEach(player => {
         const numericId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
         if (!isNaN(numericId) && numericId > 0) {
           weeklyProjectionMap.set(numericId, 0);
+          gameCountMap.set(numericId, 0);
         }
       });
 
@@ -482,6 +485,9 @@ const FreeAgents = () => {
             const dailyPoints = Number(projection.total_projected_points || 0);
             const newTotal = currentTotal + dailyPoints;
             weeklyProjectionMap.set(playerId, newTotal);
+
+            // Count games: if projection system returned data for this player on this day, they have a game
+            gameCountMap.set(playerId, (gameCountMap.get(playerId) || 0) + 1);
             
             // Debug first few to verify aggregation
             if (weeklyProjectionMap.size <= 5) {
@@ -500,7 +506,8 @@ const FreeAgents = () => {
       }
 
       setWeeklyProjections(weeklyProjectionMap);
-      
+      setWeeklyGameCounts(gameCountMap);
+
       // Debug: Log final aggregated projections with validation
       const topProjectionPlayers = Array.from(weeklyProjectionMap.entries())
         .sort((a, b) => b[1] - a[1])
@@ -1248,24 +1255,36 @@ const FreeAgents = () => {
     .slice(0, 10);
 
   // Combined Top Projected with Schedule Icons - merges projections + schedule data
+  // Game count comes from the SAME projection system (how many days had projections = how many games)
   const topProjected = [...filteredPlayers]
     .map(p => {
       // Use numeric ID to match Map key type
       const numericId = typeof p.id === 'string' ? parseInt(p.id, 10) : p.id;
       const realProjection = weeklyProjections.get(numericId);
-      // Use real projection if > 0, otherwise fallback to mock
+      const projectionGameCount = weeklyGameCounts.get(numericId) || 0;
+      // Only use real projection if the projection system returned data (games > 0)
+      // Otherwise fall back to schedule data for display
       const weeklyProjection = (realProjection && realProjection > 0) ? realProjection : ((p.points || 0) / 20);
-      
-      // Find matching schedule data for this player
+
+      // Find matching schedule data for this player (for gameDays/games display)
       const scheduleData = scheduleMaximizers.find(sm => sm.id === p.id);
-      
+      // Use projection-derived game count when available, fall back to schedule data
+      const gamesThisWeek = projectionGameCount > 0 ? projectionGameCount : (scheduleData?.gamesThisWeek || 0);
+
       return {
         ...p,
         weeklyProjection,
-        gamesThisWeek: scheduleData?.gamesThisWeek || 0,
+        gamesThisWeek,
         gameDays: scheduleData?.gameDays || [],
         games: scheduleData?.games || []
       };
+    })
+    .filter(p => {
+      // If projection data is loaded, only show players who actually have games
+      if (weeklyGameCounts.size > 0) {
+        return p.gamesThisWeek > 0;
+      }
+      return true; // Before projections load, show all
     })
     .sort((a, b) => b.weeklyProjection - a.weeklyProjection)
     .slice(0, 10); // Show top 10 instead of 5
