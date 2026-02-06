@@ -539,10 +539,22 @@ export const DraftService = {
       if (picksError) throw picksError;
       if (orderError) throw orderError;
 
-      // Reset league status
+      // Reset league status and clear timer
+      const { data: currentLeague } = await supabase
+        .from('leagues')
+        .select('settings')
+        .eq('id', leagueId)
+        .single();
+
+      const currentSettings = currentLeague?.settings || {};
+      const { timerStartedAt: _, ...settingsWithoutTimer } = currentSettings as Record<string, any>;
+
       await supabase
         .from('leagues')
-        .update({ draft_status: 'not_started' })
+        .update({
+          draft_status: 'not_started',
+          settings: { ...settingsWithoutTimer, timerStartedAt: null }
+        })
         .eq('id', leagueId);
 
       // Return new session ID for next draft
