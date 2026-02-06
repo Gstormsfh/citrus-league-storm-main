@@ -470,15 +470,17 @@ const DraftRoom = () => {
           logger.error('DraftRoom: Error pre-loading draft state:', draftStateError);
         }
 
+        // Derive timer state from server (timerStartedAt in league.settings)
+        if (leagueData.settings?.timerStartedAt) {
+          setDraftTimerStarted(true);
+          draftTimerStartedRef.current = true;
+        }
+
         // Check if user was previously in ACTIVE phase (returning from another page/tab)
         const cachedPhase = sessionStorage.getItem(`draft_phase_${leagueId}`);
         if (cachedPhase === DraftPhase.ACTIVE) {
           // Auto-resume to ACTIVE phase without requiring lobby click
           setDraftPhase(DraftPhase.ACTIVE);
-          if (hasActiveDraftData) {
-            setDraftTimerStarted(true);
-            draftTimerStartedRef.current = true;
-          }
           logger.debug('DraftRoom: Auto-resuming to ACTIVE phase from sessionStorage');
         } else {
           // Show LOBBY - user clicks "Join Draft" to enter ACTIVE phase
@@ -605,27 +607,30 @@ const DraftRoom = () => {
         setDraftHistory(activePicks);
         setDraftedPlayerIds(new Set(activePicks.map(p => p.player_id)));
 
-        // Start timer automatically when picks exist (for ALL users, not just commissioner)
-        // Uses ref to avoid stale closure reading initial false value
+        // Auto-start timer when picks exist (for ALL users)
         if (activePicks.length >= 1 && !draftTimerStartedRef.current) {
           setDraftTimerStarted(true);
           draftTimerStartedRef.current = true;
         }
 
-        // CRITICAL: Reset timer for next pick so all users see fresh countdown
-        // Clear existing timer interval so the timer effect restarts cleanly
-        if (timerIntervalRef.current) {
-          clearInterval(timerIntervalRef.current);
-          timerIntervalRef.current = null;
+        // Reload league to get updated timerStartedAt (set after each pick)
+        // This drives the server-timestamp-based timer for all clients
+        const { data: freshLeague } = await supabase
+          .from('leagues')
+          .select('settings, draft_rounds, draft_status')
+          .eq('id', leagueId)
+          .single();
+        if (freshLeague) {
+          setLeague(prev => prev ? {
+            ...prev,
+            settings: freshLeague.settings || prev.settings,
+            draft_rounds: freshLeague.draft_rounds || prev.draft_rounds,
+            draft_status: freshLeague.draft_status || prev.draft_status
+          } : null);
+          if (freshLeague.settings?.pickTimeLimit) {
+            setDraftSettings(prev => ({ ...prev, pickTimeLimit: freshLeague.settings.pickTimeLimit }));
+          }
         }
-        if (autoPickTimeoutRef.current) {
-          clearTimeout(autoPickTimeoutRef.current);
-          autoPickTimeoutRef.current = null;
-        }
-        timerRunningRef.current = false;
-        lastPickNumberRef.current = 0;
-        // Use ref to get current pickTimeLimit (avoids stale closure)
-        setTimeRemaining(pickTimeLimitRef.current);
 
         // Reload draft state to update current pick/round/nextTeam
         await loadDraftState();
@@ -692,14 +697,32 @@ const DraftRoom = () => {
           const updatedLeague = payload.new as any;
           logger.debug('DraftRoom: League status changed via realtime:', updatedLeague.draft_status);
 
-          // Update local league state
+          // Update local league state (including settings with timerStartedAt)
           if (league) {
             setLeague({
               ...league,
               draft_status: updatedLeague.draft_status,
+              draft_rounds: updatedLeague.draft_rounds || league.draft_rounds,
               settings: updatedLeague.settings || league.settings,
               scheduled_draft_time: updatedLeague.scheduled_draft_time ?? league.scheduled_draft_time
             });
+          }
+
+          // Derive draftTimerStarted from server state for ALL clients
+          if (updatedLeague.settings?.timerStartedAt && !draftTimerStartedRef.current) {
+            setDraftTimerStarted(true);
+            draftTimerStartedRef.current = true;
+          } else if (!updatedLeague.settings?.timerStartedAt && draftTimerStartedRef.current) {
+            setDraftTimerStarted(false);
+            draftTimerStartedRef.current = false;
+          }
+
+          // Sync pickTimeLimit from server
+          if (updatedLeague.settings?.pickTimeLimit) {
+            setDraftSettings(prev => ({
+              ...prev,
+              pickTimeLimit: updatedLeague.settings.pickTimeLimit
+            }));
           }
 
           // When draft starts, pre-load state but stay in LOBBY with join banner
@@ -956,61 +979,71 @@ const DraftRoom = () => {
   // Refs for stale closure prevention in realtime subscription callbacks
   const pickTimeLimitRef = useRef(draftSettings.pickTimeLimit);
   const draftTimerStartedRef = useRef(false);
+  // Ref for handleAutoDraft to avoid stale closures in timer intervals
+  const handleAutoDraftRef = useRef<() => void>(() => {});
 
   // Handler to start the draft timer (commissioner only)
+  // Saves timerStartedAt to DB so ALL clients can sync their timers
   const handleBeginDraft = async () => {
     if (!isCommissioner) return;
-    
+
     try {
       // Ensure draft phase is ACTIVE
       if (draftPhase !== DraftPhase.ACTIVE) {
-        logger.log('Draft phase is not ACTIVE, setting to ACTIVE...');
         setDraftPhase(DraftPhase.ACTIVE);
-        // Wait for state to update
         await new Promise(resolve => setTimeout(resolve, 100));
       }
-      
-      // Ensure draft state is loaded before starting timer
+
+      // Ensure draft state is loaded
       let currentDraftState = draftState;
       if (!currentDraftState) {
-        logger.log('Draft state not loaded, loading now...');
         currentDraftState = await loadDraftState();
         if (!currentDraftState) {
-          logger.error('Failed to load draft state');
           alert('Cannot start draft: draft state could not be loaded. Please try starting the draft first.');
           return;
         }
       }
-      
-      // Wait a moment for state to propagate and ensure currentTeam is available
+
       await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // Re-check currentTeam after state propagation
+
       const teamToPick = currentDraftState?.nextTeamId && teams && teams.length > 0
         ? teams.find(t => t.id === currentDraftState.nextTeamId) || null
         : null;
-      
+
       if (!teamToPick) {
-        logger.error('Cannot start draft: no current team found', {
-          nextTeamId: currentDraftState?.nextTeamId,
-          teamsCount: teams?.length || 0
-        });
         alert('Cannot start draft: draft state not ready. Please try starting the draft first.');
         return;
       }
-      
-      // Reset timer refs before starting to prevent glitches
+
+      // Save timerStartedAt to DB - this is the SERVER TIMESTAMP that ALL clients use
+      const timerStartedAt = new Date().toISOString();
+      const { error: updateError } = await supabase
+        .from('leagues')
+        .update({
+          settings: {
+            ...(league?.settings || {}),
+            timerStartedAt
+          }
+        })
+        .eq('id', leagueId);
+
+      if (updateError) {
+        logger.error('Error saving timerStartedAt:', updateError);
+        alert('Failed to start timer. Please try again.');
+        return;
+      }
+
+      // Update local state
+      if (league) {
+        setLeague({ ...league, settings: { ...league.settings, timerStartedAt } });
+      }
+
       timerRunningRef.current = false;
       lastPickNumberRef.current = 0;
-      
+
       logger.log('Starting draft timer for team:', teamToPick.team_name);
       setDraftTimerStarted(true);
-      
-      // If it's an AI team and first pick, trigger auto-pick after a short delay
-      if (!teamToPick.owner_id && (draftHistory?.length || 0) === 0) {
-        logger.log('First pick is AI team, will auto-pick in 2 seconds');
-      }
-      
+
     } catch (error: unknown) {
       logger.error('Error starting draft timer:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -1018,12 +1051,13 @@ const DraftRoom = () => {
     }
   };
 
-  // Unified timer that works for both AI and human players
-  // Timer starts at the commissioner's configured pickTimeLimit (default 90 seconds)
-  // AI teams auto-pick after 2 seconds
-  // Timer only runs when draftTimerStarted is true (commissioner must click "Start Draft Timer")
+  // Keep handleAutoDraftRef current to avoid stale closures in timer intervals
+  useEffect(() => { handleAutoDraftRef.current = handleAutoDraft; });
+
+  // SERVER-TIMESTAMP-BASED TIMER
+  // All clients compute remaining time from league.settings.timerStartedAt
+  // This ensures perfect sync across commissioner and all members
   useEffect(() => {
-    // Cleanup function - always clear any running timers
     const cleanup = () => {
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
@@ -1036,141 +1070,54 @@ const DraftRoom = () => {
       timerRunningRef.current = false;
     };
 
-    // Don't start timer if conditions aren't met
-    if (draftPhase !== DraftPhase.ACTIVE || !draftTimerStarted) {
+    // Don't run timer if not in active draft with valid state
+    if (draftPhase !== DraftPhase.ACTIVE || !draftState || !currentTeam) {
       cleanup();
-      if (!draftTimerStarted) {
-        // Only reset timer if timer hasn't been started yet
+      if (!league?.settings?.timerStartedAt) {
         setTimeRemaining(draftSettings.pickTimeLimit);
-        lastPickNumberRef.current = 0;
       }
       return cleanup;
     }
 
-    // If timer is started but draft state/team not ready, wait (but don't start timer yet)
-    if (!draftState || !currentTeam) {
-      cleanup();
-      logger.log('Timer started but draft state not ready, waiting...', {
-        hasDraftState: !!draftState,
-        hasCurrentTeam: !!currentTeam,
-        nextTeamId: draftState?.nextTeamId,
-        teamsCount: teams?.length || 0
-      });
-      // Try to load draft state if it's missing
-      if (!draftState && leagueId) {
-        loadDraftState().catch(err => logger.error('Error loading draft state in timer:', err));
-      }
-      return cleanup;
-    }
-
-    const currentPickNumber = draftState.currentPick;
-    const isAITeam = !currentTeam.owner_id;
     const timeLimit = draftSettings.pickTimeLimit;
-    
-    // Guard: Only start timer once per pick number
-    // If pick changed, cleanup and start fresh
-    if (currentPickNumber !== lastPickNumberRef.current) {
-      // Pick changed - cleanup old timer completely before starting new one
-      cleanup();
-      // Small delay to ensure cleanup completes before starting new timer
-      const startTimer = () => {
-        // Double-check conditions are still valid
-        if (draftPhase !== DraftPhase.ACTIVE || !draftTimerStarted || !draftState || !currentTeam) {
-          return;
-        }
-        
-        // Verify pick hasn't changed during the delay
-        if (draftState.currentPick !== currentPickNumber) {
-          return;
-        }
-        
-        lastPickNumberRef.current = currentPickNumber;
-        setTimeRemaining(timeLimit);
-        timerRunningRef.current = true;
-        
-        // For AI teams, auto-pick after 2 seconds
-        if (isAITeam) {
-          logger.log('AI team turn, scheduling auto-pick in 2 seconds', {
-            team: currentTeam.team_name,
-            pick: currentPickNumber
-          });
-          
-          autoPickTimeoutRef.current = setTimeout(() => {
-            // Double-check it's still the AI's turn and pick hasn't changed
-            if (draftState?.nextTeamId === currentTeam.id && !currentTeam.owner_id && 
-                draftState?.currentPick === currentPickNumber) {
-              logger.log('Executing AI auto-pick', {
-                team: currentTeam.team_name,
-                pick: currentPickNumber
-              });
-              handleAutoDraft();
-            } else {
-              logger.log('AI auto-pick cancelled - turn changed', {
-                expectedTeam: currentTeam.id,
-                actualTeam: draftState?.nextTeamId,
-                expectedPick: currentPickNumber,
-                actualPick: draftState?.currentPick
-              });
-            }
-          }, 2000);
-        }
-        
-        // Start the countdown timer for all teams
-        timerIntervalRef.current = setInterval(() => {
-          setTimeRemaining((prev) => {
-            if (prev <= 1) {
-              // Auto-draft when time expires (for human teams or if AI didn't pick)
-              handleAutoDraft();
-              return timeLimit; // Reset for next pick
-            }
-            return prev - 1;
-          });
-        }, 1000);
-      };
-      
-      // Use requestAnimationFrame to ensure cleanup completes before starting
-      requestAnimationFrame(() => {
-        setTimeout(startTimer, 0);
-      });
-    } else if (!timerRunningRef.current && lastPickNumberRef.current === currentPickNumber) {
-      // First time starting timer for this pick (only if not already running)
+    const timerStartedAt = league?.settings?.timerStartedAt;
+
+    // No server timestamp yet = commissioner hasn't started the timer
+    if (!timerStartedAt) {
       setTimeRemaining(timeLimit);
-      timerRunningRef.current = true;
-      
-      // For AI teams, auto-pick after 2 seconds
-      if (isAITeam) {
-        logger.log('AI team turn (first start), scheduling auto-pick in 2 seconds', {
-          team: currentTeam.team_name,
-          pick: currentPickNumber
-        });
-        
-        autoPickTimeoutRef.current = setTimeout(() => {
-          // Double-check it's still the AI's turn
-          if (draftState?.nextTeamId === currentTeam.id && !currentTeam.owner_id &&
-              draftState?.currentPick === currentPickNumber) {
-            logger.log('Executing AI auto-pick (first start)');
-            handleAutoDraft();
-          }
-        }, 2000);
-      }
-      
-      // Start the countdown timer
-      timerIntervalRef.current = setInterval(() => {
-        setTimeRemaining((prev) => {
-          if (prev <= 1) {
-            handleAutoDraft();
-            return timeLimit;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+      return cleanup;
     }
-    // If timer is already running for this pick, do nothing (let it continue)
+
+    const timerStartMs = new Date(timerStartedAt).getTime();
+    const isAITeam = !currentTeam.owner_id;
+
+    // For AI teams, auto-pick after 2 seconds
+    if (isAITeam) {
+      autoPickTimeoutRef.current = setTimeout(() => {
+        handleAutoDraftRef.current();
+      }, 2000);
+    }
+
+    // Calculate remaining time from server timestamp every second
+    const updateTimer = () => {
+      const elapsedSec = Math.floor((Date.now() - timerStartMs) / 1000);
+      const remaining = Math.max(0, timeLimit - elapsedSec);
+      setTimeRemaining(remaining);
+
+      if (remaining <= 0 && !isAITeam) {
+        // Time expired for human team - auto-draft
+        cleanup();
+        handleAutoDraftRef.current();
+      }
+    };
+
+    updateTimer(); // Initial calculation
+    timerIntervalRef.current = setInterval(updateTimer, 1000);
+    timerRunningRef.current = true;
 
     return cleanup;
-    // Reduced dependencies - only essential ones
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftPhase, draftState?.currentPick, draftTimerStarted, draftState?.nextTeamId, currentTeam?.id, draftSettings.pickTimeLimit]);
+  }, [draftPhase, draftState?.currentPick, draftState?.nextTeamId, currentTeam?.id, draftSettings.pickTimeLimit, league?.settings?.timerStartedAt]);
 
   // Note: Timer auto-start removed - users must manually click "Continue Draft" button
   // This gives explicit control over when the timer starts/stops
@@ -1298,17 +1245,34 @@ const DraftRoom = () => {
       // Update local state immediately
       setDraftedPlayerIds(prev => new Set([...prev, player.id]));
       setSelectedPlayer(null);
-      
+
       // Reload all picks to ensure sync
       const { picks } = await DraftService.getDraftPicks(leagueId, user.id);
       const activePicks = picks.filter(p => !p.deleted_at);
       setDraftHistory(activePicks);
       setDraftedPlayerIds(new Set(activePicks.map(p => p.player_id)));
 
-      // If this is the first pick, start the timer automatically
-      if (activePicks.length === 1 && !draftTimerStarted) {
+      // Update timerStartedAt in DB so ALL clients reset their countdown
+      const newTimerStartedAt = new Date().toISOString();
+      await supabase
+        .from('leagues')
+        .update({
+          settings: {
+            ...(league?.settings || {}),
+            timerStartedAt: newTimerStartedAt
+          }
+        })
+        .eq('id', leagueId);
+
+      // Update local league state
+      setLeague(prev => prev ? {
+        ...prev,
+        settings: { ...prev.settings, timerStartedAt: newTimerStartedAt }
+      } : null);
+
+      // Auto-start timer on first pick
+      if (!draftTimerStarted) {
         setDraftTimerStarted(true);
-        logger.log('First pick made, starting draft timer automatically');
       }
 
       // Check if draft is complete
@@ -1968,7 +1932,8 @@ const DraftRoom = () => {
   };
 
   // Handle pausing the draft timer
-  const handlePauseDraft = () => {
+  // Handle pausing the draft timer - clears timerStartedAt in DB
+  const handlePauseDraft = async () => {
     logger.log('Pausing draft timer');
     setDraftTimerStarted(false);
     // Clear any running timers
@@ -1981,33 +1946,49 @@ const DraftRoom = () => {
       autoPickTimeoutRef.current = null;
     }
     timerRunningRef.current = false;
+
+    // Clear timerStartedAt in DB so all clients stop their timers
+    if (leagueId) {
+      const currentSettings = league?.settings || {};
+      const { timerStartedAt: _, ...settingsWithoutTimer } = currentSettings as any;
+      await supabase
+        .from('leagues')
+        .update({ settings: { ...settingsWithoutTimer, timerStartedAt: null } })
+        .eq('id', leagueId);
+      setLeague(prev => prev ? {
+        ...prev,
+        settings: { ...settingsWithoutTimer, timerStartedAt: null }
+      } : null);
+    }
   };
 
-  // Handle continuing/resuming the draft timer
+  // Handle continuing/resuming the draft timer - sets new timerStartedAt in DB
   const handleContinueDraft = async () => {
     if (!draftState || !currentTeam) {
-      logger.log('Cannot continue draft: state not ready, loading...');
-      // Try to load draft state first
       if (!draftState && leagueId) {
         await loadDraftState();
       }
-      // Wait a moment for state to propagate
       await new Promise(resolve => setTimeout(resolve, 300));
     }
 
-    // Verify we have the required state
     if (!draftState || !currentTeam) {
       alert('Cannot continue draft: draft state not ready. Please try again.');
       return;
     }
 
-    logger.log('Continuing draft timer', {
-      currentPick: draftState.currentPick,
-      currentTeam: currentTeam.team_name,
-      isAI: !currentTeam.owner_id
-    });
+    // Set new timerStartedAt in DB - all clients will start counting from this point
+    const timerStartedAt = new Date().toISOString();
+    if (leagueId) {
+      await supabase
+        .from('leagues')
+        .update({ settings: { ...(league?.settings || {}), timerStartedAt } })
+        .eq('id', leagueId);
+      setLeague(prev => prev ? {
+        ...prev,
+        settings: { ...prev.settings, timerStartedAt }
+      } : null);
+    }
 
-    // Reset timer refs to allow fresh start
     timerRunningRef.current = false;
     lastPickNumberRef.current = 0;
     setDraftTimerStarted(true);
@@ -2488,6 +2469,7 @@ const DraftRoom = () => {
                   }
                 }}
                 leagueDraftRounds={league?.draft_rounds || 21}
+                leaguePickTimeLimit={league?.settings?.pickTimeLimit}
                 onResetDraft={handleResetDraft}
                 onAddAITeams={handleAddAITeams}
                 onDeleteTeam={handleDeleteTeam}
