@@ -112,21 +112,19 @@ export const DraftService = {
    */
   async getDraftPicks(leagueId: string, userId: string, sessionId?: string): Promise<{ picks: DraftPick[]; error: any }> {
     try {
-      const { sessionId: activeSessionId } = await this.getActiveDraftSession(leagueId, userId);
-      const targetSessionId = sessionId || activeSessionId;
-
-      // If no session ID found, return empty array (no draft data exists)
-      if (!targetSessionId) {
-        return { picks: [], error: null };
-      }
-
-      const { data, error } = await supabase
+      // If explicit sessionId provided, filter by it; otherwise get all active picks
+      let query = supabase
         .from('draft_picks')
         .select('*')
         .eq('league_id', leagueId)
-        .eq('draft_session_id', targetSessionId)
         .is('deleted_at', null)
         .order('pick_number', { ascending: true });
+
+      if (sessionId) {
+        query = query.eq('draft_session_id', sessionId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       return { picks: data || [], error: null };
@@ -141,19 +139,24 @@ export const DraftService = {
    */
   async getDraftOrder(leagueId: string, userId: string, roundNumber: number, sessionId?: string): Promise<{ order: DraftOrder | null; error: any }> {
     try {
-      const { sessionId: activeSessionId } = await this.getActiveDraftSession(leagueId, userId);
-      const targetSessionId = sessionId || activeSessionId;
-
-      const { data, error } = await supabase
+      let query = supabase
         .from('draft_order')
         .select('*')
         .eq('league_id', leagueId)
         .eq('round_number', roundNumber)
-        .eq('draft_session_id', targetSessionId)
-        .is('deleted_at', null)
-        .single();
+        .is('deleted_at', null);
 
-      if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows
+      if (sessionId) {
+        query = query.eq('draft_session_id', sessionId);
+      }
+
+      // Get the most recent order
+      const { data, error } = await query
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') throw error;
       return { order: data || null, error: null };
     } catch (error) {
       return { order: null, error };
@@ -458,19 +461,20 @@ export const DraftService = {
    * Get current draft state (active session only)
    */
   async getDraftState(
-    leagueId: string, 
-    teams: Team[], 
+    leagueId: string,
+    teams: Team[],
     totalRounds: number,
     userId?: string,
     sessionId?: string
   ): Promise<{ state: DraftState | null; error: any }> {
     try {
-      const { sessionId: activeSessionId } = await this.getActiveDraftSession(leagueId, userId);
-      const targetSessionId = sessionId || activeSessionId;
-
-      // FIX: Pass userId and sessionId in the correct parameter positions
-      const { picks } = await this.getDraftPicks(leagueId, userId || '', targetSessionId);
+      // Get all active (non-deleted) picks - no session ID filtering needed
+      const { picks } = await this.getDraftPicks(leagueId, userId || '', sessionId);
       const totalPicks = picks.length;
+
+      // Derive session ID from existing picks (if any) instead of generating random ones
+      const derivedSessionId = sessionId || (picks.length > 0 ? picks[0].draft_session_id : undefined);
+
       const currentRound = Math.floor(totalPicks / teams.length) + 1;
       const currentPick = totalPicks + 1;
 
@@ -482,14 +486,14 @@ export const DraftService = {
             totalPicks,
             nextTeamId: null,
             isComplete: true,
-            sessionId: targetSessionId,
+            sessionId: derivedSessionId,
           },
           error: null,
         };
       }
 
-      // FIX: Pass userId, roundNumber, sessionId in the correct parameter positions
-      const { order } = await this.getDraftOrder(leagueId, userId || '', currentRound, targetSessionId);
+      // Get draft order - pass session ID if we have one from picks
+      const { order } = await this.getDraftOrder(leagueId, userId || '', currentRound, derivedSessionId);
       if (!order) {
         return { state: null, error: new Error('Draft order not initialized') };
       }
@@ -504,7 +508,7 @@ export const DraftService = {
           totalPicks,
           nextTeamId,
           isComplete: false,
-          sessionId: targetSessionId,
+          sessionId: derivedSessionId || order.draft_session_id,
         },
         error: null,
       };
@@ -535,10 +539,22 @@ export const DraftService = {
       if (picksError) throw picksError;
       if (orderError) throw orderError;
 
-      // Reset league status
+      // Reset league status and clear timer
+      const { data: currentLeague } = await supabase
+        .from('leagues')
+        .select('settings')
+        .eq('id', leagueId)
+        .single();
+
+      const currentSettings = currentLeague?.settings || {};
+      const { timerStartedAt: _, ...settingsWithoutTimer } = currentSettings as Record<string, any>;
+
       await supabase
         .from('leagues')
-        .update({ draft_status: 'not_started' })
+        .update({
+          draft_status: 'not_started',
+          settings: { ...settingsWithoutTimer, timerStartedAt: null }
+        })
         .eq('id', leagueId);
 
       // Return new session ID for next draft
@@ -745,15 +761,9 @@ export const DraftService = {
     callback: (pick: DraftPick) => void,
     sessionId?: string
   ) {
-    let activeSessionId: string | undefined = sessionId;
-
-    // Get active session if not provided
-    this.getActiveDraftSession(leagueId, userId).then(({ sessionId }) => {
-      if (!activeSessionId) {
-        activeSessionId = sessionId;
-      }
-    });
-
+    // Subscribe to ALL pick events for this league
+    // No session ID filtering - deleted_at filtering handles old sessions
+    // The consumer reloads all picks from DB anyway, so no risk of stale data
     const channel = supabase
       .channel(`draft_picks:${leagueId}`)
       .on(
@@ -764,20 +774,10 @@ export const DraftService = {
           table: 'draft_picks',
           filter: `league_id=eq.${leagueId}`,
         },
-        async (payload) => {
+        (payload) => {
           const pick = payload.new as DraftPick;
-          // Only call callback if it's from the active session and not deleted
           if (!pick.deleted_at) {
-            if (activeSessionId && pick.draft_session_id === activeSessionId) {
-              callback(pick);
-            } else if (!activeSessionId) {
-              // If we don't have session yet, check if this is the active one
-              const { sessionId } = await this.getActiveDraftSession(leagueId, userId);
-              if (pick.draft_session_id === sessionId) {
-                activeSessionId = sessionId;
-                callback(pick);
-              }
-            }
+            callback(pick);
           }
         }
       )
@@ -789,12 +789,9 @@ export const DraftService = {
           table: 'draft_picks',
           filter: `league_id=eq.${leagueId}`,
         },
-        async (payload) => {
-          // Handle undo (soft-delete) - trigger a refresh
-          const pick = payload.new as DraftPick;
-          if (pick.deleted_at && activeSessionId && pick.draft_session_id === activeSessionId) {
-            callback(pick);
-          }
+        (payload) => {
+          // Handle undo (soft-delete) or any update - trigger a refresh
+          callback(payload.new as DraftPick);
         }
       )
       .subscribe();

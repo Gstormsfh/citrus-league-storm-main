@@ -27,7 +27,18 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Users, Clock, Trophy, History, CheckCircle, Loader2, Zap, Play, Pause, Camera } from 'lucide-react';
+import { Users, Clock, Trophy, History, CheckCircle, Loader2, Zap, Play, Pause, Camera, Trash2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import LoadingScreen from '@/components/LoadingScreen';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
@@ -316,10 +327,12 @@ const DraftRoom = () => {
     }
 
     try {
-      setLoading(true);
+      // Only show loading screen on initial load, not on return visits
+      const isReturnVisit = sessionStorage.getItem(`draft_phase_${leagueId}`);
+      if (!isReturnVisit) {
+        setLoading(true);
+      }
       setError(null);
-      // Don't prematurely set draftPhase here — phase is determined AFTER loading data
-      // The default state is already LOBBY from useState initialization
       logger.debug('DraftRoom: loadDraftData starting for league:', leagueId);
 
       // Load league (with membership validation)
@@ -642,6 +655,75 @@ const DraftRoom = () => {
       unsubscribe();
     };
   }, [leagueId, user?.id]);
+
+  // POLLING FALLBACK: Reload picks + league every 3 seconds during active draft
+  // This ensures updates even if Supabase realtime has issues (like Yahoo/ESPN do)
+  useEffect(() => {
+    if (draftPhase !== DraftPhase.ACTIVE || !leagueId || !user?.id) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        // Reload picks
+        const { picks } = await DraftService.getDraftPicks(leagueId, user.id);
+        const activePicks = picks.filter(p => !p.deleted_at);
+
+        // Only update state if picks actually changed (avoid unnecessary re-renders)
+        setDraftHistory(prev => {
+          if (prev.length !== activePicks.length) return activePicks;
+          // Check if the last pick changed
+          const prevLast = prev[prev.length - 1];
+          const newLast = activePicks[activePicks.length - 1];
+          if (prevLast?.id !== newLast?.id) return activePicks;
+          return prev;
+        });
+        setDraftedPlayerIds(new Set(activePicks.map(p => p.player_id)));
+
+        // Reload league for timerStartedAt and settings
+        const { data: freshLeague } = await supabase
+          .from('leagues')
+          .select('settings, draft_rounds, draft_status')
+          .eq('id', leagueId)
+          .single();
+
+        if (freshLeague) {
+          setLeague(prev => {
+            if (!prev) return prev;
+            // Only update if something changed
+            const settingsChanged = JSON.stringify(prev.settings) !== JSON.stringify(freshLeague.settings);
+            const statusChanged = prev.draft_status !== freshLeague.draft_status;
+            if (!settingsChanged && !statusChanged) return prev;
+            return {
+              ...prev,
+              settings: freshLeague.settings || prev.settings,
+              draft_rounds: freshLeague.draft_rounds || prev.draft_rounds,
+              draft_status: freshLeague.draft_status || prev.draft_status
+            };
+          });
+
+          if (freshLeague.settings?.pickTimeLimit) {
+            setDraftSettings(prev => {
+              if (prev.pickTimeLimit === freshLeague.settings.pickTimeLimit) return prev;
+              return { ...prev, pickTimeLimit: freshLeague.settings.pickTimeLimit };
+            });
+          }
+
+          // Derive timer started from server
+          if (freshLeague.settings?.timerStartedAt && !draftTimerStartedRef.current) {
+            setDraftTimerStarted(true);
+            draftTimerStartedRef.current = true;
+          }
+        }
+
+        // Reload draft state to keep pick/round/team current
+        await loadDraftState();
+      } catch (err) {
+        // Silent fail - polling is best-effort
+        logger.debug('DraftRoom: Poll error (non-critical):', err);
+      }
+    }, 3000);
+
+    return () => clearInterval(pollInterval);
+  }, [draftPhase, leagueId, user?.id]);
 
   // Reload teams when page becomes visible again (e.g., user changed team name in another tab)
   useEffect(() => {
@@ -1503,6 +1585,49 @@ const DraftRoom = () => {
     } catch (error) {
       logger.error('handleUndoLastPick error:', error);
       alert(`Failed to undo pick: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleNuclearDeleteDraft = async () => {
+    if (!leagueId || !isCommissioner) return;
+
+    try {
+      const { error: resetError } = await DraftService.resetDraft(leagueId);
+      if (resetError) {
+        logger.error('Nuclear delete draft error:', resetError);
+        alert(`Failed to delete draft: ${resetError.message || 'Unknown error'}`);
+        return;
+      }
+
+      // Clear all local state
+      setDraftHistory([]);
+      setDraftedPlayerIds(new Set());
+      setDraftState(null);
+      setDraftTimerStarted(false);
+      draftTimerStartedRef.current = false;
+      setTimeRemaining(draftSettings.pickTimeLimit);
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+      if (autoPickTimeoutRef.current) {
+        clearTimeout(autoPickTimeoutRef.current);
+        autoPickTimeoutRef.current = null;
+      }
+      timerRunningRef.current = false;
+      lastPickNumberRef.current = 0;
+
+      // Clear sessionStorage
+      sessionStorage.removeItem(`draft_phase_${leagueId}`);
+      sessionStorage.removeItem(`draft_timer_${leagueId}`);
+
+      // Go back to lobby
+      setDraftPhase(DraftPhase.LOBBY);
+
+      logger.log('Nuclear draft delete complete for league:', leagueId);
+    } catch (error) {
+      logger.error('Nuclear delete draft exception:', error);
+      alert(`Failed to delete draft: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -2490,7 +2615,7 @@ const DraftRoom = () => {
         {!loading && !authLoading && !error && draftPhase === DraftPhase.ACTIVE && (
           <>
             {/* Show "Start Draft Timer" button if commissioner and no picks made yet - Disabled in demo state */}
-            {isCommissioner && userLeagueState === 'active-user' && (draftHistory?.length || 0) === 0 && !draftTimerStarted && (
+            {isCommissioner && userLeagueState === 'active-user' && (draftHistory?.length || 0) === 0 && !league?.settings?.timerStartedAt && (
               <div className="container mx-auto px-4 py-6">
                 <Card className="border-2 border-primary bg-primary/5">
                   <CardContent className="p-6 text-center">
@@ -2858,18 +2983,40 @@ const DraftRoom = () => {
                       </summary>
                       <div className="mt-2 space-y-2">
                         <DraftControls
-                          isDraftActive={draftTimerStarted}
+                          isDraftActive={!!league?.settings?.timerStartedAt}
                           onPause={handlePauseDraft}
                           onContinue={handleContinueDraft}
-                          canPause={draftTimerStarted && draftPhase === DraftPhase.ACTIVE}
-                          canContinue={!draftTimerStarted && draftPhase === DraftPhase.ACTIVE}
+                          canPause={!!league?.settings?.timerStartedAt && draftPhase === DraftPhase.ACTIVE}
+                          canContinue={!league?.settings?.timerStartedAt && draftPhase === DraftPhase.ACTIVE}
                           onUndoLastPick={isCommissioner ? handleUndoLastPick : undefined}
                           canUndo={isCommissioner && draftHistory.length > 0}
                           pickTimeLimit={draftSettings.pickTimeLimit}
                         />
-                        <p className="text-xs text-muted-foreground">
-                          To reset the draft, go to Team Settings in your Profile.
-                        </p>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm" className="w-full">
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete Draft &amp; Start Over
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Draft Completely?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will permanently delete ALL draft picks, reset the draft order, and return everyone to the lobby. This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={handleNuclearDeleteDraft}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Yes, Delete Everything
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </details>
                   )}
@@ -2877,7 +3024,7 @@ const DraftRoom = () => {
                   {/* Floating Pause/Continue button for active drafts */}
                   {isCommissioner && draftPhase === DraftPhase.ACTIVE && (draftHistory?.length || 0) > 0 && (
                     <div className="fixed bottom-4 right-4 z-50">
-                      {draftTimerStarted ? (
+                      {!!league?.settings?.timerStartedAt ? (
                         <Button
                           size="lg"
                           variant="destructive"
@@ -2989,7 +3136,7 @@ const DraftRoom = () => {
             {/* Show Pause/Continue buttons for in-progress drafts - Disabled in demo state */}
             {isCommissioner && userLeagueState === 'active-user' && draftPhase === DraftPhase.ACTIVE && (draftHistory?.length || 0) > 0 && (
               <div className="fixed bottom-4 right-4 z-50">
-                {draftTimerStarted ? (
+                {!!league?.settings?.timerStartedAt ? (
                   <Button
                     size="lg"
                     variant="destructive"
