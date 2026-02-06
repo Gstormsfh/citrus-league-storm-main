@@ -549,6 +549,46 @@ export const DraftService = {
   },
 
   /**
+   * Undo the last draft pick (commissioner only)
+   * Soft-deletes the most recent pick and returns the updated state
+   */
+  async undoLastPick(
+    leagueId: string,
+    userId: string
+  ): Promise<{ undone: DraftPick | null; error: any }> {
+    try {
+      // Get the most recent active pick
+      const { data: lastPick, error: fetchError } = await supabase
+        .from('draft_picks')
+        .select('*')
+        .eq('league_id', leagueId)
+        .is('deleted_at', null)
+        .order('pick_number', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (fetchError || !lastPick) {
+        return { undone: null, error: fetchError || new Error('No picks to undo') };
+      }
+
+      // Soft-delete the pick
+      const { error: deleteError } = await supabase
+        .from('draft_picks')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', lastPick.id);
+
+      if (deleteError) {
+        return { undone: null, error: deleteError };
+      }
+
+      logger.log('Undo last pick:', lastPick.player_id, 'from team:', lastPick.team_id);
+      return { undone: lastPick, error: null };
+    } catch (error) {
+      return { undone: null, error };
+    }
+  },
+
+  /**
    * Hard delete draft data (use with caution - for cleanup only)
    */
   async hardDeleteDraft(leagueId: string): Promise<{ error: any }> {
@@ -737,6 +777,22 @@ export const DraftService = {
                 callback(pick);
               }
             }
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'draft_picks',
+          filter: `league_id=eq.${leagueId}`,
+        },
+        async (payload) => {
+          // Handle undo (soft-delete) - trigger a refresh
+          const pick = payload.new as DraftPick;
+          if (pick.deleted_at && activeSessionId && pick.draft_session_id === activeSessionId) {
+            callback(pick);
           }
         }
       )

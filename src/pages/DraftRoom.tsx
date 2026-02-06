@@ -426,80 +426,53 @@ const DraftRoom = () => {
         setDraftPhase(DraftPhase.LOBBY);
         logger.debug('DraftRoom: Draft queued, showing LOBBY');
       } else if (leagueData.draft_status === 'in_progress') {
-        // Draft is IN PROGRESS - try to load state and auto-join for ALL users
-        logger.debug('DraftRoom: Draft in progress, loading state for auto-join...');
-        
-        if (hasActiveDraftData || true) {
-          // Try to load draft state using LOCAL variables (bypasses stale closure)
-          try {
-            const { state: loadedState, error: stateError } = await DraftService.getDraftState(
-              leagueId,
-              teamsData || [],
-              leagueData.draft_rounds || 21,
-              user.id
-            );
-            
-            if (!stateError && loadedState) {
-              logger.debug('DraftRoom: Draft state loaded for auto-join:', loadedState);
-              setDraftState(loadedState);
-              
-              // Set up orderedTeamsForBoard from draft order
-              if (loadedState.sessionId) {
-                try {
-                  const { order: boardOrder } = await DraftService.getDraftOrder(
-                    leagueId, user.id, 1, loadedState.sessionId
-                  );
-                  if (boardOrder && boardOrder.team_order && boardOrder.team_order.length > 0) {
-                    const orderedTeams = boardOrder.team_order
-                      .map((teamId: string) => (teamsData || []).find(t => t.id === teamId))
-                      .filter((t: any): t is (Team & { owner_name?: string }) => t !== undefined);
-                    if (orderedTeams.length === (teamsData || []).length) {
-                      setOrderedTeamsForBoard(orderedTeams);
-                    } else {
-                      setOrderedTeamsForBoard(teamsData || []);
-                    }
+        // Draft is IN PROGRESS - show LOBBY with "join active draft" banner
+        // Users click to join rather than auto-joining
+        logger.debug('DraftRoom: Draft in progress, showing LOBBY with join banner');
+
+        // Pre-load draft state so it's ready when user clicks "Join"
+        try {
+          const { state: loadedState, error: stateError } = await DraftService.getDraftState(
+            leagueId,
+            teamsData || [],
+            leagueData.draft_rounds || 21,
+            user.id
+          );
+
+          if (!stateError && loadedState) {
+            setDraftState(loadedState);
+
+            // Pre-load ordered teams for board
+            if (loadedState.sessionId) {
+              try {
+                const { order: boardOrder } = await DraftService.getDraftOrder(
+                  leagueId, user.id, 1, loadedState.sessionId
+                );
+                if (boardOrder && boardOrder.team_order && boardOrder.team_order.length > 0) {
+                  const orderedTeams = boardOrder.team_order
+                    .map((teamId: string) => (teamsData || []).find(t => t.id === teamId))
+                    .filter((t: any): t is (Team & { owner_name?: string }) => t !== undefined);
+                  if (orderedTeams.length === (teamsData || []).length) {
+                    setOrderedTeamsForBoard(orderedTeams);
                   } else {
                     setOrderedTeamsForBoard(teamsData || []);
                   }
-                } catch (boardErr) {
-                  logger.error('DraftRoom: Error loading draft order for board:', boardErr);
+                } else {
                   setOrderedTeamsForBoard(teamsData || []);
                 }
+              } catch (boardErr) {
+                logger.error('DraftRoom: Error loading draft order for board:', boardErr);
+                setOrderedTeamsForBoard(teamsData || []);
               }
-              
-              // AUTO-JOIN: Set phase to ACTIVE for ALL users (commissioner AND non-commissioner)
-              setDraftPhase(DraftPhase.ACTIVE);
-              logger.debug('DraftRoom: Auto-joining ACTIVE draft for user:', user.id);
-            } else {
-              // Draft state couldn't be loaded - check if draft order exists
-              logger.debug('DraftRoom: Could not load draft state, checking for draft order...');
-              const { order: fallbackOrder } = await DraftService.getDraftOrder(leagueId, user.id, 1);
-              if (fallbackOrder) {
-                // Draft order exists (just started, no picks yet) - go to ACTIVE
-                setDraftPhase(DraftPhase.ACTIVE);
-                logger.debug('DraftRoom: Draft order found, entering ACTIVE phase (no picks yet)');
-              } else {
-                // No data at all - status is stale, reset to not_started
-                logger.debug('DraftRoom: No draft data found, resetting status to not_started');
-                await supabase
-                  .from('leagues')
-                  .update({ draft_status: 'not_started' })
-                  .eq('id', leagueId);
-                setLeague({ ...leagueData, draft_status: 'not_started' });
-                setDraftState(null);
-                setDraftPhase(DraftPhase.LOBBY);
-              }
-            }
-          } catch (draftStateError) {
-            logger.error('DraftRoom: Error loading draft state for auto-join:', draftStateError);
-            // Fallback: still try to show ACTIVE if we have picks
-            if (hasActiveDraftData) {
-              setDraftPhase(DraftPhase.ACTIVE);
-            } else {
-              setDraftPhase(DraftPhase.LOBBY);
             }
           }
+        } catch (draftStateError) {
+          logger.error('DraftRoom: Error pre-loading draft state:', draftStateError);
         }
+
+        // Always show LOBBY - user clicks "Join Draft" to enter ACTIVE phase
+        setDraftPhase(DraftPhase.LOBBY);
+        logger.debug('DraftRoom: Showing LOBBY with join banner for user:', user.id);
       } else if (leagueData.draft_status === 'completed') {
         // Draft completed
         if (hasActiveDraftData) {
@@ -606,18 +579,37 @@ const DraftRoom = () => {
     
     const unsubscribe = DraftService.subscribeToDraftPicks(leagueId, user.id, async (newPick) => {
       logger.debug('DraftRoom: New pick received via realtime:', newPick);
-      
+
       // Debounce rapid updates - wait 300ms for more updates before processing
       clearTimeout(updateTimeout);
       updateTimeout = setTimeout(async () => {
         // Reload all picks to ensure we have the latest state
         const { picks } = await DraftService.getDraftPicks(leagueId, user.id);
         const activePicks = picks.filter(p => !p.deleted_at);
-        
+
         setDraftHistory(activePicks);
         setDraftedPlayerIds(new Set(activePicks.map(p => p.player_id)));
-        
-        // Reload draft state to update current pick/round
+
+        // Start timer automatically if this is the first pick
+        if (activePicks.length >= 1 && !draftTimerStarted) {
+          setDraftTimerStarted(true);
+        }
+
+        // CRITICAL: Reset timer for next pick so all users see fresh countdown
+        // Clear existing timer interval so the timer effect restarts cleanly
+        if (timerIntervalRef.current) {
+          clearInterval(timerIntervalRef.current);
+          timerIntervalRef.current = null;
+        }
+        if (autoPickTimeoutRef.current) {
+          clearTimeout(autoPickTimeoutRef.current);
+          autoPickTimeoutRef.current = null;
+        }
+        timerRunningRef.current = false;
+        lastPickNumberRef.current = 0;
+        setTimeRemaining(draftSettings.pickTimeLimit);
+
+        // Reload draft state to update current pick/round/nextTeam
         await loadDraftState();
       }, 300);
     });
@@ -676,22 +668,21 @@ const DraftRoom = () => {
             });
           }
 
-          // Auto-transition to active draft when status changes to 'in_progress'
+          // When draft starts, pre-load state but stay in LOBBY with join banner
           if (updatedLeague.draft_status === 'in_progress' && draftPhase !== DraftPhase.ACTIVE) {
-            logger.debug('DraftRoom: Draft started by commissioner, auto-joining...');
+            logger.debug('DraftRoom: Draft started by commissioner, showing join banner in lobby');
 
-            // Load draft state for this user
+            // Pre-load draft state so it's ready when user clicks "Join"
             try {
-              const { state: joinState, error: stateError } = await DraftService.getDraftState(
+              const { state: joinState } = await DraftService.getDraftState(
                 leagueId,
                 teams,
                 updatedLeague.draft_rounds || league?.draft_rounds || 21,
                 user.id
               );
 
-              if (!stateError && joinState) {
+              if (joinState) {
                 setDraftState(joinState);
-                // Set up ordered teams for board
                 if (joinState.sessionId) {
                   try {
                     const { order: joinOrder } = await DraftService.getDraftOrder(
@@ -706,26 +697,21 @@ const DraftRoom = () => {
                       }
                     }
                   } catch (orderErr) {
-                    logger.error('DraftRoom: Error loading draft order during auto-join:', orderErr);
+                    logger.error('DraftRoom: Error loading draft order:', orderErr);
                   }
                 }
               }
 
-              // Update time remaining from settings
               if (updatedLeague.settings?.pickTimeLimit) {
-                setTimeRemaining(updatedLeague.settings.pickTimeLimit);
                 setDraftSettings(prev => ({
                   ...prev,
                   pickTimeLimit: updatedLeague.settings.pickTimeLimit
                 }));
               }
-
-              setDraftPhase(DraftPhase.ACTIVE);
             } catch (joinError) {
-              logger.error('DraftRoom: Error auto-joining draft:', joinError);
-              // Reload all data as fallback
-              loadDraftData();
+              logger.error('DraftRoom: Error pre-loading draft state:', joinError);
             }
+            // Stay in LOBBY - user clicks "Join Draft Room" to enter ACTIVE
           }
 
           // Handle draft completion
@@ -1385,15 +1371,74 @@ const DraftRoom = () => {
       }
     }
 
-    // Strategy 2: If no queue or no available players in queue, pick highest points
+    // Strategy 2: AI teams pick by positional need, then best available
     if (!selectedPlayer) {
-      selectedPlayer = undraftedPlayers.sort((a, b) => b.points - a.points)[0];
-      logger.log('handleAutoDraft: Picking highest points player', {
-        team: currentTeam.team_name,
-        player: selectedPlayer.full_name,
-        points: selectedPlayer.points,
-        usedQueue: isHumanTeam && draftQueue.length > 0
-      });
+      const isAITeam = !currentTeam.owner_id;
+
+      if (isAITeam) {
+        // Get what this AI team has already drafted
+        const teamPicks = draftHistory.filter(p => p.team_id === currentTeam.id && !p.deleted_at);
+        const teamPlayerIds = teamPicks.map(p => p.player_id);
+        const teamPlayers = availablePlayers.filter(p => teamPlayerIds.includes(p.id));
+
+        // Count positions already drafted
+        const positionCounts: Record<string, number> = {};
+        teamPlayers.forEach(p => {
+          const pos = p.position || 'F';
+          positionCounts[pos] = (positionCounts[pos] || 0) + 1;
+        });
+
+        // Ideal roster composition: 6C, 6LW, 6RW, 6D, 3G = needs spread across positions
+        // Simplified: prioritize positions with fewest picks relative to need
+        const positionNeeds: Record<string, number> = {
+          'C': 4, 'LW': 3, 'RW': 3, 'D': 6, 'G': 2,
+          // Fallback for combined forward positions
+          'F': 3, 'W': 3
+        };
+
+        // Find position with biggest need gap
+        let bestNeedPosition: string | null = null;
+        let biggestGap = -Infinity;
+        for (const [pos, need] of Object.entries(positionNeeds)) {
+          const have = positionCounts[pos] || 0;
+          const gap = need - have;
+          if (gap > 0 && gap > biggestGap) {
+            // Check if there are available players at this position
+            const availableAtPos = undraftedPlayers.filter(p => p.position === pos);
+            if (availableAtPos.length > 0) {
+              biggestGap = gap;
+              bestNeedPosition = pos;
+            }
+          }
+        }
+
+        if (bestNeedPosition) {
+          // Pick the best available player at the needed position
+          const posPlayers = undraftedPlayers
+            .filter(p => p.position === bestNeedPosition)
+            .sort((a, b) => (b.points || 0) - (a.points || 0));
+          if (posPlayers.length > 0) {
+            selectedPlayer = posPlayers[0];
+            logger.log('handleAutoDraft: AI picking by positional need', {
+              team: currentTeam.team_name,
+              position: bestNeedPosition,
+              player: selectedPlayer.full_name,
+              points: selectedPlayer.points
+            });
+          }
+        }
+      }
+
+      // Fallback: pick highest points player regardless of position
+      if (!selectedPlayer) {
+        selectedPlayer = undraftedPlayers.sort((a, b) => (b.points || 0) - (a.points || 0))[0];
+        logger.log('handleAutoDraft: Picking best available player', {
+          team: currentTeam.team_name,
+          player: selectedPlayer?.full_name,
+          points: selectedPlayer?.points,
+          isAI: !currentTeam.owner_id
+        });
+      }
     }
 
     if (!selectedPlayer) {
@@ -1412,6 +1457,49 @@ const DraftRoom = () => {
       logger.error('handleAutoDraft error:', error);
       setError(`Auto-draft failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       // Don't crash - just log and show error
+    }
+  };
+
+  // Undo the last draft pick (commissioner only)
+  const handleUndoLastPick = async () => {
+    if (!leagueId || !isCommissioner) return;
+
+    const confirmed = confirm('Are you sure you want to undo the last pick?');
+    if (!confirmed) return;
+
+    try {
+      const { undone, error: undoError } = await DraftService.undoLastPick(leagueId, user.id);
+      if (undoError || !undone) {
+        logger.error('handleUndoLastPick error:', undoError);
+        alert(`Failed to undo pick: ${undoError?.message || 'No picks to undo'}`);
+        return;
+      }
+
+      logger.log('Undo successful, pick removed:', undone.player_id);
+
+      // Reload picks and draft state
+      const { picks } = await DraftService.getDraftPicks(leagueId, user.id);
+      const activePicks = picks.filter(p => !p.deleted_at);
+      setDraftHistory(activePicks);
+      setDraftedPlayerIds(new Set(activePicks.map(p => p.player_id)));
+
+      // Reset timer for the restored pick
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+      if (autoPickTimeoutRef.current) {
+        clearTimeout(autoPickTimeoutRef.current);
+        autoPickTimeoutRef.current = null;
+      }
+      timerRunningRef.current = false;
+      lastPickNumberRef.current = 0;
+      setTimeRemaining(draftSettings.pickTimeLimit);
+
+      await loadDraftState();
+    } catch (error) {
+      logger.error('handleUndoLastPick error:', error);
+      alert(`Failed to undo pick: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -2707,12 +2795,15 @@ const DraftRoom = () => {
                         Commissioner Controls
                       </summary>
                       <div className="mt-2 space-y-2">
-                        <DraftControls 
+                        <DraftControls
                           isDraftActive={draftTimerStarted}
                           onPause={handlePauseDraft}
                           onContinue={handleContinueDraft}
                           canPause={draftTimerStarted && draftPhase === DraftPhase.ACTIVE}
                           canContinue={!draftTimerStarted && draftPhase === DraftPhase.ACTIVE}
+                          onUndoLastPick={isCommissioner ? handleUndoLastPick : undefined}
+                          canUndo={isCommissioner && draftHistory.length > 0}
+                          pickTimeLimit={draftSettings.pickTimeLimit}
                         />
                         <p className="text-xs text-muted-foreground">
                           To reset the draft, go to Team Settings in your Profile.
