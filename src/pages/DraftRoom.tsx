@@ -1058,6 +1058,8 @@ const DraftRoom = () => {
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   // Track the current auto-pick timeout ID for cleanup
   const autoPickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Guard against concurrent auto-draft calls (race condition prevention)
+  const autoPickInProgressRef = useRef<boolean>(false);
   // Refs for stale closure prevention in realtime subscription callbacks
   const pickTimeLimitRef = useRef(draftSettings.pickTimeLimit);
   const draftTimerStartedRef = useRef(false);
@@ -1412,7 +1414,15 @@ const DraftRoom = () => {
     } catch (error: unknown) {
       logger.error('handlePlayerDraft error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      alert(`Failed to draft player: ${errorMessage}`);
+      // Silently handle "already taken" errors during auto-draft - means another client handled it
+      const isAlreadyTaken = errorMessage.includes('already taken') || errorMessage.includes('already drafted');
+      if (isAlreadyTaken) {
+        logger.log('handlePlayerDraft: Pick already handled by another client, reloading state');
+        await loadDraftState();
+      } else if (!isAutoDraft) {
+        // Only show alert for manual picks, not auto-draft race conditions
+        alert(`Failed to draft player: ${errorMessage}`);
+      }
       // Don't throw - let draft continue
     }
   };
@@ -1424,6 +1434,19 @@ const DraftRoom = () => {
         return;
       }
 
+      // Only commissioner triggers auto-picks to prevent multiple clients racing
+      if (!isCommissioner) {
+        logger.log('handleAutoDraft: Skipping - only commissioner auto-picks');
+        return;
+      }
+
+      // Prevent concurrent auto-draft calls (race condition guard)
+      if (autoPickInProgressRef.current) {
+        logger.log('handleAutoDraft: Skipping - auto-pick already in progress');
+        return;
+      }
+      autoPickInProgressRef.current = true;
+
     // Get available (undrafted) players
     const undraftedPlayers = availablePlayers.filter(
       player => !draftedPlayerIds.has(player.id)
@@ -1431,6 +1454,7 @@ const DraftRoom = () => {
 
     if (undraftedPlayers.length === 0) {
       logger.error('handleAutoDraft: No available players to draft');
+      autoPickInProgressRef.current = false;
       return;
     }
 
@@ -1528,20 +1552,26 @@ const DraftRoom = () => {
 
     if (!selectedPlayer) {
       logger.error('handleAutoDraft: Could not select a player');
+      autoPickInProgressRef.current = false;
       return;
     }
 
       // Draft the selected player (mark as auto-draft to bypass user checks)
       await handlePlayerDraft(selectedPlayer, true);
-      
+
       // Remove from queue if it was picked from queue
       if (pickedFromQueue && selectedPlayer.id) {
         setDraftQueue(prev => prev.filter(id => id !== selectedPlayer!.id));
       }
     } catch (error) {
       logger.error('handleAutoDraft error:', error);
-      setError(`Auto-draft failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      // Don't crash - just log and show error
+      // Don't show alert for pick-number-already-taken - another client already handled it
+      const errMsg = error instanceof Error ? error.message : 'Unknown error';
+      if (!errMsg.includes('already taken') && !errMsg.includes('already drafted')) {
+        setError(`Auto-draft failed: ${errMsg}`);
+      }
+    } finally {
+      autoPickInProgressRef.current = false;
     }
   };
 
