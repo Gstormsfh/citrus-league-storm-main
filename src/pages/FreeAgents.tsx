@@ -103,6 +103,34 @@ const FreeAgents = () => {
     setWatchlist(new Set(LeagueService.getWatchlist()));
   }, [searchParams, activeLeagueId, isChangingLeague]);
 
+  // Debug: Log position distribution when players load
+  useEffect(() => {
+    if (players.length > 0) {
+      const positionCounts = players.reduce((acc, p) => {
+        const pos = p.position || 'UNKNOWN';
+        acc[pos] = (acc[pos] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      console.log('[FreeAgents] Position distribution:', positionCounts);
+      console.log('[FreeAgents] Total players:', players.length);
+      
+      // Goalie debugging
+      const goalies = players.filter(p => p.position === 'G');
+      const goalieVariants = players.filter(p => p.position && p.position.toUpperCase().includes('G'));
+      console.log('[FreeAgents] Goalies (exact "G"):', goalies.length);
+      console.log('[FreeAgents] Goalie variants (contains G):', goalieVariants.length);
+      
+      if (goalies.length === 0 && goalieVariants.length > 0) {
+        console.warn('[FreeAgents] ❌ NO GOALIES with position="G", but found variants:', 
+          goalieVariants.slice(0, 3).map(g => ({ name: g.full_name, position: g.position })));
+      } else if (goalies.length > 0) {
+        console.log('[FreeAgents] ✅ Sample goalies:', goalies.slice(0, 3).map(g => ({ name: g.full_name, position: g.position, wins: g.wins })));
+      } else {
+        console.error('[FreeAgents] ❌ NO GOALIES FOUND AT ALL - check player_directory.position_code');
+      }
+    }
+  }, [players.length]);
+
   // Load schedule maximizers when players are loaded (needed for Top Projected combined view)
   useEffect(() => {
     if (players.length > 0 && scheduleMaximizers.length === 0 && !loadingMaximizers) {
@@ -154,9 +182,11 @@ const FreeAgents = () => {
         });
         setTrendingData(trendingMap);
         if (trendingMap.size > 0) {
-          console.log(`[FreeAgents] ✅ Loaded REAL trending data for ${trendingMap.size} players`);
+          console.log(`[FreeAgents] ✅ Loaded REAL trending data for ${trendingMap.size} players from player_transactions table`);
+          console.log('[FreeAgents] Top trending:', Array.from(trendingMap.entries()).slice(0, 5));
         } else {
-          console.log('[FreeAgents] ⚠️ No trending data yet (table empty). Using estimated adds until users start adding players.');
+          console.warn('[FreeAgents] ⚠️ No trending data yet - player_transactions table is empty.');
+          console.warn('[FreeAgents] Using estimated adds based on season stats. Real data will appear once users start adding/dropping players.');
         }
       }
     } catch (error) {
@@ -175,10 +205,22 @@ const FreeAgents = () => {
       if (isGuestMode(userLeagueState)) {
         try {
           const allPlayers = await PlayerService.getAllPlayers();
-          // Show top players by points for demo
-          const sortedPlayers = [...allPlayers]
+          
+          // CRITICAL: Include top goalies AND top skaters
+          // Goalies have 0 points, so we can't just sort by points
+          const skaters = allPlayers.filter(p => p.position !== 'G');
+          const goalies = allPlayers.filter(p => p.position === 'G');
+          
+          const topSkaters = [...skaters]
             .sort((a, b) => (b.points || 0) - (a.points || 0))
-            .slice(0, 200); // Top 200 players
+            .slice(0, 170); // Top 170 skaters
+          
+          const topGoalies = [...goalies]
+            .sort((a, b) => (b.wins || 0) - (a.wins || 0))
+            .slice(0, 30); // Top 30 goalies
+          
+          const sortedPlayers = [...topSkaters, ...topGoalies];
+          console.log(`[FreeAgents] Loaded ${sortedPlayers.length} players (${topSkaters.length} skaters, ${topGoalies.length} goalies)`);
           setPlayers(sortedPlayers);
           setLoading(false);
           return;
@@ -459,7 +501,7 @@ const FreeAgents = () => {
 
       setWeeklyProjections(weeklyProjectionMap);
       
-      // Debug: Log final aggregated projections (reuse debugLog from above)
+      // Debug: Log final aggregated projections with validation
       const topProjectionPlayers = Array.from(weeklyProjectionMap.entries())
         .sort((a, b) => b[1] - a[1])
         .slice(0, 10)
@@ -470,7 +512,15 @@ const FreeAgents = () => {
           });
           return { name: player?.full_name, id: numericId, total: total.toFixed(1) };
         });
-      debugLog('[FreeAgents Projections] Top 10 aggregated weekly projections:', topProjectionPlayers);
+      
+      const hasRealProjections = Array.from(weeklyProjectionMap.values()).some(val => val > 0);
+      if (hasRealProjections) {
+        console.log('[FreeAgents Projections] ✅ REAL projections loaded from get_daily_projections RPC');
+        console.log('[FreeAgents Projections] Top 10 projected players:', topProjectionPlayers);
+      } else {
+        console.warn('[FreeAgents Projections] ⚠️ No projections returned (all 0). Fallback to estimated will be used.');
+      }
+      debugLog('[FreeAgents Projections] Full weekly projection map size:', weeklyProjectionMap.size);
       
       const goalieProjections = topPlayers
         .filter(p => p.position === 'G')
@@ -1301,13 +1351,13 @@ const FreeAgents = () => {
                           <TrendingUp className="h-5 w-5 text-green-500" />
                           Top Trending
                           {trendingData.size === 0 && (
-                            <Badge variant="outline" className="text-[10px] ml-2">
+                            <Badge variant="outline" className="text-[10px] ml-2 bg-citrus-cream text-citrus-forest border-citrus-sage">
                               Estimated
                             </Badge>
                           )}
                           {trendingData.size > 0 && (
-                            <Badge className="text-[10px] ml-2 bg-green-500">
-                              Live Data
+                            <Badge className="text-[10px] ml-2 bg-citrus-sage text-citrus-forest">
+                              {trendingData.size} Adds
                             </Badge>
                           )}
                         </CardTitle>
@@ -1393,6 +1443,16 @@ const FreeAgents = () => {
                         <CardTitle className="text-lg font-bold flex items-center gap-2">
                           <Calendar className="h-5 w-5 text-blue-500" />
                           Top Projected (Remaining Week)
+                          {weeklyProjections.size === 0 && (
+                            <Badge variant="outline" className="text-[10px] ml-2 bg-citrus-cream text-citrus-forest border-citrus-sage">
+                              Loading...
+                            </Badge>
+                          )}
+                          {weeklyProjections.size > 0 && (
+                            <Badge className="text-[10px] ml-2 bg-citrus-sage text-citrus-forest">
+                              Live Data
+                            </Badge>
+                          )}
                         </CardTitle>
                         <Button variant="ghost" size="sm" onClick={() => setActiveTab('schedule')}>See All</Button>
                       </CardHeader>

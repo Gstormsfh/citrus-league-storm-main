@@ -75,6 +75,9 @@ export const PlayerPool = ({
           case 'wins':
             comparison = (b.wins || 0) - (a.wins || 0);
             break;
+          case 'losses':
+            comparison = (b.losses || 0) - (a.losses || 0);
+            break;
           case 'gaa': {
             // Lower GAA is better, so reverse the comparison
             const gaaA = a.goals_against_average || 999;
@@ -91,6 +94,9 @@ export const PlayerPool = ({
           }
           case 'saves':
             comparison = (b.saves || 0) - (a.saves || 0);
+            break;
+          case 'shutouts':
+            comparison = (b.shutouts || 0) - (a.shutouts || 0);
             break;
           case 'name':
             comparison = a.full_name.localeCompare(b.full_name);
@@ -122,6 +128,21 @@ export const PlayerPool = ({
           case 'xGoals':
             comparison = b.xGoals - a.xGoals;
             break;
+          case 'plusMinus':
+            comparison = (b.plus_minus || 0) - (a.plus_minus || 0);
+            break;
+          case 'ppp':
+            comparison = (b.ppp || 0) - (a.ppp || 0);
+            break;
+          case 'pim':
+            comparison = (b.pim || 0) - (a.pim || 0);
+            break;
+          case 'toi': {
+            const toiA = a.icetime_seconds || 0;
+            const toiB = b.icetime_seconds || 0;
+            comparison = toiB - toiA;
+            break;
+          }
           case 'name':
             comparison = a.full_name.localeCompare(b.full_name);
             break;
@@ -178,24 +199,25 @@ export const PlayerPool = ({
         {player.position === 'G' ? (
           <>
             <td className="px-3 py-2 text-xs text-center font-semibold">{player.wins || 0}</td>
+            <td className="px-3 py-2 text-xs text-center">{player.losses || 0}</td>
             <td className="px-3 py-2 text-xs text-center">{player.goals_against_average ? player.goals_against_average.toFixed(2) : '0.00'}</td>
-            <td className="px-3 py-2 text-xs text-center">{player.save_percentage ? (player.save_percentage * 100).toFixed(3) : '0.000'}%</td>
+            <td className="px-3 py-2 text-xs text-center">{player.save_percentage ? (player.save_percentage * 100).toFixed(1) : '0.0'}%</td>
             <td className="px-3 py-2 text-xs text-center">{player.saves || 0}</td>
-            <td className="px-3 py-2 text-xs text-center">-</td>
-            <td className="px-3 py-2 text-xs text-center">-</td>
-            <td className="px-3 py-2 text-xs text-center text-muted-foreground">-</td>
-            <td className="px-3 py-2 text-xs text-center text-muted-foreground">-</td>
+            <td className="px-3 py-2 text-xs text-center">{player.shutouts || 0}</td>
           </>
         ) : (
           <>
             <td className="px-3 py-2 text-xs text-center font-semibold">{player.points}</td>
             <td className="px-3 py-2 text-xs text-center">{player.goals}</td>
             <td className="px-3 py-2 text-xs text-center">{player.assists}</td>
+            <td className="px-3 py-2 text-xs text-center">{player.plus_minus > 0 ? '+' : ''}{player.plus_minus}</td>
+            <td className="px-3 py-2 text-xs text-center">{player.ppp || 0}</td>
             <td className="px-3 py-2 text-xs text-center">{player.shots}</td>
             <td className="px-3 py-2 text-xs text-center">{player.hits}</td>
             <td className="px-3 py-2 text-xs text-center">{player.blocks}</td>
+            <td className="px-3 py-2 text-xs text-center">{player.pim || 0}</td>
+            <td className="px-3 py-2 text-xs text-center text-muted-foreground">{player.icetime_seconds ? Math.round(player.icetime_seconds / 60).toLocaleString() : '-'}</td>
             <td className="px-3 py-2 text-xs text-center text-muted-foreground">{player.xGoals.toFixed(2)}</td>
-            {/* Corsi/Fenwick intentionally removed */}
           </>
         )}
         <td className="px-3 py-2">
@@ -292,9 +314,11 @@ export const PlayerPool = ({
               {selectedPosition === 'G' ? (
                 <>
                   <SelectItem value="wins">Wins</SelectItem>
+                  <SelectItem value="losses">Losses</SelectItem>
                   <SelectItem value="gaa">GAA</SelectItem>
                   <SelectItem value="savePct">Save %</SelectItem>
                   <SelectItem value="saves">Saves</SelectItem>
+                  <SelectItem value="shutouts">Shutouts</SelectItem>
                   <SelectItem value="name">Name</SelectItem>
                 </>
               ) : (
@@ -302,9 +326,13 @@ export const PlayerPool = ({
                   <SelectItem value="points">Points</SelectItem>
                   <SelectItem value="goals">Goals</SelectItem>
                   <SelectItem value="assists">Assists</SelectItem>
+                  <SelectItem value="plusMinus">+/-</SelectItem>
+                  <SelectItem value="ppp">PPP</SelectItem>
                   <SelectItem value="shots">Shots</SelectItem>
                   <SelectItem value="hits">Hits</SelectItem>
                   <SelectItem value="blocks">Blocks</SelectItem>
+                  <SelectItem value="pim">PIM</SelectItem>
+                  <SelectItem value="toi">TOI</SelectItem>
                   <SelectItem value="xGoals">xGoals</SelectItem>
                   <SelectItem value="name">Name</SelectItem>
                 </>
@@ -353,6 +381,18 @@ export const PlayerPool = ({
                     </th>
                     <th 
                       className="px-3 py-2 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none"
+                      onClick={() => handleHeaderClick('losses')}
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        L
+                        {sortBy === 'losses' && (
+                          sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
+                        )}
+                        {sortBy !== 'losses' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                      </div>
+                    </th>
+                    <th 
+                      className="px-3 py-2 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none"
                       onClick={() => handleHeaderClick('gaa')}
                     >
                       <div className="flex items-center justify-center gap-1">
@@ -380,17 +420,25 @@ export const PlayerPool = ({
                       onClick={() => handleHeaderClick('saves')}
                     >
                       <div className="flex items-center justify-center gap-1">
-                        Saves
+                        SV
                         {sortBy === 'saves' && (
                           sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
                         )}
                         {sortBy !== 'saves' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                       </div>
                     </th>
-                    <th className="px-3 py-2 text-center font-semibold text-fantasy-dark">-</th>
-                    <th className="px-3 py-2 text-center font-semibold text-fantasy-dark">-</th>
-                    <th className="px-3 py-2 text-center font-semibold text-fantasy-dark">-</th>
-                    <th className="px-3 py-2 text-center font-semibold text-fantasy-dark">-</th>
+                    <th 
+                      className="px-3 py-2 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none"
+                      onClick={() => handleHeaderClick('shutouts')}
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        SO
+                        {sortBy === 'shutouts' && (
+                          sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
+                        )}
+                        {sortBy !== 'shutouts' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                      </div>
+                    </th>
                   </>
                 ) : (
                   <>
@@ -432,6 +480,30 @@ export const PlayerPool = ({
                 </th>
                 <th 
                   className="px-3 py-2 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none"
+                  onClick={() => handleHeaderClick('plusMinus')}
+                >
+                  <div className="flex items-center justify-center gap-1">
+                    +/-
+                    {sortBy === 'plusMinus' && (
+                      sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
+                    )}
+                    {sortBy !== 'plusMinus' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                  </div>
+                </th>
+                <th 
+                  className="px-3 py-2 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none"
+                  onClick={() => handleHeaderClick('ppp')}
+                >
+                  <div className="flex items-center justify-center gap-1">
+                    PPP
+                    {sortBy === 'ppp' && (
+                      sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
+                    )}
+                    {sortBy !== 'ppp' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                  </div>
+                </th>
+                <th 
+                  className="px-3 py-2 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none"
                   onClick={() => handleHeaderClick('shots')}
                 >
                   <div className="flex items-center justify-center gap-1">
@@ -468,6 +540,30 @@ export const PlayerPool = ({
                 </th>
                 <th 
                   className="px-3 py-2 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none"
+                  onClick={() => handleHeaderClick('pim')}
+                >
+                  <div className="flex items-center justify-center gap-1">
+                    PIM
+                    {sortBy === 'pim' && (
+                      sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
+                    )}
+                    {sortBy !== 'pim' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                  </div>
+                </th>
+                <th 
+                  className="px-3 py-2 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none"
+                  onClick={() => handleHeaderClick('toi')}
+                >
+                  <div className="flex items-center justify-center gap-1">
+                    TOI
+                    {sortBy === 'toi' && (
+                      sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
+                    )}
+                    {sortBy !== 'toi' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                  </div>
+                </th>
+                <th 
+                  className="px-3 py-2 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none"
                   onClick={() => handleHeaderClick('xGoals')}
                 >
                   <div className="flex items-center justify-center gap-1">
@@ -478,7 +574,6 @@ export const PlayerPool = ({
                     {sortBy !== 'xGoals' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                   </div>
                 </th>
-                    <th className="px-3 py-2 text-center font-semibold text-fantasy-dark">CF%</th>
                   </>
                 )}
                 <th className="px-3 py-2 text-center font-semibold text-fantasy-dark">Actions</th>

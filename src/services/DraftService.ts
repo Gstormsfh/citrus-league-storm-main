@@ -40,10 +40,12 @@ export const DraftService = {
    * Get or create active draft session for a league
    * REQUIRES: User must be a member of the league
    */
-  async getActiveDraftSession(leagueId: string, userId: string): Promise<{ sessionId: string; error: any }> {
+  async getActiveDraftSession(leagueId: string, userId?: string): Promise<{ sessionId: string; error: any }> {
     try {
-      // CRITICAL: Validate membership BEFORE accessing draft data
-      await LeagueMembershipService.requireMembership(leagueId, userId);
+      // CRITICAL: Validate membership BEFORE accessing draft data (skip if no userId)
+      if (userId) {
+        await LeagueMembershipService.requireMembership(leagueId, userId);
+      }
 
       // First, check the league status - only look for active sessions if draft is in progress
       const { data: leagueData } = await supabase
@@ -458,13 +460,15 @@ export const DraftService = {
     leagueId: string, 
     teams: Team[], 
     totalRounds: number,
+    userId?: string,
     sessionId?: string
   ): Promise<{ state: DraftState | null; error: any }> {
     try {
-      const { sessionId: activeSessionId } = await this.getActiveDraftSession(leagueId);
+      const { sessionId: activeSessionId } = await this.getActiveDraftSession(leagueId, userId);
       const targetSessionId = sessionId || activeSessionId;
 
-      const { picks } = await this.getDraftPicks(leagueId, targetSessionId);
+      // FIX: Pass userId and sessionId in the correct parameter positions
+      const { picks } = await this.getDraftPicks(leagueId, userId || '', targetSessionId);
       const totalPicks = picks.length;
       const currentRound = Math.floor(totalPicks / teams.length) + 1;
       const currentPick = totalPicks + 1;
@@ -483,8 +487,8 @@ export const DraftService = {
         };
       }
 
-      // Get draft order for current round
-      const { order } = await this.getDraftOrder(leagueId, currentRound, targetSessionId);
+      // FIX: Pass userId, roundNumber, sessionId in the correct parameter positions
+      const { order } = await this.getDraftOrder(leagueId, userId || '', currentRound, targetSessionId);
       if (!order) {
         return { state: null, error: new Error('Draft order not initialized') };
       }

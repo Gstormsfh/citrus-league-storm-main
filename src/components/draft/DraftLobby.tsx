@@ -824,7 +824,7 @@ Your Commissioner`);
                   <>
                     {onPrepareDraft && (
                       <Button 
-                        onClick={handlePrepareDraftClick}
+                        onClick={() => onPrepareDraft?.(settings)}
                         className="w-full"
                         disabled={teams.length < 4}
                       >
@@ -852,26 +852,53 @@ Your Commissioner`);
             </Card>
           ) : (
             <>
-              <Card className="border-primary/20 bg-primary/5">
-                <CardHeader>
-                  <CardTitle className="text-primary flex items-center gap-2">
-                    <Hourglass className="h-5 w-5" />
-                    Waiting to Start
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    The commissioner will start the draft once all teams have joined.
-                  </p>
-                  <div className="flex items-center justify-center">
-                    <div className="animate-pulse flex space-x-2">
-                      <div className="w-2 h-2 bg-primary rounded-full"></div>
-                      <div className="w-2 h-2 bg-primary rounded-full delay-75"></div>
-                      <div className="w-2 h-2 bg-primary rounded-full delay-150"></div>
+              {hasExistingDraft ? (
+                <Card className="border-primary/20 bg-primary/5">
+                  <CardHeader>
+                    <CardTitle className="text-primary flex items-center gap-2">
+                      <Play className="h-5 w-5" />
+                      Draft In Progress
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      The draft is currently in progress. Click below to join the draft room.
+                    </p>
+                    <p className="text-sm font-medium">
+                      Pick {currentPick} of {totalPicks}
+                    </p>
+                    <Button 
+                      onClick={handleStartDraft}
+                      className="w-full bg-primary hover:bg-primary/90"
+                      size="lg"
+                    >
+                      <Play className="h-5 w-5 mr-2" />
+                      Join Draft Room
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="border-primary/20 bg-primary/5">
+                  <CardHeader>
+                    <CardTitle className="text-primary flex items-center gap-2">
+                      <Hourglass className="h-5 w-5" />
+                      Waiting to Start
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      The commissioner will start the draft once all teams have joined.
+                    </p>
+                    <div className="flex items-center justify-center">
+                      <div className="animate-pulse flex space-x-2">
+                        <div className="w-2 h-2 bg-primary rounded-full"></div>
+                        <div className="w-2 h-2 bg-primary rounded-full delay-75"></div>
+                        <div className="w-2 h-2 bg-primary rounded-full delay-150"></div>
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              )}
 
               <Card>
                 <CardHeader>
