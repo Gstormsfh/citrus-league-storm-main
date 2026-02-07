@@ -323,20 +323,48 @@ export const DraftService = {
         return { pick: null, error: new Error('This pick number is already taken in this session') };
       }
 
-      // Insert the pick
-      const { data, error } = await supabase
-        .from('draft_picks')
-        .insert({
-          league_id: leagueId,
-          team_id: teamId,
-          player_id: playerId,
-          round_number: roundNumber,
-          pick_number: pickNumber,
-          draft_session_id: targetSessionId,
-          picked_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
+      // Insert the pick - try RPC first (bypasses RLS), fallback to direct insert
+      let data: any;
+      let error: any;
+
+      const { data: rpcResult, error: rpcError } = await supabase.rpc('make_draft_pick', {
+        p_league_id: leagueId,
+        p_team_id: teamId,
+        p_player_id: playerId,
+        p_round_number: roundNumber,
+        p_pick_number: pickNumber,
+        p_draft_session_id: targetSessionId
+      });
+
+      if (rpcError) {
+        // RPC not available - fallback to direct insert
+        logger.warn('make_draft_pick RPC failed, falling back to direct insert:', rpcError.message);
+        const result = await supabase
+          .from('draft_picks')
+          .insert({
+            league_id: leagueId,
+            team_id: teamId,
+            player_id: playerId,
+            round_number: roundNumber,
+            pick_number: pickNumber,
+            draft_session_id: targetSessionId,
+            picked_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+
+        data = result.data;
+        error = result.error;
+      } else {
+        // RPC succeeded - fetch the inserted pick
+        const { data: pickData, error: fetchError } = await supabase
+          .from('draft_picks')
+          .select('*')
+          .eq('id', rpcResult)
+          .single();
+        data = pickData;
+        error = fetchError;
+      }
 
       if (error) throw error;
 
