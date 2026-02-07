@@ -1687,44 +1687,16 @@ const DraftRoom = () => {
         return;
       }
 
-      // Clear all local state
-      setDraftHistory([]);
-      setDraftedPlayerIds(new Set());
-      setDraftState(null);
-      setDraftTimerStarted(false);
-      draftTimerStartedRef.current = false;
-      setTimeRemaining(draftSettings.pickTimeLimit);
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-        timerIntervalRef.current = null;
-      }
-      if (autoPickTimeoutRef.current) {
-        clearTimeout(autoPickTimeoutRef.current);
-        autoPickTimeoutRef.current = null;
-      }
-      timerRunningRef.current = false;
-      lastPickNumberRef.current = 0;
-      lastAutoPickedNumberRef.current = 0;
-      autoPickInProgressRef.current = false;
+      logger.log('Nuclear draft delete complete for league:', leagueId);
 
-      // Clear sessionStorage
+      // Clear all sessionStorage for this league
       sessionStorage.removeItem(`draft_phase_${leagueId}`);
       sessionStorage.removeItem(`draft_timer_${leagueId}`);
 
-      // Update local league state to reflect the reset
-      if (league) {
-        setLeague({
-          ...league,
-          draft_status: 'not_started',
-          scheduled_draft_time: null,
-          settings: { ...(league.settings || {}), timerStartedAt: null }
-        });
-      }
-
-      // Go back to lobby
-      setDraftPhase(DraftPhase.LOBBY);
-
-      logger.log('Nuclear draft delete complete for league:', leagueId);
+      // Force a full page reload to get completely clean React state
+      // Surgical state updates are unreliable because polling, realtime,
+      // and various useEffects can overwrite them within seconds
+      window.location.reload();
     } catch (error) {
       logger.error('Nuclear delete draft exception:', error);
       alert(`Failed to delete draft: ${error instanceof Error ? error.message : 'Unknown error'}`);

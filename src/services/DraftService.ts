@@ -523,18 +523,17 @@ export const DraftService = {
    */
   async resetDraft(leagueId: string): Promise<{ error: any; newSessionId?: string }> {
     try {
-      // Soft delete all picks and orders for this league
+      // HARD DELETE all picks for this league (soft-delete was unreliable with RLS)
       const { error: picksError } = await supabase
         .from('draft_picks')
-        .update({ deleted_at: new Date().toISOString() })
-        .eq('league_id', leagueId)
-        .is('deleted_at', null);
+        .delete()
+        .eq('league_id', leagueId);
 
+      // HARD DELETE all draft orders for this league
       const { error: orderError } = await supabase
         .from('draft_order')
-        .update({ deleted_at: new Date().toISOString() })
-        .eq('league_id', leagueId)
-        .is('deleted_at', null);
+        .delete()
+        .eq('league_id', leagueId);
 
       if (picksError) throw picksError;
       if (orderError) throw orderError;
@@ -571,7 +570,7 @@ export const DraftService = {
       const currentSettings = currentLeague?.settings || {};
       const { timerStartedAt: _, ...settingsWithoutTimer } = currentSettings as Record<string, any>;
 
-      await supabase
+      const { error: leagueError } = await supabase
         .from('leagues')
         .update({
           draft_status: 'not_started',
@@ -579,6 +578,8 @@ export const DraftService = {
           settings: { ...settingsWithoutTimer, timerStartedAt: null }
         } as any)
         .eq('id', leagueId);
+
+      if (leagueError) throw leagueError;
 
       // Return new session ID for next draft
       const newSessionId = crypto.randomUUID();
