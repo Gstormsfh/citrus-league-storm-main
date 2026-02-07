@@ -523,63 +523,66 @@ export const DraftService = {
    */
   async resetDraft(leagueId: string): Promise<{ error: any; newSessionId?: string }> {
     try {
-      // HARD DELETE all picks for this league (soft-delete was unreliable with RLS)
-      const { error: picksError } = await supabase
-        .from('draft_picks')
-        .delete()
-        .eq('league_id', leagueId);
+      // Use RPC function that runs as SECURITY DEFINER to bypass RLS
+      // Direct .delete() on draft_picks silently fails because there's no DELETE RLS policy
+      const { error: rpcError } = await supabase.rpc('nuclear_reset_draft', {
+        p_league_id: leagueId
+      });
 
-      // HARD DELETE all draft orders for this league
-      const { error: orderError } = await supabase
-        .from('draft_order')
-        .delete()
-        .eq('league_id', leagueId);
-
-      if (picksError) throw picksError;
-      if (orderError) throw orderError;
-
-      // Clean up roster data created during the completed draft
-      // Get all team IDs in this league for team_lineups cleanup
-      const { data: leagueTeams } = await supabase
-        .from('teams')
-        .select('id')
-        .eq('league_id', leagueId);
-
-      if (leagueTeams && leagueTeams.length > 0) {
-        const teamIds = leagueTeams.map(t => t.id);
-        // Delete team_lineups for all teams in this league
-        await supabase
-          .from('team_lineups')
+      if (rpcError) {
+        logger.error('RPC nuclear_reset_draft failed, falling back to direct deletes:', rpcError);
+        // Fallback: try direct deletes (works if RLS policies have been added)
+        const { error: picksError } = await supabase
+          .from('draft_picks')
           .delete()
-          .in('team_id', teamIds);
+          .eq('league_id', leagueId);
+        if (picksError) logger.error('Fallback delete draft_picks error:', picksError);
+
+        const { error: orderError } = await supabase
+          .from('draft_order')
+          .delete()
+          .eq('league_id', leagueId);
+        if (orderError) logger.error('Fallback delete draft_order error:', orderError);
+
+        // Clean up roster data
+        const { data: leagueTeams } = await supabase
+          .from('teams')
+          .select('id')
+          .eq('league_id', leagueId);
+
+        if (leagueTeams && leagueTeams.length > 0) {
+          await supabase
+            .from('team_lineups')
+            .delete()
+            .in('team_id', leagueTeams.map(t => t.id));
+        }
+
+        await supabase
+          .from('roster_assignments')
+          .delete()
+          .eq('league_id', leagueId);
+
+        // Reset league status
+        const { data: currentLeague } = await supabase
+          .from('leagues')
+          .select('settings')
+          .eq('id', leagueId)
+          .single();
+
+        const currentSettings = currentLeague?.settings || {};
+        const { timerStartedAt: _, ...settingsWithoutTimer } = currentSettings as Record<string, any>;
+
+        const { error: leagueError } = await supabase
+          .from('leagues')
+          .update({
+            draft_status: 'not_started',
+            scheduled_draft_time: null,
+            settings: { ...settingsWithoutTimer, timerStartedAt: null }
+          } as any)
+          .eq('id', leagueId);
+
+        if (leagueError) throw leagueError;
       }
-
-      // Delete roster_assignments for this league
-      await supabase
-        .from('roster_assignments')
-        .delete()
-        .eq('league_id', leagueId);
-
-      // Reset league status and clear timer
-      const { data: currentLeague } = await supabase
-        .from('leagues')
-        .select('settings')
-        .eq('id', leagueId)
-        .single();
-
-      const currentSettings = currentLeague?.settings || {};
-      const { timerStartedAt: _, ...settingsWithoutTimer } = currentSettings as Record<string, any>;
-
-      const { error: leagueError } = await supabase
-        .from('leagues')
-        .update({
-          draft_status: 'not_started',
-          scheduled_draft_time: null,
-          settings: { ...settingsWithoutTimer, timerStartedAt: null }
-        } as any)
-        .eq('id', leagueId);
-
-      if (leagueError) throw leagueError;
 
       // Return new session ID for next draft
       const newSessionId = crypto.randomUUID();
