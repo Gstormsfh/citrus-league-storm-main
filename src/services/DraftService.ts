@@ -539,6 +539,28 @@ export const DraftService = {
       if (picksError) throw picksError;
       if (orderError) throw orderError;
 
+      // Clean up roster data created during the completed draft
+      // Get all team IDs in this league for team_lineups cleanup
+      const { data: leagueTeams } = await supabase
+        .from('teams')
+        .select('id')
+        .eq('league_id', leagueId);
+
+      if (leagueTeams && leagueTeams.length > 0) {
+        const teamIds = leagueTeams.map(t => t.id);
+        // Delete team_lineups for all teams in this league
+        await supabase
+          .from('team_lineups')
+          .delete()
+          .in('team_id', teamIds);
+      }
+
+      // Delete roster_assignments for this league
+      await supabase
+        .from('roster_assignments')
+        .delete()
+        .eq('league_id', leagueId);
+
       // Reset league status and clear timer
       const { data: currentLeague } = await supabase
         .from('leagues')

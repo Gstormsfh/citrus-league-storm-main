@@ -134,6 +134,9 @@ export const PlayerPool = ({
           case 'ppp':
             comparison = (b.ppp || 0) - (a.ppp || 0);
             break;
+          case 'shp':
+            comparison = (b.shp || 0) - (a.shp || 0);
+            break;
           case 'pim':
             comparison = (b.pim || 0) - (a.pim || 0);
             break;
@@ -212,6 +215,7 @@ export const PlayerPool = ({
             <td className="px-3 py-2 text-xs text-center">{player.assists}</td>
             <td className="px-3 py-2 text-xs text-center">{player.plus_minus > 0 ? '+' : ''}{player.plus_minus}</td>
             <td className="px-3 py-2 text-xs text-center">{player.ppp || 0}</td>
+            <td className="px-3 py-2 text-xs text-center">{player.shp || 0}</td>
             <td className="px-3 py-2 text-xs text-center">{player.shots}</td>
             <td className="px-3 py-2 text-xs text-center">{player.hits}</td>
             <td className="px-3 py-2 text-xs text-center">{player.blocks}</td>
@@ -328,6 +332,7 @@ export const PlayerPool = ({
                   <SelectItem value="assists">Assists</SelectItem>
                   <SelectItem value="plusMinus">+/-</SelectItem>
                   <SelectItem value="ppp">PPP</SelectItem>
+                  <SelectItem value="shp">SHP</SelectItem>
                   <SelectItem value="shots">Shots</SelectItem>
                   <SelectItem value="hits">Hits</SelectItem>
                   <SelectItem value="blocks">Blocks</SelectItem>
@@ -357,7 +362,7 @@ export const PlayerPool = ({
       {/* Player List Table */}
       <div className="border border-fantasy-border rounded-lg overflow-hidden bg-[#E8EED9]/50 backdrop-blur-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[1200px] text-sm">
             <thead className="bg-fantasy-light/50 border-b border-fantasy-border">
               <tr>
                 <th className="px-3 py-2 text-left font-semibold text-fantasy-dark">Player</th>
@@ -502,7 +507,19 @@ export const PlayerPool = ({
                     {sortBy !== 'ppp' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                   </div>
                 </th>
-                <th 
+                <th
+                  className="px-3 py-2 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none"
+                  onClick={() => handleHeaderClick('shp')}
+                >
+                  <div className="flex items-center justify-center gap-1">
+                    SHP
+                    {sortBy === 'shp' && (
+                      sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
+                    )}
+                    {sortBy !== 'shp' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                  </div>
+                </th>
+                <th
                   className="px-3 py-2 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none"
                   onClick={() => handleHeaderClick('shots')}
                 >
