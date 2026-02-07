@@ -553,8 +553,9 @@ export const DraftService = {
         .from('leagues')
         .update({
           draft_status: 'not_started',
+          scheduled_draft_time: null,
           settings: { ...settingsWithoutTimer, timerStartedAt: null }
-        })
+        } as any)
         .eq('id', leagueId);
 
       // Return new session ID for next draft
