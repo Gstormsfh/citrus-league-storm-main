@@ -2098,6 +2098,8 @@ const DraftRoom = () => {
       
       // Clear any old draft state and reset timer started flag
       setDraftState(null);
+      setDraftHistory([]);
+      setDraftedPlayerIds(new Set());
       setDraftTimerStarted(false); // Reset so commissioner must click "Start Draft Timer"
 
       // Load draft state immediately and keep retrying until it works
@@ -2737,7 +2739,7 @@ const DraftRoom = () => {
             )}
 
             {/* Simplified Sticky Header with Recent Pick + Queue + Draft Button */}
-            <div className="bg-card border-b sticky top-20 z-30 shadow-sm">
+            <div className="bg-card border-b sticky top-0 z-30 shadow-sm">
               <div className="container mx-auto px-4 py-3">
                 <div className="flex items-center justify-between gap-4">
                   {/* Left: Round/Pick Info */}
