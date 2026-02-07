@@ -1373,7 +1373,9 @@ const DraftRoom = () => {
 
       if (error) {
         logger.error('DraftService.makePick error:', error);
-        throw error;
+        // Extract message from various error formats (Supabase errors aren't Error instances)
+        const msg = error?.message || error?.details || error?.hint || JSON.stringify(error);
+        throw new Error(msg);
       }
 
       logger.log('Draft pick successful:', pick);
