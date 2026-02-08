@@ -55,6 +55,7 @@ interface DraftSettings {
   draftOrder: 'standard' | 'serpentine' | 'custom';
   scoringFormat: 'standard' | 'points' | 'categories';
   customOrder?: string[]; // Optional custom team order
+  effectiveOrder?: string[]; // The actual team order from DraftLobby (randomized/custom/default)
 }
 
 enum DraftPhase {
@@ -1850,10 +1851,12 @@ const DraftRoom = () => {
       // Initialize draft order
       const draftRounds = settings.rounds || league?.draft_rounds || 21;
       
-        // Determine which order to use: settings custom order > customDraftOrder (button) > randomized order > none
-        const orderToUse = settings.draftOrder === 'custom' && settings.customOrder
-          ? settings.customOrder
-          : (customDraftOrder || randomizedTeamOrder || undefined);
+        // Determine which order to use: effectiveOrder > settings custom order > customDraftOrder (button) > randomized order > none
+        const orderToUse = settings.effectiveOrder
+          || (settings.draftOrder === 'custom' && settings.customOrder ? settings.customOrder : undefined)
+          || customDraftOrder
+          || randomizedTeamOrder
+          || undefined;
         
         const { error: initError } = await DraftService.initializeDraftOrder(
           leagueId,
@@ -2010,13 +2013,18 @@ const DraftRoom = () => {
       // This ensures the randomized/custom order from the lobby is actually used,
       // rather than stale order rows from a previous draft attempt.
       const draftRounds = settings.rounds || league?.draft_rounds || 21;
-      const orderToUse = settings.draftOrder === 'custom' && settings.customOrder
-        ? settings.customOrder
-        : (customDraftOrder || randomizedTeamOrder || undefined);
+      // Priority: effectiveOrder from DraftLobby (most reliable) > settings.customOrder > local state > none
+      const orderToUse = settings.effectiveOrder
+        || (settings.draftOrder === 'custom' && settings.customOrder ? settings.customOrder : undefined)
+        || customDraftOrder
+        || randomizedTeamOrder
+        || undefined;
 
       logger.log('handleStartDraft: Initializing draft order', {
+        hasEffectiveOrder: !!settings.effectiveOrder,
         hasCustomOrder: !!orderToUse,
         orderLength: orderToUse?.length,
+        orderFirstTeam: orderToUse?.[0],
         draftRounds
       });
 

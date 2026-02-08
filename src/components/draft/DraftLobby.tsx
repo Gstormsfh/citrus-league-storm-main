@@ -47,6 +47,7 @@ interface DraftSettings {
   pickTimeLimit: number;
   draftOrder: 'standard' | 'serpentine' | 'custom';
   scoringFormat: 'standard' | 'points' | 'categories';
+  effectiveOrder?: string[]; // The actual team order to use (randomized, custom, or default)
 }
 
 interface DraftLobbyProps {
@@ -256,7 +257,12 @@ export const DraftLobby = ({
       });
       return;
     }
-    onStartDraft(settings);
+    // Include the effective draft order so DraftRoom always has the correct order
+    const effectiveOrder = getEffectiveDraftOrder();
+    onStartDraft({
+      ...settings,
+      effectiveOrder: effectiveOrder.length > 0 ? effectiveOrder : undefined
+    });
   };
 
   return (
@@ -882,7 +888,13 @@ Your Commissioner`);
                     {/* Impromptu Draft - Start immediately */}
                     {onPrepareDraft && (
                       <Button
-                        onClick={() => onPrepareDraft?.(settings)}
+                        onClick={() => {
+                          const effectiveOrder = getEffectiveDraftOrder();
+                          onPrepareDraft?.({
+                            ...settings,
+                            effectiveOrder: effectiveOrder.length > 0 ? effectiveOrder : undefined
+                          });
+                        }}
                         className="w-full"
                         disabled={teams.length < 4}
                       >
