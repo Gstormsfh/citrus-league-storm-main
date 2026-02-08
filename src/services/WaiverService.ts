@@ -70,22 +70,16 @@ export class WaiverService {
       }
 
       // Check if player is already rostered in this league
-      // team_lineups uses JSONB arrays (starters, bench, ir)
-      const { data: lineups } = await supabase
-        .from('team_lineups')
-        .select('starters, bench, ir')
-        .eq('league_id', leagueId);
+      // CRITICAL: Use roster_assignments (source of truth) instead of team_lineups
+      // team_lineups can get out of sync; roster_assignments is the atomic transactional table
+      const { data: existingAssignment } = await supabase
+        .from('roster_assignments')
+        .select('id')
+        .eq('league_id', leagueId)
+        .eq('player_id', playerId.toString())
+        .maybeSingle();
 
-      const isRostered = (lineups || []).some(lineup => {
-        const playerIdStr = playerId.toString();
-        return (
-          (lineup.starters as any[])?.includes(playerIdStr) ||
-          (lineup.bench as any[])?.includes(playerIdStr) ||
-          (lineup.ir as any[])?.includes(playerIdStr)
-        );
-      });
-
-      if (isRostered) {
+      if (existingAssignment) {
         return {
           player_id: playerId,
           is_available: false,
@@ -193,74 +187,105 @@ export class WaiverService {
   /**
    * Add a free agent (instant pickup - no waiver claim needed)
    * Only works if player is not game-locked
+   * IMPORTANT: Availability is checked by addPlayer() before calling this.
+   * Uses process_roster_move RPC to ensure roster_assignments stays in sync.
    */
   static async addFreeAgent(
     leagueId: string,
     teamId: string,
     playerId: number,
-    dropPlayerId: number | null = null
+    dropPlayerId: number | null = null,
+    userId?: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      // Check player availability
-      const availability = await this.checkPlayerAvailability(playerId, leagueId);
-      
-      if (!availability.is_available) {
+      // Get userId from team if not provided
+      let actualUserId = userId;
+      if (!actualUserId) {
+        const { data: team } = await supabase
+          .from('teams')
+          .select('owner_id')
+          .eq('id', teamId)
+          .single();
+        
+        if (!team || !team.owner_id) {
+          return {
+            success: false,
+            error: 'Team not found or has no owner'
+          };
+        }
+        actualUserId = team.owner_id;
+      }
+
+      // NOTE: Availability check is done in addPlayer() before this is called.
+      // No need to check again here — avoids redundant API calls.
+
+      // Use process_roster_move RPC (atomic transaction engine)
+      // This ensures roster_assignments (source of truth) stays in sync
+      const { data: result, error: rpcError } = await supabase.rpc('process_roster_move', {
+        p_league_id: leagueId,
+        p_user_id: actualUserId,
+        p_drop_player_id: dropPlayerId ? String(dropPlayerId) : null,
+        p_add_player_id: String(playerId),
+        p_transaction_source: 'Free Agent Add'
+      });
+
+      if (rpcError) {
         return {
           success: false,
-          error: availability.lock_reason || 'Player is game-locked. Submit a waiver claim instead.'
+          error: rpcError.message || 'Failed to add player'
         };
       }
 
+      const rpcResult = result as { status: string; message: string };
+      if (rpcResult.status === 'error') {
+        return {
+          success: false,
+          error: rpcResult.message || 'Failed to add player'
+        };
+      }
+
+      // After successful RPC, update team_lineups to reflect the change in UI
       // Get current lineup
       const { data: lineup } = await supabase
         .from('team_lineups')
         .select('starters, bench, ir, slot_assignments')
         .eq('league_id', leagueId)
         .eq('team_id', teamId)
-        .single();
+        .maybeSingle();
 
-      if (!lineup) {
-        return {
-          success: false,
-          error: 'Team lineup not found'
-        };
-      }
+      if (lineup) {
+        let newStarters = (lineup.starters as any[]) || [];
+        let newBench = (lineup.bench as any[]) || [];
+        let newIr = (lineup.ir as any[]) || [];
+        let newSlotAssignments = (lineup.slot_assignments as any) || {};
 
-      let newStarters = (lineup.starters as any[]) || [];
-      let newBench = (lineup.bench as any[]) || [];
-      let newIr = (lineup.ir as any[]) || [];
-      let newSlotAssignments = (lineup.slot_assignments as any) || {};
+        // Drop player if specified
+        if (dropPlayerId) {
+          const dropPlayerIdStr = dropPlayerId.toString();
+          newStarters = newStarters.filter(id => id !== dropPlayerIdStr);
+          newBench = newBench.filter(id => id !== dropPlayerIdStr);
+          newIr = newIr.filter(id => id !== dropPlayerIdStr);
+          delete newSlotAssignments[dropPlayerIdStr];
+        }
 
-      // Drop player if specified
-      if (dropPlayerId) {
-        const dropPlayerIdStr = dropPlayerId.toString();
-        newStarters = newStarters.filter(id => id !== dropPlayerIdStr);
-        newBench = newBench.filter(id => id !== dropPlayerIdStr);
-        newIr = newIr.filter(id => id !== dropPlayerIdStr);
-        delete newSlotAssignments[dropPlayerIdStr];
-      }
+        // Add new player to bench
+        const playerIdStr = playerId.toString();
+        if (!newBench.includes(playerIdStr)) {
+          newBench.push(playerIdStr);
+        }
 
-      // Add new player to bench
-      newBench.push(playerId.toString());
-
-      // Update lineup
-      const { error } = await supabase
-        .from('team_lineups')
-        .update({
-          starters: newStarters,
-          bench: newBench,
-          ir: newIr,
-          slot_assignments: newSlotAssignments,
-          updated_at: new Date().toISOString()
-        })
-        .eq('league_id', leagueId)
-        .eq('team_id', teamId);
-
-      if (error) {
-        return {
-          success: false,
-          error: error.message
-        };
+        // Update lineup (non-critical - if this fails, roster_assignments is still correct)
+        await supabase
+          .from('team_lineups')
+          .update({
+            starters: newStarters,
+            bench: newBench,
+            ir: newIr,
+            slot_assignments: newSlotAssignments,
+            updated_at: new Date().toISOString()
+          })
+          .eq('league_id', leagueId)
+          .eq('team_id', teamId);
       }
 
       return { success: true };
@@ -341,15 +366,34 @@ export class WaiverService {
     leagueId: string,
     teamId: string,
     playerId: number,
-    dropPlayerId: number | null = null
+    dropPlayerId: number | null = null,
+    userId?: string
   ): Promise<{ success: boolean; error?: string; claimId?: string; isFreeAgent?: boolean }> {
     try {
-      // Check if player is available for free agent pickup
-      const availability = await this.checkPlayerAvailability(playerId, leagueId);
+      // Get userId from team if not provided
+      let actualUserId = userId;
+      if (!actualUserId) {
+        const { data: team } = await supabase
+          .from('teams')
+          .select('owner_id')
+          .eq('id', teamId)
+          .single();
+        
+        if (!team || !team.owner_id) {
+          return {
+            success: false,
+            error: 'Team not found or has no owner'
+          };
+        }
+        actualUserId = team.owner_id;
+      }
+
+      // Check if player is available for free agent pickup (requires userId)
+      const availability = await this.checkPlayerAvailability(playerId, leagueId, actualUserId);
 
       if (availability.is_available) {
         // Free agent pickup (instant)
-        const result = await this.addFreeAgent(leagueId, teamId, playerId, dropPlayerId);
+        const result = await this.addFreeAgent(leagueId, teamId, playerId, dropPlayerId, actualUserId);
         return {
           ...result,
           isFreeAgent: true
@@ -498,18 +542,15 @@ export class WaiverService {
     searchTerm?: string
   ): Promise<any[]> {
     try {
-      // Get all rostered players in the league from JSONB arrays
-      const { data: lineups } = await supabase
-        .from('team_lineups')
-        .select('starters, bench, ir')
+      // CRITICAL: Use roster_assignments (source of truth) instead of team_lineups
+      // team_lineups JSONB arrays can get out of sync; roster_assignments is the atomic table
+      const { data: assignments } = await supabase
+        .from('roster_assignments')
+        .select('player_id')
         .eq('league_id', leagueId);
 
       const rosteredPlayerIds = new Set<string>();
-      (lineups || []).forEach(lineup => {
-        ((lineup.starters as any[]) || []).forEach(id => rosteredPlayerIds.add(String(id)));
-        ((lineup.bench as any[]) || []).forEach(id => rosteredPlayerIds.add(String(id)));
-        ((lineup.ir as any[]) || []).forEach(id => rosteredPlayerIds.add(String(id)));
-      });
+      (assignments || []).forEach(a => rosteredPlayerIds.add(String(a.player_id)));
 
       // Use PlayerService as the source of truth (handles all player data correctly)
       let players = await PlayerService.getAllPlayers();

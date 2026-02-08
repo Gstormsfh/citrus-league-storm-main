@@ -250,10 +250,17 @@ export const LeagueService = {
     rosterSize: number = 21,
     draftRounds: number = 21,
     settings: Record<string, any> = {},
-    scoringSettings?: Record<string, any>
+    scoringSettings?: Record<string, any>,
+    waiverSettings?: {
+      waiver_process_time?: string;
+      waiver_period_hours?: number;
+      waiver_game_lock?: boolean;
+      waiver_type?: 'rolling' | 'faab' | 'reverse_standings';
+      allow_trades_during_games?: boolean;
+    }
   ): Promise<{ league: League | null; team: Team | null; error: any }> {
     try {
-      // Create the league
+      // Create the league with waiver settings
       const { data: league, error: leagueError } = await supabase
         .from('leagues')
         .insert({
@@ -263,6 +270,12 @@ export const LeagueService = {
           draft_rounds: draftRounds,
           settings,
           scoring_settings: scoringSettings,
+          // Include waiver settings if provided
+          waiver_process_time: waiverSettings?.waiver_process_time || '03:00:00',
+          waiver_period_hours: waiverSettings?.waiver_period_hours || 48,
+          waiver_game_lock: waiverSettings?.waiver_game_lock !== undefined ? waiverSettings.waiver_game_lock : true,
+          waiver_type: waiverSettings?.waiver_type || 'rolling',
+          allow_trades_during_games: waiverSettings?.allow_trades_during_games !== undefined ? waiverSettings.allow_trades_during_games : true,
         })
         .select()
         .single();
@@ -399,10 +412,10 @@ async joinLeagueByCode(
   }
 },
 
-/**
- * Update waiver/trade settings for a league (commissioner only)
- */
-async updateWaiverSettings(
+  /**
+   * Update waiver/trade settings for a league (commissioner only)
+   */
+  async updateWaiverSettings(
     leagueId: string,
     userId: string,
     settings: {
@@ -424,10 +437,139 @@ async updateWaiverSettings(
         .eq('id', leagueId);
 
       if (error) throw error;
+      
+      // Create notification for all league members
+      await this.notifyLeagueMembers(leagueId, 'Commissioner changed waiver settings');
+      
       return { success: true, error: null };
     } catch (error) {
       console.error('Error updating waiver settings:', error);
       return { success: false, error };
+    }
+  },
+
+  /**
+   * Update scoring settings for a league (commissioner only)
+   */
+  async updateScoringSettings(
+    leagueId: string,
+    userId: string,
+    scoringSettings: {
+      skater?: Record<string, number>;
+      goalie?: Record<string, number>;
+    }
+  ): Promise<{ success: boolean; error: any }> {
+    try {
+      // CRITICAL: Verify user is commissioner (application-level security)
+      await LeagueMembershipService.requireCommissioner(leagueId, userId);
+
+      // Update the scoring settings
+      const { error } = await supabase
+        .from('leagues')
+        .update({ scoring_settings: scoringSettings })
+        .eq('id', leagueId);
+
+      if (error) throw error;
+      
+      // Create notification for all league members
+      await this.notifyLeagueMembers(leagueId, 'Commissioner changed scoring settings');
+      
+      return { success: true, error: null };
+    } catch (error) {
+      console.error('Error updating scoring settings:', error);
+      return { success: false, error };
+    }
+  },
+
+  /**
+   * Update draft settings for a league (commissioner only)
+   */
+  async updateDraftSettings(
+    leagueId: string,
+    userId: string,
+    draftSettings: {
+      draft_rounds?: number;
+      pickTimeLimit?: number;
+    }
+  ): Promise<{ success: boolean; error: any }> {
+    try {
+      // CRITICAL: Verify user is commissioner (application-level security)
+      await LeagueMembershipService.requireCommissioner(leagueId, userId);
+
+      // Get current settings to merge pickTimeLimit
+      const { data: currentLeague } = await supabase
+        .from('leagues')
+        .select('settings, draft_rounds')
+        .eq('id', leagueId)
+        .single();
+
+      const currentSettings = (currentLeague?.settings as Record<string, any>) || {};
+      
+      // Update the draft settings
+      const updateData: any = {};
+      if (draftSettings.draft_rounds !== undefined) {
+        updateData.draft_rounds = draftSettings.draft_rounds;
+      }
+      if (draftSettings.pickTimeLimit !== undefined) {
+        updateData.settings = {
+          ...currentSettings,
+          pickTimeLimit: draftSettings.pickTimeLimit,
+        };
+      }
+
+      const { error } = await supabase
+        .from('leagues')
+        .update(updateData)
+        .eq('id', leagueId);
+
+      if (error) throw error;
+      
+      // Create notification for all league members
+      await this.notifyLeagueMembers(leagueId, 'Commissioner changed draft settings');
+      
+      return { success: true, error: null };
+    } catch (error) {
+      console.error('Error updating draft settings:', error);
+      return { success: false, error };
+    }
+  },
+
+  /**
+   * Create a notification for all league members
+   * NOTE: notifications table schema requires:
+   *   - type: one of ('ADD', 'DROP', 'WAIVER', 'TRADE', 'CHAT', 'SYSTEM')
+   *   - title: TEXT NOT NULL
+   *   - message: TEXT NOT NULL
+   *   - read_status: BOOLEAN (not "read")
+   */
+  async notifyLeagueMembers(leagueId: string, message: string): Promise<void> {
+    try {
+      // Get all teams in the league
+      const { data: teams } = await supabase
+        .from('teams')
+        .select('owner_id')
+        .eq('league_id', leagueId)
+        .not('owner_id', 'is', null);
+
+      if (!teams || teams.length === 0) return;
+
+      // Create notifications for all team owners
+      const notifications = teams.map(team => ({
+        league_id: leagueId,
+        user_id: team.owner_id,
+        title: 'League Settings Changed',
+        message,
+        type: 'SYSTEM',
+        read_status: false,
+      }));
+
+      const { error } = await supabase.from('notifications').insert(notifications);
+      if (error) {
+        console.error('Error inserting notifications:', error);
+      }
+    } catch (error) {
+      console.error('Error creating notifications:', error);
+      // Don't throw - notification failure shouldn't block settings update
     }
   },
 
@@ -2741,18 +2883,27 @@ async updateWaiverSettings(
     error: any 
   }> {
     try {
-      // Get draft picks for this team
-      const { picks: draftPicks } = await DraftService.getDraftPicks(leagueId, userId);
-      const teamPicks = draftPicks.filter(p => p.team_id === teamId);
+      // CRITICAL FIX: Read from roster_assignments (source of truth) instead of draft_picks
+      // This ensures we get exactly the players that were synced by sync_roster_assignments_for_league
+      const { data: rosterAssignments, error: rosterError } = await supabase
+        .from('roster_assignments')
+        .select('player_id')
+        .eq('league_id', leagueId)
+        .eq('team_id', teamId);
       
-      if (teamPicks.length === 0) {
-        console.log(`No draft picks found for team ${teamId}`);
+      if (rosterError) {
+        console.error(`Error fetching roster_assignments for team ${teamId}:`, rosterError);
+        return { lineup: null, error: rosterError };
+      }
+      
+      if (!rosterAssignments || rosterAssignments.length === 0) {
+        console.log(`No roster assignments found for team ${teamId}`);
         return { lineup: null, error: null };
       }
 
-      // Map draft picks to players
-      const playerIds = teamPicks.map(p => p.player_id);
-      const teamPlayers = allPlayers.filter(p => playerIds.includes(p.id));
+      // Map roster assignments to players
+      const playerIds = rosterAssignments.map(r => r.player_id);
+      const teamPlayers = allPlayers.filter(p => playerIds.includes(String(p.id)));
 
       if (teamPlayers.length === 0) {
         console.log(`No players found for team ${teamId} draft picks`);

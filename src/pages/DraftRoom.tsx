@@ -1415,42 +1415,11 @@ const DraftRoom = () => {
       }
 
       // Check if draft is complete
+      // NOTE: DraftService.makePick already handles completion logic (status update, roster sync, matchup generation)
+      // We only need to update local state and show the completion screen here
       if (isComplete || activePicks.length >= teams.length * draftSettings.rounds) {
-        // Update league status (this will trigger matchup generation in DraftService.makePick)
-        await supabase
-          .from('leagues')
-          .update({ draft_status: 'completed' })
-          .eq('id', leagueId);
-        
-        // Update local state
+        // Update local state only - DraftService.makePick handles the rest
         setLeague(prev => prev ? { ...prev, draft_status: 'completed' } : null);
-        
-        // Generate matchups immediately after draft completion
-        try {
-          logger.log('DraftRoom: Generating matchups for entire season...');
-          const { MatchupService } = await import('@/services/MatchupService');
-          const { getFirstWeekStartDate, getDraftCompletionDate } = await import('@/utils/weekCalculator');
-          
-          const draftCompletionDate = getDraftCompletionDate(league!);
-          if (draftCompletionDate) {
-            const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
-            const { error: matchupError } = await MatchupService.generateMatchupsForLeague(
-              leagueId!,
-              teams,
-              firstWeekStart,
-              false
-            );
-            
-            if (matchupError) {
-              logger.error('DraftRoom: Error generating matchups:', matchupError);
-            } else {
-              logger.log('DraftRoom: Matchups generated successfully');
-            }
-          }
-        } catch (matchupGenError) {
-          logger.error('DraftRoom: Error generating matchups:', matchupGenError);
-          // Don't block draft completion if matchup generation fails
-        }
         
         // Show congratulations screen
         setDraftPhase(DraftPhase.COMPLETED);

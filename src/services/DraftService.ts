@@ -424,17 +424,8 @@ export const DraftService = {
         } else {
           logger.log('League status updated to completed successfully');
           
-          // Auto-initialize rosters for all teams
-          try {
-            logger.log('Initializing rosters for all teams...');
-            await this.initializeRostersForAllTeams(leagueId);
-            logger.log('Roster initialization complete');
-          } catch (rosterError) {
-            logger.error('Error initializing rosters:', rosterError);
-            // Don't fail the draft completion if roster init fails
-          }
-
-          // Sync roster_assignments from draft_picks (this is what the Roster page reads)
+          // CRITICAL: Sync roster_assignments FIRST (this is the source of truth)
+          // Then initialize team_lineups FROM roster_assignments to ensure consistency
           try {
             logger.log('Syncing roster_assignments from draft_picks...');
             const { data: syncResult, error: syncError } = await supabase
@@ -476,6 +467,16 @@ export const DraftService = {
               }
             } else {
               logger.log('Roster assignments synced:', syncResult);
+            }
+            
+            // NOW initialize team_lineups from roster_assignments (after sync is complete)
+            try {
+              logger.log('Initializing rosters for all teams from roster_assignments...');
+              await this.initializeRostersForAllTeams(leagueId);
+              logger.log('Roster initialization complete');
+            } catch (rosterError) {
+              logger.error('Error initializing rosters:', rosterError);
+              // Don't fail the draft completion if roster init fails
             }
           } catch (syncError) {
             logger.error('Error syncing roster_assignments:', syncError);
@@ -930,14 +931,24 @@ export const DraftService = {
       // Get all players (needed for lineup initialization)
       const allPlayers = await PlayerService.getAllPlayers();
 
+      // Get commissioner ID for initializeTeamLineup (needed for membership validation)
+      const { data: leagueData } = await supabase
+        .from('leagues')
+        .select('commissioner_id')
+        .eq('id', leagueId)
+        .single();
+      
+      const commissionerId = leagueData?.commissioner_id;
+
       // Initialize lineup for each team
       const results = await Promise.allSettled(
         teams.map(async (team) => {
+          // Use commissioner ID since we're initializing all teams post-draft
           const { lineup, error } = await LeagueService.initializeTeamLineup(
             team.id,
             leagueId,
             allPlayers,
-            userId
+            commissionerId || ''
           );
           
           if (error) {

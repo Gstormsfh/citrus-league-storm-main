@@ -933,7 +933,8 @@ const FreeAgents = () => {
         leagueId,
         teamData.id,
         playerIdNum,
-        null // No drop player specified
+        null, // No drop player specified
+        user.id // Pass userId for membership validation
       );
 
       if (result.success) {

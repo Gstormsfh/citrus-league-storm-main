@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { LeagueService, League, Team } from '@/services/LeagueService';
 import { WaiverService } from '@/services/WaiverService';
+import { supabase } from '@/integrations/supabase/client';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 
@@ -42,6 +44,25 @@ const LeagueDashboard = () => {
     waiver_type: 'rolling' as 'rolling' | 'faab' | 'reverse_standings',
     allow_trades_during_games: true,
   });
+  
+  // Scoring settings state
+  const [scoringSettings, setScoringSettings] = useState<{
+    skater?: Record<string, number>;
+    goalie?: Record<string, number>;
+  }>({});
+  
+  // Draft settings state
+  const [draftSettings, setDraftSettings] = useState({
+    draft_rounds: 21,
+    pickTimeLimit: 90,
+  });
+  
+  // Roster counts state (for roster overview tab)
+  const [rosterCounts, setRosterCounts] = useState<Record<string, number>>({});
+  const [loadingRosterCounts, setLoadingRosterCounts] = useState(false);
+  
+  // Active settings tab
+  const [activeSettingsTab, setActiveSettingsTab] = useState('waivers');
 
   useEffect(() => {
     if (!user) {
@@ -103,6 +124,17 @@ const LeagueDashboard = () => {
         waiver_game_lock: leagueData.waiver_game_lock ?? true,
         waiver_type: leagueData.waiver_type || 'rolling',
         allow_trades_during_games: leagueData.allow_trades_during_games ?? true,
+      });
+      
+      // Update scoring settings from league data
+      if (leagueData.scoring_settings) {
+        setScoringSettings(leagueData.scoring_settings);
+      }
+      
+      // Update draft settings from league data
+      setDraftSettings({
+        draft_rounds: leagueData.draft_rounds || 21,
+        pickTimeLimit: (leagueData.settings as any)?.pickTimeLimit || 90,
       });
 
       // Load teams
@@ -232,21 +264,74 @@ const LeagueDashboard = () => {
     });
   };
 
+  // Load roster counts when rosters tab is opened
+  useEffect(() => {
+    if (activeSettingsTab === 'rosters' && leagueId && teams.length > 0) {
+      const loadRosterCounts = async () => {
+        setLoadingRosterCounts(true);
+        const counts: Record<string, number> = {};
+        
+        for (const team of teams) {
+          const { count, error } = await supabase
+            .from('roster_assignments')
+            .select('*', { count: 'exact', head: true })
+            .eq('league_id', leagueId)
+            .eq('team_id', team.id);
+          
+          if (!error && count !== null) {
+            counts[team.id] = count;
+          } else {
+            counts[team.id] = 0;
+          }
+        }
+        
+        setRosterCounts(counts);
+        setLoadingRosterCounts(false);
+      };
+      
+      loadRosterCounts();
+    }
+  }, [activeSettingsTab, leagueId, teams]);
+  
   const handleSaveSettings = async () => {
     if (!leagueId || !user) return;
     
     setSavingSettings(true);
     try {
-      const { success, error: saveError } = await LeagueService.updateWaiverSettings(
-        leagueId,
-        user.id,
-        waiverSettings
-      );
+      let saved = false;
+      let errorMessage = '';
+      
+      // Save based on active tab
+      if (activeSettingsTab === 'waivers') {
+        const { success, error: saveError } = await LeagueService.updateWaiverSettings(
+          leagueId,
+          user.id,
+          waiverSettings
+        );
+        saved = success;
+        errorMessage = saveError?.message || 'Failed to save waiver settings';
+      } else if (activeSettingsTab === 'scoring') {
+        const { success, error: saveError } = await LeagueService.updateScoringSettings(
+          leagueId,
+          user.id,
+          scoringSettings
+        );
+        saved = success;
+        errorMessage = saveError?.message || 'Failed to save scoring settings';
+      } else if (activeSettingsTab === 'draft') {
+        const { success, error: saveError } = await LeagueService.updateDraftSettings(
+          leagueId,
+          user.id,
+          draftSettings
+        );
+        saved = success;
+        errorMessage = saveError?.message || 'Failed to save draft settings';
+      }
 
-      if (saveError || !success) {
+      if (!saved) {
         toast({
           title: 'Error',
-          description: saveError?.message || 'Failed to save settings',
+          description: errorMessage,
           variant: 'destructive',
         });
         return;
@@ -254,7 +339,7 @@ const LeagueDashboard = () => {
 
       toast({
         title: 'Settings Saved',
-        description: 'League waiver and trade settings have been updated.',
+        description: `League ${activeSettingsTab} settings have been updated. All league members have been notified.`,
       });
       setSettingsOpen(false);
       
@@ -313,6 +398,44 @@ const LeagueDashboard = () => {
       });
     } finally {
       setProcessingWaivers(false);
+    }
+  };
+
+  // Sync rosters from draft picks (commissioner only) - safety net for roster sync issues
+  const [syncingRosters, setSyncingRosters] = useState(false);
+  const handleSyncRosters = async () => {
+    if (!leagueId || !user || !isCommissioner) return;
+
+    setSyncingRosters(true);
+    try {
+      const { data: syncResult, error: syncError } = await supabase
+        .rpc('sync_roster_assignments_for_league', { p_league_id: leagueId });
+
+      if (syncError) {
+        toast({
+          title: 'Error',
+          description: syncError.message || 'Failed to sync rosters',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const playersSynced = syncResult?.players_synced || 0;
+      toast({
+        title: 'Rosters Synced',
+        description: `Successfully synced ${playersSynced} players to rosters.`,
+      });
+      
+      // Reload league data to reflect changes
+      loadLeagueData();
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: err.message || 'Failed to sync rosters',
+        variant: 'destructive',
+      });
+    } finally {
+      setSyncingRosters(false);
     }
   };
 
@@ -381,18 +504,27 @@ const LeagueDashboard = () => {
                         League Settings
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-[500px]">
+                    <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
                       <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                           <Settings className="h-5 w-5" />
                           League Settings
                         </DialogTitle>
                         <DialogDescription>
-                          Configure waiver wire and trade settings for your league.
+                          Configure all league settings. Changes will notify all league members.
                         </DialogDescription>
                       </DialogHeader>
                       
-                      <div className="space-y-6 py-4">
+                      <Tabs value={activeSettingsTab} onValueChange={setActiveSettingsTab} className="w-full">
+                        <TabsList className="grid w-full grid-cols-4">
+                          <TabsTrigger value="waivers">Waivers</TabsTrigger>
+                          <TabsTrigger value="scoring">Scoring</TabsTrigger>
+                          <TabsTrigger value="draft">Draft</TabsTrigger>
+                          <TabsTrigger value="rosters">Rosters</TabsTrigger>
+                        </TabsList>
+                        
+                        {/* Waiver Settings Tab */}
+                        <TabsContent value="waivers" className="space-y-6 py-4">
                         {/* Waiver Process Time */}
                         <div className="space-y-2">
                           <Label className="flex items-center gap-2">
@@ -502,7 +634,7 @@ const LeagueDashboard = () => {
                         </div>
 
                         {/* Manual Waiver Processing */}
-                        <div className="border-t pt-4 mt-4">
+                        <div className="border-t pt-4 mt-4 space-y-4">
                           <div className="flex items-center justify-between">
                             <div className="space-y-0.5">
                               <Label className="flex items-center gap-2">
@@ -532,8 +664,264 @@ const LeagueDashboard = () => {
                               )}
                             </Button>
                           </div>
+                          
+                          {/* Sync Rosters Button */}
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <Label className="flex items-center gap-2">
+                                <RefreshCw className="h-4 w-4" />
+                                Sync Rosters from Draft
+                              </Label>
+                              <p className="text-xs text-muted-foreground">
+                                Re-sync roster_assignments from draft_picks (safety net)
+                              </p>
+                            </div>
+                            <Button 
+                              variant="secondary" 
+                              size="sm"
+                              onClick={handleSyncRosters}
+                              disabled={syncingRosters}
+                            >
+                              {syncingRosters ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Syncing...
+                                </>
+                              ) : (
+                                <>
+                                  <RefreshCw className="mr-2 h-4 w-4" />
+                                  Sync Now
+                                </>
+                              )}
+                            </Button>
+                          </div>
                         </div>
-                      </div>
+                        </TabsContent>
+                        
+                        {/* Scoring Settings Tab */}
+                        <TabsContent value="scoring" className="space-y-6 py-4">
+                          <div className="space-y-4">
+                            <div>
+                              <h3 className="text-lg font-semibold mb-2">Skater Scoring</h3>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label>Goals</Label>
+                                  <Input
+                                    type="number"
+                                    step="0.1"
+                                    value={scoringSettings.skater?.goals || 3}
+                                    onChange={(e) => setScoringSettings(prev => ({
+                                      ...prev,
+                                      skater: { ...prev.skater, goals: parseFloat(e.target.value) || 0 }
+                                    }))}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Assists</Label>
+                                  <Input
+                                    type="number"
+                                    step="0.1"
+                                    value={scoringSettings.skater?.assists || 2}
+                                    onChange={(e) => setScoringSettings(prev => ({
+                                      ...prev,
+                                      skater: { ...prev.skater, assists: parseFloat(e.target.value) || 0 }
+                                    }))}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Power Play Points</Label>
+                                  <Input
+                                    type="number"
+                                    step="0.1"
+                                    value={scoringSettings.skater?.power_play_points || 1}
+                                    onChange={(e) => setScoringSettings(prev => ({
+                                      ...prev,
+                                      skater: { ...prev.skater, power_play_points: parseFloat(e.target.value) || 0 }
+                                    }))}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Shorthanded Points</Label>
+                                  <Input
+                                    type="number"
+                                    step="0.1"
+                                    value={scoringSettings.skater?.short_handed_points || 2}
+                                    onChange={(e) => setScoringSettings(prev => ({
+                                      ...prev,
+                                      skater: { ...prev.skater, short_handed_points: parseFloat(e.target.value) || 0 }
+                                    }))}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Shots on Goal</Label>
+                                  <Input
+                                    type="number"
+                                    step="0.1"
+                                    value={scoringSettings.skater?.shots_on_goal || 0.4}
+                                    onChange={(e) => setScoringSettings(prev => ({
+                                      ...prev,
+                                      skater: { ...prev.skater, shots_on_goal: parseFloat(e.target.value) || 0 }
+                                    }))}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Blocks</Label>
+                                  <Input
+                                    type="number"
+                                    step="0.1"
+                                    value={scoringSettings.skater?.blocks || 0.5}
+                                    onChange={(e) => setScoringSettings(prev => ({
+                                      ...prev,
+                                      skater: { ...prev.skater, blocks: parseFloat(e.target.value) || 0 }
+                                    }))}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Hits</Label>
+                                  <Input
+                                    type="number"
+                                    step="0.1"
+                                    value={scoringSettings.skater?.hits || 0.2}
+                                    onChange={(e) => setScoringSettings(prev => ({
+                                      ...prev,
+                                      skater: { ...prev.skater, hits: parseFloat(e.target.value) || 0 }
+                                    }))}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Penalty Minutes</Label>
+                                  <Input
+                                    type="number"
+                                    step="0.1"
+                                    value={scoringSettings.skater?.penalty_minutes || 0.5}
+                                    onChange={(e) => setScoringSettings(prev => ({
+                                      ...prev,
+                                      skater: { ...prev.skater, penalty_minutes: parseFloat(e.target.value) || 0 }
+                                    }))}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div>
+                              <h3 className="text-lg font-semibold mb-2">Goalie Scoring</h3>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label>Wins</Label>
+                                  <Input
+                                    type="number"
+                                    step="0.1"
+                                    value={scoringSettings.goalie?.wins || 4}
+                                    onChange={(e) => setScoringSettings(prev => ({
+                                      ...prev,
+                                      goalie: { ...prev.goalie, wins: parseFloat(e.target.value) || 0 }
+                                    }))}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Shutouts</Label>
+                                  <Input
+                                    type="number"
+                                    step="0.1"
+                                    value={scoringSettings.goalie?.shutouts || 3}
+                                    onChange={(e) => setScoringSettings(prev => ({
+                                      ...prev,
+                                      goalie: { ...prev.goalie, shutouts: parseFloat(e.target.value) || 0 }
+                                    }))}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Saves</Label>
+                                  <Input
+                                    type="number"
+                                    step="0.1"
+                                    value={scoringSettings.goalie?.saves || 0.2}
+                                    onChange={(e) => setScoringSettings(prev => ({
+                                      ...prev,
+                                      goalie: { ...prev.goalie, saves: parseFloat(e.target.value) || 0 }
+                                    }))}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Goals Against</Label>
+                                  <Input
+                                    type="number"
+                                    step="0.1"
+                                    value={scoringSettings.goalie?.goals_against || -1}
+                                    onChange={(e) => setScoringSettings(prev => ({
+                                      ...prev,
+                                      goalie: { ...prev.goalie, goals_against: parseFloat(e.target.value) || 0 }
+                                    }))}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </TabsContent>
+                        
+                        {/* Draft Settings Tab */}
+                        <TabsContent value="draft" className="space-y-6 py-4">
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <Label>Draft Rounds</Label>
+                              <Input
+                                type="number"
+                                value={draftSettings.draft_rounds}
+                                onChange={(e) => setDraftSettings(prev => ({
+                                  ...prev,
+                                  draft_rounds: parseInt(e.target.value) || 21
+                                }))}
+                                disabled={league?.draft_status === 'completed'}
+                              />
+                              {league?.draft_status === 'completed' && (
+                                <p className="text-xs text-muted-foreground">Draft is completed - rounds cannot be changed</p>
+                              )}
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label>Pick Time Limit (seconds)</Label>
+                              <Input
+                                type="number"
+                                value={draftSettings.pickTimeLimit}
+                                onChange={(e) => setDraftSettings(prev => ({
+                                  ...prev,
+                                  pickTimeLimit: parseInt(e.target.value) || 90
+                                }))}
+                                disabled={league?.draft_status === 'completed'}
+                              />
+                              {league?.draft_status === 'completed' && (
+                                <p className="text-xs text-muted-foreground">Draft is completed - time limit cannot be changed</p>
+                              )}
+                            </div>
+                          </div>
+                        </TabsContent>
+                        
+                        {/* Roster Overview Tab */}
+                        <TabsContent value="rosters" className="space-y-6 py-4">
+                          <div className="space-y-4">
+                            <h3 className="text-lg font-semibold">Team Rosters</h3>
+                            {loadingRosterCounts ? (
+                              <div className="text-center py-4">
+                                <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                                <p className="text-sm text-muted-foreground mt-2">Loading roster counts...</p>
+                              </div>
+                            ) : (
+                              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                                {teams.map((team) => (
+                                  <div key={team.id} className="flex items-center justify-between p-3 border rounded-lg">
+                                    <div>
+                                      <div className="font-medium">{team.team_name}</div>
+                                      <div className="text-sm text-muted-foreground">
+                                        {rosterCounts[team.id] ?? 0} players
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </TabsContent>
+                      </Tabs>
 
                       {/* League Invite Code Section */}
                       <div className="border-t pt-4 mt-4">
@@ -630,16 +1018,18 @@ Your Commissioner`);
                         <Button variant="outline" onClick={() => setSettingsOpen(false)}>
                           Cancel
                         </Button>
-                        <Button onClick={handleSaveSettings} disabled={savingSettings}>
-                          {savingSettings ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Saving...
-                            </>
-                          ) : (
-                            'Save Settings'
-                          )}
-                        </Button>
+                        {activeSettingsTab !== 'rosters' && (
+                          <Button onClick={handleSaveSettings} disabled={savingSettings}>
+                            {savingSettings ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Saving...
+                              </>
+                            ) : (
+                              'Save Settings'
+                            )}
+                          </Button>
+                        )}
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>

@@ -41,6 +41,16 @@ const CreateLeague = () => {
   const [draftRounds, setDraftRounds] = useState("21");
   const [scoringType, setScoringType] = useState("h2h-points");
   const [draftType, setDraftType] = useState("snake");
+  const [pickTimeLimit, setPickTimeLimit] = useState("90");
+  
+  // Waiver Settings State
+  const [waiverSettings, setWaiverSettings] = useState({
+    waiver_process_time: '03:00:00',
+    waiver_period_hours: 48,
+    waiver_game_lock: true,
+    waiver_type: 'rolling' as 'rolling' | 'faab' | 'reverse_standings',
+    allow_trades_during_games: true,
+  });
 
   // Join League Form State
   const [joinCode, setJoinCode] = useState("");
@@ -125,6 +135,7 @@ const CreateLeague = () => {
         scoringType: "h2h-points", // Only implemented format
         draftType: "snake", // Only implemented format
         stats: enabledStats,
+        pickTimeLimit: parseInt(pickTimeLimit), // Store pick time limit in settings
       };
 
       // Transform leagueStats array to scoring_settings JSONB format
@@ -153,7 +164,8 @@ const CreateLeague = () => {
         parseInt(draftRounds), // Roster size per team (matches draft rounds)
         parseInt(draftRounds), // Draft rounds from user selection
         settings,
-        scoringSettings // Pass transformed scoring settings
+        scoringSettings, // Pass transformed scoring settings
+        waiverSettings // Pass waiver settings
       );
 
       if (createError) throw createError;
@@ -408,6 +420,91 @@ const CreateLeague = () => {
                     </RadioGroup>
                   </div>
 
+                </div>
+
+                {/* Waiver Settings Section */}
+                <div className="border-t pt-6">
+                  <div className="mb-6">
+                    <h3 className="text-xl font-bold mb-2">Waiver Settings</h3>
+                    <p className="text-muted-foreground text-sm">Configure how waivers work in your league</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label>Waiver Process Time (EST)</Label>
+                      <Select 
+                        value={waiverSettings.waiver_process_time}
+                        onValueChange={(value) => setWaiverSettings(prev => ({ ...prev, waiver_process_time: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="00:00:00">12:00 AM (Midnight)</SelectItem>
+                          <SelectItem value="03:00:00">3:00 AM</SelectItem>
+                          <SelectItem value="06:00:00">6:00 AM</SelectItem>
+                          <SelectItem value="09:00:00">9:00 AM</SelectItem>
+                          <SelectItem value="12:00:00">12:00 PM (Noon)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Waiver Period (Hours)</Label>
+                      <Select 
+                        value={waiverSettings.waiver_period_hours.toString()}
+                        onValueChange={(value) => setWaiverSettings(prev => ({ ...prev, waiver_period_hours: parseInt(value) }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="24">24 hours (1 day)</SelectItem>
+                          <SelectItem value="48">48 hours (2 days)</SelectItem>
+                          <SelectItem value="72">72 hours (3 days)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Waiver Type</Label>
+                      <Select 
+                        value={waiverSettings.waiver_type}
+                        onValueChange={(value: 'rolling' | 'faab' | 'reverse_standings') => setWaiverSettings(prev => ({ ...prev, waiver_type: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="rolling">Rolling Priority</SelectItem>
+                          <SelectItem value="reverse_standings">Reverse Standings</SelectItem>
+                          <SelectItem value="faab">FAAB (Bidding)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Game Lock</Label>
+                      <div className="flex items-center space-x-2 pt-2">
+                        <Switch
+                          checked={waiverSettings.waiver_game_lock}
+                          onCheckedChange={(checked) => setWaiverSettings(prev => ({ ...prev, waiver_game_lock: checked }))}
+                        />
+                        <span className="text-sm text-muted-foreground">Lock players during/after games</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Allow Trades During Games</Label>
+                      <div className="flex items-center space-x-2 pt-2">
+                        <Switch
+                          checked={waiverSettings.allow_trades_during_games}
+                          onCheckedChange={(checked) => setWaiverSettings(prev => ({ ...prev, allow_trades_during_games: checked }))}
+                        />
+                        <span className="text-sm text-muted-foreground">Players can be traded even if game-locked</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="border-t pt-6">
