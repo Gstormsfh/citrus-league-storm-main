@@ -143,6 +143,53 @@ const Profile = () => {
     loadCommissionerLeagues();
   }, [user]);
 
+  // Password Management
+  const [passwords, setPasswords] = useState({
+    current: '',
+    new: '',
+    confirm: ''
+  });
+
+  // Preferences
+  const [preferences, setPreferences] = useState({
+    autoLineup: false,
+    emailNotifications: true,
+    pushNotifications: true,
+    darkMode: false,
+    publicProfile: true
+  });
+
+  // Commissioner leagues for reset
+  const [commissionerLeagues, setCommissionerLeagues] = useState<Array<{ id: string; name: string; draft_status: string }>>([]);
+  const [loadingLeagues, setLoadingLeagues] = useState(false);
+
+  // Commissioner League Settings State
+  const [selectedSettingsLeagueId, setSelectedSettingsLeagueId] = useState<string | null>(null);
+  const [selectedLeagueData, setSelectedLeagueData] = useState<any>(null);
+  const [selectedLeagueTeams, setSelectedLeagueTeams] = useState<any[]>([]);
+  const [commSettingsTab, setCommSettingsTab] = useState('waivers');
+  const [savingCommSettings, setSavingCommSettings] = useState(false);
+  const [processingWaivers, setProcessingWaivers] = useState(false);
+  const [syncingRosters, setSyncingRosters] = useState(false);
+  const [loadingCommSettings, setLoadingCommSettings] = useState(false);
+  const [commWaiverSettings, setCommWaiverSettings] = useState({
+    waiver_process_time: '03:00:00',
+    waiver_period_hours: 48,
+    waiver_game_lock: true,
+    waiver_type: 'rolling' as 'rolling' | 'faab' | 'reverse_standings',
+    allow_trades_during_games: true,
+  });
+  const [commScoringSettings, setCommScoringSettings] = useState<{
+    skater?: Record<string, number>;
+    goalie?: Record<string, number>;
+  }>({});
+  const [commDraftSettings, setCommDraftSettings] = useState({
+    draft_rounds: 21,
+    pickTimeLimit: 90,
+  });
+  const [commRosterCounts, setCommRosterCounts] = useState<Record<string, number>>({});
+  const [loadingRosterCounts, setLoadingRosterCounts] = useState(false);
+
   // Load full league data when a commissioner league is selected for settings
   useEffect(() => {
     const loadLeagueSettings = async () => {
@@ -380,53 +427,6 @@ const Profile = () => {
       setSyncingRosters(false);
     }
   };
-
-  // Password Management
-  const [passwords, setPasswords] = useState({
-    current: '',
-    new: '',
-    confirm: ''
-  });
-
-  // Preferences
-  const [preferences, setPreferences] = useState({
-    autoLineup: false,
-    emailNotifications: true,
-    pushNotifications: true,
-    darkMode: false,
-    publicProfile: true
-  });
-
-  // Commissioner leagues for reset
-  const [commissionerLeagues, setCommissionerLeagues] = useState<Array<{ id: string; name: string; draft_status: string }>>([]);
-  const [loadingLeagues, setLoadingLeagues] = useState(false);
-
-  // Commissioner League Settings State
-  const [selectedSettingsLeagueId, setSelectedSettingsLeagueId] = useState<string | null>(null);
-  const [selectedLeagueData, setSelectedLeagueData] = useState<any>(null);
-  const [selectedLeagueTeams, setSelectedLeagueTeams] = useState<any[]>([]);
-  const [commSettingsTab, setCommSettingsTab] = useState('waivers');
-  const [savingCommSettings, setSavingCommSettings] = useState(false);
-  const [processingWaivers, setProcessingWaivers] = useState(false);
-  const [syncingRosters, setSyncingRosters] = useState(false);
-  const [loadingCommSettings, setLoadingCommSettings] = useState(false);
-  const [commWaiverSettings, setCommWaiverSettings] = useState({
-    waiver_process_time: '03:00:00',
-    waiver_period_hours: 48,
-    waiver_game_lock: true,
-    waiver_type: 'rolling' as 'rolling' | 'faab' | 'reverse_standings',
-    allow_trades_during_games: true,
-  });
-  const [commScoringSettings, setCommScoringSettings] = useState<{
-    skater?: Record<string, number>;
-    goalie?: Record<string, number>;
-  }>({});
-  const [commDraftSettings, setCommDraftSettings] = useState({
-    draft_rounds: 21,
-    pickTimeLimit: 90,
-  });
-  const [commRosterCounts, setCommRosterCounts] = useState<Record<string, number>>({});
-  const [loadingRosterCounts, setLoadingRosterCounts] = useState(false);
 
   // User stats - will be populated from actual league data later
   const userStats = {
