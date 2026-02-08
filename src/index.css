@@ -175,6 +175,31 @@
     display: none;
   }
   
+  /* Styled scrollbar for horizontal scrolling - matches citrus theme */
+  .scrollbar-styled {
+    scrollbar-width: thin;
+    scrollbar-color: #7A9B7A #E8EED9; /* citrus-sage thumb on citrus-cream track */
+  }
+  
+  .scrollbar-styled::-webkit-scrollbar {
+    height: 8px; /* Horizontal scrollbar height */
+  }
+  
+  .scrollbar-styled::-webkit-scrollbar-track {
+    background: #E8EED9; /* citrus-cream background */
+    border-radius: 4px;
+  }
+  
+  .scrollbar-styled::-webkit-scrollbar-thumb {
+    background: #7A9B7A; /* citrus-sage color */
+    border-radius: 4px;
+    border: 1px solid #E8EED9;
+  }
+  
+  .scrollbar-styled::-webkit-scrollbar-thumb:hover {
+    background: #6A8B6A; /* Slightly darker on hover */
+  }
+  
   /* iOS-style segmented control */
   .ios-segmented {
     display: flex;

@@ -453,8 +453,8 @@ export const PlayerPool = ({
       </div>
 
       {/* Desktop: Full table view */}
-      <div className="hidden md:block border border-fantasy-border rounded-lg overflow-hidden bg-[#E8EED9]/50 backdrop-blur-sm">
-        <div className="overflow-x-auto">
+      <div className="hidden md:block border border-fantasy-border rounded-lg overflow-hidden bg-[#E8EED9]/50 backdrop-blur-sm max-w-full">
+        <div className="overflow-x-auto w-full scrollbar-styled">
           <table className="w-full min-w-[1200px] text-sm">
             <thead className="bg-fantasy-light/50 border-b border-fantasy-border">
               <tr>
