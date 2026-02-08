@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Clock, Pause, Play } from 'lucide-react';
@@ -9,7 +10,7 @@ interface DraftTimerProps {
   totalTime?: number;
 }
 
-export const DraftTimer = ({ timeRemaining, isActive, totalTime = 90 }: DraftTimerProps) => {
+export const DraftTimer = memo(({ timeRemaining, isActive, totalTime = 90 }: DraftTimerProps) => {
   const progress = ((totalTime - timeRemaining) / totalTime) * 100;
   const minutes = Math.floor(timeRemaining / 60);
   const seconds = timeRemaining % 60;
@@ -68,4 +69,4 @@ export const DraftTimer = ({ timeRemaining, isActive, totalTime = 90 }: DraftTim
       )}
     </Card>
   );
-};
+});

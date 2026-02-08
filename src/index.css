@@ -175,29 +175,34 @@
     display: none;
   }
   
-  /* Styled scrollbar for horizontal scrolling - matches citrus theme */
+  /* Styled scrollbar for both horizontal and vertical scrolling - matches citrus theme */
   .scrollbar-styled {
     scrollbar-width: thin;
     scrollbar-color: #7A9B7A #E8EED9; /* citrus-sage thumb on citrus-cream track */
   }
-  
+
   .scrollbar-styled::-webkit-scrollbar {
-    height: 8px; /* Horizontal scrollbar height */
+    height: 8px; /* Horizontal scrollbar */
+    width: 8px;  /* Vertical scrollbar */
   }
-  
+
   .scrollbar-styled::-webkit-scrollbar-track {
     background: #E8EED9; /* citrus-cream background */
-    border-radius: 4px;
+    border-radius: 100px;
   }
-  
+
   .scrollbar-styled::-webkit-scrollbar-thumb {
-    background: #7A9B7A; /* citrus-sage color */
-    border-radius: 4px;
-    border: 1px solid #E8EED9;
+    background: linear-gradient(180deg, #8BAF8B, #6A8B6A); /* citrus-sage gradient */
+    border-radius: 100px;
+    border: 2px solid #E8EED9;
   }
-  
+
   .scrollbar-styled::-webkit-scrollbar-thumb:hover {
-    background: #6A8B6A; /* Slightly darker on hover */
+    background: linear-gradient(180deg, #7A9B7A, #5A7B5A); /* Darker on hover */
+  }
+
+  .scrollbar-styled::-webkit-scrollbar-corner {
+    background: #E8EED9;
   }
   
   /* iOS-style segmented control */

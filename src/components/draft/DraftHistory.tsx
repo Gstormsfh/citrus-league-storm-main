@@ -37,7 +37,7 @@ export const DraftHistory = ({ draftHistory }: DraftHistoryProps) => {
       {draftHistory.length > 0 ? (
         <>
           {/* Mobile: Compact card list */}
-          <div className="md:hidden border border-fantasy-border rounded-lg overflow-hidden bg-[#E8EED9]/50 backdrop-blur-sm max-h-[60vh] overflow-y-auto">
+          <div className="md:hidden border border-fantasy-border rounded-lg overflow-hidden bg-[#E8EED9]/50 backdrop-blur-sm max-h-[60vh] overflow-y-auto scrollbar-styled">
             {sortedHistory.map((pick) => (
               <div key={pick.id} className="border-b border-fantasy-border/50 px-3 py-2 flex items-center gap-2">
                 <span className="text-xs font-bold text-primary w-8 flex-shrink-0">#{pick.pick}</span>
