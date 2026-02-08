@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback, startTransition } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
@@ -295,12 +295,9 @@ const DraftRoom = () => {
         setDraftState(demoDraftState);
         setDraftPhase(DraftPhase.COMPLETED);
         
-        // Load available players (only if not already loaded)
-        if (!playersLoadedRef.current) {
-          const allPlayers = await PlayerService.getAllPlayers();
-          setAvailablePlayers(allPlayers);
-          playersLoadedRef.current = true;
-        }
+        // Load available players
+        const allPlayers = await PlayerService.getAllPlayers();
+        setAvailablePlayers(allPlayers);
         
         // Set draft settings
         setDraftSettings({
@@ -608,7 +605,7 @@ const DraftRoom = () => {
   }, [leagueId, user, authLoading, userLeagueState, loadDraftData, loadUserLeague, navigate]);
 
 
-  // Optimized realtime subscription with incremental updates
+  // Debounced realtime subscription to reduce lag
   useEffect(() => {
     if (!leagueId || !user?.id) return;
 
@@ -616,32 +613,19 @@ const DraftRoom = () => {
     
     const unsubscribe = DraftService.subscribeToDraftPicks(leagueId, user.id, async (newPick) => {
       logger.debug('DraftRoom: New pick received via realtime:', newPick);
-      lastRealtimeUpdateRef.current = Date.now();
 
       // Debounce rapid updates - wait 300ms for more updates before processing
       clearTimeout(updateTimeout);
       updateTimeout = setTimeout(async () => {
-        // Use incremental update: append new pick to existing state instead of reloading all
-        setDraftHistory(prev => {
-          // Check if pick already exists (avoid duplicates)
-          const exists = prev.some(p => p.id === newPick.id);
-          if (exists) {
-            // Pick already exists, might be an update - reload to be safe
-            return prev;
-          }
-          // Append new pick
-          return [...prev, newPick].sort((a, b) => a.pick_number - b.pick_number);
-        });
+        // Reload all picks to ensure we have the latest state
+        const { picks } = await DraftService.getDraftPicks(leagueId, user.id);
+        const activePicks = picks.filter(p => !p.deleted_at);
 
-        // Update drafted player IDs incrementally
-        setDraftedPlayerIds(prev => {
-          const updated = new Set(prev);
-          updated.add(newPick.player_id);
-          return updated;
-        });
+        setDraftHistory(activePicks);
+        setDraftedPlayerIds(new Set(activePicks.map(p => p.player_id)));
 
         // Auto-start timer when picks exist (for ALL users)
-        if (!draftTimerStartedRef.current) {
+        if (activePicks.length >= 1 && !draftTimerStartedRef.current) {
           setDraftTimerStarted(true);
           draftTimerStartedRef.current = true;
         }
@@ -654,63 +638,35 @@ const DraftRoom = () => {
           .eq('id', leagueId)
           .single();
         if (freshLeague) {
-          startTransition(() => {
-            setLeague(prev => prev ? {
-              ...prev,
-              settings: freshLeague.settings || prev.settings,
-              draft_rounds: freshLeague.draft_rounds || prev.draft_rounds,
-              draft_status: freshLeague.draft_status || prev.draft_status
-            } : null);
-            if (freshLeague.settings?.pickTimeLimit) {
-              setDraftSettings(prev => ({ ...prev, pickTimeLimit: freshLeague.settings.pickTimeLimit }));
-            }
-          });
+          setLeague(prev => prev ? {
+            ...prev,
+            settings: freshLeague.settings || prev.settings,
+            draft_rounds: freshLeague.draft_rounds || prev.draft_rounds,
+            draft_status: freshLeague.draft_status || prev.draft_status
+          } : null);
+          if (freshLeague.settings?.pickTimeLimit) {
+            setDraftSettings(prev => ({ ...prev, pickTimeLimit: freshLeague.settings.pickTimeLimit }));
+          }
         }
 
-        // Only reload draft state if pick number changed significantly (every 5 picks or round change)
-        // This reduces expensive operations
-        const now = Date.now();
-        const shouldReloadState = (now - lastLoadDraftStateCallRef.current) > 2000 || // At least 2 seconds since last call
-          newPick.pick_number % 5 === 0; // Every 5 picks
-        
-        if (shouldReloadState) {
-          lastLoadDraftStateCallRef.current = now;
-          // Clear any pending loadDraftState call
-          if (loadDraftStateTimeoutRef.current) {
-            clearTimeout(loadDraftStateTimeoutRef.current);
-          }
-          // Debounce loadDraftState to avoid rapid calls
-          loadDraftStateTimeoutRef.current = setTimeout(async () => {
-            await loadDraftState();
-          }, 500);
-        }
+        // Reload draft state to update current pick/round/nextTeam
+        await loadDraftState();
       }, 300);
     });
 
     return () => {
       clearTimeout(updateTimeout);
-      if (loadDraftStateTimeoutRef.current) {
-        clearTimeout(loadDraftStateTimeoutRef.current);
-      }
       unsubscribe();
     };
-  }, [leagueId, user?.id]); // loadDraftState is stable and doesn't need to be in deps
+  }, [leagueId, user?.id]);
 
-  // POLLING FALLBACK: Reload picks + league every 10 seconds during active draft
-  // Only poll if real-time hasn't received updates in 15+ seconds (smart change detection)
+  // POLLING FALLBACK: Reload picks + league every 3 seconds during active draft
   // This ensures updates even if Supabase realtime has issues (like Yahoo/ESPN do)
   useEffect(() => {
     if (draftPhase !== DraftPhase.ACTIVE || !leagueId || !user?.id) return;
 
     const pollInterval = setInterval(async () => {
       try {
-        // Smart polling: Only poll if real-time hasn't received updates recently
-        const timeSinceLastRealtime = Date.now() - lastRealtimeUpdateRef.current;
-        if (timeSinceLastRealtime < 15000) {
-          // Real-time is working, skip this poll cycle
-          return;
-        }
-
         // Reload picks
         const { picks } = await DraftService.getDraftPicks(leagueId, user.id);
         const activePicks = picks.filter(p => !p.deleted_at);
@@ -734,28 +690,26 @@ const DraftRoom = () => {
           .single();
 
         if (freshLeague) {
-          startTransition(() => {
-            setLeague(prev => {
-              if (!prev) return prev;
-              // Only update if something changed
-              const settingsChanged = JSON.stringify(prev.settings) !== JSON.stringify(freshLeague.settings);
-              const statusChanged = prev.draft_status !== freshLeague.draft_status;
-              if (!settingsChanged && !statusChanged) return prev;
-              return {
-                ...prev,
-                settings: freshLeague.settings || prev.settings,
-                draft_rounds: freshLeague.draft_rounds || prev.draft_rounds,
-                draft_status: freshLeague.draft_status || prev.draft_status
-              };
-            });
-
-            if (freshLeague.settings?.pickTimeLimit) {
-              setDraftSettings(prev => {
-                if (prev.pickTimeLimit === freshLeague.settings.pickTimeLimit) return prev;
-                return { ...prev, pickTimeLimit: freshLeague.settings.pickTimeLimit };
-              });
-            }
+          setLeague(prev => {
+            if (!prev) return prev;
+            // Only update if something changed
+            const settingsChanged = JSON.stringify(prev.settings) !== JSON.stringify(freshLeague.settings);
+            const statusChanged = prev.draft_status !== freshLeague.draft_status;
+            if (!settingsChanged && !statusChanged) return prev;
+            return {
+              ...prev,
+              settings: freshLeague.settings || prev.settings,
+              draft_rounds: freshLeague.draft_rounds || prev.draft_rounds,
+              draft_status: freshLeague.draft_status || prev.draft_status
+            };
           });
+
+          if (freshLeague.settings?.pickTimeLimit) {
+            setDraftSettings(prev => {
+              if (prev.pickTimeLimit === freshLeague.settings.pickTimeLimit) return prev;
+              return { ...prev, pickTimeLimit: freshLeague.settings.pickTimeLimit };
+            });
+          }
 
           // Derive timer started from server
           if (freshLeague.settings?.timerStartedAt && !draftTimerStartedRef.current) {
@@ -777,20 +731,16 @@ const DraftRoom = () => {
           }
         }
 
-        // Only reload draft state if we haven't done so recently
-        const now = Date.now();
-        if (now - lastLoadDraftStateCallRef.current > 5000) {
-          lastLoadDraftStateCallRef.current = now;
-          await loadDraftState();
-        }
+        // Reload draft state to keep pick/round/team current
+        await loadDraftState();
       } catch (err) {
         // Silent fail - polling is best-effort
         logger.debug('DraftRoom: Poll error (non-critical):', err);
       }
-    }, 10000); // Increased from 3000ms to 10000ms (10 seconds)
+    }, 3000);
 
     return () => clearInterval(pollInterval);
-  }, [draftPhase, leagueId, user?.id]); // loadDraftState is stable and doesn't need to be in deps
+  }, [draftPhase, leagueId, user?.id]);
 
   // Reload teams when page becomes visible again (e.g., user changed team name in another tab)
   useEffect(() => {
@@ -814,9 +764,6 @@ const DraftRoom = () => {
   // Keep refs in sync with state for realtime callbacks (avoids stale closures)
   useEffect(() => { pickTimeLimitRef.current = draftSettings.pickTimeLimit; }, [draftSettings.pickTimeLimit]);
   useEffect(() => { draftTimerStartedRef.current = draftTimerStarted; }, [draftTimerStarted]);
-  useEffect(() => { teamsRef.current = teams; }, [teams]);
-  useEffect(() => { leagueRef.current = league; }, [league]);
-  useEffect(() => { draftPhaseRef.current = draftPhase; }, [draftPhase]);
 
   // Persist draft phase and timer state to sessionStorage for tab/page navigation resilience
   useEffect(() => {
@@ -832,7 +779,6 @@ const DraftRoom = () => {
 
   // Real-time subscription to league status changes
   // This allows non-commissioner members to auto-transition when the draft starts
-  // Uses refs to avoid unnecessary re-subscriptions
   useEffect(() => {
     if (!leagueId || !user?.id) return;
 
@@ -850,21 +796,14 @@ const DraftRoom = () => {
           const updatedLeague = payload.new as any;
           logger.debug('DraftRoom: League status changed via realtime:', updatedLeague.draft_status);
 
-          // Use refs to get current values (avoids stale closures)
-          const currentLeague = leagueRef.current;
-          const currentTeams = teamsRef.current;
-          const currentDraftPhase = draftPhaseRef.current;
-
           // Update local league state (including settings with timerStartedAt)
-          if (currentLeague) {
-            startTransition(() => {
-              setLeague({
-                ...currentLeague,
-                draft_status: updatedLeague.draft_status,
-                draft_rounds: updatedLeague.draft_rounds || currentLeague.draft_rounds,
-                settings: updatedLeague.settings || currentLeague.settings,
-                scheduled_draft_time: updatedLeague.scheduled_draft_time ?? currentLeague.scheduled_draft_time
-              });
+          if (league) {
+            setLeague({
+              ...league,
+              draft_status: updatedLeague.draft_status,
+              draft_rounds: updatedLeague.draft_rounds || league.draft_rounds,
+              settings: updatedLeague.settings || league.settings,
+              scheduled_draft_time: updatedLeague.scheduled_draft_time ?? league.scheduled_draft_time
             });
           }
 
@@ -886,7 +825,7 @@ const DraftRoom = () => {
           }
 
           // Handle draft reset (nuclear delete by commissioner)
-          if (updatedLeague.draft_status === 'not_started' && currentDraftPhase !== DraftPhase.LOBBY) {
+          if (updatedLeague.draft_status === 'not_started' && draftPhase !== DraftPhase.LOBBY) {
             logger.debug('DraftRoom: Draft was reset, returning to lobby');
             setDraftPhase(DraftPhase.LOBBY);
             setDraftState(null);
@@ -899,15 +838,15 @@ const DraftRoom = () => {
           }
 
           // When draft starts, pre-load state but stay in LOBBY with join banner
-          if (updatedLeague.draft_status === 'in_progress' && currentDraftPhase !== DraftPhase.ACTIVE) {
+          if (updatedLeague.draft_status === 'in_progress' && draftPhase !== DraftPhase.ACTIVE) {
             logger.debug('DraftRoom: Draft started by commissioner, showing join banner in lobby');
 
             // Pre-load draft state so it's ready when user clicks "Join"
             try {
               const { state: joinState } = await DraftService.getDraftState(
                 leagueId,
-                currentTeams,
-                updatedLeague.draft_rounds || currentLeague?.draft_rounds || 21,
+                teams,
+                updatedLeague.draft_rounds || league?.draft_rounds || 21,
                 user.id
               );
 
@@ -920,9 +859,9 @@ const DraftRoom = () => {
                     );
                     if (joinOrder && joinOrder.team_order && joinOrder.team_order.length > 0) {
                       const orderedTeams = joinOrder.team_order
-                        .map((teamId: string) => currentTeams.find(t => t.id === teamId))
+                        .map((teamId: string) => teams.find(t => t.id === teamId))
                         .filter((t: any): t is (Team & { owner_name?: string }) => t !== undefined);
-                      if (orderedTeams.length === currentTeams.length) {
+                      if (orderedTeams.length === teams.length) {
                         setOrderedTeamsForBoard(orderedTeams);
                       }
                     }
@@ -945,7 +884,7 @@ const DraftRoom = () => {
           }
 
           // Handle draft completion
-          if (updatedLeague.draft_status === 'completed' && currentDraftPhase !== DraftPhase.COMPLETED) {
+          if (updatedLeague.draft_status === 'completed' && draftPhase !== DraftPhase.COMPLETED) {
             logger.debug('DraftRoom: Draft completed via realtime');
             setDraftPhase(DraftPhase.COMPLETED);
             sessionStorage.removeItem(`draft_phase_${leagueId}`);
@@ -958,7 +897,7 @@ const DraftRoom = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [leagueId, user?.id]); // Removed draftPhase, teams, league from dependencies
+  }, [leagueId, user?.id, draftPhase, teams, league]);
 
   const loadDraftState = async (retryCount: number = 0): Promise<DraftState | null> => {
     if (!leagueId || !league) {
@@ -1156,13 +1095,6 @@ const DraftRoom = () => {
   // Refs for stale closure prevention in realtime subscription callbacks
   const pickTimeLimitRef = useRef(draftSettings.pickTimeLimit);
   const draftTimerStartedRef = useRef(false);
-  const lastRealtimeUpdateRef = useRef<number>(Date.now());
-  const teamsRef = useRef<(Team & { owner_name?: string })[]>([]);
-  const leagueRef = useRef<League | null>(null);
-  const loadDraftStateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastLoadDraftStateCallRef = useRef<number>(0);
-  const draftPhaseRef = useRef<DraftPhase>(DraftPhase.LOBBY);
-  const playersLoadedRef = useRef<boolean>(false);
   // Ref for handleAutoDraft to avoid stale closures in timer intervals
   const handleAutoDraftRef = useRef<() => void>(() => {});
 
@@ -2470,19 +2402,13 @@ const DraftRoom = () => {
   };
 
   // Memoize expensive data transformations
-  // Use Maps for O(1) lookups instead of O(n) find operations
   const transformedDraftHistory = useMemo(() => {
-    // Create lookup maps for better performance
-    const playersMap = new Map(availablePlayers.map(p => [p.id, p]));
-    const teamsMap = new Map(teams.map(t => [t.id, t]));
-    
     return draftHistory.map(p => {
-      const player = playersMap.get(p.player_id);
-      const team = teamsMap.get(p.team_id);
+      const player = availablePlayers.find(pl => pl.id === p.player_id);
       return {
         id: p.id,
         teamId: p.team_id,
-        teamName: team?.team_name || '',
+        teamName: teams.find(t => t.id === p.team_id)?.team_name || '',
         playerId: p.player_id,
         playerName: player?.full_name || 'Unknown Player',
         position: player?.position || '',
@@ -2505,14 +2431,9 @@ const DraftRoom = () => {
   // Handle player click to open stats modal
   const handlePlayerClick = async (playerId: string) => {
     try {
-      // Use cached players if available, otherwise load
-      let playersToUse = availablePlayers;
-      if (playersToUse.length === 0) {
-        playersToUse = await PlayerService.getAllPlayers();
-        setAvailablePlayers(playersToUse);
-        playersLoadedRef.current = true;
-      }
-      const player = playersToUse.find(p => p.id === playerId);
+      // Get player data
+      const allPlayers = await PlayerService.getAllPlayers();
+      const player = allPlayers.find(p => p.id === playerId);
       
       if (!player) {
         logger.error('Player not found:', playerId);
@@ -2655,10 +2576,8 @@ const DraftRoom = () => {
   const userDraftedPlayers = useMemo(() => {
     if (!userTeam) return [];
     const userPicks = draftHistory.filter(p => p.team_id === userTeam.id);
-    // Use Map for O(1) lookup instead of O(n) find
-    const playersMap = new Map(availablePlayers.map(p => [p.id, p]));
     return userPicks
-      .map(pick => playersMap.get(pick.player_id))
+      .map(pick => availablePlayers.find(p => p.id === pick.player_id))
       .filter((p): p is Player => p !== undefined);
   }, [draftHistory, userTeam, availablePlayers]);
 
