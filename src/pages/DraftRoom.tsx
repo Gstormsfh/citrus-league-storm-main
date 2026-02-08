@@ -132,10 +132,13 @@ const DraftRoom = () => {
         return;
       }
 
-      const firstLeague = leagues[0];
+      // Use activeLeagueId from context if available, otherwise fall back to first league
+      const targetLeague = activeLeagueId
+        ? leagues.find(l => l.id === activeLeagueId) || leagues[0]
+        : leagues[0];
       // Update URL using searchParams to avoid race condition
       const newSearchParams = new URLSearchParams(searchParams);
-      newSearchParams.set('league', firstLeague.id);
+      newSearchParams.set('league', targetLeague.id);
       navigate(`/draft-room?${newSearchParams.toString()}`, { replace: true });
     } catch (error: unknown) {
       setError('Failed to load your leagues. Please try again.');
