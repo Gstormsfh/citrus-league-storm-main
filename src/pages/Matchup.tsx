@@ -4442,7 +4442,7 @@ const Matchup = () => {
     // CRITICAL: selectedDate is NOT in this dependency array
     // Date changes are handled by a separate useEffect that uses frozenRostersByDate
     // This prevents full reload on every date click
-  }, [user?.id, userLeagueState, urlLeagueId, urlWeekId, selectedMatchupId]);
+  }, [user?.id, userLeagueState, urlLeagueId, urlWeekId, selectedMatchupId, activeLeagueId]);
 
   // ============================================================
   // DATE CHANGE HANDLER - Uses pre-loaded rosters for ALL dates

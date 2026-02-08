@@ -172,7 +172,7 @@ const Navbar = () => {
                   )}>League</NavigationMenuTrigger>
                   <NavigationMenuContent>
                     <div className="w-[340px] p-3 grid gap-3 grid-cols-2 bg-[#E8EED9]/60 backdrop-blur-sm corduroy-texture border-4 border-citrus-forest rounded-[1.5rem] shadow-[0_6px_0_rgba(27,48,34,0.25)]">
-                      <Link to="/matchup" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-xl bg-gradient-to-br from-citrus-sage/20 to-citrus-green-light/10 p-4 no-underline outline-none border-3 border-citrus-sage/40 hover:shadow-patch hover:-translate-y-1 transition-all duration-200">
+                      <Link to={activeLeagueId ? `/matchup/${activeLeagueId}` : '/matchup'} onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-xl bg-gradient-to-br from-citrus-sage/20 to-citrus-green-light/10 p-4 no-underline outline-none border-3 border-citrus-sage/40 hover:shadow-patch hover:-translate-y-1 transition-all duration-200">
                         <div className="mb-1 mt-2 text-base font-varsity font-black text-citrus-forest uppercase">Matchup</div>
                         <p className="text-xs leading-tight font-display text-citrus-charcoal">Current matchups</p>
                         <ChevronRight className="h-4 w-4 mt-2 text-citrus-orange" />
@@ -306,7 +306,10 @@ const Navbar = () => {
                           key={l.id}
                           onClick={() => {
                             setActiveLeagueId(l.id);
-                            // Stay on current page - don't navigate
+                            // If on a matchup page, navigate to the new league's matchup
+                            if (location.pathname.startsWith('/matchup')) {
+                              navigate(`/matchup/${l.id}`);
+                            }
                           }}
                           className={cn(
                             "cursor-pointer",
@@ -559,7 +562,7 @@ const Navbar = () => {
                 
                 {/* League Section */}
                 <MobileNavSection title="League">
-                  <Link to="/matchup" className="ios-list-item ios-pressable" onClick={closeMobileMenu}>
+                  <Link to={activeLeagueId ? `/matchup/${activeLeagueId}` : '/matchup'} className="ios-list-item ios-pressable" onClick={closeMobileMenu}>
                     <div className="w-8 h-8 rounded-lg bg-citrus-sage/20 flex items-center justify-center mr-3">
                       <Calendar className="h-4 w-4 text-citrus-sage" />
                     </div>

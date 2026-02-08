@@ -4,8 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Link } from 'react-router-dom';
 import { CitrusSlice, CitrusSparkle, CitrusLeaf } from '@/components/icons/CitrusIcons';
+import { useLeague } from '@/contexts/LeagueContext';
 
 const Footer = () => {
+  const league = useLeague();
+  const activeLeagueId = league?.activeLeagueId ?? null;
   return (
     <footer className="bg-[#D4E8B8] pt-20 pb-10 border-t-2 border-citrus-sage/40 relative overflow-hidden">
       {/* Rich green texture overlay */}
@@ -59,7 +62,7 @@ const Footer = () => {
             <ul className="space-y-3">
               <li><Link to="/features" className="text-citrus-forest hover:text-citrus-sage transition-colors font-sans">Features</Link></li>
               <li><Link to="/draft-room" className="text-citrus-forest hover:text-citrus-sage transition-colors font-sans">Draft Room</Link></li>
-              <li><Link to="/matchup" className="text-citrus-forest hover:text-citrus-sage transition-colors font-sans">Matchups</Link></li>
+              <li><Link to={activeLeagueId ? `/matchup/${activeLeagueId}` : '/matchup'} className="text-citrus-forest hover:text-citrus-sage transition-colors font-sans">Matchups</Link></li>
               <li><Link to="/roster" className="text-citrus-forest hover:text-citrus-sage transition-colors font-sans">Roster</Link></li>
               <li><Link to="/free-agents" className="text-citrus-forest hover:text-citrus-sage transition-colors font-sans">Free Agents</Link></li>
             </ul>
