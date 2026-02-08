@@ -155,19 +155,26 @@ export const PlayerService = {
 
     try {
       const DEFAULT_SEASON = 2025;
+      // CRITICAL: Supabase defaults to returning max 1000 rows per query.
+      // NHL has ~900+ players per season. Without .range(), some players silently drop off,
+      // causing drafted players to be missing from rosters.
+      // Use .range(0, 4999) to ensure ALL players are returned (max 5000).
       const [{ data: dirRowsRaw, error: dirErr }, { data: statRowsRaw, error: statErr }, { data: talentRowsRaw, error: talentErr }] = await Promise.all([
         (supabase as any)
           .from("player_directory")
           .select("season, player_id, full_name, team_abbrev, position_code, is_goalie, jersey_number, headshot_url")
-          .eq("season", DEFAULT_SEASON),
+          .eq("season", DEFAULT_SEASON)
+          .range(0, 4999),
         (supabase as any)
           .from("player_season_stats")
           .select("season, player_id, team_abbrev, position_code, is_goalie, games_played, icetime_seconds, nhl_toi_seconds, goals, primary_assists, secondary_assists, points, shots_on_goal, hits, blocks, pim, ppp, shp, plus_minus, nhl_plus_minus, nhl_goals, nhl_assists, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_ppp, nhl_shp, x_goals, x_assists, goalie_gp, wins, saves, shots_faced, goals_against, shutouts, save_pct, nhl_wins, nhl_losses, nhl_ot_losses, nhl_saves, nhl_shots_faced, nhl_goals_against, nhl_shutouts, nhl_save_pct, nhl_gaa")
-          .eq("season", DEFAULT_SEASON),
+          .eq("season", DEFAULT_SEASON)
+          .range(0, 4999),
         (supabase as any)
           .from("player_talent_metrics")
           .select("player_id, season, roster_status, is_ir_eligible")
-          .eq("season", DEFAULT_SEASON),
+          .eq("season", DEFAULT_SEASON)
+          .range(0, 4999),
       ]);
 
       if (dirErr) throw dirErr;

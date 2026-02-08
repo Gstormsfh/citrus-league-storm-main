@@ -1573,6 +1573,9 @@ async joinLeagueByCode(
           const validPlayerIds = new Set(currentRosterData.map((p: any) => String(p.player_id)));
           const invalidPlayerIds = allLineupPlayerIds.filter(id => !validPlayerIds.has(id));
           
+          // DIAGNOSTIC: Log validation counts
+          console.log(`[LINEUP VALIDATION] Team ${teamId}: ${allLineupPlayerIds.length} in lineup, ${currentRosterData.length} in roster_assignments, ${invalidPlayerIds.length} invalid`);
+          
           if (invalidPlayerIds.length > 0) {
             console.error('[LINEUP VALIDATION] ========================================');
             console.error('[LINEUP VALIDATION] CRITICAL: Lineup contains player IDs not in roster_assignments!');
@@ -2907,6 +2910,14 @@ async joinLeagueByCode(
       // Map roster assignments to players
       const playerIds = rosterAssignments.map(r => r.player_id);
       const teamPlayers = allPlayers.filter(p => playerIds.includes(String(p.id)));
+
+      // DIAGNOSTIC: Log match rate to detect player loss
+      console.log(`[initializeTeamLineup] Team ${teamId}: ${rosterAssignments.length} roster_assignments, ${teamPlayers.length} matched in allPlayers (${allPlayers.length} total)`);
+      if (teamPlayers.length < rosterAssignments.length) {
+        const matchedIds = new Set(teamPlayers.map(p => String(p.id)));
+        const unmatchedIds = playerIds.filter((id: string) => !matchedIds.has(String(id)));
+        console.error(`[initializeTeamLineup] Team ${teamId}: ⚠️ MISSING ${unmatchedIds.length} players! Unmatched IDs:`, unmatchedIds);
+      }
 
       if (teamPlayers.length === 0) {
         console.log(`No players found for team ${teamId} draft picks`);

@@ -408,6 +408,7 @@ const LeagueDashboard = () => {
 
     setSyncingRosters(true);
     try {
+      // Step 1: Sync roster_assignments from draft_picks
       const { data: syncResult, error: syncError } = await supabase
         .rpc('sync_roster_assignments_for_league', { p_league_id: leagueId });
 
@@ -421,10 +422,22 @@ const LeagueDashboard = () => {
       }
 
       const playersSynced = syncResult?.players_synced || 0;
-      toast({
-        title: 'Rosters Synced',
-        description: `Successfully synced ${playersSynced} players to rosters.`,
-      });
+
+      // Step 2: Also rebuild team_lineups from roster_assignments
+      try {
+        const { DraftService } = await import('@/services/DraftService');
+        await DraftService.initializeRostersForAllTeams(leagueId);
+        toast({
+          title: 'Rosters Synced',
+          description: `Synced ${playersSynced} players and rebuilt all team lineups.`,
+        });
+      } catch (lineupErr) {
+        console.error('Failed to rebuild team_lineups:', lineupErr);
+        toast({
+          title: 'Partial Sync',
+          description: `Synced ${playersSynced} players. Team lineups may need a page refresh.`,
+        });
+      }
       
       // Reload league data to reflect changes
       loadLeagueData();

@@ -529,11 +529,30 @@ const Roster = () => {
             const rosterAssignments = (rosterAssignmentsData || []) as any[];
             const playerIds = rosterAssignments.map((r: any) => r.player_id);
             
+            // DIAGNOSTIC: Log roster_assignments count and sample IDs
+            console.log(`[Roster] 📋 roster_assignments for team: ${rosterAssignments.length} entries`);
+            console.log(`[Roster] 📋 allPlayers available: ${allPlayers.length} total`);
+            if (rosterAssignments.length > 0) {
+              console.log(`[Roster] 📋 Sample roster player_ids (first 5):`, playerIds.slice(0, 5));
+              console.log(`[Roster] 📋 Sample allPlayers ids (first 5):`, allPlayers.slice(0, 5).map(p => p.id));
+              console.log(`[Roster] 📋 Type of roster player_id:`, typeof playerIds[0]);
+              console.log(`[Roster] 📋 Type of allPlayers id:`, typeof allPlayers[0]?.id);
+            }
             
             // CRITICAL: player_id is TEXT in DB, and p.id is STRING in allPlayers (PlayerService line 287)
-            // Compare strings to strings directly - no type conversion needed
-            dbPlayers = allPlayers.filter(p => playerIds.includes(p.id));
+            // Compare strings to strings directly — ensure both sides are strings
+            dbPlayers = allPlayers.filter(p => playerIds.includes(String(p.id)));
             
+            // DIAGNOSTIC: Log match results
+            console.log(`[Roster] 📋 Matched players: ${dbPlayers.length} out of ${rosterAssignments.length} roster_assignments`);
+            if (dbPlayers.length < rosterAssignments.length) {
+              // Find which player_ids didn't match
+              const matchedIds = new Set(dbPlayers.map(p => String(p.id)));
+              const unmatchedIds = playerIds.filter((id: string) => !matchedIds.has(String(id)));
+              console.error(`[Roster] ⚠️ MISSING ${unmatchedIds.length} players! Unmatched IDs:`, unmatchedIds);
+              console.error(`[Roster] ⚠️ These players exist in roster_assignments but NOT in PlayerService.getAllPlayers()`);
+              console.error(`[Roster] ⚠️ Possible causes: (1) player_directory doesn't have them, (2) player_season_stats doesn't have them, (3) Supabase row limit truncation`);
+            }
           }
         }
         
