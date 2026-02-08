@@ -207,7 +207,7 @@ export const WeeklySchedule = ({
                         </div>
                         <div className={cn(
                           "text-[10px] md:text-sm font-varsity font-black text-center leading-tight",
-                          myDailyPointsForDay !== undefined && myDailyPointsForDay > 0 ? "text-citrus-sage" : "text-citrus-charcoal/50"
+                          myDailyPointsForDay !== undefined && myDailyPointsForDay > 0 ? "text-citrus-forest" : "text-citrus-charcoal/50"
                         )}>
                           {myDailyPointsForDay !== undefined ? myDailyPointsForDay.toFixed(1) : '-'}
                         </div>
@@ -223,7 +223,7 @@ export const WeeklySchedule = ({
                         </div>
                         <div className={cn(
                           "text-[10px] md:text-sm font-varsity font-black text-center leading-tight",
-                          oppDailyPointsForDay !== undefined && oppDailyPointsForDay > 0 ? "text-citrus-peach" : "text-citrus-charcoal/50"
+                          oppDailyPointsForDay !== undefined && oppDailyPointsForDay > 0 ? "text-red-700" : "text-citrus-charcoal/50"
                         )}>
                           {oppDailyPointsForDay !== undefined ? oppDailyPointsForDay.toFixed(1) : '-'}
                         </div>
