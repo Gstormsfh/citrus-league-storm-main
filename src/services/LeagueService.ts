@@ -1550,8 +1550,10 @@ async joinLeagueByCode(
       slotAssignments: lineup.slotAssignments
     };
 
-    // VALIDATION: Ensure all player IDs in lineup are currently owned (in draft_picks)
-    // This prevents saving stale/dropped player IDs that would resurrect dropped players
+    // VALIDATION: Ensure all player IDs in lineup are currently owned
+    // CRITICAL FIX: Use roster_assignments (source of truth), NOT draft_picks
+    // draft_picks can have stale session data, deleted_at mismatches, and cross-session duplicates
+    // roster_assignments is the atomic, constraint-enforced source of truth
     try {
       const allLineupPlayerIds = [
         ...lineupToSave.starters,
@@ -1560,23 +1562,22 @@ async joinLeagueByCode(
       ];
       
       if (allLineupPlayerIds.length > 0) {
-        // Query draft_picks to get current roster
-        const { data: currentPicksData, error: picksError } = await supabase
-          .from('draft_picks')
+        // Query roster_assignments (source of truth) to get current roster
+        const { data: currentRosterData, error: rosterError } = await supabase
+          .from('roster_assignments')
           .select('player_id')
           .eq('team_id', String(teamId))
-          .eq('league_id', leagueId)
-          .is('deleted_at', null);
+          .eq('league_id', leagueId);
         
-        if (!picksError && currentPicksData) {
-          const validPlayerIds = new Set(currentPicksData.map((p: any) => String(p.player_id)));
+        if (!rosterError && currentRosterData) {
+          const validPlayerIds = new Set(currentRosterData.map((p: any) => String(p.player_id)));
           const invalidPlayerIds = allLineupPlayerIds.filter(id => !validPlayerIds.has(id));
           
           if (invalidPlayerIds.length > 0) {
             console.error('[LINEUP VALIDATION] ========================================');
-            console.error('[LINEUP VALIDATION] CRITICAL: Lineup contains DROPPED player IDs!');
+            console.error('[LINEUP VALIDATION] CRITICAL: Lineup contains player IDs not in roster_assignments!');
             console.error('[LINEUP VALIDATION] Invalid IDs:', invalidPlayerIds);
-            console.error('[LINEUP VALIDATION] These players are not in draft_picks (deleted_at IS NULL)');
+            console.error('[LINEUP VALIDATION] These players are not in roster_assignments (source of truth)');
             console.error('[LINEUP VALIDATION] Filtering them out before save...');
             console.error('[LINEUP VALIDATION] ========================================');
             
@@ -1598,6 +1599,8 @@ async joinLeagueByCode(
               ir: lineupToSave.ir.length
             });
           }
+        } else if (rosterError) {
+          console.warn('[LINEUP VALIDATION] Could not read roster_assignments, skipping validation:', rosterError);
         }
       }
     } catch (validationError) {
@@ -3019,7 +3022,11 @@ async joinLeagueByCode(
       };
 
       // Save lineup to Supabase (with league_id for isolation)
-      await this.saveLineup(teamId, leagueId, lineup);
+      // CRITICAL: Pass allowPlayerRemoval=true because during draft initialization,
+      // the team_lineups table may contain stale data from a previous draft session.
+      // Without this flag, the ROSTER PROTECTION guard would block the save
+      // (detecting that old players are being "removed"), preventing the new lineup from saving.
+      await this.saveLineup(teamId, leagueId, lineup, undefined, { allowPlayerRemoval: true });
 
       console.log(`Initialized lineup for team ${teamId}: ${starters.length} starters, ${bench.length} bench, ${ir.length} IR`);
       

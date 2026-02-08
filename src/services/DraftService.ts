@@ -433,12 +433,34 @@ export const DraftService = {
             if (syncError) {
               logger.error('RPC sync_roster_assignments failed:', syncError);
               // Fallback: directly insert into roster_assignments
+              // CRITICAL: Only use picks from the LATEST draft session to avoid cross-session contamination
               logger.log('Falling back to direct roster_assignments insert...');
-              const { data: draftPicksData } = await supabase
+              
+              // Find the latest draft session ID
+              const { data: latestPickData } = await supabase
+                .from('draft_picks')
+                .select('draft_session_id')
+                .eq('league_id', leagueId)
+                .is('deleted_at', null)
+                .order('picked_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+              
+              const latestSessionId = latestPickData?.draft_session_id;
+              logger.log('Latest draft session:', latestSessionId);
+              
+              let query = supabase
                 .from('draft_picks')
                 .select('league_id, team_id, player_id, picked_at')
                 .eq('league_id', leagueId)
                 .is('deleted_at', null);
+              
+              // Filter by session if we found one
+              if (latestSessionId) {
+                query = query.eq('draft_session_id', latestSessionId);
+              }
+              
+              const { data: draftPicksData } = await query;
 
               if (draftPicksData && draftPicksData.length > 0) {
                 // Delete existing assignments first
@@ -447,26 +469,57 @@ export const DraftService = {
                   .delete()
                   .eq('league_id', leagueId);
 
-                // Insert from draft picks
-                const assignments = draftPicksData.map(pick => ({
-                  league_id: pick.league_id,
-                  team_id: pick.team_id,
-                  player_id: pick.player_id,
-                  acquired_at: pick.picked_at || new Date().toISOString()
-                }));
+                // Insert from draft picks — use individual inserts to prevent
+                // one constraint violation from killing the entire batch
+                let insertedCount = 0;
+                let skippedCount = 0;
+                for (const pick of draftPicksData) {
+                  const { error: singleInsertError } = await supabase
+                    .from('roster_assignments')
+                    .upsert({
+                      league_id: pick.league_id,
+                      team_id: pick.team_id,
+                      player_id: pick.player_id,
+                      acquired_at: pick.picked_at || new Date().toISOString()
+                    }, { onConflict: 'league_id,player_id' });
 
-                const { error: insertError } = await supabase
-                  .from('roster_assignments')
-                  .insert(assignments);
+                  if (singleInsertError) {
+                    logger.warn(`Fallback: Skipped player ${pick.player_id} (${singleInsertError.message})`);
+                    skippedCount++;
+                  } else {
+                    insertedCount++;
+                  }
+                }
 
-                if (insertError) {
-                  logger.error('Fallback roster_assignments insert failed:', insertError);
-                } else {
-                  logger.log(`Fallback: Inserted ${assignments.length} roster assignments`);
+                logger.log(`Fallback: Inserted ${insertedCount} roster assignments, skipped ${skippedCount}`);
+                if (insertedCount < draftPicksData.length) {
+                  logger.warn(`Fallback: Expected ${draftPicksData.length}, only inserted ${insertedCount}`);
                 }
               }
             } else {
               logger.log('Roster assignments synced:', syncResult);
+              
+              // CRITICAL: Verify the sync actually inserted the right number of rows
+              // The RPC returns players_synced count — verify it matches draft_picks count
+              const syncData = syncResult as any;
+              if (syncData?.players_synced !== undefined) {
+                const { count: pickCount } = await supabase
+                  .from('draft_picks')
+                  .select('*', { count: 'exact', head: true })
+                  .eq('league_id', leagueId)
+                  .is('deleted_at', null);
+                  
+                if (pickCount && syncData.players_synced < pickCount) {
+                  logger.error(`SYNC MISMATCH: roster_assignments has ${syncData.players_synced} but draft_picks has ${pickCount} active picks`);
+                  logger.error('This means some draft picks were NOT synced to roster_assignments!');
+                  // Attempt a retry
+                  const { data: retryResult } = await supabase
+                    .rpc('sync_roster_assignments_for_league', { p_league_id: leagueId });
+                  logger.log('Retry sync result:', retryResult);
+                } else {
+                  logger.log(`✅ Sync verified: ${syncData.players_synced} roster assignments match ${pickCount} draft picks`);
+                }
+              }
             }
             
             // NOW initialize team_lineups from roster_assignments (after sync is complete)

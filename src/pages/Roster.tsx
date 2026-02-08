@@ -711,13 +711,14 @@ const Roster = () => {
         
         if (savedLineup && (savedLineup.starters?.length || 0) > 0) {
           // Restore saved lineup from team_lineups
-          // IMPORTANT: draft_picks (with deleted_at IS NULL) is the SOURCE OF TRUTH for roster membership
+          // IMPORTANT: roster_assignments is the SOURCE OF TRUTH for roster membership
           // team_lineups may contain stale player IDs from old drops - we MUST filter them out
+          // transformedPlayers is already built from roster_assignments (loaded above)
           
           // Helper to deduplicate IDs
           const uniqueIds = (ids: string[]) => Array.from(new Set(ids));
           
-          // Get current roster player IDs (from draft_picks query)
+          // Get current roster player IDs (from roster_assignments via transformedPlayers)
           const currentPlayerIds = new Set(transformedPlayers.map(p => String(p.id)));
           
           // Check for stale player IDs in saved lineup (indicates team_lineups needs cleanup)
@@ -3084,11 +3085,15 @@ const Roster = () => {
               setTransactions(newTransactions);
               
               // Trigger roster reload by calling loadRoster
-              // We'll extract loadRoster to be callable
+              // CRITICAL FIX: Use roster_assignments (source of truth), NOT draft_picks
+              // draft_picks can have cross-session duplicates; roster_assignments is atomic
               const allPlayers = await PlayerService.getAllPlayers();
-              const { picks: draftPicks } = await DraftService.getDraftPicks(userTeam.league_id, user.id);
-              const teamPicks = draftPicks.filter(p => p.team_id === userTeam.id);
-              const playerIds = teamPicks.map(p => p.player_id);
+              const { data: rosterData } = await supabase
+                .from('roster_assignments')
+                .select('player_id')
+                .eq('league_id', userTeam.league_id)
+                .eq('team_id', userTeam.id);
+              const playerIds = (rosterData || []).map((r: any) => r.player_id);
               const dbPlayers = allPlayers.filter(p => playerIds.includes(p.id));
               
               // Get lineup from database
