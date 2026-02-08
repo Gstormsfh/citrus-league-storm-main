@@ -798,45 +798,16 @@ const Matchup = () => {
           const myPoints = team1DailyPoints[i] || 0;
           const oppPoints = team2DailyPoints[i] || 0;
           
-          // If all daily points are zero (RPC returned zeros), try to calculate from matchupStats
-          // Otherwise use the actual daily points from RPC
-          if (totalDailyPoints < 0.1 && team1Roster.length > 0) {
-            // Try to calculate weekly totals from matchupStats (more reliable than total_points)
-            // Use league scoring settings for accurate calculation
-            const scorer = new ScoringCalculator(scoringSettings);
-            
-            const myWeeklyTotal = team1Roster.reduce((sum, p) => {
-              if (p.matchupStats) {
-                const isGoalie = p.position === 'G' || p.position === 'Goalie';
-                return sum + scorer.calculatePoints(p.matchupStats, isGoalie);
-              }
-              // Fallback to total_points or points
-              return sum + (p.total_points || p.points || 0);
-            }, 0);
-            
-            const oppWeeklyTotal = (team2Roster || []).reduce((sum, p) => {
-              if (p.matchupStats) {
-                const isGoalie = p.position === 'G' || p.position === 'Goalie';
-                return sum + scorer.calculatePoints(p.matchupStats, isGoalie);
-              }
-              // Fallback to total_points or points
-              return sum + (p.total_points || p.points || 0);
-            }, 0);
-            
-            // Only distribute if we have a meaningful total
-            if (myWeeklyTotal > 0.1 || oppWeeklyTotal > 0.1) {
-              // Distribute evenly across 7 days (simple approach for demo when RPC has no data)
-              calculatedTotals.set(dateStr, {
-                myTotal: myWeeklyTotal / 7,
-                oppTotal: oppWeeklyTotal / 7
-              });
-            } else {
-              // If still 0, use 0 (don't distribute)
-              calculatedTotals.set(dateStr, {
-                myTotal: 0,
-                oppTotal: 0
-              });
-            }
+          // If all daily points are zero (RPC returned zeros), initialize to 0
+          // The real per-day calculation (initialCalcDoneRef effect) will fill in
+          // correct values once dailyStatsByDate loads. Never distribute weekly
+          // totals evenly — that produces identical fake scores on every day
+          // including days with no NHL games.
+          if (totalDailyPoints < 0.1) {
+            calculatedTotals.set(dateStr, {
+              myTotal: 0,
+              oppTotal: 0
+            });
           } else {
             // Use actual daily points from RPC
             calculatedTotals.set(dateStr, {
