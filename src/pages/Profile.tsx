@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { LeagueService } from '@/services/LeagueService';
 import { DraftService } from '@/services/DraftService';
+import { WaiverService } from '@/services/WaiverService';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { 
   User, 
@@ -40,7 +42,11 @@ import {
   Check,
   Crown,
   RotateCcw,
-  AlertTriangle
+  AlertTriangle,
+  Clock,
+  RefreshCw,
+  Play,
+  Loader2
 } from 'lucide-react';
 
 const Profile = () => {
@@ -137,6 +143,244 @@ const Profile = () => {
     loadCommissionerLeagues();
   }, [user]);
 
+  // Load full league data when a commissioner league is selected for settings
+  useEffect(() => {
+    const loadLeagueSettings = async () => {
+      if (!selectedSettingsLeagueId || !user) return;
+      
+      setLoadingCommSettings(true);
+      try {
+        // Load league data
+        const { data: leagueData, error: leagueError } = await supabase
+          .from('leagues')
+          .select('*')
+          .eq('id', selectedSettingsLeagueId)
+          .single();
+        
+        if (leagueError) throw leagueError;
+        setSelectedLeagueData(leagueData);
+        
+        // Load teams for this league
+        const { data: teamsData, error: teamsError } = await supabase
+          .from('teams')
+          .select('*')
+          .eq('league_id', selectedSettingsLeagueId);
+        
+        if (!teamsError) {
+          setSelectedLeagueTeams(teamsData || []);
+        }
+        
+        // Initialize waiver settings from league data
+        if (leagueData?.settings) {
+          setCommWaiverSettings({
+            waiver_process_time: leagueData.settings.waiver_process_time || '03:00:00',
+            waiver_period_hours: leagueData.settings.waiver_period_hours || 48,
+            waiver_game_lock: leagueData.settings.waiver_game_lock ?? true,
+            waiver_type: leagueData.settings.waiver_type || 'rolling',
+            allow_trades_during_games: leagueData.settings.allow_trades_during_games ?? true,
+          });
+        }
+        
+        // Initialize scoring settings
+        if (leagueData?.scoring_settings) {
+          setCommScoringSettings(leagueData.scoring_settings);
+        } else {
+          setCommScoringSettings({
+            skater: { goals: 3, assists: 2, power_play_points: 1, short_handed_points: 2, shots_on_goal: 0.4, blocks: 0.5, hits: 0.2, penalty_minutes: 0.5 },
+            goalie: { wins: 4, shutouts: 3, saves: 0.2, goals_against: -1 }
+          });
+        }
+        
+        // Initialize draft settings
+        setCommDraftSettings({
+          draft_rounds: leagueData?.draft_rounds || 21,
+          pickTimeLimit: leagueData?.settings?.pickTimeLimit || 90,
+        });
+      } catch (error) {
+        console.error('Error loading league settings:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load league settings',
+          variant: 'destructive',
+        });
+      } finally {
+        setLoadingCommSettings(false);
+      }
+    };
+
+    loadLeagueSettings();
+  }, [selectedSettingsLeagueId, user]);
+
+  // Load roster counts when rosters tab is selected
+  useEffect(() => {
+    const loadRosterCounts = async () => {
+      if (commSettingsTab !== 'rosters' || !selectedSettingsLeagueId || selectedLeagueTeams.length === 0) return;
+      
+      setLoadingRosterCounts(true);
+      const counts: Record<string, number> = {};
+      
+      for (const team of selectedLeagueTeams) {
+        const { count, error } = await supabase
+          .from('roster_assignments')
+          .select('*', { count: 'exact', head: true })
+          .eq('league_id', selectedSettingsLeagueId)
+          .eq('team_id', team.id);
+        
+        if (!error && count !== null) {
+          counts[team.id] = count;
+        } else {
+          counts[team.id] = 0;
+        }
+      }
+      
+      setCommRosterCounts(counts);
+      setLoadingRosterCounts(false);
+    };
+
+    loadRosterCounts();
+  }, [commSettingsTab, selectedSettingsLeagueId, selectedLeagueTeams]);
+
+  // Auto-select first league when commissioner leagues load
+  useEffect(() => {
+    if (commissionerLeagues.length > 0 && !selectedSettingsLeagueId) {
+      setSelectedSettingsLeagueId(commissionerLeagues[0].id);
+    }
+  }, [commissionerLeagues]);
+
+  // Save commissioner league settings
+  const handleSaveCommSettings = async () => {
+    if (!selectedSettingsLeagueId || !user) return;
+    
+    setSavingCommSettings(true);
+    try {
+      let saved = false;
+      let errorMessage = '';
+      
+      if (commSettingsTab === 'waivers') {
+        const { success, error: saveError } = await LeagueService.updateWaiverSettings(
+          selectedSettingsLeagueId,
+          user.id,
+          commWaiverSettings
+        );
+        saved = success;
+        errorMessage = saveError?.message || 'Failed to save waiver settings';
+      } else if (commSettingsTab === 'scoring') {
+        const { success, error: saveError } = await LeagueService.updateScoringSettings(
+          selectedSettingsLeagueId,
+          user.id,
+          commScoringSettings
+        );
+        saved = success;
+        errorMessage = saveError?.message || 'Failed to save scoring settings';
+      } else if (commSettingsTab === 'draft') {
+        const { success, error: saveError } = await LeagueService.updateDraftSettings(
+          selectedSettingsLeagueId,
+          user.id,
+          commDraftSettings
+        );
+        saved = success;
+        errorMessage = saveError?.message || 'Failed to save draft settings';
+      }
+
+      if (!saved) {
+        toast({
+          title: 'Error',
+          description: errorMessage,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Settings Saved',
+        description: `League ${commSettingsTab} settings have been updated. All league members have been notified.`,
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: err.message || 'Failed to save settings',
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingCommSettings(false);
+    }
+  };
+
+  // Process waivers for selected league
+  const handleCommProcessWaivers = async () => {
+    if (!selectedSettingsLeagueId || !user) return;
+
+    setProcessingWaivers(true);
+    try {
+      const result = await WaiverService.processAllPendingWaivers();
+
+      if (!result.success) {
+        toast({
+          title: 'Error',
+          description: result.error || 'Failed to process waivers',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const leagueResult = result.results.find(r => r.league_id === selectedSettingsLeagueId);
+      
+      if (leagueResult && leagueResult.total_processed > 0) {
+        toast({
+          title: 'Waivers Processed',
+          description: `Processed ${leagueResult.total_processed} claims: ${leagueResult.successful} successful, ${leagueResult.failed} failed`,
+        });
+      } else {
+        toast({
+          title: 'No Pending Claims',
+          description: 'There are no pending waiver claims to process.',
+        });
+      }
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: err.message || 'Failed to process waivers',
+        variant: 'destructive',
+      });
+    } finally {
+      setProcessingWaivers(false);
+    }
+  };
+
+  // Sync rosters for selected league
+  const handleCommSyncRosters = async () => {
+    if (!selectedSettingsLeagueId || !user) return;
+
+    setSyncingRosters(true);
+    try {
+      const { data: syncResult, error: syncError } = await supabase
+        .rpc('sync_roster_assignments_for_league', { p_league_id: selectedSettingsLeagueId });
+
+      if (syncError) {
+        toast({
+          title: 'Error',
+          description: syncError.message || 'Failed to sync rosters',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const playersSynced = syncResult?.players_synced || 0;
+      toast({
+        title: 'Rosters Synced',
+        description: `Successfully synced ${playersSynced} players to rosters.`,
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: err.message || 'Failed to sync rosters',
+        variant: 'destructive',
+      });
+    } finally {
+      setSyncingRosters(false);
+    }
+  };
+
   // Password Management
   const [passwords, setPasswords] = useState({
     current: '',
@@ -156,6 +400,33 @@ const Profile = () => {
   // Commissioner leagues for reset
   const [commissionerLeagues, setCommissionerLeagues] = useState<Array<{ id: string; name: string; draft_status: string }>>([]);
   const [loadingLeagues, setLoadingLeagues] = useState(false);
+
+  // Commissioner League Settings State
+  const [selectedSettingsLeagueId, setSelectedSettingsLeagueId] = useState<string | null>(null);
+  const [selectedLeagueData, setSelectedLeagueData] = useState<any>(null);
+  const [selectedLeagueTeams, setSelectedLeagueTeams] = useState<any[]>([]);
+  const [commSettingsTab, setCommSettingsTab] = useState('waivers');
+  const [savingCommSettings, setSavingCommSettings] = useState(false);
+  const [processingWaivers, setProcessingWaivers] = useState(false);
+  const [syncingRosters, setSyncingRosters] = useState(false);
+  const [loadingCommSettings, setLoadingCommSettings] = useState(false);
+  const [commWaiverSettings, setCommWaiverSettings] = useState({
+    waiver_process_time: '03:00:00',
+    waiver_period_hours: 48,
+    waiver_game_lock: true,
+    waiver_type: 'rolling' as 'rolling' | 'faab' | 'reverse_standings',
+    allow_trades_during_games: true,
+  });
+  const [commScoringSettings, setCommScoringSettings] = useState<{
+    skater?: Record<string, number>;
+    goalie?: Record<string, number>;
+  }>({});
+  const [commDraftSettings, setCommDraftSettings] = useState({
+    draft_rounds: 21,
+    pickTimeLimit: 90,
+  });
+  const [commRosterCounts, setCommRosterCounts] = useState<Record<string, number>>({});
+  const [loadingRosterCounts, setLoadingRosterCounts] = useState(false);
 
   // User stats - will be populated from actual league data later
   const userStats = {
@@ -933,6 +1204,355 @@ const Profile = () => {
                             This action cannot be undone. Only reset if you need to start the draft completely fresh.
                           </p>
                         </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Commissioner League Settings — Full Settings Panel */}
+                  {commissionerLeagues.length > 0 && (
+                    <Card className="animated-element lg:col-span-2 border-primary/20">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Crown className="h-5 w-5 text-primary" />
+                          Commissioner League Settings
+                        </CardTitle>
+                        <CardDescription>
+                          Configure waivers, scoring, draft, and rosters for leagues you commission. Changes will notify all league members.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-6">
+                        {/* League Selector */}
+                        <div className="space-y-2">
+                          <Label>Select League</Label>
+                          <Select
+                            value={selectedSettingsLeagueId || ''}
+                            onValueChange={(value) => setSelectedSettingsLeagueId(value)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a league to configure" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {commissionerLeagues.map((league) => (
+                                <SelectItem key={league.id} value={league.id}>
+                                  {league.name} ({league.draft_status.replace('_', ' ')})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        {loadingCommSettings ? (
+                          <div className="text-center py-8">
+                            <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                            <p className="text-sm text-muted-foreground mt-2">Loading league settings...</p>
+                          </div>
+                        ) : selectedSettingsLeagueId && selectedLeagueData ? (
+                          <Tabs value={commSettingsTab} onValueChange={setCommSettingsTab} className="w-full">
+                            <TabsList className="grid w-full grid-cols-4">
+                              <TabsTrigger value="waivers">Waivers</TabsTrigger>
+                              <TabsTrigger value="scoring">Scoring</TabsTrigger>
+                              <TabsTrigger value="draft">Draft</TabsTrigger>
+                              <TabsTrigger value="rosters">Rosters</TabsTrigger>
+                            </TabsList>
+
+                            {/* Waiver Settings Tab */}
+                            <TabsContent value="waivers" className="space-y-6 py-4">
+                              <div className="space-y-2">
+                                <Label className="flex items-center gap-2">
+                                  <Clock className="h-4 w-4" />
+                                  Waiver Process Time (EST)
+                                </Label>
+                                <Select
+                                  value={commWaiverSettings.waiver_process_time}
+                                  onValueChange={(value) => setCommWaiverSettings(prev => ({ ...prev, waiver_process_time: value }))}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="00:00:00">12:00 AM (Midnight)</SelectItem>
+                                    <SelectItem value="03:00:00">3:00 AM</SelectItem>
+                                    <SelectItem value="06:00:00">6:00 AM</SelectItem>
+                                    <SelectItem value="09:00:00">9:00 AM</SelectItem>
+                                    <SelectItem value="12:00:00">12:00 PM (Noon)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <p className="text-xs text-muted-foreground">Time when waiver claims are processed daily</p>
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label className="flex items-center gap-2">
+                                  <RefreshCw className="h-4 w-4" />
+                                  Waiver Period (Hours)
+                                </Label>
+                                <Select
+                                  value={commWaiverSettings.waiver_period_hours.toString()}
+                                  onValueChange={(value) => setCommWaiverSettings(prev => ({ ...prev, waiver_period_hours: parseInt(value) }))}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="24">24 hours (1 day)</SelectItem>
+                                    <SelectItem value="48">48 hours (2 days)</SelectItem>
+                                    <SelectItem value="72">72 hours (3 days)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <p className="text-xs text-muted-foreground">How long dropped players stay on waivers</p>
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label className="flex items-center gap-2">
+                                  <Trophy className="h-4 w-4" />
+                                  Waiver Type
+                                </Label>
+                                <Select
+                                  value={commWaiverSettings.waiver_type}
+                                  onValueChange={(value: 'rolling' | 'faab' | 'reverse_standings') => setCommWaiverSettings(prev => ({ ...prev, waiver_type: value }))}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="rolling">Rolling Priority</SelectItem>
+                                    <SelectItem value="reverse_standings">Reverse Standings</SelectItem>
+                                    <SelectItem value="faab">FAAB (Bidding)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <p className="text-xs text-muted-foreground">Rolling: Priority moves after claim. Reverse: Worst team gets priority.</p>
+                              </div>
+
+                              <div className="flex items-center justify-between">
+                                <div className="space-y-0.5">
+                                  <Label className="flex items-center gap-2">
+                                    <Shield className="h-4 w-4" />
+                                    Game Lock
+                                  </Label>
+                                  <p className="text-xs text-muted-foreground">Lock players during/after their games</p>
+                                </div>
+                                <Switch
+                                  checked={commWaiverSettings.waiver_game_lock}
+                                  onCheckedChange={(checked) => setCommWaiverSettings(prev => ({ ...prev, waiver_game_lock: checked }))}
+                                />
+                              </div>
+
+                              <div className="flex items-center justify-between">
+                                <div className="space-y-0.5">
+                                  <Label className="flex items-center gap-2">
+                                    <RefreshCw className="h-4 w-4" />
+                                    Allow Trades During Games
+                                  </Label>
+                                  <p className="text-xs text-muted-foreground">Players can be traded even if game-locked</p>
+                                </div>
+                                <Switch
+                                  checked={commWaiverSettings.allow_trades_during_games}
+                                  onCheckedChange={(checked) => setCommWaiverSettings(prev => ({ ...prev, allow_trades_during_games: checked }))}
+                                />
+                              </div>
+
+                              {/* Manual Waiver Processing & Sync Rosters */}
+                              <div className="border-t pt-4 mt-4 space-y-4">
+                                <div className="flex items-center justify-between">
+                                  <div className="space-y-0.5">
+                                    <Label className="flex items-center gap-2">
+                                      <Play className="h-4 w-4" />
+                                      Process Waivers Now
+                                    </Label>
+                                    <p className="text-xs text-muted-foreground">Manually process all pending waiver claims</p>
+                                  </div>
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={handleCommProcessWaivers}
+                                    disabled={processingWaivers}
+                                  >
+                                    {processingWaivers ? (
+                                      <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Processing...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <RefreshCw className="mr-2 h-4 w-4" />
+                                        Process Now
+                                      </>
+                                    )}
+                                  </Button>
+                                </div>
+
+                                <div className="flex items-center justify-between">
+                                  <div className="space-y-0.5">
+                                    <Label className="flex items-center gap-2">
+                                      <RefreshCw className="h-4 w-4" />
+                                      Sync Rosters from Draft
+                                    </Label>
+                                    <p className="text-xs text-muted-foreground">Re-sync roster assignments from draft picks</p>
+                                  </div>
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={handleCommSyncRosters}
+                                    disabled={syncingRosters}
+                                  >
+                                    {syncingRosters ? (
+                                      <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Syncing...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <RefreshCw className="mr-2 h-4 w-4" />
+                                        Sync Now
+                                      </>
+                                    )}
+                                  </Button>
+                                </div>
+                              </div>
+                            </TabsContent>
+
+                            {/* Scoring Settings Tab */}
+                            <TabsContent value="scoring" className="space-y-6 py-4">
+                              <div className="space-y-4">
+                                <div>
+                                  <h3 className="text-lg font-semibold mb-2">Skater Scoring</h3>
+                                  <div className="grid grid-cols-2 gap-4">
+                                    {[
+                                      { key: 'goals', label: 'Goals', default: 3 },
+                                      { key: 'assists', label: 'Assists', default: 2 },
+                                      { key: 'power_play_points', label: 'Power Play Points', default: 1 },
+                                      { key: 'short_handed_points', label: 'Shorthanded Points', default: 2 },
+                                      { key: 'shots_on_goal', label: 'Shots on Goal', default: 0.4 },
+                                      { key: 'blocks', label: 'Blocks', default: 0.5 },
+                                      { key: 'hits', label: 'Hits', default: 0.2 },
+                                      { key: 'penalty_minutes', label: 'Penalty Minutes', default: 0.5 },
+                                    ].map(stat => (
+                                      <div key={stat.key} className="space-y-2">
+                                        <Label>{stat.label}</Label>
+                                        <Input
+                                          type="number"
+                                          step="0.1"
+                                          value={commScoringSettings.skater?.[stat.key] ?? stat.default}
+                                          onChange={(e) => setCommScoringSettings(prev => ({
+                                            ...prev,
+                                            skater: { ...prev.skater, [stat.key]: parseFloat(e.target.value) || 0 }
+                                          }))}
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <h3 className="text-lg font-semibold mb-2">Goalie Scoring</h3>
+                                  <div className="grid grid-cols-2 gap-4">
+                                    {[
+                                      { key: 'wins', label: 'Wins', default: 4 },
+                                      { key: 'shutouts', label: 'Shutouts', default: 3 },
+                                      { key: 'saves', label: 'Saves', default: 0.2 },
+                                      { key: 'goals_against', label: 'Goals Against', default: -1 },
+                                    ].map(stat => (
+                                      <div key={stat.key} className="space-y-2">
+                                        <Label>{stat.label}</Label>
+                                        <Input
+                                          type="number"
+                                          step="0.1"
+                                          value={commScoringSettings.goalie?.[stat.key] ?? stat.default}
+                                          onChange={(e) => setCommScoringSettings(prev => ({
+                                            ...prev,
+                                            goalie: { ...prev.goalie, [stat.key]: parseFloat(e.target.value) || 0 }
+                                          }))}
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            </TabsContent>
+
+                            {/* Draft Settings Tab */}
+                            <TabsContent value="draft" className="space-y-6 py-4">
+                              <div className="space-y-4">
+                                <div className="space-y-2">
+                                  <Label>Draft Rounds</Label>
+                                  <Input
+                                    type="number"
+                                    value={commDraftSettings.draft_rounds}
+                                    onChange={(e) => setCommDraftSettings(prev => ({
+                                      ...prev,
+                                      draft_rounds: parseInt(e.target.value) || 21
+                                    }))}
+                                    disabled={selectedLeagueData?.draft_status === 'completed'}
+                                  />
+                                  {selectedLeagueData?.draft_status === 'completed' && (
+                                    <p className="text-xs text-muted-foreground">Draft is completed — rounds cannot be changed</p>
+                                  )}
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Pick Time Limit (seconds)</Label>
+                                  <Input
+                                    type="number"
+                                    value={commDraftSettings.pickTimeLimit}
+                                    onChange={(e) => setCommDraftSettings(prev => ({
+                                      ...prev,
+                                      pickTimeLimit: parseInt(e.target.value) || 90
+                                    }))}
+                                    disabled={selectedLeagueData?.draft_status === 'completed'}
+                                  />
+                                  {selectedLeagueData?.draft_status === 'completed' && (
+                                    <p className="text-xs text-muted-foreground">Draft is completed — time limit cannot be changed</p>
+                                  )}
+                                </div>
+                              </div>
+                            </TabsContent>
+
+                            {/* Roster Overview Tab */}
+                            <TabsContent value="rosters" className="space-y-6 py-4">
+                              <div className="space-y-4">
+                                <h3 className="text-lg font-semibold">Team Rosters</h3>
+                                {loadingRosterCounts ? (
+                                  <div className="text-center py-4">
+                                    <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                                    <p className="text-sm text-muted-foreground mt-2">Loading roster counts...</p>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                                    {selectedLeagueTeams.map((team) => (
+                                      <div key={team.id} className="flex items-center justify-between p-3 border rounded-lg">
+                                        <div>
+                                          <div className="font-medium">{team.team_name}</div>
+                                          <div className="text-sm text-muted-foreground">
+                                            {commRosterCounts[team.id] ?? 0} players
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                    {selectedLeagueTeams.length === 0 && (
+                                      <p className="text-sm text-muted-foreground text-center py-4">No teams in this league yet.</p>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </TabsContent>
+                          </Tabs>
+                        ) : (
+                          <p className="text-sm text-muted-foreground text-center py-4">Select a league above to configure its settings.</p>
+                        )}
+
+                        {/* Save Button */}
+                        {selectedSettingsLeagueId && selectedLeagueData && commSettingsTab !== 'rosters' && (
+                          <div className="flex justify-end gap-2 border-t pt-4">
+                            <Button onClick={handleSaveCommSettings} disabled={savingCommSettings}>
+                              {savingCommSettings ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Saving...
+                                </>
+                              ) : (
+                                'Save Settings'
+                              )}
+                            </Button>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   )}
