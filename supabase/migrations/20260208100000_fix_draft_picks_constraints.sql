@@ -157,3 +157,48 @@ BEGIN
   WHERE id = p_league_id;
 END;
 $$;
+
+-- Step 5: Create/update sync_roster_assignments_for_league as SECURITY DEFINER
+-- This syncs draft_picks into roster_assignments after draft completion
+CREATE OR REPLACE FUNCTION public.sync_roster_assignments_for_league(p_league_id UUID)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_inserted_count INTEGER := 0;
+BEGIN
+  -- Clear existing roster_assignments for this league
+  DELETE FROM public.roster_assignments
+  WHERE league_id = p_league_id;
+
+  -- Insert from draft_picks (deleted_at IS NULL = currently owned)
+  INSERT INTO public.roster_assignments (league_id, team_id, player_id, acquired_at)
+  SELECT
+    dp.league_id,
+    dp.team_id,
+    dp.player_id,
+    COALESCE(dp.picked_at, NOW()) as acquired_at
+  FROM public.draft_picks dp
+  WHERE dp.league_id = p_league_id
+    AND dp.deleted_at IS NULL
+  ON CONFLICT (league_id, player_id) DO NOTHING;
+
+  GET DIAGNOSTICS v_inserted_count = ROW_COUNT;
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'league_id', p_league_id,
+    'players_synced', v_inserted_count,
+    'message', format('Successfully synced %s players to roster_assignments', v_inserted_count)
+  );
+EXCEPTION WHEN OTHERS THEN
+  RETURN jsonb_build_object(
+    'success', false,
+    'league_id', p_league_id,
+    'error', SQLERRM,
+    'message', 'Failed to sync roster_assignments'
+  );
+END;
+$$;
