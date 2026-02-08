@@ -122,26 +122,26 @@ export const RosterDepthChart = ({
 
   return (
     <Card className="border-fantasy-border bg-fantasy-surface">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-lg font-semibold text-fantasy-dark">
-          Your Roster
+      <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6">
+        <CardTitle className="text-base sm:text-lg font-semibold text-fantasy-dark">
+          Roster
         </CardTitle>
-        <div className="text-xs text-muted-foreground mt-1">
-          Round {currentRound}/{totalRounds} • {draftedPlayers.length} players
+        <div className="text-xs text-muted-foreground">
+          R{currentRound}/{totalRounds} • {draftedPlayers.length} players
         </div>
       </CardHeader>
-      <CardContent className="pt-0 space-y-4">
+      <CardContent className="pt-0 space-y-3 sm:space-y-4 px-2 sm:px-6">
         {/* Starting Lineup Section */}
         <div>
-          <h3 className="text-sm font-semibold text-fantasy-dark mb-2">Starting Lineup</h3>
+          <h3 className="text-xs sm:text-sm font-semibold text-fantasy-dark mb-1.5 px-1">Starters</h3>
           <div className="border border-fantasy-border rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
+            <table className="w-full text-xs sm:text-sm">
               <thead className="bg-fantasy-light/50 border-b border-fantasy-border">
                 <tr>
-                  <th className="px-3 py-2 text-left font-semibold text-fantasy-dark">Position</th>
-                  <th className="px-3 py-2 text-left font-semibold text-fantasy-dark">Player</th>
-                  <th className="px-3 py-2 text-right font-semibold text-fantasy-dark">Points</th>
-                  <th className="px-3 py-2 text-right font-semibold text-fantasy-dark">Round</th>
+                  <th className="px-2 sm:px-3 py-1.5 text-left font-semibold text-fantasy-dark">Pos</th>
+                  <th className="px-2 sm:px-3 py-1.5 text-left font-semibold text-fantasy-dark">Player</th>
+                  <th className="px-2 sm:px-3 py-1.5 text-right font-semibold text-fantasy-dark">PTS</th>
+                  <th className="px-2 sm:px-3 py-1.5 text-right font-semibold text-fantasy-dark hidden sm:table-cell">Rd</th>
                 </tr>
               </thead>
               <tbody>
@@ -153,26 +153,26 @@ export const RosterDepthChart = ({
                         const starter = starters.find(s => s.position === pos && s.slotIndex === idx);
                         const player = starter?.player;
                         return (
-                          <tr 
+                          <tr
                             key={`${pos}-${idx}`}
                             className={cn(
                               "border-b",
-                              colors, // Light background for position
+                              colors,
                               !player && "opacity-50"
                             )}
                           >
-                            <td className="px-3 py-2 text-xs font-medium">{pos}</td>
-                            <td className="px-3 py-2 text-xs">
+                            <td className="px-2 sm:px-3 py-1.5 text-xs font-medium">{pos}</td>
+                            <td className="px-2 sm:px-3 py-1.5 text-xs">
                               {player ? (
-                                <div className="font-medium">{player.full_name}</div>
+                                <div className="font-medium truncate max-w-[120px] sm:max-w-none">{player.full_name}</div>
                               ) : (
-                                <span className="text-muted-foreground italic">Empty</span>
+                                <span className="text-muted-foreground italic">-</span>
                               )}
                             </td>
-                            <td className="px-3 py-2 text-xs text-right">
+                            <td className="px-2 sm:px-3 py-1.5 text-xs text-right">
                               {player ? player.points : '-'}
                             </td>
-                            <td className="px-3 py-2 text-xs text-right">
+                            <td className="px-2 sm:px-3 py-1.5 text-xs text-right hidden sm:table-cell">
                               {player ? draftPicks.find(p => p.player_id === player.id)?.round_number : '-'}
                             </td>
                           </tr>
@@ -189,15 +189,15 @@ export const RosterDepthChart = ({
         {/* Bench Section */}
         {bench.length > 0 && (
           <div>
-            <h3 className="text-sm font-semibold text-fantasy-dark mb-2">Bench ({bench.length})</h3>
+            <h3 className="text-xs sm:text-sm font-semibold text-fantasy-dark mb-1.5 px-1">Bench ({bench.length})</h3>
             <div className="border border-fantasy-border rounded-lg overflow-hidden">
-              <table className="w-full text-sm">
+              <table className="w-full text-xs sm:text-sm">
                 <thead className="bg-fantasy-light/50 border-b border-fantasy-border">
                   <tr>
-                    <th className="px-3 py-2 text-left font-semibold text-fantasy-dark">Position</th>
-                    <th className="px-3 py-2 text-left font-semibold text-fantasy-dark">Player</th>
-                    <th className="px-3 py-2 text-right font-semibold text-fantasy-dark">Points</th>
-                    <th className="px-3 py-2 text-right font-semibold text-fantasy-dark">Round</th>
+                    <th className="px-2 sm:px-3 py-1.5 text-left font-semibold text-fantasy-dark">Pos</th>
+                    <th className="px-2 sm:px-3 py-1.5 text-left font-semibold text-fantasy-dark">Player</th>
+                    <th className="px-2 sm:px-3 py-1.5 text-right font-semibold text-fantasy-dark">PTS</th>
+                    <th className="px-2 sm:px-3 py-1.5 text-right font-semibold text-fantasy-dark hidden sm:table-cell">Rd</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -205,18 +205,18 @@ export const RosterDepthChart = ({
                     const pos = normalizePosition(player.position);
                     const colors = positionColors[pos as keyof typeof positionColors] || 'bg-muted/20';
                     return (
-                      <tr 
+                      <tr
                         key={player.id}
                         className={cn("border-b", colors)}
                       >
-                        <td className="px-3 py-2 text-xs font-medium">{pos}</td>
-                        <td className="px-3 py-2 text-xs">
-                          <div className="font-medium">{player.full_name}</div>
+                        <td className="px-2 sm:px-3 py-1.5 text-xs font-medium">{pos}</td>
+                        <td className="px-2 sm:px-3 py-1.5 text-xs">
+                          <div className="font-medium truncate max-w-[120px] sm:max-w-none">{player.full_name}</div>
                         </td>
-                        <td className="px-3 py-2 text-xs text-right">
+                        <td className="px-2 sm:px-3 py-1.5 text-xs text-right">
                           {player.points}
                         </td>
-                        <td className="px-3 py-2 text-xs text-right">
+                        <td className="px-2 sm:px-3 py-1.5 text-xs text-right hidden sm:table-cell">
                           {draftPicks.find(p => p.player_id === player.id)?.round_number || '-'}
                         </td>
                       </tr>
