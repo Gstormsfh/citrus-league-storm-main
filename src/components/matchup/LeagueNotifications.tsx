@@ -197,6 +197,10 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
       case 'CHAT':
         // Don't navigate, just mark as read (chat is in this panel)
         break;
+      case 'SYSTEM':
+        // System/settings notifications - navigate to league dashboard
+        navigate(`/league/${leagueId}`);
+        break;
       default:
         // Default to matchup page
         navigate(`/matchup/${leagueId}`);
@@ -215,6 +219,8 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
         return <MessageSquare className="w-4 h-4 text-citrus-sage" />;
       case 'TRADE':
         return <AlertCircle className="w-4 h-4 text-citrus-orange" />;
+      case 'SYSTEM':
+        return <AlertCircle className="w-4 h-4 text-citrus-sage" />;
       default:
         return <Clock className="w-4 h-4 text-citrus-charcoal" />;
     }

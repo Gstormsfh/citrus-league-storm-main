@@ -439,7 +439,7 @@ async joinLeagueByCode(
       if (error) throw error;
       
       // Create notification for all league members
-      await this.notifyLeagueMembers(leagueId, 'Commissioner changed waiver settings');
+      await this.notifyLeagueMembers(leagueId, 'Commissioner changed waiver settings', 'Waiver Settings Updated');
       
       return { success: true, error: null };
     } catch (error) {
@@ -472,7 +472,7 @@ async joinLeagueByCode(
       if (error) throw error;
       
       // Create notification for all league members
-      await this.notifyLeagueMembers(leagueId, 'Commissioner changed scoring settings');
+      await this.notifyLeagueMembers(leagueId, 'Commissioner changed scoring settings', 'Scoring Settings Updated');
       
       return { success: true, error: null };
     } catch (error) {
@@ -525,7 +525,7 @@ async joinLeagueByCode(
       if (error) throw error;
       
       // Create notification for all league members
-      await this.notifyLeagueMembers(leagueId, 'Commissioner changed draft settings');
+      await this.notifyLeagueMembers(leagueId, 'Commissioner changed draft settings', 'Draft Settings Updated');
       
       return { success: true, error: null };
     } catch (error) {
@@ -542,30 +542,51 @@ async joinLeagueByCode(
    *   - message: TEXT NOT NULL
    *   - read_status: BOOLEAN (not "read")
    */
-  async notifyLeagueMembers(leagueId: string, message: string): Promise<void> {
+  async notifyLeagueMembers(leagueId: string, message: string, title?: string): Promise<void> {
     try {
-      // Get all teams in the league
-      const { data: teams } = await supabase
-        .from('teams')
-        .select('owner_id')
-        .eq('league_id', leagueId)
-        .not('owner_id', 'is', null);
+      // Use the SECURITY DEFINER RPC to insert notifications for all league members.
+      // Direct INSERT is blocked by RLS (no INSERT policy for type='SYSTEM' from client).
+      // The RPC verifies the caller is the commissioner and creates notifications for everyone.
+      const { data: result, error: rpcError } = await supabase.rpc('notify_league_members', {
+        p_league_id: leagueId,
+        p_title: title || 'League Settings Changed',
+        p_message: message,
+        p_notification_type: 'SYSTEM',
+      });
 
-      if (!teams || teams.length === 0) return;
+      if (rpcError) {
+        console.error('Error calling notify_league_members RPC:', rpcError);
+        // Fallback: try direct insert (will work if the INSERT policy migration is applied)
+        const { data: teams } = await supabase
+          .from('teams')
+          .select('owner_id')
+          .eq('league_id', leagueId)
+          .not('owner_id', 'is', null);
 
-      // Create notifications for all team owners
-      const notifications = teams.map(team => ({
-        league_id: leagueId,
-        user_id: team.owner_id,
-        title: 'League Settings Changed',
-        message,
-        type: 'SYSTEM',
-        read_status: false,
-      }));
+        if (teams && teams.length > 0) {
+          const notifications = teams.map(team => ({
+            league_id: leagueId,
+            user_id: team.owner_id,
+            title: title || 'League Settings Changed',
+            message,
+            type: 'SYSTEM',
+            read_status: false,
+          }));
 
-      const { error } = await supabase.from('notifications').insert(notifications);
-      if (error) {
-        console.error('Error inserting notifications:', error);
+          const { error: insertError } = await supabase.from('notifications').insert(notifications);
+          if (insertError) {
+            console.error('Fallback direct insert also failed:', insertError);
+          } else {
+            console.log('Notifications created via fallback direct insert');
+          }
+        }
+        return;
+      }
+
+      if (result && !result.success) {
+        console.error('notify_league_members RPC returned error:', result.error);
+      } else {
+        console.log(`Notifications sent: ${result?.notifications_created || 0} members notified`);
       }
     } catch (error) {
       console.error('Error creating notifications:', error);
