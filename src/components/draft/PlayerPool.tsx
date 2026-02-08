@@ -170,6 +170,68 @@ export const PlayerPool = ({
     }
   };
 
+  // Mobile card view for a player
+  const PlayerCard = ({ player }: { player: Player }) => {
+    const isSelected = selectedPlayer?.id === player.id;
+    const isDrafted = draftedPlayers.includes(player.id);
+    const isInQueue = queue.includes(player.id);
+
+    return (
+      <div
+        className={cn(
+          'border-b border-fantasy-border/50 px-3 py-2.5 transition-colors cursor-pointer active:bg-fantasy-light/50',
+          isSelected && 'bg-fantasy-primary/10 border-l-2 border-l-fantasy-primary',
+          isDrafted && 'opacity-40'
+        )}
+        onClick={() => !isDrafted && onPlayerSelect(player)}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              {isInQueue && <Star className="h-3 w-3 fill-fantasy-tertiary text-fantasy-tertiary flex-shrink-0" />}
+              <span className="font-medium text-sm truncate">{player.full_name}</span>
+              <Badge variant="outline" className="text-[10px] flex-shrink-0 px-1 py-0">{normalizePosition(player.position)}</Badge>
+              <span className="text-[10px] text-muted-foreground flex-shrink-0">{player.team}</span>
+            </div>
+            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-muted-foreground">
+              {player.position === 'G' ? (
+                <>
+                  <span className="font-semibold text-foreground">{player.wins || 0}W</span>
+                  <span>{player.losses || 0}L</span>
+                  <span>{player.goals_against_average ? player.goals_against_average.toFixed(2) : '0.00'} GAA</span>
+                  <span>{player.save_percentage ? (player.save_percentage * 100).toFixed(1) : '0.0'}%</span>
+                </>
+              ) : (
+                <>
+                  <span className="font-semibold text-foreground">{player.points} PTS</span>
+                  <span>{player.goals}G</span>
+                  <span>{player.assists}A</span>
+                  <span>{player.plus_minus > 0 ? '+' : ''}{player.plus_minus}</span>
+                  <span>{player.shots}SOG</span>
+                </>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+            {onAddToQueue && (
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0"
+                onClick={(e) => { e.stopPropagation(); e.preventDefault(); onAddToQueue(player.id); }}>
+                <Star className={cn("h-4 w-4", isInQueue ? "fill-fantasy-tertiary text-fantasy-tertiary" : "text-muted-foreground")} />
+              </Button>
+            )}
+            {isSelected && isDraftActive && !isDrafted && (
+              <Button size="sm" className="h-7 px-3 text-xs bg-fantasy-primary hover:bg-fantasy-primary/90"
+                onClick={(e) => { e.stopPropagation(); e.preventDefault(); onPlayerDraft(player); }}>
+                Draft
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Desktop table row for a player
   const PlayerRow = ({ player }: { player: Player }) => {
     const isSelected = selectedPlayer?.id === player.id;
     const isDrafted = draftedPlayers.includes(player.id);
@@ -264,48 +326,45 @@ export const PlayerPool = ({
   };
 
   return (
-    <Card className="p-4 border-fantasy-border bg-fantasy-surface">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold flex items-center gap-2 text-fantasy-dark">
-          <Star className="h-5 w-5 text-fantasy-primary" />
-          Available Players
+    <Card className="p-2 sm:p-4 border-fantasy-border bg-fantasy-surface">
+      <div className="flex items-center justify-between mb-3 px-1">
+        <h2 className="text-base sm:text-xl font-semibold flex items-center gap-2 text-fantasy-dark">
+          <Star className="h-4 w-4 sm:h-5 sm:w-5 text-fantasy-primary" />
+          Players
         </h2>
-        <div className="text-sm text-muted-foreground">
-          {filteredAndSortedPlayers.length} players
+        <div className="text-xs sm:text-sm text-muted-foreground">
+          {filteredAndSortedPlayers.length}
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
-        <div className="relative col-span-2">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+      {/* Filters - compact on mobile */}
+      <div className="flex flex-wrap gap-2 mb-3 px-1">
+        <div className="relative flex-1 min-w-[140px]">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search players or teams..."
+            placeholder="Search..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9 bg-[#E8EED9]/50 backdrop-blur-sm border-fantasy-border"
+            className="pl-8 h-9 text-sm bg-[#E8EED9]/50 backdrop-blur-sm border-fantasy-border"
           />
         </div>
-        
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Position</Label>
-          <Select value={selectedPosition} onValueChange={setSelectedPosition}>
-            <SelectTrigger className="bg-[#E8EED9]/50 backdrop-blur-sm border-fantasy-border">
-              <SelectValue placeholder="Position" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="All">All Positions</SelectItem>
-              <SelectItem value="C">C</SelectItem>
-              <SelectItem value="LW">LW</SelectItem>
-              <SelectItem value="RW">RW</SelectItem>
-              <SelectItem value="D">D</SelectItem>
-              <SelectItem value="G">G</SelectItem>
-              <SelectItem value="F">Forwards</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
 
-        <div className="space-y-1">
+        <Select value={selectedPosition} onValueChange={setSelectedPosition}>
+          <SelectTrigger className="w-[80px] sm:w-[120px] h-9 bg-[#E8EED9]/50 backdrop-blur-sm border-fantasy-border text-xs sm:text-sm">
+            <SelectValue placeholder="Pos" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="All">All</SelectItem>
+            <SelectItem value="C">C</SelectItem>
+            <SelectItem value="LW">LW</SelectItem>
+            <SelectItem value="RW">RW</SelectItem>
+            <SelectItem value="D">D</SelectItem>
+            <SelectItem value="G">G</SelectItem>
+            <SelectItem value="F">Fwd</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <div className="hidden sm:block space-y-1">
           <Label className="text-xs text-muted-foreground">Sort By</Label>
           <Select value={sortBy} onValueChange={(value) => {
             setSortBy(value);
@@ -346,21 +405,55 @@ export const PlayerPool = ({
           </Select>
         </div>
 
-        <div className="flex items-end gap-2">
-          <Button
-            variant={showDrafted ? "default" : "outline"}
-            size="sm"
-            onClick={() => setShowDrafted(!showDrafted)}
-            className="h-9"
-            title={showDrafted ? "Hide drafted players" : "Show drafted players"}
-          >
-            {showDrafted ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </Button>
-        </div>
+        {/* Mobile sort select */}
+        <Select value={sortBy} onValueChange={(value) => { setSortBy(value); setSortDirection('desc'); }}>
+          <SelectTrigger className="sm:hidden w-[80px] h-9 bg-[#E8EED9]/50 backdrop-blur-sm border-fantasy-border text-xs">
+            <SelectValue placeholder="Sort" />
+          </SelectTrigger>
+          <SelectContent>
+            {selectedPosition === 'G' ? (
+              <>
+                <SelectItem value="wins">W</SelectItem>
+                <SelectItem value="gaa">GAA</SelectItem>
+                <SelectItem value="savePct">SV%</SelectItem>
+              </>
+            ) : (
+              <>
+                <SelectItem value="points">PTS</SelectItem>
+                <SelectItem value="goals">G</SelectItem>
+                <SelectItem value="assists">A</SelectItem>
+                <SelectItem value="shots">SOG</SelectItem>
+                <SelectItem value="hits">HIT</SelectItem>
+              </>
+            )}
+          </SelectContent>
+        </Select>
+
+        <Button
+          variant={showDrafted ? "default" : "outline"}
+          size="sm"
+          onClick={() => setShowDrafted(!showDrafted)}
+          className="h-9 w-9 p-0 flex-shrink-0"
+          title={showDrafted ? "Hide drafted players" : "Show drafted players"}
+        >
+          {showDrafted ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </Button>
       </div>
 
-      {/* Player List Table */}
-      <div className="border border-fantasy-border rounded-lg overflow-hidden bg-[#E8EED9]/50 backdrop-blur-sm">
+      {/* Mobile: Card list view */}
+      <div className="md:hidden border border-fantasy-border rounded-lg overflow-hidden bg-[#E8EED9]/50 backdrop-blur-sm max-h-[60vh] overflow-y-auto">
+        {filteredAndSortedPlayers.map(player => (
+          <PlayerCard key={player.id} player={player} />
+        ))}
+        {filteredAndSortedPlayers.length === 0 && (
+          <div className="text-center py-8 text-muted-foreground text-sm">
+            No players found.
+          </div>
+        )}
+      </div>
+
+      {/* Desktop: Full table view */}
+      <div className="hidden md:block border border-fantasy-border rounded-lg overflow-hidden bg-[#E8EED9]/50 backdrop-blur-sm">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1200px] text-sm">
             <thead className="bg-fantasy-light/50 border-b border-fantasy-border">

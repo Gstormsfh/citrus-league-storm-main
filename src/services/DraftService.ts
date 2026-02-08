@@ -433,6 +433,53 @@ export const DraftService = {
             logger.error('Error initializing rosters:', rosterError);
             // Don't fail the draft completion if roster init fails
           }
+
+          // Sync roster_assignments from draft_picks (this is what the Roster page reads)
+          try {
+            logger.log('Syncing roster_assignments from draft_picks...');
+            const { data: syncResult, error: syncError } = await supabase
+              .rpc('sync_roster_assignments_for_league', { p_league_id: leagueId });
+            if (syncError) {
+              logger.error('RPC sync_roster_assignments failed:', syncError);
+              // Fallback: directly insert into roster_assignments
+              logger.log('Falling back to direct roster_assignments insert...');
+              const { data: draftPicksData } = await supabase
+                .from('draft_picks')
+                .select('league_id, team_id, player_id, picked_at')
+                .eq('league_id', leagueId)
+                .is('deleted_at', null);
+
+              if (draftPicksData && draftPicksData.length > 0) {
+                // Delete existing assignments first
+                await supabase
+                  .from('roster_assignments')
+                  .delete()
+                  .eq('league_id', leagueId);
+
+                // Insert from draft picks
+                const assignments = draftPicksData.map(pick => ({
+                  league_id: pick.league_id,
+                  team_id: pick.team_id,
+                  player_id: pick.player_id,
+                  acquired_at: pick.picked_at || new Date().toISOString()
+                }));
+
+                const { error: insertError } = await supabase
+                  .from('roster_assignments')
+                  .insert(assignments);
+
+                if (insertError) {
+                  logger.error('Fallback roster_assignments insert failed:', insertError);
+                } else {
+                  logger.log(`Fallback: Inserted ${assignments.length} roster assignments`);
+                }
+              }
+            } else {
+              logger.log('Roster assignments synced:', syncResult);
+            }
+          } catch (syncError) {
+            logger.error('Error syncing roster_assignments:', syncError);
+          }
           
           // Generate matchups for the entire season immediately after draft completion
           try {

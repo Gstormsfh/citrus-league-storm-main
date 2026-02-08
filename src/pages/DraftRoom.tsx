@@ -27,7 +27,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Users, Clock, Trophy, History, CheckCircle, Loader2, Zap, Play, Pause, Camera, Trash2 } from 'lucide-react';
+import { Users, Clock, Trophy, History, CheckCircle, Loader2, Zap, Play, Pause, Camera, Trash2, Star } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -55,6 +55,7 @@ interface DraftSettings {
   draftOrder: 'standard' | 'serpentine' | 'custom';
   scoringFormat: 'standard' | 'points' | 'categories';
   customOrder?: string[]; // Optional custom team order
+  effectiveOrder?: string[]; // The actual team order from DraftLobby (randomized/custom/default)
 }
 
 enum DraftPhase {
@@ -1850,10 +1851,12 @@ const DraftRoom = () => {
       // Initialize draft order
       const draftRounds = settings.rounds || league?.draft_rounds || 21;
       
-        // Determine which order to use: settings custom order > customDraftOrder (button) > randomized order > none
-        const orderToUse = settings.draftOrder === 'custom' && settings.customOrder
-          ? settings.customOrder
-          : (customDraftOrder || randomizedTeamOrder || undefined);
+        // Determine which order to use: effectiveOrder > settings custom order > customDraftOrder (button) > randomized order > none
+        const orderToUse = settings.effectiveOrder
+          || (settings.draftOrder === 'custom' && settings.customOrder ? settings.customOrder : undefined)
+          || customDraftOrder
+          || randomizedTeamOrder
+          || undefined;
         
         const { error: initError } = await DraftService.initializeDraftOrder(
           leagueId,
@@ -2006,31 +2009,37 @@ const DraftRoom = () => {
       setDraftSettings(settings);
       setTimeRemaining(settings.pickTimeLimit);
 
-      // Ensure draft order exists (should be created by prepare)
+      // Always (re)initialize draft order when starting a draft.
+      // This ensures the randomized/custom order from the lobby is actually used,
+      // rather than stale order rows from a previous draft attempt.
       const draftRounds = settings.rounds || league?.draft_rounds || 21;
-      const { order: existingOrder } = await DraftService.getDraftOrder(leagueId, user.id, 1);
-      
-      if (!existingOrder) {
-        // Draft order doesn't exist, create it now
-        logger.log('handleStartDraft: Draft order not found, creating now...');
-        // Determine which order to use: settings custom order > customDraftOrder (button) > randomized order > none
-        const orderToUse = settings.draftOrder === 'custom' && settings.customOrder
-          ? settings.customOrder
-          : (customDraftOrder || randomizedTeamOrder || undefined);
-        
-        const { error: initError } = await DraftService.initializeDraftOrder(
-          leagueId,
-          user.id,
-          teams, 
-          draftRounds,
-          false,
-          orderToUse
-        );
-        
-        if (initError) {
-          alert(`Failed to initialize draft order: ${initError.message || 'Unknown error'}. Please try preparing the draft first.`);
-          return;
-        }
+      // Priority: effectiveOrder from DraftLobby (most reliable) > settings.customOrder > local state > none
+      const orderToUse = settings.effectiveOrder
+        || (settings.draftOrder === 'custom' && settings.customOrder ? settings.customOrder : undefined)
+        || customDraftOrder
+        || randomizedTeamOrder
+        || undefined;
+
+      logger.log('handleStartDraft: Initializing draft order', {
+        hasEffectiveOrder: !!settings.effectiveOrder,
+        hasCustomOrder: !!orderToUse,
+        orderLength: orderToUse?.length,
+        orderFirstTeam: orderToUse?.[0],
+        draftRounds
+      });
+
+      const { error: initError } = await DraftService.initializeDraftOrder(
+        leagueId,
+        user.id,
+        teams,
+        draftRounds,
+        true, // resetExisting=true to always delete old orders and create fresh ones
+        orderToUse
+      );
+
+      if (initError) {
+        alert(`Failed to initialize draft order: ${initError.message || 'Unknown error'}. Please try preparing the draft first.`);
+        return;
       }
 
       // Update league status to in_progress and save draft settings + rounds
@@ -2606,12 +2615,12 @@ const DraftRoom = () => {
       <Navbar />
 
 
-      <main className="w-full pt-28 pb-16 m-0 p-0">
+      <main className="w-full pt-16 sm:pt-28 pb-8 sm:pb-16 m-0 p-0">
         <div className="w-full m-0 p-0">
           {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
           <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             {/* Main Content - Scrollable - Appears first on mobile */}
-            <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
+            <div className="min-w-0 max-h-[calc(100vh-8rem)] sm:max-h-[calc(100vh-12rem)] overflow-y-auto px-0 sm:px-2 lg:px-6 order-1 lg:order-2">
         {/* Loading State - Show if loading or auth is loading, but NOT for demo state */}
         {displayLoading && (
           <LoadingScreen
@@ -2692,205 +2701,177 @@ const DraftRoom = () => {
           <>
             {/* Show "Start Draft Timer" button if commissioner and no picks made yet - Disabled in demo state */}
             {isCommissioner && userLeagueState === 'active-user' && (draftHistory?.length || 0) === 0 && !league?.settings?.timerStartedAt && (
-              <div className="container mx-auto px-4 py-6">
+              <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6">
                 <Card className="border-2 border-primary bg-primary/5">
-                  <CardContent className="p-6 text-center">
-                    <h2 className="text-2xl font-bold mb-2">Ready to Begin?</h2>
-                    <p className="text-muted-foreground mb-6">
-                      All teams are ready. Click below to start the draft timer for the first pick.
+                  <CardContent className="p-4 sm:p-6 text-center">
+                    <h2 className="text-xl sm:text-2xl font-bold mb-2">Ready to Begin?</h2>
+                    <p className="text-sm sm:text-base text-muted-foreground mb-4 sm:mb-6">
+                      All teams are ready. Start the draft timer for the first pick.
                     </p>
-                    <Button 
+                    <Button
                       onClick={handleBeginDraft}
                       size="lg"
-                      className="bg-primary hover:bg-primary/90 text-lg px-8 py-6"
+                      className="bg-primary hover:bg-primary/90 text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6"
                     >
                       <Play className="h-5 w-5 mr-2" />
-                      Start Draft Timer
+                      Start Draft
                     </Button>
                   </CardContent>
                 </Card>
               </div>
             )}
 
-            {/* Simplified Sticky Header with Recent Pick + Queue + Draft Button */}
+            {/* Sticky Draft Header - Mobile-first compact design */}
             <div className="bg-card border-b sticky top-0 z-30 shadow-sm">
-              <div className="container mx-auto px-4 py-3">
-                <div className="flex items-center justify-between gap-4">
-                  {/* Left: Round/Pick Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm text-muted-foreground">
-                      Round {draftState?.currentRound || 1} • Pick {draftState?.currentPick || 1} of {(teams?.length || 0) * (draftSettings?.rounds || 21)}
+              <div className="px-3 py-2 md:container md:mx-auto md:px-4 md:py-3">
+                {/* Row 1: Pick info + Timer + Action */}
+                <div className="flex items-center justify-between gap-2">
+                  {/* Left: Round/Pick + Team */}
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs md:text-sm text-muted-foreground">
+                      R{draftState?.currentRound || 1} • Pick {draftState?.currentPick || 1}/{(teams?.length || 0) * (draftSettings?.rounds || 21)}
                     </div>
                     {currentTeam && (
-                      <div className="font-semibold text-lg truncate">
+                      <div className="font-semibold text-sm md:text-lg truncate">
                         {currentTeam.team_name}
                         {currentTeam.owner_id === user?.id && (
-                          <span className="ml-2 text-primary text-sm font-normal">(Your Turn)</span>
+                          <span className="ml-1 text-primary text-xs font-normal">(You)</span>
                         )}
                         {!currentTeam.owner_id && (
-                          <span className="ml-2 text-orange-600 text-sm font-normal">(AI)</span>
+                          <span className="ml-1 text-orange-600 text-xs font-normal">(AI)</span>
                         )}
                       </div>
                     )}
                   </div>
 
-                  {/* Center: Selected Player Card OR Most Recent Pick */}
-                  <div className="flex-1 flex justify-center">
-                    {selectedPlayer ? (
-                      // Show selected player card with compact stats - fixed height to prevent ribbon expansion
-                      <Card className="border-primary/30 bg-primary/5 max-w-md w-full">
-                        <CardContent className="p-3 flex items-center gap-3">
-                          <div className="flex-shrink-0 min-w-[120px]">
-                            <div className="text-xs text-muted-foreground">Selected</div>
-                            <div className="font-bold text-base truncate">{selectedPlayer.full_name}</div>
-                            <div className="text-xs text-muted-foreground">
-                              <Badge variant="outline" className="text-xs mr-1">{selectedPlayer.position}</Badge>
-                              {selectedPlayer.team}
-                            </div>
-                          </div>
-                          
-                          {/* Compact Stats - Horizontal */}
-                          <div className="flex items-center gap-1.5 flex-1 text-xs">
-                            <div className="text-center px-2 py-1 bg-background/50 rounded min-w-[40px]">
-                              <div className="text-muted-foreground text-[10px]">PTS</div>
-                              <div className="font-bold text-sm">{selectedPlayer.points}</div>
-                            </div>
-                            <div className="text-center px-2 py-1 bg-background/50 rounded min-w-[35px]">
-                              <div className="text-muted-foreground text-[10px]">G</div>
-                              <div className="font-bold">{selectedPlayer.goals}</div>
-                            </div>
-                            <div className="text-center px-2 py-1 bg-background/50 rounded min-w-[35px]">
-                              <div className="text-muted-foreground text-[10px]">A</div>
-                              <div className="font-bold">{selectedPlayer.assists}</div>
-                            </div>
-                            <div className="text-center px-2 py-1 bg-background/50 rounded min-w-[40px]">
-                              <div className="text-muted-foreground text-[10px]">SOG</div>
-                              <div className="font-bold">{selectedPlayer.shots}</div>
-                            </div>
-                            <div className="text-center px-2 py-1 bg-background/50 rounded min-w-[40px]">
-                              <div className="text-muted-foreground text-[10px]">HIT</div>
-                              <div className="font-bold">{selectedPlayer.hits}</div>
-                            </div>
-                            <div className="text-center px-2 py-1 bg-background/50 rounded min-w-[40px]">
-                              <div className="text-muted-foreground text-[10px]">BLK</div>
-                              <div className="font-bold">{selectedPlayer.blocks}</div>
-                            </div>
-                          </div>
-                          
-                          {/* Disable draft button in demo state */}
-                          {currentTeam?.owner_id === user?.id && userLeagueState === 'active-user' && (
-                            <Button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handlePlayerDraft(selectedPlayer);
-                              }}
-                              size="sm"
-                              className="flex-shrink-0 relative z-20 pointer-events-auto"
-                              disabled={draftedPlayerIds.has(selectedPlayer.id)}
-                            >
-                              {draftedPlayerIds.has(selectedPlayer.id) ? 'Drafted' : 'Draft'}
-                            </Button>
-                          )}
-                        </CardContent>
-                      </Card>
-                    ) : draftHistory.length > 0 ? (
-                      // Show most recent pick if no player selected
-                      (() => {
-                        const mostRecent = draftHistory[draftHistory.length - 1];
-                        const player = availablePlayers.find(p => p.id === mostRecent.player_id);
-                        const team = teams.find(t => t.id === mostRecent.team_id);
-                        if (!player || !team) return null;
-                        
-                        return (
-                          <Card className="border-primary/30 bg-primary/5 max-w-sm w-full">
-                            <CardContent className="p-3">
-                              <div className="text-xs text-muted-foreground">Most Recent Pick</div>
-                              <div className="font-bold text-base">{player.full_name}</div>
-                              <div className="text-sm text-muted-foreground">
-                                {team.team_name} • Round {mostRecent.round_number} • Pick {mostRecent.pick_number}
-                              </div>
-                            </CardContent>
-                          </Card>
-                        );
-                      })()
-                    ) : null}
-                  </div>
-
-                   {/* Right: Queue + Timer + Draft Button */}
-                   <div className="flex-1 flex items-center justify-end gap-3">
-                     {/* Queue - Always show when queue has items, not just on user's turn */}
-                     {draftQueue.length > 0 && (
-                       <div className="flex items-center gap-2 bg-muted/30 px-3 py-2 rounded-lg">
-                         <div className="text-xs text-muted-foreground">Queue:</div>
-                         <div className="flex gap-1">
-                           {draftQueue.slice(0, 3).map((playerId) => {
-                             const player = availablePlayers.find(p => p.id === playerId);
-                             if (!player || draftedPlayerIds.has(playerId)) return null;
-                             return (
-                               <Badge key={playerId} variant="outline" className="text-xs">
-                                 {player.full_name.split(' ').pop()}
-                               </Badge>
-                             );
-                           })}
-                           {draftQueue.length > 3 && (
-                             <Badge variant="outline" className="text-xs">
-                               +{draftQueue.length - 3}
-                             </Badge>
-                           )}
-                         </div>
-                       </div>
-                     )}
-                    
-                    <DraftTimer 
+                  {/* Center: Timer */}
+                  <div className="flex-shrink-0">
+                    <DraftTimer
                       timeRemaining={timeRemaining}
                       isActive={draftPhase === DraftPhase.ACTIVE && !!currentTeam}
                       totalTime={draftSettings.pickTimeLimit}
                     />
-                    
-                    {/* Disable draft button in demo state */}
+                  </div>
+
+                  {/* Right: Draft/Auto button */}
+                  <div className="flex-shrink-0 flex items-center gap-2">
                     {currentTeam?.owner_id === user?.id && userLeagueState === 'active-user' && (
-                      <Button 
-                        variant="default" 
+                      <Button
+                        variant="default"
                         size="sm"
+                        className="text-xs md:text-sm"
                         onClick={selectedPlayer ? () => handlePlayerDraft(selectedPlayer) : handleAutoDraft}
                         disabled={!selectedPlayer && draftQueue.length === 0}
                       >
-                        {selectedPlayer ? 'Draft Player' : 'Auto Draft'}
+                        {selectedPlayer ? 'Draft' : 'Auto'}
                       </Button>
                     )}
-                    {/* Show CTA for demo state */}
                     {(userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') && (
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
+                        className="text-xs"
                         onClick={() => userLeagueState === 'guest' ? navigate('/auth') : navigate('/create-league')}
                       >
-                        {userLeagueState === 'guest' ? 'Sign Up to Draft' : 'Create League to Draft'}
+                        {userLeagueState === 'guest' ? 'Sign Up' : 'Create League'}
                       </Button>
                     )}
                   </div>
                 </div>
+
+                {/* Row 2: Selected player / recent pick (collapsible on mobile) */}
+                {selectedPlayer ? (
+                  <div className="mt-2 flex items-center gap-2 bg-primary/5 border border-primary/20 rounded-lg px-3 py-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-[10px] flex-shrink-0">{selectedPlayer.position}</Badge>
+                        <span className="font-bold text-sm truncate">{selectedPlayer.full_name}</span>
+                        <span className="text-xs text-muted-foreground flex-shrink-0">{selectedPlayer.team}</span>
+                      </div>
+                      {/* Compact stat pills - scrollable on mobile */}
+                      <div className="flex items-center gap-1.5 mt-1 overflow-x-auto text-[10px] md:text-xs pb-0.5">
+                        <span className="flex-shrink-0 font-bold text-sm">{selectedPlayer.points} PTS</span>
+                        <span className="text-muted-foreground">|</span>
+                        <span className="flex-shrink-0">{selectedPlayer.goals}G</span>
+                        <span className="flex-shrink-0">{selectedPlayer.assists}A</span>
+                        <span className="hidden sm:inline flex-shrink-0">{selectedPlayer.shots}SOG</span>
+                        <span className="hidden sm:inline flex-shrink-0">{selectedPlayer.hits}HIT</span>
+                        <span className="hidden md:inline flex-shrink-0">{selectedPlayer.blocks}BLK</span>
+                      </div>
+                    </div>
+                    {currentTeam?.owner_id === user?.id && userLeagueState === 'active-user' && (
+                      <Button
+                        onClick={(e) => { e.stopPropagation(); handlePlayerDraft(selectedPlayer); }}
+                        size="sm"
+                        className="flex-shrink-0 relative z-20 text-xs"
+                        disabled={draftedPlayerIds.has(selectedPlayer.id)}
+                      >
+                        {draftedPlayerIds.has(selectedPlayer.id) ? 'Taken' : 'Draft'}
+                      </Button>
+                    )}
+                  </div>
+                ) : draftHistory.length > 0 ? (
+                  (() => {
+                    const mostRecent = draftHistory[draftHistory.length - 1];
+                    const player = availablePlayers.find(p => p.id === mostRecent.player_id);
+                    const team = teams.find(t => t.id === mostRecent.team_id);
+                    if (!player || !team) return null;
+                    return (
+                      <div className="mt-2 flex items-center gap-2 bg-muted/30 rounded-lg px-3 py-1.5 text-xs md:text-sm">
+                        <span className="text-muted-foreground">Last:</span>
+                        <span className="font-semibold truncate">{player.full_name}</span>
+                        <span className="text-muted-foreground hidden sm:inline">to {team.team_name}</span>
+                        <span className="text-muted-foreground">R{mostRecent.round_number}</span>
+                      </div>
+                    );
+                  })()
+                ) : null}
+
+                {/* Queue badges - only show on desktop or if queue has items */}
+                {draftQueue.length > 0 && (
+                  <div className="mt-1.5 flex items-center gap-1.5 overflow-x-auto pb-0.5">
+                    <span className="text-[10px] text-muted-foreground flex-shrink-0">Queue:</span>
+                    {draftQueue.slice(0, 3).map((playerId) => {
+                      const player = availablePlayers.find(p => p.id === playerId);
+                      if (!player || draftedPlayerIds.has(playerId)) return null;
+                      return (
+                        <Badge key={playerId} variant="outline" className="text-[10px]">
+                          {player.full_name.split(' ').pop()}
+                        </Badge>
+                      );
+                    })}
+                    {draftQueue.length > 3 && (
+                      <Badge variant="outline" className="text-[10px]">+{draftQueue.length - 3}</Badge>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Draft Content */}
-            <div className="container mx-auto px-4 py-6">
-              <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <div className="container mx-auto px-2 sm:px-4 py-3 sm:py-6">
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-6">
                 {/* Main Draft Area */}
                 <div className="lg:col-span-3">
-                  <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                    <TabsList className="grid w-full grid-cols-3">
-                      <TabsTrigger value="players" className="flex items-center gap-2">
-                        <Users className="h-4 w-4" />
-                        Players
+                  <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-3 sm:space-y-6">
+                    {/* Mobile: 4 tabs (includes Roster). Desktop: 3 tabs (Roster in sidebar) */}
+                    <TabsList className="grid w-full grid-cols-4 lg:grid-cols-3 h-9 sm:h-10">
+                      <TabsTrigger value="players" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
+                        <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                        <span className="hidden sm:inline">Players</span>
+                        <span className="sm:hidden">Players</span>
                       </TabsTrigger>
-                      <TabsTrigger value="board" className="flex items-center gap-2">
-                        <Trophy className="h-4 w-4" />
+                      <TabsTrigger value="board" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
+                        <Trophy className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                         Board
                       </TabsTrigger>
-                      <TabsTrigger value="history" className="flex items-center gap-2">
-                        <History className="h-4 w-4" />
+                      <TabsTrigger value="history" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
+                        <History className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                         History
+                      </TabsTrigger>
+                      <TabsTrigger value="roster" className="flex items-center gap-1 text-xs px-1 lg:hidden">
+                        <Star className="h-3.5 w-3.5" />
+                        Roster
                       </TabsTrigger>
                     </TabsList>
 
@@ -2932,16 +2913,101 @@ const DraftRoom = () => {
 
                     {activeTab === 'history' && (
                       <TabsContent value="history" className="space-y-0">
-                        <DraftHistory 
+                        <DraftHistory
                           draftHistory={transformedDraftHistory}
                         />
+                      </TabsContent>
+                    )}
+
+                    {/* Mobile-only Roster tab (mirrors sidebar content) */}
+                    {activeTab === 'roster' && (
+                      <TabsContent value="roster" className="space-y-3 lg:hidden">
+                        {/* Team selector */}
+                        <Card className="p-3">
+                          <Select
+                            value={selectedTeamId || userTeam?.id || ''}
+                            onValueChange={setSelectedTeamId}
+                          >
+                            <SelectTrigger className="text-sm">
+                              <SelectValue placeholder="Select team" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {teams.map(team => (
+                                <SelectItem key={team.id} value={team.id}>
+                                  {team.team_name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </Card>
+
+                        {/* Selected team roster */}
+                        {(() => {
+                          const teamIdToShow = selectedTeamId || userTeam?.id;
+                          if (!teamIdToShow) return null;
+                          const selectedTeam = teams.find(t => t.id === teamIdToShow);
+                          if (!selectedTeam) return null;
+                          const teamPicks = transformedDraftHistory.filter(p => p.teamId === teamIdToShow);
+                          const teamPlayers = teamPicks.map(p => availablePlayers.find(ap => ap.id === p.playerId)).filter((p): p is Player => p !== undefined);
+                          return (
+                            <RosterDepthChart
+                              draftedPlayers={teamPlayers}
+                              draftPicks={draftHistory}
+                              currentRound={draftState?.currentRound || 1}
+                              totalRounds={draftSettings.rounds}
+                            />
+                          );
+                        })()}
+
+                        {/* Draft from selected player */}
+                        {currentTeam?.owner_id === user?.id && selectedPlayer && (
+                          <Card className="p-4 border-2 border-fantasy-primary shadow-lg bg-card">
+                            <div className="text-center mb-3">
+                              <div className="text-lg font-bold">{selectedPlayer.full_name}</div>
+                              <div className="text-xs text-muted-foreground flex items-center justify-center gap-2">
+                                <Badge variant="outline">{selectedPlayer.position}</Badge>
+                                <span>{selectedPlayer.team}</span>
+                                <span className="font-semibold text-fantasy-primary">{selectedPlayer.points} PTS</span>
+                              </div>
+                            </div>
+                            <Button
+                              onClick={(e) => { e.stopPropagation(); handlePlayerDraft(selectedPlayer); }}
+                              className="w-full bg-fantasy-primary hover:bg-fantasy-primary/90 py-4"
+                              size="lg"
+                              disabled={draftedPlayerIds.has(selectedPlayer.id)}
+                            >
+                              {draftedPlayerIds.has(selectedPlayer.id) ? 'Already Drafted' : 'Draft This Player'}
+                            </Button>
+                          </Card>
+                        )}
+
+                        {/* Commissioner controls on mobile */}
+                        {isCommissioner && (
+                          <details className="group">
+                            <summary className="cursor-pointer text-sm font-semibold mb-2 p-2 bg-muted/50 rounded hover:bg-muted/70 transition-colors text-destructive">
+                              Commissioner Controls
+                            </summary>
+                            <div className="mt-2 space-y-2">
+                              <DraftControls
+                                isDraftActive={!!league?.settings?.timerStartedAt}
+                                onPause={handlePauseDraft}
+                                onContinue={handleContinueDraft}
+                                canPause={!!league?.settings?.timerStartedAt && draftPhase === DraftPhase.ACTIVE}
+                                canContinue={!league?.settings?.timerStartedAt && draftPhase === DraftPhase.ACTIVE}
+                                onUndoLastPick={isCommissioner ? handleUndoLastPick : undefined}
+                                canUndo={isCommissioner && draftHistory.length > 0}
+                                pickTimeLimit={draftSettings.pickTimeLimit}
+                              />
+                            </div>
+                          </details>
+                        )}
                       </TabsContent>
                     )}
                   </Tabs>
                 </div>
 
-                {/* Right Sidebar - Teams */}
-                <div className="lg:col-span-1 space-y-4">
+                {/* Right Sidebar - Teams (hidden on mobile, shown on lg+) */}
+                <div className="hidden lg:block lg:col-span-1 space-y-4">
                   {/* Teams Selector */}
                   <Card>
                     <CardHeader>
@@ -3099,25 +3165,27 @@ const DraftRoom = () => {
 
                   {/* Floating Pause/Continue button for active drafts */}
                   {isCommissioner && draftPhase === DraftPhase.ACTIVE && (draftHistory?.length || 0) > 0 && (
-                    <div className="fixed bottom-4 right-4 z-50">
+                    <div className="fixed bottom-3 right-3 sm:bottom-4 sm:right-4 z-50">
                       {!!league?.settings?.timerStartedAt ? (
                         <Button
-                          size="lg"
+                          size="sm"
                           variant="destructive"
-                          className="shadow-lg"
+                          className="shadow-lg sm:h-10 sm:px-4 sm:text-sm"
                           onClick={handlePauseDraft}
                         >
-                          <Pause className="h-5 w-5 mr-2" />
-                          Pause Draft
+                          <Pause className="h-4 w-4 mr-1 sm:mr-2" />
+                          <span className="hidden sm:inline">Pause Draft</span>
+                          <span className="sm:hidden">Pause</span>
                         </Button>
                       ) : (
                         <Button
-                          size="lg"
-                          className="shadow-lg"
+                          size="sm"
+                          className="shadow-lg sm:h-10 sm:px-4 sm:text-sm"
                           onClick={handleContinueDraft}
                         >
-                          <Play className="h-5 w-5 mr-2" />
-                          Continue Draft
+                          <Play className="h-4 w-4 mr-1 sm:mr-2" />
+                          <span className="hidden sm:inline">Continue Draft</span>
+                          <span className="sm:hidden">Resume</span>
                         </Button>
                       )}
                     </div>
