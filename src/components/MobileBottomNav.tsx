@@ -1,17 +1,20 @@
 import { Link, useLocation } from 'react-router-dom';
 import { Home, Calendar, Users, LineChart, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
+import { useLeague } from '@/contexts/LeagueContext';
 
 const MobileBottomNav = () => {
   const location = useLocation();
   const [isMobile, setIsMobile] = useState(false);
+  const league = useLeague();
+  const activeLeagueId = league?.activeLeagueId ?? null;
 
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 1024);
     };
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
@@ -24,7 +27,7 @@ const MobileBottomNav = () => {
 
   const navItems = [
     { icon: Home, label: 'Home', path: '/' },
-    { icon: Calendar, label: 'Matchup', path: '/matchup' },
+    { icon: Calendar, label: 'Matchup', path: activeLeagueId ? `/matchup/${activeLeagueId}` : '/matchup' },
     { icon: Users, label: 'Roster', path: '/roster' },
     { icon: LineChart, label: 'Standings', path: '/standings' },
     { icon: User, label: 'Profile', path: '/profile' },
