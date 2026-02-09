@@ -660,8 +660,11 @@ const DraftRoom = () => {
     };
   }, [leagueId, user?.id]);
 
-  // POLLING FALLBACK: Reload picks + league every 3 seconds during active draft
+  // POLLING FALLBACK: Reload picks + league every 5 seconds during active draft
   // This ensures updates even if Supabase realtime has issues (like Yahoo/ESPN do)
+  // PERF: Increased from 3s to 5s since realtime handles the fast path. Polling
+  // is a safety net, not the primary mechanism. Also uses shallow comparison
+  // instead of JSON.stringify and only recreates Set when picks actually change.
   useEffect(() => {
     if (draftPhase !== DraftPhase.ACTIVE || !leagueId || !user?.id) return;
 
@@ -672,15 +675,18 @@ const DraftRoom = () => {
         const activePicks = picks.filter(p => !p.deleted_at);
 
         // Only update state if picks actually changed (avoid unnecessary re-renders)
+        let picksChanged = false;
         setDraftHistory(prev => {
-          if (prev.length !== activePicks.length) return activePicks;
-          // Check if the last pick changed
+          if (prev.length !== activePicks.length) { picksChanged = true; return activePicks; }
           const prevLast = prev[prev.length - 1];
           const newLast = activePicks[activePicks.length - 1];
-          if (prevLast?.id !== newLast?.id) return activePicks;
+          if (prevLast?.id !== newLast?.id) { picksChanged = true; return activePicks; }
           return prev;
         });
-        setDraftedPlayerIds(new Set(activePicks.map(p => p.player_id)));
+        // Only rebuild Set when picks actually changed
+        if (picksChanged) {
+          setDraftedPlayerIds(new Set(activePicks.map(p => p.player_id)));
+        }
 
         // Reload league for timerStartedAt and settings
         const { data: freshLeague } = await supabase
@@ -692,10 +698,11 @@ const DraftRoom = () => {
         if (freshLeague) {
           setLeague(prev => {
             if (!prev) return prev;
-            // Only update if something changed
-            const settingsChanged = JSON.stringify(prev.settings) !== JSON.stringify(freshLeague.settings);
+            // PERF: Shallow compare key fields instead of JSON.stringify
+            const timerChanged = prev.settings?.timerStartedAt !== freshLeague.settings?.timerStartedAt;
+            const limitChanged = prev.settings?.pickTimeLimit !== freshLeague.settings?.pickTimeLimit;
             const statusChanged = prev.draft_status !== freshLeague.draft_status;
-            if (!settingsChanged && !statusChanged) return prev;
+            if (!timerChanged && !limitChanged && !statusChanged) return prev;
             return {
               ...prev,
               settings: freshLeague.settings || prev.settings,
@@ -731,13 +738,15 @@ const DraftRoom = () => {
           }
         }
 
-        // Reload draft state to keep pick/round/team current
-        await loadDraftState();
+        // Only reload draft state if picks changed (skip redundant call when realtime already handled it)
+        if (picksChanged) {
+          await loadDraftState();
+        }
       } catch (err) {
         // Silent fail - polling is best-effort
         logger.debug('DraftRoom: Poll error (non-critical):', err);
       }
-    }, 3000);
+    }, 5000);
 
     return () => clearInterval(pollInterval);
   }, [draftPhase, leagueId, user?.id]);
@@ -1076,9 +1085,10 @@ const DraftRoom = () => {
     }
   };
 
-  const currentTeam = draftState?.nextTeamId && teams && teams.length > 0
-    ? teams.find(t => t.id === draftState.nextTeamId) || null
-    : null;
+  const currentTeam = useMemo(() => {
+    if (!draftState?.nextTeamId || !teams || teams.length === 0) return null;
+    return teams.find(t => t.id === draftState.nextTeamId) || null;
+  }, [draftState?.nextTeamId, teams]);
 
   // Track the last pick number to prevent unnecessary timer resets
   const lastPickNumberRef = useRef<number>(0);
@@ -1173,6 +1183,14 @@ const DraftRoom = () => {
   // SERVER-TIMESTAMP-BASED TIMER
   // All clients compute remaining time from league.settings.timerStartedAt
   // This ensures perfect sync across commissioner and all members
+  //
+  // PERF: Only depends on timerStartedAt and pickTimeLimit to avoid unnecessary
+  // interval recreation. Other values accessed via refs to prevent stale closures.
+  const draftPhaseRef = useRef(draftPhase);
+  const currentTeamRef = useRef(currentTeam);
+  useEffect(() => { draftPhaseRef.current = draftPhase; }, [draftPhase]);
+  useEffect(() => { currentTeamRef.current = currentTeam; }, [currentTeam]);
+
   useEffect(() => {
     const cleanup = () => {
       if (timerIntervalRef.current) {
@@ -1186,17 +1204,17 @@ const DraftRoom = () => {
       timerRunningRef.current = false;
     };
 
+    const timerStartedAt = league?.settings?.timerStartedAt;
+    const timeLimit = draftSettings.pickTimeLimit;
+
     // Don't run timer if not in active draft with valid state
-    if (draftPhase !== DraftPhase.ACTIVE || !draftState || !currentTeam) {
+    if (draftPhaseRef.current !== DraftPhase.ACTIVE || !draftState || !currentTeamRef.current) {
       cleanup();
-      if (!league?.settings?.timerStartedAt) {
-        setTimeRemaining(draftSettings.pickTimeLimit);
+      if (!timerStartedAt) {
+        setTimeRemaining(timeLimit);
       }
       return cleanup;
     }
-
-    const timeLimit = draftSettings.pickTimeLimit;
-    const timerStartedAt = league?.settings?.timerStartedAt;
 
     // No server timestamp yet = commissioner hasn't started the timer
     if (!timerStartedAt) {
@@ -1205,7 +1223,7 @@ const DraftRoom = () => {
     }
 
     const timerStartMs = new Date(timerStartedAt).getTime();
-    const isAITeam = !currentTeam.owner_id;
+    const isAITeam = !currentTeamRef.current.owner_id;
 
     // For AI teams, auto-pick after 2 seconds
     if (isAITeam) {
@@ -1236,29 +1254,34 @@ const DraftRoom = () => {
     timerRunningRef.current = true;
 
     return cleanup;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftPhase, draftState?.currentPick, draftState?.nextTeamId, currentTeam?.id, draftSettings.pickTimeLimit, league?.settings?.timerStartedAt]);
+    // Only recreate interval when the server timestamp changes (new pick) or time limit changes
+  }, [league?.settings?.timerStartedAt, draftSettings.pickTimeLimit, draftState?.currentPick]);
 
   // Auto-start draft at scheduled time (commissioner only)
-  // Checks every 5 seconds if the scheduled draft time has arrived
+  // PERF: Uses a single setTimeout to the exact scheduled time instead of
+  // polling every 5 seconds. Saves ~12 interval fires per minute.
   useEffect(() => {
     if (!isCommissioner || !league?.scheduled_draft_time || draftPhase !== DraftPhase.LOBBY) return;
     if (league?.draft_status === 'in_progress' || league?.draft_status === 'completed') return;
 
-    const checkSchedule = () => {
-      const scheduledTime = new Date(league.scheduled_draft_time!).getTime();
-      const now = Date.now();
-      if (now >= scheduledTime) {
-        logger.log('Scheduled draft time reached, auto-starting draft');
-        // Use current draft settings to start
-        handleStartDraft(draftSettings);
-      }
-    };
+    const scheduledTime = new Date(league.scheduled_draft_time).getTime();
+    const now = Date.now();
+    const msUntilStart = scheduledTime - now;
 
-    // Check immediately, then every 5 seconds
-    checkSchedule();
-    const interval = setInterval(checkSchedule, 5000);
-    return () => clearInterval(interval);
+    if (msUntilStart <= 0) {
+      // Already past scheduled time — start immediately
+      logger.log('Scheduled draft time already passed, auto-starting draft');
+      handleStartDraft(draftSettings);
+      return;
+    }
+
+    // Set a single timeout for the exact moment
+    logger.log(`Draft scheduled in ${Math.round(msUntilStart / 1000)}s`);
+    const timeout = setTimeout(() => {
+      logger.log('Scheduled draft time reached, auto-starting draft');
+      handleStartDraft(draftSettings);
+    }, msUntilStart);
+    return () => clearTimeout(timeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCommissioner, league?.scheduled_draft_time, league?.draft_status, draftPhase]);
 

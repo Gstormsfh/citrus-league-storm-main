@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, memo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,8 @@ interface PlayerPoolProps {
   onToggleWatchlist?: (playerId: string) => void;
   queue?: string[];
   watchlist?: Set<string>;
+  /** Pre-built Set for O(1) drafted lookups (optional, built from draftedPlayers if not provided) */
+  draftedPlayerSet?: Set<string>;
 }
 
 // Normalize position (L -> LW, R -> RW)
@@ -31,17 +33,18 @@ const normalizePosition = (pos: string): string => {
   return upper;
 };
 
-export const PlayerPool = ({ 
-  onPlayerSelect, 
-  onPlayerDraft, 
-  selectedPlayer, 
-  draftedPlayers, 
+export const PlayerPool = ({
+  onPlayerSelect,
+  onPlayerDraft,
+  selectedPlayer,
+  draftedPlayers,
   isDraftActive,
   availablePlayers,
   onAddToQueue,
   onToggleWatchlist,
   queue = [],
-  watchlist = new Set()
+  watchlist = new Set(),
+  draftedPlayerSet: externalDraftedSet
 }: PlayerPoolProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPosition, setSelectedPosition] = useState('All');
@@ -49,17 +52,23 @@ export const PlayerPool = ({
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [showDrafted, setShowDrafted] = useState(false);
 
+  // PERF: Use pre-built Set for O(1) lookups instead of O(n) Array.includes on every player
+  const draftedSet = useMemo(() => {
+    return externalDraftedSet || new Set(draftedPlayers);
+  }, [externalDraftedSet, draftedPlayers]);
 
   const filteredAndSortedPlayers = useMemo(() => {
+    const lowerSearch = searchTerm.toLowerCase();
+    const normalizedFilterPos = normalizePosition(selectedPosition);
+
     const filtered = availablePlayers.filter(player => {
-      const matchesSearch = player.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           player.team.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = player.full_name.toLowerCase().includes(lowerSearch) ||
+                           player.team.toLowerCase().includes(lowerSearch);
       const normalizedPlayerPos = normalizePosition(player.position);
-      const normalizedFilterPos = normalizePosition(selectedPosition);
-      const matchesPosition = selectedPosition === 'All' || 
+      const matchesPosition = selectedPosition === 'All' ||
         normalizedPlayerPos === normalizedFilterPos ||
         (selectedPosition === 'F' && ['C', 'LW', 'RW'].includes(normalizedPlayerPos));
-      const isDrafted = draftedPlayers.includes(player.id);
+      const isDrafted = draftedSet.has(player.id);
       const matchesDraftStatus = showDrafted ? true : !isDrafted;
       
       return matchesSearch && matchesPosition && matchesDraftStatus;
@@ -173,7 +182,7 @@ export const PlayerPool = ({
   // Mobile card view for a player
   const PlayerCard = ({ player }: { player: Player }) => {
     const isSelected = selectedPlayer?.id === player.id;
-    const isDrafted = draftedPlayers.includes(player.id);
+    const isDrafted = draftedSet.has(player.id);
     const isInQueue = queue.includes(player.id);
 
     return (
@@ -234,7 +243,7 @@ export const PlayerPool = ({
   // Desktop table row for a player
   const PlayerRow = ({ player }: { player: Player }) => {
     const isSelected = selectedPlayer?.id === player.id;
-    const isDrafted = draftedPlayers.includes(player.id);
+    const isDrafted = draftedSet.has(player.id);
     const isInQueue = queue.includes(player.id);
 
     return (
@@ -441,7 +450,7 @@ export const PlayerPool = ({
       </div>
 
       {/* Mobile: Card list view */}
-      <div className="md:hidden border border-fantasy-border rounded-lg overflow-hidden bg-[#E8EED9]/50 backdrop-blur-sm max-h-[60vh] overflow-y-auto">
+      <div className="md:hidden border border-fantasy-border rounded-lg overflow-hidden bg-[#E8EED9]/50 backdrop-blur-sm max-h-[60vh] overflow-y-auto scrollbar-styled">
         {filteredAndSortedPlayers.map(player => (
           <PlayerCard key={player.id} player={player} />
         ))}
