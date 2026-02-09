@@ -7,7 +7,7 @@ import {
   LogOut, Home, FileText, Headphones, BookOpen, CircleUser, Sparkles,
   Trophy, ChevronDown, UserPlus
 } from 'lucide-react';
-import { CitrusSlice, CitrusSparkle } from '@/components/icons/CitrusIcons';
+import { CitrusSlice, CitrusSparkle, CitrusLogo } from '@/components/icons/CitrusIcons';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
@@ -119,14 +119,9 @@ const Navbar = () => {
         <div className="flex items-center justify-between">
           {/* Logo with Citrus Slice - Vintage Varsity Style */}
           <Link to="/" className="flex items-center gap-2 lg:gap-3 group relative">
-            {/* Logo icon - smaller on mobile */}
-            <div className="w-9 h-9 lg:w-11 lg:h-11 rounded-varsity bg-gradient-to-br from-citrus-sage to-citrus-green-medium border-2 lg:border-3 border-citrus-forest/20 flex items-center justify-center shadow-patch group-hover:shadow-varsity group-hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden">
-              {/* Background pattern */}
-              <div className="absolute inset-0 opacity-20">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(255,255,255,0.3)_0%,_transparent_60%)]"></div>
-              </div>
-              {/* Citrus Slice Icon */}
-              <CitrusSlice className="w-5 h-5 lg:w-7 lg:h-7 relative z-10 text-[#E8EED9] group-hover:rotate-12 transition-transform duration-300" />
+            {/* Logo icon - colorful citrus circle */}
+            <div className="w-9 h-9 lg:w-11 lg:h-11 flex items-center justify-center group-hover:-translate-y-0.5 transition-all duration-300">
+              <CitrusLogo className="w-9 h-9 lg:w-11 lg:h-11 drop-shadow-md group-hover:drop-shadow-lg group-hover:rotate-12 transition-all duration-300" />
             </div>
             {/* Text - hidden on mobile, shown on tablet+ */}
             <div className="hidden sm:flex flex-col">
