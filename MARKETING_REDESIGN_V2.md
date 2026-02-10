@@ -55,7 +55,7 @@ Accuracy    Finishes      Writeups
 ### Updated Header
 **Before:** "Everything You Need To Crush Your League"  
 **After:** "The Data That Wins Championships"  
-**Subhead:** "We process 10M+ data points per game"
+**Subhead:** "Play-by-play driven projections that give you the edge"
 
 ### Feature Cards - Impressive & Specific
 
@@ -86,7 +86,7 @@ Accuracy    Finishes      Writeups
 
 ### Bottom Badge
 **Before:** "Join 5,000+ players"  
-**After:** "Processing 10M+ data points per game"
+**After:** "Play-by-play driven projections that give you the edge"
 
 ---
 
@@ -108,7 +108,7 @@ Accuracy    Finishes      Writeups
 ### 1. Data Quality
 - 98.7% accuracy (specific, measurable)
 - 200+ data points per player
-- 10M+ data points per game
+- Play-by-play event processing
 - xGF%, deployment, zone entries
 
 ### 2. Scale & Coverage
@@ -138,7 +138,7 @@ Accuracy    Finishes      Writeups
 **Added:**
 - More specific data points
 - Technical terminology that impresses
-- Scale indicators (700+, 10M+, 200+)
+- Scale indicators (700+, 200+)
 
 ---
 
