@@ -10,12 +10,12 @@ After your question "don't you think we're switching IPs too often?", I've optim
 
 | Metric | Yahoo/Sleeper | Our Service | Winner |
 |--------|---------------|-------------|--------|
-| **LIVE game updates** | 60-90 seconds | **30 seconds** | 🍋 **We're 2-3x faster!** |
+| **LIVE game updates** | 60-90 seconds | **Periodic polling** | ✅ **Comparable** |
 | **FINAL game checks** | Every 15+ min | Every 30 min (cached) | ✅ Equal efficiency |
 | **Stat correction window** | ~24 hours | **24 hours** | ✅ Equal |
 | **Stat correction checks** | Unknown (likely 2-4h) | **Every 2 hours** | ✅ Matches or beats |
 | **IP efficiency** | Unknown | **53% reduction** | 🍋 **We're smarter!** |
-| **Goal-to-app latency** | 45-60 seconds | **30-35 seconds** | 🍋 **We're 25% faster!** |
+| **Goal-to-app latency** | Varies by platform | **Periodic polling** | ✅ **Comparable** |
 
 ### Result: We're BETTER than Yahoo/Sleeper! ✅
 
@@ -108,9 +108,9 @@ TOTAL: 8,754 IPs per day
 
 ### What We NEVER Miss
 
-✅ **Live Goals** - Detected within 30 seconds (faster than Yahoo!)  
-✅ **Stat Changes During Game** - Checked every 30 seconds  
-✅ **Game State Changes** - Detected within 30-120 seconds  
+✅ **Live Goals** - Detected via periodic polling
+✅ **Stat Changes During Game** - Checked periodically
+✅ **Game State Changes** - Detected via adaptive polling
 ✅ **Stat Corrections (Day 1)** - Checked every 2 hours for 24h  
 ✅ **Matchup Scores** - Recalculated from DB every sync  
 
@@ -221,30 +221,16 @@ Result: Self-healing, no manual intervention needed
 
 ## Performance Benchmarks
 
-### Latency (Goal Scored → User Sees It)
+### Data Flow (Goal Scored → Database Updated)
 
 **Our Service:**
 ```
-NHL Event occurs → NHL API updates (5-10s)
-                 → Our service polls (0-30s avg: 15s)
-                 → Process data (0.5s)
-                 → Update DB (0.5s)
-                 → User refreshes (<1s)
-                 
-TOTAL: 21-42 seconds (avg: 31.5s)
+NHL Event occurs → NHL API updates
+                 → Our service polls periodically
+                 → Process data
+                 → Update DB
+                 → User sees on next refresh
 ```
-
-**Yahoo:**
-```
-Estimated: 45-60 seconds (based on user reports)
-```
-
-**Sleeper:**
-```
-Estimated: 40-55 seconds (based on user reports)
-```
-
-**Winner:** 🍋 We're 25-50% faster!
 
 ---
 
@@ -362,19 +348,16 @@ def process_single_game(game_id):
 ## Competitive Advantage
 
 ### vs Yahoo
-- ✅ **Faster live updates** (30s vs 60-90s)
 - ✅ **Same stat correction window** (24h)
 - ✅ **More efficient** (70% less overhead)
-- ✅ **Better monitoring** (real-time IP tracking)
+- ✅ **Better monitoring** (IP tracking)
 
 ### vs Sleeper
-- ✅ **Faster live updates** (30s vs 60-90s)
 - ✅ **Same stat correction window** (24h)
 - ✅ **More transparent** (users can see system status)
 - ✅ **More reliable** (self-healing cache)
 
 ### vs ESPN
-- ✅ **MUCH faster** (30s vs 5+ minutes!)
 - ✅ **Better data** (NHL API direct vs delayed feed)
 - ✅ **More categories** (we track everything)
 
@@ -407,9 +390,8 @@ def process_single_game(game_id):
 
 ### What We Achieved
 
-✅ **70% reduction in IP usage**  
-✅ **25% faster than Yahoo/Sleeper for live goals**  
-✅ **100% stat correction accuracy** (24h window)  
+✅ **70% reduction in IP usage**
+✅ **100% stat correction accuracy** (24h window)
 ✅ **Zero data quality loss**  
 ✅ **Better monitoring and transparency**  
 ✅ **Self-managing and self-healing**  
@@ -423,7 +405,7 @@ def process_single_game(game_id):
 
 ### Data Quality
 
-- **Live games:** 30 seconds (best in class)
+- **Live games:** Periodic polling during games
 - **Stat corrections:** 2-hour checks for 24h (matches Yahoo/Sleeper)
 - **Final games:** Cached efficiently (same as Yahoo/Sleeper)
 - **Matchup scores:** Always accurate (updated every sync)

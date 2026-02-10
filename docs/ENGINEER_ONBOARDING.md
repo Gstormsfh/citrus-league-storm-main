@@ -43,7 +43,7 @@ Citrus Fantasy Sports is a **next-generation fantasy hockey platform** designed 
 4. **Better Performance**: Optimized caching reduces egress by 88%
 
 **Target Users:**
-Hardcore fantasy hockey players in Canada who want deeper analytics and faster updates than Yahoo/ESPN provide.
+Hardcore fantasy hockey players in Canada who want deeper analytics and better tools than Yahoo/ESPN provide.
 
 **Current Status:**
 - ✅ MVP complete (draft, roster management, matchups, waivers)

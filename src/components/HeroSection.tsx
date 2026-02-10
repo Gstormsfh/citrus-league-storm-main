@@ -23,7 +23,7 @@ const HeroSection = () => {
           </h1>
           
           <p className="text-lg md:text-xl mb-4 text-citrus-forest max-w-lg font-sans font-medium leading-relaxed">
-            <span className="font-black text-citrus-green-dark drop-shadow-[0_1px_2px_rgba(255,255,255,0.5)]">98.7% projection accuracy.</span> Writeups for all 700+ NHL players. Live scoring with <span className="font-black text-citrus-green-dark drop-shadow-[0_1px_2px_rgba(255,255,255,0.5)]">sub-second latency.</span> Saturday finishes when the entire league is playing.
+            <span className="font-black text-citrus-green-dark drop-shadow-[0_1px_2px_rgba(255,255,255,0.5)]">98.7% projection accuracy.</span> Writeups for all 700+ NHL players. <span className="font-black text-citrus-green-dark drop-shadow-[0_1px_2px_rgba(255,255,255,0.5)]">Saturday finishes</span> when the entire league is playing.
           </p>
           
           <p className="text-base md:text-lg mb-10 text-citrus-forest/80 max-w-lg font-sans leading-relaxed">
@@ -55,8 +55,8 @@ const HeroSection = () => {
               <div className="text-xs text-citrus-forest font-display uppercase tracking-wide font-bold">Accuracy</div>
             </div>
             <div className="bg-[#E8EED9]/80 backdrop-blur-sm border-2 border-citrus-green-dark/40 rounded-xl p-4 text-center shadow-md">
-              <div className="font-varsity text-2xl font-black text-citrus-green-dark drop-shadow-[0_1px_2px_rgba(255,255,255,0.5)] mb-1">&lt;1s</div>
-              <div className="text-xs text-citrus-forest font-display uppercase tracking-wide font-bold">Live Scoring</div>
+              <div className="font-varsity text-2xl font-black text-citrus-green-dark drop-shadow-[0_1px_2px_rgba(255,255,255,0.5)] mb-1">SAT</div>
+              <div className="text-xs text-citrus-forest font-display uppercase tracking-wide font-bold">Finishes</div>
             </div>
             <div className="bg-[#E8EED9]/80 backdrop-blur-sm border-2 border-citrus-orange/60 rounded-xl p-4 text-center shadow-md">
               <div className="font-varsity text-2xl font-black text-citrus-orange drop-shadow-[0_1px_2px_rgba(255,255,255,0.5)] mb-1">700+</div>

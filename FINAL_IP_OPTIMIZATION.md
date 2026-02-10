@@ -200,8 +200,8 @@ def process_single_game(game_id):
 - Sequential calls from same IP = faster
 - Better connection reuse
 
-### 4. Still World-Class
-- ✅ Live games: 30s updates (unchanged - still best in class)
+### 4. Data Quality Maintained
+- ✅ Live games: Periodic polling (unchanged)
 - ✅ Stat corrections: 2h checks for 24h (unchanged)
 - ✅ Data quality: 100% (unchanged)
 - ✅ IP efficiency: 78% better (NEW!)
@@ -214,7 +214,7 @@ def process_single_game(game_id):
 
 | Metric | Yahoo/Sleeper | Old Citrus | New Citrus | Winner |
 |--------|---------------|------------|------------|--------|
-| **Live updates** | 60-90s | 30s | **30s** | 🍋 **Unchanged - still better!** |
+| **Live updates** | 60-90s | Periodic | **Periodic** | ✅ **Comparable** |
 | **IP efficiency** | Unknown | Wasteful | **78% optimized** | 🍋 **Now better!** |
 | **Cost per 1M stats** | Unknown | $20 | **$4.30** | 🍋 **78% cheaper!** |
 
@@ -308,7 +308,7 @@ I optimized caching but didn't notice we were using 2 IPs per game!
 - **Daily IPs:** 19,800 → 4,300 (15,500 saved!)
 - **Cost savings:** $465/month
 - **Data quality:** Unchanged (100%)
-- **Speed:** Unchanged (best in class)
+- **Data quality:** Unchanged (100%)
 
 ---
 

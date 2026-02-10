@@ -31,20 +31,20 @@
 ### Data-Focused Copy
 **Key Stats Featured:**
 - **98.7% projection accuracy** - specific, impressive, credible
-- **Sub-second latency** - technical spec that matters
+- **Saturday finishes** - when all the hockey is happening
 - **700+ player writeups** - massive scale
 
 **Social Proof Replacement:**
 Removed generic "5,000+ players joined" badges  
 Added data-driven stat cards:
 ```
-[98.7%]     [<1s]        [700+]
-Accuracy    Live Scoring  Writeups
+[98.7%]     [SAT]        [700+]
+Accuracy    Finishes      Writeups
 ```
 
 ### Copy Highlights
 - "98.7% projection accuracy" (leads with strongest data point)
-- "Sub-second latency" (technical superiority)
+- "Saturday finishes" (peak hockey timing)
 - "Real-time xGF%, deployment patterns, line combos"
 - "Our AI watches every shift"
 
@@ -72,9 +72,9 @@ Accuracy    Live Scoring  Writeups
    - Every NHL player, every game
    - Massive scale demonstrated
 
-4. **Sub-Second Live Scoring**
-   - "Real-time data pipeline"
-   - "Faster than ESPN can load"
+4. **Live Scoring Updates**
+   - "Our data pipeline processes goals, assists, and stats"
+   - "Watch your scores shift with every goal"
 
 5. **AI That Watches Every Shift**
    - Ice time, PP deployment, line combos
@@ -116,9 +116,9 @@ Accuracy    Live Scoring  Writeups
 - Every NHL player, every game
 - Real-time processing
 
-### 3. Technical Superiority
-- Sub-second live scoring
-- Real-time data pipeline
+### 3. Smart Technology
+- Live scoring updates
+- Robust data pipeline
 - AI that watches every shift
 
 ### 4. Saturday Finish
@@ -158,7 +158,6 @@ Accuracy    Live Scoring  Writeups
 - Vague marketing speak
 
 **Added:**
-- Technical specifications
 - Impressive scale numbers
 - Data processing capabilities
 - Competitive advantages

@@ -30,8 +30,8 @@ const features = [
   },
   {
     icon: <Zap className="h-8 w-8" />,
-    title: "Sub-Second Live Scoring",
-    description: "Real-time data pipeline processes goals, assists, and stats faster than ESPN can load. Watch your matchup shift with every goal.",
+    title: "Live Scoring Updates",
+    description: "Our data pipeline processes goals, assists, and stats so your matchup stays current. Watch your scores shift with every goal.",
     color: "sage"
   },
   {

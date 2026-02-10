@@ -19,7 +19,7 @@ interface CacheEntry<T> {
 
 // Default TTLs (in milliseconds)
 const TTL = {
-  SHORT: 30 * 1000,        // 30 seconds - for live scores
+  SHORT: 30 * 1000,        // 30 seconds - for frequently updated data
   MEDIUM: 2 * 60 * 1000,   // 2 minutes - for roster/lineup data
   LONG: 5 * 60 * 1000,     // 5 minutes - for player stats
   VERY_LONG: 15 * 60 * 1000, // 15 minutes - for static data

@@ -143,7 +143,7 @@ except Exception as e:
 
 | Mode | Condition | Interval | Why |
 |------|-----------|----------|-----|
-| 🔴 **LIVE** | Games in progress | 30s | McDavid scores → your app in 30-35s |
+| 🔴 **LIVE** | Games in progress | 30s | Detect goals and stat changes |
 | ⏸️  **INTERMISSION** | Games on break | 60s | Moderate checking |
 | 📅 **PRE-GAME** | Games scheduled, not started | 2min | Waiting for puck drop |
 | 😴 **OFF-HOURS** | No games today or late night | 5min | Save bandwidth |
@@ -203,7 +203,7 @@ This means something is seriously wrong (DB connection, API issues, etc.)
 - **Matchup updates**: 30 matchups in ~1 second
 
 ### Expected Performance
-- **McDavid scores**: 30-35 seconds to your app
+- **Goal detection**: Periodic polling during live games
 - **Full slate processing**: 4-6 seconds for 10 games
 - **Uptime**: 24/7 with auto-recovery
 - **Success rate**: >99% under normal conditions
@@ -272,7 +272,7 @@ You checked at **22:36:35**. The service last synced at **22:35:15** and was sch
 After 23:00 MT (11pm), it switches to 5-minute intervals to save bandwidth.
 
 ### Why This Matters for Fantasy Hockey
-- **Live games**: 30-second updates = near-real-time scoring
+- **Live games**: Periodic updates for scoring
 - **Between games**: 2-minute checks = catch late-starting games
 - **Off hours**: 5-minute checks = save bandwidth without missing anything
 - **Nightly**: Deep processing ensures all stats are accurate next day
@@ -299,7 +299,7 @@ After 23:00 MT (11pm), it switches to 5-minute intervals to save bandwidth.
 - Clean shutdown statistics when you stop it
 
 ### Performance Impact
-- **Zero impact on speed** (still 30-35s for live goals)
+- **Zero impact on data collection** (live game polling unchanged)
 - **Better reliability** (auto-recovery from errors)
 - **Better visibility** (health checks and metrics)
 - **Proper nightly maintenance** (no more missing xG data)

@@ -337,8 +337,8 @@ logger.info(f"Cache hit rate: {hit_rate:.1%}")
 
 ## Questions & Answers
 
-### Q: Will this affect real-time scoring?
-**A:** No! LIVE games are NEVER cached. They're always fetched fresh every 30 seconds.
+### Q: Will this affect live scoring?
+**A:** No! LIVE games are NEVER cached. They're always fetched fresh during games.
 
 ### Q: What if a FINAL game changes?
 **A:** NHL API only marks games FINAL when truly complete. Stat corrections happen server-side, not via API changes.
