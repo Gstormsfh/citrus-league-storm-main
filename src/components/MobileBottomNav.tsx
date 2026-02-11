@@ -22,17 +22,20 @@ const MobileBottomNav = () => {
     };
   }, []);
 
+  // Build paths: only Matchup needs the league ID in its route
   const navItems = [
     { icon: Home, label: 'Home', path: '/' },
-    { icon: Calendar, label: 'Matchup', path: activeLeagueId ? `/matchup/${activeLeagueId}` : '/matchup', requiresLeague: true },
-    { icon: Users, label: 'Roster', path: '/roster', requiresLeague: true },
-    { icon: BarChart3, label: 'Standings', path: '/standings', requiresLeague: true },
+    { icon: Calendar, label: 'Matchup', path: activeLeagueId ? `/matchup/${activeLeagueId}` : '/matchup' },
+    { icon: Users, label: 'Roster', path: '/roster' },
+    { icon: BarChart3, label: 'Standings', path: '/standings' },
     { icon: User, label: user ? 'Profile' : 'Sign In', path: user ? '/profile' : '/auth' },
   ];
 
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';
-    return location.pathname.startsWith(path);
+    // Match on the base segment (e.g. /matchup, /roster)
+    const base = '/' + path.split('/')[1];
+    return location.pathname.startsWith(base);
   };
 
   // Don't show on auth pages or certain routes
@@ -51,7 +54,6 @@ const MobileBottomNav = () => {
       )}
       style={{
         paddingBottom: 'env(safe-area-inset-bottom)',
-        /* GPU-promote without willChange to avoid iOS fixed-position drift */
         backfaceVisibility: 'hidden',
         WebkitBackfaceVisibility: 'hidden',
       }}
@@ -63,26 +65,16 @@ const MobileBottomNav = () => {
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.path);
-          const disabled = item.requiresLeague && !activeLeagueId;
-
-          let actualPath = item.path;
-          if (item.requiresLeague && activeLeagueId) {
-            actualPath = `${item.path}/${activeLeagueId}`;
-          }
 
           return (
             <Link
-              key={item.path}
-              to={disabled ? '#' : actualPath}
+              key={item.label}
+              to={item.path}
               className={cn(
                 "flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] rounded-2xl transition-all duration-200",
                 "ios-pressable",
                 active && "bg-citrus-sage/20",
-                disabled && "opacity-40 pointer-events-none"
               )}
-              onClick={(e) => {
-                if (disabled) e.preventDefault();
-              }}
             >
               <div className={cn(
                 "relative flex items-center justify-center w-8 h-8 rounded-xl transition-all duration-300",

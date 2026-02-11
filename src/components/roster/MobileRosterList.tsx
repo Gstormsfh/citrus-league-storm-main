@@ -17,21 +17,21 @@ const getPositionAbbr = (pos: string) => {
 };
 
 const posColor: Record<string, string> = {
-  LW: 'bg-blue-500',
+  LW: 'bg-citrus-green-dark',
   C: 'bg-citrus-sage',
-  RW: 'bg-purple-500',
-  D: 'bg-slate-500',
-  G: 'bg-amber-500',
-  UTIL: 'bg-citrus-orange',
+  RW: 'bg-citrus-orange',
+  D: 'bg-citrus-forest',
+  G: 'bg-citrus-peach text-citrus-forest',
+  UTIL: 'bg-citrus-green-medium',
 };
 
 const posRingColor: Record<string, string> = {
-  LW: 'ring-blue-500/30',
+  LW: 'ring-citrus-green-dark/30',
   C: 'ring-citrus-sage/30',
-  RW: 'ring-purple-500/30',
-  D: 'ring-slate-400/30',
-  G: 'ring-amber-500/30',
-  UTIL: 'ring-citrus-orange/30',
+  RW: 'ring-citrus-orange/30',
+  D: 'ring-citrus-forest/30',
+  G: 'ring-citrus-peach/50',
+  UTIL: 'ring-citrus-green-medium/30',
 };
 
 // ─── Interfaces ──────────────────────────────────────────────────────
@@ -280,7 +280,7 @@ const MobileRosterList = ({
       <SectionHeader
         label="Defense"
         count={defenseSlots.filter(s => getPlayerInSlot(s) != null).length}
-        icon={<Shield className="w-4 h-4 text-slate-400" />}
+        icon={<Shield className="w-4 h-4 text-citrus-forest" />}
       />
       {renderSlotRows(defenseSlots)}
 
@@ -288,7 +288,7 @@ const MobileRosterList = ({
       <SectionHeader
         label="Goalies"
         count={goalieSlots.filter(s => getPlayerInSlot(s) != null).length}
-        icon={<Shield className="w-4 h-4 text-amber-500" />}
+        icon={<Shield className="w-4 h-4 text-citrus-peach" />}
       />
       {renderSlotRows(goalieSlots)}
 
@@ -296,7 +296,7 @@ const MobileRosterList = ({
       <SectionHeader
         label="Utility"
         count={utilSlots.filter(s => getPlayerInSlot(s) != null).length}
-        icon={<CitrusSparkle className="w-4 h-4 text-citrus-orange" />}
+        icon={<CitrusSparkle className="w-4 h-4 text-citrus-green-medium" />}
       />
       {renderSlotRows(utilSlots)}
 
