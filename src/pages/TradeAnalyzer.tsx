@@ -105,31 +105,80 @@ const TradeAnalyzer = () => {
         }
         
         // STEP 2: Only if draft is completed, load the rest
+        const allPlayers = await PlayerService.getAllPlayers();
+        if (!isMounted) return;
+
         if (user && activeLeagueId) {
-          const { data: team } = await supabase
+          // Real league: load from database
+          const { data: myTeamData } = await supabase
             .from('teams')
-            .select('id')
+            .select('id, team_name')
             .eq('league_id', activeLeagueId)
             .eq('owner_id', user.id)
             .maybeSingle();
-          
-          if (team && isMounted) {
-            setMyTeamId(team.id);
-            loadTradeOffers(team.id).catch(() => {});
+
+          if (myTeamData && isMounted) {
+            setMyTeamId(myTeamData.id);
+            loadTradeOffers(myTeamData.id).catch(() => {});
           }
+          if (!isMounted) return;
+
+          // Load all teams in the league
+          const { data: leagueTeams } = await supabase
+            .from('teams')
+            .select('id, team_name, owner_id')
+            .eq('league_id', activeLeagueId);
+
+          if (!leagueTeams || !isMounted) return;
+
+          // Load roster assignments for all teams in this league
+          const { data: rosterAssignments } = await supabase
+            .from('roster_assignments')
+            .select('team_id, player_id')
+            .eq('league_id', activeLeagueId);
+
+          if (!isMounted) return;
+
+          // Build a map of team_id -> player IDs
+          const teamRosters = new Map<string, string[]>();
+          (rosterAssignments || []).forEach((ra: { team_id: string; player_id: string }) => {
+            const existing = teamRosters.get(ra.team_id) || [];
+            existing.push(ra.player_id);
+            teamRosters.set(ra.team_id, existing);
+          });
+
+          // Build player lookup by ID
+          const playerMap = new Map<string, Player>();
+          allPlayers.forEach(p => playerMap.set(String(p.id), p));
+
+          // Set my team roster
+          const myPlayerIds = myTeamData ? (teamRosters.get(myTeamData.id) || []) : [];
+          const myRoster = myPlayerIds.map(id => playerMap.get(id)).filter((p): p is Player => !!p);
+          setMyTeamRoster(myRoster);
+
+          // Build opponent teams
+          const opponents: LeagueTeam[] = leagueTeams
+            .filter(t => t.id !== myTeamData?.id)
+            .map((t, idx) => {
+              const playerIds = teamRosters.get(t.id) || [];
+              const roster = playerIds.map(id => playerMap.get(id)).filter((p): p is Player => !!p);
+              return {
+                id: t.id,
+                name: t.team_name || `Team ${idx + 1}`,
+                logo: t.team_name?.substring(0, 2).toUpperCase() || '??',
+                roster
+              };
+            });
+          setOpponentTeams(opponents);
+        } else {
+          // Demo/guest mode: use static demo data
+          const teams = await LeagueService.getAllTeamsWithRosters(allPlayers);
+          if (!isMounted) return;
+          const myTeam = await LeagueService.getMyTeam(allPlayers);
+          if (!isMounted) return;
+          setMyTeamRoster(myTeam);
+          setOpponentTeams(teams.filter(t => t.id !== 3));
         }
-        
-        const allPlayers = await PlayerService.getAllPlayers();
-        if (!isMounted) return;
-        
-        const teams = await LeagueService.getAllTeamsWithRosters(allPlayers);
-        if (!isMounted) return;
-        
-        const myTeam = await LeagueService.getMyTeam(allPlayers);
-        if (!isMounted) return;
-        
-        setMyTeamRoster(myTeam);
-        setOpponentTeams(teams.filter(t => t.id !== 3));
       } catch (error) {
         console.error("[TradeAnalyzer] Error:", error);
         if (isMounted) {
@@ -395,12 +444,15 @@ const TradeAnalyzer = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 flex flex-col">
-      <Navbar />
-      <main className="w-full pt-28 pb-16 m-0 p-0">
+      <div className="hidden lg:block"><Navbar /></div>
+      <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
+        <div className="flex items-center justify-center h-12 px-4">
+          <h1 className="text-lg font-varsity font-bold text-citrus-forest">Trade Center</h1>
+        </div>
+      </div>
+      <main className="w-full lg:pt-24 lg:pb-16 pb-[calc(5rem+env(safe-area-inset-bottom))]">
         <div className="w-full m-0 p-0">
-          {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
           <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
-            {/* Main Content - Appears first on mobile */}
             <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2">
               {/* Loading State */}
               {loading && (
@@ -672,8 +724,12 @@ const TradeAnalyzer = () => {
                     </div>
                   )}
                   
-                  <Button className="w-full bg-blue-600 hover:bg-blue-500 text-white mt-2" disabled={myAssets.length === 0 && theirAssets.length === 0}>
-                    Submit Official Proposal
+                  <Button
+                    className="w-full bg-blue-600 hover:bg-blue-500 text-white mt-2"
+                    disabled={myAssets.length === 0 || theirAssets.length === 0 || !selectedPartnerTeam}
+                    onClick={handleProposeTrade}
+                  >
+                    <Send className="h-4 w-4 mr-2" /> Submit Official Proposal
                   </Button>
                 </div>
               </CardContent>

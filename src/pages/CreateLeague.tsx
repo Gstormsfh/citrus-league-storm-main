@@ -264,9 +264,14 @@ const CreateLeague = () => {
       <div className="absolute top-0 right-0 w-96 h-96 bg-[hsl(var(--vibrant-yellow))] rounded-full opacity-10 blur-3xl -z-10"></div>
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-[hsl(var(--vibrant-green))] rounded-full opacity-10 blur-3xl -z-10"></div>
 
-      <Navbar />
+      <div className="hidden lg:block"><Navbar /></div>
+      <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
+        <div className="flex items-center justify-center h-12 px-4">
+          <h1 className="text-lg font-varsity font-bold text-citrus-forest">Create League</h1>
+        </div>
+      </div>
 
-      <main className="pt-32 pb-20 px-4">
+      <main className="lg:pt-32 lg:pb-20 pt-4 pb-[calc(5rem+env(safe-area-inset-bottom))] px-4">
         <div className="container mx-auto max-w-4xl">
           
           <div className="mb-8 text-center">

@@ -168,8 +168,7 @@ const FreeAgents = () => {
       });
       
       if (error) {
-        console.warn('[FreeAgents] Trending RPC not available yet, using fallback:', error.message);
-        // Fallback: trending data will remain empty, topTrending will use mock data
+        console.warn('[FreeAgents] Trending RPC not available yet:', error.message);
         return;
       }
       
@@ -187,7 +186,6 @@ const FreeAgents = () => {
           console.log('[FreeAgents] Top trending:', Array.from(trendingMap.entries()).slice(0, 5));
         } else {
           console.warn('[FreeAgents] ⚠️ No trending data yet - player_transactions table is empty.');
-          console.warn('[FreeAgents] Using estimated adds based on season stats. Real data will appear once users start adding/dropping players.');
         }
       }
     } catch (error) {
@@ -1247,7 +1245,7 @@ const FreeAgents = () => {
       const realData = trendingData.get(playerId);
       return {
         ...p,
-        adds: realData?.addCount ?? Math.floor((p.points || 0) * 12 + Math.random() * 50), // Real data or estimate
+        adds: realData?.addCount ?? 0,
         netAdds: realData?.netAdds ?? 0,
         hasRealData: !!realData
       };
@@ -1297,8 +1295,13 @@ const FreeAgents = () => {
   return (
     <div className="min-h-screen bg-[#D4E8B8] relative">
       <CitrusBackground density="light" />
-      <Navbar />
-      <main className="w-full pt-28 pb-16 m-0 p-0">
+      <div className="hidden lg:block"><Navbar /></div>
+      <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
+        <div className="flex items-center justify-center h-12 px-4">
+          <h1 className="text-lg font-varsity font-bold text-citrus-forest">Free Agents</h1>
+        </div>
+      </div>
+      <main className="w-full lg:pt-24 lg:pb-16 pb-[calc(5rem+env(safe-area-inset-bottom))]">
         <div className="w-full m-0 p-0">
           {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
           <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
@@ -1372,14 +1375,9 @@ const FreeAgents = () => {
                         <CardTitle className="text-lg font-bold flex items-center gap-2">
                           <TrendingUp className="h-5 w-5 text-green-500" />
                           Top Trending
-                          {trendingData.size === 0 && (
-                            <Badge variant="outline" className="text-[10px] ml-2 bg-citrus-cream text-citrus-forest border-citrus-sage">
-                              Estimated
-                            </Badge>
-                          )}
                           {trendingData.size > 0 && (
                             <Badge className="text-[10px] ml-2 bg-citrus-sage text-citrus-forest">
-                              {trendingData.size} Adds
+                              Live
                             </Badge>
                           )}
                         </CardTitle>
