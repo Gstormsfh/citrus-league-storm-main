@@ -80,7 +80,7 @@ const StormyAssistant = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#D4E8B8] flex flex-col relative overflow-hidden">
+    <div className="min-h-screen bg-[#D4E8B8] flex flex-col relative overflow-x-hidden">
       {/* Citrus Background */}
       <CitrusBackground density="light" />
       

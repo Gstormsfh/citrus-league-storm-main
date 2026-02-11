@@ -93,7 +93,7 @@ const ScheduleManager = () => {
   const currentMatchup = upcomingMatchups[0];
 
   return (
-    <div className="min-h-screen bg-[#D4E8B8] flex flex-col relative overflow-hidden">
+    <div className="min-h-screen bg-[#D4E8B8] flex flex-col relative overflow-x-hidden">
       <CitrusBackground density="medium" />
       <Navbar />
       <main className="w-full pt-28 pb-16 m-0 p-0 relative z-10">

@@ -1293,7 +1293,7 @@ const FreeAgents = () => {
   const positions = ['ALL', 'C', 'LW', 'RW', 'W', 'D', 'G'];
 
   return (
-    <div className="min-h-screen bg-[#D4E8B8] relative overflow-hidden">
+    <div className="min-h-screen bg-[#D4E8B8] relative overflow-x-hidden">
       <CitrusBackground density="light" />
       <Navbar />
       <main className="w-full pt-28 pb-16 m-0 p-0">

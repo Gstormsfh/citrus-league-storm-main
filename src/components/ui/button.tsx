@@ -5,7 +5,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-varsity uppercase tracking-tighter border-4 border-solid transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-citrus-sage focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap text-base font-varsity uppercase tracking-tighter border-4 border-solid transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-citrus-sage focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-5 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -42,10 +42,10 @@ const buttonVariants = cva(
         ),
       },
       size: {
-        default: "h-11 min-h-[44px] px-6 py-2", // iOS HIG: 44pt minimum touch target
-        sm: "h-10 min-h-[40px] px-4 text-xs",
-        lg: "h-12 min-h-[48px] px-8 text-base",
-        icon: "h-11 w-11 min-h-[44px] min-w-[44px]", // iOS HIG: 44x44pt touch target
+        default: "h-12 min-h-[48px] px-6 py-2", // Comfortable touch target
+        sm: "h-10 min-h-[40px] px-5 text-sm",
+        lg: "h-14 min-h-[56px] px-10 text-lg",
+        icon: "h-12 w-12 min-h-[48px] min-w-[48px]", // Comfortable touch target
       },
     },
     defaultVariants: {

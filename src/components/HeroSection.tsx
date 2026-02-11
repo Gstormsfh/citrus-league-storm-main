@@ -6,10 +6,10 @@ import { CitrusLogo } from '@/components/icons/CitrusIcons';
 
 const HeroSection = () => {
   return (
-    <div className="relative min-h-screen bg-[#D4E8B8] pt-28 overflow-hidden">
+    <div className="relative bg-[#D4E8B8] overflow-x-hidden">
       {/* Solid creamy green background */}
-      
-      <div className="container mx-auto px-4 flex flex-col lg:flex-row items-center justify-between py-16 lg:py-24">
+
+      <div className="container mx-auto px-4 flex flex-col lg:flex-row items-center justify-between py-12 lg:py-16">
         <div className="lg:w-1/2 mb-12 lg:mb-0 lg:pr-12 animate-fade-in">
           {/* Vintage badge */}
           <div className="inline-flex items-center gap-2 bg-citrus-sage/40 border-2 border-citrus-sage rounded-varsity px-4 py-2 mb-6">

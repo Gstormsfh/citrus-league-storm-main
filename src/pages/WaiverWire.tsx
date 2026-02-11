@@ -319,7 +319,7 @@ const WaiverWire = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#D4E8B8] flex flex-col relative overflow-hidden">
+    <div className="min-h-screen bg-[#D4E8B8] flex flex-col relative overflow-x-hidden">
       <CitrusBackground density="light" />
       
       <Navbar />
