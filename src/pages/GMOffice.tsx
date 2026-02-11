@@ -71,7 +71,7 @@ const gmActions = [
 const GMOffice = () => {
   const { userLeagueState, activeLeagueId } = useLeague();
   return (
-    <div className="min-h-screen bg-[#D4E8B8] text-foreground overflow-x-hidden relative">
+    <div className="min-h-screen bg-[#D4E8B8] text-foreground relative">
       {/* Desktop Navbar - Hidden on mobile */}
       <div className="hidden lg:block">
         <Navbar />

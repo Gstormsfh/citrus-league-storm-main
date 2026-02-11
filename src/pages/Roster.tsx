@@ -2651,7 +2651,7 @@ const Roster = () => {
   const showLoadingOverlay = isChangingLeague || (leagueLoading && userLeagueState === 'active-user');
 
   return (
-    <div className="min-h-screen bg-[#D4E8B8] text-foreground overflow-x-hidden relative">
+    <div className="min-h-screen bg-[#D4E8B8] text-foreground relative">
       {/* Loading overlay during league switch - non-blocking */}
       {showLoadingOverlay && (
         <div className="fixed inset-0 bg-[#D4E8B8]/90 backdrop-blur-lg z-[100] flex items-center justify-center">
@@ -2695,7 +2695,7 @@ const Roster = () => {
               : "lg:grid-cols-[240px_1fr]"
           )}>
             {/* Main Content - MOBILE: Full width / DESKTOP: Scrollable panel */}
-            <div className="min-w-0 lg:max-h-[calc(100vh-12rem)] overflow-y-auto ios-scroll px-3 lg:px-4 order-1 lg:order-2">
+            <div className="min-w-0 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto px-3 lg:px-4 order-1 lg:order-2">
               {/* Fantasy Team Header with Citrus Flair */}
               <div className="bg-card rounded-lg shadow-md border p-4 mb-4 relative overflow-hidden">
                 {/* Decorative citrus leaves in background */}

@@ -588,7 +588,7 @@ const OtherTeam = () => {
           {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
           <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             {/* Main Content - Scrollable - Appears first on mobile */}
-            <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
+            <div className="min-w-0 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
               <Button 
           variant="ghost" 
           className="mb-6 hover:bg-muted/50" 

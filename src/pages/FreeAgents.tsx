@@ -1263,14 +1263,16 @@ const FreeAgents = () => {
       const numericId = typeof p.id === 'string' ? parseInt(p.id, 10) : p.id;
       const realProjection = weeklyProjections.get(numericId);
       const projectionGameCount = weeklyGameCounts.get(numericId) || 0;
-      // Only use real projection if the projection system returned data (games > 0)
-      // Otherwise fall back to schedule data for display
-      const weeklyProjection = (realProjection && realProjection > 0) ? realProjection : ((p.points || 0) / 20);
 
       // Find matching schedule data for this player (for gameDays/games display)
       const scheduleData = scheduleMaximizers.find(sm => sm.id === p.id);
       // Use projection-derived game count when available, fall back to schedule data
       const gamesThisWeek = projectionGameCount > 0 ? projectionGameCount : (scheduleData?.gamesThisWeek || 0);
+
+      // 0 games remaining = 0 projected points — tied to our internal projection model
+      const weeklyProjection = gamesThisWeek === 0
+        ? 0
+        : ((realProjection && realProjection > 0) ? realProjection : ((p.points || 0) / 20));
 
       return {
         ...p,
@@ -1293,7 +1295,7 @@ const FreeAgents = () => {
   const positions = ['ALL', 'C', 'LW', 'RW', 'W', 'D', 'G'];
 
   return (
-    <div className="min-h-screen bg-[#D4E8B8] relative overflow-x-hidden">
+    <div className="min-h-screen bg-[#D4E8B8] relative">
       <CitrusBackground density="light" />
       <Navbar />
       <main className="w-full pt-28 pb-16 m-0 p-0">
@@ -1932,7 +1934,10 @@ const FreeAgents = () => {
                         const sorted = [...positionFiltered].map(player => {
                           const numericId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
                           const realProjection = weeklyProjections.get(numericId);
-                          const weeklyProjection = (realProjection && realProjection > 0) ? realProjection : ((player.points || 0) / 20);
+                          // 0 games remaining = 0 projected points
+                          const weeklyProjection = (player.gamesThisWeek || 0) === 0
+                            ? 0
+                            : ((realProjection && realProjection > 0) ? realProjection : ((player.points || 0) / 20));
                           return { ...player, weeklyProjection };
                         }).sort((a, b) => {
                           if (sortColumn === 'weeklyProjection' || !sortColumn) {

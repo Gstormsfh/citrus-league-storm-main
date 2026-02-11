@@ -86,7 +86,7 @@ const PlayoffBracket = () => {
             {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
             <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
               {/* Main Content - Scrollable - Appears first on mobile */}
-              <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
+              <div className="min-w-0 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
                 <div className="text-center py-20">
                   <p className="text-destructive text-lg">{error}</p>
                   <Button
@@ -126,7 +126,7 @@ const PlayoffBracket = () => {
             {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
           <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px]">
               {/* Main Content - Scrollable - Appears first on mobile */}
-              <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
+              <div className="min-w-0 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
                 <div className="text-center py-20">
                   <h1 className="text-2xl font-bold mb-4">Playoff Bracket</h1>
                   <p className="text-muted-foreground mb-4">Playoff matchups have not been generated yet.</p>
