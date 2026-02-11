@@ -42,9 +42,12 @@ interface StartersGridProps {
   onPlayerClick?: (player: HockeyPlayer) => void;
   className?: string;
   lockedPlayerIds?: Set<string>; // Set of locked player IDs
+  tapSelectedPlayerId?: string | number | null; // Mobile tap-to-swap: currently selected player
+  tapEligibleSlots?: Set<string>; // Mobile tap-to-swap: slots this player can move to
+  onSlotTap?: (slotId: string) => void; // Mobile tap-to-swap: handler when an eligible slot is tapped
 }
 
-const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, className, lockedPlayerIds = new Set() }: StartersGridProps) => {
+const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, className, lockedPlayerIds = new Set(), tapSelectedPlayerId = null, tapEligibleSlots = new Set(), onSlotTap }: StartersGridProps) => {
   
   const getPlayerInSlot = (slotId: string) => {
     // Look for key in slotAssignments where value is slotId
@@ -61,6 +64,8 @@ const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, className,
      const slotPlayers = player ? [player] : [];
      const isFull = !!player;
      const isEmpty = !player;
+     const isEligibleTarget = tapSelectedPlayerId != null && tapEligibleSlots.has(slot.id);
+     const isSelected = player != null && player.id === tapSelectedPlayerId;
 
      return (
        <div key={slot.id} className="w-full">
@@ -71,6 +76,10 @@ const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, className,
            isEmpty={isEmpty}
            onPlayerClick={onPlayerClick}
            lockedPlayerIds={lockedPlayerIds}
+           tapSelectedPlayerId={tapSelectedPlayerId}
+           isEligibleTarget={isEligibleTarget}
+           isSlotSelected={isSelected}
+           onSlotTap={onSlotTap}
          />
        </div>
      );
@@ -171,15 +180,23 @@ interface PositionSlotProps {
   isEmpty: boolean;
   onPlayerClick?: (player: HockeyPlayer) => void;
   lockedPlayerIds?: Set<string>;
+  tapSelectedPlayerId?: string | number | null;
+  isEligibleTarget?: boolean;
+  isSlotSelected?: boolean;
+  onSlotTap?: (slotId: string) => void;
 }
 
-const PositionSlot = ({ 
-  slot, 
-  players, 
-  isFull, 
-  isEmpty, 
+const PositionSlot = ({
+  slot,
+  players,
+  isFull,
+  isEmpty,
   onPlayerClick,
-  lockedPlayerIds = new Set()
+  lockedPlayerIds = new Set(),
+  tapSelectedPlayerId = null,
+  isEligibleTarget = false,
+  isSlotSelected = false,
+  onSlotTap,
 }: PositionSlotProps) => {
   const { setNodeRef, isOver } = useDroppable({
     id: slot.id,
@@ -205,29 +222,42 @@ const PositionSlot = ({
     return positionStyles[slot.position] || 'border-border/50 bg-card/50';
   };
 
+  const handleSlotTap = () => {
+    if (isEligibleTarget && onSlotTap) {
+      onSlotTap(slot.id);
+    }
+  };
+
   return (
     <Card
       ref={setNodeRef}
       className={cn(
-        "p-2 transition-all rounded-lg w-full", 
+        "p-2 transition-all rounded-lg w-full",
         "border-2",
-        "min-h-[154px]", // Fixed: Accommodate 130px card + 24px padding (12px top + 12px bottom)
+        "min-h-[154px]",
         isOver && "border-citrus-sage bg-citrus-sage/10 shadow-lg",
-        isEmpty && "border-dashed border-citrus-charcoal/20 bg-[#E8EED9]/50 backdrop-blur-sm/50",
-        isFull && !isOver && "border-citrus-sage/30 bg-[#E8EED9]/50 backdrop-blur-sm shadow-sm"
+        isEmpty && !isEligibleTarget && "border-dashed border-citrus-charcoal/20 bg-[#E8EED9]/50 backdrop-blur-sm/50",
+        isFull && !isOver && !isSlotSelected && !isEligibleTarget && "border-citrus-sage/30 bg-[#E8EED9]/50 backdrop-blur-sm shadow-sm",
+        isSlotSelected && "!border-citrus-orange !bg-citrus-orange/10 shadow-lg",
+        isEligibleTarget && !isSlotSelected && "!border-citrus-sage !bg-citrus-sage/15 !border-solid shadow-md cursor-pointer animate-pulse",
       )}
+      onClick={isEligibleTarget ? handleSlotTap : undefined}
     >
       {/* Compact Slot Header */}
       <div className="flex items-center justify-between mb-1">
-        <Badge 
-          variant="outline" 
+        <Badge
+          variant="outline"
           className={cn(
             "text-[9px] font-bold px-1 py-0 h-4",
+            isEligibleTarget && !isSlotSelected ? "text-citrus-sage border-citrus-sage" :
             isEmpty ? "text-muted-foreground border-muted-foreground/30" : "text-foreground border-border"
           )}
         >
           {slot.position}
         </Badge>
+        {isEligibleTarget && !isSlotSelected && (
+          <span className="text-[8px] font-bold text-citrus-sage uppercase tracking-wide">Tap to move</span>
+        )}
       </div>
 
       {/* Players Grid */}
@@ -242,25 +272,33 @@ const PositionSlot = ({
                 isLocked={lockedPlayerIds.has(String(player.id))}
                 onClick={() => onPlayerClick?.(player)}
                 className="border-0 shadow-none bg-transparent"
+                isSwapSelected={player.id === tapSelectedPlayerId}
+                isSwapTarget={isEligibleTarget && player.id !== tapSelectedPlayerId}
               />
             ))}
           </div>
         </SortableContext>
       ) : (
-        <div className={cn(
-          "flex items-center justify-center h-[130px] rounded border border-dashed transition-all",
-          isOver ? "border-primary bg-primary/10 border-2" : "border-muted-foreground/20 bg-muted/5"
-        )}>
+        <div
+          className={cn(
+            "flex items-center justify-center h-[130px] rounded border border-dashed transition-all",
+            isEligibleTarget ? "border-citrus-sage bg-citrus-sage/10 border-2 cursor-pointer" :
+            isOver ? "border-primary bg-primary/10 border-2" : "border-muted-foreground/20 bg-muted/5"
+          )}
+          onClick={isEligibleTarget ? handleSlotTap : undefined}
+        >
           <div className="text-center">
             <Plus className={cn(
               "h-4 w-4 mx-auto mb-1 transition-colors",
+              isEligibleTarget ? "text-citrus-sage" :
               isOver ? "text-primary" : "text-muted-foreground/40"
             )} />
             <p className={cn(
               "text-[9px] font-medium",
+              isEligibleTarget ? "text-citrus-sage font-bold" :
               isOver ? "text-primary" : "text-muted-foreground/60"
             )}>
-              Empty
+              {isEligibleTarget ? "Tap here" : "Empty"}
             </p>
           </div>
         </div>

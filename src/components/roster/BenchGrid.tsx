@@ -11,6 +11,9 @@ interface BenchGridProps {
   onPlayerClick?: (player: HockeyPlayer) => void;
   className?: string;
   lockedPlayerIds?: Set<string>; // Set of locked player IDs
+  tapSelectedPlayerId?: string | number | null;
+  isEligibleTarget?: boolean; // Whether bench is a valid drop target for selected player
+  onBenchTap?: () => void; // Handler when bench is tapped as a swap target
 }
 
 // Helper to normalize position to standard abbreviations
@@ -39,7 +42,7 @@ const getPositionBorderColor = (position: string): string => {
   }
 };
 
-const BenchGrid = ({ players, onPlayerClick, className, lockedPlayerIds = new Set() }: BenchGridProps) => {
+const BenchGrid = ({ players, onPlayerClick, className, lockedPlayerIds = new Set(), tapSelectedPlayerId = null, isEligibleTarget = false, onBenchTap }: BenchGridProps) => {
   const { setNodeRef, isOver } = useDroppable({
     id: 'bench-grid',
     data: {
@@ -67,9 +70,16 @@ const BenchGrid = ({ players, onPlayerClick, className, lockedPlayerIds = new Se
           "p-3 transition-all rounded-lg",
           "border-2",
           isOver && "border-citrus-sage bg-citrus-sage/10 shadow-lg",
-          !isOver && "border-citrus-sage/30 bg-[#E8EED9]/50 backdrop-blur-sm shadow-sm"
+          isEligibleTarget && !isOver && "!border-citrus-sage !bg-citrus-sage/15 shadow-md",
+          !isOver && !isEligibleTarget && "border-citrus-sage/30 bg-[#E8EED9]/50 backdrop-blur-sm shadow-sm"
         )}
+        onClick={isEligibleTarget && onBenchTap ? onBenchTap : undefined}
       >
+        {isEligibleTarget && (
+          <div className="text-center mb-2">
+            <span className="text-[9px] font-bold text-citrus-sage uppercase tracking-wide">Tap a player or here to move to bench</span>
+          </div>
+        )}
         {players.length > 0 ? (
           <SortableContext items={playerIds} strategy={rectSortingStrategy}>
             {/* Flexbox with fixed-width cards - centered when wrapping to new rows */}
@@ -83,6 +93,7 @@ const BenchGrid = ({ players, onPlayerClick, className, lockedPlayerIds = new Se
                       isInSlot={false}
                       isLocked={lockedPlayerIds.has(String(player.id))}
                       onClick={() => onPlayerClick?.(player)}
+                      isSwapSelected={player.id === tapSelectedPlayerId}
                     />
                   </div>
                 );

@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { cn } from '@/lib/utils';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, closestCenter } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { useSearchParams, useLocation } from 'react-router-dom';
@@ -238,6 +239,8 @@ const Roster = () => {
   const [isDropDialogOpen, setIsDropDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("roster");
   const [activeId, setActiveId] = useState<string | number | null>(null);
+  const [tapSelectedPlayerId, setTapSelectedPlayerId] = useState<string | number | null>(null);
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 1024);
   const [loading, setLoading] = useState(true);
   
   // Tab reset mechanism - reset to default tab when league changes
@@ -2118,7 +2121,7 @@ const Roster = () => {
     return [...roster.starters, ...roster.bench, ...roster.ir].find(p => p.id === activeId) || null;
   }, [activeId, roster]);
 
-  const handlePlayerClick = async (player: HockeyPlayer) => {
+  const handlePlayerClick = useCallback(async (player: HockeyPlayer) => {
     // Fetch fresh season stats using unified helper (same as Matchup and FreeAgents tabs)
     const playerWithStats = await getPlayerWithSeasonStats(player.id);
     if (playerWithStats) {
@@ -2134,7 +2137,7 @@ const Roster = () => {
         variant: "default"
       });
     }
-  };
+  }, [toast]);
 
   // Validate roster state - check if any player in IR slot has returned to ACT status
   const validateRosterState = (currentRoster: RosterState): { isValid: boolean; invalidPlayers: HockeyPlayer[] } => {
@@ -2513,6 +2516,136 @@ const Roster = () => {
     toast({ title: "Lineup Updated", description: "Player moved successfully." });
   };
 
+  // Mobile detection for tap-to-swap
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // All known starter slot IDs for tap-to-swap eligibility calculation
+  const ALL_STARTER_SLOT_IDS = useMemo(() => [
+    'slot-C-1', 'slot-C-2', 'slot-LW-1', 'slot-LW-2', 'slot-RW-1', 'slot-RW-2',
+    'slot-D-1', 'slot-D-2', 'slot-D-3', 'slot-D-4', 'slot-G-1', 'slot-G-2', 'slot-UTIL'
+  ], []);
+
+  // Compute which slots the tap-selected player can move to
+  const tapEligibleSlots = useMemo(() => {
+    if (!tapSelectedPlayerId) return new Set<string>();
+    const allPlayers = [...roster.starters, ...roster.bench, ...roster.ir];
+    const player = allPlayers.find(p => p.id === tapSelectedPlayerId);
+    if (!player) return new Set<string>();
+
+    const eligible = new Set<string>();
+    for (const slotId of ALL_STARTER_SLOT_IDS) {
+      if (isPositionValid(player, slotId)) {
+        eligible.add(slotId);
+      }
+    }
+    // Bench is always a valid target
+    eligible.add('bench-grid');
+    return eligible;
+  }, [tapSelectedPlayerId, roster, ALL_STARTER_SLOT_IDS]);
+
+  // Handle mobile tap-to-swap: player tapped
+  const handleMobileTapPlayer = (player: HockeyPlayer) => {
+    // Read-only guards
+    if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
+      toast({ title: "Demo Mode - Read Only", description: "Sign up to create your own league and make lineup changes!", variant: "default" });
+      return;
+    }
+    if (userTeam && isDemoLeague(userTeam.league_id)) {
+      toast({ title: "Demo League - Read Only", description: "Sign up to create your own league and make changes!", variant: "default" });
+      return;
+    }
+    if (lockedPlayerIds.has(String(player.id))) {
+      toast({ title: "Player Locked", description: `${player.name}'s game has started. Players cannot be moved once their game begins.`, variant: "destructive" });
+      return;
+    }
+
+    // If no player selected, select this one
+    if (!tapSelectedPlayerId) {
+      setTapSelectedPlayerId(player.id);
+      return;
+    }
+
+    // If same player tapped, deselect
+    if (tapSelectedPlayerId === player.id) {
+      setTapSelectedPlayerId(null);
+      return;
+    }
+
+    // Another player tapped - attempt swap between them
+    const allPlayers = [...roster.starters, ...roster.bench, ...roster.ir];
+    const sourcePlayer = allPlayers.find(p => p.id === tapSelectedPlayerId);
+    if (!sourcePlayer) {
+      setTapSelectedPlayerId(player.id);
+      return;
+    }
+
+    // Find the target player's current slot
+    let targetSlotId: string;
+    if (roster.bench.some(p => p.id === player.id)) {
+      targetSlotId = 'bench-grid';
+    } else if (roster.ir.some(p => p.id === player.id)) {
+      targetSlotId = roster.slotAssignments[player.id] || 'ir-slot-1';
+    } else {
+      targetSlotId = roster.slotAssignments[player.id] || 'slot-UTIL';
+    }
+
+    // Validate the source player can go to that slot
+    if (!tapEligibleSlots.has(targetSlotId)) {
+      toast({ title: "Invalid Position", description: "Player cannot be placed in that position.", variant: "destructive" });
+      setTapSelectedPlayerId(player.id); // Switch selection to the tapped player
+      return;
+    }
+
+    // Perform the swap by simulating a drag end event
+    handleDragEnd({
+      active: { id: sourcePlayer.id, data: { current: {} }, rect: { current: { initial: null, translated: null } } },
+      over: { id: player.id, data: { current: {} }, rect: { width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0 } },
+      activatorEvent: new Event('tap'),
+      collisions: [],
+      delta: { x: 0, y: 0 },
+    } as any);
+
+    setTapSelectedPlayerId(null);
+  };
+
+  // Handle mobile tap-to-swap: empty slot tapped
+  const handleMobileTapSlot = (slotId: string) => {
+    if (!tapSelectedPlayerId) return;
+    const allPlayers = [...roster.starters, ...roster.bench, ...roster.ir];
+    const sourcePlayer = allPlayers.find(p => p.id === tapSelectedPlayerId);
+    if (!sourcePlayer) { setTapSelectedPlayerId(null); return; }
+
+    // Simulate drag end to the slot
+    handleDragEnd({
+      active: { id: sourcePlayer.id, data: { current: {} }, rect: { current: { initial: null, translated: null } } },
+      over: { id: slotId, data: { current: { type: 'starter-slot' } }, rect: { width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0 } },
+      activatorEvent: new Event('tap'),
+      collisions: [],
+      delta: { x: 0, y: 0 },
+    } as any);
+
+    setTapSelectedPlayerId(null);
+  };
+
+  // Handle mobile tap-to-swap: bench tapped (move selected player to bench)
+  const handleMobileTapBench = () => {
+    if (!tapSelectedPlayerId) return;
+    handleMobileTapSlot('bench-grid');
+  };
+
+  // Combined player click handler: mobile uses tap-to-swap, desktop opens stats
+  const handlePlayerClickWithSwap = (player: HockeyPlayer) => {
+    if (isMobile) {
+      handleMobileTapPlayer(player);
+    } else {
+      handlePlayerClick(player);
+    }
+  };
+
   // Determine if we should show a loading overlay (but don't unmount the component)
   const showLoadingOverlay = isChangingLeague || (leagueLoading && userLeagueState === 'active-user');
 
@@ -2554,7 +2687,12 @@ const Roster = () => {
       <main className="w-full lg:pt-28 lg:pb-16 pb-[calc(5rem+env(safe-area-inset-bottom))]">
         <div className="w-full m-0 p-0">
           {/* Desktop: 3-column grid / Mobile: Single column */}
-          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
+          <div className={cn(
+            "flex flex-col lg:grid lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2",
+            userLeagueState === 'active-user' && userTeam?.league_id
+              ? "lg:grid-cols-[240px_1fr_300px]"
+              : "lg:grid-cols-[240px_1fr]"
+          )}>
             {/* Main Content - MOBILE: Full width / DESKTOP: Scrollable panel */}
             <div className="min-w-0 lg:max-h-[calc(100vh-12rem)] overflow-y-auto ios-scroll px-3 lg:px-4 order-1 lg:order-2">
               {/* Fantasy Team Header with Citrus Flair */}
@@ -2827,24 +2965,44 @@ const Roster = () => {
                     onDragStart={(userLeagueState === 'guest' || (userLeagueState as string) === 'logged-in-no-league') ? undefined : handleDragStart}
                     onDragEnd={(userLeagueState === 'guest' || (userLeagueState as string) === 'logged-in-no-league') ? undefined : handleDragEnd}
                   >
+                    {/* Mobile tap-to-swap cancel bar */}
+                    {isMobile && tapSelectedPlayerId && (
+                      <div className="flex items-center justify-between bg-citrus-orange/15 border border-citrus-orange/30 rounded-lg px-4 py-2 mb-4">
+                        <span className="text-sm font-display font-semibold text-citrus-forest">
+                          Tap a highlighted slot to move player
+                        </span>
+                        <button
+                          onClick={() => setTapSelectedPlayerId(null)}
+                          className="text-xs font-bold text-citrus-orange bg-citrus-orange/10 hover:bg-citrus-orange/20 rounded-lg px-3 py-1 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
                     <div className="space-y-6">
-                      <StartersGrid 
+                      <StartersGrid
                         players={displayRoster.starters}
                         slotAssignments={displayRoster.slotAssignments}
-                        onPlayerClick={handlePlayerClick}
+                        onPlayerClick={handlePlayerClickWithSwap}
                         lockedPlayerIds={lockedPlayerIds}
+                        tapSelectedPlayerId={isMobile ? tapSelectedPlayerId : null}
+                        tapEligibleSlots={isMobile ? tapEligibleSlots : new Set()}
+                        onSlotTap={isMobile ? handleMobileTapSlot : undefined}
                       />
-                      
-                      <BenchGrid 
+
+                      <BenchGrid
                         players={displayRoster.bench}
-                        onPlayerClick={handlePlayerClick}
+                        onPlayerClick={handlePlayerClickWithSwap}
                         lockedPlayerIds={lockedPlayerIds}
+                        tapSelectedPlayerId={isMobile ? tapSelectedPlayerId : null}
+                        isEligibleTarget={isMobile && tapSelectedPlayerId != null && tapEligibleSlots.has('bench-grid')}
+                        onBenchTap={isMobile ? handleMobileTapBench : undefined}
                       />
-                      
-                      <IRSlot 
+
+                      <IRSlot
                         players={displayRoster.ir}
                         slotAssignments={displayRoster.slotAssignments}
-                        onPlayerClick={handlePlayerClick}
+                        onPlayerClick={handlePlayerClickWithSwap}
                         lockedPlayerIds={lockedPlayerIds}
                       />
                     </div>
@@ -2852,7 +3010,7 @@ const Roster = () => {
                     <DragOverlay>
                       {activePlayer ? (
                         <div className="opacity-90 rotate-3">
-                          <HockeyPlayerCard 
+                          <HockeyPlayerCard
                             player={activePlayer}
                             draggable={false}
                           />

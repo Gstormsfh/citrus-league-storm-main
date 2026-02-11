@@ -50,13 +50,13 @@ else:
 ### **Scenario 1: Saturday Night - 3 Games Live**
 ```
 7:00 PM - Game starts
-7:00:15 PM - First check (15s later)
-7:00:30 PM - McDavid scores! (detected within 15s)
-7:00:45 PM - Stats updated, matchup scores refresh
-... continues every 15 seconds during live action ...
+7:00:XX PM - Periodic check detects live action
+7:00:XX PM - McDavid scores! (detected on next poll)
+7:00:XX PM - Stats updated, matchup scores refresh
+... continues periodically during live action ...
 ```
 
-**Result**: Users see goal within 15-30 seconds max (Yahoo-level)
+**Result**: Users see goals reflected in their matchup scores during games
 
 ### **Scenario 2: Intermission**
 ```
@@ -81,18 +81,11 @@ else:
 
 ---
 
-## 💪 WHY THIS IS WORLD CLASS
+## 💪 WHY THIS IS SOLID
 
-### **Competitive Benchmarks**
+### **Competitive Context**
 
-| Platform | Live Refresh | Our Rate |
-|----------|-------------|----------|
-| Yahoo Fantasy | ~20-30s | **15s** ✅ |
-| ESPN Fantasy | ~30-45s | **15s** ✅ |
-| NHL.com | ~10-15s | **15s** ✅ |
-| Sleeper | ~20-30s | **15s** ✅ |
-
-**We're now competitive with ALL major platforms!** 🏆
+Our adaptive polling system adjusts to game state for efficient data collection while maintaining quality updates.
 
 ### **IP Usage Efficiency**
 
@@ -132,27 +125,18 @@ With 100 IPs rotating:
 
 ## 📈 PERFORMANCE GAINS
 
-### **Before (90s refresh):**
-- Goal scored at 7:00:00 PM
-- Detected at 7:01:30 PM (best case)
-- **90-second delay**
-
-### **After (15s refresh):**
-- Goal scored at 7:00:00 PM
-- Detected at 7:00:15 PM (best case)
-- **15-second delay** ✅
-
-**Result: 6x faster updates!** 🚀
+### **Improved Adaptive Scheduling**
+- Faster polling during live games vs old fixed 90s intervals
+- Smart state detection adjusts automatically
 
 ---
 
 ## 🎮 USER EXPERIENCE
 
 ### **What Users Will Notice:**
-1. **Near Real-Time Scoring**: Goals/assists show up within 15-30 seconds
-2. **Live Matchup Updates**: Fantasy scores update constantly during games
-3. **No Lag**: Competitive with Yahoo/ESPN/Sleeper
-4. **Reliable**: 100-IP rotation = no downtime
+1. **Live Scoring**: Goals/assists show up during games
+2. **Live Matchup Updates**: Fantasy scores update during games
+3. **Reliable**: 100-IP rotation = no downtime
 
 ### **What They Won't Notice:**
 - Smart bandwidth conservation during breaks
@@ -227,8 +211,8 @@ for game in intermission_games:
 █                                                                  █
 █   🍋 CITRUS MASTER COMMAND CENTER ONLINE - AGGRESSIVE MODE       █
 █   Architecture: Adaptive Scheduling with 100-IP Rotation         █
-█   Features: 15s Live Updates + xG Audit + PPP/SHP Sync           █
-█   Performance: Yahoo/ESPN Competitive (Real-Time)                █
+█   Features: Adaptive Live Updates + xG Audit + PPP/SHP Sync      █
+█   Performance: Adaptive Polling + Smart Caching                  █
 █                                                                  █
 ████████████████████████████████████████████████████████████████████
 ```
@@ -237,12 +221,9 @@ for game in intermission_games:
 
 ## 🏆 BOTTOM LINE
 
-**You now have WORLD-CLASS live scoring that rivals Yahoo, ESPN, and NHL.com itself.** 🔥
-
-**15-second refresh + 100-IP rotation = bulletproof, real-time fantasy sports platform!** ✅
+**Adaptive polling + 100-IP rotation = reliable fantasy sports data pipeline.** ✅
 
 ---
 
-**Version**: 2.0 (Aggressive Mode)  
-**Date**: 2026-01-13  
-**Performance**: Yahoo/ESPN Competitive ✅
+**Version**: 2.0 (Adaptive Mode)
+**Date**: 2026-01-13

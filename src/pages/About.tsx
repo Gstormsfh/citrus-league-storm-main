@@ -11,8 +11,8 @@ const About = () => {
           
           <div className="prose dark:prose-invert max-w-none space-y-8 text-lg text-muted-foreground">
             <p>
-              We built Citrus because every other fantasy hockey platform feels like it was designed by people who don't actually watch hockey. 
-              Laggy live scoring. Terrible projections. Sunday finishes when nobody plays. We got tired of it.
+              We built Citrus because every other fantasy hockey platform feels like it was designed by people who don't actually watch hockey.
+              Terrible projections. Sunday finishes when nobody plays. We got tired of it.
             </p>
             
             <p>

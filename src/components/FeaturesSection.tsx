@@ -30,8 +30,8 @@ const features = [
   },
   {
     icon: <Zap className="h-8 w-8" />,
-    title: "Sub-Second Live Scoring",
-    description: "Real-time data pipeline processes goals, assists, and stats faster than ESPN can load. Watch your matchup shift with every goal.",
+    title: "Live Scoring Updates",
+    description: "Our data pipeline processes goals, assists, and stats so your matchup stays current. Watch your scores shift with every goal.",
     color: "sage"
   },
   {
@@ -125,7 +125,7 @@ const FeaturesSection = () => {
           </h2>
           
           <p className="text-lg md:text-xl text-citrus-forest/80 max-w-2xl mx-auto font-sans leading-relaxed">
-            We process 10M+ data points per game to give you insights other platforms can't touch. This is what separates champions from chumps.
+            We process every play-by-play event to build the best projections in the game. This is what separates champions from chumps.
           </p>
         </div>
 
@@ -164,7 +164,7 @@ const FeaturesSection = () => {
           <div className="inline-flex items-center gap-3 bg-[#E8EED9]/50 backdrop-blur-sm/80 backdrop-blur-sm border border-citrus-sage/30 rounded-xl px-6 py-4">
             <BarChart className="h-6 w-6 text-citrus-sage" />
             <p className="font-display font-bold text-citrus-forest">
-              Processing 10M+ data points per game to give you the edge
+              Play-by-play driven projections that give you the edge
             </p>
           </div>
         </div>

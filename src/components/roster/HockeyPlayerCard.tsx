@@ -122,17 +122,21 @@ interface HockeyPlayerCardProps {
   className?: string;
   isInSlot?: boolean; // Whether the card is in a starter slot
   isLocked?: boolean; // Whether the player's game has started (locked from moves)
+  isSwapSelected?: boolean; // Mobile tap-to-swap: this player is selected for swap
+  isSwapTarget?: boolean; // Mobile tap-to-swap: this player's slot is a valid swap target
 }
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
-const HockeyPlayerCardContent = ({ 
-  player, 
-  onClick, 
-  draggable = true, 
+const HockeyPlayerCardContent = ({
+  player,
+  onClick,
+  draggable = true,
   className,
   isInSlot = false,
-  isLocked = false
+  isLocked = false,
+  isSwapSelected = false,
+  isSwapTarget = false,
 }: HockeyPlayerCardProps) => {
   const {
     attributes,
@@ -329,11 +333,13 @@ const HockeyPlayerCardContent = ({
         "relative overflow-visible transition-all",
         canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed",
         "h-[130px] flex flex-col",
-        isInSlot 
-          ? "border-0 bg-transparent shadow-none" 
+        isInSlot
+          ? "border-0 bg-transparent shadow-none"
           : "border border-border/40 hover:border-primary/50 hover:shadow-md",
         isDragging && "shadow-xl z-50 opacity-90",
         isLocked && "opacity-75 bg-muted/30",
+        isSwapSelected && "!ring-2 !ring-citrus-orange !ring-offset-1 !border-citrus-orange !shadow-lg",
+        isSwapTarget && "!ring-2 !ring-citrus-sage !ring-offset-1 !border-citrus-sage animate-pulse",
         className
       )}
       onClick={onClick}

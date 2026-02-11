@@ -143,7 +143,7 @@ Get-Content "C:\Users\garre\.cursor\projects\c-Users-garre-Documents-citrus-leag
 - **Sync duration**: 3-6 seconds for 10 games
 - **Success rate**: >99% (occasional API hiccups OK)
 - **Uptime**: Days/weeks (auto-recovery from errors)
-- **Goal latency**: 30-35 seconds from real-time
+- **Goal detection**: Periodic polling during live games
 
 ### Red Flags
 - Sync duration >15 seconds consistently
@@ -168,7 +168,7 @@ The service now **caches FINAL games** to avoid wasting IPs!
 - **53% less IP usage** overall
 - **50x faster** when games are finished  
 - **10-minute intervals** when all games done
-- Still **30-second updates** for LIVE games!
+- Periodic updates for LIVE games
 
 ### Cache Behavior
 - ✅ **FINAL/OFF games**: Cached (no API calls)

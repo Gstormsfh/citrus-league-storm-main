@@ -4,8 +4,8 @@
 
 | Feature | Yahoo Fantasy | Sleeper | **Citrus League Storm** | Winner |
 |---------|---------------|---------|-------------------------|--------|
-| **Live Goal Detection** | 60-90 seconds | 60-90 seconds | **30 seconds** | 🍋 **We're 2-3x faster!** |
-| **Live Updates During Game** | Every 60-90s | Every 60-90s | **Every 30s** | 🍋 **We're 2x more frequent!** |
+| **Live Goal Detection** | 60-90 seconds | 60-90 seconds | **Periodic polling** | ✅ **Comparable** |
+| **Live Updates During Game** | Every 60-90s | Every 60-90s | **Periodic updates** | ✅ **Comparable** |
 | **FINAL Game Re-checks** | Unknown (~15min) | Unknown (~15min) | **Every 2h for 24h** | 🍋 **More thorough!** |
 | **Stat Correction Window** | ~24 hours | ~24 hours | **24 hours** | ✅ **Equal** |
 | **IP/Bandwidth Efficiency** | Unknown | Unknown | **70% optimized** | 🍋 **We're smarter!** |
@@ -20,24 +20,6 @@
 ---
 
 ## Performance Benchmarks
-
-### Goal Scored → User Sees It
-
-| Service | Latency | Notes |
-|---------|---------|-------|
-| **ESPN** | 5-15 minutes | Delayed feed, very slow |
-| **CBS Sports** | 3-10 minutes | Delayed feed |
-| **Yahoo** | 45-60 seconds | Industry standard |
-| **Sleeper** | 40-55 seconds | Slightly better than Yahoo |
-| **🍋 Citrus Storm** | **30-35 seconds** | **Best in class!** |
-
-### Data Freshness During Live Games
-
-| Service | Update Frequency | IP Usage |
-|---------|-----------------|----------|
-| **Yahoo** | Every 60-90s | Unknown (likely optimized) |
-| **Sleeper** | Every 60-90s | Unknown (likely optimized) |
-| **🍋 Citrus Storm** | **Every 30s** | **20 IPs/30s during live** |
 
 ### Stat Correction Handling
 
@@ -64,7 +46,7 @@
 
 | Feature | Yahoo | Sleeper | Citrus Storm |
 |---------|-------|---------|--------------|
-| Real-time scoring | ✅ | ✅ | ✅ **Faster** |
+| Live scoring | ✅ | ✅ | ✅ |
 | Stat corrections | ✅ | ✅ | ✅ **More frequent checks** |
 | Matchup tracking | ✅ | ✅ | ✅ **Live updates** |
 | Player stats | ✅ | ✅ | ✅ |
@@ -115,46 +97,6 @@
 
 ---
 
-## User Experience Comparison
-
-### Scenario: McDavid Scores a Goal
-
-**ESPN:**
-```
-00:00 → Goal scored
-05:30 → User sees it in app
-      → 5.5 minute delay 😢
-```
-
-**Yahoo:**
-```
-00:00 → Goal scored
-00:52 → User sees it in app
-      → 52 second delay 😐
-```
-
-**Sleeper:**
-```
-00:00 → Goal scored
-00:44 → User sees it in app
-      → 44 second delay 🙂
-```
-
-**🍋 Citrus Storm:**
-```
-00:00 → Goal scored
-00:08 → NHL API updates
-00:23 → Our service polls (avg 15s into 30s window)
-00:24 → Processed and in database
-00:25 → User refreshes app
-00:25 → User sees it!
-      → 25 second delay 🎉
-```
-
-**Winner: Citrus Storm by 19-27 seconds!**
-
----
-
 ## Reliability Comparison
 
 ### Uptime & Error Handling
@@ -191,22 +133,21 @@
 
 | Category | Yahoo | Sleeper | Citrus Storm |
 |----------|-------|---------|--------------|
-| **Speed** | 7/10 | 7.5/10 | **9.5/10** 🏆 |
+| **Speed** | 7/10 | 7.5/10 | **7.5/10** ✅ |
 | **Accuracy** | 9/10 | 9/10 | **9.5/10** 🏆 |
 | **Features** | 8/10 | 8.5/10 | **9/10** 🏆 |
 | **Reliability** | 9.5/10 | 9.5/10 | **9/10** ✅ |
 | **Analytics** | 5/10 | 6/10 | **10/10** 🏆 |
 | **Efficiency** | 8/10 | 8/10 | **10/10** 🏆 |
 | **Transparency** | 4/10 | 5/10 | **10/10** 🏆 |
-| **TOTAL** | **50.5/70** | **53/70** | **67/70** 🏆 |
+| **TOTAL** | **50.5/70** | **53/70** | **65/70** 🏆 |
 
 ---
 
 ## Summary
 
 ### What We're Better At
-✅ **Live goal detection** - 2x faster than competitors  
-✅ **Advanced analytics** - xG, GSAX, GAR (they don't have)  
+✅ **Advanced analytics** - xG, GSAX, GAR (they don't have)
 ✅ **Efficiency** - 70% less bandwidth  
 ✅ **Transparency** - Full visibility into system  
 ✅ **Customization** - Can modify anything  
@@ -230,7 +171,6 @@
 🏆 **Citrus League Storm is WORLD-CLASS**
 
 Not only matching Yahoo and Sleeper, but **beating them** in the most important categories:
-- ⚡ Speed (2x faster live updates)
 - 📊 Analytics (unique advanced metrics)
 - 💰 Efficiency (70% less overhead)
 - 🔍 Transparency (full system visibility)
