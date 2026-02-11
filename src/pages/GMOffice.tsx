@@ -1,4 +1,5 @@
 import { useLeague } from '@/contexts/LeagueContext';
+import { cn } from '@/lib/utils';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +11,6 @@ import { HeadlinesBanner } from '@/components/gm-office/HeadlinesBanner';
 import { TeamIntelHub } from '@/components/gm-office/TeamIntelHub';
 import { isGuestMode } from '@/utils/guestHelpers';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
-import { CitrusBackground } from '@/components/CitrusBackground';
 import { CitrusSectionDivider } from '@/components/CitrusSectionDivider';
 import { CitrusSlice, CitrusSparkle, CitrusLeaf, CitrusWedge, CitrusBurst } from '@/components/icons/CitrusIcons';
 import { AdSpace } from '@/components/AdSpace';
@@ -72,29 +72,32 @@ const GMOffice = () => {
   const { userLeagueState, activeLeagueId } = useLeague();
   return (
     <div className="min-h-screen bg-[#D4E8B8] text-foreground overflow-x-hidden relative">
-      {/* Citrus Background */}
-      <CitrusBackground density="medium" animated={true} />
-      
-      <Navbar />
-      <main className="w-full pt-20 pb-16 m-0 p-0 relative z-10">
+      {/* Desktop Navbar - Hidden on mobile */}
+      <div className="hidden lg:block">
+        <Navbar />
+      </div>
+
+      {/* MOBILE: Compact sticky header */}
+      <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
+        <div className="flex items-center justify-center h-12 px-4">
+          <h1 className="text-lg font-varsity font-bold text-citrus-forest">GM's Office</h1>
+        </div>
+      </div>
+
+      <main className="w-full lg:pt-24 lg:pb-16 pb-[calc(5rem+env(safe-area-inset-bottom))] m-0 p-0 relative z-10">
         <div className="w-full m-0 p-0">
-          {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
-          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
+          <div className={cn(
+            "flex flex-col lg:grid lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2",
+            userLeagueState === 'active-user' && activeLeagueId
+              ? "lg:grid-cols-[240px_1fr_300px]"
+              : "lg:grid-cols-[240px_1fr]"
+          )}>
             {/* Main Content - Appears first on mobile */}
             <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2">
-              <div className="max-w-5xl mx-auto text-center mb-4 relative">
-                {/* Citrus Decorations */}
-                <CitrusSlice className="absolute -top-6 -left-6 w-16 h-16 text-citrus-sage/15 rotate-12" />
-                <CitrusLeaf className="absolute -top-4 -right-8 w-12 h-12 text-citrus-sage/15 -rotate-45" />
-                
-                <div className="flex items-center justify-center gap-3 mb-2">
-                  <CitrusSparkle className="w-10 h-10 text-citrus-sage animate-pulse" />
-                  <h1 className="text-4xl md:text-5xl font-varsity font-black text-citrus-forest uppercase tracking-tight">GM's Office</h1>
-                  <CitrusSparkle className="w-10 h-10 text-citrus-sage animate-pulse" style={{ animationDelay: '0.3s' }} />
-                </div>
-                <p className="text-lg font-display text-citrus-forest">
-                  Your command center for team management and strategy
-                </p>
+              {/* Compact page header */}
+              <div className="hidden lg:block max-w-5xl mx-auto mb-4">
+                <h1 className="text-2xl font-varsity font-black text-citrus-forest uppercase tracking-tight">GM's Office</h1>
+                <p className="text-sm font-display text-citrus-charcoal/70">Your command center for team management and strategy</p>
               </div>
               
               {/* Demo Mode Banner */}
@@ -153,7 +156,7 @@ const GMOffice = () => {
 
             {/* Left Sidebar - At bottom on mobile, left on desktop - Extends to edge */}
             <aside className="w-full lg:w-auto order-2 lg:order-1">
-              <div className="lg:sticky lg:top-32 space-y-4 lg:space-y-6">
+              <div className="lg:sticky lg:top-28 space-y-4 lg:space-y-6">
                 <TeamIntelHub />
                 <AdSpace size="300x250" label="GM Sponsor" />
               </div>
@@ -162,7 +165,7 @@ const GMOffice = () => {
             {/* Right Sidebar - Notifications (hidden on mobile) - Extends to edge */}
             {userLeagueState === 'active-user' && activeLeagueId && (
               <aside className="hidden lg:block order-3">
-                <div className="lg:sticky lg:top-32 h-[calc(100vh-12rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                <div className="lg:sticky lg:top-28 h-[calc(100vh-12rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
                   <LeagueNotifications leagueId={activeLeagueId} />
                 </div>
               </aside>

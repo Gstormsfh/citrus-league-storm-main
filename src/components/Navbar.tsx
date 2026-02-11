@@ -1,24 +1,15 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { 
-  Menu, X, ChevronRight, User, Bell, Search, 
-  Calendar, LineChart, Newspaper, Medal, Users, Settings, 
-  LogOut, Home, FileText, Headphones, BookOpen, CircleUser, Sparkles,
-  Trophy, ChevronDown, UserPlus
+import {
+  Menu, X, Bell, Search, Users, LogOut, CircleUser,
+  Trophy, ChevronDown, UserPlus, Calendar, BarChart3,
+  Swords, Newspaper, Sparkles, Settings
 } from 'lucide-react';
-import { CitrusSlice, CitrusSparkle, CitrusLogo } from '@/components/icons/CitrusIcons';
+import { CitrusLogo } from '@/components/icons/CitrusIcons';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
-import { 
-  NavigationMenu, 
-  NavigationMenuContent, 
-  NavigationMenuItem, 
-  NavigationMenuLink, 
-  NavigationMenuList, 
-  NavigationMenuTrigger 
-} from "@/components/ui/navigation-menu";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,22 +19,18 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from '@/lib/utils';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useNotificationStore } from '@/stores/notificationStore';
 
 const Navbar = () => {
-  const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  
-  // Get auth - handle gracefully if context not ready
+
   const auth = useAuth();
   const user = auth?.user ?? null;
   const profile = auth?.profile ?? null;
   const signOut = auth?.signOut ?? (async () => {});
 
-  // Get active league and notification count
   const league = useLeague();
   const activeLeagueId = league?.activeLeagueId ?? null;
   const activeLeague = league?.activeLeague ?? null;
@@ -51,39 +38,17 @@ const Navbar = () => {
   const setActiveLeagueId = league?.setActiveLeagueId ?? (() => {});
   const notificationStore = useNotificationStore();
   const unreadCount = activeLeagueId ? (notificationStore.unreadCounts.get(activeLeagueId) || 0) : 0;
-  
-  useEffect(() => {
-    const handleScroll = () => {
-      if (window.scrollY > 20) {
-        setIsScrolled(true);
-      } else {
-        setIsScrolled(false);
-      }
-    };
-    
-    window.addEventListener('scroll', handleScroll);
-    
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-    };
-  }, []);
 
-  // Load notifications for active league when it changes
   useEffect(() => {
     if (user?.id && activeLeagueId) {
-      const notificationStore = useNotificationStore.getState();
-      notificationStore.loadNotifications(activeLeagueId, user.id);
-      notificationStore.subscribe(activeLeagueId, user.id);
-      
-      return () => {
-        notificationStore.unsubscribe(activeLeagueId);
-      };
+      const store = useNotificationStore.getState();
+      store.loadNotifications(activeLeagueId, user.id);
+      store.subscribe(activeLeagueId, user.id);
+      return () => { store.unsubscribe(activeLeagueId); };
     }
   }, [user?.id, activeLeagueId]);
 
-  const closeMobileMenu = () => {
-    setMobileMenuOpen(false);
-  };
+  const closeMobileMenu = () => setMobileMenuOpen(false);
 
   const handleSignOut = async () => {
     await signOut();
@@ -91,621 +56,318 @@ const Navbar = () => {
     closeMobileMenu();
   };
 
-  // Check if the current path matches the link path
-  const isActive = (path: string) => {
-    return location.pathname === path;
+  // Check if current path matches a nav tab
+  const isTabActive = (path: string) => {
+    if (path === '/') return location.pathname === '/';
+    const base = '/' + path.split('/')[1];
+    return location.pathname.startsWith(base);
   };
 
   const userInitial = profile?.username?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U';
   const displayName = profile?.username || user?.email?.split('@')[0] || 'User';
-  
+
+  // Flat navigation tabs — one click to anywhere
+  const navTabs = [
+    { label: 'Matchup', path: activeLeagueId ? `/matchup/${activeLeagueId}` : '/matchup', icon: Swords },
+    { label: 'Roster', path: '/roster', icon: Users },
+    { label: 'Standings', path: '/standings', icon: BarChart3 },
+    { label: 'Players', path: '/free-agents', icon: Search },
+    { label: 'GM Office', path: '/gm-office', icon: Settings },
+    { label: 'Draft', path: '/draft-room', icon: Sparkles },
+  ];
+
   return (
-    <header 
-      className={cn(
-        "fixed top-0 left-0 right-0 w-full z-50 transition-all duration-500", 
-        // MOBILE: Hide the full navbar - use bottom nav instead
-        // Only show the compact mobile header bar
-        "lg:block",
-        // Desktop styling
-        isScrolled ? 
-          "py-3 bg-[#D4E8B8]/95 backdrop-blur-lg shadow-sm border-b-2 border-citrus-sage/30" : 
-          "py-5 bg-[#D4E8B8]/90 backdrop-blur-sm border-b border-citrus-sage/20",
-        // Mobile: Ultra-compact header
-        "max-lg:py-2 max-lg:pt-[calc(0.5rem+env(safe-area-inset-top))]"
-      )}
-    >
-      <div className="container mx-auto px-4 max-w-full">
-        {/* Main Navigation Row */}
-        <div className="flex items-center justify-between">
-          {/* Logo with Citrus Slice - Vintage Varsity Style */}
-          <Link to="/" className="flex items-center gap-2 lg:gap-3 group relative">
-            {/* Logo icon - colorful citrus circle */}
-            <div className="w-9 h-9 lg:w-11 lg:h-11 flex items-center justify-center group-hover:-translate-y-0.5 transition-all duration-300">
-              <CitrusLogo className="w-9 h-9 lg:w-11 lg:h-11 drop-shadow-md group-hover:drop-shadow-lg group-hover:rotate-12 transition-all duration-300" />
-            </div>
-            {/* Text - hidden on mobile, shown on tablet+ */}
-            <div className="hidden sm:flex flex-col">
-              <div className="flex items-center gap-1.5">
-                <span className="font-varsity font-black text-lg uppercase text-citrus-forest group-hover:text-citrus-sage transition-colors duration-300 tracking-tight">
-                  Citrus
-                </span>
-                <CitrusSparkle className="w-3 h-3 text-citrus-sage opacity-60 group-hover:opacity-100 transition-opacity" />
-              </div>
-              <span className="text-[10px] text-citrus-charcoal font-display tracking-widest uppercase">Fantasy League</span>
-            </div>
+    <header className="fixed top-0 left-0 right-0 w-full z-50 lg:block max-lg:py-2 max-lg:pt-[calc(0.5rem+env(safe-area-inset-top))] max-lg:bg-[#D4E8B8]/95 max-lg:backdrop-blur-lg max-lg:border-b max-lg:border-citrus-sage/20">
+      {/* ===== ROW 1: Brand bar ===== */}
+      <div className="hidden lg:block bg-citrus-forest">
+        <div className="max-w-[1400px] mx-auto px-6 h-11 flex items-center justify-between">
+          {/* Left: Logo */}
+          <Link to="/" className="flex items-center gap-2 group">
+            <CitrusLogo className="w-7 h-7 drop-shadow-sm group-hover:rotate-12 transition-transform duration-200" />
+            <span className="font-varsity font-black text-sm uppercase text-citrus-cream tracking-tight">
+              Citrus
+            </span>
           </Link>
 
-          {/* Desktop Navigation - Show to everyone for demo exploration */}
-          <div className="hidden lg:flex items-center space-x-1">
-              <NavigationMenu>
-                <NavigationMenuList>
-                  <NavigationMenuItem>
-                    <NavigationMenuTrigger className={cn(
-                      "text-sm font-varsity font-bold text-citrus-forest uppercase tracking-wide hover:text-citrus-sage transition-colors",
-                      (isActive("/roster") || isActive("/gm-office")) && "text-citrus-sage"
-                    )}>My Team</NavigationMenuTrigger>
-                    <NavigationMenuContent>
-                      <div className="w-[340px] p-3 grid gap-3 grid-cols-2 bg-[#E8EED9]/60 backdrop-blur-sm corduroy-texture border-4 border-citrus-forest rounded-[1.5rem] shadow-[0_6px_0_rgba(27,48,34,0.25)]">
-                        <Link to="/roster" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-xl bg-gradient-to-br from-citrus-sage/20 to-citrus-sage/10 p-4 no-underline outline-none border-3 border-citrus-sage/40 hover:shadow-patch hover:-translate-y-1 transition-all duration-200">
-                          <div className="mb-1 mt-2 text-base font-varsity font-black text-citrus-forest uppercase">Roster</div>
-                          <p className="text-xs leading-tight font-display text-citrus-charcoal">Manage your team's lineup</p>
-                          <ChevronRight className="h-4 w-4 mt-2 text-citrus-sage" />
-                        </Link>
-                        <Link to="/gm-office" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-xl bg-gradient-to-br from-citrus-peach/20 to-citrus-orange/10 p-4 no-underline outline-none border-3 border-citrus-peach/40 hover:shadow-patch hover:-translate-y-1 transition-all duration-200">
-                          <div className="mb-1 mt-2 text-base font-varsity font-black text-citrus-forest uppercase">GM's Office</div>
-                          <p className="text-xs leading-tight font-display text-citrus-charcoal">Team operations center</p>
-                          <ChevronRight className="h-4 w-4 mt-2 text-citrus-sage" />
-                        </Link>
-                      </div>
-                    </NavigationMenuContent>
-                  </NavigationMenuItem>
-                
-                <NavigationMenuItem>
-                  <NavigationMenuTrigger className={cn(
-                    "text-sm font-varsity font-bold text-citrus-forest uppercase tracking-wide hover:text-citrus-sage transition-colors",
-                    (isActive("/matchup") || isActive("/standings") || isActive("/free-agents") || isActive("/draft")) && "text-citrus-sage"
-                  )}>League</NavigationMenuTrigger>
-                  <NavigationMenuContent>
-                    <div className="w-[340px] p-3 grid gap-3 grid-cols-2 bg-[#E8EED9]/60 backdrop-blur-sm corduroy-texture border-4 border-citrus-forest rounded-[1.5rem] shadow-[0_6px_0_rgba(27,48,34,0.25)]">
-                      <Link to={activeLeagueId ? `/matchup/${activeLeagueId}` : '/matchup'} onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-xl bg-gradient-to-br from-citrus-sage/20 to-citrus-green-light/10 p-4 no-underline outline-none border-3 border-citrus-sage/40 hover:shadow-patch hover:-translate-y-1 transition-all duration-200">
-                        <div className="mb-1 mt-2 text-base font-varsity font-black text-citrus-forest uppercase">Matchup</div>
-                        <p className="text-xs leading-tight font-display text-citrus-charcoal">Current matchups</p>
-                        <ChevronRight className="h-4 w-4 mt-2 text-citrus-orange" />
-                      </Link>
-                      <Link to="/standings" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-xl bg-gradient-to-br from-citrus-sage/20 to-citrus-sage/10 p-4 no-underline outline-none border-3 border-citrus-sage/40 hover:shadow-patch hover:-translate-y-1 transition-all duration-200">
-                        <div className="mb-1 mt-2 text-base font-varsity font-black text-citrus-forest uppercase">Standings</div>
-                        <p className="text-xs leading-tight font-display text-citrus-charcoal">League rankings</p>
-                        <ChevronRight className="h-4 w-4 mt-2 text-citrus-orange" />
-                      </Link>
-                      <Link to="/draft-room" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-xl bg-gradient-to-br from-citrus-peach/20 to-citrus-orange/10 p-4 no-underline outline-none border-3 border-citrus-peach/40 hover:shadow-patch hover:-translate-y-1 transition-all duration-200">
-                        <div className="mb-1 mt-2 text-base font-varsity font-black text-citrus-forest uppercase">Draft Room</div>
-                        <p className="text-xs leading-tight font-display text-citrus-charcoal">Live fantasy draft</p>
-                        <ChevronRight className="h-4 w-4 mt-2 text-citrus-orange" />
-                      </Link>
-                      <Link to="/free-agents" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-xl bg-gradient-to-br from-citrus-sage/20 to-citrus-orange/10 p-4 no-underline outline-none border-3 border-citrus-sage/40 hover:shadow-patch hover:-translate-y-1 transition-all duration-200">
-                        <div className="mb-1 mt-2 text-base font-varsity font-black text-citrus-forest uppercase">Free Agents</div>
-                        <p className="text-xs leading-tight font-display text-citrus-charcoal">Available players</p>
-                        <ChevronRight className="h-4 w-4 mt-2 text-citrus-orange" />
-                      </Link>
-                    </div>
-                  </NavigationMenuContent>
-                </NavigationMenuItem>
-                
-                <NavigationMenuItem>
-                  <NavigationMenuTrigger className={cn(
-                    "text-sm font-varsity font-bold text-citrus-forest uppercase tracking-wide hover:text-citrus-sage transition-colors",
-                    (isActive("/blog") || isActive("/podcasts") || isActive("/guides") || isActive("/news")) && "text-citrus-sage"
-                  )}>Resources</NavigationMenuTrigger>
-                  <NavigationMenuContent>
-                    <div className="w-[340px] p-3 grid gap-3 grid-cols-2 bg-[#E8EED9]/60 backdrop-blur-sm corduroy-texture border-4 border-citrus-forest rounded-[1.5rem] shadow-[0_6px_0_rgba(27,48,34,0.25)]">
-                      <Link to="/news" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-xl bg-gradient-to-br from-citrus-sage/20 to-citrus-green-light/10 p-4 no-underline outline-none border-3 border-citrus-sage/40 hover:shadow-patch hover:-translate-y-1 transition-all duration-200">
-                        <div className="mb-1 mt-2 text-base font-varsity font-black text-citrus-forest uppercase">News</div>
-                        <p className="text-xs leading-tight font-display text-citrus-charcoal">Latest fantasy updates</p>
-                        <ChevronRight className="h-4 w-4 mt-2 text-citrus-orange" />
-                      </Link>
-                      <Link to="/create-league" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-xl bg-gradient-to-br from-citrus-sage/20 to-citrus-sage/10 p-4 no-underline outline-none border-3 border-citrus-sage/40 hover:shadow-patch hover:-translate-y-1 transition-all duration-200">
-                        <div className="mb-1 mt-2 text-base font-varsity font-black text-citrus-forest uppercase">Create League</div>
-                        <p className="text-xs leading-tight font-display text-citrus-charcoal">Start a new league</p>
-                        <ChevronRight className="h-4 w-4 mt-2 text-citrus-orange" />
-                      </Link>
-                      <Link to="/blog" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-xl bg-gradient-to-br from-citrus-peach/20 to-citrus-orange/10 p-4 no-underline outline-none border-3 border-citrus-peach/40 hover:shadow-patch hover:-translate-y-1 transition-all duration-200">
-                        <div className="mb-1 mt-2 text-base font-varsity font-black text-citrus-forest uppercase">Blog & Podcasts</div>
-                        <p className="text-xs leading-tight font-display text-citrus-charcoal">Insights & Analysis</p>
-                        <ChevronRight className="h-4 w-4 mt-2 text-citrus-orange" />
-                      </Link>
-                      <Link to="/guides" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-xl bg-gradient-to-br from-citrus-sage/20 to-citrus-orange/10 p-4 no-underline outline-none border-3 border-citrus-sage/40 hover:shadow-patch hover:-translate-y-1 transition-all duration-200">
-                        <div className="mb-1 mt-2 text-base font-varsity font-black text-citrus-forest uppercase">Strategy Guides</div>
-                        <p className="text-xs leading-tight font-display text-citrus-charcoal">Winning tactics</p>
-                        <ChevronRight className="h-4 w-4 mt-2 text-citrus-orange" />
-                      </Link>
-                    </div>
-                  </NavigationMenuContent>
-                </NavigationMenuItem>
-                
-                <NavigationMenuItem>
-                  <NavigationMenuLink asChild>
-                    <Link to="/contact" className={cn(
-                      "inline-flex items-center justify-center rounded-varsity h-9 px-4 py-1.5 text-sm font-varsity font-bold text-citrus-forest uppercase tracking-wide hover:text-[#E8EED9] hover:bg-citrus-sage border-2 border-transparent hover:border-citrus-forest transition-all",
-                      isActive("/contact") && "text-[#E8EED9] bg-citrus-sage border-citrus-forest"
-                    )}>
-                      Contact
-                    </Link>
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-              </NavigationMenuList>
-            </NavigationMenu>
-          </div>
-
-          {/* Right side navigation - Search, Notifications, User */}
-          <div className="hidden lg:flex items-center space-x-2">
-            {user ? (
-              <>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="ghost" size="icon" className="text-citrus-forest hover:text-citrus-sage hover:bg-citrus-sage/10 h-9 w-9 rounded-lg border-2 border-transparent hover:border-citrus-sage/30 transition-all">
-                      <Search className="h-4 w-4" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-64 p-3">
-                    <div className="flex flex-col space-y-3">
-                      <h4 className="font-medium text-xs">Quick search</h4>
-                      <div className="relative">
-                        <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
-                        <input
-                          placeholder="Search players, teams..."
-                          className="w-full rounded-md border border-input bg-background pl-7 pr-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
-                        />
-                      </div>
-                      <div className="text-[10px] text-muted-foreground">
-                        Press <kbd className="rounded bg-muted px-1 py-0.5 text-[10px]">⌘</kbd> + <kbd className="rounded bg-muted px-1 py-0.5 text-[10px]">K</kbd> to search
-                      </div>
-                    </div>
-                  </PopoverContent>
-                </Popover>
-
-                {/* JOIN LEAGUE BUTTON - Always visible when logged in */}
-                <Link to="/create-league?tab=join">
-                  <Button 
-                    variant="ghost" 
-                    className="text-citrus-forest hover:text-citrus-sage hover:bg-citrus-sage/10 h-9 px-3 rounded-lg border-2 border-transparent hover:border-citrus-sage/30 transition-all flex items-center gap-1.5"
-                  >
-                    <UserPlus className="h-4 w-4" />
-                    <span className="text-xs font-varsity font-bold uppercase hidden sm:inline">
-                      Join League
+          {/* Center: League switcher */}
+          <div className="flex items-center gap-3">
+            {userLeagues.length > 0 ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-2 px-3 py-1 rounded-lg hover:bg-white/10 transition-colors">
+                    <Trophy className="h-3.5 w-3.5 text-citrus-orange" />
+                    <span className="text-xs font-display font-semibold text-citrus-cream max-w-[200px] truncate">
+                      {activeLeague?.name || 'Select League'}
                     </span>
-                  </Button>
-                </Link>
-
-                {/* LEAGUE SWITCHER - Multi-League Support (Yahoo/Sleeper style) */}
-                {userLeagues.length > 0 && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button 
-                        variant="ghost" 
-                        className="text-citrus-forest hover:text-citrus-sage hover:bg-citrus-sage/10 h-9 px-3 rounded-lg border-2 border-transparent hover:border-citrus-sage/30 transition-all flex items-center gap-1.5"
-                      >
-                        <Trophy className="h-4 w-4" />
-                        <span className="text-xs font-varsity font-bold uppercase max-w-[120px] truncate">
-                          {activeLeague?.name || 'Select League'}
-                        </span>
-                        <ChevronDown className="h-3.5 w-3.5 opacity-50" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-64">
-                      <DropdownMenuLabel className="text-xs font-varsity uppercase text-citrus-forest">
-                        My Leagues ({userLeagues.length})
-                      </DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      {userLeagues.map((l) => (
-                        <DropdownMenuItem
-                          key={l.id}
-                          onClick={() => {
-                            setActiveLeagueId(l.id);
-                            // If on a matchup page, navigate to the new league's matchup
-                            if (location.pathname.startsWith('/matchup')) {
-                              navigate(`/matchup/${l.id}`);
-                            }
-                          }}
-                          className={cn(
-                            "cursor-pointer",
-                            activeLeagueId === l.id && "bg-citrus-sage/20 text-citrus-forest font-semibold"
-                          )}
-                        >
-                          <Trophy className="h-4 w-4 mr-2" />
-                          <div className="flex-1">
-                            <div className="font-medium truncate">{l.name}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {l.draft_status === 'completed' ? 'Season Active' : 'Draft Pending'}
-                            </div>
-                          </div>
-                        </DropdownMenuItem>
-                      ))}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onClick={() => navigate('/create-league')}
-                        className="text-citrus-sage font-medium"
-                      >
-                        <Trophy className="h-4 w-4 mr-2" />
-                        Create/Join League
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-                
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="text-citrus-forest hover:text-citrus-sage hover:bg-citrus-sage/10 relative h-9 w-9 rounded-lg border-2 border-transparent hover:border-citrus-sage/30 transition-all"
+                    <ChevronDown className="h-3 w-3 text-citrus-cream/60" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="center" className="w-64">
+                  <DropdownMenuLabel className="text-xs font-display uppercase text-citrus-forest">
+                    My Leagues ({userLeagues.length})
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {userLeagues.map((l) => (
+                    <DropdownMenuItem
+                      key={l.id}
                       onClick={() => {
-                        // Navigate to matchup page with notifications panel visible
-                        if (activeLeagueId) {
-                          navigate(`/matchup/${activeLeagueId}`);
+                        setActiveLeagueId(l.id);
+                        if (location.pathname.startsWith('/matchup')) {
+                          navigate(`/matchup/${l.id}`);
                         }
                       }}
+                      className={cn(
+                        "cursor-pointer",
+                        activeLeagueId === l.id && "bg-citrus-sage/20 font-semibold"
+                      )}
                     >
-                      <Bell className="h-4 w-4" />
-                      {unreadCount > 0 && (
-                        <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-citrus-orange border-2 border-[#F2EDE1] text-[9px] font-varsity font-bold text-[#E8EED9] shadow-patch">
-                          {unreadCount > 9 ? '9+' : unreadCount}
-                        </span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent align="end" className="w-64 p-0">
-                    <div className="flex flex-col">
-                      <div className="flex items-center justify-between p-3 border-b border-border/30">
-                        <h4 className="font-medium text-xs">Notifications</h4>
-                        {activeLeagueId && unreadCount > 0 && (
-                          <Button 
-                            variant="ghost" 
-                            className="text-[10px] h-auto p-0 hover:bg-transparent hover:text-primary"
-                            onClick={async () => {
-                              if (user?.id && activeLeagueId) {
-                                const notificationStore = useNotificationStore.getState();
-                                await notificationStore.markAllAsRead(activeLeagueId, user.id);
-                              }
-                            }}
-                          >
-                            Mark all read
-                          </Button>
-                        )}
-                      </div>
-                      <div className="max-h-[250px] overflow-y-auto">
-                        {activeLeagueId && user?.id ? (
-                          (() => {
-                            const notificationStore = useNotificationStore.getState();
-                            const leagueNotifications = notificationStore.notifications.get(activeLeagueId) || [];
-                            const recentNotifications = leagueNotifications.slice(0, 3);
-                            
-                            if (recentNotifications.length === 0) {
-                              return (
-                                <div className="p-4 text-center">
-                                  <p className="text-xs text-muted-foreground">No notifications</p>
-                                </div>
-                              );
-                            }
-                            
-                            return recentNotifications.map((notification) => (
-                              <div 
-                                key={notification.id} 
-                                className="flex gap-2 p-2.5 hover:bg-accent/5 cursor-pointer border-b border-border/10"
-                                onClick={() => {
-                                  if (activeLeagueId) {
-                                    navigate(`/matchup/${activeLeagueId}`);
-                                  }
-                                }}
-                              >
-                                <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                                  <Bell className="h-3 w-3" />
-                                </div>
-                                <div className="flex-1">
-                                  <p className={`text-xs font-medium ${notification.read_status ? 'text-muted-foreground' : 'text-foreground'}`}>
-                                    {notification.title}
-                                  </p>
-                                  <p className="text-[10px] text-muted-foreground line-clamp-1">
-                                    {notification.message}
-                                  </p>
-                                </div>
-                                {!notification.read_status && (
-                                  <div className="w-2 h-2 bg-primary rounded-full shrink-0 mt-1.5" />
-                                )}
-                              </div>
-                            ));
-                          })()
-                        ) : (
-                          <div className="p-4 text-center">
-                            <p className="text-xs text-muted-foreground">Join a league to see notifications</p>
-                          </div>
-                        )}
-                      </div>
-                      {activeLeagueId && (
-                        <div className="p-2.5">
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="w-full text-xs h-7"
-                            onClick={() => navigate(`/matchup/${activeLeagueId}`)}
-                          >
-                            View all
-                          </Button>
+                      <Trophy className="h-4 w-4 mr-2" />
+                      <div className="flex-1">
+                        <div className="font-medium truncate">{l.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {l.draft_status === 'completed' ? 'Season Active' : 'Draft Pending'}
                         </div>
-                      )}
-                    </div>
-                  </PopoverContent>
-                </Popover>
-                
-                <div className="w-px h-7 bg-border/30 mx-1"></div>
-                
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button className="bg-citrus-sage border-3 border-citrus-forest/20 rounded-xl flex gap-2 pl-2 pr-4 h-10 hover:shadow-patch hover:-translate-y-0.5 transition-all">
-                      <div className="h-6 w-6 rounded-full bg-citrus-orange border-2 border-citrus-charcoal/20 flex items-center justify-center text-[#E8EED9] text-xs font-varsity font-bold shadow-sm">
+                      </div>
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate('/create-league')} className="text-citrus-sage font-medium">
+                    <UserPlus className="h-4 w-4 mr-2" /> Create / Join League
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <span className="text-xs font-display text-citrus-cream/60">Fantasy Hockey</span>
+            )}
+          </div>
+
+          {/* Right: Actions */}
+          <div className="flex items-center gap-1">
+            {user ? (
+              <>
+                {/* Notifications */}
+                <button
+                  onClick={() => activeLeagueId && navigate(`/matchup/${activeLeagueId}`)}
+                  className="relative p-2 rounded-lg hover:bg-white/10 transition-colors"
+                >
+                  <Bell className="h-4 w-4 text-citrus-cream/80" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-0.5 right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-citrus-orange text-[8px] font-bold text-white">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {/* User menu */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-white/10 transition-colors">
+                      <div className="h-6 w-6 rounded-full bg-citrus-orange flex items-center justify-center text-white text-[10px] font-varsity font-bold">
                         {userInitial}
                       </div>
-                      <span className="text-xs font-display font-bold text-citrus-forest">{displayName}</span>
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent align="end" className="w-48 p-1.5">
-                    <div className="flex flex-col space-y-1">
-                      <Button variant="ghost" className="justify-start text-xs h-8" asChild>
-                        <Link to="/profile">
-                          <CircleUser className="h-3.5 w-3.5 mr-2" /> Profile
-                        </Link>
-                      </Button>
-                      <Button variant="ghost" className="justify-start text-xs h-8">
-                        <Users className="h-3.5 w-3.5 mr-2" /> Subscription
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        className="justify-start text-xs h-8 text-destructive hover:text-destructive"
-                        onClick={handleSignOut}
-                      >
-                        <LogOut className="h-3.5 w-3.5 mr-2" /> Log out
-                      </Button>
-                    </div>
-                  </PopoverContent>
-                </Popover>
+                      <span className="text-xs font-display font-medium text-citrus-cream hidden xl:inline">{displayName}</span>
+                      <ChevronDown className="h-3 w-3 text-citrus-cream/60 hidden xl:block" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuLabel className="text-xs">{displayName}</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link to="/profile"><CircleUser className="h-4 w-4 mr-2" /> Profile</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to="/settings"><Settings className="h-4 w-4 mr-2" /> Settings</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive">
+                      <LogOut className="h-4 w-4 mr-2" /> Log out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </>
             ) : (
-              <Button variant="varsity" size="sm" asChild>
+              <Button size="sm" className="h-7 px-4 text-xs font-display font-bold bg-citrus-sage hover:bg-citrus-sage/80 text-citrus-forest border-0 rounded-lg" asChild>
                 <Link to="/auth">Sign In</Link>
               </Button>
             )}
           </div>
+        </div>
+      </div>
 
-          {/* Mobile Menu Button - iOS-style touch targets */}
-          <div className="flex lg:hidden items-center gap-1">
-            {/* Notification bell for mobile */}
+      {/* ===== ROW 2: Tab bar ===== */}
+      <div className="hidden lg:block bg-[#D4E8B8] border-b border-citrus-sage/30">
+        <div className="max-w-[1400px] mx-auto px-6">
+          <nav className="flex items-center gap-0 h-10 -mb-px">
+            {navTabs.map((tab) => {
+              const active = isTabActive(tab.path);
+              return (
+                <Link
+                  key={tab.label}
+                  to={tab.path}
+                  className={cn(
+                    "flex items-center gap-1.5 px-4 h-10 text-[13px] font-display font-semibold transition-colors border-b-2 whitespace-nowrap",
+                    active
+                      ? "border-citrus-forest text-citrus-forest"
+                      : "border-transparent text-citrus-charcoal/70 hover:text-citrus-forest hover:border-citrus-sage/50"
+                  )}
+                >
+                  <tab.icon className="h-3.5 w-3.5" />
+                  {tab.label}
+                </Link>
+              );
+            })}
+
+            {/* Secondary links pushed right */}
+            <div className="ml-auto flex items-center gap-0">
+              <Link
+                to="/news"
+                className={cn(
+                  "flex items-center gap-1.5 px-3 h-10 text-[12px] font-display font-medium transition-colors border-b-2 whitespace-nowrap",
+                  isTabActive('/news')
+                    ? "border-citrus-forest text-citrus-forest"
+                    : "border-transparent text-citrus-charcoal/50 hover:text-citrus-forest"
+                )}
+              >
+                <Newspaper className="h-3 w-3" />
+                News
+              </Link>
+              <Link
+                to="/contact"
+                className={cn(
+                  "flex items-center px-3 h-10 text-[12px] font-display font-medium transition-colors border-b-2 whitespace-nowrap",
+                  isTabActive('/contact')
+                    ? "border-citrus-forest text-citrus-forest"
+                    : "border-transparent text-citrus-charcoal/50 hover:text-citrus-forest"
+                )}
+              >
+                Contact
+              </Link>
+            </div>
+          </nav>
+        </div>
+      </div>
+
+      {/* ===== MOBILE: Top bar with logo + hamburger ===== */}
+      <div className="lg:hidden container mx-auto px-4">
+        <div className="flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-2">
+            <CitrusLogo className="w-8 h-8 drop-shadow-sm" />
+            <span className="font-varsity font-black text-base uppercase text-citrus-forest tracking-tight hidden sm:block">
+              Citrus
+            </span>
+          </Link>
+
+          <div className="flex items-center gap-1">
             {user && (
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="touch-target ios-pressable text-citrus-forest hover:text-citrus-sage hover:bg-citrus-sage/10 h-11 w-11 rounded-xl relative"
-                onClick={() => {
-                  if (activeLeagueId) {
-                    navigate(`/matchup/${activeLeagueId}`);
-                  }
-                }}
+              <button
+                className="p-2.5 rounded-xl text-citrus-forest relative"
+                onClick={() => activeLeagueId && navigate(`/matchup/${activeLeagueId}`)}
               >
                 <Bell className="h-5 w-5" />
                 {unreadCount > 0 && (
-                  <span className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-citrus-orange border-2 border-[#E8EED9] text-[10px] font-varsity font-bold text-white shadow-sm">
+                  <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-citrus-orange text-[9px] font-bold text-white">
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
                 )}
-              </Button>
+              </button>
             )}
-            
-            {/* Menu toggle */}
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="touch-target ios-pressable text-citrus-forest hover:text-citrus-sage hover:bg-citrus-sage/10 h-11 w-11 rounded-xl"
+            <button
+              className="p-2.5 rounded-xl text-citrus-forest"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             >
               {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </Button>
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Mobile Navigation - iOS-style slide-in menu */}
+      {/* ===== MOBILE: Slide-in menu ===== */}
       {mobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 top-[calc(var(--header-height)+1px)] z-50 bg-[#E8EED9]/98 backdrop-blur-xl animate-in fade-in slide-in-from-top duration-200">
-          <div className="container mx-auto px-4 py-4 h-[calc(100dvh-var(--header-height)-env(safe-area-inset-bottom)-4.5rem)] flex flex-col ios-scroll">
-            <div className="flex-1 overflow-y-auto scrollbar-hide">
-              <nav className="flex flex-col space-y-3">
-                
-                {/* League Switcher - Prominent on mobile */}
-                {userLeagues.length > 0 && (
-                  <div className="ios-card p-3 mb-2">
-                    <div className="ios-section-header !mt-0 !pt-0 !px-0 mb-2">Active League</div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-citrus-sage/20 flex items-center justify-center">
-                        <Trophy className="h-5 w-5 text-citrus-sage" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-varsity font-bold text-citrus-forest text-sm">{activeLeague?.name || 'Select League'}</p>
-                        <p className="text-[11px] text-citrus-charcoal/60">
-                          {activeLeague?.draft_status === 'completed' ? 'Season Active' : 'Draft Pending'}
-                        </p>
-                      </div>
-                      <ChevronRight className="h-4 w-4 text-citrus-charcoal/40" />
-                    </div>
-                  </div>
-                )}
-
-                {/* My Team Section */}
-                <MobileNavSection title="My Team">
-                  <Link to="/roster" className="ios-list-item ios-pressable" onClick={closeMobileMenu}>
-                    <div className="w-8 h-8 rounded-lg bg-citrus-sage/20 flex items-center justify-center mr-3">
-                      <Users className="h-4 w-4 text-citrus-sage" />
-                    </div>
-                    <span className="flex-1 text-[15px] font-medium text-citrus-forest">Roster</span>
-                    <ChevronRight className="h-4 w-4 text-citrus-charcoal/30" />
-                  </Link>
-                  <Link to="/gm-office" className="ios-list-item ios-pressable" onClick={closeMobileMenu}>
-                    <div className="w-8 h-8 rounded-lg bg-citrus-peach/30 flex items-center justify-center mr-3">
-                      <Settings className="h-4 w-4 text-citrus-orange" />
-                    </div>
-                    <span className="flex-1 text-[15px] font-medium text-citrus-forest">GM's Office</span>
-                    <ChevronRight className="h-4 w-4 text-citrus-charcoal/30" />
-                  </Link>
-                </MobileNavSection>
-                
-                {/* League Section */}
-                <MobileNavSection title="League">
-                  <Link to={activeLeagueId ? `/matchup/${activeLeagueId}` : '/matchup'} className="ios-list-item ios-pressable" onClick={closeMobileMenu}>
-                    <div className="w-8 h-8 rounded-lg bg-citrus-sage/20 flex items-center justify-center mr-3">
-                      <Calendar className="h-4 w-4 text-citrus-sage" />
-                    </div>
-                    <span className="flex-1 text-[15px] font-medium text-citrus-forest">Matchup</span>
-                    <ChevronRight className="h-4 w-4 text-citrus-charcoal/30" />
-                  </Link>
-                  <Link to="/standings" className="ios-list-item ios-pressable" onClick={closeMobileMenu}>
-                    <div className="w-8 h-8 rounded-lg bg-citrus-sage/20 flex items-center justify-center mr-3">
-                      <LineChart className="h-4 w-4 text-citrus-sage" />
-                    </div>
-                    <span className="flex-1 text-[15px] font-medium text-citrus-forest">Standings</span>
-                    <ChevronRight className="h-4 w-4 text-citrus-charcoal/30" />
-                  </Link>
-                  <Link to="/free-agents" className="ios-list-item ios-pressable" onClick={closeMobileMenu}>
-                    <div className="w-8 h-8 rounded-lg bg-citrus-sage/20 flex items-center justify-center mr-3">
-                      <Users className="h-4 w-4 text-citrus-sage" />
-                    </div>
-                    <span className="flex-1 text-[15px] font-medium text-citrus-forest">Free Agents</span>
-                    <ChevronRight className="h-4 w-4 text-citrus-charcoal/30" />
-                  </Link>
-                  <Link to="/draft-room" className="ios-list-item ios-pressable" onClick={closeMobileMenu}>
-                    <div className="w-8 h-8 rounded-lg bg-citrus-peach/30 flex items-center justify-center mr-3">
-                      <Sparkles className="h-4 w-4 text-citrus-orange" />
-                    </div>
-                    <span className="flex-1 text-[15px] font-medium text-citrus-forest">Draft Room</span>
-                    <ChevronRight className="h-4 w-4 text-citrus-charcoal/30" />
-                  </Link>
-                </MobileNavSection>
-                
-                {/* Resources Section */}
-                <MobileNavSection title="Resources">
-                  <Link to="/news" className="ios-list-item ios-pressable" onClick={closeMobileMenu}>
-                    <div className="w-8 h-8 rounded-lg bg-citrus-sage/20 flex items-center justify-center mr-3">
-                      <Newspaper className="h-4 w-4 text-citrus-sage" />
-                    </div>
-                    <span className="flex-1 text-[15px] font-medium text-citrus-forest">News</span>
-                    <ChevronRight className="h-4 w-4 text-citrus-charcoal/30" />
-                  </Link>
-                  <Link to="/blog" className="ios-list-item ios-pressable" onClick={closeMobileMenu}>
-                    <div className="w-8 h-8 rounded-lg bg-citrus-sage/20 flex items-center justify-center mr-3">
-                      <FileText className="h-4 w-4 text-citrus-sage" />
-                    </div>
-                    <span className="flex-1 text-[15px] font-medium text-citrus-forest">Blog</span>
-                    <ChevronRight className="h-4 w-4 text-citrus-charcoal/30" />
-                  </Link>
-                  <Link to="/guides" className="ios-list-item ios-pressable" onClick={closeMobileMenu}>
-                    <div className="w-8 h-8 rounded-lg bg-citrus-sage/20 flex items-center justify-center mr-3">
-                      <BookOpen className="h-4 w-4 text-citrus-sage" />
-                    </div>
-                    <span className="flex-1 text-[15px] font-medium text-citrus-forest">Strategy Guides</span>
-                    <ChevronRight className="h-4 w-4 text-citrus-charcoal/30" />
-                  </Link>
-                </MobileNavSection>
-                
-                {/* Contact */}
-                <Link to="/contact" className="ios-card ios-list-item ios-pressable mt-2" onClick={closeMobileMenu}>
-                  <div className="w-8 h-8 rounded-lg bg-citrus-orange/20 flex items-center justify-center mr-3">
-                    <Medal className="h-4 w-4 text-citrus-orange" />
-                  </div>
-                  <span className="flex-1 text-[15px] font-medium text-citrus-forest">Contact Us</span>
-                  <ChevronRight className="h-4 w-4 text-citrus-charcoal/30" />
-                </Link>
-              </nav>
-            </div>
-            
-            {/* User Section - iOS-style footer */}
-            {user ? (
-              <div className="border-t border-citrus-sage/20 pt-4 mt-4 pb-safe">
-                <div className="ios-card p-4">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="h-12 w-12 rounded-full bg-citrus-orange flex items-center justify-center text-white text-lg font-varsity font-bold shadow-sm">
-                      {userInitial}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-[15px] font-semibold text-citrus-forest">{displayName}</p>
-                      <p className="text-[13px] text-citrus-charcoal/60">{user.email}</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="flex-1 h-11 text-sm font-medium rounded-xl border-citrus-sage/30 ios-pressable" 
-                      asChild
-                    >
-                      <Link to="/profile" onClick={closeMobileMenu}>
-                        <User className="h-4 w-4 mr-2" /> Profile
-                      </Link>
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="flex-1 h-11 text-sm font-medium rounded-xl text-red-500 border-red-200 hover:bg-red-50 ios-pressable"
-                      onClick={handleSignOut}
-                    >
-                      <LogOut className="h-4 w-4 mr-2" /> Log out
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="border-t border-citrus-sage/20 pt-4 mt-4 pb-safe">
-                <Button 
-                  variant="varsity" 
-                  className="w-full h-12 text-base font-varsity font-bold rounded-xl ios-pressable" 
-                  asChild
-                >
-                  <Link to="/auth" onClick={closeMobileMenu}>Sign In</Link>
-                </Button>
+        <div className="lg:hidden fixed inset-0 top-[56px] z-50 bg-[#E8EED9]/98 backdrop-blur-xl animate-in fade-in slide-in-from-top duration-200">
+          <div className="flex flex-col h-[calc(100dvh-56px-env(safe-area-inset-bottom)-4.5rem)] px-4 py-3">
+            {/* League context */}
+            {userLeagues.length > 0 && (
+              <div className="flex items-center gap-3 px-3 py-2.5 mb-3 bg-citrus-forest/5 rounded-xl">
+                <Trophy className="h-4 w-4 text-citrus-orange" />
+                <span className="text-sm font-display font-semibold text-citrus-forest truncate">
+                  {activeLeague?.name || 'Select League'}
+                </span>
               </div>
             )}
+
+            {/* Nav links - flat list */}
+            <nav className="flex-1 overflow-y-auto space-y-0.5">
+              {navTabs.map((tab) => {
+                const active = isTabActive(tab.path);
+                return (
+                  <Link
+                    key={tab.label}
+                    to={tab.path}
+                    onClick={closeMobileMenu}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-3 rounded-xl transition-colors",
+                      active ? "bg-citrus-sage/20 text-citrus-forest" : "text-citrus-charcoal/80"
+                    )}
+                  >
+                    <tab.icon className="h-5 w-5" />
+                    <span className="text-[15px] font-display font-medium">{tab.label}</span>
+                    {active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-citrus-orange" />}
+                  </Link>
+                );
+              })}
+
+              {/* Divider */}
+              <div className="h-px bg-citrus-sage/20 my-3" />
+
+              {/* Secondary links */}
+              <Link to="/news" onClick={closeMobileMenu} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-citrus-charcoal/70">
+                <Newspaper className="h-4 w-4" />
+                <span className="text-[14px] font-display font-medium">News</span>
+              </Link>
+              <Link to="/blog" onClick={closeMobileMenu} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-citrus-charcoal/70">
+                <Calendar className="h-4 w-4" />
+                <span className="text-[14px] font-display font-medium">Blog</span>
+              </Link>
+              <Link to="/contact" onClick={closeMobileMenu} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-citrus-charcoal/70">
+                <Newspaper className="h-4 w-4" />
+                <span className="text-[14px] font-display font-medium">Contact</span>
+              </Link>
+            </nav>
+
+            {/* User footer */}
+            <div className="border-t border-citrus-sage/20 pt-3 mt-2 pb-safe">
+              {user ? (
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-citrus-orange flex items-center justify-center text-white text-sm font-varsity font-bold">
+                    {userInitial}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-citrus-forest truncate">{displayName}</p>
+                    <p className="text-xs text-citrus-charcoal/60 truncate">{user.email}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Link to="/profile" onClick={closeMobileMenu} className="p-2 rounded-lg bg-citrus-sage/10">
+                      <CircleUser className="h-4 w-4 text-citrus-forest" />
+                    </Link>
+                    <button onClick={handleSignOut} className="p-2 rounded-lg bg-red-50">
+                      <LogOut className="h-4 w-4 text-red-500" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <Button className="w-full h-11 font-display font-bold rounded-xl bg-citrus-sage text-citrus-forest" asChild>
+                  <Link to="/auth" onClick={closeMobileMenu}>Sign In</Link>
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       )}
 
       <style>
-        {`:root {
-          --header-height: ${isScrolled ? '73px' : '89px'};
-        }`}
+        {`:root { --header-height: 84px; }`}
       </style>
     </header>
-  );
-};
-
-// Helper component for mobile navigation sections - iOS style
-const MobileNavSection = ({ title, children }: { title: string, children: React.ReactNode }) => {
-  const [isOpen, setIsOpen] = useState(true); // Default open for better UX
-  
-  return (
-    <div className="mb-1">
-      <button 
-        className="w-full text-left py-2 px-1 flex justify-between items-center ios-pressable" 
-        onClick={() => setIsOpen(!isOpen)}
-      >
-        <span className="text-[13px] font-semibold text-citrus-charcoal/60 uppercase tracking-wide">{title}</span>
-        <ChevronRight
-          className={cn(
-            "h-4 w-4 text-citrus-charcoal/40 transition-transform duration-200",
-            isOpen ? "transform rotate-90" : ""
-          )}
-        />
-      </button>
-      {isOpen && (
-        <div className="ios-card overflow-hidden">
-          {children}
-        </div>
-      )}
-    </div>
   );
 };
 

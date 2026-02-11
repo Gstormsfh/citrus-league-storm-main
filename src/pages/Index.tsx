@@ -42,14 +42,14 @@ const Index = () => {
 
   try {
     return (
-      <div className="min-h-screen relative overflow-hidden bg-[#D4E8B8]">
+      <div className="min-h-screen relative overflow-x-hidden bg-[#D4E8B8]">
         {/* Citrus Background - Floating citrus elements */}
         <CitrusBackground density="medium" animated={true} />
         
         <Suspense fallback={<div>Loading Navbar...</div>}>
           <Navbar />
         </Suspense>
-        <main>
+        <main className="pt-[84px]">
           <Suspense fallback={<div>Loading sections...</div>}>
             <HeroSection />
             <FeaturesSection />
