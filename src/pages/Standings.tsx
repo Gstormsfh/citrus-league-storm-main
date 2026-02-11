@@ -402,7 +402,7 @@ const Standings = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#D4E8B8] relative overflow-hidden">
+    <div className="min-h-screen bg-[#D4E8B8] relative overflow-x-hidden">
       {/* Desktop Navbar - Hidden on mobile */}
       <div className="hidden lg:block">
         <Navbar />
