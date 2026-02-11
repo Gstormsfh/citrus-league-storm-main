@@ -168,8 +168,7 @@ const FreeAgents = () => {
       });
       
       if (error) {
-        console.warn('[FreeAgents] Trending RPC not available yet, using fallback:', error.message);
-        // Fallback: trending data will remain empty, topTrending will use mock data
+        console.warn('[FreeAgents] Trending RPC not available yet:', error.message);
         return;
       }
       
@@ -187,7 +186,6 @@ const FreeAgents = () => {
           console.log('[FreeAgents] Top trending:', Array.from(trendingMap.entries()).slice(0, 5));
         } else {
           console.warn('[FreeAgents] ⚠️ No trending data yet - player_transactions table is empty.');
-          console.warn('[FreeAgents] Using estimated adds based on season stats. Real data will appear once users start adding/dropping players.');
         }
       }
     } catch (error) {
@@ -1247,7 +1245,7 @@ const FreeAgents = () => {
       const realData = trendingData.get(playerId);
       return {
         ...p,
-        adds: realData?.addCount ?? Math.floor((p.points || 0) * 12 + Math.random() * 50), // Real data or estimate
+        adds: realData?.addCount ?? 0,
         netAdds: realData?.netAdds ?? 0,
         hasRealData: !!realData
       };
@@ -1372,14 +1370,9 @@ const FreeAgents = () => {
                         <CardTitle className="text-lg font-bold flex items-center gap-2">
                           <TrendingUp className="h-5 w-5 text-green-500" />
                           Top Trending
-                          {trendingData.size === 0 && (
-                            <Badge variant="outline" className="text-[10px] ml-2 bg-citrus-cream text-citrus-forest border-citrus-sage">
-                              Estimated
-                            </Badge>
-                          )}
                           {trendingData.size > 0 && (
                             <Badge className="text-[10px] ml-2 bg-citrus-sage text-citrus-forest">
-                              {trendingData.size} Adds
+                              Live
                             </Badge>
                           )}
                         </CardTitle>
