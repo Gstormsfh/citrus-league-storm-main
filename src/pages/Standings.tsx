@@ -402,7 +402,7 @@ const Standings = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#D4E8B8] relative overflow-x-hidden">
+    <div className="min-h-screen bg-[#D4E8B8] relative">
       {/* Desktop Navbar - Hidden on mobile */}
       <div className="hidden lg:block">
         <Navbar />
@@ -425,7 +425,7 @@ const Standings = () => {
               : "lg:grid-cols-[240px_1fr]"
           )}>
             {/* Main Content */}
-            <div className="min-w-0 lg:max-h-[calc(100vh-10rem)] overflow-y-auto ios-scroll px-3 lg:px-6 order-1 lg:order-2">
+            <div className="min-w-0 lg:max-h-[calc(100vh-10rem)] lg:overflow-y-auto px-3 lg:px-6 order-1 lg:order-2">
           
           {userLeagueState === 'logged-in-no-league' && (
             <div className="max-w-3xl mx-auto mb-12">

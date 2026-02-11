@@ -226,7 +226,7 @@ const TeamAnalytics = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#D4E8B8] flex flex-col relative overflow-x-hidden">
+    <div className="min-h-screen bg-[#D4E8B8] flex flex-col relative">
       <CitrusBackground density="light" />
       <Navbar />
       <main className="w-full pt-28 pb-16 m-0 p-0">
