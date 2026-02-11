@@ -6,7 +6,7 @@ import {
   Trophy, ChevronDown, UserPlus, Calendar, BarChart3,
   Swords, Newspaper, Sparkles, Settings
 } from 'lucide-react';
-import { CitrusSlice } from '@/components/icons/CitrusIcons';
+import { CitrusLogo } from '@/components/icons/CitrusIcons';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
@@ -83,9 +83,7 @@ const Navbar = () => {
         <div className="max-w-[1400px] mx-auto px-6 h-11 flex items-center justify-between">
           {/* Left: Logo */}
           <Link to="/" className="flex items-center gap-2 group">
-            <div className="w-7 h-7 rounded-lg bg-citrus-sage/20 flex items-center justify-center">
-              <CitrusSlice className="w-4.5 h-4.5 text-citrus-cream group-hover:rotate-12 transition-transform duration-200" />
-            </div>
+            <CitrusLogo className="w-7 h-7 drop-shadow-sm group-hover:rotate-12 transition-transform duration-200" />
             <span className="font-varsity font-black text-sm uppercase text-citrus-cream tracking-tight">
               Citrus
             </span>
@@ -253,9 +251,7 @@ const Navbar = () => {
       <div className="lg:hidden container mx-auto px-4">
         <div className="flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-citrus-sage to-citrus-green-medium border-2 border-citrus-forest/20 flex items-center justify-center">
-              <CitrusSlice className="w-5 h-5 text-citrus-cream" />
-            </div>
+            <CitrusLogo className="w-8 h-8 drop-shadow-sm" />
             <span className="font-varsity font-black text-base uppercase text-citrus-forest tracking-tight hidden sm:block">
               Citrus
             </span>

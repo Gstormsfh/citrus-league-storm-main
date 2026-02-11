@@ -2,6 +2,7 @@
 import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { CitrusLogo } from '@/components/icons/CitrusIcons';
 
 const HeroSection = () => {
   return (
@@ -12,7 +13,7 @@ const HeroSection = () => {
         <div className="lg:w-1/2 mb-12 lg:mb-0 lg:pr-12 animate-fade-in">
           {/* Vintage badge */}
           <div className="inline-flex items-center gap-2 bg-citrus-sage/40 border-2 border-citrus-sage rounded-varsity px-4 py-2 mb-6">
-            <span className="w-2 h-2 bg-citrus-orange rounded-full animate-pulse"></span>
+            <CitrusLogo className="w-5 h-5 animate-pulse" />
             <span className="font-display font-bold text-xs uppercase tracking-wider text-citrus-forest">Live Fantasy Hockey • 2025</span>
           </div>
           
@@ -68,8 +69,8 @@ const HeroSection = () => {
         <div className="lg:w-1/2 relative animate-fade-in">
           {/* Premium Letterman Card with thick borders */}
           <div className="card-letterman-thick shadow-varsity relative">
-            <div className="absolute -top-3 -right-3 bg-citrus-orange border-2 border-citrus-sage rounded-full w-16 h-16 flex items-center justify-center font-varsity text-xs text-[#E8EED9] uppercase rotate-12 shadow-sm">
-              New
+            <div className="absolute -top-4 -right-4 w-16 h-16 rotate-12">
+              <CitrusLogo className="w-16 h-16 drop-shadow-lg" />
             </div>
             
             <div className="relative">
