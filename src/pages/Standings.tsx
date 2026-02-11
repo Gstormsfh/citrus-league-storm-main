@@ -14,13 +14,13 @@ import { DraftService } from '@/services/DraftService';
 import { PlayerService } from '@/services/PlayerService';
 import { MatchupService } from '@/services/MatchupService';
 import { Loader2, RefreshCw } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import LoadingScreen from '@/components/LoadingScreen';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { supabase } from '@/integrations/supabase/client';
 import { AdSpace } from '@/components/AdSpace';
-import { CitrusBackground } from '@/components/CitrusBackground';
-import { CitrusSlice, CitrusLeaf, CitrusSparkle } from '@/components/icons/CitrusIcons';
+// Citrus decorative imports removed — cleaner layout
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 
 interface StandingsTeam {
@@ -402,21 +402,12 @@ const Standings = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#D4E8B8] relative overflow-hidden" style={{ visibility: 'visible', opacity: 1 }}>
-      {/* Citrus Background - Hidden on mobile */}
-      <div className="hidden lg:block">
-        <CitrusBackground density="light" animated={true} />
-      </div>
-      
-      {/* Decorative elements - Hidden on mobile */}
-      <div className="hidden lg:block absolute top-0 right-0 w-96 h-96 bg-[hsl(var(--vibrant-yellow))] rounded-full opacity-10 blur-3xl -z-10"></div>
-      <div className="hidden lg:block absolute bottom-0 left-0 w-96 h-96 bg-[hsl(var(--vibrant-green))] rounded-full opacity-10 blur-3xl -z-10"></div>
-
+    <div className="min-h-screen bg-[#D4E8B8] relative overflow-hidden">
       {/* Desktop Navbar - Hidden on mobile */}
       <div className="hidden lg:block">
         <Navbar />
       </div>
-      
+
       {/* MOBILE: Compact header */}
       <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-center h-12 px-4">
@@ -424,25 +415,17 @@ const Standings = () => {
         </div>
       </div>
 
-      <main className="w-full lg:pt-28 lg:pb-16 pb-[calc(5rem+env(safe-area-inset-bottom))]" style={{ visibility: 'visible', opacity: 1, zIndex: 1 }}>
-        <div className="w-full m-0 p-0" style={{ visibility: 'visible', opacity: 1 }}>
+      <main className="w-full lg:pt-24 lg:pb-16 pb-[calc(5rem+env(safe-area-inset-bottom))]">
+        <div className="w-full m-0 p-0">
           {/* Desktop: Grid / Mobile: Single column */}
-          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
+          <div className={cn(
+            "flex flex-col lg:grid lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2",
+            userLeagueState === 'active-user' && activeLeagueId
+              ? "lg:grid-cols-[240px_1fr_300px]"
+              : "lg:grid-cols-[240px_1fr]"
+          )}>
             {/* Main Content */}
-            <div className="min-w-0 lg:max-h-[calc(100vh-12rem)] overflow-y-auto ios-scroll px-3 lg:px-6 order-1 lg:order-2">
-              {/* Desktop: Large hero header / Mobile: Hidden (using compact sticky header) */}
-              <div className="hidden lg:block max-w-3xl mx-auto text-center mb-10 animated-element animate relative" style={{ visibility: 'visible', opacity: 1 }}>
-            {/* Citrus Decorations */}
-            <CitrusSlice className="absolute -top-6 -left-6 w-12 h-12 text-citrus-orange/20 rotate-12" />
-            <CitrusLeaf className="absolute -top-4 -right-8 w-10 h-10 text-citrus-sage/20 -rotate-45" />
-            
-            <div className="flex items-center justify-center gap-3 mb-4">
-              <CitrusSparkle className="w-8 h-8 text-citrus-orange animate-pulse" />
-              <h1 className="text-4xl md:text-5xl font-bold citrus-gradient-text" style={{ visibility: 'visible', opacity: 1 }}>League Standings</h1>
-              <CitrusSparkle className="w-8 h-8 text-citrus-sage animate-pulse" style={{ animationDelay: '0.3s' }} />
-            </div>
-            <p className="text-lg text-muted-foreground" style={{ visibility: 'visible', opacity: 1 }}>Track your team's position in the league rankings.</p>
-          </div>
+            <div className="min-w-0 lg:max-h-[calc(100vh-10rem)] overflow-y-auto ios-scroll px-3 lg:px-6 order-1 lg:order-2">
           
           {userLeagueState === 'logged-in-no-league' && (
             <div className="max-w-3xl mx-auto mb-12">
@@ -669,7 +652,7 @@ const Standings = () => {
 
             {/* Left Sidebar - Hidden on mobile */}
             <aside className="hidden lg:block w-full lg:w-auto order-2 lg:order-1">
-              <div className="lg:sticky lg:top-32 space-y-4 lg:space-y-6">
+              <div className="lg:sticky lg:top-28 space-y-4 lg:space-y-6">
                 <AdSpace size="300x250" label="Standings Sponsor" />
                 <AdSpace size="300x250" label="Fantasy Partner" />
               </div>
@@ -678,7 +661,7 @@ const Standings = () => {
             {/* Right Sidebar - Notifications (hidden on mobile) */}
             {userLeagueState === 'active-user' && activeLeagueId && (
               <aside className="hidden lg:block order-3">
-                <div className="lg:sticky lg:top-32 h-[calc(100vh-12rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                <div className="lg:sticky lg:top-28 h-[calc(100vh-12rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
                   <LeagueNotifications leagueId={activeLeagueId} />
                 </div>
               </aside>

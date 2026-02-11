@@ -4850,7 +4850,7 @@ const Matchup = () => {
       <main className={cn(
         "w-full",
         // Mobile: Full height scrollable, no padding for navbar
-        "lg:pt-28 lg:pb-16",
+        "lg:pt-24 lg:pb-16",
         // Mobile: Account for bottom nav
         "pb-[calc(5rem+env(safe-area-inset-bottom))]"
       )}>

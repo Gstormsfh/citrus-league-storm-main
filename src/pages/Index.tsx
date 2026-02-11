@@ -49,7 +49,7 @@ const Index = () => {
         <Suspense fallback={<div>Loading Navbar...</div>}>
           <Navbar />
         </Suspense>
-        <main>
+        <main className="pt-[84px]">
           <Suspense fallback={<div>Loading sections...</div>}>
             <HeroSection />
             <FeaturesSection />
