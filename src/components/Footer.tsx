@@ -3,7 +3,7 @@ import { Facebook, Twitter, Instagram, Youtube, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Link } from 'react-router-dom';
-import { CitrusSlice, CitrusSparkle, CitrusLeaf } from '@/components/icons/CitrusIcons';
+import { CitrusSlice, CitrusSparkle, CitrusLeaf, CitrusLogo } from '@/components/icons/CitrusIcons';
 import { useLeague } from '@/contexts/LeagueContext';
 
 const Footer = () => {
@@ -19,13 +19,8 @@ const Footer = () => {
           <div className="lg:col-span-2">
             {/* Logo with Citrus Icon - Vintage Style */}
             <div className="flex items-center gap-3 mb-6 group">
-              <div className="w-14 h-14 rounded-varsity bg-gradient-to-br from-citrus-sage to-citrus-orange border-4 border-citrus-forest/20 flex items-center justify-center shadow-patch relative overflow-hidden">
-                {/* Background shine */}
-                <div className="absolute inset-0 opacity-20">
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(255,255,255,0.3)_0%,_transparent_60%)]"></div>
-                </div>
-                {/* Citrus Slice */}
-                <CitrusSlice className="w-9 h-9 relative z-10 text-[#E8EED9]" />
+              <div className="w-14 h-14 flex items-center justify-center">
+                <CitrusLogo className="w-14 h-14 drop-shadow-md" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
@@ -127,7 +122,7 @@ const Footer = () => {
             </p>
             <p className="text-citrus-forest/70 text-xs font-sans mt-2 flex items-center justify-start lg:justify-end gap-1.5">
               Made with 
-              <CitrusSlice className="w-3.5 h-3.5 text-citrus-orange inline-block" />
+              <CitrusLogo className="w-4 h-4 inline-block" />
               by hockey fanatics
             </p>
           </div>

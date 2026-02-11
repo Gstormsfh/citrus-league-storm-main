@@ -234,6 +234,36 @@ export const CitrusBurst = ({ className = "w-8 h-8", color = "currentColor" }: {
   </svg>
 );
 
+// Citrus Logo - Colorful filled citrus slice matching the app favicon
+export const CitrusLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
+  <svg
+    className={className}
+    viewBox="0 0 64 64"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    {/* Outer rind */}
+    <circle cx="32" cy="32" r="30" fill="#F9A436"/>
+    {/* Inner flesh */}
+    <circle cx="32" cy="32" r="25" fill="#FFD580"/>
+    {/* Segment lines (white membrane) */}
+    <line x1="32" y1="7" x2="32" y2="57" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+    <line x1="7" y1="32" x2="57" y2="32" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+    <line x1="14.3" y1="14.3" x2="49.7" y2="49.7" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+    <line x1="49.7" y1="14.3" x2="14.3" y2="49.7" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+    {/* Center pith */}
+    <circle cx="32" cy="32" r="5" fill="white" opacity="0.7"/>
+    {/* Segment juice vesicle dots */}
+    <circle cx="32" cy="17" r="2" fill="#F9A436" opacity="0.5"/>
+    <circle cx="32" cy="47" r="2" fill="#F9A436" opacity="0.5"/>
+    <circle cx="17" cy="32" r="2" fill="#F9A436" opacity="0.5"/>
+    <circle cx="47" cy="32" r="2" fill="#F9A436" opacity="0.5"/>
+    {/* Leaf */}
+    <ellipse cx="36" cy="4" rx="6" ry="3" fill="#459345" transform="rotate(30 36 4)"/>
+    <line x1="33" y1="2" x2="38" y2="6" stroke="#2d6b2d" strokeWidth="0.8"/>
+  </svg>
+);
+
 export default {
   CitrusSlice,
   CitrusFruit,
@@ -244,6 +274,7 @@ export default {
   CitrusPeel,
   CitrusDrops,
   CitrusZest,
-  CitrusBurst
+  CitrusBurst,
+  CitrusLogo
 };
 
