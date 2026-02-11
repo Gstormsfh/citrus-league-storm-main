@@ -25,6 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { StartersGrid, BenchGrid, IRSlot } from '@/components/roster';
+import MobileRosterList from '@/components/roster/MobileRosterList';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { useToast } from '@/hooks/use-toast';
 import HockeyPlayerCard from '@/components/roster/HockeyPlayerCard';
@@ -2936,23 +2937,52 @@ const Roster = () => {
                   
                   // Main roster content
                   return (
-                  // Disable drag-and-drop for demo league
-                  userTeam && isDemoLeague(userTeam.league_id) ? (
+                  // Mobile: clean list view with tap-to-swap
+                  // Desktop: grid with drag-and-drop
+                  // Demo league: read-only (no DnD, no swap)
+                  isMobile ? (
+                    <div>
+                      {/* Mobile tap-to-swap cancel bar */}
+                      {tapSelectedPlayerId && (
+                        <div className="flex items-center justify-between bg-citrus-orange/15 border border-citrus-orange/30 rounded-lg px-3 py-2 mb-3">
+                          <span className="text-sm font-display font-semibold text-citrus-forest">
+                            Tap a highlighted position to move
+                          </span>
+                          <button
+                            onClick={() => setTapSelectedPlayerId(null)}
+                            className="text-xs font-bold text-citrus-orange bg-citrus-orange/10 hover:bg-citrus-orange/20 rounded-lg px-3 py-1 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
+                      <MobileRosterList
+                        starters={displayRoster.starters}
+                        bench={displayRoster.bench}
+                        ir={displayRoster.ir}
+                        slotAssignments={displayRoster.slotAssignments}
+                        lockedPlayerIds={lockedPlayerIds}
+                        tapSelectedPlayerId={tapSelectedPlayerId}
+                        tapEligibleSlots={tapEligibleSlots}
+                        onPlayerTap={handlePlayerClickWithSwap}
+                        onSlotTap={handleMobileTapSlot}
+                        onBenchTap={handleMobileTapBench}
+                      />
+                    </div>
+                  ) : userTeam && isDemoLeague(userTeam.league_id) ? (
                     <div className="space-y-6">
-                      <StartersGrid 
+                      <StartersGrid
                         players={displayRoster.starters}
                         slotAssignments={displayRoster.slotAssignments}
                         onPlayerClick={handlePlayerClick}
                         lockedPlayerIds={lockedPlayerIds}
                       />
-                      
-                      <BenchGrid 
+                      <BenchGrid
                         players={displayRoster.bench}
                         onPlayerClick={handlePlayerClick}
                         lockedPlayerIds={lockedPlayerIds}
                       />
-                      
-                      <IRSlot 
+                      <IRSlot
                         players={displayRoster.ir}
                         slotAssignments={displayRoster.slotAssignments}
                         onPlayerClick={handlePlayerClick}
@@ -2965,38 +2995,20 @@ const Roster = () => {
                     onDragStart={(userLeagueState === 'guest' || (userLeagueState as string) === 'logged-in-no-league') ? undefined : handleDragStart}
                     onDragEnd={(userLeagueState === 'guest' || (userLeagueState as string) === 'logged-in-no-league') ? undefined : handleDragEnd}
                   >
-                    {/* Mobile tap-to-swap cancel bar */}
-                    {isMobile && tapSelectedPlayerId && (
-                      <div className="flex items-center justify-between bg-citrus-orange/15 border border-citrus-orange/30 rounded-lg px-4 py-2 mb-4">
-                        <span className="text-sm font-display font-semibold text-citrus-forest">
-                          Tap a highlighted slot to move player
-                        </span>
-                        <button
-                          onClick={() => setTapSelectedPlayerId(null)}
-                          className="text-xs font-bold text-citrus-orange bg-citrus-orange/10 hover:bg-citrus-orange/20 rounded-lg px-3 py-1 transition-colors"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    )}
                     <div className="space-y-6">
                       <StartersGrid
                         players={displayRoster.starters}
                         slotAssignments={displayRoster.slotAssignments}
                         onPlayerClick={handlePlayerClickWithSwap}
                         lockedPlayerIds={lockedPlayerIds}
-                        tapSelectedPlayerId={isMobile ? tapSelectedPlayerId : null}
-                        tapEligibleSlots={isMobile ? tapEligibleSlots : new Set()}
-                        onSlotTap={isMobile ? handleMobileTapSlot : undefined}
+                        tapSelectedPlayerId={null}
+                        tapEligibleSlots={new Set()}
                       />
 
                       <BenchGrid
                         players={displayRoster.bench}
                         onPlayerClick={handlePlayerClickWithSwap}
                         lockedPlayerIds={lockedPlayerIds}
-                        tapSelectedPlayerId={isMobile ? tapSelectedPlayerId : null}
-                        isEligibleTarget={isMobile && tapSelectedPlayerId != null && tapEligibleSlots.has('bench-grid')}
-                        onBenchTap={isMobile ? handleMobileTapBench : undefined}
                       />
 
                       <IRSlot
