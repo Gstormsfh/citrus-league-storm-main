@@ -11,6 +11,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { StormyChatBubble } from "./components/StormyChatBubble";
 import MobileBottomNav from "./components/MobileBottomNav";
+import ScrollToTop from "./components/ScrollToTop";
 import LoadingScreen from "./components/LoadingScreen";
 import "./App.css";
 
@@ -137,6 +138,7 @@ const App = () => {
             <Toaster />
             <Sonner position="top-right" closeButton />
             <BrowserRouter>
+              <ScrollToTop />
               <LeagueProvider>
                 <Suspense fallback={<PageLoader />}>
                   <Routes>
