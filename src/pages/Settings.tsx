@@ -11,18 +11,16 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { AdSpace } from '@/components/AdSpace';
-import { Loader2, User, Mail, Lock, Trash2, ExternalLink, Shield, FileText } from 'lucide-react';
+import { Loader2, User, Mail, Lock, Trash2, ExternalLink, Shield, FileText, Download } from 'lucide-react';
 import { logger } from '@/utils/logger';
-import { AdSpace } from '@/components/AdSpace';
 
 const Settings = () => {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   
-  const [loading, setLoading] = useState(false);
   const [changePasswordLoading, setChangePasswordLoading] = useState(false);
   const [deleteAccountLoading, setDeleteAccountLoading] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   
   const [newPassword, setNewPassword] = useState('');
@@ -71,6 +69,42 @@ const Settings = () => {
     }
   };
 
+  const handleExportData = async () => {
+    setExportLoading(true);
+    setMessage(null);
+
+    try {
+      const { data, error } = await supabase.rpc('export_user_data');
+      if (error) throw error;
+
+      const result = data as Record<string, unknown>;
+      if (result && result.success === false) {
+        throw new Error((result.error as string) || 'Export failed');
+      }
+
+      // Download as JSON file
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `citrus-fantasy-data-export-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setMessage({ type: 'success', text: 'Your data has been exported successfully.' });
+    } catch (error: unknown) {
+      logger.error('Data export error:', error);
+      setMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Failed to export data. Please try again.'
+      });
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
   const handleDeleteAccount = async () => {
     if (deleteConfirmation !== 'DELETE') {
       setMessage({ type: 'error', text: 'Please type DELETE to confirm' });
@@ -81,82 +115,20 @@ const Settings = () => {
     setMessage(null);
 
     try {
-      // Step 1: Get all user's leagues and teams
-      const { data: userTeams, error: teamsError } = await supabase
-        .from('fantasy_teams')
-        .select('id, league_id')
-        .eq('user_id', user.id);
+      const { data, error } = await supabase.rpc('delete_user_account');
+      if (error) throw error;
 
-      if (teamsError) throw teamsError;
-
-      // Step 2: Delete user's teams and related data
-      for (const team of userTeams || []) {
-        // Delete matchup lines
-        await supabase
-          .from('fantasy_matchup_lines')
-          .delete()
-          .eq('team_id', team.id);
-
-        // Delete waiver claims
-        await supabase
-          .from('waiver_claims')
-          .delete()
-          .eq('team_id', team.id);
-
-        // Delete draft picks
-        await supabase
-          .from('draft_picks')
-          .delete()
-          .eq('team_id', team.id);
-
-        // Delete team
-        await supabase
-          .from('fantasy_teams')
-          .delete()
-          .eq('id', team.id);
+      const result = data as Record<string, unknown>;
+      if (result && result.success === false) {
+        throw new Error((result.error as string) || 'Deletion failed');
       }
 
-      // Step 3: Delete leagues where user is commissioner (if no other teams)
-      const { data: userLeagues, error: leaguesError } = await supabase
-        .from('fantasy_leagues')
-        .select('id')
-        .eq('commissioner_id', user.id);
-
-      if (leaguesError) throw leaguesError;
-
-      for (const league of userLeagues || []) {
-        // Check if league has other teams
-        const { data: otherTeams } = await supabase
-          .from('fantasy_teams')
-          .select('id')
-          .eq('league_id', league.id)
-          .limit(1);
-
-        // If no other teams, delete the league
-        if (!otherTeams || otherTeams.length === 0) {
-          await supabase
-            .from('fantasy_leagues')
-            .delete()
-            .eq('id', league.id);
-        }
-      }
-
-      // Step 4: Delete auth user (this also triggers Supabase to cascade delete related data)
-      const { error: deleteError } = await supabase.auth.admin.deleteUser(user.id);
-      
-      if (deleteError) {
-        // If admin delete fails (requires service role), try regular delete
-        const { error: regularDeleteError } = await supabase.rpc('delete_user_account');
-        if (regularDeleteError) throw regularDeleteError;
-      }
-
-      // Step 5: Sign out and redirect
       await signOut();
       navigate('/auth?message=account-deleted');
     } catch (error: unknown) {
       logger.error('Account deletion error:', error);
-      setMessage({ 
-        type: 'error', 
+      setMessage({
+        type: 'error',
         text: error instanceof Error ? error.message : 'Failed to delete account. Please contact support.'
       });
       setDeleteAccountLoading(false);
@@ -296,6 +268,40 @@ const Settings = () => {
               <span className="font-medium text-gray-900 group-hover:text-green-700">Terms of Service</span>
               <ExternalLink className="h-4 w-4 text-gray-400 group-hover:text-green-700" />
             </a>
+          </CardContent>
+        </Card>
+
+        {/* Data Export (GDPR/CCPA) */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Download className="h-5 w-5" />
+              Your Data
+            </CardTitle>
+            <CardDescription>Export a copy of all your data</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-600 mb-4">
+              Download a JSON file containing all your account data, including your profile, teams, leagues, transactions, and draft history.
+            </p>
+            <Button
+              variant="outline"
+              onClick={handleExportData}
+              disabled={exportLoading}
+              className="w-full sm:w-auto"
+            >
+              {exportLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Exporting...
+                </>
+              ) : (
+                <>
+                  <Download className="mr-2 h-4 w-4" />
+                  Export My Data
+                </>
+              )}
+            </Button>
           </CardContent>
         </Card>
 
