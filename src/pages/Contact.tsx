@@ -33,13 +33,13 @@ const Contact = () => {
     const body = encodeURIComponent(
       `Name: ${formData.name}\nEmail: ${formData.email}\n\n${formData.message}`
     );
-    window.location.href = `mailto:support@citrusfantasy.com?subject=${subject}&body=${body}`;
+    window.location.href = `mailto:CitrusFantasySports@Gmail.com?subject=${subject}&body=${body}`;
 
     setTimeout(() => {
       setIsSubmitting(false);
       toast({
         title: "Opening your email client",
-        description: "If your email client didn't open, please email us directly at support@citrusfantasy.com",
+        description: "If your email client didn't open, please email us directly at CitrusFantasySports@Gmail.com",
         variant: "default"
       });
       setFormData({
@@ -157,8 +157,8 @@ const Contact = () => {
                     </div>
                     <div>
                       <h3 className="text-sm font-medium">Email</h3>
-                      <a href="mailto:support@citrusfantasy.com" className="text-muted-foreground hover:text-primary transition-colors">
-                        support@citrusfantasy.com
+                      <a href="mailto:CitrusFantasySports@Gmail.com" className="text-muted-foreground hover:text-primary transition-colors">
+                        CitrusFantasySports@Gmail.com
                       </a>
                     </div>
                   </div>

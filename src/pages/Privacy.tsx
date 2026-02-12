@@ -206,8 +206,8 @@ const Privacy = () => {
               <div className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg">
                 <p>If you have questions, concerns, or requests regarding this Privacy Policy or our data practices, please contact us:</p>
                 <p className="mt-2">
-                  <strong>Email:</strong> <a href="mailto:privacy@citrusfantasy.com" className="text-green-700 hover:underline">privacy@citrusfantasy.com</a><br />
-                  <strong>Support:</strong> <a href="mailto:support@citrusfantasy.com" className="text-green-700 hover:underline">support@citrusfantasy.com</a>
+                  <strong>Email:</strong> <a href="mailto:CitrusFantasySports@Gmail.com" className="text-green-700 hover:underline">CitrusFantasySports@Gmail.com</a><br />
+                  <strong>Support:</strong> <a href="mailto:CitrusFantasySports@Gmail.com" className="text-green-700 hover:underline">CitrusFantasySports@Gmail.com</a>
                 </p>
                 <p className="mt-2"><strong>Response Time:</strong> We will respond to privacy requests within 30 days.</p>
               </div>
