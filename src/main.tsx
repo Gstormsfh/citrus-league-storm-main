@@ -15,6 +15,9 @@ if (!rootElement) {
   throw new Error("Root element not found! Make sure index.html has <div id='root'></div>");
 }
 
+// Clear loading screen inline styles so the app can scroll normally
+rootElement.removeAttribute('style');
+
 // Add error handling for the root render
 try {
   const root = createRoot(rootElement);

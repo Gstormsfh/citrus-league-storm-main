@@ -382,7 +382,7 @@ const Settings = () => {
         </Card>
 
         <div className="mt-8 text-center text-sm text-gray-600">
-          <p>Need help? Contact us at <a href="mailto:support@citrusfantasy.com" className="text-green-700 hover:underline">support@citrusfantasy.com</a></p>
+          <p>Need help? Contact us at <a href="mailto:CitrusFantasySports@Gmail.com" className="text-green-700 hover:underline">CitrusFantasySports@Gmail.com</a></p>
         </div>
           </div>
         </div>

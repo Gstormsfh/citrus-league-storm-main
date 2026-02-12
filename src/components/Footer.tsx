@@ -69,7 +69,7 @@ const Footer = () => {
               <li><Link to="/news" className="text-citrus-forest hover:text-citrus-sage transition-colors font-sans">Player News</Link></li>
               <li><Link to="/standings" className="text-citrus-forest hover:text-citrus-sage transition-colors font-sans">Standings</Link></li>
               <li><Link to="/gm-office/stormy" className="text-citrus-forest hover:text-citrus-sage transition-colors font-sans">Stormy AI</Link></li>
-              <li><a href="mailto:support@citrusfantasy.com" className="text-citrus-forest hover:text-citrus-sage transition-colors font-sans">Contact Support</a></li>
+              <li><a href="mailto:CitrusFantasySports@Gmail.com" className="text-citrus-forest hover:text-citrus-sage transition-colors font-sans">Contact Support</a></li>
             </ul>
           </div>
           
@@ -113,8 +113,8 @@ const Footer = () => {
           <div className="lg:text-right flex flex-col justify-end">
             <div className="flex lg:justify-end items-center gap-3 mb-4 p-3 bg-citrus-sage/10 border-2 border-citrus-sage rounded-xl lg:inline-flex">
               <Mail size={16} className="text-citrus-sage" />
-              <a href="mailto:hello@citrussports.com" className="text-citrus-forest hover:text-citrus-sage transition-colors font-display font-semibold">
-                hello@citrussports.com
+              <a href="mailto:CitrusFantasySports@Gmail.com" className="text-citrus-forest hover:text-citrus-sage transition-colors font-display font-semibold">
+                CitrusFantasySports@Gmail.com
               </a>
             </div>
             <p className="text-citrus-forest text-sm font-sans">
