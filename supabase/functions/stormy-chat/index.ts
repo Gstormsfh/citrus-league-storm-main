@@ -7,10 +7,25 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-// ── Rate Limiting ────────────────────────────────────────────────
-const DAILY_MESSAGE_LIMIT = 25; // per authenticated user
-const MAX_RESPONSE_TOKENS = 1024;
-const CLAUDE_MODEL = "claude-sonnet-4-5-20250929";
+// ── Cost Controls ────────────────────────────────────────────────
+// HARD CAPS. Stormy stops responding once ANY limit is hit.
+//
+//   Model            Input          Output
+//   Haiku 4.5        $1 / 1M tok    $5 / 1M tok
+//
+// With Haiku + 512-token max reply + 3 msgs/user/week:
+//   ~2K tokens/msg × 3 = 6K tokens/user/week
+//   50 users = 300K tokens/month ≈ $1.50 max
+//
+// These limits are intentionally tight for testing/demo phase.
+// Bump them when you're ready to scale.
+
+const WEEKLY_MESSAGE_LIMIT = 3;          // per registered user per matchup week (7 days)
+const GLOBAL_DAILY_MESSAGE_LIMIT = 30;   // ALL users combined per 24 h (safety net)
+const MONTHLY_TOKEN_BUDGET = 200_000;    // total tokens (in + out) per calendar month — hard kill switch
+const MAX_RESPONSE_TOKENS = 512;         // cap each reply
+const MAX_CONVERSATION_TURNS = 6;        // max prior turns sent to API
+const CLAUDE_MODEL = "claude-haiku-4-5-20251001"; // cheapest model — swap to sonnet when funded
 
 // ── System Prompt ────────────────────────────────────────────────
 const SYSTEM_PROMPT = `You are Stormy, the AI fantasy hockey assistant for Citrus Fantasy Sports. You're the team's narwhal mascot — sharp, data-driven, and a little playful.
@@ -18,109 +33,118 @@ const SYSTEM_PROMPT = `You are Stormy, the AI fantasy hockey assistant for Citru
 ## Personality
 - Enthusiastic but not over-the-top. Knowledgeable and direct.
 - Speak like a hockey analyst who's also fun to chat with.
-- Keep responses concise (2-4 short paragraphs). Users want quick, actionable advice.
+- Keep responses concise (2-3 short paragraphs MAX). Bullet points preferred.
 - Use hockey terminology naturally. Explain advanced stats briefly when they help.
 - Never fabricate specific stats or numbers. If you lack data, say so honestly.
-- Use markdown formatting for readability (bold, bullet points, etc.).
 
 ## The Citrus xG Projection Model
 Our projection system uses Expected Goals (xG) as its foundation:
 
 ### How xG Works
 - xG measures shot quality: location, type, game situation, angle.
-- A slot shot ≈ 0.15 xG (15 % chance of scoring).
+- A slot shot ≈ 0.15 xG (15% chance of scoring).
 - Players outperforming xG may regress; underperformers may bounce back.
 
 ### Daily Projection Factors
-Each player's daily projection considers:
 1. **Base PPG** — Historical fantasy points per game this season.
-2. **Shrinkage Weight** — How much to trust small samples (fewer GP → more regression to the mean).
-3. **Finishing Multiplier** — Goals ÷ xG. Above 1.0 = "hot" (expect regression). Below 1.0 = "cold" (expect bounce-back).
-4. **Opponent Adjustment** — Opposing team's defensive/goaltending strength.
-5. **Back-to-Back Penalty** — Reduced projection for B2B games (fatigue).
-6. **Home / Away Adjustment** — Home-ice advantage factor.
-7. **Confidence Score** — Reliability of the projection (higher = more data).
+2. **Shrinkage Weight** — Fewer GP → more regression to the mean.
+3. **Finishing Multiplier** — Goals ÷ xG. Above 1.0 = hot (expect regression).
+4. **Opponent Adjustment** — Opposing team's defensive strength.
+5. **B2B Penalty** — Fatigue factor for back-to-backs.
+6. **Home / Away Adjustment** — Home-ice advantage.
+7. **Confidence Score** — Higher = more reliable projection.
 
 ### Goalie Projections
-- Based on projected wins, saves, shutouts, goals against.
-- Considers starter confirmation, GAA & SV% trends.
-- High-Danger Save Pct as a skill indicator.
-- Goals Saved Above Expected (GSAx) for true talent assessment.
+- Projected wins, saves, shutouts, goals against.
+- Starter confirmation, GAA & SV% trends, GSAx for true talent.
 
 ## Default Fantasy Scoring
 **Skaters:** Goals 3 | Assists 2 | PPP +1 | SHP +2 | SOG 0.4 | BLK 0.5 | HIT 0.2 | PIM 0.5
 **Goalies:** W 4 | SO 3 | SV 0.2 | GA −1
-
-If the user's league has custom scoring (provided in context), always use those values instead.
+Use league-specific scoring from context if provided.
 
 ## What You Help With
-1. **Start / Sit** — Use projections, matchups, schedule. Give a clear pick, not "it depends."
-2. **Trade Analysis** — Evaluate both sides, factor in schedule and projections, then give a verdict.
-3. **Waiver Wire** — Identify undervalued free agents via xG vs. actual divergence.
-4. **Roster Strategy** — Lineup optimization, IR management, streaming goalies.
-5. **Matchup Analysis** — Win probability, key players, schedule advantages.
-6. **Player Deep Dive** — Stats, trends, projections, comparisons.
-7. **General Hockey** — NHL trends, team performance, league news.
+Start/sit, trade analysis, waiver pickups, roster strategy, matchup analysis, player deep dives, general hockey.
 
-## Response Guidelines
-- Reference specific data when available (stats, projections, schedule).
-- Explain reasoning, especially when xG or projection factors are involved.
-- Flag uncertainty: "His projection looks solid, but the confidence score is low…"
-- For trades: evaluate both sides fairly, then state your recommendation clearly.
-- Stay focused and actionable. Managers want answers, not essays.`;
+## Response Rules
+- Be SHORT. 2-3 paragraphs max. Bullet points preferred.
+- Reference data when available. Give clear recommendations, not "it depends."
+- Flag uncertainty honestly.`;
 
 // ── Helpers ──────────────────────────────────────────────────────
-function makeJsonResponse(
-  body: Record<string, unknown>,
-  status = 200,
-): Response {
+function makeJsonResponse(body: Record<string, unknown>, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
 
-// Try to check rate limit. Returns { allowed, used } or null if table missing.
-async function checkRateLimit(
-  serviceClient: ReturnType<typeof createClient>,
+/** Per-user weekly limit (rolling 7 days). */
+async function checkUserWeeklyLimit(
+  svc: ReturnType<typeof createClient>,
   userId: string,
 ): Promise<{ allowed: boolean; used: number } | null> {
   try {
-    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const { count, error } = await serviceClient
+    const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { count, error } = await svc
       .from("stormy_chat_log")
       .select("*", { count: "exact", head: true })
       .eq("user_id", userId)
       .gte("created_at", cutoff);
-
-    if (error) {
-      // Table likely doesn't exist yet — fail open
-      console.warn("Rate-limit check skipped (table missing?):", error.message);
-      return null;
-    }
-
+    if (error) { console.warn("User limit check skipped:", error.message); return null; }
     const used = count ?? 0;
-    return { allowed: used < DAILY_MESSAGE_LIMIT, used };
-  } catch {
-    return null;
-  }
+    return { allowed: used < WEEKLY_MESSAGE_LIMIT, used };
+  } catch { return null; }
+}
+
+/** Global daily cap across ALL users. Safety net. */
+async function checkGlobalDailyLimit(
+  svc: ReturnType<typeof createClient>,
+): Promise<{ allowed: boolean; used: number } | null> {
+  try {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { count, error } = await svc
+      .from("stormy_chat_log")
+      .select("*", { count: "exact", head: true })
+      .gte("created_at", cutoff);
+    if (error) return null;
+    const used = count ?? 0;
+    return { allowed: used < GLOBAL_DAILY_MESSAGE_LIMIT, used };
+  } catch { return null; }
+}
+
+/** Monthly token budget — the absolute kill switch. */
+async function checkMonthlyTokenBudget(
+  svc: ReturnType<typeof createClient>,
+): Promise<{ allowed: boolean; totalTokens: number } | null> {
+  try {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const { data, error } = await svc
+      .from("stormy_chat_log")
+      .select("tokens_used")
+      .gte("created_at", monthStart);
+    if (error) return null;
+    const totalTokens = (data ?? []).reduce(
+      (sum: number, row: { tokens_used: number }) => sum + (row.tokens_used || 0), 0,
+    );
+    return { allowed: totalTokens < MONTHLY_TOKEN_BUDGET, totalTokens };
+  } catch { return null; }
 }
 
 async function logUsage(
-  serviceClient: ReturnType<typeof createClient>,
+  svc: ReturnType<typeof createClient>,
   userId: string,
   tokensUsed: number,
   preview: string,
 ): Promise<void> {
   try {
-    await serviceClient.from("stormy_chat_log").insert({
+    await svc.from("stormy_chat_log").insert({
       user_id: userId,
       tokens_used: tokensUsed,
       message_preview: preview.substring(0, 200),
     });
-  } catch {
-    // Non-critical — don't fail the request
-  }
+  } catch { /* non-critical */ }
 }
 
 // ── Main Handler ─────────────────────────────────────────────────
@@ -133,10 +157,8 @@ serve(async (req) => {
     // ── API Key ────────────────────────────────────────────────
     const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
     if (!ANTHROPIC_API_KEY) {
-      console.error("ANTHROPIC_API_KEY is not set. Run: supabase secrets set ANTHROPIC_API_KEY=sk-ant-...");
-      throw new Error(
-        "AI service is not configured yet. The team is on it!",
-      );
+      console.error("ANTHROPIC_API_KEY not set. Run: supabase secrets set ANTHROPIC_API_KEY=sk-ant-...");
+      throw new Error("AI service is not configured yet. The team is on it!");
     }
 
     // ── Auth ───────────────────────────────────────────────────
@@ -150,59 +172,72 @@ serve(async (req) => {
       },
     });
 
-    const {
-      data: { user },
-    } = await authClient.auth.getUser();
+    const { data: { user } } = await authClient.auth.getUser();
 
-    // ── Rate Limiting (authenticated users only) ───────────────
-    if (user && supabaseServiceKey) {
-      const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
-      const rl = await checkRateLimit(serviceClient, user.id);
+    // ── 3-Layer Rate Limiting ──────────────────────────────────
+    if (supabaseServiceKey) {
+      const svc = createClient(supabaseUrl, supabaseServiceKey);
 
-      if (rl && !rl.allowed) {
-        return makeJsonResponse(
-          {
-            error: `You've hit your daily limit of ${DAILY_MESSAGE_LIMIT} messages. It resets in 24 hours — come back soon!`,
-            limit: DAILY_MESSAGE_LIMIT,
-            used: rl.used,
-          },
-          429,
-        );
+      // Layer 1: Monthly token budget (hard kill-switch)
+      const budget = await checkMonthlyTokenBudget(svc);
+      if (budget && !budget.allowed) {
+        console.warn(`BUDGET KILL-SWITCH: ${budget.totalTokens}/${MONTHLY_TOKEN_BUDGET} tokens`);
+        return makeJsonResponse({
+          error: "Stormy has hit the monthly usage cap. We'll be back next month!",
+        }, 429);
+      }
+
+      // Layer 2: Global daily cap (all users)
+      const globalRL = await checkGlobalDailyLimit(svc);
+      if (globalRL && !globalRL.allowed) {
+        console.warn(`GLOBAL DAILY CAP: ${globalRL.used}/${GLOBAL_DAILY_MESSAGE_LIMIT}`);
+        return makeJsonResponse({
+          error: "Stormy is resting — daily capacity reached. Try again tomorrow!",
+        }, 429);
+      }
+
+      // Layer 3: Per-user weekly cap
+      if (user) {
+        const userRL = await checkUserWeeklyLimit(svc, user.id);
+        if (userRL && !userRL.allowed) {
+          return makeJsonResponse({
+            error: `You've used your ${WEEKLY_MESSAGE_LIMIT} Stormy questions for this matchup week. They reset every 7 days!`,
+            limit: WEEKLY_MESSAGE_LIMIT,
+            used: userRL.used,
+          }, 429);
+        }
       }
     }
 
     // ── Parse request ──────────────────────────────────────────
     const { message, conversationHistory, context } = await req.json();
-
     if (!message || typeof message !== "string") {
       return makeJsonResponse({ error: "Message is required" }, 400);
     }
 
-    // ── Build system prompt with context ───────────────────────
+    // ── Build system prompt + context (capped) ─────────────────
     let systemPrompt = SYSTEM_PROMPT;
     if (context && typeof context === "string" && context.length > 0) {
-      systemPrompt += "\n\n## Current User Context\n" + context;
+      systemPrompt += "\n\n## Current User Context\n" + context.substring(0, 2000);
     }
 
-    // ── Build messages array ───────────────────────────────────
+    // ── Build messages array (trimmed for tokens) ──────────────
     const messages: Array<{ role: string; content: string }> = [];
-
     if (Array.isArray(conversationHistory)) {
-      for (const msg of conversationHistory) {
+      const recent = conversationHistory.slice(-MAX_CONVERSATION_TURNS);
+      for (const msg of recent) {
         if (msg.role && msg.content) {
           messages.push({
             role: msg.role === "assistant" ? "assistant" : "user",
-            content: String(msg.content),
+            content: String(msg.content).substring(0, 500),
           });
         }
       }
     }
-    messages.push({ role: "user", content: message });
+    messages.push({ role: "user", content: message.substring(0, 1000) });
 
     // ── Call Claude API ────────────────────────────────────────
-    console.log(
-      `Stormy: calling Claude (${CLAUDE_MODEL}) with ${messages.length} messages, context: ${context ? context.length : 0} chars`,
-    );
+    console.log(`Stormy: ${CLAUDE_MODEL} | ${messages.length} msgs | ctx ${context ? Math.min(context.length, 2000) : 0} chars`);
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -222,9 +257,7 @@ serve(async (req) => {
     if (!response.ok) {
       const errorBody = await response.text();
       console.error("Claude API error:", response.status, errorBody);
-      throw new Error(
-        `AI service returned an error (${response.status}). Try again in a moment.`,
-      );
+      throw new Error(`AI service error (${response.status}). Try again in a moment.`);
     }
 
     const data = await response.json();
@@ -233,31 +266,20 @@ serve(async (req) => {
     const outputTokens = data.usage?.output_tokens ?? 0;
     const tokensUsed = inputTokens + outputTokens;
 
-    // ── Log usage (fire-and-forget) ────────────────────────────
+    // ── Log usage ──────────────────────────────────────────────
     if (user && supabaseServiceKey) {
-      const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
-      logUsage(serviceClient, user.id, tokensUsed, message);
+      const svc = createClient(supabaseUrl, supabaseServiceKey);
+      logUsage(svc, user.id, tokensUsed, message);
     }
 
-    // ── Respond ────────────────────────────────────────────────
     return makeJsonResponse({
       response: aiResponse,
-      usage: {
-        messagesUsed: 0, // Will be filled by rate limit check next call
-        dailyLimit: DAILY_MESSAGE_LIMIT,
-        inputTokens,
-        outputTokens,
-      },
+      usage: { weeklyLimit: WEEKLY_MESSAGE_LIMIT, inputTokens, outputTokens },
     });
   } catch (error) {
     console.error("Error in stormy-chat:", error);
-    return makeJsonResponse(
-      {
-        error: error instanceof Error
-          ? error.message
-          : "Something went wrong. Try again in a moment.",
-      },
-      500,
-    );
+    return makeJsonResponse({
+      error: error instanceof Error ? error.message : "Something went wrong. Try again in a moment.",
+    }, 500);
   }
 });

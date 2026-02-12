@@ -29,7 +29,7 @@ interface ChatMessage {
   timestamp: Date;
 }
 
-const DAILY_LIMIT = 25;
+const WEEKLY_LIMIT = 3; // 3 questions per matchup week
 
 const StormyAssistant = () => {
   const { userLeagueState, activeLeagueId, activeLeague } = useLeague();
@@ -294,26 +294,26 @@ const StormyAssistant = () => {
                         <CardHeader className="relative z-10">
                           <CardTitle className="flex items-center gap-2 font-varsity font-black text-citrus-forest uppercase">
                             <Zap className="h-6 w-6 text-citrus-orange" />
-                            Daily Usage
+                            Matchup Week Usage
                           </CardTitle>
-                          <CardDescription className="font-display text-citrus-charcoal">Messages remaining today</CardDescription>
+                          <CardDescription className="font-display text-citrus-charcoal">Questions remaining this week</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6 relative z-10">
                           <div className="text-center py-4">
                             <div className="text-5xl font-varsity font-black text-citrus-orange mb-2">
-                              {messagesUsed}<span className="text-xl text-citrus-charcoal font-display font-normal">/{DAILY_LIMIT}</span>
+                              {messagesUsed}<span className="text-xl text-citrus-charcoal font-display font-normal">/{WEEKLY_LIMIT}</span>
                             </div>
-                            <p className="text-sm font-display text-citrus-charcoal">Messages Used Today</p>
+                            <p className="text-sm font-display text-citrus-charcoal">Questions Used This Week</p>
                           </div>
 
                           <div className="space-y-2">
                             <div className="flex justify-between text-sm font-display">
                               <span className="font-semibold text-citrus-forest">Usage Level</span>
                               <span className="font-bold text-citrus-orange">
-                                {Math.round((messagesUsed / DAILY_LIMIT) * 100)}%
+                                {Math.round((messagesUsed / WEEKLY_LIMIT) * 100)}%
                               </span>
                             </div>
-                            <Progress value={(messagesUsed / DAILY_LIMIT) * 100} className="h-3 bg-citrus-sage/20" />
+                            <Progress value={(messagesUsed / WEEKLY_LIMIT) * 100} className="h-3 bg-citrus-sage/20" />
                           </div>
 
                           <div className="flex items-center justify-between p-3 bg-citrus-sage/10 border-2 border-citrus-sage/30 rounded-varsity text-sm">
@@ -321,7 +321,7 @@ const StormyAssistant = () => {
                               <Clock className="h-4 w-4" />
                               <span>Resets:</span>
                             </div>
-                            <span className="font-varsity font-bold text-citrus-forest">Every 24 hours</span>
+                            <span className="font-varsity font-bold text-citrus-forest">Every 7 days</span>
                           </div>
 
                           <Button className="w-full bg-gradient-to-r from-citrus-orange to-citrus-peach hover:from-citrus-peach hover:to-citrus-orange text-citrus-cream border-4 border-citrus-forest rounded-varsity shadow-[inset_0_2px_4px_rgba(0,0,0,0.1),0_4px_0_rgba(27,48,34,0.2)] font-varsity font-bold uppercase hover:-translate-y-1 transition-all">

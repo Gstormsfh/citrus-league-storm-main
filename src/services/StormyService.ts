@@ -48,9 +48,10 @@ export interface StormyResponse {
 // ── Service ──────────────────────────────────────────────────────
 
 class StormyServiceImpl {
-  // Track guest usage client-side (edge function handles auth users)
+  // Demo/guest users: 1 message per session (client-side enforcement)
+  // Registered users: 3 per matchup week (server-side enforcement)
   private guestMessageCount = 0;
-  private static readonly GUEST_LIMIT = 5;
+  private static readonly GUEST_LIMIT = 1;
 
   /**
    * Send a message to Stormy and get an AI-powered response.
@@ -76,7 +77,7 @@ class StormyServiceImpl {
           return {
             response: "",
             error:
-              "Sign in to keep chatting with Stormy! Guest users get 5 messages per session.",
+              "Want more from Stormy? Sign up for a free account to get 3 questions per matchup week!",
           };
         }
       }
