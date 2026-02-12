@@ -77,8 +77,8 @@ const Footer = () => {
             <h4 className="font-display font-bold text-base uppercase text-citrus-forest mb-5 tracking-wide">Legal</h4>
             <ul className="space-y-3">
               <li><Link to="/settings" className="text-citrus-forest hover:text-citrus-sage transition-colors font-sans">Account Settings</Link></li>
-              <li><a href="/privacy-policy.html" target="_blank" rel="noopener noreferrer" className="text-citrus-forest hover:text-citrus-sage transition-colors font-sans">Privacy Policy</a></li>
-              <li><a href="/terms-of-service.html" target="_blank" rel="noopener noreferrer" className="text-citrus-forest hover:text-citrus-sage transition-colors font-sans">Terms of Service</a></li>
+              <li><Link to="/privacy" className="text-citrus-forest hover:text-citrus-sage transition-colors font-sans">Privacy Policy</Link></li>
+              <li><Link to="/terms" className="text-citrus-forest hover:text-citrus-sage transition-colors font-sans">Terms of Service</Link></li>
             </ul>
           </div>
         </div>

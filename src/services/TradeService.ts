@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { PlayerService } from './PlayerService';
+import { LeagueMembershipService } from './LeagueMembershipService';
 import { COLUMNS } from '@/utils/queryColumns';
 
 export interface TradeOffer {
@@ -77,9 +78,9 @@ export class TradeService {
   }
 
   /**
-   * Accept a trade offer
+   * Accept a trade offer - validates that the accepting user owns the to_team
    */
-  static async acceptTradeOffer(tradeId: string): Promise<{ success: boolean; error?: string }> {
+  static async acceptTradeOffer(tradeId: string, userId?: string): Promise<{ success: boolean; error?: string }> {
     try {
       // Get the trade offer details
       const { data: trade, error: fetchError } = await supabase
@@ -94,6 +95,23 @@ export class TradeService {
           success: false,
           error: 'Trade offer not found or no longer pending'
         };
+      }
+
+      // Validate that the accepting user owns the to_team
+      if (userId) {
+        const { data: toTeam } = await supabase
+          .from('teams')
+          .select('owner_id')
+          .eq('id', trade.to_team_id)
+          .eq('league_id', trade.league_id)
+          .single();
+
+        if (!toTeam || toTeam.owner_id !== userId) {
+          return {
+            success: false,
+            error: 'You can only accept trades sent to your team'
+          };
+        }
       }
 
       // Update trade status to accepted
@@ -257,10 +275,33 @@ export class TradeService {
   }
 
   /**
-   * Reject a trade offer
+   * Reject a trade offer - validates that the rejecting user owns the to_team
    */
-  static async rejectTradeOffer(tradeId: string): Promise<{ success: boolean; error?: string }> {
+  static async rejectTradeOffer(tradeId: string, userId?: string): Promise<{ success: boolean; error?: string }> {
     try {
+      // Validate ownership if userId provided
+      if (userId) {
+        const { data: trade } = await supabase
+          .from('trade_offers')
+          .select('to_team_id, league_id')
+          .eq('id', tradeId)
+          .eq('status', 'pending')
+          .single();
+
+        if (trade) {
+          const { data: toTeam } = await supabase
+            .from('teams')
+            .select('owner_id')
+            .eq('id', trade.to_team_id)
+            .eq('league_id', trade.league_id)
+            .single();
+
+          if (!toTeam || toTeam.owner_id !== userId) {
+            return { success: false, error: 'You can only reject trades sent to your team' };
+          }
+        }
+      }
+
       const { error } = await supabase
         .from('trade_offers')
         .update({
@@ -288,10 +329,33 @@ export class TradeService {
   }
 
   /**
-   * Cancel a trade offer (by the proposer)
+   * Cancel a trade offer (by the proposer) - validates that the canceller owns the from_team
    */
-  static async cancelTradeOffer(tradeId: string): Promise<{ success: boolean; error?: string }> {
+  static async cancelTradeOffer(tradeId: string, userId?: string): Promise<{ success: boolean; error?: string }> {
     try {
+      // Validate ownership if userId provided
+      if (userId) {
+        const { data: trade } = await supabase
+          .from('trade_offers')
+          .select('from_team_id, league_id')
+          .eq('id', tradeId)
+          .eq('status', 'pending')
+          .single();
+
+        if (trade) {
+          const { data: fromTeam } = await supabase
+            .from('teams')
+            .select('owner_id')
+            .eq('id', trade.from_team_id)
+            .eq('league_id', trade.league_id)
+            .single();
+
+          if (!fromTeam || fromTeam.owner_id !== userId) {
+            return { success: false, error: 'You can only cancel trades you proposed' };
+          }
+        }
+      }
+
       const { error } = await supabase
         .from('trade_offers')
         .update({

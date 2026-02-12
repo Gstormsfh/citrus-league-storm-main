@@ -244,7 +244,7 @@ const TradeAnalyzer = () => {
   };
 
   const handleAcceptTrade = async (tradeId: string) => {
-    const result = await TradeService.acceptTradeOffer(tradeId);
+    const result = await TradeService.acceptTradeOffer(tradeId, user?.id);
     
     if (result.success) {
       toast({
@@ -264,7 +264,7 @@ const TradeAnalyzer = () => {
   };
 
   const handleRejectTrade = async (tradeId: string) => {
-    const result = await TradeService.rejectTradeOffer(tradeId);
+    const result = await TradeService.rejectTradeOffer(tradeId, user?.id);
     
     if (result.success) {
       toast({
@@ -284,7 +284,7 @@ const TradeAnalyzer = () => {
   };
 
   const handleCancelTrade = async (tradeId: string) => {
-    const result = await TradeService.cancelTradeOffer(tradeId);
+    const result = await TradeService.cancelTradeOffer(tradeId, user?.id);
     
     if (result.success) {
       toast({

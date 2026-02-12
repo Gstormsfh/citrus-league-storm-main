@@ -667,7 +667,7 @@ const CreateLeague = () => {
                 <div className="pt-4 flex justify-end items-center gap-4">
                   <Button 
                     variant="outline"
-                    onClick={() => navigate('/dashboard')}
+                    onClick={() => navigate('/gm-office')}
                     disabled={loading}
                   >
                     Cancel

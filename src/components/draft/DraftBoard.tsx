@@ -1,5 +1,5 @@
+import { useMemo } from 'react';
 import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Trophy, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -56,9 +56,12 @@ const normalizePosition = (pos: string): string => {
 export const DraftBoard = ({ teams, draftHistory, currentPick, currentRound, totalRounds = 16, onPlayerClick }: DraftBoardProps) => {
   const totalPicks = teams.length * totalRounds;
 
+  // PERF: Memoize picks into a Map for O(1) lookups instead of O(n) Array.find per cell
+  const picksMap = useMemo(() => {
+    return new Map(draftHistory.map(p => [p.pick, p]));
+  }, [draftHistory]);
+
   // Calculate pick number based on round and team index (serpentine draft)
-  // Odd rounds: team order is normal (0, 1, 2, ...)
-  // Even rounds: team order is reversed (..., 2, 1, 0)
   const getPickNumber = (round: number, teamIndex: number): number => {
     const isOddRound = round % 2 === 1;
     const actualTeamIndex = isOddRound ? teamIndex : (teams.length - 1 - teamIndex);
@@ -67,7 +70,7 @@ export const DraftBoard = ({ teams, draftHistory, currentPick, currentRound, tot
 
   const getDraftPick = (round: number, teamIndex: number): DraftPick | null => {
     const pickNumber = getPickNumber(round, teamIndex);
-    return draftHistory.find(pick => pick.pick === pickNumber) || null;
+    return picksMap.get(pickNumber) || null;
   };
 
   const isPendingPick = (round: number, teamIndex: number): boolean => {

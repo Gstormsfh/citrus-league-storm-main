@@ -614,7 +614,7 @@ const DraftRoom = () => {
     const unsubscribe = DraftService.subscribeToDraftPicks(leagueId, user.id, async (newPick) => {
       logger.debug('DraftRoom: New pick received via realtime:', newPick);
 
-      // Debounce rapid updates - wait 300ms for more updates before processing
+      // Debounce rapid updates - wait 50ms for batched processing (fast enough to feel real-time)
       clearTimeout(updateTimeout);
       updateTimeout = setTimeout(async () => {
         // Reload all picks to ensure we have the latest state
@@ -651,7 +651,7 @@ const DraftRoom = () => {
 
         // Reload draft state to update current pick/round/nextTeam
         await loadDraftState();
-      }, 300);
+      }, 50);
     });
 
     return () => {
