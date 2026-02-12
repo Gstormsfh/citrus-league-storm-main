@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,6 +28,7 @@ const Auth = () => {
   const [resetLoading, setResetLoading] = useState(false);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
+  const [tosAccepted, setTosAccepted] = useState(false);
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -96,6 +98,11 @@ const Auth = () => {
       return;
     }
 
+    if (!tosAccepted) {
+      setError('You must agree to the Terms of Service and Privacy Policy');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -124,7 +131,9 @@ const Auth = () => {
         setConfirmPassword('');
         setLoading(false);
       } else if (data?.session) {
-        // User is automatically signed in (if email confirmation is disabled)
+        // Record consent for ToS and Privacy Policy
+        await supabase.rpc('record_user_consent', { p_policy_type: 'terms_of_service', p_policy_version: '2026-01-13' });
+        await supabase.rpc('record_user_consent', { p_policy_type: 'privacy_policy', p_policy_version: '2026-01-13' });
         navigate('/profile-setup');
       } else {
         setError('Account created! Please sign in.');
@@ -484,8 +493,26 @@ const Auth = () => {
                       />
                     </div>
                   </div>
-                  
-                  <Button type="submit" className="w-full" disabled={loading || oauthLoading !== null}>
+
+                  <div className="flex items-start space-x-2">
+                    <Checkbox
+                      id="tos-accept"
+                      checked={tosAccepted}
+                      onCheckedChange={(checked) => setTosAccepted(checked as boolean)}
+                    />
+                    <Label htmlFor="tos-accept" className="text-sm font-normal cursor-pointer leading-tight">
+                      I agree to the{' '}
+                      <a href="/terms-of-service.html" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                        Terms of Service
+                      </a>{' '}
+                      and{' '}
+                      <a href="/privacy-policy.html" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                        Privacy Policy
+                      </a>
+                    </Label>
+                  </div>
+
+                  <Button type="submit" className="w-full" disabled={loading || oauthLoading !== null || !tosAccepted}>
                     {loading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
