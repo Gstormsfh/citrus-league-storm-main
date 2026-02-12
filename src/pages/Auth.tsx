@@ -23,7 +23,6 @@ const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
@@ -93,8 +92,8 @@ const Auth = () => {
       return;
     }
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters');
       return;
     }
 
@@ -123,7 +122,13 @@ const Auth = () => {
         return;
       }
       
-      // If email confirmation is required, show message
+      // Record consent for ToS and Privacy Policy (best-effort)
+      if (data?.session || data?.user) {
+        supabase.rpc('record_user_consent', { p_policy_type: 'terms_of_service', p_policy_version: '2026-01-13' }).catch(() => {});
+        supabase.rpc('record_user_consent', { p_policy_type: 'privacy_policy', p_policy_version: '2026-01-13' }).catch(() => {});
+      }
+
+      // If email confirmation is required (no session), show verify message
       if (data?.user && !data?.session) {
         setError('Please check your email to verify your account, then sign in.');
         setEmail('');
@@ -131,12 +136,9 @@ const Auth = () => {
         setConfirmPassword('');
         setLoading(false);
       } else if (data?.session) {
-        // Record consent for ToS and Privacy Policy
-        await supabase.rpc('record_user_consent', { p_policy_type: 'terms_of_service', p_policy_version: '2026-01-13' });
-        await supabase.rpc('record_user_consent', { p_policy_type: 'privacy_policy', p_policy_version: '2026-01-13' });
         navigate('/profile-setup');
       } else {
-        setError('Account created! Please sign in.');
+        setError('Account created! Please check your email to verify, then sign in.');
         setLoading(false);
       }
     } catch (err: unknown) {
@@ -362,17 +364,6 @@ const Auth = () => {
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="remember-me"
-                      checked={rememberMe}
-                      onCheckedChange={(checked) => setRememberMe(checked as boolean)}
-                    />
-                    <Label htmlFor="remember-me" className="text-sm font-normal cursor-pointer">
-                      Remember me
-                    </Label>
-                  </div>
-                  
                   <Button type="submit" className="w-full" disabled={loading || oauthLoading !== null}>
                     {loading ? (
                       <>
@@ -469,7 +460,7 @@ const Auth = () => {
                         }}
                         className="pl-10"
                         required
-                        minLength={6}
+                        minLength={8}
                       />
                     </div>
                     {password && <PasswordStrength password={password} />}
