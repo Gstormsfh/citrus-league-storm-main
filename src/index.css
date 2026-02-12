@@ -376,6 +376,7 @@
   
   body {
   overflow-x: hidden;
+  overflow-y: auto;
   background: #D4E8B8; /* Beautiful pastel green from loading screen */
   @apply text-citrus-forest font-sans corduroy-texture;
   margin: 0;
@@ -429,14 +430,17 @@
   scroll-behavior: smooth;
   margin: 0;
   padding: 0;
-  overflow-x: hidden;
   width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
   }
   
   #root {
   margin: 0;
   padding: 0;
   width: 100%;
+  min-height: 100vh;
+  overflow: visible;
   }
 
   /* Override any focus rings with our theme colors */
@@ -1852,4 +1856,18 @@
   .player-card .player-projection-bar-container .flex.gap-1 > div {
     height: 10px !important;
   }
+}
+
+/* ==========================================
+   GLOBAL SCROLL FIX - ALL SCREEN SIZES
+   Ensures vertical scrolling always works.
+   ========================================== */
+html, body {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+#root {
+  overflow: visible !important;
+  min-height: 100vh;
 }

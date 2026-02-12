@@ -12,10 +12,13 @@ const MobileBottomNav = () => {
   const user = auth?.user ?? null;
   const activeLeagueId = league?.activeLeagueId ?? null;
 
-  // Prevent iOS rubber-band overscroll from shifting the fixed nav
+  // Prevent iOS rubber-band overscroll from shifting the fixed nav (mobile only)
   useEffect(() => {
-    document.body.style.overscrollBehavior = 'none';
-    document.documentElement.style.overscrollBehavior = 'none';
+    const isMobile = window.innerWidth < 1024;
+    if (isMobile) {
+      document.body.style.overscrollBehavior = 'none';
+      document.documentElement.style.overscrollBehavior = 'none';
+    }
     return () => {
       document.body.style.overscrollBehavior = '';
       document.documentElement.style.overscrollBehavior = '';
