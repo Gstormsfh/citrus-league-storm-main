@@ -8,6 +8,7 @@ import { Notification } from '@/services/NotificationService';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { CitrusSparkle, CitrusLeaf } from '@/components/icons/CitrusIcons';
+import { toast } from '@/hooks/use-toast';
 
 interface LeagueNotificationsProps {
   leagueId: string;
@@ -163,9 +164,8 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
       }, 300);
     } catch (error: unknown) {
       console.error('Error sending chat message:', error);
-      // You could add a toast notification here to show the error to the user
       const errorMessage = error instanceof Error ? error.message : 'Failed to send message. Please try again.';
-      alert(errorMessage);
+      toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
     } finally {
       setSendingMessage(false);
     }
