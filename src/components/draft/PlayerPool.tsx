@@ -166,7 +166,7 @@ export const PlayerPool = ({
     });
 
     return filtered;
-  }, [searchTerm, selectedPosition, sortBy, sortDirection, draftedPlayers, showDrafted, availablePlayers]);
+  }, [searchTerm, selectedPosition, sortBy, sortDirection, draftedSet, showDrafted, availablePlayers]);
 
   const handleHeaderClick = (stat: string) => {
     if (sortBy === stat) {

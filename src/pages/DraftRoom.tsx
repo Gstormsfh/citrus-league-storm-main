@@ -112,6 +112,26 @@ const DraftRoom = () => {
   const actualLoading = loading || authLoading || (!user && userLeagueState !== 'guest' && userLeagueState !== 'logged-in-no-league');
   const displayLoading = useMinimumLoadingTime(actualLoading, 800);
 
+  // ── Lookup Maps (O(1) instead of O(n) for .find()) ──────────────
+  const teamsById = useMemo(() => {
+    const map = new Map<string, Team & { owner_name?: string }>();
+    teams.forEach(t => map.set(t.id, t));
+    return map;
+  }, [teams]);
+
+  const playersById = useMemo(() => {
+    const map = new Map<string, Player>();
+    availablePlayers.forEach(p => map.set(p.id, p));
+    return map;
+  }, [availablePlayers]);
+
+  // Helper: resolve team_order IDs to team objects via Map (O(n) total)
+  const resolveTeamOrder = useCallback((teamOrder: string[]) => {
+    return teamOrder
+      .map((id: string) => teamsById.get(id))
+      .filter((t): t is (Team & { owner_name?: string }) => t !== undefined);
+  }, [teamsById]);
+
   // Memoize loadUserLeague to prevent infinite loops
   const loadUserLeague = useCallback(async () => {
     if (!user) {
@@ -468,9 +488,7 @@ const DraftRoom = () => {
                   leagueId, user.id, 1, loadedState.sessionId
                 );
                 if (boardOrder && boardOrder.team_order && boardOrder.team_order.length > 0) {
-                  const orderedTeams = boardOrder.team_order
-                    .map((teamId: string) => (teamsData || []).find(t => t.id === teamId))
-                    .filter((t: any): t is (Team & { owner_name?: string }) => t !== undefined);
+                  const orderedTeams = resolveTeamOrder(boardOrder.team_order);
                   if (orderedTeams.length === (teamsData || []).length) {
                     setOrderedTeamsForBoard(orderedTeams);
                   } else {
@@ -524,9 +542,7 @@ const DraftRoom = () => {
                   leagueId, user.id, 1, completedState.sessionId
                 );
                 if (completedOrder && completedOrder.team_order) {
-                  const orderedTeams = completedOrder.team_order
-                    .map((teamId: string) => (teamsData || []).find(t => t.id === teamId))
-                    .filter((t: any): t is (Team & { owner_name?: string }) => t !== undefined);
+                  const orderedTeams = resolveTeamOrder(completedOrder.team_order);
                   if (orderedTeams.length === (teamsData || []).length) {
                     setOrderedTeamsForBoard(orderedTeams);
                   } else {
@@ -662,11 +678,9 @@ const DraftRoom = () => {
     };
   }, [leagueId, user?.id]);
 
-  // POLLING FALLBACK: Reload picks + league every 5 seconds during active draft
-  // This ensures updates even if Supabase realtime has issues (like Yahoo/ESPN do)
-  // PERF: Increased from 3s to 5s since realtime handles the fast path. Polling
-  // is a safety net, not the primary mechanism. Also uses shallow comparison
-  // instead of JSON.stringify and only recreates Set when picks actually change.
+  // POLLING FALLBACK: safety net in case Supabase realtime drops.
+  // Realtime handles the fast path; polling only catches missed events.
+  // PERF: 15s interval (was 5s) — reduces 12 queries/min to 4.
   useEffect(() => {
     if (draftPhase !== DraftPhase.ACTIVE || !leagueId || !user?.id) return;
 
@@ -748,7 +762,7 @@ const DraftRoom = () => {
         // Silent fail - polling is best-effort
         logger.debug('DraftRoom: Poll error (non-critical):', err);
       }
-    }, 5000);
+    }, 15000);
 
     return () => clearInterval(pollInterval);
   }, [draftPhase, leagueId, user?.id]);
@@ -869,9 +883,7 @@ const DraftRoom = () => {
                       leagueId, user.id, 1, joinState.sessionId
                     );
                     if (joinOrder && joinOrder.team_order && joinOrder.team_order.length > 0) {
-                      const orderedTeams = joinOrder.team_order
-                        .map((teamId: string) => teams.find(t => t.id === teamId))
-                        .filter((t: any): t is (Team & { owner_name?: string }) => t !== undefined);
+                      const orderedTeams = resolveTeamOrder(joinOrder.team_order);
                       if (orderedTeams.length === teams.length) {
                         setOrderedTeamsForBoard(orderedTeams);
                       }
@@ -908,7 +920,10 @@ const DraftRoom = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [leagueId, user?.id, draftPhase, teams, league]);
+  // PERF: Only re-subscribe when identifiers change — not on every teams/league object update.
+  // teams and league are accessed via refs/closures inside the callback, not as reactive deps.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leagueId, user?.id, draftPhase]);
 
   const loadDraftState = async (retryCount: number = 0): Promise<DraftState | null> => {
     if (!leagueId || !league) {
@@ -1041,9 +1056,7 @@ const DraftRoom = () => {
           const { order } = await DraftService.getDraftOrder(leagueId, user.id, 1, state.sessionId);
           if (order && order.team_order && order.team_order.length > 0) {
             // Map team IDs to team objects in the correct order
-            const orderedTeams = order.team_order
-              .map(teamId => teams.find(t => t.id === teamId))
-              .filter((t): t is (Team & { owner_name?: string }) => t !== undefined);
+            const orderedTeams = resolveTeamOrder(order.team_order);
             
             if (orderedTeams.length === teams.length) {
               setOrderedTeamsForBoard(orderedTeams);
@@ -1946,9 +1959,7 @@ const DraftRoom = () => {
           if (rejoinState.sessionId) {
             const { order: rejoinOrder } = await DraftService.getDraftOrder(leagueId, user.id, 1, rejoinState.sessionId);
             if (rejoinOrder && rejoinOrder.team_order) {
-              const orderedTeams = rejoinOrder.team_order
-                .map((teamId: string) => teams.find(t => t.id === teamId))
-                .filter((t: any): t is (Team & { owner_name?: string }) => t !== undefined);
+              const orderedTeams = resolveTeamOrder(rejoinOrder.team_order);
               if (orderedTeams.length === teams.length) {
                 setOrderedTeamsForBoard(orderedTeams);
               }
@@ -2426,14 +2437,14 @@ const DraftRoom = () => {
     }
   };
 
-  // Memoize expensive data transformations
+  // Memoize expensive data transformations (O(n) via Maps, was O(n²) via .find())
   const transformedDraftHistory = useMemo(() => {
     return draftHistory.map(p => {
-      const player = availablePlayers.find(pl => pl.id === p.player_id);
+      const player = playersById.get(p.player_id);
       return {
         id: p.id,
         teamId: p.team_id,
-        teamName: teams.find(t => t.id === p.team_id)?.team_name || '',
+        teamName: teamsById.get(p.team_id)?.team_name || '',
         playerId: p.player_id,
         playerName: player?.full_name || 'Unknown Player',
         position: player?.position || '',
@@ -2442,7 +2453,7 @@ const DraftRoom = () => {
         timestamp: new Date(p.picked_at).getTime(),
       };
     });
-  }, [draftHistory, availablePlayers, teams]);
+  }, [draftHistory, playersById, teamsById]);
 
   // Memoize team picks map for faster lookups
   const teamPicksMap = useMemo(() => {
@@ -2456,9 +2467,8 @@ const DraftRoom = () => {
   // Handle player click to open stats modal
   const handlePlayerClick = async (playerId: string) => {
     try {
-      // Get player data
-      const allPlayers = await PlayerService.getAllPlayers();
-      const player = allPlayers.find(p => p.id === playerId);
+      // Get player data from cached Map (no network call needed)
+      const player = playersById.get(playerId);
       
       if (!player) {
         logger.error('Player not found:', playerId);
@@ -2597,14 +2607,26 @@ const DraftRoom = () => {
     }
   };
 
-  // Get user's drafted players
+  // Get user's drafted players (O(n) via Map, was O(n²) via .find())
   const userDraftedPlayers = useMemo(() => {
     if (!userTeam) return [];
-    const userPicks = draftHistory.filter(p => p.team_id === userTeam.id);
-    return userPicks
-      .map(pick => availablePlayers.find(p => p.id === pick.player_id))
+    return draftHistory
+      .filter(p => p.team_id === userTeam.id)
+      .map(pick => playersById.get(pick.player_id))
       .filter((p): p is Player => p !== undefined);
-  }, [draftHistory, userTeam, availablePlayers]);
+  }, [draftHistory, userTeam, playersById]);
+
+  // Pre-map teams for lobby so we don't create new objects every render
+  const lobbyTeams = useMemo(() => {
+    if (!teams || teams.length === 0) return [];
+    return teams.map(t => ({
+      id: t.id,
+      name: t.team_name || 'Unnamed Team',
+      owner: (t as { owner_name?: string }).owner_name || (t.owner_id ? 'User' : 'AI Team'),
+      color: '#7CB518',
+      picks: [] as any[],
+    }));
+  }, [teams]);
 
   // ALWAYS render something - never return null
   return (
@@ -2654,14 +2676,8 @@ const DraftRoom = () => {
         {!loading && !authLoading && !error && draftPhase !== DraftPhase.ACTIVE && draftPhase !== DraftPhase.COMPLETED && (
           <div className="container mx-auto px-4 py-8">
             {teams && Array.isArray(teams) && teams.length > 0 && league ? (
-              <DraftLobby 
-                teams={teams.map(t => ({
-                  id: t.id,
-                  name: t.team_name || 'Unnamed Team',
-                  owner: (t as { owner_name?: string }).owner_name || (t.owner_id ? 'User' : 'AI Team'),
-                  color: '#7CB518', // Default color, can be customized later
-                  picks: []
-                }))} 
+              <DraftLobby
+                teams={lobbyTeams}
                 onStartDraft={handleStartDraft}
                 onPrepareDraft={handlePrepareDraft}
                 isCommissioner={isCommissioner}
