@@ -115,7 +115,7 @@ export const DraftService = {
       // If explicit sessionId provided, filter by it; otherwise get all active picks
       let query = supabase
         .from('draft_picks')
-        .select('*')
+        .select('id, league_id, team_id, player_id, round_number, pick_number, draft_session_id, picked_at, deleted_at')
         .eq('league_id', leagueId)
         .is('deleted_at', null)
         .order('pick_number', { ascending: true });

@@ -32,14 +32,6 @@ const Index = () => {
     };
   }, []);
 
-  // Add a timeout to detect if component is stuck
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      console.warn("⚠️ Index component has been mounted for 5 seconds");
-    }, 5000);
-    return () => clearTimeout(timer);
-  }, []);
-
   try {
     return (
       <div className="min-h-screen relative bg-[#D4E8B8]">
