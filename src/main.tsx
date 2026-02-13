@@ -6,8 +6,6 @@ import './index.css'
 import { ErrorBoundary } from './components/ErrorBoundary'
 // Import logger early to silence all console output (Sleeper-style)
 import './utils/logger'
-// Firebase Analytics — initializes async, no-ops if unsupported
-import './integrations/firebase'
 
 // Ensure root element exists
 const rootElement = document.getElementById("root");

@@ -92,9 +92,8 @@ const ResetPassword = lazyWithErrorHandling(() => import("./pages/ResetPassword"
 const VerifyEmail = lazyWithErrorHandling(() => import("./pages/VerifyEmail"));
 const LeagueDashboard = lazyWithErrorHandling(() => import("./pages/LeagueDashboard"));
 
-// No Suspense fallback - let individual pages handle their own loading states
-// This prevents multiple loading screens from flashing
-const PageLoader = () => null;
+// Use the picturesque LoadingScreen as the Suspense fallback for lazy-loaded routes
+const PageLoader = () => <LoadingScreen />;
 
 // ===================================================================
 // EGRESS OPTIMIZATION: React Query Caching Configuration
