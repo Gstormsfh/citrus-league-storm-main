@@ -18,18 +18,21 @@ if (!rootElement) {
 // Clear loading screen inline styles so the app can scroll normally
 rootElement.removeAttribute('style');
 
+// Tell the index.html boot monitor that React is taking over
+(window as any).__REACT_MOUNTED = true;
+
 // Add error handling for the root render
 try {
   const root = createRoot(rootElement);
-  
+
   root.render(
     <ErrorBoundary>
       <App />
     </ErrorBoundary>
   );
-  
+
 } catch (error) {
-  // Silent - no console output (Sleeper-style)
+  console.error('Critical render error:', error);
   if (rootElement) {
     rootElement.innerHTML = `
       <div style="padding: 20px; font-family: sans-serif; background: white; min-height: 100vh; display: flex; align-items: center; justify-content: center;">
