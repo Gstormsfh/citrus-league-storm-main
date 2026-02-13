@@ -7,6 +7,16 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
+import {
+  getFirstWeekStartDate,
+  getCurrentWeekNumber,
+  getWeekStartDate,
+  getWeekEndDate,
+  getWeekLabel,
+  getScheduleLength,
+} from "@/utils/weekCalculator";
+import { fetchGamesForTeams } from "@/utils/scheduleMaximizer";
+import { getWeeklyProjections } from "@/utils/projectionHelper";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -181,8 +191,8 @@ class StormyServiceImpl {
 
   /**
    * Lightweight fetch of league context for Stormy.
-   * Runs a handful of small Supabase queries to populate roster,
-   * matchup, and team context without pulling the full player dataset.
+   * Gathers weekly view (schedule maximizer, weekly projections, lineup
+   * status) plus matchup data in a handful of small Supabase queries.
    */
   static async fetchLeagueContext(
     leagueId: string,
@@ -191,7 +201,7 @@ class StormyServiceImpl {
     const ctx: Partial<StormyContext> = {};
 
     try {
-      // 1. Get user's team
+      // ── 1. User's team ───────────────────────────────────────────
       const { data: team } = await supabase
         .from("teams")
         .select("id, team_name")
@@ -202,7 +212,33 @@ class StormyServiceImpl {
       if (!team) return ctx;
       ctx.teamName = team.team_name;
 
-      // 2. Get roster player IDs from draft picks
+      // ── 2. League → current matchup week dates ───────────────────
+      const { data: leagueRow } = await supabase
+        .from("leagues")
+        .select("updated_at, draft_status, scoring_settings")
+        .eq("id", leagueId)
+        .maybeSingle();
+
+      let weekStart: Date | null = null;
+      let weekEnd: Date | null = null;
+      let currentWeek = 0;
+      let weekLabel = "";
+      let totalWeeks = 0;
+
+      if (leagueRow?.draft_status === "completed") {
+        const draftDate = new Date(leagueRow.updated_at);
+        const firstWeekStart = getFirstWeekStartDate(draftDate);
+        currentWeek = getCurrentWeekNumber(firstWeekStart);
+        weekStart = getWeekStartDate(currentWeek, firstWeekStart);
+        weekEnd = getWeekEndDate(currentWeek, firstWeekStart);
+        weekLabel = getWeekLabel(currentWeek, firstWeekStart);
+        totalWeeks = getScheduleLength(
+          firstWeekStart,
+          new Date().getFullYear(),
+        );
+      }
+
+      // ── 3. Roster player IDs (draft picks) ──────────────────────
       const { data: picks } = await supabase
         .from("draft_picks")
         .select("player_id")
@@ -218,45 +254,105 @@ class StormyServiceImpl {
         .filter((id): id is number => id !== null && id > 0);
 
       if (playerIds.length > 0) {
-        // 3. Get player directory info (names, positions, teams)
-        const { data: players } = await supabase
-          .from("player_directory")
-          .select("player_id, full_name, position_code, team_abbrev")
-          .in("player_id", playerIds)
-          .eq("season", 2025);
+        // ── 4. Player directory + lineup status (parallel) ─────────
+        type DirRow = {
+          player_id: number;
+          full_name: string;
+          position_code: string | null;
+          team_abbrev: string | null;
+        };
+        const [dirResult, lineupResult] = await Promise.all([
+          supabase
+            .from("player_directory")
+            .select("player_id, full_name, position_code, team_abbrev")
+            .in("player_id", playerIds)
+            .eq("season", 2025),
+          supabase
+            .from("team_lineups")
+            .select("starters, bench, ir")
+            .eq("team_id", team.id)
+            .eq("league_id", leagueId)
+            .maybeSingle(),
+        ]);
 
-        // 4. Try to get today's projections (non-critical)
-        const today = new Date().toISOString().split("T")[0];
-        let projMap = new Map<number, number>();
-        try {
-          const { data: projections } = await supabase.rpc(
-            "get_daily_projections",
-            { p_player_ids: playerIds, p_target_date: today },
-          );
-          if (projections) {
-            for (const p of projections) {
-              if (p.player_id && p.total_projected_points != null) {
-                projMap.set(Number(p.player_id), p.total_projected_points);
-              }
+        const players = (dirResult.data ?? []) as DirRow[];
+        const lineup = lineupResult.data;
+
+        const starterIds = new Set(
+          ((lineup?.starters as string[]) ?? []).map(String),
+        );
+        const irIds = new Set(
+          ((lineup?.ir as string[]) ?? []).map(String),
+        );
+
+        // ── 5. Weekly projections + schedule (parallel, optional) ──
+        let weeklyProjMap = new Map<number, number>();
+        const teamGamesCountMap = new Map<string, number>();
+        const teamGameDaysMap = new Map<string, string[]>();
+
+        if (weekStart && weekEnd) {
+          const uniqueTeams = [
+            ...new Set(
+              players
+                .map((p) => p.team_abbrev)
+                .filter((t): t is string => !!t),
+            ),
+          ];
+
+          const [projResult, gamesResult] = await Promise.allSettled([
+            getWeeklyProjections(playerIds, weekStart, weekEnd),
+            fetchGamesForTeams(uniqueTeams, weekStart, weekEnd),
+          ]);
+
+          if (projResult.status === "fulfilled") {
+            weeklyProjMap = projResult.value;
+          }
+          if (gamesResult.status === "fulfilled") {
+            const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+            for (const [abbrev, games] of gamesResult.value) {
+              teamGamesCountMap.set(abbrev, games.length);
+              teamGameDaysMap.set(
+                abbrev,
+                games.map((g) => dayNames[new Date(g.game_date).getDay()]),
+              );
             }
           }
-        } catch {
-          // Projections are optional — no-op
         }
 
-        if (players?.length) {
-          ctx.rosterSummary = StormyServiceImpl.summarizeRoster(
-            players.map((p: { player_id: number; full_name: string; position_code: string | null; team_abbrev: string | null }) => ({
-              name: p.full_name,
-              position: p.position_code ?? "?",
-              team: p.team_abbrev ?? "?",
-              projectedPoints: projMap.get(p.player_id),
-            })),
-          );
+        // ── 6. Build enriched roster summary ──────────────────────
+        if (players.length) {
+          interface RosterLine {
+            sortOrder: number;
+            line: string;
+          }
+          const rosterLines: RosterLine[] = players.map((p) => {
+            const pid = String(p.player_id);
+            const isStarter = starterIds.has(pid);
+            const isIR = irIds.has(pid);
+            const status = isStarter ? "START" : isIR ? "IR" : "BENCH";
+            const sortOrder = isStarter ? 0 : isIR ? 2 : 1;
+
+            let line = `${status} ${p.position_code ?? "?"} ${p.full_name} (${p.team_abbrev ?? "?"})`;
+
+            const gp = teamGamesCountMap.get(p.team_abbrev ?? "");
+            const days = teamGameDaysMap.get(p.team_abbrev ?? "");
+            if (gp != null) {
+              line += ` ${gp}GP`;
+              if (days?.length) line += `[${days.join(",")}]`;
+            }
+
+            const proj = weeklyProjMap.get(p.player_id);
+            if (proj != null) line += ` proj ${proj.toFixed(1)}`;
+
+            return { sortOrder, line };
+          });
+
+          rosterLines.sort((a, b) => a.sortOrder - b.sortOrder);
+          ctx.rosterSummary = rosterLines.map((r) => r.line).join("\n");
         }
       }
 
-      // 5. Get current/latest matchup
+      // ── 7. Current matchup ─────────────────────────────────────
       const { data: matchups } = await supabase
         .from("matchups")
         .select(
@@ -290,6 +386,17 @@ class StormyServiceImpl {
           weekNumber: m.week_number,
           status: m.status,
         });
+      }
+
+      // ── 8. Week summary (extra) ────────────────────────────────
+      if (weekLabel) {
+        const parts = [`Current: ${weekLabel}`];
+        if (totalWeeks > 0) {
+          parts.push(
+            `Regular season: ${totalWeeks} weeks (${currentWeek > totalWeeks ? "playoffs" : `week ${currentWeek} of ${totalWeeks}`})`,
+          );
+        }
+        ctx.extra = parts.join("\n");
       }
     } catch {
       // Context fetch is non-critical — Stormy still works without it
