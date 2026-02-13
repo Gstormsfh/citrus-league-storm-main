@@ -281,7 +281,7 @@ export const CitrusPuckService = {
       const [statsResponse, directoryResponse] = await Promise.all([
           (supabase as any)
             .from("player_season_stats")
-            .select("season, player_id, team_abbrev, position_code, is_goalie, games_played, icetime_seconds, nhl_toi_seconds, goals, primary_assists, secondary_assists, points, shots_on_goal, hits, blocks, pim, ppp, shp, plus_minus, nhl_plus_minus, nhl_goals, nhl_assists, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_ppp, nhl_shp, x_goals, x_assists, goalie_gp, wins, saves, shots_faced, goals_against, shutouts, save_pct, nhl_wins, nhl_losses, nhl_ot_losses, nhl_saves, nhl_shots_faced, nhl_goals_against, nhl_shutouts, nhl_save_pct, nhl_gaa")
+            .select("season, player_id, team_abbrev, position_code, is_goalie, games_played, nhl_toi_seconds, goals, primary_assists, secondary_assists, points, nhl_goals, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_saves, x_goals, pim, hits, blocks, saves, wins, nhl_wins, nhl_losses, nhl_ot_losses, goals_against, shutouts, save_pct, nhl_gaa, nhl_save_pct, nhl_shutouts, shots_faced, nhl_shots_faced, nhl_goals_against, goalie_gp")
             .eq("season", season),
           (supabase as any)
             .from("player_directory")

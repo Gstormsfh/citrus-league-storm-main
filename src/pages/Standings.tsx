@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
@@ -348,26 +348,13 @@ const Standings = () => {
     };
   }, [teams.length]); // Re-run when teams change to ensure new elements get animated
   
-  // Sort teams by winning record
-  const sortedTeams = [...teams].sort((a, b) => {
-    // First by wins
-    if (b.record.wins !== a.record.wins) {
-      return b.record.wins - a.record.wins;
-    }
-    // Then by points if wins are the same
+  // Sort teams by winning record (memoized to avoid re-sorting on every render)
+  const sortedTeams = useMemo(() => [...teams].sort((a, b) => {
+    if (b.record.wins !== a.record.wins) return b.record.wins - a.record.wins;
     return b.points - a.points;
-  });
+  }), [teams]);
 
   const selectedLeague = leagues.find(l => l.id === activeLeagueId);
-  
-  // CRITICAL: Debug logging to diagnose visibility issue
-  console.log('[Standings] Render decision:', {
-    loading,
-    teamsLength: teams.length,
-    leaguesLength: leagues.length,
-    shouldShowLoading: loading && teams.length === 0 && leagues.length === 0,
-    shouldShowContent: !loading || teams.length > 0 || leagues.length > 0
-  });
   
   // Early return for loading - must be after all hooks are declared
   // CRITICAL: If teams exist, NEVER show LoadingScreen - content must render

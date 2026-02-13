@@ -106,17 +106,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
     });
 
-    // Listen for auth changes
+    // Listen for auth changes — only re-fetch profile on actual login/logout/update,
+    // not on token refreshes (which fire every ~55 min and don't change user data)
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) {
-        // Set user ID for analytics
-        analyticsService.setUserId(session.user.id);
-        fetchProfile(session.user.id);
-      } else {
+      if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+        if (session?.user) {
+          analyticsService.setUserId(session.user.id);
+          fetchProfile(session.user.id);
+        }
+      } else if (event === 'SIGNED_OUT') {
         analyticsService.setUserId(null);
         setProfile(null);
       }
