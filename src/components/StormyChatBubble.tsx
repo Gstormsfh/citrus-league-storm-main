@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { X, Send, Minimize2, Maximize2, Loader2 } from 'lucide-react';
 import { Narwhal } from '@/components/icons/Narwhal';
 import { CitrusSparkle, CitrusLeaf } from '@/components/icons/CitrusIcons';
-import { StormyService, type StormyMessage, type StormyContext } from '@/services/StormyService';
+import { StormyService, fetchLeagueContext, type StormyMessage, type StormyContext } from '@/services/StormyService';
 import { useLeague } from '@/contexts/LeagueContext';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -84,6 +84,9 @@ export const StormyChatBubble = () => {
   ]);
   // Conversation history for the API (excludes the initial greeting)
   const apiHistoryRef = useRef<StormyMessage[]>([]);
+  // Cached league context (roster, matchup, team name) — fetched lazily on first message
+  const leagueCtxRef = useRef<Partial<StormyContext> | null>(null);
+  const leagueCtxFetchedForRef = useRef<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -103,8 +106,8 @@ export const StormyChatBubble = () => {
     }
   }, [messages, isOpen]);
 
-  // Build context from current page + league data
-  const buildContext = useCallback((): StormyContext => {
+  // Build context from current page + league data (merges cached league context)
+  const buildContext = useCallback(async (): Promise<StormyContext> => {
     const ctx: StormyContext = { page: getPageLabel(location.pathname) };
     if (activeLeague) {
       ctx.leagueName = activeLeague.name;
@@ -112,8 +115,26 @@ export const StormyChatBubble = () => {
         ctx.scoringSettings = JSON.stringify(activeLeague.scoring_settings);
       }
     }
+
+    // Lazy-fetch league context (roster, matchup, team) on first message per league
+    const leagueId = league?.activeLeagueId;
+    const userId = auth?.user?.id;
+    if (leagueId && userId) {
+      if (leagueCtxFetchedForRef.current !== leagueId) {
+        try {
+          leagueCtxRef.current = await fetchLeagueContext(leagueId, userId);
+          leagueCtxFetchedForRef.current = leagueId;
+        } catch {
+          // Non-critical — proceed without enriched context
+        }
+      }
+      if (leagueCtxRef.current) {
+        Object.assign(ctx, leagueCtxRef.current);
+      }
+    }
+
     return ctx;
-  }, [location.pathname, activeLeague]);
+  }, [location.pathname, activeLeague, league?.activeLeagueId, auth?.user?.id]);
 
   const handleSend = useCallback(async () => {
     const text = inputValue.trim();
@@ -134,10 +155,11 @@ export const StormyChatBubble = () => {
     apiHistoryRef.current.push({ role: 'user', content: text });
 
     try {
+      const context = await buildContext();
       const result = await StormyService.sendMessage(
         text,
         apiHistoryRef.current.slice(0, -1), // exclude current msg (sent as `message`)
-        buildContext(),
+        context,
       );
 
       const responseText = result.error || result.response || "I couldn't process that. Try again?";
