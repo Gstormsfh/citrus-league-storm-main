@@ -141,7 +141,7 @@ export const DraftService = {
     try {
       let query = supabase
         .from('draft_order')
-        .select('*')
+        .select('id, league_id, round_number, team_order, draft_session_id, created_at, deleted_at')
         .eq('league_id', leagueId)
         .eq('round_number', roundNumber)
         .is('deleted_at', null);
@@ -359,7 +359,7 @@ export const DraftService = {
         // RPC succeeded - fetch the inserted pick
         const { data: pickData, error: fetchError } = await supabase
           .from('draft_picks')
-          .select('*')
+          .select('id, league_id, team_id, player_id, round_number, pick_number, draft_session_id, picked_at, deleted_at')
           .eq('id', rpcResult)
           .single();
         data = pickData;
@@ -469,31 +469,31 @@ export const DraftService = {
                   .delete()
                   .eq('league_id', leagueId);
 
-                // Insert from draft picks — use individual inserts to prevent
-                // one constraint violation from killing the entire batch
-                let insertedCount = 0;
-                let skippedCount = 0;
-                for (const pick of draftPicksData) {
-                  const { error: singleInsertError } = await supabase
-                    .from('roster_assignments')
-                    .upsert({
-                      league_id: pick.league_id,
-                      team_id: pick.team_id,
-                      player_id: pick.player_id,
-                      acquired_at: pick.picked_at || new Date().toISOString()
-                    }, { onConflict: 'league_id,player_id' });
+                // Insert from draft picks as a single batch upsert
+                const rosterRows = draftPicksData.map(pick => ({
+                  league_id: pick.league_id,
+                  team_id: pick.team_id,
+                  player_id: pick.player_id,
+                  acquired_at: pick.picked_at || new Date().toISOString()
+                }));
 
-                  if (singleInsertError) {
-                    logger.warn(`Fallback: Skipped player ${pick.player_id} (${singleInsertError.message})`);
-                    skippedCount++;
-                  } else {
-                    insertedCount++;
+                const { error: batchError } = await supabase
+                  .from('roster_assignments')
+                  .upsert(rosterRows, { onConflict: 'league_id,player_id' });
+
+                if (batchError) {
+                  logger.warn(`Fallback: Batch upsert error, retrying one-by-one: ${batchError.message}`);
+                  // Fall back to individual inserts only if batch fails
+                  let insertedCount = 0;
+                  for (const row of rosterRows) {
+                    const { error: singleErr } = await supabase
+                      .from('roster_assignments')
+                      .upsert(row, { onConflict: 'league_id,player_id' });
+                    if (!singleErr) insertedCount++;
                   }
-                }
-
-                logger.log(`Fallback: Inserted ${insertedCount} roster assignments, skipped ${skippedCount}`);
-                if (insertedCount < draftPicksData.length) {
-                  logger.warn(`Fallback: Expected ${draftPicksData.length}, only inserted ${insertedCount}`);
+                  logger.log(`Fallback: Inserted ${insertedCount}/${rosterRows.length} roster assignments`);
+                } else {
+                  logger.log(`Fallback: Batch inserted ${rosterRows.length} roster assignments`);
                 }
               }
             } else {
@@ -733,7 +733,7 @@ export const DraftService = {
       // Get the most recent active pick
       const { data: lastPick, error: fetchError } = await supabase
         .from('draft_picks')
-        .select('*')
+        .select('id, league_id, team_id, player_id, round_number, pick_number, draft_session_id, picked_at, deleted_at')
         .eq('league_id', leagueId)
         .is('deleted_at', null)
         .order('pick_number', { ascending: false })
