@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session, AuthError, AuthResponse } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { analyticsService } from '@/services/AnalyticsService';
 
 interface Profile {
   id: string;
@@ -89,10 +90,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
+        // Set user ID for analytics
+        analyticsService.setUserId(session.user.id);
         fetchProfile(session.user.id).finally(() => {
           if (mounted) setLoading(false);
         });
       } else {
+        analyticsService.setUserId(null);
         setLoading(false);
       }
     }).catch((error) => {
@@ -109,8 +113,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
+        // Set user ID for analytics
+        analyticsService.setUserId(session.user.id);
         fetchProfile(session.user.id);
       } else {
+        analyticsService.setUserId(null);
         setProfile(null);
       }
     });
@@ -156,6 +163,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     import('@/services/AuditService').then(({ AuditService }) => AuditService.logLogout()).catch(() => {});
     await supabase.auth.signOut();
     setProfile(null);
+    // Clear user ID from analytics
+    analyticsService.setUserId(null);
   };
 
   const resetPassword = async (email: string) => {
