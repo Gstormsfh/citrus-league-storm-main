@@ -132,24 +132,26 @@ export class TradeService {
 
       // ===== EXECUTE THE TRADE =====
       // 1. Update roster_assignments (source of truth for player ownership)
-      // Transfer offered players: from_team -> to_team
-      for (const playerId of trade.offered_player_ids) {
+      const now = new Date().toISOString();
+
+      // Transfer offered players: from_team -> to_team (single batch query)
+      if (trade.offered_player_ids.length > 0) {
         await supabase
           .from('roster_assignments')
-          .update({ team_id: trade.to_team_id, updated_at: new Date().toISOString() })
+          .update({ team_id: trade.to_team_id, updated_at: now })
           .eq('league_id', trade.league_id)
           .eq('team_id', trade.from_team_id)
-          .eq('player_id', String(playerId));
+          .in('player_id', trade.offered_player_ids.map(String));
       }
 
-      // Transfer requested players: to_team -> from_team
-      for (const playerId of trade.requested_player_ids) {
+      // Transfer requested players: to_team -> from_team (single batch query)
+      if (trade.requested_player_ids.length > 0) {
         await supabase
           .from('roster_assignments')
-          .update({ team_id: trade.from_team_id, updated_at: new Date().toISOString() })
+          .update({ team_id: trade.from_team_id, updated_at: now })
           .eq('league_id', trade.league_id)
           .eq('team_id', trade.to_team_id)
-          .eq('player_id', String(playerId));
+          .in('player_id', trade.requested_player_ids.map(String));
       }
 
       // 2. Update team_lineups (display layer - starters/bench/IR)
@@ -217,7 +219,6 @@ export class TradeService {
       }
 
       // 3. Log transactions in transaction_ledger
-      const now = new Date().toISOString();
       const txnEntries = [
         ...trade.offered_player_ids.map((pid: number) => ({
           league_id: trade.league_id,

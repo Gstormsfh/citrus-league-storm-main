@@ -326,7 +326,7 @@ export const LeagueService = {
 
       const { data, error} = await supabase
         .from('leagues')
-        .select('*')
+        .select('id, name, commissioner_id, draft_status, join_code, roster_size, draft_rounds, settings, waiver_process_time, waiver_period_hours, waiver_game_lock, waiver_type, allow_trades_during_games, scoring_settings, scheduled_draft_time, created_at, updated_at')
         .eq('id', leagueId)
         .single();
 
@@ -602,7 +602,7 @@ async joinLeagueByCode(
       // Get leagues where user is commissioner (exclude demo league)
       const { data: commissionerLeagues, error: commError } = await supabase
         .from('leagues')
-        .select('*')
+        .select('id, name, commissioner_id, draft_status, join_code, roster_size, draft_rounds, settings, waiver_process_time, waiver_period_hours, waiver_game_lock, waiver_type, allow_trades_during_games, scoring_settings, scheduled_draft_time, created_at, updated_at')
         .eq('commissioner_id', userId)
         .neq('id', DEMO_LEAGUE_ID_FOR_GUESTS) // Exclude demo league - guests only
         .order('created_at', { ascending: false });
@@ -639,7 +639,7 @@ async joinLeagueByCode(
       if (leagueIds.length > 0) {
         const { data, error: ownerError } = await supabase
           .from('leagues')
-          .select('*')
+          .select('id, name, commissioner_id, draft_status, join_code, roster_size, draft_rounds, settings, waiver_process_time, waiver_period_hours, waiver_game_lock, waiver_type, allow_trades_during_games, scoring_settings, scheduled_draft_time, created_at, updated_at')
           .in('id', leagueIds)
           .neq('id', DEMO_LEAGUE_ID_FOR_GUESTS) // Exclude demo league - guests only
           .order('created_at', { ascending: false });
@@ -885,7 +885,7 @@ async joinLeagueByCode(
     try {
       const { data, error } = await supabase
         .from('teams')
-        .select('*')
+        .select('id, league_id, owner_id, team_name, created_at, updated_at')
         .eq('league_id', leagueId)
         .eq('owner_id', userId)
         .single();
