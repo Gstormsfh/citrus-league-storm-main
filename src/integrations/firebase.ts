@@ -5,13 +5,12 @@ import { getAnalytics, logEvent as firebaseLogEvent, isSupported } from "firebas
 import type { Analytics } from "firebase/analytics";
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "citrus-fantasy-sports.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "citrus-fantasy-sports",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "citrus-fantasy-sports.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDvNht3HFeikaT_gS4PQDCKl2LpxgLZL34",
+  authDomain: "citrus-fantasy-sports.firebaseapp.com",
+  projectId: "citrus-fantasy-sports",
+  storageBucket: "citrus-fantasy-sports.firebasestorage.app",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:565653385598:web:b1bb4ccd62ebda2c92432f",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-444BMD2Z3P",
 };
 
 const app = initializeApp(firebaseConfig);
