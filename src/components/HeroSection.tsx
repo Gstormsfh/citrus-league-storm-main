@@ -167,8 +167,8 @@ const HeroSection = () => {
         </div>
       </div>
       
-      {/* Vintage Scroll Indicator */}
-      <div className="absolute bottom-12 left-1/2 transform -translate-x-1/2 flex flex-col items-center animate-bounce-subtle">
+      {/* Vintage Scroll Indicator — hidden on mobile so it doesn't block content */}
+      <div className="hidden md:flex absolute bottom-12 left-1/2 transform -translate-x-1/2 flex-col items-center animate-bounce-subtle">
         <p className="font-display text-xs text-citrus-charcoal mb-3 uppercase tracking-widest">Explore Features</p>
         <div className="w-8 h-12 border-2 border-citrus-sage/60 rounded-varsity flex justify-center shadow-sm">
           <div className="w-2.5 h-2.5 bg-citrus-orange rounded-full mt-2 animate-bounce"></div>
