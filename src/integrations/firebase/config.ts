@@ -26,11 +26,11 @@ if (import.meta.env.DEV) {
 }
 
 // Initialize Firebase (only if not already initialized)
-let app: FirebaseApp;
-if (getApps().length === 0) {
-  app = initializeApp(firebaseConfig);
-} else {
-  app = getApps()[0];
+let app: FirebaseApp | null = null;
+try {
+  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+} catch (err) {
+  console.warn('Firebase init failed — analytics disabled:', err);
 }
 
 // Initialize Analytics (only in browser environment and if supported)
@@ -41,26 +41,16 @@ export const getAnalyticsInstance = (): Analytics | null => {
   return analytics;
 };
 
-// Initialize analytics synchronously if possible, otherwise async
-if (typeof window !== 'undefined') {
+// Initialize analytics — fully guarded so it can never crash the app
+if (typeof window !== 'undefined' && app) {
   try {
-    // Try to initialize immediately (works in most cases)
     analytics = getAnalytics(app);
-  } catch (error) {
-    // If that fails, try async initialization
+  } catch {
     isSupported().then((supported) => {
-      if (supported) {
-        try {
-          analytics = getAnalytics(app);
-        } catch (err) {
-          // Analytics already initialized or error occurred
-          console.warn('Firebase Analytics initialization warning:', err);
-        }
+      if (supported && app) {
+        try { analytics = getAnalytics(app); } catch {}
       }
-    }).catch(() => {
-      // Analytics not supported or error during initialization
-      // This is fine - analytics will gracefully fail
-    });
+    }).catch(() => {});
   }
 }
 

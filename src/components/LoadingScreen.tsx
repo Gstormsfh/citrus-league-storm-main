@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 
 // Import the 4 loading screen images
@@ -27,7 +27,7 @@ const getRandomCharacter = (): LoadingCharacter => {
   if (cachedRandomCharacter) {
     return cachedRandomCharacter;
   }
-  
+
   // Otherwise, pick a random one and cache it
   const randomIndex = Math.floor(Math.random() * LOADING_CHARACTERS.length);
   cachedRandomCharacter = LOADING_CHARACTERS[randomIndex];
@@ -40,11 +40,24 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
   progress = undefined,
   className,
 }) => {
+  const [dismissed, setDismissed] = useState(false);
+  const [showTapHint, setShowTapHint] = useState(false);
+
+  // Auto-dismiss after 8 seconds as a safety valve
+  useEffect(() => {
+    const hintTimer = setTimeout(() => setShowTapHint(true), 4000);
+    const dismissTimer = setTimeout(() => setDismissed(true), 8000);
+    return () => {
+      clearTimeout(hintTimer);
+      clearTimeout(dismissTimer);
+    };
+  }, []);
+
   // Use provided character, or randomize if not provided
   const selectedCharacter = useMemo(() => {
     return character || getRandomCharacter();
   }, [character]);
-  
+
   const getImageSrc = (char: LoadingCharacter): string => {
     switch (char) {
       case 'kiwi':
@@ -60,27 +73,40 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
     }
   };
 
+  // If dismissed (by timeout or tap), don't render
+  if (dismissed) {
+    return null;
+  }
+
   const imageSrc = getImageSrc(selectedCharacter);
 
   return (
     <div
       className={cn(
-        'fixed inset-0 z-50 flex items-center justify-center',
+        'fixed inset-0 z-50 flex items-center justify-center cursor-pointer',
         'bg-[#D4E8B8]', // Light green background
         className
       )}
+      onClick={() => setDismissed(true)}
     >
-      <div className="relative">
+      <div className="relative flex flex-col items-center">
         <img
           src={imageSrc}
           alt={`${selectedCharacter} loading screen`}
-          className="w-auto h-auto max-w-[90vw] max-h-[90vh] object-contain drop-shadow-lg relative"
+          className="w-auto h-auto max-w-[90vw] max-h-[80vh] object-contain drop-shadow-lg relative"
           style={{
             maxWidth: '600px',
-            maxHeight: '800px',
+            maxHeight: '700px',
           }}
         />
-        
+        {showTapHint && (
+          <p
+            className="mt-4 text-gray-600 text-sm animate-pulse"
+            style={{ fontFamily: 'sans-serif' }}
+          >
+            Tap anywhere to continue
+          </p>
+        )}
       </div>
     </div>
   );
