@@ -21,7 +21,7 @@ The NHL schedule integration has been implemented! The system now uses real NHL 
 
 ### 3. Schedule Fetch Script
 - **File**: `scripts/fetch-nhl-schedule.ts`
-- Fetches full 2024-2025 season schedule from NHL Stats API
+- Fetches full 2025-2026 season schedule from NHL Stats API
 - Stores games in the database
 
 ### 4. Integration Updates
@@ -49,7 +49,7 @@ npx tsx scripts/fetch-nhl-schedule.ts
 ```
 
 This will:
-- Fetch the full 2024-2025 season schedule from NHL Stats API
+- Fetch the full 2025-2026 season schedule from NHL Stats API
 - Store all games in the `nhl_games` table
 - Take a few minutes to complete (fetches ~1300 games)
 

@@ -84,7 +84,7 @@ bg-citrus-cream text-citrus-forest border-citrus-sage
 <Card>
   <CardHeader>
     <CardTitle>Player Profile</CardTitle>
-    <CardDescription>Season 2024-2025</CardDescription>
+    <CardDescription>Season 2025-2026</CardDescription>
   </CardHeader>
   <CardContent>
     {/* Your content */}

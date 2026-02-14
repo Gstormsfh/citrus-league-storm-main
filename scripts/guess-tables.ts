@@ -10,7 +10,7 @@ async function guessTableNames() {
   console.log('🔍 Guessing Supabase tables...');
   
   const bases = ['goalies', 'skaters'];
-  const years = ['2024', '2025'];
+  const years = ['2025', '2026'];
   const suffixes = ['', '_season', '_staging', 'Season', ' Staging', '_data'];
   
   const combinations: string[] = [];
@@ -27,10 +27,10 @@ async function guessTableNames() {
   });
 
   // Add the specific filename format
-  combinations.push('goalies_2024_season');
   combinations.push('goalies_2025_season');
-  combinations.push('skaters_2024_season');
+  combinations.push('goalies_2026_season');
   combinations.push('skaters_2025_season');
+  combinations.push('skaters_2026_season');
 
   for (const table of combinations) {
     // console.log(`Checking ${table}...`);
