@@ -1,7 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
-import { componentTagger } from "lovable-tagger";
 import type { Plugin } from "vite";
 
 // Plugin to remove crossorigin attribute and ensure React loads first
@@ -49,8 +48,6 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
-    mode === 'development' &&
-    componentTagger(),
     removeCrossorigin(),
   ].filter(Boolean),
   resolve: {
