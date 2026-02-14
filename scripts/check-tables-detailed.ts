@@ -14,20 +14,22 @@ async function listTables() {
   // console.log('Reference error:', error404);
 
   const potentialTables = [
-    'goalies_2024_staging',
     'goalies_2025_staging',
-    'skaters_2024_staging',
+    'goalies_2026_staging',
     'skaters_2025_staging',
+    'skaters_2026_staging',
     'staging_2025_skaters',
     'staging_2025_goalies',
-    'Goalies 2024 Season',
+    'staging_2026_skaters',
+    'staging_2026_goalies',
     'Goalies 2025 Season',
-    'Skaters 2024 Season',
+    'Goalies 2026 Season',
     'Skaters 2025 Season',
-    'goalies_2024',
+    'Skaters 2026 Season',
     'goalies_2025',
-    'skaters_2024',
-    'skaters_2025'
+    'goalies_2026',
+    'skaters_2025',
+    'skaters_2026'
   ];
 
   for (const table of potentialTables) {

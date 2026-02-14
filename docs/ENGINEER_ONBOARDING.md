@@ -403,7 +403,7 @@ CREATE TABLE player_game_stats (
 CREATE TABLE player_season_stats (
   id UUID PRIMARY KEY,
   player_id UUID REFERENCES players(id),
-  season_id TEXT, -- '2024-2025'
+  season_id TEXT, -- '2025-2026'
   games_played INTEGER,
   goals INTEGER,
   assists INTEGER,

@@ -10,7 +10,7 @@ async function checkAssists() {
   console.log('🔍 Checking assists columns for McDavid...');
   
   const { data, error } = await supabase
-    .from('staging_2024_skaters') // Using 2024 as 2025 might be early season/empty?
+    .from('staging_2025_skaters')
     .select('*')
     .ilike('name', '%McDavid%')
     .eq('situation', 'all')

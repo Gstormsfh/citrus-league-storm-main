@@ -2,7 +2,7 @@
  * Script to fetch and store NHL schedule data from NHL Stats API
  * Run with: npx tsx scripts/fetch-nhl-schedule.ts
  * 
- * This fetches the full 2024-2025 season schedule and stores it in the nhl_games table
+ * This fetches the full 2025-2026 season schedule and stores it in the nhl_games table
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -46,12 +46,12 @@ interface NHLAPIScheduleResponse {
   }>;
 }
 
-async function fetchNHLSchedule(season: string = '20242025'): Promise<NHLAPIGame[]> {
+async function fetchNHLSchedule(season: string = '20252026'): Promise<NHLAPIGame[]> {
   console.log(`📅 Fetching NHL schedule for season ${season}...`);
-  
+
   const allGames: NHLAPIGame[] = [];
-  let startDate = new Date('2024-10-01'); // Season typically starts in October
-  const endDate = new Date('2025-06-30'); // Season ends in June
+  let startDate = new Date('2025-10-01'); // Season typically starts in October
+  const endDate = new Date('2026-06-30'); // Season ends in June
 
   // Fetch schedule in monthly chunks to avoid overwhelming the API
   while (startDate <= endDate) {
@@ -146,7 +146,7 @@ function transformGame(game: NHLAPIGame): TransformedGame {
     period: period,
     period_time: periodTime,
     venue: game.venue?.name || null,
-    season: 2024,
+    season: 2025,
     game_type: 'regular' // Could be enhanced to detect playoffs
   };
 }
@@ -192,7 +192,7 @@ async function main() {
   try {
     console.log('🚀 Starting NHL schedule import...\n');
     
-    const games = await fetchNHLSchedule('20242025');
+    const games = await fetchNHLSchedule('20252026');
     
     if (games.length === 0) {
       console.log('⚠️  No games found. The season may not have started yet or the API may be unavailable.');

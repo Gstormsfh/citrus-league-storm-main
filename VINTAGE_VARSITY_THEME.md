@@ -294,7 +294,7 @@ shadow-varsity     // Enhanced depth with dual shadows
     <CardTitle className="font-varsity uppercase">
       Season Stats
     </CardTitle>
-    <CardDescription>2024-2025 Regular Season</CardDescription>
+    <CardDescription>2025-2026 Regular Season</CardDescription>
   </CardHeader>
   <CardContent>
     <div className="grid grid-cols-3 gap-4">
