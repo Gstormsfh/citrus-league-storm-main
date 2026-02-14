@@ -11,21 +11,21 @@ const corsHeaders = {
 // HARD CAPS. Stormy stops responding once ANY limit is hit.
 //
 //   Model            Input          Output
-//   Haiku 4.5        $1 / 1M tok    $5 / 1M tok
+//   Sonnet 4.5       $3 / 1M tok    $15 / 1M tok
 //
-// With Haiku + 512-token max reply + 3 msgs/user/week:
-//   ~2K tokens/msg × 3 = 6K tokens/user/week
-//   50 users = 300K tokens/month ≈ $1.50 max
+// With Sonnet + 1024-token max reply + 3 msgs/user/week:
+//   ~3K tokens/msg × 3 = 9K tokens/user/week
+//   50 users = ~180K tokens/month
+//   Realistic cost: ~$2.50–3.50/month (well under $5 budget)
+//   Monthly budget hard cap of 300K tokens ≈ $4.50 worst case
 //
-// These limits are intentionally tight for testing/demo phase.
-// Bump them when you're ready to scale.
 
 const WEEKLY_MESSAGE_LIMIT = 3;          // per registered user per matchup week (7 days)
 const GLOBAL_DAILY_MESSAGE_LIMIT = 30;   // ALL users combined per 24 h (safety net)
-const MONTHLY_TOKEN_BUDGET = 200_000;    // total tokens (in + out) per calendar month — hard kill switch
-const MAX_RESPONSE_TOKENS = 512;         // cap each reply
+const MONTHLY_TOKEN_BUDGET = 300_000;    // total tokens (in + out) per calendar month — hard kill switch
+const MAX_RESPONSE_TOKENS = 1024;        // cap each reply
 const MAX_CONVERSATION_TURNS = 6;        // max prior turns sent to API
-const CLAUDE_MODEL = "claude-haiku-4-5-20251001"; // cheapest model — swap to sonnet when funded
+const CLAUDE_MODEL = "claude-sonnet-4-5-20250929";
 
 // ── System Prompt ────────────────────────────────────────────────
 const SYSTEM_PROMPT = `You are Stormy, the AI fantasy hockey assistant for Citrus Fantasy Sports. You're the team's narwhal mascot — sharp, data-driven, and a little playful.
