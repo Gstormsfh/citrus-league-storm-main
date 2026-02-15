@@ -19,11 +19,12 @@ import {
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
-import { Trophy, Users, Settings, CheckCircle, AlertCircle, UserPlus, Loader2, Copy } from "lucide-react";
+import { Trophy, Users, Settings, CheckCircle, AlertCircle, UserPlus, Loader2, Copy, Sparkles } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import WaitlistSignup from "@/components/WaitlistSignup";
 
 const CreateLeague = () => {
   const navigate = useNavigate();
@@ -281,6 +282,22 @@ const CreateLeague = () => {
             <p className="text-lg text-muted-foreground">
               Start your own league or join your friends.
             </p>
+          </div>
+
+          {/* Testing Phase Banner */}
+          <Alert className="mb-6 bg-citrus-orange/20 border-2 border-citrus-orange/40">
+            <Sparkles className="h-4 w-4 text-citrus-orange" />
+            <AlertDescription className="text-citrus-forest">
+              <span className="font-bold">We're in testing phase!</span> Your league will be filled with AI teams so you can experience the full platform. Try the complete draft experience and draft against AI opponents. 
+              <span className="block mt-2 text-sm">
+                Sign up for the waitlist to be notified when full service launches with real multiplayer leagues.
+              </span>
+            </AlertDescription>
+          </Alert>
+
+          {/* Waitlist Signup */}
+          <div className="mb-6">
+            <WaitlistSignup source="create_league_page" variant="compact" />
           </div>
 
           <Card className="card-citrus border-none shadow-xl overflow-hidden">

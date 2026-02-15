@@ -1,6 +1,7 @@
 
 import { useEffect, Suspense } from 'react';
 import Navbar from '../components/Navbar';
+import TestingPhaseBanner from '../components/TestingPhaseBanner';
 import HeroSection from '../components/HeroSection';
 import FeaturesSection from '../components/FeaturesSection';
 import StormySection from '../components/StormySection';
@@ -41,6 +42,7 @@ const Index = () => {
         <Suspense fallback={<div>Loading Navbar...</div>}>
           <Navbar />
         </Suspense>
+        <TestingPhaseBanner />
         <main className="pt-[92px]">
           <Suspense fallback={<div>Loading sections...</div>}>
             <HeroSection />

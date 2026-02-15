@@ -1,7 +1,8 @@
 
 import { Button } from '@/components/ui/button';
-import { Play, ArrowRight, Trophy } from 'lucide-react';
+import { Play, ArrowRight, Trophy, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import WaitlistSignup from '@/components/WaitlistSignup';
 
 const CtaSection = () => {
   return (
@@ -25,23 +26,24 @@ const CtaSection = () => {
           </h2>
           
           {/* Subheadline */}
-          <div className="max-w-2xl mx-auto mb-12">
+          <div className="max-w-2xl mx-auto mb-8">
             <p className="text-lg md:text-2xl text-citrus-forest font-display font-bold leading-relaxed animated-element animate">
               Built by people who actually watch hockey. For people who actually want to win.
             </p>
             <p className="text-base md:text-lg text-citrus-forest/80 font-sans mt-4 leading-relaxed animated-element animate">
-              Free forever • No credit card • Join in 30 seconds
+              <span className="font-bold text-citrus-orange">Testing Phase:</span> Create a test league and we'll fill it with AI teams so you can experience the full platform.
             </p>
           </div>
           
           {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-5 justify-center mb-10 animated-element animate">
-            <Link to="/gm-office">
+          <div className="flex flex-col sm:flex-row gap-5 justify-center mb-8 animated-element animate">
+            <Link to="/create-league">
               <Button 
                 size="lg" 
                 className="bg-[#E8EED9]/60 backdrop-blur-sm text-citrus-orange hover:bg-citrus-orange hover:text-[#E8EED9] border-3 border-citrus-sage rounded-varsity text-base px-10 py-6 font-varsity uppercase shadow-md hover:translate-y-1 hover:shadow-sm transition-all font-bold"
               >
-                Start Your Season <ArrowRight size={20} className="ml-2" />
+                <Sparkles size={20} className="mr-2" />
+                Create Test League <ArrowRight size={20} className="ml-2" />
               </Button>
             </Link>
             <Link to="/standings">
@@ -52,6 +54,14 @@ const CtaSection = () => {
                 <Play size={20} className="mr-2" /> View Demo
               </Button>
             </Link>
+          </div>
+          
+          {/* Waitlist Signup */}
+          <div className="max-w-md mx-auto mb-10 animated-element animate">
+            <p className="text-sm font-display font-bold text-citrus-forest mb-4 uppercase tracking-wide text-center">
+              Join the Waitlist for Launch Notification
+            </p>
+            <WaitlistSignup source="cta_section" variant="default" />
           </div>
           
           {/* Trust Badge */}

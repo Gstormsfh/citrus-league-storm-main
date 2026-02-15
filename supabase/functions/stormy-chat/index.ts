@@ -20,9 +20,9 @@ const corsHeaders = {
 //   Monthly budget hard cap of 300K tokens ≈ $4.50 worst case
 //
 
-const WEEKLY_MESSAGE_LIMIT = 3;          // per registered user per matchup week (7 days)
-const GLOBAL_DAILY_MESSAGE_LIMIT = 30;   // ALL users combined per 24 h (safety net)
-const MONTHLY_TOKEN_BUDGET = 300_000;    // total tokens (in + out) per calendar month — hard kill switch
+const WEEKLY_MESSAGE_LIMIT = 10;         // per registered user per matchup week (7 days) — bumped for demo
+const GLOBAL_DAILY_MESSAGE_LIMIT = 100;  // ALL users combined per 24 h (safety net) — bumped for demo
+const MONTHLY_TOKEN_BUDGET = 500_000;    // total tokens (in + out) per calendar month — hard kill switch
 const MAX_RESPONSE_TOKENS = 1024;        // cap each reply
 const MAX_CONVERSATION_TURNS = 6;        // max prior turns sent to API
 const CLAUDE_MODEL = "claude-sonnet-4-5-20250929";

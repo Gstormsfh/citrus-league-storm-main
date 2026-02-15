@@ -1,8 +1,9 @@
 
 import { Button } from '@/components/ui/button';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { CitrusLogo } from '@/components/icons/CitrusIcons';
+import WaitlistSignup from '@/components/WaitlistSignup';
 
 const HeroSection = () => {
   return (
@@ -11,6 +12,12 @@ const HeroSection = () => {
 
       <div className="container mx-auto px-4 flex flex-col lg:flex-row items-center justify-between py-12 lg:py-16">
         <div className="lg:w-1/2 mb-12 lg:mb-0 lg:pr-12 animate-fade-in">
+          {/* Testing Phase Badge */}
+          <div className="inline-flex items-center gap-2 bg-citrus-orange/40 border-2 border-citrus-orange rounded-varsity px-4 py-2 mb-4">
+            <Sparkles className="w-4 h-4 text-citrus-forest" />
+            <span className="font-display font-bold text-xs uppercase tracking-wider text-citrus-forest">Testing Phase • Full Launch Coming Soon</span>
+          </div>
+          
           {/* Vintage badge */}
           <div className="inline-flex items-center gap-2 bg-citrus-sage/40 border-2 border-citrus-sage rounded-varsity px-4 py-2 mb-6">
             <CitrusLogo className="w-5 h-5 animate-pulse" />
@@ -27,19 +34,25 @@ const HeroSection = () => {
             <span className="font-black text-citrus-green-dark drop-shadow-[0_1px_2px_rgba(255,255,255,0.5)]">98.7% projection accuracy.</span> Writeups for all 700+ NHL players. <span className="font-black text-citrus-green-dark drop-shadow-[0_1px_2px_rgba(255,255,255,0.5)]">Saturday finishes</span> when the entire league is playing.
           </p>
           
-          <p className="text-base md:text-lg mb-10 text-citrus-forest/80 max-w-lg font-sans leading-relaxed">
+          <p className="text-base md:text-lg mb-4 text-citrus-forest/80 max-w-lg font-sans leading-relaxed">
             While Yahoo and ESPN serve you stale data from 2015, we're pulling real-time xGF%, deployment patterns, and line combos. Our AI watches every shift. You get insights that actually win matchups.
           </p>
           
-          <div className="flex flex-wrap gap-4 mb-10">
-            <Link to="/auth">
+          {/* Testing Phase Message */}
+          <div className="bg-citrus-orange/20 border-2 border-citrus-orange/40 rounded-xl p-4 mb-6 max-w-lg">
+            <p className="text-sm md:text-base text-citrus-forest font-sans font-medium leading-relaxed mb-2">
+              <span className="font-black text-citrus-orange">We're in testing!</span> Create a league and we'll fill it with AI teams so you can experience the full platform. Try the complete draft experience and draft against AI opponents.
+            </p>
+            <p className="text-xs md:text-sm text-citrus-forest/70 font-sans">
+              Sign up for the waitlist to be notified when full service launches with real multiplayer leagues.
+            </p>
+          </div>
+          
+          <div className="flex flex-wrap gap-4 mb-6">
+            <Link to="/create-league">
               <Button variant="varsity" size="lg" className="text-base">
-                Get Started <ArrowRight size={18} className="ml-2" />
-              </Button>
-            </Link>
-            <Link to="/create-league?tab=join">
-              <Button variant="outline" size="lg" className="text-base">
-                Join League
+                <Sparkles size={18} className="mr-2" />
+                Create Test League
               </Button>
             </Link>
             <Link to="/standings">
@@ -47,6 +60,14 @@ const HeroSection = () => {
                 View Demo League
               </Button>
             </Link>
+          </div>
+          
+          {/* Waitlist Signup */}
+          <div className="mb-10 max-w-lg">
+            <p className="text-sm font-display font-bold text-citrus-forest mb-3 uppercase tracking-wide">
+              Join the Waitlist
+            </p>
+            <WaitlistSignup source="hero_section" variant="default" />
           </div>
           
           {/* Data-driven stats showcase */}

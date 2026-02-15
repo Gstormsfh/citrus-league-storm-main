@@ -91,6 +91,7 @@ const ProfileSetup = lazyWithErrorHandling(() => import("./pages/ProfileSetup"))
 const ResetPassword = lazyWithErrorHandling(() => import("./pages/ResetPassword"));
 const VerifyEmail = lazyWithErrorHandling(() => import("./pages/VerifyEmail"));
 const LeagueDashboard = lazyWithErrorHandling(() => import("./pages/LeagueDashboard"));
+const Waitlist = lazyWithErrorHandling(() => import("./pages/Waitlist"));
 
 // Use the picturesque LoadingScreen as the Suspense fallback for lazy-loaded routes
 const PageLoader = () => <LoadingScreen />;
@@ -178,6 +179,7 @@ const App = () => {
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                <Route path="/waitlist" element={<Waitlist />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

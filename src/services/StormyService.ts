@@ -109,12 +109,17 @@ class StormyServiceImpl {
         },
       });
 
-      if (error) {
-        throw new Error(error.message || "Failed to reach Stormy");
-      }
-
+      // Supabase functions.invoke returns { data, error } where:
+      // - On non-2xx responses (429 rate limit, 500 error), BOTH data and error are populated
+      // - data contains the parsed JSON body with the user-friendly message
+      // - error contains a generic "Edge Function returned a non-2xx status code"
+      // Always check data.error FIRST to surface the real message from the edge function
       if (data?.error) {
         return { response: "", error: data.error };
+      }
+
+      if (error) {
+        throw new Error(error.message || "Failed to reach Stormy");
       }
 
       return {
@@ -238,15 +243,14 @@ class StormyServiceImpl {
         );
       }
 
-      // ── 3. Roster player IDs (draft picks) ──────────────────────
-      const { data: picks } = await supabase
-        .from("draft_picks")
+      // ── 3. Roster player IDs (from roster_assignments — reflects trades/waivers)
+      const { data: rosterRows } = await supabase
+        .from("roster_assignments")
         .select("player_id")
         .eq("league_id", leagueId)
-        .eq("team_id", team.id)
-        .is("deleted_at", null);
+        .eq("team_id", team.id);
 
-      const playerIds = (picks ?? [])
+      const playerIds = (rosterRows ?? [])
         .map((p: { player_id: string }) => {
           const n = parseInt(String(p.player_id));
           return isNaN(n) ? null : n;
