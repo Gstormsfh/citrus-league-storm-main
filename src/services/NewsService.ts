@@ -60,11 +60,21 @@ async function fetchNHLNews(): Promise<NewsArticle[]> {
       else if (lower.includes('recap') || lower.includes('score') || lower.includes('highlights')) category = 'recap';
       else if (lower.includes('olympic')) category = 'olympics';
 
+      // NHL.com article URLs live under /news/ — bare slugs need this prefix
+      let articleUrl: string;
+      if (slug.startsWith('http')) {
+        articleUrl = slug;
+      } else if (slug.startsWith('/')) {
+        articleUrl = `https://www.nhl.com${slug}`;
+      } else {
+        articleUrl = `https://www.nhl.com/news/${slug}`;
+      }
+
       return {
         id: item._entityId || item.id || `nhl-${idx}`,
         title: headline,
         description: summary,
-        url: slug.startsWith('http') ? slug : `https://www.nhl.com/${slug}`,
+        url: articleUrl,
         imageUrl: img,
         source: 'NHL.com',
         category,
