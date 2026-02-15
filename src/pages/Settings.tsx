@@ -143,7 +143,7 @@ const Settings = () => {
           <h1 className="text-lg font-varsity font-bold text-citrus-forest">Settings</h1>
         </div>
       </div>
-      <main className="w-full lg:pt-24 lg:pb-16 pb-[calc(5rem+env(safe-area-inset-bottom))]">
+      <main className="w-full lg:pt-20 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
         <div className="w-full m-0 p-0">
           <div className="max-w-4xl mx-auto px-2 lg:px-6">
             <div className="mb-8">

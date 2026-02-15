@@ -2685,17 +2685,17 @@ const Roster = () => {
       </div>
       
       {/* MOBILE: Full-screen scrollable content / DESKTOP: Grid layout */}
-      <main className="w-full lg:pt-24 lg:pb-16 pb-[calc(5rem+env(safe-area-inset-bottom))]">
+      <main className="w-full lg:pt-20 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
         <div className="w-full m-0 p-0">
           {/* Desktop: 3-column grid / Mobile: Single column */}
           <div className={cn(
-            "flex flex-col lg:grid lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2",
+            "flex flex-col lg:grid lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2",
             userLeagueState === 'active-user' && userTeam?.league_id
-              ? "lg:grid-cols-[240px_1fr_300px]"
-              : "lg:grid-cols-[240px_1fr]"
+              ? "lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px]"
+              : "lg:grid-cols-[200px_1fr] xl:grid-cols-[220px_1fr]"
           )}>
             {/* Main Content - MOBILE: Full width / DESKTOP: Scrollable panel */}
-            <div className="min-w-0 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto px-3 lg:px-4 order-1 lg:order-2">
+            <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto px-3 lg:px-0 order-1 lg:order-2">
               {/* Fantasy Team Header with Citrus Flair */}
               <div className="bg-card rounded-lg shadow-md border p-4 mb-4 relative overflow-hidden">
                 {/* Decorative citrus leaves in background */}
@@ -3496,7 +3496,7 @@ const Roster = () => {
 
             {/* Left Sidebar - Hidden on mobile, left on desktop */}
             <aside className="hidden lg:block w-full lg:w-auto order-2 lg:order-1">
-              <div className="lg:sticky lg:top-32 space-y-4 lg:space-y-6">
+              <div className="lg:sticky lg:top-24 space-y-4 lg:space-y-4">
                 {/* Roster Depth Widget */}
                 <TeamIntelHub />
 
@@ -3511,7 +3511,7 @@ const Roster = () => {
             {/* Right Sidebar - Notifications/Chat Panel - Hidden on mobile */}
             {userLeagueState === 'active-user' && userTeam?.league_id && (
               <aside className="hidden lg:block order-3">
-                <div className="lg:sticky lg:top-32 h-[calc(100vh-12rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
                   <LeagueNotifications leagueId={userTeam.league_id} />
                 </div>
               </aside>
