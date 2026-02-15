@@ -15,42 +15,45 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || '',
 };
 
-// Check if we have the minimum required config to initialize Firebase
-const hasValidConfig = !!(firebaseConfig.apiKey && firebaseConfig.appId && firebaseConfig.projectId);
+// Firebase API keys always start with "AIzaSy" — if it doesn't match, the key
+// is missing or invalid and we must NOT call initializeApp (which would trigger
+// the Installations service and throw an uncatchable async 400 error).
+const apiKeyLooksValid = typeof firebaseConfig.apiKey === 'string'
+  && firebaseConfig.apiKey.startsWith('AIzaSy')
+  && firebaseConfig.apiKey.length > 20;
 
-// Initialize Firebase (only if config is valid and not already initialized)
+const hasValidConfig = apiKeyLooksValid
+  && !!firebaseConfig.appId
+  && !!firebaseConfig.projectId;
+
+// Initialize Firebase (only if config is fully valid)
 let app: FirebaseApp | null = null;
 if (hasValidConfig) {
   try {
     app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
   } catch {
     // Firebase init failed — analytics disabled silently
+    app = null;
   }
 }
 
-// Initialize Analytics (only in browser environment, if supported, and if Firebase is initialized)
+// Initialize Analytics
 let analytics: Analytics | null = null;
 
-// Function to get analytics instance (handles async initialization)
-export const getAnalyticsInstance = (): Analytics | null => {
-  return analytics;
-};
+export const getAnalyticsInstance = (): Analytics | null => analytics;
 
-// Initialize analytics — fully guarded so it can never crash the app
-if (typeof window !== 'undefined' && app && hasValidConfig) {
+if (typeof window !== 'undefined' && app) {
   isSupported()
     .then((supported) => {
       if (supported && app) {
         try {
           analytics = getAnalytics(app);
         } catch {
-          // Silently fail — analytics is non-critical
+          // Silently fail
         }
       }
     })
-    .catch(() => {
-      // isSupported check failed — skip analytics
-    });
+    .catch(() => {});
 }
 
 export { app, analytics };
