@@ -88,6 +88,13 @@ const HeroSection = () => {
         </div>
         
         <div className="lg:w-1/2 relative animate-fade-in">
+          {/* Testing phase context text — fills the visual gap above the card */}
+          <div className="hidden lg:block mb-6 max-w-lg">
+            <p className="text-sm md:text-base text-citrus-forest/90 font-sans leading-relaxed">
+              <span className="font-bold text-citrus-orange">We're in testing!</span> Create a league and we'll fill it with AI teams so you can experience the full platform. Try the complete draft experience and draft against AI opponents. Sign up for the waitlist to be notified when full service launches with real multiplayer leagues.
+            </p>
+          </div>
+
           {/* Premium Letterman Card with thick borders */}
           <div className="card-letterman-thick shadow-varsity relative">
             <div className="absolute -top-4 -right-4 w-16 h-16 rotate-12">
