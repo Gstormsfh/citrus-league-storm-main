@@ -243,7 +243,7 @@ class StormyServiceImpl {
         );
       }
 
-      // ── 3. Roster player IDs (from roster_assignments — reflects trades/waivers)
+      // ── 3. Roster player IDs (from roster_assignments — source of truth)
       const { data: rosterRows } = await supabase
         .from("roster_assignments")
         .select("player_id")

@@ -4850,20 +4850,20 @@ const Matchup = () => {
       <main className={cn(
         "w-full",
         // Mobile: Full height scrollable, no padding for navbar
-        "lg:pt-24 lg:pb-16",
+        "lg:pt-20 lg:pb-8",
         // Mobile: Account for bottom nav
         "pb-[calc(5rem+env(safe-area-inset-bottom))]"
       )}>
         <div className="w-full m-0 p-0">
           {/* Desktop: 3-column grid / Mobile: Single column, content only */}
           <div className={cn(
-            "flex flex-col lg:grid lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2",
+            "flex flex-col lg:grid lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2",
             userLeagueState === 'active-user' && league?.id
-              ? "lg:grid-cols-[240px_1fr_300px]"
-              : "lg:grid-cols-[240px_1fr]"
+              ? "lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px]"
+              : "lg:grid-cols-[200px_1fr] xl:grid-cols-[220px_1fr]"
           )}>
             {/* Main Content - MOBILE: Full width, full height / DESKTOP: Scrollable panel */}
-            <div className="min-w-0 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto px-0 lg:px-4 order-1 lg:order-2">
+            <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto px-0 lg:px-4 order-1 lg:order-2">
               {/* Header Section - Clean and Professional with Citrus Colors */}
               <div className="mb-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
@@ -5129,7 +5129,7 @@ const Matchup = () => {
 
             {/* Dynamic Matchup Sidebar - Hidden on mobile, shown on desktop */}
             <aside className="hidden lg:block w-full lg:w-auto order-2 lg:order-1">
-              <div className="lg:sticky lg:top-32">
+              <div className="lg:sticky lg:top-24">
                 <MatchupSidebar
                   myStarters={weeklyMyStarters}
                   opponentStarters={weeklyOpponentStarters}
@@ -5150,7 +5150,7 @@ const Matchup = () => {
             {/* Notifications Panel - Right side on desktop, hidden on mobile */}
             {userLeagueState === 'active-user' && league?.id && (
               <aside className="hidden lg:block order-3">
-                <div className="lg:sticky lg:top-32 h-[calc(100vh-12rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
                   <LeagueNotifications leagueId={league.id} />
                 </div>
               </aside>

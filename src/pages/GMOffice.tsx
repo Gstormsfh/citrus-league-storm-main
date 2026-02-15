@@ -84,13 +84,13 @@ const GMOffice = () => {
         </div>
       </div>
 
-      <main className="w-full lg:pt-24 lg:pb-16 pb-[calc(5rem+env(safe-area-inset-bottom))] m-0 p-0 relative z-10">
+      <main className="w-full lg:pt-20 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))] m-0 p-0 relative z-10">
         <div className="w-full m-0 p-0">
           <div className={cn(
-            "flex flex-col lg:grid lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2",
+            "flex flex-col lg:grid lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2",
             userLeagueState === 'active-user' && activeLeagueId
-              ? "lg:grid-cols-[240px_1fr_300px]"
-              : "lg:grid-cols-[240px_1fr]"
+              ? "lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px]"
+              : "lg:grid-cols-[200px_1fr] xl:grid-cols-[220px_1fr]"
           )}>
             {/* Main Content - Appears first on mobile */}
             <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2">
@@ -156,7 +156,7 @@ const GMOffice = () => {
 
             {/* Left Sidebar - At bottom on mobile, left on desktop - Extends to edge */}
             <aside className="w-full lg:w-auto order-2 lg:order-1">
-              <div className="lg:sticky lg:top-28 space-y-4 lg:space-y-6">
+              <div className="lg:sticky lg:top-24 space-y-4 lg:space-y-6">
                 <TeamIntelHub />
                 <AdSpace size="300x250" label="GM Sponsor" />
               </div>
@@ -165,7 +165,7 @@ const GMOffice = () => {
             {/* Right Sidebar - Notifications (hidden on mobile) - Extends to edge */}
             {userLeagueState === 'active-user' && activeLeagueId && (
               <aside className="hidden lg:block order-3">
-                <div className="lg:sticky lg:top-28 h-[calc(100vh-12rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
                   <LeagueNotifications leagueId={activeLeagueId} />
                 </div>
               </aside>

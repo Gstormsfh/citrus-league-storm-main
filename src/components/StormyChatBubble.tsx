@@ -220,7 +220,7 @@ export const StormyChatBubble = () => {
 
   return (
     <Card
-      className={`fixed w-[calc(100vw-3rem)] md:w-[380px] shadow-[0_8px_0_rgba(27,48,34,0.2)] border-4 border-citrus-forest rounded-[2rem] overflow-hidden flex flex-col transition-all duration-300 bg-[#E8EED9]/60 backdrop-blur-sm corduroy-texture ${isMinimized ? 'h-[70px]' : 'h-[600px]'}`}
+      className={`fixed w-[calc(100vw-3rem)] md:w-[380px] shadow-[0_8px_0_rgba(27,48,34,0.2)] border-4 border-citrus-forest rounded-[2rem] overflow-hidden flex flex-col transition-all duration-300 bg-[#E8EED9]/60 backdrop-blur-sm corduroy-texture ${isMinimized ? 'h-[70px]' : 'h-[min(600px,calc(100vh-6rem))]'}`}
       style={{
         position: 'fixed',
         bottom: isMobile ? 'calc(3.5rem + env(safe-area-inset-bottom) + 2rem)' : '1.5rem',
