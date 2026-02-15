@@ -109,7 +109,12 @@ class StormyServiceImpl {
         },
       });
 
+      // When edge function returns non-2xx, supabase sets error but data
+      // may still contain the JSON body with a user-friendly message.
       if (error) {
+        if (data?.error) {
+          return { response: "", error: data.error };
+        }
         throw new Error(error.message || "Failed to reach Stormy");
       }
 
@@ -238,15 +243,14 @@ class StormyServiceImpl {
         );
       }
 
-      // ── 3. Roster player IDs (draft picks) ──────────────────────
-      const { data: picks } = await supabase
-        .from("draft_picks")
+      // ── 3. Roster player IDs (roster_assignments — source of truth) ─
+      const { data: rosterRows } = await supabase
+        .from("roster_assignments")
         .select("player_id")
         .eq("league_id", leagueId)
-        .eq("team_id", team.id)
-        .is("deleted_at", null);
+        .eq("team_id", team.id);
 
-      const playerIds = (picks ?? [])
+      const playerIds = (rosterRows ?? [])
         .map((p: { player_id: string }) => {
           const n = parseInt(String(p.player_id));
           return isNaN(n) ? null : n;

@@ -88,12 +88,12 @@ const PlayoffBracket = () => {
             <h1 className="text-lg font-varsity font-bold text-citrus-forest">Playoffs</h1>
           </div>
         </div>
-        <main className="w-full lg:pt-24 lg:pb-16 pb-[calc(5rem+env(safe-area-inset-bottom))]">
+        <main className="w-full lg:pt-20 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
           <div className="w-full m-0 p-0">
             {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
-            <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] lg:gap-8 lg:px-8 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
+            <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
               {/* Main Content - Scrollable - Appears first on mobile */}
-              <div className="min-w-0 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
+              <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
                 <div className="text-center py-20">
                   <p className="text-destructive text-lg">{error}</p>
                   <Button
@@ -105,13 +105,13 @@ const PlayoffBracket = () => {
                 </div>
               </div>
               <aside className="w-full lg:w-auto order-2 lg:order-1">
-                <div className="lg:sticky lg:top-32 space-y-4 lg:space-y-6">
+                <div className="lg:sticky lg:top-24 space-y-4 lg:space-y-4">
                   <AdSpace size="300x250" label="Bracket Sponsor" />
                 </div>
               </aside>
               {userLeagueState === 'active-user' && (activeLeagueId || leagueId) && (
                 <aside className="hidden lg:block order-3">
-                  <div className="lg:sticky lg:top-32 h-[calc(100vh-12rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                  <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
                     <LeagueNotifications leagueId={activeLeagueId || leagueId || ''} />
                   </div>
                 </aside>
@@ -133,12 +133,12 @@ const PlayoffBracket = () => {
             <h1 className="text-lg font-varsity font-bold text-citrus-forest">Playoffs</h1>
           </div>
         </div>
-        <main className="w-full lg:pt-24 lg:pb-16 pb-[calc(5rem+env(safe-area-inset-bottom))]">
+        <main className="w-full lg:pt-20 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
           <div className="w-full m-0 p-0">
             {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
-          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px]">
+          <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px]">
               {/* Main Content - Scrollable - Appears first on mobile */}
-              <div className="min-w-0 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
+              <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
                 <div className="text-center py-20">
                   <h1 className="text-2xl font-bold mb-4">Playoff Bracket</h1>
                   <p className="text-muted-foreground mb-4">Playoff matchups have not been generated yet.</p>
@@ -150,14 +150,14 @@ const PlayoffBracket = () => {
                 </div>
               </div>
               <aside className="w-full lg:w-auto order-2 lg:order-1">
-                <div className="lg:sticky lg:top-32 space-y-4 lg:space-y-6">
+                <div className="lg:sticky lg:top-24 space-y-4 lg:space-y-4">
                   <AdSpace size="300x250" label="Bracket Sponsor" />
                   <AdSpace size="300x250" label="Fantasy Partner" />
                 </div>
               </aside>
               {userLeagueState === 'active-user' && (activeLeagueId || leagueId) && (
                 <aside className="hidden lg:block order-3">
-                  <div className="lg:sticky lg:top-32 h-[calc(100vh-12rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                  <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
                     <LeagueNotifications leagueId={activeLeagueId || leagueId || ''} />
                   </div>
                 </aside>
@@ -178,10 +178,10 @@ const PlayoffBracket = () => {
           <h1 className="text-lg font-varsity font-bold text-citrus-forest">Playoffs</h1>
         </div>
       </div>
-      <main className="w-full lg:pt-24 lg:pb-16 pb-[calc(5rem+env(safe-area-inset-bottom))]">
+      <main className="w-full lg:pt-20 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
         <div className="w-full m-0 p-0">
-          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px]">
-            <div className="min-w-0 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
+          <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px]">
+            <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
               <div className="mb-6">
                 <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-fantasy-primary to-fantasy-secondary bg-clip-text text-transparent">
                   Playoff Bracket
@@ -251,7 +251,7 @@ const PlayoffBracket = () => {
 
             {/* Left Sidebar - At bottom on mobile, left on desktop */}
             <aside className="w-full lg:w-auto order-2 lg:order-1">
-              <div className="lg:sticky lg:top-32 space-y-4 lg:space-y-6">
+              <div className="lg:sticky lg:top-24 space-y-4 lg:space-y-4">
                 <AdSpace size="300x250" label="Bracket Sponsor" />
                 <AdSpace size="300x250" label="Fantasy Partner" />
               </div>
@@ -260,7 +260,7 @@ const PlayoffBracket = () => {
             {/* Right Sidebar - Notifications (hidden on mobile) */}
             {userLeagueState === 'active-user' && (activeLeagueId || leagueId) && (
               <aside className="hidden lg:block order-3">
-                <div className="lg:sticky lg:top-32 h-[calc(100vh-12rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
                   <LeagueNotifications leagueId={activeLeagueId || leagueId || ''} />
                 </div>
               </aside>
