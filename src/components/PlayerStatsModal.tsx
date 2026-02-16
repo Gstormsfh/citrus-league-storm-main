@@ -7,12 +7,12 @@ import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { cn } from '@/lib/utils';
 import { LeagueService } from '@/services/LeagueService';
 import { ScheduleService } from '@/services/ScheduleService';
-import { MatchupService } from '@/services/MatchupService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useState, useEffect, useRef } from 'react';
 import { CitrusSparkle } from '@/components/icons/CitrusIcons';
 import { getTodayMST } from '@/utils/timezoneUtils';
+import { supabase } from '@/integrations/supabase/client';
 
 // ─── Types for week projections ─────────────────────────────────────
 interface GameProjection {
@@ -83,7 +83,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
   const [weekTotalProjected, setWeekTotalProjected] = useState(0);
   const fetchedForPlayerRef = useRef<string | null>(null);
 
-  // Fetch all future game projections for the current week when modal opens
+  // Fetch ALL future game projections when modal opens
   useEffect(() => {
     if (!isOpen || !player) {
       // Reset when modal closes
@@ -99,26 +99,19 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
     if (fetchedForPlayerRef.current === playerKey) return; // Already fetched for this player
     fetchedForPlayerRef.current = playerKey;
 
-    const fetchWeekProjections = async () => {
+    const fetchAllFutureProjections = async () => {
       const teamAbbrev = player.teamAbbreviation || player.team || '';
       if (!teamAbbrev) return;
 
       setWeekProjectionsLoading(true);
       try {
         const todayStr = getTodayMST();
-        const today = new Date(todayStr + 'T00:00:00');
+        const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
+        const playerIsGoalie = player.position === 'Goalie' || player.position === 'G';
 
-        // Calculate current week boundaries (Sunday-Saturday)
-        const dayOfWeek = today.getDay(); // 0=Sun
-        const weekStart = new Date(today);
-        weekStart.setDate(today.getDate() - dayOfWeek);
-        weekStart.setHours(0, 0, 0, 0);
-        const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekStart.getDate() + 6);
-        weekEnd.setHours(23, 59, 59, 999);
-
-        // Fetch games for this team in the current week
-        const { games } = await ScheduleService.getGamesForTeam(teamAbbrev, weekStart, weekEnd);
+        // Fetch ALL future games for this team (from today onward)
+        const startDate = new Date(todayStr + 'T00:00:00');
+        const { games } = await ScheduleService.getGamesForTeam(teamAbbrev, startDate);
         
         if (!games || games.length === 0) {
           setWeekProjections([]);
@@ -127,11 +120,27 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
           return;
         }
 
-        const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
-        const projections: GameProjection[] = [];
-        const playerIsGoalie = player.position === 'Goalie' || player.position === 'G';
+        // Batch-fetch ALL projections for this player from today onward (single query)
+        const projectionMap = new Map<string, any>();
+        try {
+          const { data: projRows } = await supabase
+            .from('player_projected_stats')
+            .select('*')
+            .eq('player_id', playerId)
+            .gte('projection_date', todayStr)
+            .order('projection_date', { ascending: true });
 
-        // For each game, fetch projections
+          if (projRows) {
+            for (const row of projRows) {
+              const dateKey = (row.projection_date as string).split('T')[0];
+              projectionMap.set(dateKey, row);
+            }
+          }
+        } catch {
+          // Projections not available - that's OK, we still show the games
+        }
+
+        const projections: GameProjection[] = [];
         for (const game of games) {
           const gameDate = game.game_date.split('T')[0]; // YYYY-MM-DD
           const [gy, gm, gd] = gameDate.split('-').map(Number);
@@ -149,19 +158,9 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
           const isPast = gameDate < todayStr;
           const isToday = gameDate === todayStr;
 
-          // Fetch projection for this date
-          let projection: any = null;
-          let projectedPoints = 0;
-          try {
-            const projMap = await MatchupService.getDailyProjectionsForMatchup([playerId], gameDate);
-            const proj = projMap.get(playerId);
-            if (proj) {
-              projection = proj;
-              projectedPoints = proj.total_projected_points || 0;
-            }
-          } catch {
-            // Projection not available for this date - that's OK
-          }
+          // Look up projection from our batch-fetched map
+          const projection = projectionMap.get(gameDate) || null;
+          const projectedPoints = projection?.total_projected_points || 0;
 
           projections.push({
             date: gameDate,
@@ -183,19 +182,19 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
           });
         }
 
-        // Calculate week total (all games, including past for full context)
+        // Calculate total projected points across all future games
         const total = projections.reduce((sum, gp) => sum + gp.projectedPoints, 0);
 
         setWeekProjections(projections);
         setWeekTotalProjected(total);
       } catch (error) {
-        console.error('[PlayerStatsModal] Error fetching week projections:', error);
+        console.error('[PlayerStatsModal] Error fetching projections:', error);
       } finally {
         setWeekProjectionsLoading(false);
       }
     };
 
-    fetchWeekProjections();
+    fetchAllFutureProjections();
   }, [isOpen, player]);
 
   if (!player) return null;
@@ -207,7 +206,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
   const teamAbbr = player.teamAbbreviation || player.team?.split(' ').pop()?.substring(0, 3).toUpperCase() || '';
   const teamLogoUrl = `https://assets.nhle.com/logos/nhl/svg/${player.teamAbbreviation || 'NHL'}_light.svg`;
 
-  // Use week total for the hero banner if available, otherwise fall back to daily projection
+  // Use all-future-games total for the hero banner if available, otherwise fall back to daily projection
   const dailyProj = isGoalie ? player.goalieProjection : player.daily_projection;
   const hasGame = weekProjections.length > 0 || dailyProj != null;
   const heroProjectedPts = weekProjections.length > 0 ? weekTotalProjected : (dailyProj?.total_projected_points || 0);
@@ -300,20 +299,20 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                   <CalendarDays className="w-4 h-4 text-citrus-orange" />
                   <span className="text-white/80 text-sm font-display font-medium">
                     {heroGameCount > 0
-                      ? `${heroGameCount} game${heroGameCount !== 1 ? 's' : ''} this week`
+                      ? `${heroGameCount} upcoming game${heroGameCount !== 1 ? 's' : ''}`
                       : (player.nextGame?.opponent || 'Today')}
                   </span>
                 </>
               ) : (
                 <>
                   <Snowflake className="w-4 h-4 text-white/40" />
-                  <span className="text-white/40 text-sm font-display italic">No games this week</span>
+                  <span className="text-white/40 text-sm font-display italic">No upcoming games</span>
                 </>
               )}
             </div>
             <div className="flex items-center gap-1.5">
               <span className="text-white/50 text-[10px] font-display uppercase tracking-wider">
-                {heroGameCount > 0 ? 'Week Proj' : 'Proj'}
+                {heroGameCount > 0 ? 'Total Proj' : 'Proj'}
               </span>
               <span className={cn(
                 "text-xl font-varsity font-black",
@@ -489,12 +488,12 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                 </div>
               ) : weekProjections.length > 0 ? (
                 <>
-                  {/* Week total banner */}
+                  {/* All games total banner */}
                   <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-citrus-sage/10 to-citrus-peach/10 rounded-xl border border-citrus-sage/20">
                     <CalendarDays className="w-5 h-5 text-citrus-orange flex-shrink-0" />
                     <div>
                       <span className="text-sm font-display font-bold text-citrus-forest">
-                        {weekProjections.length} Game{weekProjections.length !== 1 ? 's' : ''} This Week
+                        {weekProjections.length} Upcoming Game{weekProjections.length !== 1 ? 's' : ''}
                       </span>
                       <span className="text-xs text-citrus-charcoal/50 ml-2">
                         {weekProjections[0]?.dateLabel} – {weekProjections[weekProjections.length - 1]?.dateLabel}
@@ -502,7 +501,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                     </div>
                     <div className="ml-auto text-right">
                       <div className="text-2xl font-varsity font-black text-citrus-orange">{weekTotalProjected.toFixed(1)}</div>
-                      <div className="text-[9px] text-citrus-charcoal/40 font-display uppercase">week total</div>
+                      <div className="text-[9px] text-citrus-charcoal/40 font-display uppercase">total proj</div>
                     </div>
                   </div>
 
@@ -612,7 +611,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
               ) : (
                 <div className="text-center py-10">
                   <Snowflake className="w-10 h-10 text-citrus-charcoal/20 mx-auto mb-3" />
-                  <p className="text-sm font-display text-citrus-charcoal/40">No games scheduled this week</p>
+                  <p className="text-sm font-display text-citrus-charcoal/40">No upcoming games scheduled</p>
                   <p className="text-xs font-display text-citrus-charcoal/30 mt-1">Projections appear when games are on the schedule</p>
                 </div>
               )}
