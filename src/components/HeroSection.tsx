@@ -62,14 +62,6 @@ const HeroSection = () => {
             </Link>
           </div>
           
-          {/* Waitlist Signup */}
-          <div className="mb-10 max-w-lg">
-            <p className="text-sm font-display font-bold text-citrus-forest mb-3 uppercase tracking-wide">
-              Join the Waitlist
-            </p>
-            <WaitlistSignup source="hero_section" variant="default" />
-          </div>
-          
           {/* Data-driven stats showcase */}
           <div className="grid grid-cols-3 gap-4 max-w-lg">
             <div className="bg-[#E8EED9]/80 backdrop-blur-sm border-2 border-citrus-green-dark/40 rounded-xl p-4 text-center shadow-md">
@@ -88,6 +80,14 @@ const HeroSection = () => {
         </div>
         
         <div className="lg:w-1/2 relative animate-fade-in">
+          {/* Waitlist Signup - positioned right below News/Contact */}
+          <div className="hidden lg:block mb-6 max-w-lg">
+            <p className="text-sm font-display font-bold text-citrus-forest mb-3 uppercase tracking-wide">
+              Join the Waitlist
+            </p>
+            <WaitlistSignup source="hero_section" variant="default" />
+          </div>
+          
           {/* Testing phase context text — fills the visual gap above the card */}
           <div className="hidden lg:block mb-6 max-w-lg">
             <p className="text-sm md:text-base text-citrus-forest/90 font-sans leading-relaxed">
