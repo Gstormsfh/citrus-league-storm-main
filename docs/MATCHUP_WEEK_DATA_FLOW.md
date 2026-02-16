@@ -17,14 +17,14 @@ This document traces the complete logic flow from raw game statistics to display
 **Location**: `src/services/MatchupService.ts` → `getMatchupRosters()` (line 1232-1233)
 
 ```typescript
-const weekStart = new Date(matchup.week_start_date);  // Monday of matchup week
-const weekEnd = new Date(matchup.week_end_date);      // Sunday of matchup week
+const weekStart = new Date(matchup.week_start_date);  // Sunday of matchup week
+const weekEnd = new Date(matchup.week_end_date);      // Saturday of matchup week
 ```
 
 **Source**: `matchups` table
-- `week_start_date`: Monday (e.g., "2025-12-15")
-- `week_end_date`: Sunday (e.g., "2025-12-21")
-- These dates come from `weekCalculator.ts` which ensures Monday-Sunday weeks
+- `week_start_date`: Sunday (e.g., "2025-12-14")
+- `week_end_date`: Saturday (e.g., "2025-12-20")
+- These dates come from `weekCalculator.ts` which ensures Sunday-Saturday weeks
 
 ---
 
@@ -49,8 +49,8 @@ async fetchMatchupStatsForPlayers(
 ```sql
 create or replace function public.get_matchup_stats(
   p_player_ids int[],
-  p_start_date date,  -- Monday of matchup week
-  p_end_date date     -- Sunday of matchup week
+  p_start_date date,  -- Sunday of matchup week
+  p_end_date date     -- Saturday of matchup week
 )
 ```
 
@@ -182,8 +182,8 @@ stats.push({
                        ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ 2. MATCHUP: Get week dates                                  │
-│    matchup.week_start_date (Monday)                         │
-│    matchup.week_end_date (Sunday)                           │
+│    matchup.week_start_date (Sunday)                         │
+│    matchup.week_end_date (Saturday)                         │
 └──────────────────────┬──────────────────────────────────────┘
                        │
                        ▼
@@ -250,7 +250,7 @@ stats.push({
 ## Potential Issues & Debugging
 
 ### Issue 1: RPC Not Filtering Correctly
-**Check**: Verify `week_start_date` and `week_end_date` in `matchups` table are correct (Monday-Sunday)
+**Check**: Verify `week_start_date` and `week_end_date` in `matchups` table are correct (Sunday-Saturday)
 **Debug**: Add logging in `fetchMatchupStatsForPlayers()` to see what dates are being passed
 
 ### Issue 2: fantasy_matchup_lines Has Season Totals
@@ -281,8 +281,8 @@ WHERE league_id = 'YOUR_LEAGUE_ID'
 ```sql
 SELECT * FROM get_matchup_stats(
   ARRAY[8470621, 8475149],  -- Player IDs
-  '2025-12-15'::date,       -- Week start (Monday)
-  '2025-12-21'::date        -- Week end (Sunday)
+  '2025-12-14'::date,       -- Week start (Sunday)
+  '2025-12-20'::date        -- Week end (Saturday)
 );
 ```
 

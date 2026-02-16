@@ -12,34 +12,34 @@ export function getDraftCompletionDate(league: League): Date | null {
 }
 
 /**
- * Get the test first week start date (December 8, 2025 - Monday)
- * This is used for testing when today is December 8th, 2025
+ * Get the test first week start date (December 7, 2025 - Sunday)
+ * This is used for testing when today is December 7th, 2025
  */
 export function getTestFirstWeekStartDate(): Date {
-  // December 8, 2025 is a Monday
-  const testDate = new Date('2025-12-08T00:00:00');
+  // December 7, 2025 is a Sunday
+  const testDate = new Date('2025-12-07T00:00:00');
   testDate.setHours(0, 0, 0, 0);
   return testDate;
 }
 
 /**
- * Get the Monday of the first week after draft completion
- * If draft completes on Monday, that Monday is the start
- * Otherwise, it's the next Monday
+ * Get the Sunday of the first week after draft completion
+ * If draft completes on Sunday, that Sunday is the start
+ * Otherwise, it's the next Sunday
  * 
- * For testing: If today is December 8, 2025 or later and draft was completed before/on that date,
- * use December 8, 2025 as the first week start
+ * For testing: If today is December 7, 2025 or later and draft was completed before/on that date,
+ * use December 7, 2025 as the first week start
  */
 export function getFirstWeekStartDate(draftCompletionDate: Date): Date {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   
-  // Test date: December 8, 2025 (Monday)
-  const testDate = new Date('2025-12-08T00:00:00');
+  // Test date: December 7, 2025 (Sunday)
+  const testDate = new Date('2025-12-07T00:00:00');
   testDate.setHours(0, 0, 0, 0);
   
-  // If today is December 8, 2025 or later, and draft was completed on or before that date,
-  // use December 8, 2025 as the first week start for testing
+  // If today is December 7, 2025 or later, and draft was completed on or before that date,
+  // use December 7, 2025 as the first week start for testing
   if (today >= testDate) {
     const draftDate = new Date(draftCompletionDate);
     draftDate.setHours(0, 0, 0, 0);
@@ -49,25 +49,25 @@ export function getFirstWeekStartDate(draftCompletionDate: Date): Date {
     }
   }
   
-  // Normal logic: calculate Monday after draft completion
+  // Normal logic: calculate Sunday after draft completion
   const date = new Date(draftCompletionDate);
   date.setHours(0, 0, 0, 0);
   
   // Get day of week (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
   const dayOfWeek = date.getDay();
   
-  // Calculate days to add to get to Monday
-  // If it's Monday (1), add 0 days
-  // If it's Sunday (0), add 1 day
-  // Otherwise, add (8 - dayOfWeek) days to get to next Monday
-  const daysToAdd = dayOfWeek === 1 ? 0 : (dayOfWeek === 0 ? 1 : (8 - dayOfWeek));
+  // Calculate days to add to get to Sunday
+  // If it's Sunday (0), add 0 days
+  // If it's Saturday (6), add 1 day
+  // Otherwise, add (7 - dayOfWeek) days to get to next Sunday
+  const daysToAdd = dayOfWeek === 0 ? 0 : (dayOfWeek === 6 ? 1 : (7 - dayOfWeek));
   
   date.setDate(date.getDate() + daysToAdd);
   return date;
 }
 
 /**
- * Get the Monday date for a given week number (1-based)
+ * Get the Sunday date for a given week number (1-based)
  */
 export function getWeekStartDate(weekNumber: number, firstWeekStart: Date): Date {
   const date = new Date(firstWeekStart);
@@ -77,12 +77,12 @@ export function getWeekStartDate(weekNumber: number, firstWeekStart: Date): Date
 }
 
 /**
- * Get the Sunday date for a given week number (1-based)
+ * Get the Saturday date for a given week number (1-based)
  */
 export function getWeekEndDate(weekNumber: number, firstWeekStart: Date): Date {
   const startDate = getWeekStartDate(weekNumber, firstWeekStart);
   const endDate = new Date(startDate);
-  endDate.setDate(endDate.getDate() + 6); // Sunday is 6 days after Monday
+  endDate.setDate(endDate.getDate() + 6); // Saturday is 6 days after Sunday
   return endDate;
 }
 
@@ -115,10 +115,10 @@ export function getCurrentWeekNumber(firstWeekStart: Date): number {
  * which is when the regular season ends and playoffs typically begin.
  * 
  * Examples:
- * - Season starts Dec 8, 2025 → Regular season ends Apr 15, 2026 (≈18 weeks)
- * - Season starts Oct 7, 2025 → Regular season ends Apr 15, 2026 (≈27 weeks)
+ * - Season starts Dec 7, 2025 → Regular season ends Apr 15, 2026 (≈18 weeks)
+ * - Season starts Oct 6, 2025 → Regular season ends Apr 15, 2026 (≈27 weeks)
  * 
- * @param firstWeekStart - The Monday date of the first week of the season
+ * @param firstWeekStart - The Sunday date of the first week of the season
  * @param currentYear - The current calendar year (used for context, but calculation is based on firstWeekStart)
  * @returns Array of week numbers (1-based) from week 1 to the last week of regular season
  */

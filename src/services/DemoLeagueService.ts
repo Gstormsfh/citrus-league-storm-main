@@ -630,10 +630,11 @@ export const DemoLeagueService = {
       console.log('[DemoLeagueService] Creating static matchups...');
 
       // Generate matchups for weeks 1-20
+      // Start from Dec 31, 2023 (Sunday) so weeks align to Sunday-Saturday
       for (let week = 1; week <= 20; week++) {
-        const weekStart = new Date(2024, 0, 1 + (week - 1) * 7);
+        const weekStart = new Date(2023, 11, 31 + (week - 1) * 7); // Dec 31, 2023 is a Sunday
         const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekEnd.getDate() + 6);
+        weekEnd.setDate(weekEnd.getDate() + 6); // Saturday
 
         // Create round-robin matchups
         for (let i = 0; i < teams.length; i += 2) {

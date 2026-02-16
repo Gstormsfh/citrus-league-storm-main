@@ -411,10 +411,10 @@ export const DemoDataService = {
       // Get current week for schedule data
       const now = new Date();
       const weekStart = new Date(now);
-      weekStart.setDate(now.getDate() - now.getDay() + 1); // Monday
+      weekStart.setDate(now.getDate() - now.getDay()); // Sunday
       weekStart.setHours(0, 0, 0, 0);
       const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekStart.getDate() + 6); // Sunday
+      weekEnd.setDate(weekStart.getDate() + 6); // Saturday
       weekEnd.setHours(23, 59, 59, 999);
       
       // Get all unique teams from both rosters for batch schedule query

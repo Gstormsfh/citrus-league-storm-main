@@ -23,7 +23,7 @@ export async function calculateWeekDates(
 ): Promise<WeekDates> {
   // Test mode controlled via VITE_TEST_MODE environment variable (defaults to false)
   const TEST_MODE = import.meta.env.VITE_TEST_MODE === 'true';
-  const TEST_DATE = import.meta.env.VITE_TEST_DATE || '2025-12-08';
+  const TEST_DATE = import.meta.env.VITE_TEST_DATE || '2025-12-07';
   
   const getTodayDate = () => {
     if (TEST_MODE) {
@@ -36,12 +36,13 @@ export async function calculateWeekDates(
     return today;
   };
 
-  // Default to calendar week
+  // Default to calendar week (Sunday-Saturday)
   const today = getTodayDate();
   const dayOfWeek = today.getDay();
-  const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  // Calculate days from Sunday (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
+  const daysFromSunday = dayOfWeek;
   let weekStart = new Date(today);
-  weekStart.setDate(today.getDate() - daysFromMonday);
+  weekStart.setDate(today.getDate() - daysFromSunday);
   weekStart.setHours(0, 0, 0, 0);
   let weekEnd = new Date(weekStart);
   weekEnd.setDate(weekStart.getDate() + 6);

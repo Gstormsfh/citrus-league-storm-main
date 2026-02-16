@@ -3,7 +3,7 @@
 Populate player_weekly_stats table from player_game_stats.
 
 This script:
-1. Calculates all weeks for the current season (Monday-Sunday)
+1. Calculates all weeks for the current season (Sunday-Saturday)
 2. For each week, aggregates player_game_stats into player_weekly_stats
 3. Can be run periodically to keep weekly stats up to date
 """
@@ -35,9 +35,9 @@ db = SupabaseRest(SUPABASE_URL, SUPABASE_KEY)
 
 
 def get_first_week_start(draft_completion_date: datetime) -> datetime:
-    """Get the Monday of the first week after draft completion."""
-    # Test date: December 8, 2025 (Monday)
-    test_date = datetime(2025, 12, 8, 0, 0, 0)
+    """Get the Sunday of the first week after draft completion."""
+    # Test date: December 7, 2025 (Sunday)
+    test_date = datetime(2025, 12, 7, 0, 0, 0)
     today = datetime.now()
     
     # Make both datetimes timezone-naive for comparison
@@ -49,29 +49,29 @@ def get_first_week_start(draft_completion_date: datetime) -> datetime:
         if draft_date <= test_date:
             return test_date
     
-    # Normal logic: calculate Monday after draft completion
+    # Normal logic: calculate Sunday after draft completion
     date = draft_completion_date.replace(hour=0, minute=0, second=0, microsecond=0)
     day_of_week = date.weekday()  # 0 = Monday, 6 = Sunday
     
-    if day_of_week == 0:  # Monday
+    if day_of_week == 6:  # Sunday
         days_to_add = 0
-    elif day_of_week == 6:  # Sunday
+    elif day_of_week == 5:  # Saturday
         days_to_add = 1
     else:
-        days_to_add = 7 - day_of_week
+        days_to_add = 6 - day_of_week
     
     date += timedelta(days=days_to_add)
     return date
 
 
 def get_week_start_date(week_number: int, first_week_start: datetime) -> datetime:
-    """Get the Monday date for a given week number (1-based)."""
+    """Get the Sunday date for a given week number (1-based)."""
     weeks_to_add = (week_number - 1) * 7
     return first_week_start + timedelta(days=weeks_to_add)
 
 
 def get_week_end_date(week_start: datetime) -> datetime:
-    """Get the Sunday date for a week (6 days after Monday)."""
+    """Get the Saturday date for a week (6 days after Sunday)."""
     return week_start + timedelta(days=6)
 
 
@@ -156,8 +156,8 @@ def main():
         updated_at = completed_league.get('updated_at')
         
         if not updated_at:
-            print("⚠️  No updated_at found. Using default date: 2025-12-08")
-            draft_date = datetime(2025, 12, 8)
+            print("⚠️  No updated_at found. Using default date: 2025-12-07")
+            draft_date = datetime(2025, 12, 7)
         else:
             # Parse the timestamp (could be ISO format with or without timezone)
             if 'T' in updated_at:

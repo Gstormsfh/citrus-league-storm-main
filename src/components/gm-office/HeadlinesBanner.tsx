@@ -58,7 +58,7 @@ export const HeadlinesBanner = () => {
               const weekEnd = getWeekEndDate(currentWeek, firstWeekStart);
               const today = new Date();
               
-              // Check if matchup is upcoming (starts Monday)
+              // Check if matchup is upcoming (starts Sunday)
               if (today < weekStart) {
                 const daysUntil = Math.ceil((weekStart.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
                 const opponentId = matchup.team1_id === userTeam.id ? matchup.team2_id : matchup.team1_id;
@@ -166,22 +166,22 @@ export const HeadlinesBanner = () => {
           console.error('Error calculating streak:', error);
         }
 
-        // 3. Check for waiver wire deadline (default to Sunday 11 PM EST)
+        // 3. Check for waiver wire deadline (default to Saturday 11 PM EST)
         // For now, we'll use a simple check - could be enhanced with league settings
         const today = new Date();
         const dayOfWeek = today.getDay(); // 0 = Sunday, 6 = Saturday
         const hours = today.getHours();
         
-        if (dayOfWeek === 0 && hours < 23) {
-          // Sunday before 11 PM
+        if (dayOfWeek === 6 && hours < 23) {
+          // Saturday before 11 PM
           const hoursUntil = 23 - hours;
           headlines.push({
             type: 'waiver',
             message: `Waiver Wire runs tonight at 11 PM EST. ${hoursUntil} hour${hoursUntil !== 1 ? 's' : ''} remaining.`,
             urgency: hoursUntil <= 3 ? 'high' : 'medium'
           });
-        } else if (dayOfWeek === 6 || (dayOfWeek === 0 && hours >= 23)) {
-          // Saturday or Sunday after 11 PM
+        } else if (dayOfWeek === 0 || (dayOfWeek === 6 && hours >= 23)) {
+          // Sunday or Saturday after 11 PM
           headlines.push({
             type: 'waiver',
             message: 'Waiver Wire processing tonight. Make your claims now!',

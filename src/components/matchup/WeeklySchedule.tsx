@@ -5,8 +5,8 @@ import { getTodayMST } from '@/utils/timezoneUtils';
 import { CitrusSparkle } from '@/components/icons/CitrusIcons';
 
 interface WeeklyScheduleProps {
-  weekStart: string; // Monday date (YYYY-MM-DD)
-  weekEnd: string; // Sunday date (YYYY-MM-DD)
+  weekStart: string; // Sunday date (YYYY-MM-DD)
+  weekEnd: string; // Saturday date (YYYY-MM-DD)
   onDayClick: (date: string | null) => void; // null clears selection (returns to full week view)
   selectedDate: string | null;
   team1Name?: string; // Team 1 name for display
@@ -28,7 +28,7 @@ export const WeeklySchedule = ({
 }: WeeklyScheduleProps) => {
   const todayStr = getTodayMST(); // Get today's date string in MST (YYYY-MM-DD)
 
-  // Generate all dates in the week (Mon-Sun)
+  // Generate all dates in the week (Sun-Sat)
   // Parse dates carefully to avoid timezone issues
   const dates: string[] = [];
   
@@ -40,21 +40,21 @@ export const WeeklySchedule = ({
   const startDate = new Date(startYear, startMonth - 1, startDay); // Month is 0-indexed
   const endDate = new Date(endYear, endMonth - 1, endDay);
   
-  // Verify that startDate is actually a Monday (getDay() returns 1 for Monday)
+  // Verify that startDate is actually a Sunday (getDay() returns 0 for Sunday)
   const startDayOfWeek = startDate.getDay();
-  if (startDayOfWeek !== 1) {
-    console.warn(`[WeeklySchedule] weekStart (${weekStart}) is not a Monday! Day of week: ${startDayOfWeek} (0=Sun, 1=Mon, etc.)`);
+  if (startDayOfWeek !== 0) {
+    console.warn(`[WeeklySchedule] weekStart (${weekStart}) is not a Sunday! Day of week: ${startDayOfWeek} (0=Sun, 1=Mon, etc.)`);
   }
   
-  // Verify that endDate is actually a Sunday (getDay() returns 0 for Sunday)
+  // Verify that endDate is actually a Saturday (getDay() returns 6 for Saturday)
   const endDayOfWeek = endDate.getDay();
-  if (endDayOfWeek !== 0) {
-    console.warn(`[WeeklySchedule] weekEnd (${weekEnd}) is not a Sunday! Day of week: ${endDayOfWeek} (0=Sun, 1=Mon, etc.)`);
+  if (endDayOfWeek !== 6) {
+    console.warn(`[WeeklySchedule] weekEnd (${weekEnd}) is not a Saturday! Day of week: ${endDayOfWeek} (0=Sun, 1=Mon, etc.)`);
   }
   
   const current = new Date(startDate);
 
-  // Generate dates from Monday to Sunday (7 days)
+  // Generate dates from Sunday to Saturday (7 days)
   while (current <= endDate) {
     // Format as YYYY-MM-DD to match database format
     // Use local date components to avoid timezone issues
@@ -65,7 +65,7 @@ export const WeeklySchedule = ({
     current.setDate(current.getDate() + 1);
   }
   
-  // Ensure we have exactly 7 days (Mon-Sun)
+  // Ensure we have exactly 7 days (Sun-Sat)
   if (dates.length !== 7) {
     console.warn(`[WeeklySchedule] Expected 7 days but got ${dates.length}. Week: ${weekStart} to ${weekEnd}`, {
       dates,
@@ -75,7 +75,7 @@ export const WeeklySchedule = ({
     });
   }
   
-  // Debug: Log first and last day to verify Monday-Sunday
+  // Debug: Log first and last day to verify Sunday-Saturday
   if (dates.length > 0) {
     // Parse dates consistently to avoid timezone issues
     const [firstYear, firstMonth, firstDay] = dates[0].split('-').map(Number);

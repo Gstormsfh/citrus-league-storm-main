@@ -465,8 +465,8 @@ CREATE TABLE matchups (
   id UUID PRIMARY KEY,
   league_id UUID REFERENCES leagues(id),
   week_number INTEGER,
-  week_start DATE, -- Monday
-  week_end DATE, -- Sunday
+  week_start DATE, -- Sunday
+  week_end DATE, -- Saturday
   team1_id UUID REFERENCES teams(id),
   team2_id UUID REFERENCES teams(id),
   team1_score NUMERIC,
@@ -1318,7 +1318,7 @@ daily_points = (
 
 **Step 5: Sum All 7 Days**
 ```python
-weekly_total = sum(daily_points for each day Mon-Sun)
+weekly_total = sum(daily_points for each day Sun-Sat)
 ```
 
 **Step 6: Update Matchup**

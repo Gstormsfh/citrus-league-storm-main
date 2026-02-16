@@ -4197,7 +4197,7 @@ const Matchup = () => {
           oppSlots: matchupData.opponentTeam?.slotAssignments || {}
         });
         
-        // Generate all week dates (Mon-Sun)
+        // Generate all week dates (Sun-Sat)
         const weekStart = new Date(matchupData.matchup.week_start_date + 'T00:00:00');
         const weekDates: string[] = [];
         for (let i = 0; i < 7; i++) {

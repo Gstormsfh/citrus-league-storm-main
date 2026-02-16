@@ -2,14 +2,31 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Target, Shield, Zap, Star, AlertCircle, Clock, Activity, Crosshair, Trash2, TrendingUp, TrendingDown, Flame, Snowflake } from 'lucide-react';
+import { Star, AlertCircle, Clock, Trash2, Flame, Snowflake, CalendarDays, Loader2 } from 'lucide-react';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { cn } from '@/lib/utils';
 import { LeagueService } from '@/services/LeagueService';
+import { ScheduleService } from '@/services/ScheduleService';
+import { MatchupService } from '@/services/MatchupService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { CitrusSparkle } from '@/components/icons/CitrusIcons';
+import { getTodayMST } from '@/utils/timezoneUtils';
+
+// ─── Types for week projections ─────────────────────────────────────
+interface GameProjection {
+  date: string; // YYYY-MM-DD
+  dayLabel: string; // e.g. "Sun", "Mon"
+  dateLabel: string; // e.g. "Feb 15"
+  opponent: string; // e.g. "vs BOS" or "@ NYR"
+  gameTime?: string;
+  projectedPoints: number;
+  projection: any; // Full projection object (skater or goalie)
+  isGoalie: boolean;
+  isPast: boolean;
+  isToday: boolean;
+}
 
 interface PlayerStatsModalProps {
   player: HockeyPlayer | null;
@@ -60,6 +77,127 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
   const [isDropping, setIsDropping] = useState(false);
   const [imgErr, setImgErr] = useState(false);
 
+  // Week projections state
+  const [weekProjections, setWeekProjections] = useState<GameProjection[]>([]);
+  const [weekProjectionsLoading, setWeekProjectionsLoading] = useState(false);
+  const [weekTotalProjected, setWeekTotalProjected] = useState(0);
+  const fetchedForPlayerRef = useRef<string | null>(null);
+
+  // Fetch all future game projections for the current week when modal opens
+  useEffect(() => {
+    if (!isOpen || !player) {
+      // Reset when modal closes
+      if (!isOpen) {
+        setWeekProjections([]);
+        setWeekTotalProjected(0);
+        fetchedForPlayerRef.current = null;
+      }
+      return;
+    }
+
+    const playerKey = `${player.id}-${player.team}`;
+    if (fetchedForPlayerRef.current === playerKey) return; // Already fetched for this player
+    fetchedForPlayerRef.current = playerKey;
+
+    const fetchWeekProjections = async () => {
+      const teamAbbrev = player.teamAbbreviation || player.team || '';
+      if (!teamAbbrev) return;
+
+      setWeekProjectionsLoading(true);
+      try {
+        const todayStr = getTodayMST();
+        const today = new Date(todayStr + 'T00:00:00');
+
+        // Calculate current week boundaries (Sunday-Saturday)
+        const dayOfWeek = today.getDay(); // 0=Sun
+        const weekStart = new Date(today);
+        weekStart.setDate(today.getDate() - dayOfWeek);
+        weekStart.setHours(0, 0, 0, 0);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        weekEnd.setHours(23, 59, 59, 999);
+
+        // Fetch games for this team in the current week
+        const { games } = await ScheduleService.getGamesForTeam(teamAbbrev, weekStart, weekEnd);
+        
+        if (!games || games.length === 0) {
+          setWeekProjections([]);
+          setWeekTotalProjected(0);
+          setWeekProjectionsLoading(false);
+          return;
+        }
+
+        const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
+        const projections: GameProjection[] = [];
+        const playerIsGoalie = player.position === 'Goalie' || player.position === 'G';
+
+        // For each game, fetch projections
+        for (const game of games) {
+          const gameDate = game.game_date.split('T')[0]; // YYYY-MM-DD
+          const [gy, gm, gd] = gameDate.split('-').map(Number);
+          const gameDateObj = new Date(gy, gm - 1, gd);
+          const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+          const dayLabel = dayNames[gameDateObj.getDay()];
+          const dateLabel = gameDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+          // Determine opponent string
+          const isHome = game.home_team.toUpperCase() === teamAbbrev.toUpperCase();
+          const opponent = isHome
+            ? `vs ${game.away_team}`
+            : `@ ${game.home_team}`;
+
+          const isPast = gameDate < todayStr;
+          const isToday = gameDate === todayStr;
+
+          // Fetch projection for this date
+          let projection: any = null;
+          let projectedPoints = 0;
+          try {
+            const projMap = await MatchupService.getDailyProjectionsForMatchup([playerId], gameDate);
+            const proj = projMap.get(playerId);
+            if (proj) {
+              projection = proj;
+              projectedPoints = proj.total_projected_points || 0;
+            }
+          } catch {
+            // Projection not available for this date - that's OK
+          }
+
+          projections.push({
+            date: gameDate,
+            dayLabel,
+            dateLabel,
+            opponent,
+            gameTime: game.game_time ? (() => {
+              try {
+                return new Date(game.game_time).toLocaleTimeString('en-US', {
+                  hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Denver'
+                });
+              } catch { return undefined; }
+            })() : undefined,
+            projectedPoints,
+            projection,
+            isGoalie: playerIsGoalie,
+            isPast,
+            isToday,
+          });
+        }
+
+        // Calculate week total (all games, including past for full context)
+        const total = projections.reduce((sum, gp) => sum + gp.projectedPoints, 0);
+
+        setWeekProjections(projections);
+        setWeekTotalProjected(total);
+      } catch (error) {
+        console.error('[PlayerStatsModal] Error fetching week projections:', error);
+      } finally {
+        setWeekProjectionsLoading(false);
+      }
+    };
+
+    fetchWeekProjections();
+  }, [isOpen, player]);
+
   if (!player) return null;
 
   const isGoalie = player.position === 'Goalie' || player.position === 'G';
@@ -69,9 +207,11 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
   const teamAbbr = player.teamAbbreviation || player.team?.split(' ').pop()?.substring(0, 3).toUpperCase() || '';
   const teamLogoUrl = `https://assets.nhle.com/logos/nhl/svg/${player.teamAbbreviation || 'NHL'}_light.svg`;
 
+  // Use week total for the hero banner if available, otherwise fall back to daily projection
   const dailyProj = isGoalie ? player.goalieProjection : player.daily_projection;
-  const hasGame = dailyProj != null;
-  const projPts = dailyProj?.total_projected_points || 0;
+  const hasGame = weekProjections.length > 0 || dailyProj != null;
+  const heroProjectedPts = weekProjections.length > 0 ? weekTotalProjected : (dailyProj?.total_projected_points || 0);
+  const heroGameCount = weekProjections.length;
 
   const statusConfig: Record<string, { label: string; cls: string; icon: typeof AlertCircle }> = {
     IR:   { label: 'Injury Reserve', cls: 'bg-red-500/10 text-red-600 border-red-200', icon: AlertCircle },
@@ -152,31 +292,34 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
             </div>
           </div>
 
-          {/* Today's Projection Banner */}
+          {/* Week Projection Banner */}
           <div className="mt-4 flex items-center justify-between bg-white/10 backdrop-blur-sm rounded-xl px-4 py-2.5 border border-white/10">
             <div className="flex items-center gap-2">
               {hasGame ? (
                 <>
-                  <Flame className="w-4 h-4 text-citrus-orange" />
+                  <CalendarDays className="w-4 h-4 text-citrus-orange" />
                   <span className="text-white/80 text-sm font-display font-medium">
-                    {player.nextGame?.opponent || 'Today'}
-                    {player.nextGame?.gameTime && <span className="text-white/50 ml-1.5">{player.nextGame.gameTime}</span>}
+                    {heroGameCount > 0
+                      ? `${heroGameCount} game${heroGameCount !== 1 ? 's' : ''} this week`
+                      : (player.nextGame?.opponent || 'Today')}
                   </span>
                 </>
               ) : (
                 <>
                   <Snowflake className="w-4 h-4 text-white/40" />
-                  <span className="text-white/40 text-sm font-display italic">No game today</span>
+                  <span className="text-white/40 text-sm font-display italic">No games this week</span>
                 </>
               )}
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="text-white/50 text-[10px] font-display uppercase tracking-wider">Proj</span>
+              <span className="text-white/50 text-[10px] font-display uppercase tracking-wider">
+                {heroGameCount > 0 ? 'Week Proj' : 'Proj'}
+              </span>
               <span className={cn(
                 "text-xl font-varsity font-black",
                 hasGame ? "text-citrus-orange" : "text-white/30"
               )}>
-                {hasGame ? projPts.toFixed(1) : '—'}
+                {hasGame ? heroProjectedPts.toFixed(1) : '—'}
               </span>
             </div>
           </div>
@@ -339,71 +482,138 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
 
             {/* ─── Projections Tab ─── */}
             <TabsContent value="projections" className="mt-0 space-y-4">
-              {hasGame ? (
+              {weekProjectionsLoading ? (
+                <div className="text-center py-10">
+                  <Loader2 className="w-8 h-8 text-citrus-sage/40 mx-auto mb-3 animate-spin" />
+                  <p className="text-sm font-display text-citrus-charcoal/40">Loading projections…</p>
+                </div>
+              ) : weekProjections.length > 0 ? (
                 <>
-                  {/* Game context */}
-                  <div className="flex items-center gap-3 p-3 bg-citrus-sage/10 rounded-xl border border-citrus-sage/20">
-                    <Flame className="w-5 h-5 text-citrus-orange flex-shrink-0" />
+                  {/* Week total banner */}
+                  <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-citrus-sage/10 to-citrus-peach/10 rounded-xl border border-citrus-sage/20">
+                    <CalendarDays className="w-5 h-5 text-citrus-orange flex-shrink-0" />
                     <div>
                       <span className="text-sm font-display font-bold text-citrus-forest">
-                        {player.nextGame?.opponent || 'Game Today'}
+                        {weekProjections.length} Game{weekProjections.length !== 1 ? 's' : ''} This Week
                       </span>
-                      {player.nextGame?.gameTime && (
-                        <span className="text-xs text-citrus-charcoal/50 ml-2">{player.nextGame.gameTime}</span>
-                      )}
+                      <span className="text-xs text-citrus-charcoal/50 ml-2">
+                        {weekProjections[0]?.dateLabel} – {weekProjections[weekProjections.length - 1]?.dateLabel}
+                      </span>
                     </div>
                     <div className="ml-auto text-right">
-                      <div className="text-2xl font-varsity font-black text-citrus-orange">{projPts.toFixed(1)}</div>
-                      <div className="text-[9px] text-citrus-charcoal/40 font-display uppercase">projected pts</div>
+                      <div className="text-2xl font-varsity font-black text-citrus-orange">{weekTotalProjected.toFixed(1)}</div>
+                      <div className="text-[9px] text-citrus-charcoal/40 font-display uppercase">week total</div>
                     </div>
                   </div>
 
-                  {/* Projection breakdown */}
-                  {isGoalie && player.goalieProjection ? (
-                    <div className="grid grid-cols-3 gap-2">
-                      <StatCell label="W" value={player.goalieProjection.projected_wins?.toFixed(2) ?? '—'} highlight />
-                      <StatCell label="SV" value={player.goalieProjection.projected_saves?.toFixed(0) ?? '—'} />
-                      <StatCell label="SO" value={player.goalieProjection.projected_shutouts?.toFixed(2) ?? '—'} />
-                      <StatCell label="GA" value={player.goalieProjection.projected_goals_against?.toFixed(2) ?? '—'} />
-                      <StatCell label="GAA" value={player.goalieProjection.projected_gaa?.toFixed(2) ?? '—'} />
-                      <StatCell label="SV%" value={player.goalieProjection.projected_save_pct ? `${(player.goalieProjection.projected_save_pct * 100).toFixed(1)}` : '—'} />
-                    </div>
-                  ) : player.daily_projection ? (
-                    <div className="grid grid-cols-4 gap-2">
-                      <StatCell label="G" value={player.daily_projection.projected_goals?.toFixed(2) ?? '—'} highlight />
-                      <StatCell label="A" value={player.daily_projection.projected_assists?.toFixed(2) ?? '—'} highlight />
-                      <StatCell label="SOG" value={player.daily_projection.projected_sog?.toFixed(1) ?? '—'} />
-                      <StatCell label="BLK" value={player.daily_projection.projected_blocks?.toFixed(1) ?? '—'} />
-                      <StatCell label="PPP" value={player.daily_projection.projected_ppp?.toFixed(2) ?? '—'} />
-                      <StatCell label="SHP" value={player.daily_projection.projected_shp?.toFixed(2) ?? '—'} />
-                      <StatCell label="HIT" value={player.daily_projection.projected_hits?.toFixed(1) ?? '—'} />
-                      <StatCell label="PIM" value={player.daily_projection.projected_pim?.toFixed(1) ?? '—'} />
-                    </div>
-                  ) : null}
-
-                  {/* Confidence */}
-                  {dailyProj?.confidence_score != null && (
-                    <div className="flex items-center justify-between py-2 px-3 bg-citrus-cream/30 rounded-xl border border-citrus-sage/15">
-                      <span className="text-xs font-display text-citrus-charcoal/50">Confidence</span>
-                      <div className="flex items-center gap-2">
-                        <div className="w-24 h-2 bg-citrus-sage/15 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-gradient-to-r from-citrus-sage to-citrus-orange rounded-full"
-                            style={{ width: `${Math.min(dailyProj.confidence_score * 100, 100)}%` }}
-                          />
+                  {/* Game-by-game projections */}
+                  <div className="space-y-2">
+                    {weekProjections.map((gp) => (
+                      <div
+                        key={gp.date}
+                        className={cn(
+                          "rounded-xl border overflow-hidden transition-all",
+                          gp.isToday ? "border-citrus-orange bg-citrus-peach/5" : gp.isPast ? "border-citrus-sage/15 bg-citrus-cream/20 opacity-60" : "border-citrus-sage/20 bg-[#E8EED9]/30"
+                        )}
+                      >
+                        {/* Game header row */}
+                        <div className="flex items-center gap-3 px-3 py-2">
+                          <div className="flex flex-col items-center min-w-[40px]">
+                            <span className={cn(
+                              "text-[10px] font-varsity font-black uppercase tracking-wider",
+                              gp.isToday ? "text-citrus-orange" : "text-citrus-charcoal/50"
+                            )}>
+                              {gp.dayLabel}
+                            </span>
+                            <span className="text-xs font-display font-bold text-citrus-forest">{gp.dateLabel}</span>
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <Flame className={cn("w-3.5 h-3.5", gp.isToday ? "text-citrus-orange" : "text-citrus-sage")} />
+                              <span className="text-sm font-display font-bold text-citrus-forest">{gp.opponent}</span>
+                              {gp.gameTime && <span className="text-[10px] text-citrus-charcoal/40 font-display">{gp.gameTime}</span>}
+                            </div>
+                            {gp.isToday && (
+                              <Badge className="mt-0.5 bg-citrus-orange/90 text-white border-0 text-[8px] font-varsity font-black tracking-wider h-4 px-1.5">
+                                TODAY
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <div className={cn(
+                              "text-xl font-varsity font-black",
+                              gp.projectedPoints > 0 ? "text-citrus-orange" : "text-citrus-charcoal/30"
+                            )}>
+                              {gp.projectedPoints > 0 ? gp.projectedPoints.toFixed(1) : '—'}
+                            </div>
+                            <div className="text-[8px] text-citrus-charcoal/40 font-display uppercase">proj pts</div>
+                          </div>
                         </div>
-                        <span className="text-xs font-varsity font-black text-citrus-forest">
-                          {(dailyProj.confidence_score * 100).toFixed(0)}%
-                        </span>
+
+                        {/* Stat breakdown row (expandable detail) */}
+                        {gp.projection && gp.projectedPoints > 0 && (
+                          <div className="px-3 pb-2 pt-0">
+                            {gp.isGoalie ? (
+                              <div className="grid grid-cols-6 gap-1">
+                                {[
+                                  { label: 'W', value: gp.projection.projected_wins?.toFixed(2) },
+                                  { label: 'SV', value: gp.projection.projected_saves?.toFixed(0) },
+                                  { label: 'SO', value: gp.projection.projected_shutouts?.toFixed(2) },
+                                  { label: 'GA', value: gp.projection.projected_goals_against?.toFixed(2) },
+                                  { label: 'GAA', value: gp.projection.projected_gaa?.toFixed(2) },
+                                  { label: 'SV%', value: gp.projection.projected_save_pct ? `${(gp.projection.projected_save_pct * 100).toFixed(1)}` : '—' },
+                                ].map((s, i) => (
+                                  <div key={i} className="flex flex-col items-center py-1 bg-[#E8EED9]/40 rounded border border-citrus-sage/10">
+                                    <span className="text-[7px] font-display font-semibold text-citrus-charcoal/40 uppercase">{s.label}</span>
+                                    <span className="text-[10px] font-varsity font-black text-citrus-forest">{s.value ?? '—'}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-8 gap-1">
+                                {[
+                                  { label: 'G', value: gp.projection.projected_goals?.toFixed(2) },
+                                  { label: 'A', value: gp.projection.projected_assists?.toFixed(2) },
+                                  { label: 'SOG', value: gp.projection.projected_sog?.toFixed(1) },
+                                  { label: 'BLK', value: gp.projection.projected_blocks?.toFixed(1) },
+                                  { label: 'PPP', value: gp.projection.projected_ppp?.toFixed(2) },
+                                  { label: 'SHP', value: gp.projection.projected_shp?.toFixed(2) },
+                                  { label: 'HIT', value: gp.projection.projected_hits?.toFixed(1) },
+                                  { label: 'PIM', value: gp.projection.projected_pim?.toFixed(1) },
+                                ].map((s, i) => (
+                                  <div key={i} className="flex flex-col items-center py-1 bg-[#E8EED9]/40 rounded border border-citrus-sage/10">
+                                    <span className="text-[7px] font-display font-semibold text-citrus-charcoal/40 uppercase">{s.label}</span>
+                                    <span className="text-[10px] font-varsity font-black text-citrus-forest">{s.value ?? '—'}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {/* Confidence bar */}
+                            {gp.projection.confidence_score != null && (
+                              <div className="flex items-center gap-2 mt-1.5">
+                                <span className="text-[8px] font-display text-citrus-charcoal/40">Confidence</span>
+                                <div className="flex-1 h-1.5 bg-citrus-sage/10 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-gradient-to-r from-citrus-sage to-citrus-orange rounded-full"
+                                    style={{ width: `${Math.min(gp.projection.confidence_score * 100, 100)}%` }}
+                                  />
+                                </div>
+                                <span className="text-[9px] font-varsity font-black text-citrus-forest">
+                                  {(gp.projection.confidence_score * 100).toFixed(0)}%
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  )}
+                    ))}
+                  </div>
                 </>
               ) : (
                 <div className="text-center py-10">
                   <Snowflake className="w-10 h-10 text-citrus-charcoal/20 mx-auto mb-3" />
-                  <p className="text-sm font-display text-citrus-charcoal/40">No game scheduled today</p>
-                  <p className="text-xs font-display text-citrus-charcoal/30 mt-1">Projections are available on game days</p>
+                  <p className="text-sm font-display text-citrus-charcoal/40">No games scheduled this week</p>
+                  <p className="text-xs font-display text-citrus-charcoal/30 mt-1">Projections appear when games are on the schedule</p>
                 </div>
               )}
             </TabsContent>

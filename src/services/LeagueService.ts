@@ -2014,7 +2014,7 @@ async joinLeagueByCode(
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
-      // Generate all dates in the week (Mon-Sun)
+      // Generate all dates in the week (Sun-Sat)
       const weekDates: Date[] = [];
       let currentDate = new Date(weekStart);
       while (currentDate <= weekEnd) {

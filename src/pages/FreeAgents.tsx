@@ -347,14 +347,14 @@ const FreeAgents = () => {
       const debugLog = (window as any).__originalConsole?.log || console.log;
       const formatDateLocalHelper = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       
-      // CRITICAL FIX: For DEMO mode, ALWAYS use current calendar week (Monday-Sunday)
+      // CRITICAL FIX: For DEMO mode, ALWAYS use current calendar week (Sunday-Saturday)
       // The demo league's DB dates are stale and don't represent the actual current week.
       if (isDemo) {
         const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
-        const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        const daysFromSunday = dayOfWeek; // Sunday is 0, Monday is 1, etc.
         
         weekStart = new Date(today);
-        weekStart.setDate(today.getDate() - daysFromMonday);
+        weekStart.setDate(today.getDate() - daysFromSunday);
         weekStart.setHours(0, 0, 0, 0);
         
         weekEnd = new Date(weekStart);
@@ -405,13 +405,13 @@ const FreeAgents = () => {
           }
         }
         
-        // FALLBACK: If still no week dates, use current calendar week (Monday-Sunday)
+        // FALLBACK: If still no week dates, use current calendar week (Sunday-Saturday)
         if (!weekStart || !weekEnd) {
           const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
-          const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+          const daysFromSunday = dayOfWeek; // Sunday is 0, Monday is 1, etc.
           
           weekStart = new Date(today);
-          weekStart.setDate(today.getDate() - daysFromMonday);
+          weekStart.setDate(today.getDate() - daysFromSunday);
           weekStart.setHours(0, 0, 0, 0);
           
           weekEnd = new Date(weekStart);
@@ -422,7 +422,7 @@ const FreeAgents = () => {
         }
       }
 
-      // Get remaining days in the week (today through Sunday)
+      // Get remaining days in the week (today through Saturday)
       // CRITICAL: Use local date format to avoid UTC timezone shift issues with toISOString()
       const formatDateLocal = (d: Date) => {
         const year = d.getFullYear();
@@ -573,15 +573,15 @@ const FreeAgents = () => {
       const log = (window as any).__originalConsole?.log || console.log;
       const formatLocalDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       
-      // CRITICAL FIX: For DEMO mode, ALWAYS use current calendar week (Monday-Sunday)
+      // CRITICAL FIX: For DEMO mode, ALWAYS use current calendar week (Sunday-Saturday)
       // The demo league's DB dates are stale and don't represent the actual current week.
       // This matches what the Matchup tab does - it recalculates dates, not trusts DB dates.
       if (isDemo) {
         const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
-        const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        const daysFromSunday = dayOfWeek; // Sunday is 0, Monday is 1, etc.
         
         weekStart = new Date(today);
-        weekStart.setDate(today.getDate() - daysFromMonday);
+        weekStart.setDate(today.getDate() - daysFromSunday);
         weekStart.setHours(0, 0, 0, 0);
         
         weekEnd = new Date(weekStart);
@@ -632,13 +632,13 @@ const FreeAgents = () => {
           }
         }
         
-        // FALLBACK: If still no week dates, use current calendar week (Monday-Sunday)
+        // FALLBACK: If still no week dates, use current calendar week (Sunday-Saturday)
         if (!weekStart || !weekEnd) {
           const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
-          const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+          const daysFromSunday = dayOfWeek; // Sunday is 0, Monday is 1, etc.
           
           weekStart = new Date(today);
-          weekStart.setDate(today.getDate() - daysFromMonday);
+          weekStart.setDate(today.getDate() - daysFromSunday);
           weekStart.setHours(0, 0, 0, 0);
           
           weekEnd = new Date(weekStart);
