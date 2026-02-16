@@ -26,6 +26,31 @@ interface GameProjection {
   isGoalie: boolean;
   isPast: boolean;
   isToday: boolean;
+  computedConfidence: number; // 0.0-1.0, computed fresh on the frontend
+}
+
+/** Compute a meaningful confidence score from projection data + temporal distance */
+function computeConfidence(projection: any, gameDate: string, todayStr: string): number {
+  if (!projection) return 0;
+
+  // Base confidence from sample size (games played proxy: shrinkage_weight)
+  // shrinkage_weight is 0.0-1.0 based on GP/sample — use directly as base
+  const shrinkage = Number(projection.shrinkage_weight || 0);
+  const baseConfidence = shrinkage > 0 ? Math.min(shrinkage / 0.9, 1.0) : 0.7;
+
+  // Temporal decay: games farther out are less confident
+  // ~1.0 for tomorrow, ~0.85 at 30 days, ~0.70 at 60 days
+  const gameMs = new Date(gameDate + 'T00:00:00').getTime();
+  const todayMs = new Date(todayStr + 'T00:00:00').getTime();
+  const daysOut = Math.max(0, (gameMs - todayMs) / 86400000);
+  const temporalFactor = Math.max(0.50, 1.0 - (daysOut * 0.005));
+
+  // Opponent factor: extreme opponent adjustments = less confidence
+  const oppAdj = Number(projection.opponent_adjustment || 1.0);
+  const oppDeviation = Math.abs(oppAdj - 1.0);
+  const opponentFactor = Math.max(0.75, 1.0 - oppDeviation);
+
+  return Math.round(baseConfidence * temporalFactor * opponentFactor * 100) / 100;
 }
 
 interface PlayerStatsModalProps {
@@ -168,7 +193,10 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
 
           // Look up projection from our batch-fetched map
           const projection = projectionMap.get(gameDate) || null;
-          const projectedPoints = projection?.total_projected_points || 0;
+          const projectedPoints = Number(projection?.total_projected_points || 0);
+
+          // Compute confidence fresh on the frontend (temporal + opponent factors)
+          const confidence = computeConfidence(projection, gameDate, todayStr);
 
           projections.push({
             date: gameDate,
@@ -187,6 +215,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
             isGoalie: playerIsGoalie,
             isPast,
             isToday,
+            computedConfidence: confidence,
           });
         }
 
@@ -595,18 +624,18 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                                 ))}
                               </div>
                             )}
-                            {/* Confidence bar */}
-                            {gp.projection.confidence_score != null && (
+                            {/* Confidence bar (computed fresh from temporal + opponent factors) */}
+                            {gp.computedConfidence > 0 && (
                               <div className="flex items-center gap-2 mt-1.5">
                                 <span className="text-[8px] font-display text-citrus-charcoal/40">Confidence</span>
                                 <div className="flex-1 h-1.5 bg-citrus-sage/10 rounded-full overflow-hidden">
                                   <div
                                     className="h-full bg-gradient-to-r from-citrus-sage to-citrus-orange rounded-full"
-                                    style={{ width: `${Math.min(gp.projection.confidence_score * 100, 100)}%` }}
+                                    style={{ width: `${Math.min(gp.computedConfidence * 100, 100)}%` }}
                                   />
                                 </div>
                                 <span className="text-[9px] font-varsity font-black text-citrus-forest">
-                                  {(gp.projection.confidence_score * 100).toFixed(0)}%
+                                  {Math.round(gp.computedConfidence * 100)}%
                                 </span>
                               </div>
                             )}
