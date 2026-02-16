@@ -121,6 +121,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
         }
 
         // Batch-fetch ALL projections for this player from today onward (single query)
+        // Filter to only canonical calculation methods to avoid stale test data
         const projectionMap = new Map<string, any>();
         try {
           const { data: projRows } = await supabase
@@ -128,12 +129,19 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
             .select('*')
             .eq('player_id', playerId)
             .gte('projection_date', todayStr)
+            .in('calculation_method', ['hybrid_bayesian', 'probability_based_volume'])
             .order('projection_date', { ascending: true });
 
           if (projRows) {
             for (const row of projRows) {
               const dateKey = (row.projection_date as string).split('T')[0];
-              projectionMap.set(dateKey, row);
+              const existing = projectionMap.get(dateKey);
+              
+              // If duplicate date, prefer row with higher total_projected_points
+              // (more likely to be the correct/proper projection)
+              if (!existing || (Number(row.total_projected_points || 0) > Number(existing.total_projected_points || 0))) {
+                projectionMap.set(dateKey, row);
+              }
             }
           }
         } catch {

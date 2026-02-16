@@ -1689,10 +1689,23 @@ def calculate_goalie_projection(
         
         total_projected_points = calculate_fantasy_points(goalie_projection, scoring_settings, is_goalie=True)
         
-        # Calculate confidence score
-        confidence_score = min(games_played / 20.0, 1.0) if games_played > 0 else 0.1
+        # Calculate confidence score with temporal decay and opponent data quality factors
+        # Base confidence from sample size (unchanged)
+        base_confidence = min(games_played / 20.0, 1.0) if games_played > 0 else 0.1
         if not starter_confirmed:
-            confidence_score *= 0.7  # Reduce confidence if starter not confirmed
+            base_confidence *= 0.7  # Reduce confidence if starter not confirmed
+        
+        # Temporal decay: projections farther out are less confident
+        # ~1.0 for tomorrow, ~0.85 at 30 days, ~0.70 at 60 days
+        days_out = (game_date - date.today()).days
+        temporal_factor = max(0.50, 1.0 - (days_out * 0.005))
+        
+        # Opponent data quality: use win probability variance as proxy
+        # Extreme win probabilities (<0.3 or >0.7) suggest less reliable data
+        win_prob_variance = abs(win_probability - 0.5)  # Distance from 50/50
+        opponent_factor = max(0.75, 1.0 - (win_prob_variance * 0.5))
+        
+        confidence_score = round(base_confidence * temporal_factor * opponent_factor, 2)
         
         return {
             "player_id": player_id,
@@ -3030,8 +3043,21 @@ def calculate_daily_projection(
         offensive_paa_per_60 = offensive_paa_60_raw
         defensive_value_per_60 = defensive_value_60_raw
         
-        # Calculate confidence score (simplified: based on games played)
-        confidence_score = min(games_played / 30.0, 1.0) if games_played > 0 else 0.1
+        # Calculate confidence score with temporal decay and opponent data quality factors
+        # Base confidence from sample size (unchanged)
+        base_confidence = min(games_played / 30.0, 1.0) if games_played > 0 else 0.1
+        
+        # Temporal decay: projections farther out are less confident
+        # ~1.0 for tomorrow, ~0.85 at 30 days, ~0.70 at 60 days
+        days_out = (game_date - date.today()).days
+        temporal_factor = max(0.50, 1.0 - (days_out * 0.005))
+        
+        # Opponent data quality: extreme adjustments = less confidence
+        # If opponent_adjustment is very high (>1.2) or very low (<0.8), reduce confidence
+        opp_deviation = abs(opponent_adjustment - 1.0)
+        opponent_factor = max(0.75, 1.0 - opp_deviation)
+        
+        confidence_score = round(base_confidence * temporal_factor * opponent_factor, 2)
         
         return {
             "player_id": player_id,
