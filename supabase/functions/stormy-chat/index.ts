@@ -233,7 +233,7 @@ serve(async (req) => {
     // ── Build system prompt + context (capped) ─────────────────
     let systemPrompt = SYSTEM_PROMPT;
     if (context && typeof context === "string" && context.length > 0) {
-      systemPrompt += "\n\n## Current User Context\n" + context.substring(0, 2000);
+      systemPrompt += "\n\n## Current User Context\n" + context.substring(0, 4000);
     }
 
     // ── Build messages array (trimmed for tokens) ──────────────

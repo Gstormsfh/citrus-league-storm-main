@@ -20,7 +20,7 @@ import { CitrusBackground } from '@/components/CitrusBackground';
 import { CitrusSparkle, CitrusLeaf, CitrusWedge } from '@/components/icons/CitrusIcons';
 import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
-import { StormyService, type StormyMessage, type StormyContext } from '@/services/StormyService';
+import { StormyService, fetchLeagueContext, type StormyMessage, type StormyContext } from '@/services/StormyService';
 
 interface ChatMessage {
   id: string;
@@ -40,11 +40,14 @@ const StormyAssistant = () => {
   const [messagesUsed, setMessagesUsed] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const apiHistoryRef = useRef<StormyMessage[]>([]);
+  // Cached league context (roster, matchup, team name) — fetched lazily on first message
+  const leagueCtxRef = useRef<Partial<StormyContext> | null>(null);
+  const leagueCtxFetchedForRef = useRef<string | null>(null);
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '1',
-      text: "Hey! I'm Stormy — your AI-powered fantasy hockey analyst. I know our xG projection model inside-out and I'm ready to help you dominate your league. What's on your mind?",
+      text: "Hey! I'm Stormy — your Assistant GM powered by our xG projection model. I already know your league settings, roster, and matchup. Let's win your week — what's on your mind?",
       sender: 'stormy',
       timestamp: new Date(),
     },
@@ -56,7 +59,7 @@ const StormyAssistant = () => {
     }
   }, [messages, activeTab]);
 
-  const buildContext = useCallback((): StormyContext => {
+  const buildContext = useCallback(async (): Promise<StormyContext> => {
     const ctx: StormyContext = { page: 'Stormy Assistant (full page)' };
     if (activeLeague) {
       ctx.leagueName = activeLeague.name;
@@ -64,8 +67,26 @@ const StormyAssistant = () => {
         ctx.scoringSettings = JSON.stringify(activeLeague.scoring_settings);
       }
     }
+
+    // Lazy-fetch full league context (roster, matchup, team, projections) on first message per league
+    const leagueId = activeLeagueId;
+    const userId = auth?.user?.id;
+    if (leagueId && userId) {
+      if (leagueCtxFetchedForRef.current !== leagueId) {
+        try {
+          leagueCtxRef.current = await fetchLeagueContext(leagueId, userId);
+          leagueCtxFetchedForRef.current = leagueId;
+        } catch {
+          // Non-critical — proceed without enriched context
+        }
+      }
+      if (leagueCtxRef.current) {
+        Object.assign(ctx, leagueCtxRef.current);
+      }
+    }
+
     return ctx;
-  }, [activeLeague]);
+  }, [activeLeague, activeLeagueId, auth?.user?.id]);
 
   const handleSend = useCallback(async () => {
     const text = inputValue.trim();
@@ -84,10 +105,11 @@ const StormyAssistant = () => {
     apiHistoryRef.current.push({ role: 'user', content: text });
 
     try {
+      const context = await buildContext();
       const result = await StormyService.sendMessage(
         text,
         apiHistoryRef.current.slice(0, -1),
-        buildContext(),
+        context,
       );
 
       const responseText = result.error || result.response || "I couldn't process that. Try again?";
