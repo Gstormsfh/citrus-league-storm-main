@@ -130,28 +130,28 @@ const FeaturesSection = () => {
         </div>
 
         {/* Feature Cards Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 lg:gap-8">
           {features.map((feature, index) => {
             const colors = getColorClasses(feature.color);
             return (
               <div 
                 key={index} 
-                className="card-letterman-thick animated-element group cursor-pointer hover:shadow-md hover:-translate-y-1 transition-all duration-300"
+                className="card-letterman-thick animated-element group cursor-pointer hover:shadow-md hover:-translate-y-1 transition-all duration-300 p-4 sm:p-5 md:p-6"
                 ref={el => elementRefs.current[index + 1] = el}
                 style={{ animationDelay: `${index * 0.1}s` }}
               >
                 {/* Icon Badge with Varsity Style */}
-                <div className={`mb-4 ${colors.bg} border-2 ${colors.border} w-12 h-12 md:w-16 md:h-16 rounded-varsity flex items-center justify-center shadow-sm ${colors.glow} transition-all duration-300 text-citrus-forest`}>
+                <div className={`mb-3 sm:mb-4 ${colors.bg} border-2 ${colors.border} w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-varsity flex items-center justify-center shadow-sm ${colors.glow} transition-all duration-300 text-citrus-forest`}>
                   {feature.icon}
                 </div>
                 
                 {/* Title with Varsity Font */}
-                <h3 className="text-base md:text-xl font-varsity uppercase text-citrus-forest mb-2 md:mb-3 leading-tight tracking-wide font-bold">
+                <h3 className="text-sm sm:text-base md:text-xl font-varsity uppercase text-citrus-forest mb-2 leading-tight tracking-wide font-bold">
                   {feature.title}
                 </h3>
 
                 {/* Description */}
-                <p className="text-xs md:text-base text-citrus-forest/80 font-sans leading-relaxed">
+                <p className="text-xs sm:text-sm md:text-base text-citrus-forest/80 font-sans leading-snug sm:leading-relaxed">
                   {feature.description}
                 </p>
               </div>
