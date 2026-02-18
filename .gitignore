@@ -42,6 +42,8 @@ dist-ssr
 data/*.csv.gz
 data/moneypuck_shots_2018*.csv
 data/moneypuck_shots_historical*.csv
+data/shots_2018-2024.csv
+data/shots_2018-2024.zip
 
 # Temporary files
 temp_*.json
