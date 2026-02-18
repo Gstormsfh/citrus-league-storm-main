@@ -8,7 +8,7 @@ const Privacy = () => {
       <main className="flex-grow pt-24 px-4">
         <div className="container mx-auto max-w-3xl py-12">
           <h1 className="text-3xl md:text-4xl font-bold mb-2">Privacy Policy</h1>
-          <p className="text-sm text-muted-foreground mb-8">Last Updated: January 13, 2026</p>
+          <p className="text-sm text-muted-foreground mb-8">Last Updated: February 18, 2026</p>
 
           <div className="prose dark:prose-invert max-w-none space-y-6">
             <p>
@@ -180,13 +180,16 @@ const Privacy = () => {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold mb-3">11. Analytics and Tracking</h2>
+              <h2 className="text-xl font-semibold mb-3">11. Analytics, Cookies, and Tracking</h2>
               <p>We use analytics tools to understand how users interact with our Service:</p>
               <ul className="list-disc pl-6 space-y-1">
-                <li><strong>First-Party Analytics:</strong> We collect usage data directly through our servers</li>
-                <li><strong>No Third-Party Tracking:</strong> We do not use third-party advertising networks or tracking pixels</li>
-                <li><strong>No Cross-Site Tracking:</strong> We do not track your activity outside our Service</li>
-                <li><strong>Performance Monitoring:</strong> We use Firebase Performance to monitor app performance and crashes</li>
+                <li><strong>Consent-Based Analytics:</strong> We use Firebase Analytics to collect anonymous usage data. Analytics is <strong>only activated after you explicitly grant consent</strong> via the cookie consent banner displayed on your first visit.</li>
+                <li><strong>Your Choice:</strong> You can decline analytics tracking at any time. If you decline, no analytics cookies are set and no usage data is collected. You can change your preference by clearing your browser storage and revisiting the site.</li>
+                <li><strong>What We Track (with consent):</strong> Page views, feature usage, and aggregate interaction patterns. We do not track individual keystrokes, form contents, or personally identifiable browsing behavior.</li>
+                <li><strong>No Third-Party Advertising:</strong> We do not use advertising networks, remarketing pixels, or sell data to advertisers.</li>
+                <li><strong>No Cross-Site Tracking:</strong> We do not track your activity outside our Service.</li>
+                <li><strong>Essential Storage:</strong> We use localStorage for app functionality (authentication tokens, user preferences, consent choice). These are not tracking cookies and are required for the Service to function.</li>
+                <li><strong>Performance Monitoring:</strong> Firebase Performance collects anonymous crash reports and loading times to help us improve reliability.</li>
               </ul>
             </section>
 
