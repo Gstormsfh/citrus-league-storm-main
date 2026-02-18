@@ -100,94 +100,71 @@ def fetch_player_landing_data(player_id: int, retries: int = 5) -> Tuple[Optiona
     - (data, None) - success
     - (None, "429") - rate limited after all retries
     - (None, "not_found") - 404 or other error (not 429)
-    
-    Implements exponential backoff retry for 429 errors: 5s, 10s, 20s, 40s, 80s
+
+    Delegates retry logic and proxy rotation to citrus_request (100-IP rotation,
+    exponential backoff, circuit breaker). No redundant retry loops needed here.
     """
     url = f"{NHL_API_BASE}/player/{player_id}/landing"
-    
-    for attempt in range(retries):
-        try:
-            response = citrus_request(url, timeout=10)
-            
-            # Success case
-            if response.status_code == 200:
-                return (response.json(), None)
-            
-            # 429 Rate Limit - retry with exponential backoff
-            if response.status_code == 429:
-                if attempt < retries - 1:
-                    delay = 5 * (2 ** attempt)  # 5s, 10s, 20s, 40s, 80s
-                    print(f"  [RETRY] Player {player_id}, attempt {attempt + 1}/{retries} after 429 error, waiting {delay}s...")
-                    time.sleep(delay)
-                    continue
-                else:
-                    # All retries exhausted
-                    print(f"  Error fetching landing data for player {player_id}: 429 Client Error: Too Many Requests (after {retries} attempts)")
-                    return (None, "429")
-            
-            # Other HTTP errors (404, 500, etc.)
-            response.raise_for_status()
-            
-        except requests.exceptions.HTTPError as e:
-            # 404 or other HTTP error (not 429)
-            if hasattr(e.response, 'status_code') and e.response.status_code == 404:
+
+    try:
+        response = citrus_request(url, timeout=10, max_retries=retries)
+
+        if response.status_code == 200:
+            return (response.json(), None)
+
+        # citrus_request already retried 429s with proxy rotation — if we still get one, it's truly exhausted
+        if response.status_code == 429:
+            return (None, "429")
+
+        if response.status_code == 404:
+            return (None, "not_found")
+
+        # Other unexpected status codes
+        return (None, "not_found")
+
+    except requests.exceptions.HTTPError as e:
+        if hasattr(e, 'response') and hasattr(e.response, 'status_code'):
+            if e.response.status_code == 404:
                 return (None, "not_found")
-            else:
-                # Other HTTP errors
-                if attempt < retries - 1:
-                    delay = 5 * (2 ** attempt)
-                    time.sleep(delay)
-                    continue
-                else:
-                    print(f"  Error fetching landing data for player {player_id}: {e}")
-                    return (None, "not_found")
-        except Exception as e:
-            # Network errors, timeouts, etc.
-            if attempt < retries - 1:
-                delay = 5 * (2 ** attempt)
-                time.sleep(delay)
-                continue
-            else:
-                print(f"  Error fetching landing data for player {player_id}: {e}")
-                return (None, "not_found")
-    
-    # Should never reach here, but safety fallback
-    return (None, "not_found")
+            if e.response.status_code == 429:
+                return (None, "429")
+        print(f"  Error fetching landing data for player {player_id}: {e}")
+        return (None, "not_found")
+    except Exception as e:
+        print(f"  Error fetching landing data for player {player_id}: {e}")
+        return (None, "not_found")
 
 
 def fetch_player_statsapi_data(player_id: int, season: str, retries: int = 5) -> Optional[Dict[str, Any]]:
     """
     Fetch player stats from StatsAPI endpoint (official NHL.com API for hits/blocks).
     Returns dict with stats or None if failed.
-    
-    WARNING: StatsAPI has DNS issues as of 2026. This is a best-effort fallback.
-    If it fails, the script continues without hits/blocks (they'll be 0).
+
+    Uses citrus_request for 100-IP proxy rotation. StatsAPI often has DNS issues —
+    citrus_request handles this with proxy failover.
     """
     url = f"{STATS_API_BASE}/people/{player_id}/stats"
     params = {
         "stats": "statsSingleSeason",
         "season": season
     }
-    
+
     try:
-        # Try with direct requests (no proxy) - StatsAPI DNS is broken, proxies won't help
-        # If this fails, it's okay - hits/blocks will be 0
-        response = requests.get(url, params=params, timeout=5)
+        response = citrus_request(url, params=params, timeout=15, max_retries=retries)
         response.raise_for_status()
         data = response.json()
-        
+
         # Extract stats from response
         stats_list = data.get("stats", [])
         if stats_list:
             splits = stats_list[0].get("splits", [])
             if splits:
                 return splits[0].get("stat", {})
-        
+
         return None
-        
-    except Exception as e:
-        # StatsAPI has DNS issues - this is expected, don't log as error
-        # Just return None and continue (hits/blocks will be 0)
+
+    except Exception:
+        # StatsAPI often has DNS issues - this is expected, don't log as error
         return None
 
 
@@ -456,12 +433,10 @@ def main() -> int:
     failed_429_players = []  # List of (player_id, player_name, is_goalie) tuples
     failed_not_found_players = []  # List of (player_id, player_name, is_goalie) tuples
     
-    # Track base delay - optimized for 100-IP proxy rotation
-    # FIXED: Increased from 0.1s to 0.3s to prevent rapid rotation glitches
-    # Even with proxy rotation, making requests every 100ms can trigger bot detection
-    # Conservative delays prevent the midnight run from rotating too fast
-    base_delay = 0.3  # 300ms - conservative delay to prevent rapid rotation glitches
-    consecutive_errors = 0  # Track consecutive errors to adapt delay
+    # Minimal courtesy delay between requests — citrus_request handles rate limiting
+    # internally via 100-IP proxy rotation, exponential backoff, and circuit breaker
+    base_delay = 0.15  # 150ms courtesy delay between players
+    consecutive_errors = 0  # Track consecutive errors for logging
     
     for idx, player in enumerate(players, 1):
         player_id = _safe_int(player.get("player_id"), 0)
@@ -482,25 +457,17 @@ def main() -> int:
         landing_data, error_type = fetch_player_landing_data(player_id)
         
         # Track failed players for retry phase
+        # Note: citrus_request handles 429s internally via 100-IP rotation + exponential backoff.
+        # If we still get a 429 error_type here, all retries across all proxies were exhausted.
         if error_type == "429":
             failed_429_players.append((player_id, player_name, is_goalie))
             rate_limited_429_count += 1
             consecutive_errors += 1
-            # Adaptive delay increase on errors - prevents rapid rotation glitches
-            if consecutive_errors >= 3:
-                # Multiple errors in a row - slow down significantly
-                base_delay = min(base_delay * 1.5, 2.0)  # Cap at 2s max
-                print(f"  [RATE LIMIT] {consecutive_errors} consecutive 429 errors, increasing delay to {base_delay:.2f}s")
-            elif base_delay < 0.5:
-                base_delay = 0.5
-                print(f"  [RATE LIMIT] Detected 429 error, increasing delay to 0.5s between requests")
         elif error_type == "not_found":
             failed_not_found_players.append((player_id, player_name, is_goalie))
             not_found_count += 1
-            # Not found errors don't indicate rate limiting, reset error counter
             consecutive_errors = 0
         else:
-            # Success - reset error counter
             consecutive_errors = 0
         
         if landing_data:
@@ -641,15 +608,9 @@ def main() -> int:
             print(f"  [PROGRESS] Processed {idx}/{len(players)} players ({updated_count['skaters']} skaters, {updated_count['goalies']} goalies updated, {not_found_count} not found, {error_count} errors)...")
             last_progress_time = current_time
         
-        # Rate limiting - Conservative delays to prevent rapid rotation glitches
-        # Even with proxy rotation, we need delays to avoid bot detection
-        # Base delay adapts based on errors (0.3s default, up to 2s if many errors)
+        # Minimal courtesy delay — citrus_request handles rate limiting via 100-IP rotation
         if idx < len(players):
             time.sleep(base_delay)
-            
-            # Periodic cooldown every 50 requests to prevent overwhelming the API
-            if idx % 50 == 0:
-                time.sleep(0.5)  # Extra 500ms cooldown every 50 requests
     
     print()
     print("=" * 80)
@@ -840,13 +801,9 @@ def main() -> int:
                         print(f"  [ERROR] Failed to update player {player_id} ({player_name}) in retry: {e}")
                         retry_error_count += 1
             
-            # Rate limiting delay - use same adaptive delay as main phase
+            # Minimal courtesy delay — citrus_request handles rate limiting via 100-IP rotation
             if idx < len(players_to_retry):
-                time.sleep(base_delay)
-                
-                # Periodic cooldown every 25 requests during retry (more conservative)
-                if idx % 25 == 0:
-                    time.sleep(0.5)  # Extra 500ms cooldown every 25 retry requests
+                time.sleep(0.5)  # Slightly higher delay for retry phase
         
         # Print retry phase summary
         print()
