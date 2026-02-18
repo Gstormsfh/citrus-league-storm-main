@@ -5,7 +5,13 @@ import os
 import requests 
 import datetime
 from dotenv import load_dotenv # Used to load your .env file
-from supabase import create_client, Client
+try:
+    from supabase import create_client, Client
+except BaseException:
+    # Fallback: supabase-py may not be available (cffi/pyo3 issues, etc.)
+    # All DB operations use SupabaseRest instead
+    create_client = None
+    Client = None
 from src.utils.citrus_request import citrus_request
 
 # Set UTF-8 encoding for stdout to handle Unicode characters on Windows
