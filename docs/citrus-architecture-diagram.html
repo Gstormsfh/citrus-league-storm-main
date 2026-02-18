@@ -555,8 +555,8 @@
       <div class="layer-body">
         <div class="items-grid grid-4">
           <div class="item-card">
-            <div class="item-title">xG v2 Model (XGBoost)</div>
-            <div class="item-desc">29 features. Trained on 77K real NHL shots. AUC-ROC 0.776, Brier 0.061. Distance, angle, strength state, rebounds, pass quality &amp; more.</div>
+            <div class="item-title">xG v3 Model (XGBoost)</div>
+            <div class="item-desc">31 features. Trained on 863K real NHL shots (7 seasons). AUC-ROC 0.817, Brier 0.054. Distance, angle, strength state, rebounds, pass quality &amp; more.</div>
             <div class="item-badge">7 Models</div>
           </div>
           <div class="item-card">
@@ -578,11 +578,11 @@
         <div class="data-flow-row" style="margin-top:14px;">
           <span class="flow-chip" style="color:var(--citrus-purple)">raw_shots</span>
           <span class="flow-arrow">&rarr;</span>
-          <span class="flow-chip">Feature Extraction (29 features)</span>
+          <span class="flow-chip">Feature Extraction (31 features)</span>
           <span class="flow-arrow">&rarr;</span>
-          <span class="flow-chip">XGBoost v2 Predict</span>
+          <span class="flow-chip">XGBoost v3 Predict</span>
           <span class="flow-arrow">&rarr;</span>
-          <span class="flow-chip">Clip (0.0 &ndash; 0.6)</span>
+          <span class="flow-chip">Clip (0.0 &ndash; 0.95)</span>
           <span class="flow-arrow">&rarr;</span>
           <span class="flow-chip" style="color:var(--citrus-purple)">player_talent_metrics</span>
         </div>
