@@ -6,10 +6,16 @@ These functions take raw extracted data and compute additional features.
 """
 
 import math
+import os
 import pandas as pd
 import numpy as np
 from scipy import stats
 from collections import defaultdict
+
+try:
+    import joblib
+except ImportError:
+    joblib = None
 
 # Arena adjustment mappings (some arenas have different coordinate systems)
 # This is a simplified version - MoneyPuck likely has more sophisticated arena adjustments
@@ -695,6 +701,65 @@ def calculate_expected_goals_of_expected_rebounds(df_shots, rebound_prob_col='ex
         df[rebound_prob_col] * rebound_shot_xg
     )
     
+    return df
+
+
+def calculate_calibrated_xg(df_shots, xg_column='xg_value', shot_type_col='shot_type',
+                            calibration_path=None):
+    """
+    Apply per-shot-type isotonic regression calibration to xG values.
+
+    Corrects systematic over/under-prediction by shot type:
+    - Tip-ins, deflections, wrap-arounds, bat shots are overvalued by the base model
+    - Slap shots, snap shots are slightly undervalued
+    - Isotonic regression learns monotonic recalibration curves per shot type
+
+    Args:
+        df_shots: DataFrame with shot data
+        xg_column: Column name for raw xG values to calibrate
+        shot_type_col: Column name for shot type
+        calibration_path: Path to calibration models file (.joblib)
+
+    Returns:
+        DataFrame with 'calibrated_xg' column added
+    """
+    df = df_shots.copy()
+    df['calibrated_xg'] = df[xg_column].copy()
+
+    if calibration_path is None:
+        calibration_path = os.path.join(
+            os.path.dirname(__file__), '..', '..', 'models', 'xg_shot_type_calibration.joblib'
+        )
+
+    if joblib is None or not os.path.exists(calibration_path):
+        print("WARNING: Calibration models not found, skipping shot-type calibration")
+        return df
+
+    try:
+        cal_package = joblib.load(calibration_path)
+    except Exception as e:
+        print(f"WARNING: Could not load calibration models: {e}")
+        return df
+
+    shot_type_models = cal_package.get('shot_type_models', {})
+    global_model = cal_package.get('global_model')
+
+    # Apply per-shot-type isotonic calibration
+    for st, model in shot_type_models.items():
+        mask = df[shot_type_col] == st
+        if mask.sum() > 0:
+            df.loc[mask, 'calibrated_xg'] = model.predict(df.loc[mask, xg_column].values)
+
+    # Apply global model to unknown shot types
+    known_types = set(shot_type_models.keys())
+    remaining = ~df[shot_type_col].isin(known_types) | df[shot_type_col].isna()
+    if remaining.sum() > 0 and global_model is not None:
+        df.loc[remaining, 'calibrated_xg'] = global_model.predict(
+            df.loc[remaining, xg_column].values
+        )
+
+    df['calibrated_xg'] = df['calibrated_xg'].clip(0.001, 0.95)
+
     return df
 
 
