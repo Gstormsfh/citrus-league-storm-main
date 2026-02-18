@@ -2078,7 +2078,11 @@ def process_single_game(game_id, rate_limit_flag=None):
         
         # Predict xG
         if USE_MONEYPUCK_MODEL:
-            df_shots['xG_Value'] = XG_MODEL.predict(X_predict)
+            # Use predict_proba for classifiers, predict for regressors
+            if hasattr(XG_MODEL, 'predict_proba'):
+                df_shots['xG_Value'] = XG_MODEL.predict_proba(X_predict)[:, 1]
+            else:
+                df_shots['xG_Value'] = XG_MODEL.predict(X_predict)
             df_shots['xG_Value'] = df_shots['xG_Value'].clip(lower=0.0, upper=0.6)
         else:
             raw_xg = XG_MODEL.predict_proba(X_predict)[:, 1]
@@ -3479,10 +3483,11 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
     
     # 2. Predict xG values
     if USE_MONEYPUCK_MODEL:
-        # MoneyPuck model is a regression model (XGBRegressor) - use predict()
-        # Model already outputs MoneyPuck-scale xG, no calibration needed
-        df_shots['xG_Value'] = XG_MODEL.predict(X_predict)
-        # Cap at reasonable maximum (MoneyPuck xG rarely exceeds 0.5)
+        # Use predict_proba for classifiers (v2+), predict for regressors (legacy)
+        if hasattr(XG_MODEL, 'predict_proba'):
+            df_shots['xG_Value'] = XG_MODEL.predict_proba(X_predict)[:, 1]
+        else:
+            df_shots['xG_Value'] = XG_MODEL.predict(X_predict)
         df_shots['xG_Value'] = df_shots['xG_Value'].clip(lower=0.0, upper=0.6)
     else:
         # Old model is classification (XGBClassifier) - use predict_proba()
