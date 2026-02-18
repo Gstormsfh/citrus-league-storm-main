@@ -105,14 +105,41 @@ def export_raw_shots(
     return output_file
 
 
+def export_training_data(output_file: str = None) -> str:
+    """Export shots in the format needed by train_xg_v3.py.
+
+    Overwrites data/shots_full_features_2025.csv (the file the v3 training
+    pipeline reads).  Run this before retraining to pick up newly scraped games.
+
+    Usage:
+        python scripts/utilities/export_raw_shots_csv.py --training
+    """
+    if output_file is None:
+        output_file = os.path.join("data", "shots_full_features_2025.csv")
+
+    print("=" * 80)
+    print("EXPORT TRAINING DATA  ->  shots_full_features_2025.csv")
+    print("=" * 80)
+
+    return export_raw_shots(
+        output_file=output_file,
+        batch_size=1000,
+        select_columns="*",
+    )
+
+
 def main() -> None:
     _configure_stdout_utf8()
 
-    # Default output name includes timestamp to avoid accidental overwrite.
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_file = os.path.join("data", f"raw_shots_export_{ts}.csv")
-
-    export_raw_shots(output_file=output_file, batch_size=1000, select_columns="*")
+    if "--training" in sys.argv:
+        # Export in training-ready format (overwrites stable filename)
+        export_training_data()
+        print("\nNext step: python scripts/utilities/train_xg_v3.py")
+    else:
+        # Default: timestamped snapshot
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_file = os.path.join("data", f"raw_shots_export_{ts}.csv")
+        export_raw_shots(output_file=output_file, batch_size=1000, select_columns="*")
 
 
 if __name__ == "__main__":

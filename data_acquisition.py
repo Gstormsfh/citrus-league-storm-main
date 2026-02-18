@@ -2083,7 +2083,7 @@ def process_single_game(game_id, rate_limit_flag=None):
                 df_shots['xG_Value'] = XG_MODEL.predict_proba(X_predict)[:, 1]
             else:
                 df_shots['xG_Value'] = XG_MODEL.predict(X_predict)
-            df_shots['xG_Value'] = df_shots['xG_Value'].clip(lower=0.0, upper=0.6)
+            df_shots['xG_Value'] = df_shots['xG_Value'].clip(lower=0.0, upper=0.95)
         else:
             raw_xg = XG_MODEL.predict_proba(X_predict)[:, 1]
             CALIBRATION_FACTOR = 3.5
@@ -3491,7 +3491,7 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
             df_shots['xG_Value'] = XG_MODEL.predict_proba(X_predict)[:, 1]
         else:
             df_shots['xG_Value'] = XG_MODEL.predict(X_predict)
-        df_shots['xG_Value'] = df_shots['xG_Value'].clip(lower=0.0, upper=0.6)
+        df_shots['xG_Value'] = df_shots['xG_Value'].clip(lower=0.0, upper=0.95)
     else:
         # Old model is classification (XGBClassifier) - use predict_proba()
         raw_xg = XG_MODEL.predict_proba(X_predict)[:, 1]
