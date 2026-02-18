@@ -38,6 +38,11 @@ dist-ssr
 *.class
 *.pyc
 
+# Large training data files (too big for Git, train locally)
+data/*.csv.gz
+data/moneypuck_shots_2018*.csv
+data/moneypuck_shots_historical*.csv
+
 # Temporary files
 temp_*.json
 test-*.html
