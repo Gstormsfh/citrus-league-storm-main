@@ -409,14 +409,16 @@ def main() -> int:
         print(f"[fetch_nhl_stats] ERROR: Failed to connect: {e}")
         return 1
     
-    # Get all players from player_directory
-    print("[fetch_nhl_stats] Fetching players from player_directory...")
+    # Get all players from player_directory for current season only
+    # CRITICAL: Must filter by season to avoid fetching players from all seasons,
+    # which causes excessive API calls and 429 rate limiting that leaves players without stats rows
+    print(f"[fetch_nhl_stats] Fetching players from player_directory (season={DEFAULT_SEASON})...")
     players = []
     offset = 0
     batch_size = 1000
-    
+
     while True:
-        batch = db.select("player_directory", select="player_id,full_name", limit=batch_size, offset=offset)
+        batch = db.select("player_directory", select="player_id,full_name", filters=[("season", "eq", DEFAULT_SEASON)], limit=batch_size, offset=offset)
         if not batch:
             break
         players.extend(batch)
@@ -535,7 +537,13 @@ def main() -> int:
                 continue
             
             updates = {}
-            
+
+            # CRITICAL: Include games_played for both skaters and goalies
+            # Without this, players created solely by this script (no prior row from
+            # build_player_season_stats) get games_played=0 and display with blank stats
+            if "games_played" in stats and stats.get("games_played", 0) > 0:
+                updates["games_played"] = stats.get("games_played", 0)
+
             if is_goalie:
                 # Goalie stats - use .get() with defaults to avoid KeyError
                 if "goalie_gp" in stats:
@@ -736,9 +744,13 @@ def main() -> int:
                 # Update database if we got valid data
                 if not stats:
                     continue
-                
+
                 updates = {}
-                
+
+                # Include games_played for both skaters and goalies (same as main phase)
+                if "games_played" in stats and stats.get("games_played", 0) > 0:
+                    updates["games_played"] = stats.get("games_played", 0)
+
                 if is_goalie:
                     # Goalie stats
                     if "goalie_gp" in stats:
