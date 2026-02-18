@@ -311,7 +311,11 @@ def process_single_game_json(raw_json, game_id):
         
         # 6. Predict xG
         if USE_MONEYPUCK_MODEL:
-            df_shots['xG_Value'] = XG_MODEL.predict(X_predict)
+            # Use predict_proba for classifiers (v2+), predict for regressors (legacy)
+            if hasattr(XG_MODEL, 'predict_proba'):
+                df_shots['xG_Value'] = XG_MODEL.predict_proba(X_predict)[:, 1]
+            else:
+                df_shots['xG_Value'] = XG_MODEL.predict(X_predict)
             df_shots['xG_Value'] = df_shots['xG_Value'].clip(lower=0.0, upper=0.6)
         else:
             raw_xg = XG_MODEL.predict_proba(X_predict)[:, 1]

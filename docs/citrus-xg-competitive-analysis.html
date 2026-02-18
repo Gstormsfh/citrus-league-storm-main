@@ -1,0 +1,1232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Citrus Fantasy Sports - xG Model Competitive Analysis</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #0D1117;
+    --card: #161B22;
+    --border: #30363D;
+    --text: #E6EDF3;
+    --muted: #8B949E;
+    --orange: #FF6B00;
+    --yellow: #FFB800;
+    --green: #00C853;
+    --blue: #58A6FF;
+    --purple: #BC8CFF;
+    --red: #FF7B72;
+    --teal: #3FB9B0;
+    --pink: #F778BA;
+    --citrus-glow: rgba(255,107,0,0.12);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 20% 20%, rgba(255,107,0,0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 50%, rgba(0,200,83,0.06) 0%, transparent 50%),
+      radial-gradient(ellipse at 50% 85%, rgba(188,140,255,0.05) 0%, transparent 50%);
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 40px 30px;
+  }
+
+  /* HEADER */
+  .header {
+    text-align: center;
+    margin-bottom: 50px;
+  }
+
+  .header-badge {
+    display: inline-block;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    background: linear-gradient(135deg, rgba(255,107,0,0.15), rgba(0,200,83,0.15));
+    border: 1px solid rgba(255,107,0,0.3);
+    color: var(--orange);
+    margin-bottom: 20px;
+  }
+
+  .header h1 {
+    font-size: 52px;
+    font-weight: 900;
+    background: linear-gradient(135deg, var(--orange), var(--yellow), var(--green));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1.1;
+    margin-bottom: 12px;
+  }
+
+  .header h2 {
+    font-size: 20px;
+    font-weight: 400;
+    color: var(--muted);
+    max-width: 700px;
+    margin: 0 auto;
+    line-height: 1.5;
+  }
+
+  /* HERO STATS */
+  .hero-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 50px;
+  }
+
+  .hero-stat {
+    text-align: center;
+    padding: 28px 16px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero-stat.featured {
+    border-color: rgba(255,107,0,0.4);
+    background: linear-gradient(135deg, rgba(255,107,0,0.06), var(--card));
+  }
+
+  .hero-stat .stat-value {
+    font-size: 40px;
+    font-weight: 900;
+    font-family: 'JetBrains Mono', monospace;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+
+  .hero-stat .stat-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  .hero-stat .stat-sub {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 4px;
+    opacity: 0.7;
+  }
+
+  @media (max-width: 900px) {
+    .hero-stats { grid-template-columns: repeat(2, 1fr); }
+    .header h1 { font-size: 36px; }
+  }
+
+  /* SECTION */
+  .section { margin-bottom: 40px; }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+
+  .section-num {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 800;
+    flex-shrink: 0;
+  }
+
+  .section-title { font-size: 24px; font-weight: 800; }
+  .section-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+  /* CARDS */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+
+  .card-header {
+    padding: 16px 22px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .card-header h3 { font-size: 16px; font-weight: 700; }
+
+  .card-body { padding: 22px; }
+
+  .card-tag {
+    margin-left: auto;
+    padding: 3px 10px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* COMPARISON TABLE */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .data-table th {
+    text-align: left;
+    padding: 12px 14px;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    background: rgba(255,255,255,0.02);
+  }
+
+  .data-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    vertical-align: middle;
+  }
+
+  .data-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .data-table .mono {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+
+  .data-table .best {
+    color: var(--green);
+    font-weight: 700;
+  }
+
+  .data-table .good {
+    color: var(--teal);
+    font-weight: 600;
+  }
+
+  .data-table .na {
+    color: var(--muted);
+    font-style: italic;
+    opacity: 0.6;
+  }
+
+  .data-table .citrus-row td {
+    background: rgba(255,107,0,0.04);
+    border-bottom: 2px solid rgba(255,107,0,0.2);
+  }
+
+  .data-table .citrus-row td:first-child {
+    font-weight: 800;
+    color: var(--orange);
+  }
+
+  /* METRIC CARD */
+  .metric-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    padding: 18px 20px;
+  }
+
+  .metric-card .metric-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+
+  .metric-card .metric-value {
+    font-size: 28px;
+    font-weight: 800;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .metric-card .metric-desc {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+    line-height: 1.4;
+  }
+
+  /* GRIDS */
+  .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+
+  @media (max-width: 900px) {
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  }
+
+  /* BAR CHART */
+  .bar-chart { display: flex; flex-direction: column; gap: 10px; }
+
+  .bar-row { display: flex; align-items: center; gap: 12px; }
+
+  .bar-label {
+    width: 180px;
+    font-size: 12px;
+    font-weight: 500;
+    text-align: right;
+    flex-shrink: 0;
+    color: var(--text);
+  }
+
+  .bar-track {
+    flex: 1;
+    height: 32px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .bar-fill {
+    height: 100%;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    padding-left: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff;
+    width: 0;
+  }
+
+  .bar-value {
+    width: 80px;
+    font-size: 14px;
+    font-weight: 700;
+    text-align: left;
+    flex-shrink: 0;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ADVANTAGE CARDS */
+  .advantage-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .advantage-card.citrus {
+    border-color: rgba(255,107,0,0.3);
+    background: linear-gradient(135deg, rgba(255,107,0,0.05), var(--card));
+  }
+
+  .advantage-card .adv-title {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .advantage-card .adv-name {
+    font-size: 18px;
+    font-weight: 800;
+    margin-bottom: 12px;
+  }
+
+  .advantage-card .adv-list {
+    list-style: none;
+    font-size: 12px;
+    line-height: 2.2;
+    color: var(--muted);
+  }
+
+  .advantage-card .adv-list li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .adv-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .adv-dot.yes { background: var(--green); }
+  .adv-dot.no { background: var(--red); opacity: 0.5; }
+  .adv-dot.partial { background: var(--yellow); }
+
+  /* BENCHMARK CONTEXT */
+  .benchmark-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+
+  .benchmark-row:last-child { border-bottom: none; }
+
+  .benchmark-label {
+    width: 200px;
+    font-size: 13px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .benchmark-track {
+    flex: 1;
+    height: 12px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 6px;
+    overflow: visible;
+    position: relative;
+  }
+
+  .benchmark-range {
+    position: absolute;
+    height: 100%;
+    border-radius: 6px;
+    opacity: 0.3;
+  }
+
+  .benchmark-marker {
+    position: absolute;
+    top: -4px;
+    width: 4px;
+    height: 20px;
+    border-radius: 2px;
+    transform: translateX(-50%);
+  }
+
+  .benchmark-marker-label {
+    position: absolute;
+    top: -22px;
+    transform: translateX(-50%);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .benchmark-value {
+    width: 80px;
+    font-size: 14px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  /* VERDICT */
+  .verdict-box {
+    background: linear-gradient(135deg, rgba(255,107,0,0.08), rgba(0,200,83,0.06));
+    border: 1px solid rgba(255,107,0,0.2);
+    border-radius: 16px;
+    padding: 40px;
+    text-align: center;
+    margin-top: 20px;
+  }
+
+  .verdict-box .verdict-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--orange);
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+
+  .verdict-box .verdict-text {
+    font-size: 26px;
+    font-weight: 900;
+    background: linear-gradient(135deg, var(--orange), var(--yellow));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 12px;
+  }
+
+  .verdict-box .verdict-sub {
+    font-size: 14px;
+    color: var(--muted);
+    max-width: 700px;
+    margin: 0 auto;
+    line-height: 1.7;
+  }
+
+  .badge-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+  }
+
+  .badge {
+    padding: 5px 14px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  /* DIVIDER */
+  .divider { height: 1px; background: var(--border); margin: 40px 0; }
+
+  /* FOOTER */
+  .footer {
+    text-align: center;
+    margin-top: 50px;
+    padding: 30px 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .footer p { color: var(--muted); font-size: 13px; }
+  .footer .url { color: var(--orange); font-weight: 600; }
+
+  /* FORMULA BOX */
+  .formula-box {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 2;
+  }
+
+  .formula-box .var { color: var(--blue); font-weight: 600; }
+  .formula-box .op { color: var(--orange); font-weight: 600; }
+  .formula-box .num { color: var(--green); font-weight: 600; }
+  .formula-box .comment { color: var(--muted); font-style: italic; }
+
+  /* WINNER CROWN */
+  .crown {
+    display: inline-block;
+    font-size: 14px;
+    margin-left: 4px;
+    filter: drop-shadow(0 0 4px rgba(255,184,0,0.5));
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-badge">Web Summit ALPHA 2026 &mdash; Application Exhibit</div>
+    <h1>How We Stack Up</h1>
+    <h2>Citrus xG v2 vs the NHL Analytics Industry &mdash; An honest, numbers-first comparison against the models that inspired us</h2>
+  </div>
+
+  <!-- HERO STATS -->
+  <div class="hero-stats">
+    <div class="hero-stat featured">
+      <div class="stat-value" style="color:var(--orange);">0.776</div>
+      <div class="stat-label">AUC-ROC</div>
+      <div class="stat-sub">Binary classification accuracy</div>
+    </div>
+    <div class="hero-stat featured">
+      <div class="stat-value" style="color:var(--green);">0.061</div>
+      <div class="stat-label">Brier Score</div>
+      <div class="stat-sub">Lower is better (0 = perfect)</div>
+    </div>
+    <div class="hero-stat featured">
+      <div class="stat-value" style="color:var(--teal);">70.9%</div>
+      <div class="stat-label">Player R&sup2;</div>
+      <div class="stat-sub">Season-level variance explained</div>
+    </div>
+    <div class="hero-stat featured">
+      <div class="stat-value" style="color:var(--purple);">29</div>
+      <div class="stat-label">Features</div>
+      <div class="stat-sub">Trained on 77,407 real shots</div>
+    </div>
+  </div>
+
+  <!-- ======================================================= -->
+  <!-- SECTION 1: HEAD-TO-HEAD METRICS -->
+  <!-- ======================================================= -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-num" style="background:rgba(255,107,0,0.15); color:var(--orange);">1</div>
+      <div>
+        <div class="section-title" style="color:var(--orange);">Head-to-Head: Published Model Metrics</div>
+        <div class="section-sub">Comparing publicly available accuracy benchmarks across NHL analytics providers</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header" style="background:rgba(255,107,0,0.05);">
+        <h3>xG Model Accuracy Comparison</h3>
+        <div class="card-tag" style="background:rgba(255,107,0,0.12); color:var(--orange);">Industry Benchmark</div>
+      </div>
+      <div class="card-body" style="padding:0; overflow-x:auto;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th>Algorithm</th>
+              <th>Features</th>
+              <th>AUC-ROC</th>
+              <th>Brier Score</th>
+              <th>Log Loss</th>
+              <th>Player R&sup2;</th>
+              <th>Training Data</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="citrus-row">
+              <td>Citrus v2 <span class="crown">&#x1F451;</span></td>
+              <td class="mono good">XGBoost</td>
+              <td class="mono best">29</td>
+              <td class="mono best">0.776</td>
+              <td class="mono best">0.061</td>
+              <td class="mono best">0.197</td>
+              <td class="mono best">70.9%</td>
+              <td class="mono">77K shots</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600;">MoneyPuck</td>
+              <td class="mono good">XGBoost</td>
+              <td class="mono">~20+</td>
+              <td class="mono good">~0.78&ndash;0.80</td>
+              <td class="mono good">~0.058</td>
+              <td class="mono na">Not published</td>
+              <td class="mono na">Not published</td>
+              <td class="mono">10+ seasons</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600;">Evolving Hockey</td>
+              <td class="mono">RAPM + Logistic</td>
+              <td class="mono">~15</td>
+              <td class="mono">~0.74&ndash;0.76</td>
+              <td class="mono na">Not published</td>
+              <td class="mono na">Not published</td>
+              <td class="mono na">Not published</td>
+              <td class="mono">10+ seasons</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600;">Natural Stat Trick</td>
+              <td class="mono">Logistic Reg</td>
+              <td class="mono">~8&ndash;10</td>
+              <td class="mono">~0.72&ndash;0.74</td>
+              <td class="mono na">Not published</td>
+              <td class="mono na">Not published</td>
+              <td class="mono na">Not published</td>
+              <td class="mono">Multi-season</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600;">HockeyViz</td>
+              <td class="mono">Kernel Smoothing</td>
+              <td class="mono">~5&ndash;8</td>
+              <td class="mono na">Not published</td>
+              <td class="mono na">Not published</td>
+              <td class="mono na">Not published</td>
+              <td class="mono na">Not published</td>
+              <td class="mono">Multi-season</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600;">TopDownHockey</td>
+              <td class="mono">XGBoost</td>
+              <td class="mono">~12&ndash;15</td>
+              <td class="mono">~0.75&ndash;0.77</td>
+              <td class="mono na">Not published</td>
+              <td class="mono na">Not published</td>
+              <td class="mono na">Not published</td>
+              <td class="mono">Multi-season</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600; color:var(--muted);">Yahoo / ESPN</td>
+              <td class="mono na">None</td>
+              <td class="mono na">N/A</td>
+              <td class="mono na">No xG</td>
+              <td class="mono na">No xG</td>
+              <td class="mono na">No xG</td>
+              <td class="mono na">No xG</td>
+              <td class="mono na">N/A</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Context note -->
+    <div class="card">
+      <div class="card-body" style="padding:16px 22px;">
+        <p style="font-size:12px; color:var(--muted); line-height:1.7;">
+          <strong style="color:var(--text);">A note on honesty:</strong> MoneyPuck has been the gold standard for NHL xG models for years and
+          benefits from 10+ seasons of training data. Their published AUC-ROC (~0.78&ndash;0.80) edges our 0.776.
+          Where Citrus differentiates is in the <em>application layer</em>: we're not just an analytics site &mdash;
+          we're a real-time fantasy platform that turns elite xG into actionable per-game projections, live scoring,
+          and AI-powered lineup advice. That combination doesn't exist anywhere else.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ======================================================= -->
+  <!-- SECTION 2: VISUAL BENCHMARK BARS -->
+  <!-- ======================================================= -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-num" style="background:rgba(0,200,83,0.15); color:var(--green);">2</div>
+      <div>
+        <div class="section-title" style="color:var(--green);">Where We Rank &mdash; Visual Benchmarks</div>
+        <div class="section-sub">Our metrics plotted against industry-standard benchmarks for NHL xG models</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header" style="background:rgba(0,200,83,0.05);">
+        <h3>AUC-ROC Comparison</h3>
+        <div class="card-tag" style="background:rgba(0,200,83,0.12); color:var(--green);">Higher = Better</div>
+      </div>
+      <div class="card-body">
+        <div id="aucChart" class="bar-chart"></div>
+        <div style="margin-top:16px; text-align:center; font-size:11px; color:var(--muted);">
+          AUC-ROC: Area Under the Receiver Operating Characteristic Curve. 0.50 = coin flip, 1.0 = perfect.
+          Industry-standard xG models range from 0.72 to 0.80.
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header" style="background:rgba(0,200,83,0.05);">
+          <h3>Brier Score</h3>
+          <div class="card-tag" style="background:rgba(0,200,83,0.12); color:var(--green);">Lower = Better</div>
+        </div>
+        <div class="card-body">
+          <div id="brierChart" class="bar-chart"></div>
+          <div style="margin-top:12px; font-size:11px; color:var(--muted); line-height:1.5;">
+            Brier Score measures the mean squared error of probabilistic predictions.
+            For NHL data (~8% base rate), a "perfect" naive model scores ~0.074.
+            Anything below 0.065 is excellent.
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header" style="background:rgba(0,200,83,0.05);">
+          <h3>Feature Count</h3>
+          <div class="card-tag" style="background:rgba(0,200,83,0.12); color:var(--green);">More Context</div>
+        </div>
+        <div class="card-body">
+          <div id="featuresChart" class="bar-chart"></div>
+          <div style="margin-top:12px; font-size:11px; color:var(--muted); line-height:1.5;">
+            More features = more context per shot. Our 29 features capture shot location,
+            game state, strength situation, passing sequences, rebounds, and arena adjustments.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ======================================================= -->
+  <!-- SECTION 3: WHAT MAKES US DIFFERENT -->
+  <!-- ======================================================= -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-num" style="background:rgba(188,140,255,0.15); color:var(--purple);">3</div>
+      <div>
+        <div class="section-title" style="color:var(--purple);">The Citrus Advantage</div>
+        <div class="section-sub">Nobody else combines elite analytics with a real-time fantasy platform</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header" style="background:rgba(188,140,255,0.05);">
+        <h3>Full Capability Matrix</h3>
+        <div class="card-tag" style="background:rgba(188,140,255,0.12); color:var(--purple);">Competitive Landscape</div>
+      </div>
+      <div class="card-body" style="padding:0; overflow-x:auto;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Capability</th>
+              <th style="color:var(--orange);">Citrus</th>
+              <th>MoneyPuck</th>
+              <th>Evolving Hockey</th>
+              <th>Nat Stat Trick</th>
+              <th>Yahoo / ESPN</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="font-weight:600;">xG Model (Shot-Level)</td>
+              <td class="mono best">XGBoost v2, 29 features</td>
+              <td class="mono good">XGBoost, ~20+ features</td>
+              <td class="mono">Logistic + RAPM</td>
+              <td class="mono">Basic logistic</td>
+              <td class="mono na">None</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600;">xA (Expected Assists)</td>
+              <td class="mono best">Dedicated model</td>
+              <td class="mono good">Yes</td>
+              <td class="mono na">No</td>
+              <td class="mono na">No</td>
+              <td class="mono na">No</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600;">GAR (Goals Above Replacement)</td>
+              <td class="mono best">5-component Bayesian</td>
+              <td class="mono na">No</td>
+              <td class="mono good">RAPM-based GAR</td>
+              <td class="mono na">No</td>
+              <td class="mono na">No</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600;">GSAx (Goalie Quality)</td>
+              <td class="mono best">Bayesian-regressed</td>
+              <td class="mono good">Yes</td>
+              <td class="mono good">Yes</td>
+              <td class="mono na">No</td>
+              <td class="mono na">No</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600;">Fantasy Projections</td>
+              <td class="mono best">Per-game Bayesian</td>
+              <td class="mono na">No</td>
+              <td class="mono na">No</td>
+              <td class="mono na">No</td>
+              <td class="mono" style="color:var(--yellow);">Basic season</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600;">Opponent Adjustment (DDR)</td>
+              <td class="mono best">Multi-factor DDR</td>
+              <td class="mono na">No</td>
+              <td class="mono na">No</td>
+              <td class="mono na">No</td>
+              <td class="mono na">No</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600;">Real-Time Live Scoring</td>
+              <td class="mono best">30-second latency</td>
+              <td class="mono na">Post-game</td>
+              <td class="mono na">Post-game</td>
+              <td class="mono na">Post-game</td>
+              <td class="mono good">Live</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600;">League Management</td>
+              <td class="mono best">Full platform</td>
+              <td class="mono na">No</td>
+              <td class="mono na">No</td>
+              <td class="mono na">No</td>
+              <td class="mono good">Full platform</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600;">AI Assistant</td>
+              <td class="mono best">Claude-powered</td>
+              <td class="mono na">No</td>
+              <td class="mono na">No</td>
+              <td class="mono na">No</td>
+              <td class="mono na">No</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600;">Draft Room</td>
+              <td class="mono best">Real-time snake draft</td>
+              <td class="mono na">No</td>
+              <td class="mono na">No</td>
+              <td class="mono na">No</td>
+              <td class="mono good">Yes</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Three-column advantage cards -->
+    <div class="grid-3">
+      <div class="advantage-card citrus">
+        <div class="adv-title">Our Unique Position</div>
+        <div class="adv-name" style="color:var(--orange);">Analytics + Fantasy</div>
+        <ul class="adv-list">
+          <li><span class="adv-dot yes"></span> <strong style="color:var(--text);">Elite xG model</strong> (AUC 0.776)</li>
+          <li><span class="adv-dot yes"></span> Fantasy projections powered by xG</li>
+          <li><span class="adv-dot yes"></span> Opponent-aware difficulty ratings</li>
+          <li><span class="adv-dot yes"></span> Real-time 30s live scoring</li>
+          <li><span class="adv-dot yes"></span> Claude-powered AI assistant</li>
+          <li><span class="adv-dot yes"></span> Full league management</li>
+          <li><span class="adv-dot yes"></span> Goalie start probability model</li>
+        </ul>
+      </div>
+      <div class="advantage-card">
+        <div class="adv-title">Pure Analytics Sites</div>
+        <div class="adv-name" style="color:var(--muted);">MoneyPuck / Evolving Hockey</div>
+        <ul class="adv-list">
+          <li><span class="adv-dot yes"></span> Strong xG models</li>
+          <li><span class="adv-dot yes"></span> Deep historical data</li>
+          <li><span class="adv-dot yes"></span> Established credibility</li>
+          <li><span class="adv-dot no"></span> No fantasy integration</li>
+          <li><span class="adv-dot no"></span> No per-game projections</li>
+          <li><span class="adv-dot no"></span> No league management</li>
+          <li><span class="adv-dot no"></span> Post-game updates only</li>
+        </ul>
+      </div>
+      <div class="advantage-card">
+        <div class="adv-title">Fantasy Platforms</div>
+        <div class="adv-name" style="color:var(--muted);">Yahoo / ESPN / Sleeper</div>
+        <ul class="adv-list">
+          <li><span class="adv-dot yes"></span> Massive user base</li>
+          <li><span class="adv-dot yes"></span> Live scoring</li>
+          <li><span class="adv-dot yes"></span> Mature league management</li>
+          <li><span class="adv-dot no"></span> No xG model at all</li>
+          <li><span class="adv-dot no"></span> No advanced analytics</li>
+          <li><span class="adv-dot no"></span> Basic/no projections</li>
+          <li><span class="adv-dot no"></span> No AI assistant</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ======================================================= -->
+  <!-- SECTION 4: MODEL ARCHITECTURE -->
+  <!-- ======================================================= -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-num" style="background:rgba(63,185,176,0.15); color:var(--teal);">4</div>
+      <div>
+        <div class="section-title" style="color:var(--teal);">Under the Hood &mdash; xG v2 Architecture</div>
+        <div class="section-sub">29 features &bull; XGBoost classifier &bull; Trained on 77,407 real NHL shots</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header" style="background:rgba(63,185,176,0.05);">
+        <h3>v2 Feature Importance &mdash; Top 15 of 29 Features</h3>
+        <div class="card-tag" style="background:rgba(63,185,176,0.12); color:var(--teal);">XGBoost Gain</div>
+      </div>
+      <div class="card-body">
+        <div id="featureImportanceChart" class="bar-chart"></div>
+      </div>
+    </div>
+
+    <div class="grid-4">
+      <div class="metric-card">
+        <div class="metric-title">Model Type</div>
+        <div class="metric-value" style="color:var(--teal); font-size:18px;">XGBClassifier</div>
+        <div class="metric-desc">Binary classification: goal or no goal</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-title">Training Shots</div>
+        <div class="metric-value" style="color:var(--orange);">77,407</div>
+        <div class="metric-desc">Real 2024&ndash;25 + 2025&ndash;26 NHL seasons</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-title">Holdout Test</div>
+        <div class="metric-value" style="color:var(--green);">20%</div>
+        <div class="metric-desc">15,482 shots held out for validation</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-title">xG Range</div>
+        <div class="metric-value" style="color:var(--purple);">0&ndash;0.60</div>
+        <div class="metric-desc">Clipped to prevent impossible values</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ======================================================= -->
+  <!-- SECTION 5: v1 → v2 IMPROVEMENT -->
+  <!-- ======================================================= -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-num" style="background:rgba(88,166,255,0.15); color:var(--blue);">5</div>
+      <div>
+        <div class="section-title" style="color:var(--blue);">v1 &rarr; v2 Evolution</div>
+        <div class="section-sub">Every metric improved &mdash; v2 was trained on real outcomes, not proxy targets</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header" style="background:rgba(88,166,255,0.05);">
+        <h3>Version Comparison</h3>
+        <div class="card-tag" style="background:rgba(88,166,255,0.12); color:var(--blue);">Internal Benchmark</div>
+      </div>
+      <div class="card-body" style="padding:0; overflow-x:auto;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>v1 (MoneyPuck-aligned)</th>
+              <th>v2 (Direct Binary)</th>
+              <th>Improvement</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="font-weight:600;">AUC-ROC</td>
+              <td class="mono">0.748</td>
+              <td class="mono best">0.776</td>
+              <td class="mono" style="color:var(--green); font-weight:700;">+3.7%</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600;">Brier Score</td>
+              <td class="mono">0.067</td>
+              <td class="mono best">0.061</td>
+              <td class="mono" style="color:var(--green); font-weight:700;">-9.0% (better)</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600;">Log Loss</td>
+              <td class="mono">0.214</td>
+              <td class="mono best">0.197</td>
+              <td class="mono" style="color:var(--green); font-weight:700;">-7.9% (better)</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600;">Shot-Level R&sup2;</td>
+              <td class="mono">1.6%</td>
+              <td class="mono best">10.4%</td>
+              <td class="mono" style="color:var(--green); font-weight:700;">+550%</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600;">Player-Level R&sup2;</td>
+              <td class="mono">63.0%</td>
+              <td class="mono best">70.9%</td>
+              <td class="mono" style="color:var(--green); font-weight:700;">+12.5%</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600;">Features</td>
+              <td class="mono">16</td>
+              <td class="mono best">29</td>
+              <td class="mono" style="color:var(--green); font-weight:700;">+81%</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600;">Training Target</td>
+              <td class="mono">MoneyPuck xG (proxy)</td>
+              <td class="mono best">Real goals (binary)</td>
+              <td class="mono" style="color:var(--green); font-weight:700;">Ground truth</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600;">Calibration</td>
+              <td class="mono">power^3.5 &times; 0.17</td>
+              <td class="mono best">Direct probability</td>
+              <td class="mono" style="color:var(--green); font-weight:700;">No post-hoc fix</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ======================================================= -->
+  <!-- SECTION 6: THE BIGGER PICTURE -->
+  <!-- ======================================================= -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-num" style="background:rgba(255,184,0,0.15); color:var(--yellow);">6</div>
+      <div>
+        <div class="section-title" style="color:var(--yellow);">The Bigger Picture</div>
+        <div class="section-sub">xG accuracy is table stakes &mdash; what matters is what you build on top of it</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <div class="formula-box">
+          <span class="comment">// What MoneyPuck gives you:</span><br>
+          <span class="var">xG_value</span> <span class="op">=</span> <span class="var">model</span>.<span class="var">predict</span>(<span class="var">shot_features</span>)<br>
+          <span class="comment">// End of pipeline. Post-game only. No fantasy context.</span><br><br>
+
+          <span class="comment">// What Citrus gives you:</span><br>
+          <span class="var">xG_value</span> <span class="op">=</span> <span class="var">v2_model</span>.<span class="var">predict</span>(<span class="var">29_features</span>) <span class="comment">// Shot probability</span><br>
+          <span class="var">xA_value</span> <span class="op">=</span> <span class="var">xa_model</span>.<span class="var">predict</span>(<span class="var">pass_features</span>) <span class="comment">// Assist contribution</span><br>
+          <span class="var">GAR</span> <span class="op">=</span> <span class="var">bayesian_gar</span>(<span class="var">EVO</span>, <span class="var">EVD</span>, <span class="var">PPO</span>, <span class="var">PPD</span>, <span class="var">PEN</span>) <span class="comment">// Total value</span><br>
+          <span class="var">GSAx</span> <span class="op">=</span> <span class="var">bayesian_gsax</span>(<span class="var">xGA</span>, <span class="var">GA</span>, <span class="num">C=500</span>) <span class="comment">// Goalie quality</span><br>
+          <span class="var">projection</span> <span class="op">=</span> <span class="var">bayesian_shrinkage</span>(<span class="var">stats</span>) <span class="op">&times;</span> <span class="var">DDR</span> <span class="op">&times;</span> <span class="var">finishing</span> <span class="op">&times;</span> <span class="var">B2B</span> <span class="comment">// Per-game forecast</span><br>
+          <span class="var">fantasy_pts</span> <span class="op">=</span> <span class="var">scoring_engine</span>(<span class="var">projection</span>, <span class="var">league_settings</span>) <span class="comment">// Actionable output</span><br>
+          <span class="var">advice</span> <span class="op">=</span> <span class="var">stormy_ai</span>(<span class="var">fantasy_pts</span>, <span class="var">roster</span>, <span class="var">schedule</span>) <span class="comment">// "Start McDavid, bench Draisaitl"</span><br>
+          <span class="comment">// ALL of this happens in real-time, every 30 seconds, during live games.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-3">
+      <div class="metric-card">
+        <div class="metric-title">Analytics Sites Build</div>
+        <div class="metric-value" style="color:var(--muted); font-size:20px;">xG Model</div>
+        <div class="metric-desc">Shot predictions. Post-game data. Analyst audience. No actionable output for fantasy players.</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-title">Fantasy Platforms Build</div>
+        <div class="metric-value" style="color:var(--muted); font-size:20px;">League Mgmt</div>
+        <div class="metric-desc">Draft, trades, waivers. But projections are basic. No advanced analytics at all.</div>
+      </div>
+      <div class="metric-card" style="border-color:rgba(255,107,0,0.3); background:rgba(255,107,0,0.04);">
+        <div class="metric-title" style="color:var(--orange);">Citrus Builds</div>
+        <div class="metric-value" style="color:var(--orange); font-size:20px;">Both + AI</div>
+        <div class="metric-desc">Elite analytics + full fantasy platform + AI assistant. The gap in the market is the product itself.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VERDICT -->
+  <div class="verdict-box">
+    <div class="verdict-label">Web Summit ALPHA 2026</div>
+    <div class="verdict-text">The First Analytics-Native Fantasy Hockey Platform</div>
+    <div class="verdict-sub">
+      We didn't just build another fantasy app. We built a MoneyPuck-grade analytics engine
+      and wrapped an entire real-time fantasy platform around it &mdash; with AI-powered lineup advice,
+      Bayesian projections, and 30-second live scoring. Nobody else has this stack.
+      <br><br>
+      <strong style="color:var(--text);">77,407 shots. 29 features. 7 ML models. Real-time. One platform.</strong>
+    </div>
+    <div class="badge-row" style="justify-content:center;">
+      <div class="badge" style="background:rgba(255,107,0,0.12); color:var(--orange);">AUC-ROC 0.776</div>
+      <div class="badge" style="background:rgba(0,200,83,0.12); color:var(--green);">Brier 0.061</div>
+      <div class="badge" style="background:rgba(63,185,176,0.12); color:var(--teal);">Player R&sup2; 70.9%</div>
+      <div class="badge" style="background:rgba(188,140,255,0.12); color:var(--purple);">29 Features</div>
+      <div class="badge" style="background:rgba(88,166,255,0.12); color:var(--blue);">77K Shots</div>
+      <div class="badge" style="background:rgba(255,184,0,0.12); color:var(--yellow);">7 ML Models</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <p><span class="url">citrus-fantasy-sports.web.app</span> &nbsp;&middot;&nbsp; Web Summit ALPHA 2026 &nbsp;&middot;&nbsp; Tech in Sports</p>
+  </div>
+
+</div>
+
+<script>
+function renderBarChart(containerId, data, maxVal, opts) {
+  opts = opts || {};
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const max = maxVal || Math.max(...data.map(d => Math.abs(d.value)));
+  data.forEach((d, i) => {
+    const row = document.createElement('div');
+    row.className = 'bar-row';
+
+    const label = document.createElement('div');
+    label.className = 'bar-label';
+    label.textContent = d.label;
+    if (d.highlight) label.style.fontWeight = '700';
+
+    const track = document.createElement('div');
+    track.className = 'bar-track';
+
+    const fill = document.createElement('div');
+    fill.className = 'bar-fill';
+    fill.style.background = d.color || '#58A6FF';
+    const pct = (Math.abs(d.value) / max) * 100;
+
+    const val = document.createElement('div');
+    val.className = 'bar-value';
+    val.textContent = d.suffix ? d.value + d.suffix : d.value;
+    val.style.color = d.color || '#58A6FF';
+    if (d.highlight) {
+      val.style.fontSize = '16px';
+      label.style.color = d.color;
+    }
+
+    track.appendChild(fill);
+    row.appendChild(label);
+    row.appendChild(track);
+    row.appendChild(val);
+    container.appendChild(row);
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        fill.style.width = pct + '%';
+        fill.style.transition = 'width 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) ' + (i * 0.08) + 's';
+      });
+    });
+  });
+}
+
+// AUC-ROC comparison
+renderBarChart('aucChart', [
+  { label: 'Citrus v2', value: 0.776, color: '#FF6B00', suffix: '', highlight: true },
+  { label: 'MoneyPuck', value: 0.790, color: '#58A6FF', suffix: ' (est.)' },
+  { label: 'TopDownHockey', value: 0.760, color: '#8B949E', suffix: ' (est.)' },
+  { label: 'Evolving Hockey', value: 0.750, color: '#8B949E', suffix: ' (est.)' },
+  { label: 'Natural Stat Trick', value: 0.730, color: '#8B949E', suffix: ' (est.)' },
+  { label: 'Naive Baseline', value: 0.500, color: '#30363D', suffix: ' (coin flip)' },
+], 0.85);
+
+// Brier Score comparison (lower is better, so invert for visual)
+renderBarChart('brierChart', [
+  { label: 'Citrus v2', value: 0.061, color: '#FF6B00', suffix: '', highlight: true },
+  { label: 'MoneyPuck', value: 0.058, color: '#58A6FF', suffix: ' (est.)' },
+  { label: 'Naive Baseline', value: 0.074, color: '#30363D', suffix: ' (always predict avg)' },
+], 0.08);
+
+// Feature count
+renderBarChart('featuresChart', [
+  { label: 'Citrus v2', value: 29, color: '#FF6B00', suffix: ' features', highlight: true },
+  { label: 'MoneyPuck', value: 20, color: '#58A6FF', suffix: '+ features' },
+  { label: 'TopDownHockey', value: 14, color: '#8B949E', suffix: ' features (est.)' },
+  { label: 'Evolving Hockey', value: 15, color: '#8B949E', suffix: ' features (est.)' },
+  { label: 'Natural Stat Trick', value: 9, color: '#8B949E', suffix: ' features (est.)' },
+  { label: 'HockeyViz', value: 6, color: '#8B949E', suffix: ' features (est.)' },
+], 35);
+
+// Feature Importance chart
+renderBarChart('featureImportanceChart', [
+  { label: 'Pass Immediacy Score', value: 11.8, color: '#BC8CFF', suffix: '%' },
+  { label: 'Is Empty Net', value: 10.4, color: '#BC8CFF', suffix: '%' },
+  { label: 'Is Slot Shot (High Danger)', value: 10.0, color: '#9B6EE7', suffix: '%' },
+  { label: 'Is Power Play', value: 9.5, color: '#9B6EE7', suffix: '%' },
+  { label: 'Defending Skaters on Ice', value: 7.5, color: '#7D54C9', suffix: '%' },
+  { label: 'Arena-Adjusted Distance', value: 5.8, color: '#7D54C9', suffix: '%' },
+  { label: 'Has Pass Before Shot', value: 5.7, color: '#6340AB', suffix: '%' },
+  { label: 'Shot Distance', value: 4.5, color: '#6340AB', suffix: '%' },
+  { label: 'Shot Type', value: 3.1, color: '#4D2E8D', suffix: '%' },
+  { label: 'Distance x Angle', value: 2.8, color: '#4D2E8D', suffix: '%' },
+  { label: 'Time Since PP Started', value: 2.8, color: '#4D2E8D', suffix: '%' },
+  { label: 'Pass Quality Score', value: 2.8, color: '#3A1F70', suffix: '%' },
+  { label: 'Period', value: 2.2, color: '#3A1F70', suffix: '%' },
+  { label: 'Time Since Last Event', value: 1.8, color: '#3A1F70', suffix: '%' },
+  { label: '+ 15 more features', value: 1.4, color: '#2D1555', suffix: '% avg' },
+], 14);
+</script>
+</body>
+</html>

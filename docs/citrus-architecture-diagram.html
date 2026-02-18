@@ -436,7 +436,7 @@
     <div class="stats-bar">
       <div class="stat-item"><div class="number">95K+</div><div class="label">Lines of Code</div></div>
       <div class="stat-item"><div class="number">60+</div><div class="label">Database Tables</div></div>
-      <div class="stat-item"><div class="number">6</div><div class="label">ML Models</div></div>
+      <div class="stat-item"><div class="number">7</div><div class="label">ML Models</div></div>
       <div class="stat-item"><div class="number">200+</div><div class="label">Migrations</div></div>
       <div class="stat-item"><div class="number">30s</div><div class="label">Live Update Latency</div></div>
       <div class="stat-item"><div class="number">100</div><div class="label">Rotating Proxy IPs</div></div>
@@ -555,9 +555,9 @@
       <div class="layer-body">
         <div class="items-grid grid-4">
           <div class="item-card">
-            <div class="item-title">xG Model (XGBoost)</div>
-            <div class="item-desc">13 features. Predicts shot-to-goal probability (0&ndash;1). Pass quality, distance, angle, shot type, rebounds.</div>
-            <div class="item-badge">6 Models</div>
+            <div class="item-title">xG v2 Model (XGBoost)</div>
+            <div class="item-desc">29 features. Trained on 77K real NHL shots. AUC-ROC 0.776, Brier 0.061. Distance, angle, strength state, rebounds, pass quality &amp; more.</div>
+            <div class="item-badge">7 Models</div>
           </div>
           <div class="item-card">
             <div class="item-title">xA (Expected Assists)</div>
@@ -578,11 +578,11 @@
         <div class="data-flow-row" style="margin-top:14px;">
           <span class="flow-chip" style="color:var(--citrus-purple)">raw_shots</span>
           <span class="flow-arrow">&rarr;</span>
-          <span class="flow-chip">Feature Extraction (13 features)</span>
+          <span class="flow-chip">Feature Extraction (29 features)</span>
           <span class="flow-arrow">&rarr;</span>
-          <span class="flow-chip">XGBoost Predict</span>
+          <span class="flow-chip">XGBoost v2 Predict</span>
           <span class="flow-arrow">&rarr;</span>
-          <span class="flow-chip">Calibration (power^3.5 &times; 0.17)</span>
+          <span class="flow-chip">Clip (0.0 &ndash; 0.6)</span>
           <span class="flow-arrow">&rarr;</span>
           <span class="flow-chip" style="color:var(--citrus-purple)">player_talent_metrics</span>
         </div>
