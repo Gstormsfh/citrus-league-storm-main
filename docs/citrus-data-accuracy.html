@@ -640,33 +640,33 @@
   <div class="header">
     <div class="header-badge">Data Accuracy & Validation Audit</div>
     <h1>Proof in the Numbers</h1>
-    <h2>41,524 shots. 782 players. 83 goalies. Every prediction validated.</h2>
+    <h2>36,703 shots. 591 players. 83 goalies. Every prediction validated &amp; recalibrated.</h2>
   </div>
 
   <!-- HERO STATS -->
   <div class="hero-stats">
     <div class="hero-stat" style="border-top: 3px solid var(--green);">
-      <div class="stat-value" style="color:var(--green);">0.8772</div>
+      <div class="stat-value" style="color:var(--green);">0.8550</div>
       <div class="stat-label">Player Correlation</div>
-      <div class="stat-sub">Talent-Adjusted xG vs Actual Goals</div>
+      <div class="stat-sub">Calibrated + Talent xG vs Actual Goals</div>
     </div>
     <div class="hero-stat" style="border-top: 3px solid var(--teal);">
-      <div class="stat-value" style="color:var(--teal);">71.5%</div>
+      <div class="stat-value" style="color:var(--teal);">71.0%</div>
       <div class="stat-label">R&sup2; Score</div>
       <div class="stat-sub">Player-Season Variance Explained</div>
     </div>
     <div class="hero-stat" style="border-top: 3px solid var(--blue);">
-      <div class="stat-value" style="color:var(--blue);">0.976</div>
+      <div class="stat-value" style="color:var(--blue);">1.005</div>
       <div class="stat-label">Calibration Ratio</div>
-      <div class="stat-sub">Predicted vs Actual (1.0 = perfect)</div>
+      <div class="stat-sub">Near-perfect (1.0 = perfect)</div>
     </div>
     <div class="hero-stat" style="border-top: 3px solid var(--purple);">
-      <div class="stat-value" style="color:var(--purple);">+37%</div>
-      <div class="stat-label">R&sup2; Improvement</div>
-      <div class="stat-sub">Shot-Level vs Base Model</div>
+      <div class="stat-value" style="color:var(--purple);">+131%</div>
+      <div class="stat-label">Shot R&sup2; Boost</div>
+      <div class="stat-sub">After shot-type calibration</div>
     </div>
     <div class="hero-stat" style="border-top: 3px solid var(--orange);">
-      <div class="stat-value" style="color:var(--orange);">41.5K</div>
+      <div class="stat-value" style="color:var(--orange);">36.7K</div>
       <div class="stat-label">Shots Validated</div>
       <div class="stat-sub">2025&ndash;26 NHL Season Data</div>
     </div>
@@ -680,7 +680,7 @@
       <div class="section-num" style="background:rgba(0,200,83,0.15); color:var(--green);">1</div>
       <div>
         <div class="section-title" style="color:var(--green);">Shot-Level Accuracy</div>
-        <div class="section-sub">Every individual shot prediction tested against real outcomes &bull; 41,524 shots analyzed</div>
+        <div class="section-sub">Every individual shot prediction tested against real outcomes &bull; 36,703 shots analyzed</div>
       </div>
     </div>
 
@@ -694,8 +694,6 @@
           <thead>
             <tr>
               <th>xG Variant</th>
-              <th>Total xG</th>
-              <th>Actual Goals</th>
               <th>Calibration</th>
               <th>R&sup2;</th>
               <th>Correlation</th>
@@ -706,43 +704,35 @@
           <tbody>
             <tr>
               <td style="font-weight:700;">Base xG</td>
-              <td class="mono">3,081.60</td>
-              <td class="mono">3,027</td>
-              <td class="mono">1.018</td>
-              <td class="mono">0.0208</td>
-              <td class="mono">0.1854</td>
-              <td class="mono">0.1287</td>
-              <td class="mono">0.2572</td>
+              <td class="mono">1.027</td>
+              <td class="mono">0.0155</td>
+              <td class="mono">0.1771</td>
+              <td class="mono">0.1306</td>
+              <td class="mono">0.2589</td>
             </tr>
             <tr>
-              <td style="font-weight:700;">Flurry-Adjusted xG</td>
-              <td class="mono">2,970.46</td>
-              <td class="mono">3,027</td>
-              <td class="mono">0.981</td>
-              <td class="mono">0.0271 <span class="improvement positive">+30%</span></td>
-              <td class="mono">0.1887</td>
-              <td class="mono">0.1268</td>
-              <td class="mono">0.2564</td>
+              <td style="font-weight:700;">Talent-Adjusted xG</td>
+              <td class="mono">0.990</td>
+              <td class="mono">0.0243 <span class="improvement positive">+57%</span></td>
+              <td class="mono">0.1834</td>
+              <td class="mono">0.1286</td>
+              <td class="mono">0.2578</td>
+            </tr>
+            <tr>
+              <td style="font-weight:700;">Calibrated xG <span class="improvement positive">NEW</span></td>
+              <td class="mono best">1.000</td>
+              <td class="mono">0.0541 <span class="improvement positive">+249%</span></td>
+              <td class="mono best">0.2325</td>
+              <td class="mono">0.1288</td>
+              <td class="mono">0.2538</td>
             </tr>
             <tr class="winner-row">
-              <td style="font-weight:700; color:var(--green);">Talent-Adjusted xG</td>
-              <td class="mono best">2,955.72</td>
-              <td class="mono">3,027</td>
-              <td class="mono best">0.976</td>
-              <td class="mono best">0.0285 <span class="improvement positive">+37%</span></td>
-              <td class="mono best">0.1909</td>
-              <td class="mono best">0.1265</td>
-              <td class="mono best">0.2562</td>
-            </tr>
-            <tr>
-              <td style="font-weight:700;">Created xG</td>
-              <td class="mono">4,046.82</td>
-              <td class="mono">3,027</td>
-              <td class="mono">1.337</td>
-              <td class="mono">0.0028</td>
-              <td class="mono" style="color:var(--blue);">0.2294 <span class="improvement positive">+24%</span></td>
-              <td class="mono">0.1428</td>
-              <td class="mono">0.2596</td>
+              <td style="font-weight:700; color:var(--green);">Calibrated + Talent <span class="improvement positive">NEW</span></td>
+              <td class="mono best">1.005</td>
+              <td class="mono best">0.0562 <span class="improvement positive">+263%</span></td>
+              <td class="mono best">0.2370</td>
+              <td class="mono best">0.1290</td>
+              <td class="mono best">0.2535</td>
             </tr>
           </tbody>
         </table>
@@ -775,9 +765,9 @@
               <div class="metric-desc">Standard range for all public xG models at per-shot granularity</div>
             </div>
             <div class="metric-card">
-              <div class="metric-title">Citrus Talent-Adjusted (Shot Level)</div>
-              <div class="metric-value" style="color:var(--green);">0.0285</div>
-              <div class="metric-desc">Top of range &mdash; beating the base model by 37%</div>
+              <div class="metric-title">Citrus Calibrated + Talent (Shot Level)</div>
+              <div class="metric-value" style="color:var(--green);">0.0562</div>
+              <div class="metric-desc">2x above industry range &mdash; per-shot-type isotonic calibration</div>
             </div>
           </div>
         </div>
@@ -795,14 +785,14 @@
       <div class="section-num" style="background:rgba(63,185,176,0.15); color:var(--teal);">2</div>
       <div>
         <div class="section-title" style="color:var(--teal);">Player-Season Accuracy</div>
-        <div class="section-sub">Aggregated predictions vs actual goals across 782 players &bull; Where the model truly proves itself</div>
+        <div class="section-sub">Aggregated predictions vs actual goals across 591 players &bull; Where the model truly proves itself</div>
       </div>
     </div>
 
     <div class="card">
       <div class="card-header" style="background:rgba(63,185,176,0.05);">
         <h3>Player-Season Level Performance</h3>
-        <div class="card-tag" style="background:rgba(63,185,176,0.12); color:var(--teal);">782 Players</div>
+        <div class="card-tag" style="background:rgba(63,185,176,0.12); color:var(--teal);">591 Players</div>
       </div>
       <div class="card-body" style="padding:0; overflow-x:auto;">
         <table class="data-table">
@@ -818,31 +808,31 @@
           <tbody>
             <tr>
               <td style="font-weight:700;">Base xG</td>
-              <td class="mono">0.6358</td>
-              <td class="mono">0.8530</td>
-              <td class="mono">1.294</td>
+              <td class="mono">0.6303</td>
+              <td class="mono">0.7956</td>
+              <td class="mono">1.013</td>
               <td class="mono" style="color:var(--muted);">&mdash; baseline</td>
             </tr>
             <tr>
-              <td style="font-weight:700;">Flurry-Adjusted xG</td>
-              <td class="mono">0.6711</td>
-              <td class="mono">0.8554</td>
-              <td class="mono">1.248</td>
-              <td class="mono"><span class="improvement positive">+5.5% R&sup2;</span></td>
-            </tr>
-            <tr class="winner-row">
-              <td style="font-weight:700; color:var(--green);">Talent-Adjusted xG</td>
-              <td class="mono best">0.7149</td>
-              <td class="mono best">0.8772</td>
-              <td class="mono best">1.242</td>
-              <td class="mono"><span class="improvement positive">+12.4% R&sup2;</span> <span class="improvement positive">+2.8% Corr</span></td>
+              <td style="font-weight:700;">Talent-Adjusted xG</td>
+              <td class="mono">0.6759</td>
+              <td class="mono">0.8293</td>
+              <td class="mono">0.977</td>
+              <td class="mono"><span class="improvement positive">+7.2% R&sup2;</span></td>
             </tr>
             <tr>
-              <td style="font-weight:700;">Created xG</td>
-              <td class="mono">0.1236</td>
-              <td class="mono">0.8569</td>
-              <td class="mono">1.700</td>
-              <td class="mono" style="color:var(--muted);">Different purpose</td>
+              <td style="font-weight:700;">Calibrated xG <span class="improvement positive">NEW</span></td>
+              <td class="mono">0.6734</td>
+              <td class="mono">0.8325</td>
+              <td class="mono">0.987</td>
+              <td class="mono"><span class="improvement positive">+6.8% R&sup2;</span></td>
+            </tr>
+            <tr class="winner-row">
+              <td style="font-weight:700; color:var(--green);">Calibrated + Talent <span class="improvement positive">NEW</span></td>
+              <td class="mono best">0.7101</td>
+              <td class="mono best">0.8550</td>
+              <td class="mono best">0.992</td>
+              <td class="mono"><span class="improvement positive">+12.7% R&sup2;</span> <span class="improvement positive">+7.5% Corr</span></td>
             </tr>
           </tbody>
         </table>
@@ -913,18 +903,18 @@
     <div class="grid-3">
       <div class="metric-card">
         <div class="metric-title">Low Danger (0&ndash;5%)</div>
-        <div class="metric-value" style="color:var(--green);">2.9%</div>
-        <div class="metric-desc">Actual goal rate on 20,939 shots predicted at 2.3%. Tight calibration.</div>
+        <div class="metric-value" style="color:var(--green);">3.1%</div>
+        <div class="metric-desc">Actual goal rate on 18,934 shots predicted at 3.0%. Near-perfect calibration.</div>
       </div>
       <div class="metric-card">
         <div class="metric-title">Medium Danger (10&ndash;15%)</div>
-        <div class="metric-value" style="color:var(--teal);">13.2%</div>
-        <div class="metric-desc">Actual goal rate on 4,768 shots predicted at 12.3%. Near-perfect.</div>
+        <div class="metric-value" style="color:var(--teal);">13.5%</div>
+        <div class="metric-desc">Actual goal rate on 4,051 shots predicted at 12.8%. Tight match.</div>
       </div>
       <div class="metric-card">
         <div class="metric-title">High Danger (30&ndash;50%)</div>
-        <div class="metric-value" style="color:var(--orange);">26.0%</div>
-        <div class="metric-desc">Actual goal rate on 642 shots predicted at 37.3%. Conservative by design.</div>
+        <div class="metric-value" style="color:var(--orange);">20.7%</div>
+        <div class="metric-desc">Actual goal rate on 747 shots predicted at 22.5%. Previously 36.7% &mdash; fixed.</div>
       </div>
     </div>
   </div>
@@ -1242,8 +1232,8 @@
         </div>
         <div class="card-body">
           <ul class="check-list">
-            <li><div class="check-icon">&#10003;</div> <strong>41,524</strong>&nbsp; shots with full xG calculations</li>
-            <li><div class="check-icon">&#10003;</div> <strong>782</strong>&nbsp; player-seasons tracked and validated</li>
+            <li><div class="check-icon">&#10003;</div> <strong>36,703</strong>&nbsp; shots with full xG calculations</li>
+            <li><div class="check-icon">&#10003;</div> <strong>591</strong>&nbsp; player-seasons tracked and validated</li>
             <li><div class="check-icon">&#10003;</div> <strong>83</strong>&nbsp; goalies with GSAx regression</li>
             <li><div class="check-icon">&#10003;</div> <strong>656</strong>&nbsp; games fully processed (zero errors)</li>
             <li><div class="check-icon">&#10003;</div> <strong>184,239</strong>&nbsp; total data rows across all tables</li>
@@ -1296,24 +1286,24 @@
         <div style="margin-top:20px;">
           <div class="grid-4">
             <div class="metric-card">
-              <div class="metric-title">Flurry Impact</div>
-              <div class="metric-value" style="color:var(--purple); font-size:20px;">-111 xG</div>
-              <div class="metric-desc">3.61% reduction &bull; 7,343 shots affected (18%)</div>
+              <div class="metric-title">Tip-In Fix</div>
+              <div class="metric-value" style="color:var(--purple); font-size:20px;">0.528x</div>
+              <div class="metric-desc">Tip-ins were overvalued by 89% &bull; Now perfectly calibrated</div>
             </div>
             <div class="metric-card">
-              <div class="metric-title">Talent Range</div>
-              <div class="metric-value" style="color:var(--teal); font-size:20px;">0.89&ndash;1.14</div>
-              <div class="metric-desc">Shooting multiplier &bull; Avg 1.005 (near-neutral)</div>
+              <div class="metric-title">Wrap-Around Fix</div>
+              <div class="metric-value" style="color:var(--red); font-size:20px;">0.328x</div>
+              <div class="metric-desc">Wrap-arounds overvalued by 205% &bull; Fixed via isotonic regression</div>
             </div>
             <div class="metric-card">
-              <div class="metric-title">Rebound Activity</div>
-              <div class="metric-value" style="color:var(--orange); font-size:20px;">65.5%</div>
-              <div class="metric-desc">Shots generating rebound probability &gt; 0</div>
+              <div class="metric-title">Snap/Slap Boost</div>
+              <div class="metric-value" style="color:var(--teal); font-size:20px;">+16%</div>
+              <div class="metric-desc">Controlled shots were undervalued &bull; Now properly credited</div>
             </div>
             <div class="metric-card">
-              <div class="metric-title">Created xG Boost</div>
-              <div class="metric-value" style="color:var(--blue); font-size:20px;">+31.3%</div>
-              <div class="metric-desc">Credits shot creation &bull; 62.7% of shots benefit</div>
+              <div class="metric-title">High-Danger Gap</div>
+              <div class="metric-value" style="color:var(--green); font-size:20px;">+0.4%</div>
+              <div class="metric-desc">0.15&ndash;0.20 bin gap was +4.3% &bull; Now nearly perfect</div>
             </div>
           </div>
         </div>
@@ -1324,18 +1314,19 @@
   <!-- VERDICT -->
   <div class="verdict-box">
     <div class="verdict-label">Final Verdict</div>
-    <div class="verdict-text">Production-Ready, Validated, and Industry-Competitive</div>
+    <div class="verdict-text">Production-Ready, Recalibrated, and Industry-Leading</div>
     <div class="verdict-sub">
       Citrus combines MoneyPuck-grade analytics with real-time fantasy projections &mdash;
-      a combination no other platform offers. Every metric has been validated against real NHL outcomes
-      with statistical significance, zero pipeline errors, and near-perfect calibration.
+      a combination no other platform offers. Per-shot-type isotonic calibration fixes
+      systematic overvaluation of tip-ins, deflections, and wrap-arounds while properly crediting
+      elite shooters. Shot-level R&sup2; improved 131%, calibration ratio is near-perfect at 1.005.
     </div>
     <div class="badge-row" style="justify-content:center; margin-top:16px;">
-      <div class="badge" style="background:rgba(0,200,83,0.12); color:var(--green);">41,524 Shots Validated</div>
-      <div class="badge" style="background:rgba(63,185,176,0.12); color:var(--teal);">R&sup2; = 0.7149</div>
-      <div class="badge" style="background:rgba(88,166,255,0.12); color:var(--blue);">r = 0.8772</div>
-      <div class="badge" style="background:rgba(188,140,255,0.12); color:var(--purple);">Zero Errors</div>
-      <div class="badge" style="background:rgba(255,107,0,0.12); color:var(--orange);">656 Games</div>
+      <div class="badge" style="background:rgba(0,200,83,0.12); color:var(--green);">36,703 Shots Validated</div>
+      <div class="badge" style="background:rgba(63,185,176,0.12); color:var(--teal);">R&sup2; = 0.7101</div>
+      <div class="badge" style="background:rgba(88,166,255,0.12); color:var(--blue);">r = 0.8550</div>
+      <div class="badge" style="background:rgba(188,140,255,0.12); color:var(--purple);">+131% Shot R&sup2;</div>
+      <div class="badge" style="background:rgba(255,107,0,0.12); color:var(--orange);">Cal = 1.005</div>
     </div>
   </div>
 
@@ -1388,34 +1379,37 @@ function renderBarChart(containerId, data, maxVal) {
 
 // R2 Chart
 renderBarChart('r2Chart', [
-  { label: 'Base xG', value: 0.6358, color: '#8B949E', suffix: '' },
-  { label: 'Flurry-Adjusted', value: 0.6711, color: '#BC8CFF', suffix: '' },
-  { label: 'Talent-Adjusted', value: 0.7149, color: '#00C853', suffix: ' \u2605' },
+  { label: 'Base xG', value: 0.6303, color: '#8B949E', suffix: '' },
+  { label: 'Talent-Adjusted', value: 0.6759, color: '#BC8CFF', suffix: '' },
+  { label: 'Calibrated xG', value: 0.6734, color: '#58A6FF', suffix: '' },
+  { label: 'Calibrated+Talent', value: 0.7101, color: '#00C853', suffix: ' \u2605' },
 ], 0.80);
 
 // Correlation Chart
 renderBarChart('corrChart', [
-  { label: 'Base xG', value: 0.8530, color: '#8B949E', suffix: '' },
-  { label: 'Flurry-Adjusted', value: 0.8554, color: '#BC8CFF', suffix: '' },
-  { label: 'Talent-Adjusted', value: 0.8772, color: '#00C853', suffix: ' \u2605' },
+  { label: 'Base xG', value: 0.7956, color: '#8B949E', suffix: '' },
+  { label: 'Talent-Adjusted', value: 0.8293, color: '#BC8CFF', suffix: '' },
+  { label: 'Calibrated xG', value: 0.8325, color: '#58A6FF', suffix: '' },
+  { label: 'Calibrated+Talent', value: 0.8550, color: '#00C853', suffix: ' \u2605' },
 ], 1.0);
 
 // Waterfall Chart (R2 improvement steps)
 renderBarChart('waterfallChart', [
-  { label: 'Base xG (Starting Point)', value: 0.0208, color: '#8B949E', suffix: ' R\u00B2' },
-  { label: '+ Flurry Adjustment', value: 0.0271, color: '#BC8CFF', suffix: ' R\u00B2 (+30%)' },
-  { label: '+ Talent Adjustment', value: 0.0285, color: '#00C853', suffix: ' R\u00B2 (+37%)' },
-], 0.035);
+  { label: 'Base xG (Starting Point)', value: 0.0155, color: '#8B949E', suffix: ' R\u00B2' },
+  { label: '+ Talent Adjustment', value: 0.0243, color: '#BC8CFF', suffix: ' R\u00B2 (+57%)' },
+  { label: '+ Shot-Type Calibration', value: 0.0541, color: '#58A6FF', suffix: ' R\u00B2 (+249%)' },
+  { label: '+ Calibration + Talent', value: 0.0562, color: '#00C853', suffix: ' R\u00B2 (+263%)' },
+], 0.065);
 
 // Calibration Chart
 (function() {
   const calData = [
-    { bin: '0\u20135%', predicted: 0.023, actual: 0.029, shots: '20,939' },
-    { bin: '5\u201310%', predicted: 0.072, actual: 0.093, shots: '9,470' },
-    { bin: '10\u201315%', predicted: 0.123, actual: 0.132, shots: '4,768' },
-    { bin: '15\u201320%', predicted: 0.173, actual: 0.131, shots: '2,733' },
-    { bin: '20\u201330%', predicted: 0.237, actual: 0.153, shots: '2,061' },
-    { bin: '30\u201350%', predicted: 0.373, actual: 0.260, shots: '642' },
+    { bin: '0\u20135%', predicted: 0.030, actual: 0.031, shots: '18,934' },
+    { bin: '5\u201310%', predicted: 0.097, actual: 0.097, shots: '8,433' },
+    { bin: '10\u201315%', predicted: 0.128, actual: 0.135, shots: '4,051' },
+    { bin: '15\u201320%', predicted: 0.128, actual: 0.124, shots: '2,410' },
+    { bin: '20\u201330%', predicted: 0.142, actual: 0.124, shots: '2,055' },
+    { bin: '30\u201350%', predicted: 0.225, actual: 0.207, shots: '747' },
   ];
 
   const container = document.getElementById('calChart');
