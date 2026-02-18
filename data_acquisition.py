@@ -2725,12 +2725,15 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                         # Ensure non-negative (shouldn't happen, but safety check)
                         time_since_powerplay_started = max(0.0, time_since_powerplay_started)
                 else:
-                    # Not on powerplay - check if we should reset tracking
-                    # Only reset if we're definitely not on a powerplay (even strength or shorthanded)
-                    # AND we're not in the middle of tracking a powerplay
-                    # Actually, keep tracking until powerplay definitively ends (goal scored or penalty expires)
-                    # For now, if not on PP, set to 0 but don't delete tracking (in case PP resumes)
+                    # Not on powerplay - clear stale tracking for the shooting team
+                    # This handles penalty expiration: power play ended without a goal,
+                    # so we must remove the old start time. Otherwise, if the same team
+                    # gets another PP in the same period, elapsed time would be calculated
+                    # from the OLD start time instead of the new one.
                     time_since_powerplay_started = 0.0
+                    if event_owner_team_id and event_owner_team_id in powerplay_start_times:
+                        if period_number in powerplay_start_times[event_owner_team_id]:
+                            del powerplay_start_times[event_owner_team_id][period_number]
                 
                 # Reset powerplay tracking on goals (powerplay ends when goal is scored)
                 if type_code == 505:  # Goal
