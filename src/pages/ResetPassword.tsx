@@ -44,8 +44,8 @@ const ResetPassword = () => {
     e.preventDefault();
     setError(null);
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters');
       return;
     }
 
@@ -144,7 +144,7 @@ const ResetPassword = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-10"
                   required
-                  minLength={6}
+                  minLength={8}
                 />
               </div>
               {password && <PasswordStrength password={password} />}

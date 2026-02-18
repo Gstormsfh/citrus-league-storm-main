@@ -11,6 +11,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { StormyChatBubble } from "./components/StormyChatBubble";
 import MobileBottomNav from "./components/MobileBottomNav";
+import { CookieConsent } from "./components/CookieConsent";
 import ScrollToTop from "./components/ScrollToTop";
 import LoadingScreen from "./components/LoadingScreen";
 import '@/integrations/firebase/config'; // Initialize Firebase
@@ -139,9 +140,11 @@ const App = () => {
             <Toaster />
             <Sonner position="top-right" closeButton />
             <BrowserRouter>
+              <a href="#main-content" className="skip-to-content">Skip to content</a>
               <ScrollToTop />
               <LeagueProvider>
                 <Suspense fallback={<PageLoader />}>
+                  <main id="main-content">
                   <Routes>
                     <Route path="/" element={<Index />} />
                 <Route path="/auth" element={<Auth />} />
@@ -183,9 +186,11 @@ const App = () => {
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
+                  </main>
             </Suspense>
             <StormyChatBubble />
             <MobileBottomNav />
+            <CookieConsent />
           </LeagueProvider>
         </BrowserRouter>
       </TooltipProvider>

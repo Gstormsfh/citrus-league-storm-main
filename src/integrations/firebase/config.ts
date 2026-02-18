@@ -37,12 +37,24 @@ if (hasValidConfig) {
   }
 }
 
-// Initialize Analytics
+// Cookie consent key used by the consent banner
+const CONSENT_KEY = 'citrus_analytics_consent';
+
+function hasAnalyticsConsent(): boolean {
+  try {
+    return localStorage.getItem(CONSENT_KEY) === 'granted';
+  } catch {
+    return false;
+  }
+}
+
+// Initialize Analytics (only after user consent)
 let analytics: Analytics | null = null;
 
 export const getAnalyticsInstance = (): Analytics | null => analytics;
 
-if (typeof window !== 'undefined' && app) {
+function initAnalytics() {
+  if (typeof window === 'undefined' || !app || analytics) return;
   isSupported()
     .then((supported) => {
       if (supported && app) {
@@ -54,6 +66,39 @@ if (typeof window !== 'undefined' && app) {
       }
     })
     .catch(() => {});
+}
+
+// Auto-init only if consent was previously granted
+if (hasAnalyticsConsent()) {
+  initAnalytics();
+}
+
+/**
+ * Call after user grants analytics consent.
+ * Persists the choice and boots Firebase Analytics.
+ */
+export function grantAnalyticsConsent() {
+  try { localStorage.setItem(CONSENT_KEY, 'granted'); } catch { /* noop */ }
+  initAnalytics();
+}
+
+/**
+ * Call if user declines analytics.
+ */
+export function denyAnalyticsConsent() {
+  try { localStorage.setItem(CONSENT_KEY, 'denied'); } catch { /* noop */ }
+}
+
+/**
+ * Check if the user has made a consent choice yet.
+ */
+export function hasConsentChoice(): boolean {
+  try {
+    const val = localStorage.getItem(CONSENT_KEY);
+    return val === 'granted' || val === 'denied';
+  } catch {
+    return false;
+  }
 }
 
 export { app, analytics };

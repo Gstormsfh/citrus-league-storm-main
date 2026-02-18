@@ -36,8 +36,8 @@ const Settings = () => {
     e.preventDefault();
     setMessage(null);
 
-    if (newPassword.length < 6) {
-      setMessage({ type: 'error', text: 'Password must be at least 6 characters' });
+    if (newPassword.length < 8) {
+      setMessage({ type: 'error', text: 'Password must be at least 8 characters' });
       return;
     }
 
