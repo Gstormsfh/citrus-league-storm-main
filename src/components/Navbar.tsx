@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import {
   Menu, X, Bell, Search, Users, LogOut, CircleUser,
   Trophy, ChevronDown, UserPlus, Calendar, BarChart3,
-  Swords, Newspaper, Sparkles, Settings
+  Swords, Newspaper, Sparkles, Settings, DollarSign
 } from 'lucide-react';
 import { CitrusLogo } from '@/components/icons/CitrusIcons';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -74,6 +74,7 @@ const Navbar = () => {
     { label: 'Players', path: '/free-agents', icon: Search },
     { label: 'GM Office', path: '/gm-office', icon: Settings },
     { label: 'Draft', path: '/draft-room', icon: Sparkles },
+    { label: 'Armchair GM', path: '/armchair-gm', icon: DollarSign },
   ];
 
   return (

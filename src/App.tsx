@@ -77,6 +77,7 @@ const TeamAnalytics = lazyWithErrorHandling(() => import("./pages/TeamAnalytics"
 const WaiverWire = lazyWithErrorHandling(() => import("./pages/WaiverWire"));
 const ScheduleManager = lazyWithErrorHandling(() => import("./pages/ScheduleManager"));
 const TradeAnalyzer = lazyWithErrorHandling(() => import("./pages/TradeAnalyzer"));
+const ArmchairGM = lazyWithErrorHandling(() => import("./pages/ArmchairGM"));
 const OtherTeam = lazyWithErrorHandling(() => import("./pages/OtherTeam"));
 const CreateLeague = lazyWithErrorHandling(() => import("./pages/CreateLeague"));
 const Features = lazyWithErrorHandling(() => import("./pages/Features"));
@@ -174,6 +175,7 @@ const App = () => {
                 <Route path="/waiver-wire" element={<WaiverWire />} />
                 <Route path="/schedule-manager" element={<ScheduleManager />} />
                 <Route path="/trade-analyzer" element={<TradeAnalyzer />} />
+                <Route path="/armchair-gm" element={<ArmchairGM />} />
                 <Route path="/team/:teamId" element={<OtherTeam />} />
                 <Route path="/features" element={<Features />} />
                 <Route path="/pricing" element={<Pricing />} />
