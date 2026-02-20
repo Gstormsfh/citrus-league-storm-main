@@ -303,7 +303,7 @@ export const DemoLeagueService = {
    */
   async populateDemoRosters(
     leagueId: string,
-    teams: any[],
+    teams: TeamRow[],
     allPlayers: Player[]
   ): Promise<void> {
     try {
@@ -443,7 +443,7 @@ export const DemoLeagueService = {
    */
   async initializeDemoLineups(
     leagueId: string,
-    teams: any[],
+    teams: TeamRow[],
     allPlayers: Player[]
   ): Promise<void> {
     try {
@@ -636,7 +636,7 @@ export const DemoLeagueService = {
   /**
    * Create static matchups for demo league
    */
-  async createDemoMatchups(leagueId: string, teams: any[]): Promise<void> {
+  async createDemoMatchups(leagueId: string, teams: TeamRow[]): Promise<void> {
     try {
       console.log('[DemoLeagueService] Creating static matchups...');
 

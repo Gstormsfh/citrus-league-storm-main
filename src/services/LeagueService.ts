@@ -680,7 +680,7 @@ async joinLeagueByCode(
    * Delete a team from a league (Commissioner only)
    * Also cleans up related data (roster_assignments, team_lineups, draft_picks, etc.)
    */
-  async deleteTeam(teamId: string, leagueId: string, userId: string): Promise<{ success: boolean; error: any }> {
+  async deleteTeam(teamId: string, leagueId: string, userId: string): Promise<{ success: boolean; error: unknown }> {
     try {
       logger.debug(`[LeagueService] Deleting team ${teamId} from league ${leagueId}`);
       
@@ -707,7 +707,7 @@ async joinLeagueByCode(
   /**
    * Get all teams in a league with owner profile information
    */
-  async getLeagueTeamsWithOwners(leagueId: string): Promise<{ teams: (Team & { owner_name?: string })[]; error: any }> {
+  async getLeagueTeamsWithOwners(leagueId: string): Promise<{ teams: (Team & { owner_name?: string })[]; error: unknown }> {
     try {
       logger.debug('Fetching teams with owners for league:', leagueId);
       
@@ -778,7 +778,7 @@ async joinLeagueByCode(
    * This function is idempotent - it will only create teams up to the target number
    * and will never create duplicates
    */
-  async simulateLeagueFill(leagueId: string, numTeams: number = 12): Promise<{ error: any }> {
+  async simulateLeagueFill(leagueId: string, numTeams: number = 12): Promise<{ error: unknown }> {
     try {
       // Get ALL existing teams with their names to avoid duplicates
       const { data: existingTeams, error: countError } = await supabase
@@ -860,7 +860,7 @@ async joinLeagueByCode(
   /**
    * Get user's team in a league
    */
-  async getUserTeam(leagueId: string, userId: string): Promise<{ team: Team | null; error: any }> {
+  async getUserTeam(leagueId: string, userId: string): Promise<{ team: Team | null; error: unknown }> {
     try {
       const { data, error } = await supabase
         .from('teams')
@@ -1357,7 +1357,7 @@ async joinLeagueByCode(
   /**
    * Fetch real transactions from roster_transactions table
    */
-  async fetchTransactions(leagueId: string): Promise<{ transactions: Transaction[]; error: any }> {
+  async fetchTransactions(leagueId: string): Promise<{ transactions: Transaction[]; error: unknown }> {
     try {
       const { data, error } = await supabase
         .from('transaction_ledger')
@@ -1711,7 +1711,7 @@ async joinLeagueByCode(
     teamId: string | number,
     leagueId: string,
     matchupId: string
-  ): Promise<{ backfilledCount: number; error: any }> {
+  ): Promise<{ backfilledCount: number; error: unknown }> {
     try {
       // Get matchup dates
       const { data: matchup, error: matchupError } = await supabase
@@ -1839,10 +1839,10 @@ async joinLeagueByCode(
    * Manual backfill for ALL teams in ALL matchups for a league
    * Use this to ensure all historical data exists
    */
-  async backfillAllMatchupsForLeague(leagueId: string): Promise<{ 
-    totalBackfilled: number; 
+  async backfillAllMatchupsForLeague(leagueId: string): Promise<{
+    totalBackfilled: number;
     matchupsProcessed: number;
-    errors: any[] 
+    errors: Array<{ matchup?: string; team?: string; error: unknown }>
   }> {
     try {
       logger.debug('[LeagueService] Starting backfill for ALL matchups in league:', leagueId);
@@ -1866,7 +1866,7 @@ async joinLeagueByCode(
       logger.debug(`[LeagueService] Found ${matchups.length} matchups to backfill`);
       
       let totalBackfilled = 0;
-      const errors: any[] = [];
+      const errors: Array<{ matchup?: string; team?: string; error: unknown }> = [];
       
       for (const matchup of matchups) {
         logger.debug(`[LeagueService] Processing matchup ${matchup.id}...`);

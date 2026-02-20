@@ -1364,7 +1364,7 @@ export const MatchupService = {
       goals_against?: number;
     },
     garPercentage?: number,
-    dailyProjection?: any
+    dailyProjection?: DailyProjectionRow
   ): MatchupPlayer {
     // CRITICAL: Debug goalie detection and stats
     const isGoalie = player.position === 'G' || player.position === 'Goalie';
@@ -1723,12 +1723,12 @@ export const MatchupService = {
     timezone: string = 'America/Denver',
     userId?: string, // Optional: required for logged-in users, not needed for guests viewing demo league
     targetDate?: string // Optional: if provided and is past date, use frozen roster for that date
-  ): Promise<{ 
-    team1Roster: MatchupPlayer[]; 
-    team2Roster: MatchupPlayer[]; 
+  ): Promise<{
+    team1Roster: MatchupPlayer[];
+    team2Roster: MatchupPlayer[];
     team1SlotAssignments: Record<string, string>;
     team2SlotAssignments: Record<string, string>;
-    error: any 
+    error: Error | null
   }> {
     try {
       // Validate: Ensure team1_id !== team2_id (prevent duplicate teams)
@@ -1988,7 +1988,7 @@ export const MatchupService = {
         const uuidIds: string[] = [];
         
         // Separate numeric IDs from UUIDs
-        lineupIds.forEach((id: any) => {
+        lineupIds.forEach((id: string | number) => {
           if (typeof id === 'string') {
             const numId = parseInt(id);
             if (!isNaN(numId) && numId > 0 && !id.includes('-')) {
@@ -2021,7 +2021,7 @@ export const MatchupService = {
             const roster = teamId === matchup.team1_id ? team1Roster : team2Roster;
             
             uuidIds.forEach((uuid: string) => {
-              const pickIndex = allTeamDraftPicks.findIndex((p: any) => p.player_id === uuid);
+              const pickIndex = allTeamDraftPicks.findIndex((p: { player_id: string; pick_number: number }) => p.player_id === uuid);
               if (pickIndex >= 0 && pickIndex < roster.length) {
                 const rosterPlayer = roster[pickIndex];
                 if (rosterPlayer && rosterPlayer.id) {
@@ -2042,7 +2042,7 @@ export const MatchupService = {
           // If we still have unmatched UUIDs, try fallback to players table
           if (numericIds.size < uuidIds.length) {
             const unmatchedUuids = uuidIds.filter(uuid => {
-              const pickIndex = allTeamDraftPicks?.findIndex((p: any) => p.player_id === uuid) ?? -1;
+              const pickIndex = allTeamDraftPicks?.findIndex((p: { player_id: string; pick_number: number }) => p.player_id === uuid) ?? -1;
               return pickIndex < 0;
             });
             
@@ -2681,14 +2681,14 @@ export const MatchupService = {
         team2SlotAssignments,
         error: null
       };
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error getting matchup rosters:', error);
       return {
         team1Roster: [],
         team2Roster: [],
         team1SlotAssignments: {},
         team2SlotAssignments: {},
-        error
+        error: error instanceof Error ? error : new Error(String(error))
       };
     }
   },
