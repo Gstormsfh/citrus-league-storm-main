@@ -2866,7 +2866,7 @@ export const MatchupService = {
       matchups: Matchup[];
     }>;
     bracketSize: number; // 4, 6, or 8
-    error: any;
+    error: PostgrestError | Error | null;
   }> {
     try {
       // Get league to determine schedule length
@@ -2966,43 +2966,43 @@ export const MatchupService = {
       }
 
       return { rounds, bracketSize, error: null };
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error getting playoff bracket:', error);
-      return { rounds: [], bracketSize: 0, error };
+      return { rounds: [], bracketSize: 0, error: error instanceof Error ? error : new Error(String(error)) };
     }
   },
 
   /**
    * Fetch pre-calculated matchup lines from fantasy_matchup_lines table
    */
-  async getMatchupLines(matchupId: string): Promise<Map<number, any>> {
+  async getMatchupLines(matchupId: string): Promise<Map<number, MatchupLineRow>> {
     try {
       const queryPromise = supabase
         .from('fantasy_matchup_lines')
         .select(COLUMNS.MATCHUP_LINES)
         .eq('matchup_id', matchupId);
-      
-      let data: any = null;
-      let error: any = null;
+
+      let data: MatchupLineRow[] | null = null;
+      let error: PostgrestError | Error | null = null;
       try {
         const result = await withTimeout(queryPromise, 5000, 'getMatchupLines timeout');
-        data = result.data;
+        data = result.data as MatchupLineRow[] | null;
         error = result.error;
-      } catch (timeoutError: any) {
+      } catch (timeoutError: unknown) {
         console.error('[MatchupService.getMatchupLines] Query timeout:', timeoutError);
-        error = timeoutError;
+        error = timeoutError instanceof Error ? timeoutError : new Error(String(timeoutError));
       }
-      
+
       if (error) throw error;
-      
+
       // Convert array to Map keyed by player_id for O(1) lookup
-      const linesMap = new Map<number, any>();
+      const linesMap = new Map<number, MatchupLineRow>();
       (data || []).forEach(line => {
         linesMap.set(line.player_id, line);
       });
-      
+
       return linesMap;
-    } catch (error) {
+    } catch (error: unknown) {
       console.warn('[MatchupService] getMatchupLines timeout or error:', error);
       return new Map(); // Graceful degradation
     }
@@ -3026,23 +3026,23 @@ export const MatchupService = {
         p_end_date: endDateStr
       });
       
-      let data: any = null;
-      let error: any = null;
+      let data: unknown[] | null = null;
+      let error: PostgrestError | Error | null = null;
       try {
         const result = await withTimeout(rpcPromise, 5000, 'fetchMatchupStatsForPlayers timeout');
-        data = result.data;
+        data = result.data as unknown[] | null;
         error = result.error;
-      } catch (timeoutError: any) {
+      } catch (timeoutError: unknown) {
         console.error('[MatchupService.fetchMatchupStatsForPlayers] RPC timeout:', timeoutError);
-        error = timeoutError;
+        error = timeoutError instanceof Error ? timeoutError : new Error(String(timeoutError));
       }
-      
+
       if (error) throw error;
-      
-      const statsMap = new Map<number, { 
-        goals: number; 
-        assists: number; 
-        sog: number; 
+
+      const statsMap = new Map<number, {
+        goals: number;
+        assists: number;
+        sog: number;
         blocks: number;
         // NEW: All 8 stat categories
         ppp: number;           // Power Play Points
@@ -3057,7 +3057,7 @@ export const MatchupService = {
         shutouts?: number;
         goals_against?: number;
       }>();
-      (data || []).forEach((row: any) => {
+      (data || []).forEach((row: Record<string, unknown>) => {
         const goalieStats = {
           wins: Number(row.wins) || 0,
           saves: Number(row.saves) || 0,

@@ -1383,20 +1383,20 @@ async joinLeagueByCode(
       const allPlayers = await PlayerService.getAllPlayers();
       const playerMap = new Map(allPlayers.map(p => [p.id, p]));
 
-      const transactions: Transaction[] = (data || []).map((tx: any) => {
+      const transactions: Transaction[] = (data || []).map((tx: { id: string; type: string; player_id: string; created_at: string; source: string | null; teams: { team_name: string } | null; profiles: { first_name: string | null; last_name: string | null } | null }) => {
         const player = playerMap.get(tx.player_id);
         const type = tx.type.toLowerCase() as 'claim' | 'drop' | 'trade';
-        
+
         return {
           id: tx.id,
           type: type === 'add' ? 'claim' : type, // Map 'ADD' to 'claim' for UI
           playerId: tx.player_id,
           playerName: player?.full_name || 'Unknown Player',
           playerTeam: player?.team || 'N/A',
-          date: new Date(tx.created_at).toLocaleDateString('en-US', { 
-            month: 'short', 
-            day: 'numeric', 
-            year: 'numeric' 
+          date: new Date(tx.created_at).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
           }),
           status: 'processed' as const, // All transactions in DB are processed
         };
@@ -1449,20 +1449,20 @@ async joinLeagueByCode(
       const allPlayers = await PlayerService.getAllPlayers();
       const playerMap = new Map(allPlayers.map(p => [p.id, p]));
 
-      const transactions: Transaction[] = data.map((tx: any) => {
+      const transactions: Transaction[] = data.map((tx: { id: string; type: string; player_id: string; created_at: string; source: string | null; league_id: string; teams: { team_name: string } | null }) => {
         const player = playerMap.get(tx.player_id);
         const type = tx.type.toLowerCase() as 'claim' | 'drop' | 'trade';
-        
+
         return {
           id: tx.id,
           type: type === 'add' ? 'claim' : type,
           playerId: tx.player_id,
           playerName: player?.full_name || 'Unknown Player',
           playerTeam: player?.team || 'N/A',
-          date: new Date(tx.created_at).toLocaleDateString('en-US', { 
-            month: 'short', 
-            day: 'numeric', 
-            year: 'numeric' 
+          date: new Date(tx.created_at).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
           }),
           status: 'processed' as const,
         };
@@ -1559,7 +1559,7 @@ async joinLeagueByCode(
           .eq('league_id', leagueId);
         
         if (!rosterError && currentRosterData) {
-          const validPlayerIds = new Set(currentRosterData.map((p: any) => String(p.player_id)));
+          const validPlayerIds = new Set(currentRosterData.map((p: { player_id: string }) => String(p.player_id)));
           const invalidPlayerIds = allLineupPlayerIds.filter(id => !validPlayerIds.has(id));
           
           if (invalidPlayerIds.length > 0) {
@@ -1976,7 +1976,7 @@ async joinLeagueByCode(
           .in('player_id', allPlayerIds);
         
         if (players) {
-          players.forEach((p: any) => {
+          players.forEach((p: { player_id: number; team_abbrev: string | null }) => {
             if (p.team_abbrev) {
               playerTeamMap.set(p.player_id, p.team_abbrev);
             }
