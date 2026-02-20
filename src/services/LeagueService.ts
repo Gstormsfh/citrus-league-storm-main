@@ -2526,15 +2526,16 @@ async joinLeagueByCode(
     }
     
     // Initialize all teams with 0 stats
-    const teamStats: Record<string, {
+    type TeamStatsWithHistory = {
       pointsFor: number;
       pointsAgainst: number;
       wins: number;
       losses: number;
       streak: string;
       last5: { wins: number; losses: number };
-      matchupHistory?: Array<{ week: number; won: boolean }>; // Track matchup history for streak/last5
-    }> = {};
+      matchupHistory: Array<{ week: number; won: boolean }>; // Track matchup history for streak/last5
+    };
+    const teamStats: Record<string, TeamStatsWithHistory> = {};
     
     teams.forEach(team => {
       teamStats[team.id] = {
@@ -2751,7 +2752,7 @@ async joinLeagueByCode(
         };
         
         // Remove matchupHistory from final result (it was just for calculation)
-        delete (stats as any).matchupHistory;
+        delete (stats as Partial<TeamStatsWithHistory>).matchupHistory;
       });
     } catch (error) {
       console.error('[LeagueService] Exception calculating team standings:', error);
@@ -2760,7 +2761,7 @@ async joinLeagueByCode(
 
     // Remove matchupHistory from all teams before caching/returning
     Object.keys(teamStats).forEach(teamId => {
-      delete (teamStats[teamId] as any).matchupHistory;
+      delete (teamStats[teamId] as Partial<TeamStatsWithHistory>).matchupHistory;
     });
 
     // Cache the result for 60 seconds

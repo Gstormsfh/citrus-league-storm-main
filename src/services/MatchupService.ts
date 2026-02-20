@@ -627,7 +627,7 @@ export const MatchupService = {
         const { team } = await LeagueService.getUserTeam(matchup.league_id, userId);
         userTeam = team || null;
         isUserInMatchup = userTeam && (matchup.team1_id === userTeam.id || matchup.team2_id === userTeam.id);
-      } catch (error) {
+      } catch (error: unknown) {
         // User might not be in this league/matchup - that's okay, we'll view as team1
         userTeam = null;
         isUserInMatchup = false;
