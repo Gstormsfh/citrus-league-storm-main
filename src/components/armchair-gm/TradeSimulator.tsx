@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   ArrowLeftRight, Search, AlertTriangle,
   ChevronDown, Loader2, RotateCcw, Check, X, SlidersHorizontal,
-  Save, FolderOpen, Trash2, Clock,
+  Save, FolderOpen, Trash2, Clock, Shield,
 } from 'lucide-react';
 import PlayerAvatar from './PlayerAvatar';
 

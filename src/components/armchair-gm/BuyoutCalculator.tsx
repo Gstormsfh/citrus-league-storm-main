@@ -8,7 +8,7 @@ import {
 import { getTeamCapData } from '@/services/NHLCapService';
 import { Badge } from '@/components/ui/badge';
 import {
-  Calculator, ChevronDown, Loader2, Search,
+  Calculator, ChevronDown, Loader2, Search, Shield,
   TrendingDown, TrendingUp, AlertCircle, DollarSign,
 } from 'lucide-react';
 import PlayerAvatar from './PlayerAvatar';
