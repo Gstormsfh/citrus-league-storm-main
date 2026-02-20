@@ -705,7 +705,7 @@ export const MatchupService = {
           const sorted = (viewingDailyScores as Array<{ roster_date: string; daily_score: string | number }>).sort((a, b) =>
             new Date(a.roster_date).getTime() - new Date(b.roster_date).getTime()
           );
-          viewingDailyPoints = sorted.map(d => parseFloat(d.daily_score) || 0);
+          viewingDailyPoints = sorted.map(d => parseFloat(String(d.daily_score)) || 0);
         } else {
           viewingDailyPoints = Array(7).fill(0);
         }
@@ -729,7 +729,7 @@ export const MatchupService = {
             const sorted = (oppDailyScores as Array<{ roster_date: string; daily_score: string | number }>).sort((a, b) =>
               new Date(a.roster_date).getTime() - new Date(b.roster_date).getTime()
             );
-            opponentDailyPoints = sorted.map(d => parseFloat(d.daily_score) || 0);
+            opponentDailyPoints = sorted.map(d => parseFloat(String(d.daily_score)) || 0);
           } else {
             opponentDailyPoints = Array(7).fill(0);
           }
@@ -997,7 +997,7 @@ export const MatchupService = {
           const sorted = (userDailyScores as Array<{ roster_date: string; daily_score: string | number }>).sort((a, b) =>
             new Date(a.roster_date).getTime() - new Date(b.roster_date).getTime()
           );
-          userDailyPoints = sorted.map(d => parseFloat(d.daily_score) || 0);
+          userDailyPoints = sorted.map(d => parseFloat(String(d.daily_score)) || 0);
         } else {
           console.warn('[getMatchupData] Error calculating user daily scores:', userError);
           // Fallback: use placeholder if calculation fails
@@ -1026,7 +1026,7 @@ export const MatchupService = {
             const sorted = (oppDailyScores as Array<{ roster_date: string; daily_score: string | number }>).sort((a, b) => 
               new Date(a.roster_date).getTime() - new Date(b.roster_date).getTime()
             );
-            opponentDailyPoints = sorted.map(d => parseFloat(d.daily_score) || 0);
+            opponentDailyPoints = sorted.map(d => parseFloat(String(d.daily_score)) || 0);
           } else {
             console.warn('[getMatchupData] Error calculating opponent daily scores:', oppError);
             opponentDailyPoints = Array(7).fill(0);
@@ -3301,7 +3301,7 @@ export const MatchupService = {
         slot_type: row.slot_type,
         slot_id: row.slot_id,
         is_locked: row.is_locked,
-        daily_points: parseFloat(row.daily_points) || 0,
+        daily_points: parseFloat(String(row.daily_points)) || 0,
         goals: row.goals || 0,
         assists: row.assists || 0,
         shots_on_goal: row.shots_on_goal || 0,
