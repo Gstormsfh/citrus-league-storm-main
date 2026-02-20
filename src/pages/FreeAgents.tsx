@@ -482,12 +482,9 @@ const FreeAgents = () => {
             weekStart.setHours(0, 0, 0, 0);
             weekEnd = new Date(matchup.week_end_date + 'T23:59:59');
             weekEnd.setHours(23, 59, 59, 999);
-            log(`[FreeAgents Schedule] Using matchup week from database: ${formatLocalDate(weekStart)} to ${formatLocalDate(weekEnd)}`);
-          } else {
-            log('[FreeAgents Schedule] No in_progress matchup found, will calculate from league');
           }
         } catch (error) {
-          log('[FreeAgents Schedule] Error fetching matchup:', error);
+          // Error fetching matchup - will fall through to calculated week
         }
         
         // If no matchup found, calculate from league draft completion date
@@ -501,11 +498,10 @@ const FreeAgents = () => {
                 const currentWeek = getCurrentWeekNumber(firstWeekStart);
                 weekStart = getWeekStartDate(currentWeek, firstWeekStart);
                 weekEnd = getWeekEndDate(currentWeek, firstWeekStart);
-                log(`[FreeAgents Schedule] Calculated week from league: ${formatLocalDate(weekStart)} to ${formatLocalDate(weekEnd)}`);
               }
             }
           } catch (error) {
-            log('[FreeAgents Schedule] Error fetching league:', error);
+            // Error fetching league - will fall through to calendar week fallback
           }
         }
         
@@ -521,23 +517,19 @@ const FreeAgents = () => {
           weekEnd = new Date(weekStart);
           weekEnd.setDate(weekStart.getDate() + 6);
           weekEnd.setHours(23, 59, 59, 999);
-          
-          log(`[FreeAgents Schedule] FALLBACK: Using calendar week ${formatLocalDate(weekStart)} to ${formatLocalDate(weekEnd)}`);
         }
       }
-      
+
       // Batch fetch games for all teams in parallel
       const teamGamesPromises = uniqueTeams.map(team => 
         ScheduleService.getGamesForTeamInWeek(team, weekStart, weekEnd)
           .then(({ games, error }) => {
             if (error) {
-              console.warn(`Error fetching games for ${team}:`, error);
               return { team, games: [] };
             }
             return { team, games: games || [] };
           })
-          .catch((error) => {
-            console.warn(`Exception fetching games for ${team}:`, error);
+          .catch(() => {
             return { team, games: [] };
           })
       );
@@ -559,26 +551,7 @@ const FreeAgents = () => {
       };
       const weekStartStr = formatDateLocal(weekStart);
       const weekEndStr = formatDateLocal(weekEnd);
-      
-      // Use log from above (already declared)
-      log(`[FreeAgents Schedule] ==========================================`);
-      log(`[FreeAgents Schedule] Week range: ${weekStartStr} to ${weekEndStr}`);
-      log(`[FreeAgents Schedule] Today (MST): ${todayMSTStr}`);
-      log(`[FreeAgents Schedule] Day of week: ${today.getDay()} (0=Sun, 1=Mon, 6=Sat)`);
-      log(`[FreeAgents Schedule] Fetched games for ${uniqueTeams.length} teams. Total games before filtering: ${Array.from(teamGamesMap.values()).reduce((sum, games) => sum + games.length, 0)}`);
-      
-      // Log sample team's games for debugging
-      if (teamGamesMap.size > 0) {
-        const sampleTeam = Array.from(teamGamesMap.keys())[0];
-        const sampleGames = teamGamesMap.get(sampleTeam) || [];
-        log(`[FreeAgents Schedule] Sample team ${sampleTeam} games:`, sampleGames.map(g => ({
-          date: g.game_date?.split('T')[0],
-          home: g.home_team,
-          away: g.away_team,
-          status: g.status
-        })));
-      }
-      
+
       for (const player of topPlayers) {
         const allGames = teamGamesMap.get(player.team) || [];
         
@@ -601,27 +574,9 @@ const FreeAgents = () => {
           const isNotFinal = gameStatusLower !== 'final' && gameStatusLower !== 'off';
           return isTodayOrFuture && isNotFinal;
         }).length;
-        
-        // Log first few players for debugging
-        if (maximizers.length < 3) {
-          log(`[FreeAgents Schedule] ${player.name} (${player.team}): ${gamesRemaining} games remaining, ${games.length} total in week`);
-          games.forEach(g => {
-            const gameDateStr = g.game_date.split('T')[0];
-            const gameStatusLower = (g.status || '').toLowerCase();
-            const isTodayOrFuture = gameDateStr >= todayMSTStr;
-            const isNotFinal = gameStatusLower !== 'final' && gameStatusLower !== 'off';
-            const isRemaining = isTodayOrFuture && isNotFinal;
-            log(`    ${gameDateStr} vs ${g.home_team}/${g.away_team} - ${g.status} - ${isRemaining ? 'REMAINING' : 'past/final'}`);
-          });
-        }
-        
+
         const count = gamesRemaining; // Use REMAINING games, not total
-        
-        // Log first few players for debugging
-        if (maximizers.length < 3) {
-          log(`[FreeAgents Schedule] Player ${player.name} (${player.team}): ${count} games in week, ${allGames.length} total fetched`);
-        }
-        
+
         // Include all players (no minimum game requirement)
         // Get day abbreviations for each game
         const gameDays = games.map(game => {
@@ -637,9 +592,7 @@ const FreeAgents = () => {
           games: games // Include full game data for rendering logos (filtered to week only)
         });
       }
-      
-      log(`[FreeAgents Schedule] Calculated maximizers for ${maximizers.length} players`);
-      
+
       // Sort by games count (descending), then by points (descending)
       maximizers.sort((a, b) => {
         // First sort by games count (most games first)
@@ -827,7 +780,6 @@ const FreeAgents = () => {
           });
         } catch (transactionError) {
           // Non-critical - don't fail the add if transaction recording fails
-          console.warn('[FreeAgents] Failed to record transaction:', transactionError);
         }
 
         if (result.isFreeAgent) {

@@ -1,5 +1,6 @@
 import { Player, PlayerService } from "@/services/PlayerService";
 import { supabase } from "@/integrations/supabase/client";
+import type { PostgrestError } from '@supabase/supabase-js';
 import { DraftService } from "./DraftService";
 import { MatchupService } from "./MatchupService";
 import { RosterCacheService } from "./RosterCacheService";
@@ -15,7 +16,7 @@ export interface League {
   join_code: string;
   roster_size: number;
   draft_rounds: number;
-  settings: Record<string, any>;
+  settings: Record<string, unknown>;
   // Waiver settings (added for world-class waiver system)
   waiver_process_time?: string;
   waiver_period_hours?: number;
@@ -28,16 +29,16 @@ export interface League {
       assists?: number;
       shots_on_goal?: number;
       blocks?: number;
-      [key: string]: any;
+      [key: string]: number | undefined;
     };
     goalie?: {
       wins?: number;
       saves?: number;
       shutouts?: number;
       goals_against?: number;
-      [key: string]: any;
+      [key: string]: number | undefined;
     };
-    [key: string]: any;
+    [key: string]: Record<string, number | undefined> | undefined;
   };
   scheduled_draft_time?: string | null;
   created_at: string;
@@ -249,8 +250,8 @@ export const LeagueService = {
     commissionerId: string,
     rosterSize: number = 21,
     draftRounds: number = 21,
-    settings: Record<string, any> = {},
-    scoringSettings?: Record<string, any>,
+    settings: Record<string, unknown> = {},
+    scoringSettings?: Record<string, number>,
     waiverSettings?: {
       waiver_process_time?: string;
       waiver_period_hours?: number;
@@ -499,10 +500,10 @@ async joinLeagueByCode(
         .eq('id', leagueId)
         .single();
 
-      const currentSettings = (currentLeague?.settings as Record<string, any>) || {};
+      const currentSettings = (currentLeague?.settings as Record<string, unknown>) || {};
       
       // Update the draft settings
-      const updateData: any = {};
+      const updateData: { draft_rounds?: number; settings?: Record<string, unknown> } = {};
       if (draftSettings.draft_rounds !== undefined) {
         updateData.draft_rounds = draftSettings.draft_rounds;
       }

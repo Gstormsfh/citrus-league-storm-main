@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import type { PostgrestError } from '@supabase/supabase-js';
 import { League, Team, LeagueService } from './LeagueService';
 import { DraftService } from './DraftService';
 import { PlayerService, Player } from './PlayerService';
@@ -10,6 +11,73 @@ import { withTimeout } from '@/utils/promiseUtils';
 import { getTodayMST, getTodayMSTDate, formatDateToString, isDateInRange } from '@/utils/timezoneUtils';
 import { COLUMNS } from '@/utils/queryColumns';
 import { ScoringCalculator, extractScoringSettings } from '@/utils/scoringUtils';
+
+// Shared stat shape used by calculateMatchupWeekPoints and matchup stats
+interface MatchupWeekStats {
+  goals?: number;
+  assists?: number;
+  sog?: number;
+  blocks?: number;
+  ppp?: number;
+  shp?: number;
+  hits?: number;
+  pim?: number;
+  plus_minus?: number;
+  xGoals?: number;
+  wins?: number;
+  saves?: number;
+  shutouts?: number;
+  goals_against?: number;
+}
+
+// Shape for daily projection rows returned from RPC
+interface DailyProjectionRow {
+  player_id: number;
+  is_goalie?: boolean;
+  total_projected_points?: number;
+  projected_goals?: number;
+  projected_assists?: number;
+  projected_sog?: number;
+  projected_blocks?: number;
+  projected_ppp?: number;
+  projected_shp?: number;
+  projected_hits?: number;
+  projected_pim?: number;
+  projected_xg?: number;
+  base_ppg?: number;
+  shrinkage_weight?: number;
+  finishing_multiplier?: number;
+  opponent_adjustment?: number;
+  b2b_penalty?: number;
+  home_away_adjustment?: number;
+  confidence_score?: number;
+  calculation_method?: string;
+  projected_wins?: number;
+  projected_saves?: number;
+  projected_shutouts?: number;
+  projected_goals_against?: number;
+  projected_gaa?: number;
+  projected_save_pct?: number;
+  projected_gp?: number;
+  starter_confirmed?: boolean;
+}
+
+// Shape for matchup line rows from fantasy_matchup_lines
+interface MatchupLineRow {
+  player_id: number;
+  total_points: number;
+  games_played: number;
+  games_remaining_total: number;
+  games_remaining_active: number;
+  has_live_game: boolean;
+  live_game_locked: boolean;
+  stats_breakdown?: Record<string, unknown>;
+}
+
+// Shape for raw stats breakdown JSONB from database
+interface RawStatsBreakdown {
+  [key: string]: number;
+}
 
 // Roster cache for performance optimization
 interface RosterCacheEntry {
@@ -76,18 +144,18 @@ export const MatchupService = {
   /**
    * Delete all matchups for a league (useful for regeneration)
    */
-  async deleteAllMatchupsForLeague(leagueId: string): Promise<{ error: any }> {
+  async deleteAllMatchupsForLeague(leagueId: string): Promise<{ error: PostgrestError | Error | null }> {
     try {
       const { error } = await supabase
         .from('matchups')
         .delete()
         .eq('league_id', leagueId);
-      
+
       if (error) throw error;
       return { error: null };
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('[MatchupService] Error deleting matchups:', error);
-      return { error };
+      return { error: error instanceof Error ? error : new Error(String(error)) };
     }
   },
 
@@ -190,7 +258,7 @@ export const MatchupService = {
     teams: Team[],
     firstWeekStart: Date,
     forceRegenerate: boolean = false
-  ): Promise<{ error: any }> {
+  ): Promise<{ error: PostgrestError | Error | null }> {
     try {
       // Get available weeks
       const currentYear = new Date().getFullYear();
@@ -409,9 +477,9 @@ export const MatchupService = {
       }
       
       return { error: null };
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('[MatchupService] Error generating matchups:', error);
-      return { error };
+      return { error: error instanceof Error ? error : new Error(String(error)) };
     }
   },
 
@@ -421,7 +489,7 @@ export const MatchupService = {
   async getMatchup(
     leagueId: string,
     weekNumber: number
-  ): Promise<{ matchup: Matchup | null; error: any }> {
+  ): Promise<{ matchup: Matchup | null; error: PostgrestError | Error | null }> {
     try {
       const { data, error } = await supabase
         .from('matchups')
@@ -432,8 +500,8 @@ export const MatchupService = {
 
       if (error) throw error;
       return { matchup: data || null, error: null };
-    } catch (error) {
-      return { matchup: null, error };
+    } catch (error: unknown) {
+      return { matchup: null, error: error instanceof Error ? error : new Error(String(error)) };
     }
   },
 

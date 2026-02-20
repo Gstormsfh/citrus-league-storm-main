@@ -354,8 +354,8 @@ export const DraftService = {
       }
 
       // Insert the pick - try RPC first (bypasses RLS), fallback to direct insert
-      let data: any;
-      let error: any;
+      let data: DraftPick | null = null;
+      let error: PostgrestError | null = null;
 
       const { data: rpcResult, error: rpcError } = await supabase.rpc('make_draft_pick', {
         p_league_id: leagueId,
@@ -531,7 +531,7 @@ export const DraftService = {
               
               // CRITICAL: Verify the sync actually inserted the right number of rows
               // The RPC returns players_synced count — verify it matches draft_picks count
-              const syncData = syncResult as any;
+              const syncData = syncResult as { players_synced?: number } | null;
               if (syncData?.players_synced !== undefined) {
                 const { count: pickCount } = await supabase
                   .from('draft_picks')
@@ -729,7 +729,7 @@ export const DraftService = {
           .single();
 
         const currentSettings = currentLeague?.settings || {};
-        const { timerStartedAt: _, ...settingsWithoutTimer } = currentSettings as Record<string, any>;
+        const { timerStartedAt: _, ...settingsWithoutTimer } = currentSettings as Record<string, unknown>;
 
         const { error: leagueError } = await supabase
           .from('leagues')
@@ -991,7 +991,7 @@ export const DraftService = {
    * Initialize rosters for all teams in a league after draft completion
    * This ensures every team has a valid lineup saved in team_lineups table
    */
-  async initializeRostersForAllTeams(leagueId: string): Promise<{ error: any }> {
+  async initializeRostersForAllTeams(leagueId: string): Promise<{ error: unknown }> {
     try {
       logger.log(`Initializing rosters for all teams in league ${leagueId}...`);
       
@@ -1080,7 +1080,7 @@ export const DraftService = {
       draftOrder: string;
       completedAt: string;
     }
-  ): Promise<{ snapshotId: string | null; error: any }> {
+  ): Promise<{ snapshotId: string | null; error: unknown }> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -1132,7 +1132,7 @@ export const DraftService = {
   /**
    * Get the most recent draft snapshot for a league
    */
-  async getDraftSnapshot(leagueId: string): Promise<{ snapshot: any | null; error: any }> {
+  async getDraftSnapshot(leagueId: string): Promise<{ snapshot: DraftSnapshot | null; error: unknown }> {
     try {
       const { data, error } = await supabase
         .from('draft_snapshots')
