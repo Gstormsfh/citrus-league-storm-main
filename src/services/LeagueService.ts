@@ -259,7 +259,7 @@ export const LeagueService = {
       waiver_type?: 'rolling' | 'faab' | 'reverse_standings';
       allow_trades_during_games?: boolean;
     }
-  ): Promise<{ league: League | null; team: Team | null; error: PostgrestError | Error | null }> {
+  ): Promise<{ league: League | null; team: Team | null; error: unknown }> {
     try {
       // Create the league with waiver settings
       const { data: league, error: leagueError } = await supabase
@@ -351,7 +351,7 @@ async joinLeagueByCode(
   joinCode: string,
   userId: string,
   teamName?: string
-): Promise<{ league: League | null; team: Team | null; error: PostgrestError | Error | null }> {
+): Promise<{ league: League | null; team: Team | null; error: unknown }> {
   try {
     // Validate inputs
     if (!joinCode || !joinCode.trim()) {
@@ -2974,7 +2974,7 @@ async joinLeagueByCode(
     userId: string,
     playerId: string,
     source: string = 'Roster Tab'
-  ): Promise<{ success: boolean; error: PostgrestError | Error | null }> {
+  ): Promise<{ success: boolean; error: unknown }> {
     // Read-only guard: Block all drops for demo league
     if (leagueId === DEMO_LEAGUE_ID_FOR_GUESTS) {
       return {
@@ -3028,7 +3028,7 @@ async joinLeagueByCode(
     userId: string,
     playerId: string,
     source: string = 'Roster Tab'
-  ): Promise<{ success: boolean; error: any }> {
+  ): Promise<{ success: boolean; error: unknown }> {
     // Read-only guard: Block all adds for demo league
     if (leagueId === DEMO_LEAGUE_ID_FOR_GUESTS) {
       return { 

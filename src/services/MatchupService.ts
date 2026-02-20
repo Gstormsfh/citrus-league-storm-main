@@ -2188,7 +2188,7 @@ export const MatchupService = {
       ].filter(id => id > 0);
 
       // NEW: Fetch pre-calculated matchup lines (with graceful degradation)
-      let matchupLines = new Map<number, any>();
+      let matchupLines = new Map<number, MatchupLineRow>();
       try {
         matchupLines = await this.getMatchupLines(matchup.id);
       } catch (error) {
@@ -2247,7 +2247,7 @@ export const MatchupService = {
       
       // Fetch daily projections for today's games
       const todayMST = getTodayMST();
-      let dailyProjectionsMap = new Map<number, any>();
+      let dailyProjectionsMap = new Map<number, DailyProjectionRow>();
       try {
         dailyProjectionsMap = await this.getDailyProjectionsForMatchup(allPlayerIds, todayMST);
       } catch (error) {
@@ -2291,7 +2291,7 @@ export const MatchupService = {
           const matchupLine = matchupLines.get(playerId);
 
           // Helper function to calculate matchup week points from stats using league scoring settings
-          const calculateMatchupWeekPoints = (stats: any, isGoalie: boolean = false): number => {
+          const calculateMatchupWeekPoints = (stats: MatchupWeekStats | undefined, isGoalie: boolean = false): number => {
             if (!stats) return 0;
             
             if (isGoalie && (stats.wins !== undefined || stats.saves !== undefined)) {
@@ -2499,7 +2499,7 @@ export const MatchupService = {
           const matchupLine = matchupLines.get(playerId);
 
           // Helper function to calculate matchup week points from stats using league scoring settings
-          const calculateMatchupWeekPoints = (stats: any, isGoalie: boolean = false): number => {
+          const calculateMatchupWeekPoints = (stats: MatchupWeekStats | undefined, isGoalie: boolean = false): number => {
             if (!stats) return 0;
             
             if (isGoalie && (stats.wins !== undefined || stats.saves !== undefined)) {
@@ -2799,7 +2799,7 @@ export const MatchupService = {
       team2Score: number; 
       weekStart: Date 
     }>; 
-    error: any 
+    error: PostgrestError | Error | null
   }> {
     try {
       if (!team2Id) {
@@ -2850,9 +2850,9 @@ export const MatchupService = {
       }));
 
       return { matchups, error: null };
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error getting matchup history:', error);
-      return { matchups: [], error };
+      return { matchups: [], error: error instanceof Error ? error : new Error(String(error)) };
     }
   },
 

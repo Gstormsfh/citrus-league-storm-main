@@ -383,7 +383,7 @@ export const DraftService = {
           .select()
           .single();
 
-        data = result.data as DraftPick | null;
+        data = result.data as unknown as DraftPick | null;
         error = result.error;
       } else {
         // RPC succeeded - fetch the inserted pick
