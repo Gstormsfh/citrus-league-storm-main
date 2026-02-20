@@ -73,8 +73,6 @@ const OtherTeam = () => {
           && teamIdNum >= 1 && teamIdNum <= 10;
         
         if (isDemoTeam) {
-          console.log('[OtherTeam] Loading REAL demo team from database:', teamIdNum);
-          
           // Import DEMO_LEAGUE_ID_FOR_GUESTS
           const { DEMO_LEAGUE_ID_FOR_GUESTS } = await import('@/services/DemoLeagueService');
           const { COLUMNS } = await import('@/utils/queryColumns');
@@ -118,9 +116,7 @@ const OtherTeam = () => {
           
           setTeam(demoTeamFromDb);
           setOwnerName(demoTeamMetadata?.owner || 'Demo Owner');
-          
-          console.log('[OtherTeam] Demo team loaded:', demoTeamFromDb.team_name);
-          
+
           // Get draft picks for this team
           const { data: draftPicksData, error: picksError } = await supabase
             .from('draft_picks')
@@ -136,8 +132,7 @@ const OtherTeam = () => {
           }
           
           const playerIds = (draftPicksData || []).map((p: any) => p.player_id);
-          console.log('[OtherTeam] Found', playerIds.length, 'players for team');
-          
+
           if (playerIds.length === 0) {
             console.error(`[OtherTeam] Demo team ${teamIdNum} has no players in roster`);
             setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
@@ -326,7 +321,6 @@ const OtherTeam = () => {
         // Check if draft is completed
         const { league: leagueData, error: leagueError } = await LeagueService.getLeague(teamData.league_id, user.id);
         if (leagueError || !leagueData || leagueData.draft_status !== 'completed') {
-          console.log(`Draft not completed for league ${teamData.league_id}`);
           setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
           setLoading(false);
           return;
@@ -340,7 +334,6 @@ const OtherTeam = () => {
         const teamPicks = draftPicks.filter(p => p.team_id === teamId);
         
         if (teamPicks.length === 0) {
-          console.log(`No draft picks found for team ${teamId}`);
           setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
           setLoading(false);
           return;
@@ -349,9 +342,7 @@ const OtherTeam = () => {
         // Map draft picks to players
         const playerIds = teamPicks.map(p => p.player_id);
         const teamPlayers = allPlayers.filter(p => playerIds.includes(p.id));
-        
-        console.log(`OtherTeam: Loaded ${teamPlayers.length} players for team ${teamId}`);
-        
+
         // CRITICAL: If no players loaded, something is wrong - log and return
         if (teamPlayers.length === 0) {
           console.error(`OtherTeam: Team ${teamId} - ❌ NO PLAYERS LOADED! This team has no players assigned.`);
@@ -432,9 +423,7 @@ const OtherTeam = () => {
           : 0;
         
         const isValidLineup = starterCount >= 10 && benchCount > 0;
-        
-        console.log(`OtherTeam: Team ${teamId} lineup check - ${starterCount} starters, ${benchCount} bench, valid: ${isValidLineup}, players loaded: ${transformedPlayers.length}`);
-        
+
         // If lineup exists but is invalid (especially if starters is empty), force re-assignment
         if (savedLineup && !isValidLineup) {
           console.error(`OtherTeam: Team ${teamId} - ❌ INVALID LINEUP DETECTED! (${starterCount} starters, ${benchCount} bench). All players on bench! Auto-fixing NOW...`);
@@ -531,9 +520,7 @@ const OtherTeam = () => {
 
           const initialRoster = { starters, bench, ir, slotAssignments: assignments };
           setRoster(initialRoster);
-          
-          console.log(`OtherTeam: Team ${teamId} - Auto-assigned lineup: ${starters.length} starters, ${bench.length} bench, ${ir.length} IR`);
-          
+
           // Save initial lineup for this team (handles UUID)
           // This ensures the lineup is persisted even if initialization missed it
           if (starters.length >= 10 && bench.length > 0) {

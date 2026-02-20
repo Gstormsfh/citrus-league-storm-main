@@ -38,17 +38,6 @@ export const MatchupSidebar: React.FC<MatchupSidebarProps> = ({
       ...opponentStarters.map(p => ({ ...p, teamName: opponentTeamName, isMyTeam: false }))
     ];
     
-    // Debug: Log player stats to see what's available
-    if (allPlayers.length > 0 && allPlayers[0]) {
-      console.log('[MatchupSidebar] Sample player data:', {
-        player: allPlayers[0].name,
-        total_points: allPlayers[0].total_points,
-        points: allPlayers[0].points,
-        stats: allPlayers[0].stats,
-        matchupStats: allPlayers[0].matchupStats
-      });
-    }
-    
     // Sort by total points (check multiple possible sources)
     const playersWithPoints = allPlayers.map(p => {
       // Try multiple sources for points

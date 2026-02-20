@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { withTimeout } from '@/utils/promiseUtils';
 import { getTodayMST, getTodayMSTDate } from '@/utils/timezoneUtils';
 import { COLUMNS } from '@/utils/queryColumns';
+import type { PostgrestError } from '@supabase/supabase-js';
 
 // Test mode: Controlled via VITE_TEST_MODE environment variable
 // Set VITE_TEST_MODE=true in .env to use test date for development
@@ -58,7 +59,7 @@ export const ScheduleService = {
   async getGamesForDateRange(
     startDate: Date,
     endDate: Date
-  ): Promise<{ games: NHLGame[]; error: any }> {
+  ): Promise<{ games: NHLGame[]; error: PostgrestError | null }> {
     try {
       // Helper to format date in local timezone (avoids UTC shift issues with toISOString)
       const formatDateLocal = (d: Date) => {
@@ -102,7 +103,7 @@ export const ScheduleService = {
     teamAbbrevs: string[],
     startDate?: Date,
     endDate?: Date
-  ): Promise<{ gamesByTeam: Map<string, NHLGame[]>; error: any }> {
+  ): Promise<{ gamesByTeam: Map<string, NHLGame[]>; error: PostgrestError | null }> {
     try {
       if (teamAbbrevs.length === 0) {
         return { gamesByTeam: new Map(), error: null };

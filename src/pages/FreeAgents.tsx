@@ -104,34 +104,6 @@ const FreeAgents = () => {
     setWatchlist(new Set(LeagueService.getWatchlist()));
   }, [searchParams, activeLeagueId, isChangingLeague]);
 
-  // Debug: Log position distribution when players load
-  useEffect(() => {
-    if (players.length > 0) {
-      const positionCounts = players.reduce((acc, p) => {
-        const pos = p.position || 'UNKNOWN';
-        acc[pos] = (acc[pos] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
-      console.log('[FreeAgents] Position distribution:', positionCounts);
-      console.log('[FreeAgents] Total players:', players.length);
-      
-      // Goalie debugging
-      const goalies = players.filter(p => p.position === 'G');
-      const goalieVariants = players.filter(p => p.position && p.position.toUpperCase().includes('G'));
-      console.log('[FreeAgents] Goalies (exact "G"):', goalies.length);
-      console.log('[FreeAgents] Goalie variants (contains G):', goalieVariants.length);
-      
-      if (goalies.length === 0 && goalieVariants.length > 0) {
-        console.warn('[FreeAgents] ❌ NO GOALIES with position="G", but found variants:', 
-          goalieVariants.slice(0, 3).map(g => ({ name: g.full_name, position: g.position })));
-      } else if (goalies.length > 0) {
-        console.log('[FreeAgents] ✅ Sample goalies:', goalies.slice(0, 3).map(g => ({ name: g.full_name, position: g.position, wins: g.wins })));
-      } else {
-        console.error('[FreeAgents] ❌ NO GOALIES FOUND AT ALL - check player_directory.position_code');
-      }
-    }
-  }, [players.length]);
-
   // Load schedule maximizers when players are loaded (needed for Top Projected combined view)
   useEffect(() => {
     if (players.length > 0 && scheduleMaximizers.length === 0 && !loadingMaximizers) {
@@ -168,7 +140,6 @@ const FreeAgents = () => {
       });
       
       if (error) {
-        console.warn('[FreeAgents] Trending RPC not available yet:', error.message);
         return;
       }
       
@@ -181,15 +152,8 @@ const FreeAgents = () => {
           });
         });
         setTrendingData(trendingMap);
-        if (trendingMap.size > 0) {
-          console.log(`[FreeAgents] ✅ Loaded REAL trending data for ${trendingMap.size} players from player_transactions table`);
-          console.log('[FreeAgents] Top trending:', Array.from(trendingMap.entries()).slice(0, 5));
-        } else {
-          console.warn('[FreeAgents] ⚠️ No trending data yet - player_transactions table is empty.');
-        }
       }
     } catch (error) {
-      console.warn('[FreeAgents] Error fetching trending data:', error);
       // Non-critical error - fallback to mock data
     } finally {
       setLoadingTrending(false);
@@ -219,7 +183,6 @@ const FreeAgents = () => {
             .slice(0, 30); // Top 30 goalies
           
           const sortedPlayers = [...topSkaters, ...topGoalies];
-          console.log(`[FreeAgents] Loaded ${sortedPlayers.length} players (${topSkaters.length} skaters, ${topGoalies.length} goalies)`);
           setPlayers(sortedPlayers);
           setLoading(false);
           return;
@@ -264,21 +227,7 @@ const FreeAgents = () => {
       // CRITICAL: This now filters to only include players with matching stats records (same as getPlayersByIds)
       // This ensures Free Agents shows the EXACT same players and stats as Matchup tab and Player Cards
       const allPlayers = await PlayerService.getAllPlayers();
-      
-      console.log(`[FreeAgents] Fetched ${allPlayers.length} players from PlayerService.getAllPlayers()`);
-      
-      // Debug: Log sample players to verify data
-      if (allPlayers.length > 0) {
-        const samplePlayers = allPlayers.slice(0, 3);
-        samplePlayers.forEach(samplePlayer => {
-          const calculatedPoints = samplePlayer.goals + samplePlayer.assists;
-          console.log(`[FreeAgents] Sample: ${samplePlayer.full_name} (ID: ${samplePlayer.id}) - ${samplePlayer.goals}G ${samplePlayer.assists}A ${samplePlayer.points}P (GP: ${samplePlayer.games_played}, Team: ${samplePlayer.team})`);
-          if (Math.abs(samplePlayer.points - calculatedPoints) > 0.5) {
-            console.warn(`[FreeAgents] WARNING: Points mismatch for ${samplePlayer.full_name}: points=${samplePlayer.points}, goals+assists=${calculatedPoints}`);
-          }
-        });
-      }
-      
+
       if (!allPlayers || allPlayers.length === 0) {
         throw new Error('No players found');
       }
@@ -291,10 +240,6 @@ const FreeAgents = () => {
       // Don't calculate schedule maximizers here - will be lazy loaded when tab is active
     } catch (error) {
       console.error('Error fetching players:', error);
-      console.error('Error details:', {
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined
-      });
       toast({
         title: "Error",
         description: `Failed to load players: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -344,24 +289,19 @@ const FreeAgents = () => {
       
       const effectiveLeagueId = leagueId || '750f4e1a-92ae-44cf-a798-2f3e06d0d5c9'; // Demo league ID for guests
       const isDemo = !leagueId || effectiveLeagueId === '750f4e1a-92ae-44cf-a798-2f3e06d0d5c9';
-      const debugLog = (window as any).__originalConsole?.log || console.log;
-      const formatDateLocalHelper = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      
       // CRITICAL FIX: For DEMO mode, ALWAYS use current calendar week (Sunday-Saturday)
       // The demo league's DB dates are stale and don't represent the actual current week.
       if (isDemo) {
         const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
         const daysFromSunday = dayOfWeek; // Sunday is 0, Monday is 1, etc.
-        
+
         weekStart = new Date(today);
         weekStart.setDate(today.getDate() - daysFromSunday);
         weekStart.setHours(0, 0, 0, 0);
-        
+
         weekEnd = new Date(weekStart);
         weekEnd.setDate(weekStart.getDate() + 6);
         weekEnd.setHours(23, 59, 59, 999);
-        
-        debugLog(`[FreeAgents Projections] DEMO MODE: Using current calendar week ${formatDateLocalHelper(weekStart)} to ${formatDateLocalHelper(weekEnd)}`);
       } else {
         // For logged-in users with real leagues, try to get matchup week from database
         try {
@@ -378,12 +318,9 @@ const FreeAgents = () => {
             weekStart.setHours(0, 0, 0, 0);
             weekEnd = new Date(matchup.week_end_date + 'T23:59:59');
             weekEnd.setHours(23, 59, 59, 999);
-            debugLog(`[FreeAgents Projections] Using matchup week from database: ${formatDateLocalHelper(weekStart)} to ${formatDateLocalHelper(weekEnd)}`);
-          } else {
-            debugLog('[FreeAgents Projections] No in_progress matchup found, will calculate from league');
           }
         } catch (error) {
-          debugLog('[FreeAgents Projections] Error fetching matchup:', error);
+          // Error fetching matchup - will fall through to calculated week
         }
         
         // If no matchup found, calculate from league draft completion date
@@ -397,11 +334,10 @@ const FreeAgents = () => {
                 const currentWeek = getCurrentWeekNumber(firstWeekStart);
                 weekStart = getWeekStartDate(currentWeek, firstWeekStart);
                 weekEnd = getWeekEndDate(currentWeek, firstWeekStart);
-                debugLog(`[FreeAgents Projections] Calculated week from league: ${formatDateLocalHelper(weekStart)} to ${formatDateLocalHelper(weekEnd)}`);
               }
             }
           } catch (error) {
-            debugLog('[FreeAgents Projections] Error fetching league:', error);
+            // Error fetching league - will fall through to calendar week fallback
           }
         }
         
@@ -417,8 +353,6 @@ const FreeAgents = () => {
           weekEnd = new Date(weekStart);
           weekEnd.setDate(weekStart.getDate() + 6);
           weekEnd.setHours(23, 59, 59, 999);
-          
-          debugLog(`[FreeAgents Projections] FALLBACK: Using calendar week`);
         }
       }
 
@@ -438,8 +372,6 @@ const FreeAgents = () => {
         weekDays.push(formatDateLocal(currentDate));
         currentDate.setDate(currentDate.getDate() + 1);
       }
-      
-      debugLog(`[FreeAgents Projections] Fetching projections for remaining week: ${weekDays[0]} to ${weekDays[weekDays.length - 1]} (${weekDays.length} days)`);
 
       // Convert player IDs to numbers
       const playerIds = topPlayers.map(p => {
@@ -465,16 +397,11 @@ const FreeAgents = () => {
         }
       });
 
-      // Debug logging (reuse debugLog from above)
-      debugLog(`[FreeAgents Projections] Fetching for ${weekDays.length} days: ${weekDays[0]} to ${weekDays[weekDays.length - 1]}`);
-      debugLog(`[FreeAgents Projections] Player count: ${playerIds.length}`);
-      
       // Fetch projections for each day and aggregate ALL 8 STATS
       for (const date of weekDays) {
         try {
           const dailyProjections = await MatchupService.getDailyProjectionsForMatchup(playerIds, date);
-          debugLog(`[FreeAgents Projections] ${date}: Got ${dailyProjections.size} projections`);
-          
+
           // Sum up ALL STATS for each player (full transparency)
           // CRITICAL: Use playerId directly (numeric) as Map key to ensure proper accumulation
           dailyProjections.forEach((projection, playerId) => {
@@ -486,59 +413,14 @@ const FreeAgents = () => {
 
             // Count games: if projection system returned data for this player on this day, they have a game
             gameCountMap.set(playerId, (gameCountMap.get(playerId) || 0) + 1);
-            
-            // Debug first few to verify aggregation
-            if (weeklyProjectionMap.size <= 5) {
-              const player = topPlayers.find(p => {
-                const pId = typeof p.id === 'string' ? parseInt(p.id, 10) : p.id;
-                return pId === playerId;
-              });
-              if (player) {
-                debugLog(`  [${date}] Player ${player.full_name} (ID: ${playerId}): ${currentTotal.toFixed(1)} + ${dailyPoints.toFixed(1)} = ${newTotal.toFixed(1)}`);
-              }
-            }
           });
         } catch (error) {
-          debugLog(`[FreeAgents Projections] Error for ${date}:`, error);
+          // Error fetching projections for this date - continue with other dates
         }
       }
 
       setWeeklyProjections(weeklyProjectionMap);
       setWeeklyGameCounts(gameCountMap);
-
-      // Debug: Log final aggregated projections with validation
-      const topProjectionPlayers = Array.from(weeklyProjectionMap.entries())
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10)
-        .map(([numericId, total]) => {
-          const player = topPlayers.find(p => {
-            const pId = typeof p.id === 'string' ? parseInt(p.id, 10) : p.id;
-            return pId === numericId;
-          });
-          return { name: player?.full_name, id: numericId, total: total.toFixed(1) };
-        });
-      
-      const hasRealProjections = Array.from(weeklyProjectionMap.values()).some(val => val > 0);
-      if (hasRealProjections) {
-        console.log('[FreeAgents Projections] ✅ REAL projections loaded from get_daily_projections RPC');
-        console.log('[FreeAgents Projections] Top 10 projected players:', topProjectionPlayers);
-      } else {
-        console.warn('[FreeAgents Projections] ⚠️ No projections returned (all 0). Fallback to estimated will be used.');
-      }
-      debugLog('[FreeAgents Projections] Full weekly projection map size:', weeklyProjectionMap.size);
-      
-      const goalieProjections = topPlayers
-        .filter(p => p.position === 'G')
-        .slice(0, 5)
-        .map(p => {
-          const numericId = typeof p.id === 'string' ? parseInt(p.id, 10) : p.id;
-          return {
-            name: p.full_name,
-            id: numericId,
-            weeklyProj: (weeklyProjectionMap.get(numericId) || 0).toFixed(1)
-          };
-        });
-      debugLog('[FreeAgents Projections] Top 5 goalie projections:', goalieProjections);
     } catch (error) {
       console.error('Error fetching weekly projections:', error);
       // On error, set empty map (will fall back to mock projection)
@@ -570,25 +452,20 @@ const FreeAgents = () => {
       
       const effectiveLeagueId = leagueId || '750f4e1a-92ae-44cf-a798-2f3e06d0d5c9'; // Demo league ID for guests
       const isDemo = !leagueId || effectiveLeagueId === '750f4e1a-92ae-44cf-a798-2f3e06d0d5c9';
-      const log = (window as any).__originalConsole?.log || console.log;
-      const formatLocalDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      
       // CRITICAL FIX: For DEMO mode, ALWAYS use current calendar week (Sunday-Saturday)
       // The demo league's DB dates are stale and don't represent the actual current week.
       // This matches what the Matchup tab does - it recalculates dates, not trusts DB dates.
       if (isDemo) {
         const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
         const daysFromSunday = dayOfWeek; // Sunday is 0, Monday is 1, etc.
-        
+
         weekStart = new Date(today);
         weekStart.setDate(today.getDate() - daysFromSunday);
         weekStart.setHours(0, 0, 0, 0);
-        
+
         weekEnd = new Date(weekStart);
         weekEnd.setDate(weekStart.getDate() + 6);
         weekEnd.setHours(23, 59, 59, 999);
-        
-        log(`[FreeAgents Schedule] DEMO MODE: Using current calendar week ${formatLocalDate(weekStart)} to ${formatLocalDate(weekEnd)}`);
       } else {
         // For logged-in users with real leagues, try to get matchup week from database
         try {

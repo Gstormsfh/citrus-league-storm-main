@@ -40,7 +40,29 @@ async function fetchNHLNews(): Promise<NewsArticle[]> {
     const data = await resp.json();
     const items = data?.items || data?.docs || [];
 
-    return items.slice(0, 30).map((item: any, idx: number) => {
+    interface NHLStoryItem {
+      headline?: string;
+      title?: string;
+      summary?: string;
+      subhead?: string;
+      slug?: string;
+      contentUrl?: string;
+      thumbnail?: { templateUrl?: string };
+      image?: { templateUrl?: string };
+      contentDate?: string;
+      date?: string;
+      _entityId?: string;
+      id?: string;
+      fields?: {
+        headline?: string;
+        summary?: string;
+        slug?: string;
+        date?: string;
+        thumbnail?: { templateUrl?: string };
+      };
+    }
+
+    return items.slice(0, 30).map((item: NHLStoryItem, idx: number) => {
       const headline = item.headline || item.title || item.fields?.headline || 'NHL News';
       const summary = item.summary || item.subhead || item.fields?.summary || '';
       const slug = item.slug || item.contentUrl || item.fields?.slug || '';

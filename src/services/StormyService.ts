@@ -559,13 +559,23 @@ class StormyServiceImpl {
         }
 
         // ── 11. Top free agents ──────────────────────────────────
+        type RosProjectionRow = {
+          player_id: number;
+          player_name: string;
+          position: string | null;
+          team_abbrev: string | null;
+          total_projected_points: number;
+          avg_points_per_game: number;
+          games_remaining: number;
+        };
+
         if (rosProjectionsData.length > 0) {
-          const freeAgents = rosProjectionsData
-            .filter((p: any) => !allRosteredIds.has(p.player_id))
+          const freeAgents = (rosProjectionsData as RosProjectionRow[])
+            .filter((p: RosProjectionRow) => !allRosteredIds.has(p.player_id))
             .slice(0, 8);  // Top 8 unrostered
 
           if (freeAgents.length > 0) {
-            const faLines = freeAgents.map((p: any) =>
+            const faLines = freeAgents.map((p: RosProjectionRow) =>
               `${p.position ?? "?"} ${p.player_name} (${p.team_abbrev ?? "?"}) ROS:${Number(p.total_projected_points).toFixed(1)}pts ${Number(p.avg_points_per_game).toFixed(1)}PPG ${p.games_remaining}GR`
             );
             ctx.extra = (ctx.extra ? ctx.extra + "\n\n" : "") + "Top Available Free Agents:\n" + faLines.join("\n");

@@ -18,11 +18,25 @@ export interface TradeOffer {
   counter_offer_id: string | null;
 }
 
+interface TradePlayerSummary {
+  player_id: number;
+  full_name: string;
+  position_code: string;
+  team_abbrev: string;
+}
+
+interface TeamLineup {
+  starters: string[];
+  bench: string[];
+  ir: string[];
+  slot_assignments: Record<string, string>;
+}
+
 export interface TradeOfferWithPlayers extends TradeOffer {
   from_team_name: string;
   to_team_name: string;
-  offered_players: any[];
-  requested_players: any[];
+  offered_players: TradePlayerSummary[];
+  requested_players: TradePlayerSummary[];
 }
 
 export class TradeService {
@@ -68,11 +82,11 @@ export class TradeService {
         success: true,
         tradeId: data.id
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating trade offer:', error);
       return {
         success: false,
-        error: error.message || 'Failed to create trade offer'
+        error: error instanceof Error ? error.message : String(error)
       };
     }
   }
@@ -170,20 +184,20 @@ export class TradeService {
         .single();
 
       if (fromTeamLineup && toTeamLineup) {
-        const removePlayers = (lineup: any, playerIds: number[]) => {
+        const removePlayers = (lineup: TeamLineup, playerIds: number[]): TeamLineup => {
           const playerIdStrs = playerIds.map(id => id.toString());
           return {
-            starters: ((lineup.starters as any[]) || []).filter((id: string) => !playerIdStrs.includes(id)),
-            bench: ((lineup.bench as any[]) || []).filter((id: string) => !playerIdStrs.includes(id)),
-            ir: ((lineup.ir as any[]) || []).filter((id: string) => !playerIdStrs.includes(id)),
+            starters: (lineup.starters || []).filter((id: string) => !playerIdStrs.includes(id)),
+            bench: (lineup.bench || []).filter((id: string) => !playerIdStrs.includes(id)),
+            ir: (lineup.ir || []).filter((id: string) => !playerIdStrs.includes(id)),
             slot_assignments: Object.fromEntries(
-              Object.entries((lineup.slot_assignments as any) || {}).filter(([key]) => !playerIdStrs.includes(key))
+              Object.entries(lineup.slot_assignments || {}).filter(([key]) => !playerIdStrs.includes(key))
             )
           };
         };
 
-        const addPlayersToBench = (lineup: any, playerIds: number[]) => {
-          const newBench = [...((lineup.bench as any[]) || []), ...playerIds.map(id => id.toString())];
+        const addPlayersToBench = (lineup: TeamLineup, playerIds: number[]): TeamLineup => {
+          const newBench = [...(lineup.bench || []), ...playerIds.map(id => id.toString())];
           return { ...lineup, bench: newBench };
         };
 
@@ -266,11 +280,11 @@ export class TradeService {
         });
 
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error accepting trade:', error);
       return {
         success: false,
-        error: error.message || 'Failed to accept trade'
+        error: error instanceof Error ? error.message : String(error)
       };
     }
   }
@@ -320,11 +334,11 @@ export class TradeService {
       }
 
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error rejecting trade:', error);
       return {
         success: false,
-        error: error.message || 'Failed to reject trade'
+        error: error instanceof Error ? error.message : String(error)
       };
     }
   }
@@ -374,11 +388,11 @@ export class TradeService {
       }
 
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error cancelling trade:', error);
       return {
         success: false,
-        error: error.message || 'Failed to cancel trade'
+        error: error instanceof Error ? error.message : String(error)
       };
     }
   }

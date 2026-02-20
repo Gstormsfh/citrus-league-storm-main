@@ -178,7 +178,7 @@ export class WaiverService {
         waiver_clear_time: waiverClearTime,
         lock_reason: lockReason
       };
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error checking player availability:', error);
       throw error;
     }
@@ -289,11 +289,11 @@ export class WaiverService {
       }
 
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error adding free agent:', error);
       return {
         success: false,
-        error: error.message || 'Failed to add free agent'
+        error: error instanceof Error ? error.message : String(error)
       };
     }
   }
@@ -349,11 +349,11 @@ export class WaiverService {
         success: true,
         claimId: data.id
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error submitting waiver claim:', error);
       return {
         success: false,
-        error: error.message || 'Failed to submit waiver claim'
+        error: error instanceof Error ? error.message : String(error)
       };
     }
   }
@@ -406,11 +406,11 @@ export class WaiverService {
           isFreeAgent: false
         };
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error adding player:', error);
       return {
         success: false,
-        error: error.message || 'Failed to add player'
+        error: error instanceof Error ? error.message : String(error)
       };
     }
   }
@@ -434,11 +434,11 @@ export class WaiverService {
       }
 
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error cancelling waiver claim:', error);
       return {
         success: false,
-        error: error.message || 'Failed to cancel waiver claim'
+        error: error instanceof Error ? error.message : String(error)
       };
     }
   }
@@ -473,7 +473,7 @@ export class WaiverService {
         priority: wp.priority,
         updated_at: wp.updated_at
       }));
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error fetching waiver priority:', error);
       return [];
     }
@@ -500,7 +500,7 @@ export class WaiverService {
       }
 
       return data || [];
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error fetching team waiver claims:', error);
       return [];
     }
@@ -526,7 +526,7 @@ export class WaiverService {
       }
 
       return data as LeagueWaiverSettings;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error fetching league waiver settings:', error);
       return null;
     }
@@ -583,7 +583,7 @@ export class WaiverService {
         jersey_number: p.jersey_number || '',
         is_goalie: p.position === 'G'
       }));
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error fetching available players:', error);
       return [];
     }
@@ -605,7 +605,7 @@ export class WaiverService {
       total_processed: number;
       successful: number;
       failed: number;
-      details: any[];
+      details: { team_id: string; success: boolean; error?: string }[];
     }>;
     error?: string;
   }> {
@@ -628,7 +628,7 @@ export class WaiverService {
       let totalSuccessful = 0;
       let totalFailed = 0;
       
-      results.forEach((r: any) => {
+      results.forEach((r: { league_id: string; league_name: string; total_processed: number; successful: number; failed: number; details: { team_id: string; success: boolean; error?: string }[] }) => {
         totalProcessed += r.total_processed || 0;
         totalSuccessful += r.successful || 0;
         totalFailed += r.failed || 0;
@@ -638,12 +638,12 @@ export class WaiverService {
         success: true,
         results
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[WaiverService] Error processing waivers:', error);
       return {
         success: false,
         results: [],
-        error: error.message || 'Failed to process waivers'
+        error: error instanceof Error ? error.message : String(error)
       };
     }
   }
@@ -671,9 +671,9 @@ export class WaiverService {
       }
       
       return { leagues: data || [] };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[WaiverService] Error getting waiver status:', error);
-      return { leagues: [], error: error.message };
+      return { leagues: [], error: error instanceof Error ? error.message : String(error) };
     }
   }
 }

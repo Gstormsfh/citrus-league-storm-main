@@ -83,7 +83,6 @@ const LeagueDashboard = () => {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && leagueId && user) {
-        console.log('LeagueDashboard: Page visible again, reloading data');
         loadLeagueData();
       }
     };
@@ -143,17 +142,7 @@ const LeagueDashboard = () => {
         console.error('Error loading teams:', teamsError);
         throw teamsError;
       }
-      console.log('Loaded teams:', teamsData);
-      console.log('Team count:', teamsData?.length || 0);
       setTeams(teamsData || []);
-      
-      // Log button visibility conditions
-      console.log('Button visibility check:', {
-        draftStatus: leagueData.draft_status,
-        teamsLength: teamsData?.length || 0,
-        isCommissioner: leagueData.commissioner_id === user.id,
-        willShowButton: leagueData.draft_status === 'not_started' && (teamsData?.length || 0) >= 12
-      });
 
       // Load user's team
       const { team: userTeamData } = await LeagueService.getUserTeam(leagueId, user.id);
@@ -173,11 +162,9 @@ const LeagueDashboard = () => {
 
     // Prevent multiple simultaneous calls
     if (simulating) {
-      console.log('handleSimulateFill: Already simulating, ignoring duplicate call');
       return;
     }
 
-    console.log('handleSimulateFill: Starting for league', leagueId);
     setSimulating(true);
     
     try {
@@ -194,8 +181,6 @@ const LeagueDashboard = () => {
         return;
       }
 
-      console.log('handleSimulateFill: Teams created successfully, reloading...');
-      
       toast({
         title: 'Teams Created',
         description: 'Simulated teams have been added to the league.',
@@ -220,7 +205,6 @@ const LeagueDashboard = () => {
         
         retries--;
         if (retries > 0) {
-          console.log('handleSimulateFill: Retrying team reload, attempts left:', retries);
           await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
@@ -233,7 +217,6 @@ const LeagueDashboard = () => {
           variant: 'destructive',
         });
       } else {
-        console.log('handleSimulateFill: Reloaded teams:', teamsData);
         setTeams(teamsData || []);
         
         if (teamsData && teamsData.length > 0) {

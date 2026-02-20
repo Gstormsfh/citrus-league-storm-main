@@ -526,36 +526,20 @@ const Roster = () => {
             .eq('team_id' as any, userTeamData.id as any);
           
           if (rosterError) {
-            console.error('[Roster] ❌ Error fetching roster_assignments:', rosterError);
+            console.error('[Roster] Error fetching roster_assignments:', rosterError);
             // Last resort: empty roster
             dbPlayers = [];
           } else {
             const rosterAssignments = (rosterAssignmentsData || []) as any[];
             const playerIds = rosterAssignments.map((r: any) => r.player_id);
             
-            // DIAGNOSTIC: Log roster_assignments count and sample IDs
-            console.log(`[Roster] 📋 roster_assignments for team: ${rosterAssignments.length} entries`);
-            console.log(`[Roster] 📋 allPlayers available: ${allPlayers.length} total`);
-            if (rosterAssignments.length > 0) {
-              console.log(`[Roster] 📋 Sample roster player_ids (first 5):`, playerIds.slice(0, 5));
-              console.log(`[Roster] 📋 Sample allPlayers ids (first 5):`, allPlayers.slice(0, 5).map(p => p.id));
-              console.log(`[Roster] 📋 Type of roster player_id:`, typeof playerIds[0]);
-              console.log(`[Roster] 📋 Type of allPlayers id:`, typeof allPlayers[0]?.id);
-            }
-            
             // CRITICAL: player_id is TEXT in DB, and p.id is STRING in allPlayers (PlayerService line 287)
             // Compare strings to strings directly — ensure both sides are strings
             dbPlayers = allPlayers.filter(p => playerIds.includes(String(p.id)));
             
-            // DIAGNOSTIC: Log match results
-            console.log(`[Roster] 📋 Matched players: ${dbPlayers.length} out of ${rosterAssignments.length} roster_assignments`);
             if (dbPlayers.length < rosterAssignments.length) {
-              // Find which player_ids didn't match
-              const matchedIds = new Set(dbPlayers.map(p => String(p.id)));
-              const unmatchedIds = playerIds.filter((id: string) => !matchedIds.has(String(id)));
-              console.error(`[Roster] ⚠️ MISSING ${unmatchedIds.length} players! Unmatched IDs:`, unmatchedIds);
-              console.error(`[Roster] ⚠️ These players exist in roster_assignments but NOT in PlayerService.getAllPlayers()`);
-              console.error(`[Roster] ⚠️ Possible causes: (1) player_directory doesn't have them, (2) player_season_stats doesn't have them, (3) Supabase row limit truncation`);
+              // Some players in roster_assignments were not found in PlayerService.getAllPlayers()
+              // Possible causes: player_directory missing entries, player_season_stats missing entries, or Supabase row limit truncation
             }
           }
         }
@@ -570,8 +554,6 @@ const Roster = () => {
         
         // Transform players from pipeline tables to HockeyPlayer format
         // All data (names, stats, positions, teams) comes from PlayerService (player_directory + player_season_stats)
-        console.log('[Roster] 📊 Draft picks loaded:', dbPlayers.length, 'players');
-        
         const formatSecondsToMMSS = (totalSeconds: number): string => {
           const s = Math.max(0, Math.round(totalSeconds || 0));
           const m = Math.floor(s / 60);
@@ -688,8 +670,6 @@ const Roster = () => {
         const matchupForLoading = currentMatchup; // Use from closure
         
         if (isPastDate && matchupForLoading && teamId && leagueIdForLineup && !isDemoLeague(leagueIdForLineup)) {
-          console.log('[Roster] 📅 Loading FROZEN roster for PAST date:', selectedDate);
-          
           const dailyRoster = await LeagueService.loadDailyRoster(
             String(teamId),
             matchupForLoading.id,
@@ -753,17 +733,12 @@ const Roster = () => {
           const stalePlayerIds = Array.from(allSavedIds).filter(id => !currentPlayerIds.has(id));
           
           if (stalePlayerIds.length > 0) {
-            console.warn('[Roster] 🧹 Filtering out', stalePlayerIds.length, 'stale player IDs from team_lineups (dropped players)');
-            console.warn('[Roster] Stale IDs:', stalePlayerIds);
-            console.warn('[Roster] ⚠️ team_lineups table needs cleanup - run CLEANUP_STALE_TEAM_LINEUPS.sql');
           }
           
           // Filter saved lineup to only include current roster players
           const filteredStarters = uniqueIds(savedLineup.starters).filter(id => currentPlayerIds.has(id));
           const filteredBench = uniqueIds(savedLineup.bench).filter(id => currentPlayerIds.has(id));
           const filteredIr = uniqueIds(savedLineup.ir).filter(id => currentPlayerIds.has(id));
-          
-          console.log('[Roster] 📊 After filtering: starters:', filteredStarters.length, 'bench:', filteredBench.length, 'ir:', filteredIr.length);
           
           // Build player map from current roster
           const playerMap = new Map(transformedPlayers.map(p => [String(p.id), p]));
@@ -773,7 +748,6 @@ const Roster = () => {
             .map(id => {
               const player = playerMap.get(id);
               if (!player) {
-                console.error('[Roster] ❌ Player', id, 'in filtered lineup but not in transformedPlayers!');
                 return null;
               }
               return { ...player, starter: true };
@@ -784,7 +758,6 @@ const Roster = () => {
             .map(id => {
               const player = playerMap.get(id);
               if (!player) {
-                console.error('[Roster] ❌ Player', id, 'in filtered lineup but not in transformedPlayers!');
                 return null;
               }
               return player;
@@ -795,7 +768,6 @@ const Roster = () => {
             .map(id => {
               const player = playerMap.get(id);
               if (!player) {
-                console.error('[Roster] ❌ Player', id, 'in filtered lineup but not in transformedPlayers!');
                 return null;
               }
               return player;
@@ -936,14 +908,6 @@ const Roster = () => {
             normalizedSlotAssignments[String(playerId)] = slotId;
           });
           
-          console.log('[Roster] Setting roster from saved lineup:', { 
-            starters: starters.length, 
-            bench: bench.length, 
-            ir: ir.length, 
-            slotAssignments: Object.keys(normalizedSlotAssignments).length,
-            hasUtilSlot: Object.values(normalizedSlotAssignments).includes('slot-UTIL'),
-            utilSlotPlayer: Object.entries(normalizedSlotAssignments).find(([_, slot]) => slot === 'slot-UTIL')?.[0]
-          });
           setRoster({ starters, bench, ir, slotAssignments: normalizedSlotAssignments });
         } else {
           // No saved lineup - use EXACT SAME LOGIC AS OtherTeam.tsx
@@ -1136,7 +1100,6 @@ const Roster = () => {
           });
         } else {
           // Silently ignore demo league errors
-          console.debug("Demo league error (expected and harmless):", errorMessage);
         }
       } finally {
         // Always set loading to false at the end
@@ -1182,7 +1145,6 @@ const Roster = () => {
 
         const draftCompletionDate = getDraftCompletionDate(league);
         if (!draftCompletionDate) {
-          console.warn('[Roster] League has no draft completion date');
           return;
         }
 
@@ -1394,23 +1356,10 @@ const Roster = () => {
   // Reload roster when selected date changes to a PAST date (to load frozen roster)
   // For TODAY/FUTURE dates, we keep the current roster - projections are fetched by the dedicated useEffect
   useEffect(() => {
-    console.log('[Roster] Date change effect triggered:', {
-      selectedDate,
-      hasCurrentMatchup: !!currentMatchup,
-      hasUserTeamId: !!userTeamId
-    });
-    
     if (selectedDate && currentMatchup && userTeamId) {
       const todayStr = getTodayMST();
       const isPastDate = selectedDate < todayStr;
-      
-      console.log('[Roster] Date evaluation:', {
-        selectedDate,
-        todayStr,
-        isPastDate,
-        willReload: isPastDate
-      });
-      
+
       if (isPastDate) {
         // Past date - need to load frozen roster from database
         loadRoster(true);
@@ -2489,20 +2438,9 @@ const Roster = () => {
             ir: newIR.map(p => p.id),
             slotAssignments: newAssignments
           };
-          console.log('[Roster] Saving lineup:', {
-            teamId: userTeamId,
-            leagueId: userTeam.league_id,
-            selectedDate,
-            starters: lineupToSave.starters.length,
-            bench: lineupToSave.bench.length,
-            ir: lineupToSave.ir.length,
-            starterIds: lineupToSave.starters,
-            targetDate: selectedDate || 'ALL future dates (cascade)'
-          });
           // Yahoo-style: If selectedDate is set, only save to that date; otherwise cascade
           LeagueService.saveLineup(userTeamId, userTeam.league_id, lineupToSave, selectedDate || undefined)
             .then(() => {
-              console.log('[Roster] Lineup saved successfully to:', selectedDate || 'all future dates');
               // Reload roster to reflect saved changes
               loadRoster(true);
             })

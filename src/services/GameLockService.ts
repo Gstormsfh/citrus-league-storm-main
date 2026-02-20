@@ -77,7 +77,7 @@ export const GameLockService = {
         return { isLocked: false, gameStatus: 'not_started' };
       }
 
-      const game = games as any;
+      const game = games;
       const gameStatus = game.status as 'scheduled' | 'live' | 'final';
 
       // If game is already final, player is locked
@@ -191,7 +191,7 @@ export const GameLockService = {
 
     // Build map of team -> game info
     const teamGameMap = new Map<string, { gameTime?: string; status: string }>();
-    (games || []).forEach((game: any) => {
+    (games || []).forEach((game: { game_time: string | null; status: string; home_team: string; away_team: string; game_date: string }) => {
       if (teamList.includes(game.home_team)) {
         teamGameMap.set(game.home_team, { gameTime: game.game_time, status: game.status });
       }

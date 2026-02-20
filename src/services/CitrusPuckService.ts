@@ -86,7 +86,8 @@ function mapStatsToCitrusPuck(
   
   // ALWAYS use NHL.com official stats exclusively (no PBP fallback)
   // This ensures we display only NHL.com data, not PBP-calculated data
-  
+  const useNhlStats = true;
+
   // Base CitrusPuckPlayerData with all fields defaulted to 0
   const citrusData: CitrusPuckPlayerData = {
     playerId: stats.player_id,

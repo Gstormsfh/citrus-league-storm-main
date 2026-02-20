@@ -94,6 +94,8 @@
 import { LeagueTeam, LEAGUE_TEAMS_DATA } from './LeagueService';
 import { MatchupPlayer } from '@/components/matchup/types';
 import { Player } from './PlayerService';
+import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
+import type { NHLGame } from './ScheduleService';
 
 export interface DemoLeague {
   id: 'demo-league';
@@ -268,7 +270,7 @@ export const DemoDataService = {
     // CRITICAL: Use REAL NHL data for ALL users (guests and logged-in)
     // Only team assignments are static - everything else uses real data
     // This ensures demo matchup follows EXACT same logic as real matchups
-    let allPlayers: any[] = [];
+    let allPlayers: Player[] = [];
     let useRealData = false;
     
     // Step 1: Try to load real players from database (works for guests if RLS allows)
@@ -330,13 +332,13 @@ export const DemoDataService = {
       
       // Helper function to organize roster into starters/bench (EXACT SAME LOGIC AS Roster.tsx)
       // This creates slot assignments as it organizes, ensuring consistency with Roster page
-      const organizeRoster = (roster: any[]) => {
+      const organizeRoster = (roster: HockeyPlayer[]) => {
         const slotsNeeded = { 'C': 2, 'LW': 2, 'RW': 2, 'D': 4, 'G': 2, 'UTIL': 1 };
         const slotsFilled = { 'C': 0, 'LW': 0, 'RW': 0, 'D': 0, 'G': 0, 'UTIL': 0 };
         
-        const starters: any[] = [];
-        const bench: any[] = [];
-        const ir: any[] = [];
+        const starters: HockeyPlayer[] = [];
+        const bench: HockeyPlayer[] = [];
+        const ir: HockeyPlayer[] = [];
         const slotAssignments: Record<string, string> = {};
         let irSlotIndex = 1;
         
@@ -401,7 +403,7 @@ export const DemoDataService = {
       
       // Batch fetch games for all teams at once (more efficient)
       // Wrap in try-catch in case schedule query fails for guests
-      let gamesByTeam = new Map<string, any[]>();
+      let gamesByTeam = new Map<string, NHLGame[]>();
       try {
         const { ScheduleService } = await import('./ScheduleService');
         const scheduleResult = await ScheduleService.getGamesForTeams(allTeams, weekStart, weekEnd);
