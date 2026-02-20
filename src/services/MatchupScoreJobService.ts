@@ -16,6 +16,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { MatchupService } from './MatchupService';
+import type { PostgrestError } from '@supabase/supabase-js';
 
 export const MatchupScoreJobService = {
   /**
@@ -23,7 +24,7 @@ export const MatchupScoreJobService = {
    * This prevents users from retroactively changing their lineups after games complete
    * Uses SINGLE batch update for efficiency (no more spam!)
    */
-  async lockCompletedDays(): Promise<{ lockedCount: number; error: any }> {
+  async lockCompletedDays(): Promise<{ lockedCount: number; error: PostgrestError | null }> {
     try {
       // Find all games that are 'final' (completed)
       const { data: finalGames, error: gamesError } = await supabase
@@ -64,7 +65,7 @@ export const MatchupScoreJobService = {
       
     } catch (error) {
       console.error('[MatchupScoreJobService] Exception in lockCompletedDays:', error);
-      return { lockedCount: 0, error };
+      return { lockedCount: 0, error: error as PostgrestError };
     }
   },
 
@@ -75,7 +76,7 @@ export const MatchupScoreJobService = {
    * 
    * @param leagueId - Optional league ID to update scores for. If not provided, updates all leagues.
    */
-  async calculateAndStoreScores(leagueId?: string): Promise<{ updatedCount: number; error: any }> {
+  async calculateAndStoreScores(leagueId?: string): Promise<{ updatedCount: number; error: PostgrestError | null }> {
     try {
       // Call the existing MatchupService method which uses update_all_matchup_scores RPC
       const { error, updatedCount, results } = await MatchupService.updateMatchupScores(leagueId);
@@ -89,7 +90,7 @@ export const MatchupScoreJobService = {
       
     } catch (error) {
       console.error('[MatchupScoreJobService] Exception in calculateAndStoreScores:', error);
-      return { updatedCount: 0, error };
+      return { updatedCount: 0, error: error as PostgrestError };
     }
   },
 
@@ -99,12 +100,12 @@ export const MatchupScoreJobService = {
    * 
    * @param leagueId - Optional league ID to process. If not provided, processes all leagues.
    */
-  async runJob(leagueId?: string): Promise<{ 
-    lockedCount: number; 
-    updatedCount: number; 
-    errors: any[] 
+  async runJob(leagueId?: string): Promise<{
+    lockedCount: number;
+    updatedCount: number;
+    errors: Array<{ step: string; error: PostgrestError | null }>
   }> {
-    const errors: any[] = [];
+    const errors: Array<{ step: string; error: PostgrestError | null }> = [];
     
     // Step 1: Lock completed days
     const { lockedCount, error: lockError } = await this.lockCompletedDays();

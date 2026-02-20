@@ -798,11 +798,11 @@ export const MatchupService = {
     timezone: string = 'America/Denver',
     existingMatchup?: Matchup | null,
     targetDate?: string // Optional: if provided and is past date, load frozen roster for that date
-  ): Promise<{ data: MatchupDataResponse | null; error: any }> {
+  ): Promise<{ data: MatchupDataResponse | null; error: PostgrestError | Error | null }> {
     try {
       // Get league to determine first week start
-      let league: any = null;
-      let leagueError: any = null;
+      let league: Record<string, unknown> | null = null;
+      let leagueError: PostgrestError | Error | null = null;
       try {
         const result = await withTimeout(
           supabase.from('leagues').select(COLUMNS.LEAGUE).eq('id', leagueId).maybeSingle(),
@@ -811,9 +811,9 @@ export const MatchupService = {
         );
         league = result.data;
         leagueError = result.error;
-      } catch (timeoutError: any) {
+      } catch (timeoutError: unknown) {
         console.error('[MatchupService.getMatchupData] League query timeout:', timeoutError);
-        leagueError = timeoutError;
+        leagueError = timeoutError instanceof Error ? timeoutError : new Error(String(timeoutError));
       }
 
       if (leagueError) throw leagueError;
@@ -822,15 +822,15 @@ export const MatchupService = {
       }
 
       // Get first week start date
-      const draftCompletionDate = league.updated_at ? new Date(league.updated_at) : new Date();
+      const draftCompletionDate = league.updated_at ? new Date(league.updated_at as string) : new Date();
       const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
       const currentYear = new Date().getFullYear();
       const scheduleLength = getScheduleLength(firstWeekStart, currentYear);
       const isPlayoffWeek = weekNumber > scheduleLength;
 
       // Get user's team
-      let userTeam: any = null;
-      let teamError: any = null;
+      let userTeam: Record<string, unknown> | null = null;
+      let teamError: PostgrestError | Error | null = null;
       try {
         const result = await withTimeout(
           supabase.from('teams').select(COLUMNS.TEAM).eq('league_id', leagueId).eq('owner_id', userId).maybeSingle(),
@@ -839,15 +839,18 @@ export const MatchupService = {
         );
         userTeam = result.data;
         teamError = result.error;
-      } catch (timeoutError: any) {
+      } catch (timeoutError: unknown) {
         console.error('[MatchupService.getMatchupData] User team query timeout:', timeoutError);
-        teamError = timeoutError;
+        teamError = timeoutError instanceof Error ? timeoutError : new Error(String(timeoutError));
       }
 
       if (teamError) throw teamError;
       if (!userTeam) {
         return { data: null, error: new Error('User team not found') };
       }
+
+      // Cast to known shape after null check
+      const userTeamData = userTeam as { id: string; team_name: string; [key: string]: unknown };
 
       // Use existingMatchup if provided, otherwise query
       let matchup: Matchup | null = null;
@@ -863,9 +866,9 @@ export const MatchupService = {
         console.warn('[MatchupService.getMatchupData] No matchup found for week:', weekNumber);
         return { data: null, error: new Error(`No matchup found for week ${weekNumber}`) };
       }
-      
+
       // Determine which team the user is (team1 or team2)
-      const isTeam1 = matchup.team1_id === userTeam.id;
+      const isTeam1 = matchup.team1_id === userTeamData.id;
       const opponentTeamId = isTeam1 ? matchup.team2_id : matchup.team1_id;
 
       // Get opponent team object
@@ -959,7 +962,7 @@ export const MatchupService = {
       const opponentSlotAssignments = normalizeSlotAssignments(isTeam1 ? team2SlotAssignments : team1SlotAssignments);
 
       // Get team records
-      const userRecord = await this.getTeamRecord(userTeam.id, leagueId, userId);
+      const userRecord = await this.getTeamRecord(userTeamData.id, leagueId, userId);
       const opponentRecord = opponentTeamObj ? await this.getTeamRecord(opponentTeamObj.id, leagueId, userId) : { wins: 0, losses: 0 };
 
       // Calculate daily points
@@ -983,7 +986,7 @@ export const MatchupService = {
           'calculate_daily_matchup_scores',
           {
             p_matchup_id: matchup.id,
-            p_team_id: userTeam.id,
+            p_team_id: userTeamData.id,
             p_week_start: weekStartStr,
             p_week_end: weekEndStr
           }
