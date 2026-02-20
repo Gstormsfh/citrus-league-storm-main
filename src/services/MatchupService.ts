@@ -3153,7 +3153,7 @@ export const MatchupService = {
   /**
    * Transform raw stats_breakdown JSONB to StatBreakdown interface
    */
-  transformStatsBreakdown(rawBreakdown: any): StatBreakdown | undefined {
+  transformStatsBreakdown(rawBreakdown: RawStatsBreakdown | null | undefined): StatBreakdown | undefined {
     if (!rawBreakdown || typeof rawBreakdown !== 'object') {
       return undefined;
     }
@@ -3226,7 +3226,7 @@ export const MatchupService = {
    */
   async updateMatchupScores(
     leagueId?: string
-  ): Promise<{ error: any; updatedCount?: number; results?: Array<{ matchup_id: string; team1_score: number; team2_score: number; updated: boolean }> }> {
+  ): Promise<{ error: PostgrestError | Error | null; updatedCount?: number; results?: Array<{ matchup_id: string; team1_score: number; team2_score: number; updated: boolean }> }> {
     try {
       // Input validation
       if (leagueId && typeof leagueId !== 'string') {
@@ -3243,17 +3243,17 @@ export const MatchupService = {
       }
       
       // Filter out failed updates (where updated = false) for count
-      const successfulUpdates = (data || []).filter((r: any) => r.updated === true);
+      const successfulUpdates = (data || []).filter((r: { matchup_id: string; team1_score: number; team2_score: number; updated: boolean }) => r.updated === true);
       
       return { 
         error: null, 
         updatedCount: successfulUpdates.length,
         results: data || []
       };
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('[MatchupService] Error updating matchup scores:', error);
-      return { 
-        error,
+      return {
+        error: error instanceof Error ? error : new Error(String(error)),
         updatedCount: 0
       };
     }
@@ -3292,7 +3292,7 @@ export const MatchupService = {
         return [];
       }
       
-      const lineup: DailyLineupPlayer[] = (data || []).map((row: any) => ({
+      const lineup: DailyLineupPlayer[] = (data || []).map((row: { player_id: number; player_name: string; player_position: string; nhl_team: string; headshot_url: string | null; slot_type: 'active' | 'bench' | 'ir'; slot_id: string | null; is_locked: boolean; daily_points: string | number; goals?: number; assists?: number; shots_on_goal?: number; blocks?: number; hits?: number; pim?: number; ppp?: number; shp?: number; wins?: number; saves?: number; goals_against?: number; shutouts?: number; is_goalie?: boolean }) => ({
         player_id: row.player_id,
         player_name: row.player_name,
         position: row.player_position,

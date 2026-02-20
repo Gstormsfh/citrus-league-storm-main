@@ -2418,7 +2418,7 @@ async joinLeagueByCode(
       const missingPlayerIds: string[] = [];
 
       // First pass: identify missing players (dropped/traded)
-      dailyRosters.forEach((entry: any) => {
+      dailyRosters.forEach((entry: { player_id: number; slot_type: string; slot_id: string | null }) => {
         const playerId = String(entry.player_id);
         if (!playerMap.has(playerId)) {
           missingPlayerIds.push(playerId);
@@ -2467,7 +2467,7 @@ async joinLeagueByCode(
       }
 
       // Second pass: build roster arrays
-      dailyRosters.forEach((entry: any) => {
+      dailyRosters.forEach((entry: { player_id: number; slot_type: string; slot_id: string | null }) => {
         const playerId = String(entry.player_id);
         const player = playerMap.get(playerId);
         if (!player) {
@@ -2526,14 +2526,14 @@ async joinLeagueByCode(
     }
     
     // Initialize all teams with 0 stats
-    const teamStats: Record<string, { 
-      pointsFor: number; 
-      pointsAgainst: number; 
-      wins: number; 
+    const teamStats: Record<string, {
+      pointsFor: number;
+      pointsAgainst: number;
+      wins: number;
       losses: number;
       streak: string;
       last5: { wins: number; losses: number };
-      matchupHistory: Array<{ week: number; won: boolean }>; // Track matchup history for streak/last5
+      matchupHistory?: Array<{ week: number; won: boolean }>; // Track matchup history for streak/last5
     }> = {};
     
     teams.forEach(team => {
