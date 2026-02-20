@@ -59,7 +59,7 @@ const ArmchairGM = () => {
       <main className="flex-1 w-full pt-[var(--header-height)] pb-24 lg:pb-12">
         {/* Hero Header */}
         <div className="w-full bg-gradient-to-r from-citrus-forest via-citrus-forest/95 to-citrus-forest relative">
-          <div className="absolute inset-0 opacity-5">
+          <div className="absolute inset-0 opacity-5 pointer-events-none">
             <div className="absolute inset-0" style={{
               backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.1) 20px, rgba(255,255,255,0.1) 40px)',
             }} />
@@ -90,7 +90,7 @@ const ArmchairGM = () => {
           </div>
 
           {/* Tab Bar */}
-          <div className="max-w-7xl mx-auto px-4 md:px-6">
+          <div className="max-w-7xl mx-auto px-4 md:px-6 relative">
             <div className="flex gap-1 -mb-[2px] overflow-x-auto scrollbar-hide pb-[2px]">
               {TABS.map(tab => (
                 <button
