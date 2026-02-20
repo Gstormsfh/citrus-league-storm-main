@@ -709,7 +709,7 @@ export const MatchupService = {
         } else {
           viewingDailyPoints = Array(7).fill(0);
         }
-      } catch (error) {
+      } catch (error: unknown) {
         viewingDailyPoints = Array(7).fill(0);
       }
 
@@ -733,7 +733,7 @@ export const MatchupService = {
           } else {
             opponentDailyPoints = Array(7).fill(0);
           }
-        } catch (error) {
+        } catch (error: unknown) {
           opponentDailyPoints = Array(7).fill(0);
         }
       }
@@ -925,7 +925,7 @@ export const MatchupService = {
               // Continue with partial roster rather than loading all players
             }
           }
-        } catch (error) {
+        } catch (error: unknown) {
           console.error('[MatchupService] Error in optimized roster loading:', error);
           // DO NOT fallback to getAllPlayers - it causes 504 timeouts
           // Return empty array and let UI show error
@@ -1003,7 +1003,7 @@ export const MatchupService = {
           // Fallback: use placeholder if calculation fails
           userDailyPoints = Array(7).fill(0);
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('[getMatchupData] Exception calculating user daily scores:', error);
         userDailyPoints = Array(7).fill(0);
       }
@@ -1031,7 +1031,7 @@ export const MatchupService = {
             console.warn('[getMatchupData] Error calculating opponent daily scores:', oppError);
             opponentDailyPoints = Array(7).fill(0);
           }
-        } catch (error) {
+        } catch (error: unknown) {
           console.error('[getMatchupData] Exception calculating opponent daily scores:', error);
           opponentDailyPoints = Array(7).fill(0);
         }
@@ -1140,7 +1140,7 @@ export const MatchupService = {
       }
       
       return (teamDraftPicks || []).map(p => p.player_id);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error getting roster player IDs:', error);
       return [];
     }
@@ -1243,7 +1243,7 @@ export const MatchupService = {
       rosterCache.set(cacheKey, { roster, timestamp: now });
       
       return roster;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error getting team roster:', error);
       return [];
     }
@@ -1657,7 +1657,7 @@ export const MatchupService = {
       }
       
       return basePlayer;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(`Error transforming player ${player.name} to matchup player:`, error);
       // Return basic player info if schedule lookup fails
       return {
@@ -1708,7 +1708,7 @@ export const MatchupService = {
       }
       
       return this.transformToMatchupPlayerWithGames(player, isStarter, weekStart, weekEnd, timezone, games || [], undefined, undefined);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(`Error transforming player ${player.name} to matchup player:`, error);
       return this.transformToMatchupPlayerWithGames(player, isStarter, weekStart, weekEnd, timezone, [], undefined, undefined);
     }
@@ -2191,7 +2191,7 @@ export const MatchupService = {
       let matchupLines = new Map<number, MatchupLineRow>();
       try {
         matchupLines = await this.getMatchupLines(matchup.id);
-      } catch (error) {
+      } catch (error: unknown) {
         console.warn('[MatchupService] Failed to fetch matchup lines, continuing with empty data:', error);
         // Continue with empty Map - page should still load
       }
@@ -2240,7 +2240,7 @@ export const MatchupService = {
             samplePlayerIds: allPlayerIds.slice(0, 5)
           });
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('[MatchupService] ❌ Failed to fetch matchup stats:', error);
         // Continue with empty Map - page should still load
       }
@@ -2250,7 +2250,7 @@ export const MatchupService = {
       let dailyProjectionsMap = new Map<number, DailyProjectionRow>();
       try {
         dailyProjectionsMap = await this.getDailyProjectionsForMatchup(allPlayerIds, todayMST);
-      } catch (error) {
+      } catch (error: unknown) {
         console.warn('[MatchupService] Failed to fetch daily projections, continuing without them:', error);
       }
       
@@ -2777,7 +2777,7 @@ export const MatchupService = {
         wins: teamStanding.wins, 
         losses: teamStanding.losses 
       };
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error getting team record from standings:', error);
       return { wins: 0, losses: 0 };
     }
@@ -3329,7 +3329,7 @@ export const MatchupService = {
       }
       
       return lineup;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('[MatchupService] getDailyLineup exception:', error);
       return [];
     }
