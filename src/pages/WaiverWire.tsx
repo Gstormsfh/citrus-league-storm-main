@@ -157,7 +157,6 @@ const WaiverWire = () => {
       // If no priority record exists, create one (for existing teams that predate the trigger)
       if (team && !myPrio && actualTeamCount > 0) {
         try {
-          console.log('Creating waiver priority for team:', team.id, 'in league:', activeLeagueId);
           // Use RPC function to create priority (bypasses RLS)
           const { data: rpcResult, error: rpcError } = await supabase
             .rpc('create_waiver_priority_for_team', {
@@ -165,17 +164,15 @@ const WaiverWire = () => {
               p_team_id: team.id
             });
           
-          console.log('RPC result:', rpcResult, 'RPC error:', rpcError);
-          
+
           if (!rpcError && rpcResult && rpcResult.length > 0) {
             const result = rpcResult[0];
-            console.log('RPC result data:', result);
+
             if (result.success && result.priority) {
               // Reload priority after creating
               const updatedPriority = await WaiverService.getWaiverPriority(activeLeagueId);
               setWaiverPriority(updatedPriority);
               const newMyPrio = updatedPriority.find(p => p.team_id === team.id);
-              console.log('New priority after reload:', newMyPrio);
               if (newMyPrio && newMyPrio.priority > 0 && newMyPrio.priority <= actualTeamCount) {
                 setMyPriority(newMyPrio.priority);
               } else {
@@ -195,12 +192,6 @@ const WaiverWire = () => {
           setMyPriority(null);
         }
       } else {
-        console.log('Priority check:', { 
-          hasTeam: !!team, 
-          hasPrio: !!myPrio, 
-          teamCount: actualTeamCount,
-          myPrio 
-        });
         // Validate priority is within valid range
         const validPriority = myPrio && 
           myPrio.priority > 0 && 

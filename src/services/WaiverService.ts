@@ -610,8 +610,6 @@ export class WaiverService {
     error?: string;
   }> {
     try {
-      console.log('[WaiverService] Processing all pending waivers...');
-      
       const { data, error } = await supabase.rpc('process_all_pending_waivers');
       
       if (error) {
@@ -634,10 +632,7 @@ export class WaiverService {
         totalProcessed += r.total_processed || 0;
         totalSuccessful += r.successful || 0;
         totalFailed += r.failed || 0;
-        console.log(`[WaiverService] ${r.league_name}: ${r.successful} successful, ${r.failed} failed`);
       });
-      
-      console.log(`[WaiverService] Total: ${totalProcessed} processed, ${totalSuccessful} successful, ${totalFailed} failed`);
       
       return {
         success: true,

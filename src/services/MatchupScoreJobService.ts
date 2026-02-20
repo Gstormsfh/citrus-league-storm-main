@@ -25,8 +25,6 @@ export const MatchupScoreJobService = {
    */
   async lockCompletedDays(): Promise<{ lockedCount: number; error: any }> {
     try {
-      console.log('[MatchupScoreJobService] Starting lockCompletedDays job...');
-      
       // Find all games that are 'final' (completed)
       const { data: finalGames, error: gamesError } = await supabase
         .from('nhl_games')
@@ -39,14 +37,12 @@ export const MatchupScoreJobService = {
       }
       
       if (!finalGames || finalGames.length === 0) {
-        console.log('[MatchupScoreJobService] No final games found - nothing to lock');
         return { lockedCount: 0, error: null };
       }
       
       // Get unique game dates
       const gameDates = [...new Set(finalGames.map(g => g.game_date))];
-      console.log(`[MatchupScoreJobService] Found ${gameDates.length} dates with final games`);
-      
+
       // SINGLE batch update instead of 87+ individual requests!
       const { data: updated, error: updateError } = await supabase
         .from('fantasy_daily_rosters')
@@ -64,7 +60,6 @@ export const MatchupScoreJobService = {
       }
       
       const totalLocked = updated?.length || 0;
-      console.log(`[MatchupScoreJobService] Completed lockCompletedDays: ${totalLocked} roster entries locked`);
       return { lockedCount: totalLocked, error: null };
       
     } catch (error) {
@@ -82,23 +77,12 @@ export const MatchupScoreJobService = {
    */
   async calculateAndStoreScores(leagueId?: string): Promise<{ updatedCount: number; error: any }> {
     try {
-      console.log('[MatchupScoreJobService] Starting calculateAndStoreScores job...', 
-        leagueId ? `for league ${leagueId}` : 'for all leagues');
-      
       // Call the existing MatchupService method which uses update_all_matchup_scores RPC
       const { error, updatedCount, results } = await MatchupService.updateMatchupScores(leagueId);
       
       if (error) {
         console.error('[MatchupScoreJobService] Error updating matchup scores:', error);
         return { updatedCount: 0, error };
-      }
-      
-      console.log(`[MatchupScoreJobService] Completed calculateAndStoreScores: ${updatedCount || 0} matchups updated`);
-      
-      // Log a sample of results for debugging
-      if (results && results.length > 0) {
-        const sample = results.slice(0, 3);
-        console.log('[MatchupScoreJobService] Sample results:', sample);
       }
       
       return { updatedCount: updatedCount || 0, error: null };
@@ -120,10 +104,6 @@ export const MatchupScoreJobService = {
     updatedCount: number; 
     errors: any[] 
   }> {
-    console.log('[MatchupScoreJobService] ========================================');
-    console.log('[MatchupScoreJobService] Starting full matchup score job');
-    console.log('[MatchupScoreJobService] ========================================');
-    
     const errors: any[] = [];
     
     // Step 1: Lock completed days
@@ -137,13 +117,6 @@ export const MatchupScoreJobService = {
     if (scoresError) {
       errors.push({ step: 'calculateAndStoreScores', error: scoresError });
     }
-    
-    console.log('[MatchupScoreJobService] ========================================');
-    console.log('[MatchupScoreJobService] Job completed:');
-    console.log(`[MatchupScoreJobService]   - ${lockedCount} roster entries locked`);
-    console.log(`[MatchupScoreJobService]   - ${updatedCount} matchup scores updated`);
-    console.log(`[MatchupScoreJobService]   - ${errors.length} errors encountered`);
-    console.log('[MatchupScoreJobService] ========================================');
     
     if (errors.length > 0) {
       console.error('[MatchupScoreJobService] Errors:', errors);
@@ -205,7 +178,5 @@ export const MatchupScoreJobService = {
 // Expose job service globally for manual triggering in console
 if (typeof window !== 'undefined') {
   (window as any).MatchupScoreJobService = MatchupScoreJobService;
-  console.log('[MatchupScoreJobService] Service available globally as window.MatchupScoreJobService');
-  console.log('[MatchupScoreJobService] Run manually with: window.MatchupScoreJobService.runJob()');
 }
 

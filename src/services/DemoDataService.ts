@@ -268,28 +268,22 @@ export const DemoDataService = {
     // CRITICAL: Use REAL NHL data for ALL users (guests and logged-in)
     // Only team assignments are static - everything else uses real data
     // This ensures demo matchup follows EXACT same logic as real matchups
-    console.log('[DemoDataService] getDemoMatchupData() called - attempting to use REAL NHL data with static team assignments');
-    
     let allPlayers: any[] = [];
     let useRealData = false;
     
     // Step 1: Try to load real players from database (works for guests if RLS allows)
     try {
-      console.log('[DemoDataService] Step 1: Attempting to load real players from database...');
       const { PlayerService } = await import('./PlayerService');
       allPlayers = await PlayerService.getAllPlayers();
-      console.log('[DemoDataService] ✅ Successfully loaded', allPlayers.length, 'real players from database');
       useRealData = true;
     } catch (playerError) {
       console.warn('[DemoDataService] ⚠️ Failed to load real players from database:', playerError);
-      console.log('[DemoDataService] Will use static fallback data instead');
       useRealData = false;
     }
     
     // Step 2: If we have real players, use them; otherwise use static fallback
     if (useRealData && allPlayers.length > 0) {
       try {
-        console.log('[DemoDataService] Step 2: Using real NHL data to build demo matchup...');
         const { MatchupService } = await import('./MatchupService');
         const { LeagueService } = await import('./LeagueService');
       
@@ -299,12 +293,8 @@ export const DemoDataService = {
         
         // Get Team 3 (My Team) roster - same as Roster.tsx
         const myTeamRoster = await LeagueService.getTeamRoster(3, allPlayers);
-        console.log('[DemoDataService] My team (Team 3) roster loaded:', myTeamRoster.length, 'players');
-        
         // Get Team 1 (Opponent) roster - same approach
         const opponentTeamRoster = await LeagueService.getTeamRoster(1, allPlayers);
-        console.log('[DemoDataService] Opponent team (Team 1) roster loaded:', opponentTeamRoster.length, 'players');
-        
         if (myTeamRoster.length === 0 || opponentTeamRoster.length === 0) {
           console.error('[DemoDataService] One or both rosters are empty! Falling back to static data.');
           throw new Error('Demo rosters not available');
@@ -313,11 +303,6 @@ export const DemoDataService = {
         // Convert Player[] to HockeyPlayer[] using MatchupService
         const myTeamHockeyPlayers = myTeamRoster.map(p => MatchupService.transformToHockeyPlayer(p));
         const opponentTeamHockeyPlayers = opponentTeamRoster.map(p => MatchupService.transformToHockeyPlayer(p));
-      
-      console.log('[DemoDataService] Demo rosters loaded:', {
-        myTeamCount: myTeamHockeyPlayers.length,
-        opponentTeamCount: opponentTeamHockeyPlayers.length
-      });
       
       // Sort players consistently by ID for deterministic auto-assignment (same as Roster.tsx)
       myTeamHockeyPlayers.sort((a, b) => {
@@ -391,22 +376,13 @@ export const DemoDataService = {
       };
       
       // Auto-organize both teams (same as Roster.tsx - always auto-organize for demo)
-      console.log('[DemoDataService] Auto-organizing my team roster');
       const myTeamOrganized = organizeRoster(myTeamHockeyPlayers);
       const myTeamStarters = new Set(myTeamOrganized.starters.map(p => String(p.id)));
       const myTeamSlotAssignmentsFromOrg = myTeamOrganized.slotAssignments;
       
-      console.log('[DemoDataService] Auto-organizing opponent team roster');
       const opponentTeamOrganized = organizeRoster(opponentTeamHockeyPlayers);
       const opponentTeamStarters = new Set(opponentTeamOrganized.starters.map(p => String(p.id)));
       const opponentTeamSlotAssignmentsFromOrg = opponentTeamOrganized.slotAssignments;
-      
-      console.log('[DemoDataService] Organized rosters:', {
-        myTeamStarters: myTeamOrganized.starters.length,
-        myTeamBench: myTeamOrganized.bench.length,
-        opponentTeamStarters: opponentTeamOrganized.starters.length,
-        opponentTeamBench: opponentTeamOrganized.bench.length
-      });
       
       // Get current week for schedule data
       const now = new Date();
@@ -423,8 +399,6 @@ export const DemoDataService = {
         ...opponentTeamHockeyPlayers.map(p => p.team || '').filter(t => t)
       ]));
       
-      console.log('[DemoDataService] Fetching schedule for teams:', allTeams);
-      
       // Batch fetch games for all teams at once (more efficient)
       // Wrap in try-catch in case schedule query fails for guests
       let gamesByTeam = new Map<string, any[]>();
@@ -432,13 +406,8 @@ export const DemoDataService = {
         const { ScheduleService } = await import('./ScheduleService');
         const scheduleResult = await ScheduleService.getGamesForTeams(allTeams, weekStart, weekEnd);
         gamesByTeam = scheduleResult.gamesByTeam || new Map();
-        console.log('[DemoDataService] Schedule loaded:', {
-          teamsWithGames: Array.from(gamesByTeam.keys()).length,
-          totalGames: Array.from(gamesByTeam.values()).flat().length
-        });
       } catch (scheduleError) {
         console.warn('[DemoDataService] Failed to load schedule data (non-critical):', scheduleError);
-        console.log('[DemoDataService] Continuing without schedule data - players will show without game info');
         gamesByTeam = new Map(); // Empty map - players will still work, just without game info
       }
       
@@ -483,15 +452,6 @@ export const DemoDataService = {
         );
       });
       
-      console.log('[DemoDataService] Matchup players with starter status:', {
-        myTeamTotal: myTeamMatchupPlayers.length,
-        myTeamStarters: myTeamMatchupPlayers.filter(p => p.isStarter).length,
-        myTeamBench: myTeamMatchupPlayers.filter(p => !p.isStarter).length,
-        opponentTeamTotal: opponentTeamMatchupPlayers.length,
-        opponentTeamStarters: opponentTeamMatchupPlayers.filter(p => p.isStarter).length,
-        opponentTeamBench: opponentTeamMatchupPlayers.filter(p => !p.isStarter).length
-      });
-      
       // Use slot assignments from organizeRoster (which matches Roster.tsx logic exactly)
       // This ensures consistency between Roster page and Matchup page
       // We need to map the slot assignments from HockeyPlayer IDs to MatchupPlayer IDs
@@ -515,11 +475,6 @@ export const DemoDataService = {
         }
       });
       
-        console.log('[DemoDataService] Slot assignments calculated:', {
-          myTeamSlots: Object.keys(myTeamSlotAssignments).length,
-          opponentTeamSlots: Object.keys(opponentTeamSlotAssignments).length
-        });
-        
         return {
           myTeam: myTeamMatchupPlayers,
           opponentTeam: opponentTeamMatchupPlayers,
@@ -528,25 +483,16 @@ export const DemoDataService = {
         };
       } catch (realDataError) {
         console.error('[DemoDataService] Error building matchup with real data:', realDataError);
-        console.log('[DemoDataService] Falling back to static data...');
         useRealData = false; // Fall through to static data
       }
     }
     
     // Step 3: Fallback to static data if real data failed
     if (!useRealData) {
-      console.log('[DemoDataService] Step 3: Using static fallback data');
       const staticMyTeam = this.getDemoMyTeam();
       const staticOpponentTeam = this.getDemoOpponentTeam();
       const myStarters = staticMyTeam.filter(p => p.isStarter);
       const oppStarters = staticOpponentTeam.filter(p => p.isStarter);
-      
-      console.log('[DemoDataService] Static data loaded:', {
-        myTeamCount: staticMyTeam.length,
-        opponentTeamCount: staticOpponentTeam.length,
-        myTeamStarters: myStarters.length,
-        opponentTeamStarters: oppStarters.length
-      });
       
       return {
         myTeam: staticMyTeam,

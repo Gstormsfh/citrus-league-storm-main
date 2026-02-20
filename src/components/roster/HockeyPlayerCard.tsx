@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { AlertCircle, Shield, CalendarDays, Skull, Plus, Lock, Info } from "lucide-react";
-import { useState } from "react";
+import { useState, memo } from "react";
 import { CitrusPuckPlayerData, AggregatedPlayerData } from "@/types/citruspuck";
 
 export interface HockeyPlayer {
@@ -590,10 +590,12 @@ const HockeyPlayerCardContent = ({
   );
 };
 
-const HockeyPlayerCard = (props: HockeyPlayerCardProps) => (
+const HockeyPlayerCard = memo((props: HockeyPlayerCardProps) => (
   <ErrorBoundary>
     <HockeyPlayerCardContent {...props} />
   </ErrorBoundary>
-);
+));
+
+HockeyPlayerCard.displayName = 'HockeyPlayerCard';
 
 export default HockeyPlayerCard;

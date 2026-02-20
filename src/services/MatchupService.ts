@@ -242,7 +242,6 @@ export const MatchupService = {
       
       if (forceRegenerate || weeksWithMatchups.size === 0) {
         // Full regeneration: delete all, generate all weeks
-        console.log('[MatchupService] Full regeneration requested - deleting all existing matchups...');
         await this.deleteAllMatchupsForLeague(leagueId);
         weeksNeedingMatchups = availableWeeks;
       } else {
@@ -293,12 +292,6 @@ export const MatchupService = {
           console.error(`[MatchupService] ABORTING matchup generation to prevent incomplete data`);
           return { error: new Error(`Round-robin algorithm failed: ${missingFromPairs.length} teams missing from week ${weekNumber} pairs. Teams: ${missingFromPairs.join(', ')}`) };
         }
-        
-        console.log(`[MatchupService] Week ${weekNumber} - Verification passed: All ${numTeams} teams included in pairs ✓`);
-        
-        console.log(`[MatchupService] Week ${weekNumber} - Generated ${teamPairs.length} pairs:`, teamPairs.map(p => 
-          `${p.team1.team_name || p.team1.id} (${p.team1.id}) vs ${p.team2?.team_name || p.team2?.id || 'BYE'} (${p.team2?.id || 'null'})`
-        ).join(', '));
         
         // Insert matchups for this week
         for (const pair of teamPairs) {
@@ -354,7 +347,6 @@ export const MatchupService = {
             console.error(`[MatchupService] Failed matchup data:`, insertData);
             matchupsErrors++;
           } else {
-            console.log(`[MatchupService] Week ${weekNumber} - Successfully created matchup:`, inserted);
             matchupsCreated++;
           }
         }
@@ -476,14 +468,6 @@ export const MatchupService = {
         return { matchup: null, error: null };
       }
 
-      console.log('[MatchupService.getUserMatchup] User team ID:', userTeam.id);
-      console.log('[MatchupService.getUserMatchup] Querying matchups table with:', {
-        league_id: leagueId,
-        week_number: weekNumber,
-        week_number_type: typeof weekNumber,
-        team_filter: `team1_id=${userTeam.id} OR team2_id=${userTeam.id}`
-      });
-
       // Find matchup where user's team is team1 or team2
       // Use .limit(1) instead of .maybeSingle() to handle potential duplicates gracefully
       // Ensure week_number is treated as a number in the query
@@ -577,11 +561,6 @@ export const MatchupService = {
         isUserInMatchup = userTeam && (matchup.team1_id === userTeam.id || matchup.team2_id === userTeam.id);
       } catch (error) {
         // User might not be in this league/matchup - that's okay, we'll view as team1
-        console.log('[MatchupService.getMatchupDataById] User not in matchup or league, viewing as team1:', {
-          matchupId,
-          userId,
-          error: error?.message || 'User team lookup failed'
-        });
         userTeam = null;
         isUserInMatchup = false;
       }
@@ -754,13 +733,6 @@ export const MatchupService = {
     targetDate?: string // Optional: if provided and is past date, load frozen roster for that date
   ): Promise<{ data: MatchupDataResponse | null; error: any }> {
     try {
-      console.log('[MatchupService.getMatchupData] Received parameters:', {
-        leagueId,
-        userId,
-        weekNumber,
-        timezone
-      });
-      
       // Get league to determine first week start
       let league: any = null;
       let leagueError: any = null;
@@ -813,10 +785,8 @@ export const MatchupService = {
       // Use existingMatchup if provided, otherwise query
       let matchup: Matchup | null = null;
       if (existingMatchup) {
-        console.log('[MatchupService.getMatchupData] Using pre-fetched matchup (avoiding redundant query)');
         matchup = existingMatchup;
       } else {
-        console.log('[MatchupService.getMatchupData] Querying matchup from DB...');
         const { matchup: queriedMatchup, error: matchupError } = await this.getUserMatchup(leagueId, userId, weekNumber);
         if (matchupError) throw matchupError;
         matchup = queriedMatchup;
@@ -827,13 +797,6 @@ export const MatchupService = {
         return { data: null, error: new Error(`No matchup found for week ${weekNumber}`) };
       }
       
-      console.log('[MatchupService.getMatchupData] Found matchup:', {
-        id: matchup.id,
-        week_number: matchup.week_number,
-        team1_id: matchup.team1_id,
-        team2_id: matchup.team2_id
-      });
-
       // Determine which team the user is (team1 or team2)
       const isTeam1 = matchup.team1_id === userTeam.id;
       const opponentTeamId = isTeam1 ? matchup.team2_id : matchup.team1_id;
@@ -853,7 +816,6 @@ export const MatchupService = {
       let rosterPlayers: Player[];
       if (isPastDate) {
         // For past dates: Load ALL players (needed to find dropped players in frozen lineups)
-        console.log('[MatchupService.getMatchupData] Loading ALL players for frozen roster lookup');
         rosterPlayers = await withTimeout(
           PlayerService.getAllPlayers(),
           15000,
@@ -1278,8 +1240,6 @@ export const MatchupService = {
         return new Map();
       }
 
-      console.log(`[MatchupService.getDailyProjections] Calling RPC for ${playerIds.length} players on ${targetDate}`);
-      
       const { data, error } = await supabase.rpc('get_daily_projections', {
         p_player_ids: playerIds,
         p_target_date: targetDate
@@ -1290,17 +1250,7 @@ export const MatchupService = {
         return new Map(); // Return empty map on error (graceful degradation)
       }
       
-      console.log(`[MatchupService.getDailyProjections] ✅ RPC returned ${data?.length || 0} projections`);
-      
-      // Log sample projection to verify structure
-      if (data && data.length > 0) {
-        console.log('[MatchupService.getDailyProjections] Sample projection:', {
-          player_id: data[0].player_id,
-          total_projected_points: data[0].total_projected_points,
-          is_goalie: data[0].is_goalie,
-          has_all_fields: !!(data[0].player_id && data[0].total_projected_points !== undefined)
-        });
-      } else {
+      if (!data || data.length === 0) {
         console.warn('[MatchupService.getDailyProjections] ⚠️ RPC returned empty array - no projections for this date');
       }
       
@@ -1313,8 +1263,6 @@ export const MatchupService = {
           }
         });
       }
-      
-      console.log(`[MatchupService.getDailyProjections] Created projection map with ${projectionMap.size} entries`);
       
       return projectionMap;
     } catch (error) {
@@ -1350,14 +1298,8 @@ export const MatchupService = {
   ): MatchupPlayer {
     // CRITICAL: Debug goalie detection and stats
     const isGoalie = player.position === 'G' || player.position === 'Goalie';
-    if (isGoalie) {
-      console.log(`[MatchupService.transformToMatchupPlayerWithGames] 🥅 GOALIE DETECTED: ${player.name} (ID: ${player.id})`);
-      console.log(`  Position: ${player.position}, matchupStats:`, matchupStats);
-      if (matchupStats) {
-        console.log(`  Goalie Stats from RPC: W=${matchupStats.wins || 0}, SV=${matchupStats.saves || 0}, SO=${matchupStats.shutouts || 0}, GA=${matchupStats.goals_against || 0}`);
-      } else {
-        console.warn(`  ⚠️ NO MATCHUP STATS for goalie ${player.name}!`);
-      }
+    if (isGoalie && !matchupStats) {
+      console.warn(`  ⚠️ NO MATCHUP STATS for goalie ${player.name}!`);
     }
     const teamAbbrev = player.teamAbbreviation || player.team || '';
     
@@ -1474,18 +1416,6 @@ export const MatchupService = {
                             (shutouts * 3) + 
                             (goals_against * -1);
             
-            // Debug: Log goalie point calculation
-            if (wins > 0 || saves > 0 || shutouts > 0) {
-              console.log(`[MatchupService.transformToMatchupPlayerWithGames] ✅ Goalie ${player.name} weekly points:`, {
-                wins,
-                saves,
-                shutouts,
-                goals_against,
-                calculation: `(${wins} * 4) + (${saves} * 0.2) + (${shutouts} * 3) + (${goals_against} * -1)`,
-                totalPoints: fantasyPoints,
-                week: `${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`
-              });
-            }
           }
         } else {
           // Skater scoring: Goals=3, Assists=2, SOG=0.4, Blocks=0.4
@@ -1511,25 +1441,6 @@ export const MatchupService = {
           }
         }
         
-        // Debug logging for first few players
-        if (Math.random() < 0.1) { // Log ~10% of players to avoid spam
-          console.log(`[MatchupService.transformToMatchupPlayerWithGames] Calculated points for ${player.name} (${isGoalie ? 'Goalie' : 'Skater'}):`, {
-            matchupStats: matchupStats ? (isGoalie ? {
-              wins: matchupStats.wins || 0,
-              saves: matchupStats.saves || 0,
-              shutouts: matchupStats.shutouts || 0,
-              goals_against: matchupStats.goals_against || 0
-            } : {
-              goals: matchupStats.goals,
-              assists: matchupStats.assists,
-              sog: matchupStats.sog,
-              blocks: matchupStats.blocks || 0
-            }) : null,
-            calculatedPoints: fantasyPoints,
-            weekStart: weekStart.toISOString().split('T')[0],
-            weekEnd: weekEnd.toISOString().split('T')[0]
-          });
-        }
       } else {
         // Log when matchupStats is missing
         if (Math.random() < 0.1) {
@@ -1578,25 +1489,6 @@ export const MatchupService = {
           goalsSavedAboveExpected: player.stats.goalsSavedAboveExpected || 0
         };
         
-        // Debug logging for goalie stats
-        if (Math.random() < 0.1) { // Log ~10% of goalies to avoid spam
-          console.log(`[MatchupService] Goalie stats for ${player.name}:`, {
-            gamesPlayed: goalieStats.gamesPlayed,
-            wins: goalieStats.wins,
-            saves: goalieStats.saves,
-            shutouts: goalieStats.shutouts,
-            gaa: goalieStats.gaa,
-            savePct: goalieStats.savePct,
-            rawPlayerStats: {
-              gamesPlayed: player.stats.gamesPlayed,
-              wins: player.stats.wins,
-              saves: player.stats.saves,
-              shutouts: player.stats.shutouts,
-              gaa: player.stats.gaa,
-              savePct: player.stats.savePct
-            }
-          });
-        }
         
         basePlayer.goalieStats = goalieStats;
         
@@ -1821,7 +1713,7 @@ export const MatchupService = {
       let useFrozenRoster = targetDate !== undefined && targetDate !== null && targetDate < todayStr;
       
       if (useFrozenRoster && targetDate) {
-        console.log(`[MatchupService.getMatchupRosters] Using frozen roster for date: ${targetDate} (today: ${todayStr})`);
+        // Using frozen roster for past date
       } else {
         // Clear cache for current lineup (only needed when using team_lineups)
         this.clearRosterCache(matchup.team1_id, matchup.league_id);
@@ -1888,11 +1780,6 @@ export const MatchupService = {
             ...team2FrozenRoster.ir
           ].map(p => this.transformToHockeyPlayer(p)) : [];
           
-          console.log(`[MatchupService.getMatchupRosters] Using frozen rosters from LeagueService:`, {
-            team1: team1Roster.length,
-            team2: team2Roster.length,
-            date: targetDate || 'N/A'
-          });
         }
       }
       
@@ -1984,27 +1871,22 @@ export const MatchupService = {
       // This ensures all teams have lineups for future week matchups
       // SKIP for demo league - guests can't write, and lineups should already exist from migration
       if (!isDemoLeague && !team1Lineup && team1Roster.length > 0) {
-        console.log(`[MatchupService] Auto-initializing default lineup for Team1 (${matchup.team1_id})`);
         const defaultLineup = organizeRosterIntoLineup(team1Roster);
         team1Lineup = defaultLineup;
         // Save the default lineup to database
         await LeagueService.saveLineup(matchup.team1_id, matchup.league_id, defaultLineup);
-        console.log(`[MatchupService] Saved default lineup for Team1: ${defaultLineup.starters.length} starters`);
       }
 
       if (!isDemoLeague && matchup.team2_id && !team2Lineup && team2Roster.length > 0) {
-        console.log(`[MatchupService] Auto-initializing default lineup for Team2 (${matchup.team2_id})`);
         const defaultLineup = organizeRosterIntoLineup(team2Roster);
         team2Lineup = defaultLineup;
         // Save the default lineup to database
         await LeagueService.saveLineup(matchup.team2_id, matchup.league_id, defaultLineup);
-        console.log(`[MatchupService] Saved default lineup for Team2: ${defaultLineup.starters.length} starters`);
       }
 
       // Debug logging to help diagnose lineup sync issues
       if (team1Lineup) {
-        console.log(`[MatchupService] Team1 lineup loaded: ${team1Lineup.starters.length} starters, ${team1Lineup.bench.length} bench, ${team1Lineup.ir.length} IR`);
-        console.log(`[MatchupService] Team1 starter IDs:`, team1Lineup.starters);
+        // Team1 lineup loaded successfully
       } else {
         const error = new Error(`Team ${matchup.team1_id} has no saved lineup and roster is empty.`);
         console.error('[MatchupService] No lineup found for team1:', error);
