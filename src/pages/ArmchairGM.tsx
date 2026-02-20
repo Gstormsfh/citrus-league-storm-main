@@ -58,14 +58,14 @@ const ArmchairGM = () => {
 
       <main className="flex-1 w-full pt-[var(--header-height)] pb-24 lg:pb-12">
         {/* Hero Header */}
-        <div className="w-full bg-gradient-to-r from-citrus-forest via-citrus-forest/95 to-citrus-forest relative">
-          <div className="absolute inset-0 opacity-5 pointer-events-none">
-            <div className="absolute inset-0" style={{
+        <div className="w-full bg-gradient-to-r from-citrus-forest via-citrus-forest/95 to-citrus-forest relative isolate overflow-visible">
+          <div className="absolute inset-0 opacity-5 pointer-events-none z-0" aria-hidden="true"
+            style={{
               backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.1) 20px, rgba(255,255,255,0.1) 40px)',
-            }} />
-          </div>
+            }}
+          />
 
-          <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8 relative">
+          <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8 relative z-10">
             <div className="flex items-center gap-4">
               <div className="p-3 rounded-2xl bg-citrus-sage/20 border-2 border-citrus-sage/30">
                 <DollarSign className="w-7 h-7 md:w-8 md:h-8 text-citrus-sage" />
@@ -90,14 +90,15 @@ const ArmchairGM = () => {
           </div>
 
           {/* Tab Bar */}
-          <div className="max-w-7xl mx-auto px-4 md:px-6 relative">
+          <div className="max-w-7xl mx-auto px-4 md:px-6 relative z-10">
             <div className="flex gap-1 -mb-[2px] overflow-x-auto scrollbar-hide pb-[2px]">
               {TABS.map(tab => (
                 <button
                   key={tab.id}
+                  type="button"
                   onClick={() => setActiveTab(tab.id)}
                   className={cn(
-                    "flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-sm font-display font-bold transition-all border-2 border-b-0 flex-shrink-0 whitespace-nowrap",
+                    "flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-sm font-display font-bold transition-all border-2 border-b-0 flex-shrink-0 whitespace-nowrap cursor-pointer",
                     activeTab === tab.id
                       ? "bg-[#E8EED9] text-citrus-forest border-citrus-sage/30 shadow-sm"
                       : "bg-citrus-forest/50 text-citrus-sage/70 border-transparent hover:bg-citrus-forest/30 hover:text-citrus-cream"
