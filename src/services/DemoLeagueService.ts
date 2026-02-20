@@ -15,6 +15,17 @@ import { DraftService } from './DraftService';
 import { MatchupService } from './MatchupService';
 import { COLUMNS } from '@/utils/queryColumns';
 import { logger } from '@/utils/logger';
+import type { PostgrestError } from '@supabase/supabase-js';
+
+/** Shape of a row from the `teams` table, used for demo league operations. */
+interface TeamRow {
+  id: string;
+  league_id: string;
+  owner_id: string | null;
+  team_name: string;
+  created_at: string;
+  updated_at: string;
+}
 
 // Static demo league ID (old approach - not used anymore)
 export const DEMO_LEAGUE_ID = '00000000-0000-0000-0000-000000000001';
@@ -40,7 +51,7 @@ export const DemoLeagueService = {
    * Force reinitialize demo league (useful for debugging)
    * This will delete existing draft picks and recreate everything
    */
-  async forceReinitialize(): Promise<{ success: boolean; error: any }> {
+  async forceReinitialize(): Promise<{ success: boolean; error: PostgrestError | Error | null }> {
     try {
       console.log('[DemoLeagueService] FORCE REINITIALIZING demo league...');
       
@@ -90,7 +101,7 @@ export const DemoLeagueService = {
       return await this.initializeDemoLeague();
     } catch (error) {
       console.error('[DemoLeagueService] Error in forceReinitialize:', error);
-      return { success: false, error };
+      return { success: false, error: error as PostgrestError | Error };
     }
   },
 
@@ -122,7 +133,7 @@ export const DemoLeagueService = {
    * Includes timeout handling for reliability
    * NOTE: Guests (not logged in) cannot write to database - will return error
    */
-  async initializeDemoLeague(timeoutMs: number = 30000): Promise<{ success: boolean; error: any }> {
+  async initializeDemoLeague(timeoutMs: number = 30000): Promise<{ success: boolean; error: PostgrestError | Error | null }> {
     const startTime = Date.now();
     
     try {
@@ -166,8 +177,8 @@ export const DemoLeagueService = {
         return { success: false, error: new Error('Initialization timeout') };
       }
 
-      let teams = [];
-      
+      let teams: TeamRow[] = [];
+
       if (!exists) {
         // Double-check authentication before attempting to create league
         const { data: { user: verifyUser }, error: verifyError } = await supabase.auth.getUser();
@@ -283,7 +294,7 @@ export const DemoLeagueService = {
       return { success: true, error: null };
     } catch (error) {
       console.error('[DemoLeagueService] Error initializing demo league:', error);
-      return { success: false, error };
+      return { success: false, error: error as PostgrestError | Error };
     }
   },
 

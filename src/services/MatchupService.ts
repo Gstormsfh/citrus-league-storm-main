@@ -1178,7 +1178,7 @@ export const MatchupService = {
         const teamPicks = draftPicks.filter(p => p.team_id === teamId);
         const playerIds = teamPicks.map(p => p.player_id);
         // Convert string IDs to numbers for matching
-        const playerIdsAsNumbers = playerIds.map((id: any) => typeof id === 'string' ? parseInt(id) || 0 : id || 0).filter(id => id > 0);
+        const playerIdsAsNumbers = playerIds.map((id: string | number) => typeof id === 'string' ? parseInt(id) || 0 : id || 0).filter(id => id > 0);
         const teamPlayers = allPlayers.filter(p => playerIdsAsNumbers.includes(Number(p.id)));
         
         const roster = teamPlayers.map((p) => this.transformToHockeyPlayer(p));
@@ -1196,7 +1196,7 @@ export const MatchupService = {
       const numericIds: number[] = [];
       const uuidIds: string[] = [];
       
-      playerIds.forEach((id: any) => {
+      playerIds.forEach((id: string | number) => {
         if (typeof id === 'string') {
           // Check if it's a numeric string (NHL ID) or UUID
           const numId = parseInt(id);
@@ -1224,9 +1224,9 @@ export const MatchupService = {
         
         if (!uuidError && uuidPlayers) {
           // Match UUID players to allPlayers by name and team
-          uuidPlayers.forEach((uuidPlayer: any) => {
-            const matched = allPlayers.find(p => 
-              p.full_name === uuidPlayer.full_name && 
+          uuidPlayers.forEach((uuidPlayer: { id: string; full_name: string; team: string }) => {
+            const matched = allPlayers.find(p =>
+              p.full_name === uuidPlayer.full_name &&
               p.team === uuidPlayer.team
             );
             if (matched && !teamPlayers.find(tp => tp.id === matched.id)) {
@@ -1303,7 +1303,7 @@ export const MatchupService = {
   async getDailyProjectionsForMatchup(
     playerIds: number[],
     targetDate: string
-  ): Promise<Map<number, any>> {
+  ): Promise<Map<number, DailyProjectionRow>> {
     try {
       if (!playerIds || playerIds.length === 0) {
         console.warn('[MatchupService.getDailyProjections] No player IDs provided');
@@ -1314,28 +1314,28 @@ export const MatchupService = {
         p_player_ids: playerIds,
         p_target_date: targetDate
       });
-      
+
       if (error) {
         console.error('[MatchupService.getDailyProjections] ❌ RPC error:', error);
         return new Map(); // Return empty map on error (graceful degradation)
       }
-      
+
       if (!data || data.length === 0) {
         console.warn('[MatchupService.getDailyProjections] ⚠️ RPC returned empty array - no projections for this date');
       }
-      
+
       // Create a map for O(1) lookup during player transformation
-      const projectionMap = new Map<number, any>();
+      const projectionMap = new Map<number, DailyProjectionRow>();
       if (data && Array.isArray(data)) {
-        data.forEach((p: any) => {
+        data.forEach((p: DailyProjectionRow) => {
           if (p.player_id) {
             projectionMap.set(Number(p.player_id), p);
           }
         });
       }
-      
+
       return projectionMap;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('[MatchupService.getDailyProjections] ❌ Unexpected error:', error);
       return new Map(); // Return empty map on error
     }
