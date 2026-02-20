@@ -994,7 +994,7 @@ export const MatchupService = {
 
         if (!userError && userDailyScores) {
           // Sort by date and extract scores
-          const sorted = (userDailyScores as any[]).sort((a, b) => 
+          const sorted = (userDailyScores as Array<{ roster_date: string; daily_score: string | number }>).sort((a, b) =>
             new Date(a.roster_date).getTime() - new Date(b.roster_date).getTime()
           );
           userDailyPoints = sorted.map(d => parseFloat(d.daily_score) || 0);
@@ -1067,8 +1067,8 @@ export const MatchupService = {
         scheduleLength,
         isPlayoffWeek,
         userTeam: {
-          id: userTeam.id,
-          name: userTeam.team_name,
+          id: userTeamData.id,
+          name: userTeamData.team_name,
           roster: userRoster,
           slotAssignments: userSlotAssignments,
           record: userRecord,
@@ -1091,9 +1091,9 @@ export const MatchupService = {
       };
 
       return { data: response, error: null };
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error getting matchup data:', error);
-      return { data: null, error };
+      return { data: null, error: error instanceof Error ? error : new Error(String(error)) };
     }
   },
 
