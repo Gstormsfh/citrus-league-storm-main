@@ -16,6 +16,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { MatchupService } from './MatchupService';
+import type { PostgrestError } from '@supabase/supabase-js';
 
 export const MatchupScoreJobService = {
   /**
@@ -23,10 +24,8 @@ export const MatchupScoreJobService = {
    * This prevents users from retroactively changing their lineups after games complete
    * Uses SINGLE batch update for efficiency (no more spam!)
    */
-  async lockCompletedDays(): Promise<{ lockedCount: number; error: any }> {
+  async lockCompletedDays(): Promise<{ lockedCount: number; error: PostgrestError | null }> {
     try {
-      console.log('[MatchupScoreJobService] Starting lockCompletedDays job...');
-      
       // Find all games that are 'final' (completed)
       const { data: finalGames, error: gamesError } = await supabase
         .from('nhl_games')
@@ -39,14 +38,12 @@ export const MatchupScoreJobService = {
       }
       
       if (!finalGames || finalGames.length === 0) {
-        console.log('[MatchupScoreJobService] No final games found - nothing to lock');
         return { lockedCount: 0, error: null };
       }
       
       // Get unique game dates
       const gameDates = [...new Set(finalGames.map(g => g.game_date))];
-      console.log(`[MatchupScoreJobService] Found ${gameDates.length} dates with final games`);
-      
+
       // SINGLE batch update instead of 87+ individual requests!
       const { data: updated, error: updateError } = await supabase
         .from('fantasy_daily_rosters')
@@ -64,12 +61,11 @@ export const MatchupScoreJobService = {
       }
       
       const totalLocked = updated?.length || 0;
-      console.log(`[MatchupScoreJobService] Completed lockCompletedDays: ${totalLocked} roster entries locked`);
       return { lockedCount: totalLocked, error: null };
       
     } catch (error) {
       console.error('[MatchupScoreJobService] Exception in lockCompletedDays:', error);
-      return { lockedCount: 0, error };
+      return { lockedCount: 0, error: error as PostgrestError };
     }
   },
 
@@ -80,11 +76,8 @@ export const MatchupScoreJobService = {
    * 
    * @param leagueId - Optional league ID to update scores for. If not provided, updates all leagues.
    */
-  async calculateAndStoreScores(leagueId?: string): Promise<{ updatedCount: number; error: any }> {
+  async calculateAndStoreScores(leagueId?: string): Promise<{ updatedCount: number; error: PostgrestError | null }> {
     try {
-      console.log('[MatchupScoreJobService] Starting calculateAndStoreScores job...', 
-        leagueId ? `for league ${leagueId}` : 'for all leagues');
-      
       // Call the existing MatchupService method which uses update_all_matchup_scores RPC
       const { error, updatedCount, results } = await MatchupService.updateMatchupScores(leagueId);
       
@@ -93,19 +86,11 @@ export const MatchupScoreJobService = {
         return { updatedCount: 0, error };
       }
       
-      console.log(`[MatchupScoreJobService] Completed calculateAndStoreScores: ${updatedCount || 0} matchups updated`);
-      
-      // Log a sample of results for debugging
-      if (results && results.length > 0) {
-        const sample = results.slice(0, 3);
-        console.log('[MatchupScoreJobService] Sample results:', sample);
-      }
-      
       return { updatedCount: updatedCount || 0, error: null };
       
     } catch (error) {
       console.error('[MatchupScoreJobService] Exception in calculateAndStoreScores:', error);
-      return { updatedCount: 0, error };
+      return { updatedCount: 0, error: error as PostgrestError };
     }
   },
 
@@ -115,16 +100,12 @@ export const MatchupScoreJobService = {
    * 
    * @param leagueId - Optional league ID to process. If not provided, processes all leagues.
    */
-  async runJob(leagueId?: string): Promise<{ 
-    lockedCount: number; 
-    updatedCount: number; 
-    errors: any[] 
+  async runJob(leagueId?: string): Promise<{
+    lockedCount: number;
+    updatedCount: number;
+    errors: Array<{ step: string; error: PostgrestError | null }>
   }> {
-    console.log('[MatchupScoreJobService] ========================================');
-    console.log('[MatchupScoreJobService] Starting full matchup score job');
-    console.log('[MatchupScoreJobService] ========================================');
-    
-    const errors: any[] = [];
+    const errors: Array<{ step: string; error: PostgrestError | null }> = [];
     
     // Step 1: Lock completed days
     const { lockedCount, error: lockError } = await this.lockCompletedDays();
@@ -137,13 +118,6 @@ export const MatchupScoreJobService = {
     if (scoresError) {
       errors.push({ step: 'calculateAndStoreScores', error: scoresError });
     }
-    
-    console.log('[MatchupScoreJobService] ========================================');
-    console.log('[MatchupScoreJobService] Job completed:');
-    console.log(`[MatchupScoreJobService]   - ${lockedCount} roster entries locked`);
-    console.log(`[MatchupScoreJobService]   - ${updatedCount} matchup scores updated`);
-    console.log(`[MatchupScoreJobService]   - ${errors.length} errors encountered`);
-    console.log('[MatchupScoreJobService] ========================================');
     
     if (errors.length > 0) {
       console.error('[MatchupScoreJobService] Errors:', errors);
@@ -205,7 +179,5 @@ export const MatchupScoreJobService = {
 // Expose job service globally for manual triggering in console
 if (typeof window !== 'undefined') {
   (window as any).MatchupScoreJobService = MatchupScoreJobService;
-  console.log('[MatchupScoreJobService] Service available globally as window.MatchupScoreJobService');
-  console.log('[MatchupScoreJobService] Run manually with: window.MatchupScoreJobService.runJob()');
 }
 

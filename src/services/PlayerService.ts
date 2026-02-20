@@ -119,6 +119,12 @@ type PlayerSeasonStatsRow = {
   nhl_gaa?: number;
 };
 
+/** Shape of a row from the goalie GSAx tables (goalie_gsax_primary, goalie_gsax). */
+interface GoalieGsaxRow {
+  goalie_id: number;
+  regressed_gsax: number | null;
+}
+
 // In-memory cache for player data
 interface CacheEntry {
   data: Player[];
@@ -213,7 +219,7 @@ export const PlayerService = {
             .in("goalie_id", goalieIds);
           
           if (gsaxData) {
-            gsaxData.forEach((g: any) => {
+            gsaxData.forEach((g: GoalieGsaxRow) => {
               if (g.goalie_id && g.regressed_gsax != null) {
                 gsaxMap.set(Number(g.goalie_id), Number(g.regressed_gsax));
               }
@@ -229,7 +235,7 @@ export const PlayerService = {
               .in("goalie_id", missingGoalieIds);
             
             if (gsaxFallbackData) {
-              gsaxFallbackData.forEach((g: any) => {
+              gsaxFallbackData.forEach((g: GoalieGsaxRow) => {
                 if (g.goalie_id && g.regressed_gsax != null && !gsaxMap.has(Number(g.goalie_id))) {
                   gsaxMap.set(Number(g.goalie_id), Number(g.regressed_gsax));
                 }
@@ -434,7 +440,7 @@ export const PlayerService = {
             .in("goalie_id", goalieIds);
           
           if (gsaxData) {
-            gsaxData.forEach((g: any) => {
+            gsaxData.forEach((g: GoalieGsaxRow) => {
               if (g.goalie_id && g.regressed_gsax != null) {
                 gsaxMap.set(Number(g.goalie_id), Number(g.regressed_gsax));
               }
@@ -450,7 +456,7 @@ export const PlayerService = {
               .in("goalie_id", missingGoalieIds);
             
             if (gsaxFallbackData) {
-              gsaxFallbackData.forEach((g: any) => {
+              gsaxFallbackData.forEach((g: GoalieGsaxRow) => {
                 if (g.goalie_id && g.regressed_gsax != null && !gsaxMap.has(Number(g.goalie_id))) {
                   gsaxMap.set(Number(g.goalie_id), Number(g.regressed_gsax));
                 }

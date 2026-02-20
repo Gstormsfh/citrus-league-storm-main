@@ -1,5 +1,6 @@
 import { Player, PlayerService } from "@/services/PlayerService";
 import { supabase } from "@/integrations/supabase/client";
+import type { PostgrestError } from '@supabase/supabase-js';
 import { DraftService } from "./DraftService";
 import { MatchupService } from "./MatchupService";
 import { RosterCacheService } from "./RosterCacheService";
@@ -15,7 +16,7 @@ export interface League {
   join_code: string;
   roster_size: number;
   draft_rounds: number;
-  settings: Record<string, any>;
+  settings: Record<string, unknown>;
   // Waiver settings (added for world-class waiver system)
   waiver_process_time?: string;
   waiver_period_hours?: number;
@@ -28,16 +29,16 @@ export interface League {
       assists?: number;
       shots_on_goal?: number;
       blocks?: number;
-      [key: string]: any;
+      [key: string]: number | undefined;
     };
     goalie?: {
       wins?: number;
       saves?: number;
       shutouts?: number;
       goals_against?: number;
-      [key: string]: any;
+      [key: string]: number | undefined;
     };
-    [key: string]: any;
+    [key: string]: Record<string, number | undefined> | undefined;
   };
   scheduled_draft_time?: string | null;
   created_at: string;
@@ -249,8 +250,8 @@ export const LeagueService = {
     commissionerId: string,
     rosterSize: number = 21,
     draftRounds: number = 21,
-    settings: Record<string, any> = {},
-    scoringSettings?: Record<string, any>,
+    settings: Record<string, unknown> = {},
+    scoringSettings?: Record<string, number>,
     waiverSettings?: {
       waiver_process_time?: string;
       waiver_period_hours?: number;
@@ -258,7 +259,7 @@ export const LeagueService = {
       waiver_type?: 'rolling' | 'faab' | 'reverse_standings';
       allow_trades_during_games?: boolean;
     }
-  ): Promise<{ league: League | null; team: Team | null; error: any }> {
+  ): Promise<{ league: League | null; team: Team | null; error: unknown }> {
     try {
       // Create the league with waiver settings
       const { data: league, error: leagueError } = await supabase
@@ -319,7 +320,7 @@ export const LeagueService = {
    * Get a league by ID
    * REQUIRES: User must be a member of the league (commissioner or team owner)
    */
-  async getLeague(leagueId: string, userId: string): Promise<{ league: League | null; error: any }> {
+  async getLeague(leagueId: string, userId: string): Promise<{ league: League | null; error: unknown }> {
     try {
       // CRITICAL: Validate membership BEFORE querying (application-level security)
       await LeagueMembershipService.requireMembership(leagueId, userId);
@@ -350,7 +351,7 @@ async joinLeagueByCode(
   joinCode: string,
   userId: string,
   teamName?: string
-): Promise<{ league: League | null; team: Team | null; error: any }> {
+): Promise<{ league: League | null; team: Team | null; error: unknown }> {
   try {
     // Validate inputs
     if (!joinCode || !joinCode.trim()) {
@@ -390,18 +391,14 @@ async joinLeagueByCode(
     };
     
     if (!result.success) {
-      console.log(`Failed to join league with code ${joinCode}:`, result.error);
-      return { 
+      return {
         league: null, 
         team: null, 
         error: new Error(result.error || 'Failed to join league') 
       };
     }
 
-    // Success!
-    console.log(`User ${userId} successfully joined league ${result.league?.id} with team ${result.team?.id}`);
-    
-    return { 
+    return {
       league: result.league || null, 
       team: result.team || null, 
       error: null 
@@ -425,7 +422,7 @@ async joinLeagueByCode(
       waiver_type?: 'rolling' | 'faab' | 'reverse_standings';
       allow_trades_during_games?: boolean;
     }
-  ): Promise<{ success: boolean; error: any }> {
+  ): Promise<{ success: boolean; error: unknown }> {
     try {
       // CRITICAL: Verify user is commissioner (application-level security)
       await LeagueMembershipService.requireCommissioner(leagueId, userId);
@@ -437,10 +434,10 @@ async joinLeagueByCode(
         .eq('id', leagueId);
 
       if (error) throw error;
-      
+
       // Create notification for all league members
       await this.notifyLeagueMembers(leagueId, 'Commissioner changed waiver settings', 'Waiver Settings Updated');
-      
+
       return { success: true, error: null };
     } catch (error) {
       console.error('Error updating waiver settings:', error);
@@ -458,7 +455,7 @@ async joinLeagueByCode(
       skater?: Record<string, number>;
       goalie?: Record<string, number>;
     }
-  ): Promise<{ success: boolean; error: any }> {
+  ): Promise<{ success: boolean; error: unknown }> {
     try {
       // CRITICAL: Verify user is commissioner (application-level security)
       await LeagueMembershipService.requireCommissioner(leagueId, userId);
@@ -491,7 +488,7 @@ async joinLeagueByCode(
       draft_rounds?: number;
       pickTimeLimit?: number;
     }
-  ): Promise<{ success: boolean; error: any }> {
+  ): Promise<{ success: boolean; error: unknown }> {
     try {
       // CRITICAL: Verify user is commissioner (application-level security)
       await LeagueMembershipService.requireCommissioner(leagueId, userId);
@@ -503,10 +500,10 @@ async joinLeagueByCode(
         .eq('id', leagueId)
         .single();
 
-      const currentSettings = (currentLeague?.settings as Record<string, any>) || {};
+      const currentSettings = (currentLeague?.settings as Record<string, unknown>) || {};
       
       // Update the draft settings
-      const updateData: any = {};
+      const updateData: { draft_rounds?: number; settings?: Record<string, unknown> } = {};
       if (draftSettings.draft_rounds !== undefined) {
         updateData.draft_rounds = draftSettings.draft_rounds;
       }
@@ -576,8 +573,6 @@ async joinLeagueByCode(
           const { error: insertError } = await supabase.from('notifications').insert(notifications);
           if (insertError) {
             console.error('Fallback direct insert also failed:', insertError);
-          } else {
-            console.log('Notifications created via fallback direct insert');
           }
         }
         return;
@@ -585,8 +580,6 @@ async joinLeagueByCode(
 
       if (result && !result.success) {
         console.error('notify_league_members RPC returned error:', result.error);
-      } else {
-        console.log(`Notifications sent: ${result?.notifications_created || 0} members notified`);
       }
     } catch (error) {
       console.error('Error creating notifications:', error);
@@ -597,7 +590,7 @@ async joinLeagueByCode(
   /**
    * Get all leagues the user belongs to (as commissioner or team owner)
    */
-  async getUserLeagues(userId: string): Promise<{ leagues: League[]; error: any }> {
+  async getUserLeagues(userId: string): Promise<{ leagues: League[]; error: unknown }> {
     try {
       // Get leagues where user is commissioner (exclude demo league)
       const { data: commissionerLeagues, error: commError } = await supabase
@@ -664,7 +657,7 @@ async joinLeagueByCode(
    * Get all teams in a league
    * Uses RPC function to bypass RLS and return all teams
    */
-  async getLeagueTeams(leagueId: string): Promise<{ teams: Team[]; error: any }> {
+  async getLeagueTeams(leagueId: string): Promise<{ teams: Team[]; error: unknown }> {
     try {
       logger.debug('Fetching teams for league:', leagueId);
       
@@ -676,7 +669,6 @@ async joinLeagueByCode(
         console.error('Error fetching teams:', error);
         throw error;
       }
-      console.log('Fetched teams:', data);
       return { teams: data || [], error: null };
     } catch (error) {
       console.error('Exception in getLeagueTeams:', error);
@@ -688,7 +680,7 @@ async joinLeagueByCode(
    * Delete a team from a league (Commissioner only)
    * Also cleans up related data (roster_assignments, team_lineups, draft_picks, etc.)
    */
-  async deleteTeam(teamId: string, leagueId: string, userId: string): Promise<{ success: boolean; error: any }> {
+  async deleteTeam(teamId: string, leagueId: string, userId: string): Promise<{ success: boolean; error: unknown }> {
     try {
       logger.debug(`[LeagueService] Deleting team ${teamId} from league ${leagueId}`);
       
@@ -715,7 +707,7 @@ async joinLeagueByCode(
   /**
    * Get all teams in a league with owner profile information
    */
-  async getLeagueTeamsWithOwners(leagueId: string): Promise<{ teams: (Team & { owner_name?: string })[]; error: any }> {
+  async getLeagueTeamsWithOwners(leagueId: string): Promise<{ teams: (Team & { owner_name?: string })[]; error: unknown }> {
     try {
       logger.debug('Fetching teams with owners for league:', leagueId);
       
@@ -786,10 +778,8 @@ async joinLeagueByCode(
    * This function is idempotent - it will only create teams up to the target number
    * and will never create duplicates
    */
-  async simulateLeagueFill(leagueId: string, numTeams: number = 12): Promise<{ error: any }> {
+  async simulateLeagueFill(leagueId: string, numTeams: number = 12): Promise<{ error: unknown }> {
     try {
-      console.log('simulateLeagueFill: Starting for league', leagueId, 'target teams:', numTeams);
-      
       // Get ALL existing teams with their names to avoid duplicates
       const { data: existingTeams, error: countError } = await supabase
         .from('teams')
@@ -803,14 +793,10 @@ async joinLeagueByCode(
       }
 
       const existingCount = existingTeams?.length || 0;
-      console.log('simulateLeagueFill: Existing teams count:', existingCount);
-      console.log('simulateLeagueFill: Existing teams:', existingTeams?.map(t => t.team_name));
-      
+
       const teamsToCreate = numTeams - existingCount;
-      console.log('simulateLeagueFill: Teams to create:', teamsToCreate);
 
       if (teamsToCreate <= 0) {
-        console.log('simulateLeagueFill: Already has enough teams (', existingCount, '>=', numTeams, ')');
         return { error: null }; // Already has enough teams
       }
 
@@ -822,7 +808,6 @@ async joinLeagueByCode(
         if (match) {
           const num = parseInt(match[1]);
           existingAITeamNumbers.add(num);
-          console.log('simulateLeagueFill: Found existing AI Team', num);
         }
       });
 
@@ -839,22 +824,18 @@ async joinLeagueByCode(
             owner_id: null, // Simulated teams have no owner
             team_name: `AI Team ${teamNumber}`,
           });
-          console.log('simulateLeagueFill: Will create AI Team', teamNumber);
         }
         teamNumber++;
         attempts++;
       }
 
       if (teamsToInsert.length === 0) {
-        console.log('simulateLeagueFill: No teams to insert (all numbers 1-100 are taken)');
         return { error: null };
       }
 
       if (teamsToInsert.length < teamsToCreate) {
         console.warn('simulateLeagueFill: Could only create', teamsToInsert.length, 'out of', teamsToCreate, 'requested teams');
       }
-
-      console.log('simulateLeagueFill: Inserting', teamsToInsert.length, 'teams:', teamsToInsert.map(t => t.team_name));
 
       // Insert teams one at a time to avoid any potential race conditions
       // Actually, let's do a single insert for efficiency, but with proper error handling
@@ -868,8 +849,6 @@ async joinLeagueByCode(
         throw error;
       }
 
-      console.log('simulateLeagueFill: Successfully inserted', insertedTeams?.length || 0, 'teams');
-      console.log('simulateLeagueFill: Inserted teams:', insertedTeams?.map(t => t.team_name));
       
       return { error: null };
     } catch (error) {
@@ -881,7 +860,7 @@ async joinLeagueByCode(
   /**
    * Get user's team in a league
    */
-  async getUserTeam(leagueId: string, userId: string): Promise<{ team: Team | null; error: any }> {
+  async getUserTeam(leagueId: string, userId: string): Promise<{ team: Team | null; error: unknown }> {
     try {
       const { data, error } = await supabase
         .from('teams')
@@ -1165,15 +1144,12 @@ async joinLeagueByCode(
    */
   async initializeDefaultLineups() {
     if (!cachedLeagueState) {
-      console.log('initializeDefaultLineups: No cached league state, skipping');
       return;
     }
     
     // Use a fixed demo league ID for demo teams (not a real database league)
     const demoLeagueId = 'demo-league-id';
     
-    console.log('initializeDefaultLineups: Starting lineup initialization for all demo teams (1-10)');
-
     const getFantasyPosition = (position: string): 'C' | 'LW' | 'RW' | 'D' | 'G' | 'UTIL' => {
       const pos = position?.toUpperCase() || '';
       if (['C', 'CENTRE', 'CENTER'].includes(pos)) return 'C';
@@ -1187,7 +1163,6 @@ async joinLeagueByCode(
     // Process ALL 10 demo teams (IDs 1-10) from LEAGUE_TEAMS_DATA
     // This ensures EVERY team in the demo league has a full, valid lineup
     // Not just Team 3 (guest's team), but ALL 10 teams
-    console.log(`initializeDefaultLineups: Processing all ${LEAGUE_TEAMS_DATA.length} demo teams...`);
     for (let teamIdNum = 1; teamIdNum <= LEAGUE_TEAMS_DATA.length; teamIdNum++) {
       const players = cachedLeagueState[teamIdNum] || [];
       
@@ -1215,7 +1190,6 @@ async joinLeagueByCode(
       const isValidLineup = starterCount >= 10 && benchCount > 0;
       
       if (isValidLineup) {
-        console.log(`Team ${teamIdNum}: Lineup already exists and is valid (${starterCount} starters, ${benchCount} bench)`);
         continue; // Skip if lineup already exists and is valid
       }
       
@@ -1223,11 +1197,7 @@ async joinLeagueByCode(
       if (existingLineup) {
         if (starterCount === 0 && benchCount > 0) {
           console.error(`Team ${teamIdNum}: ❌ CRITICAL - All ${benchCount} players are on bench, NO STARTERS! This is invalid. Re-initializing...`);
-        } else {
-          console.log(`Team ${teamIdNum}: Existing lineup is INVALID (${starterCount} starters, ${benchCount} bench). Re-initializing...`);
         }
-      } else {
-        console.log(`Team ${teamIdNum}: No lineup exists, creating default lineup...`);
       }
       
       // If we get here, either no lineup exists or it's invalid - create/fix it
@@ -1312,7 +1282,6 @@ async joinLeagueByCode(
               ir,
               slotAssignments
             });
-            console.log(`Team ${teamIdNum}: ⚠️ Saved partial lineup as fallback (${starters.length} starters, ${bench.length} bench)`);
           } catch (error) {
             console.error(`Team ${teamIdNum}: ❌ FAILED to save even partial lineup:`, error);
           }
@@ -1320,7 +1289,6 @@ async joinLeagueByCode(
       }
     }
     
-    console.log('initializeDefaultLineups: Completed lineup initialization for all demo teams');
   },
 
   async getMyTeam(allPlayers: Player[]): Promise<Player[]> {
@@ -1389,7 +1357,7 @@ async joinLeagueByCode(
   /**
    * Fetch real transactions from roster_transactions table
    */
-  async fetchTransactions(leagueId: string): Promise<{ transactions: Transaction[]; error: any }> {
+  async fetchTransactions(leagueId: string): Promise<{ transactions: Transaction[]; error: unknown }> {
     try {
       const { data, error } = await supabase
         .from('transaction_ledger')
@@ -1415,20 +1383,20 @@ async joinLeagueByCode(
       const allPlayers = await PlayerService.getAllPlayers();
       const playerMap = new Map(allPlayers.map(p => [p.id, p]));
 
-      const transactions: Transaction[] = (data || []).map((tx: any) => {
+      const transactions: Transaction[] = (data || []).map((tx: { id: string; type: string; player_id: string; created_at: string; source: string | null; teams: { team_name: string } | null; profiles: { first_name: string | null; last_name: string | null } | null }) => {
         const player = playerMap.get(tx.player_id);
         const type = tx.type.toLowerCase() as 'claim' | 'drop' | 'trade';
-        
+
         return {
           id: tx.id,
           type: type === 'add' ? 'claim' : type, // Map 'ADD' to 'claim' for UI
           playerId: tx.player_id,
           playerName: player?.full_name || 'Unknown Player',
           playerTeam: player?.team || 'N/A',
-          date: new Date(tx.created_at).toLocaleDateString('en-US', { 
-            month: 'short', 
-            day: 'numeric', 
-            year: 'numeric' 
+          date: new Date(tx.created_at).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
           }),
           status: 'processed' as const, // All transactions in DB are processed
         };
@@ -1481,20 +1449,20 @@ async joinLeagueByCode(
       const allPlayers = await PlayerService.getAllPlayers();
       const playerMap = new Map(allPlayers.map(p => [p.id, p]));
 
-      const transactions: Transaction[] = data.map((tx: any) => {
+      const transactions: Transaction[] = data.map((tx: { id: string; type: string; player_id: string; created_at: string; source: string | null; league_id: string; teams: { team_name: string } | null }) => {
         const player = playerMap.get(tx.player_id);
         const type = tx.type.toLowerCase() as 'claim' | 'drop' | 'trade';
-        
+
         return {
           id: tx.id,
           type: type === 'add' ? 'claim' : type,
           playerId: tx.player_id,
           playerName: player?.full_name || 'Unknown Player',
           playerTeam: player?.team || 'N/A',
-          date: new Date(tx.created_at).toLocaleDateString('en-US', { 
-            month: 'short', 
-            day: 'numeric', 
-            year: 'numeric' 
+          date: new Date(tx.created_at).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
           }),
           status: 'processed' as const,
         };
@@ -1591,11 +1559,8 @@ async joinLeagueByCode(
           .eq('league_id', leagueId);
         
         if (!rosterError && currentRosterData) {
-          const validPlayerIds = new Set(currentRosterData.map((p: any) => String(p.player_id)));
+          const validPlayerIds = new Set(currentRosterData.map((p: { player_id: string }) => String(p.player_id)));
           const invalidPlayerIds = allLineupPlayerIds.filter(id => !validPlayerIds.has(id));
-          
-          // DIAGNOSTIC: Log validation counts
-          console.log(`[LINEUP VALIDATION] Team ${teamId}: ${allLineupPlayerIds.length} in lineup, ${currentRosterData.length} in roster_assignments, ${invalidPlayerIds.length} invalid`);
           
           if (invalidPlayerIds.length > 0) {
             console.error('[LINEUP VALIDATION] ========================================');
@@ -1617,11 +1582,6 @@ async joinLeagueByCode(
               }
             });
             
-            console.log('[LINEUP VALIDATION] ✅ Filtered lineup:', {
-              starters: lineupToSave.starters.length,
-              bench: lineupToSave.bench.length,
-              ir: lineupToSave.ir.length
-            });
           }
         } else if (rosterError) {
           console.warn('[LINEUP VALIDATION] Could not read roster_assignments, skipping validation:', rosterError);
@@ -1710,19 +1670,11 @@ async joinLeagueByCode(
       
       // Verify the save was successful
       if (data) {
-        console.log('[saveLineup] Lineup saved successfully to Supabase:', {
-          teamId,
-          leagueId,
-          starters: data.starters?.length || 0,
-          bench: data.bench?.length || 0,
-          ir: data.ir?.length || 0
-        });
       }
       
       // Supabase save succeeded - clear any stale localStorage data to prevent conflicts
       const key = `lineup_team_${teamId}`;
       localStorage.removeItem(key);
-      console.log('[saveLineup] Cleared stale localStorage');
       
       // Clear roster cache when lineup is saved so matchup page shows updated lineup
       MatchupService.clearRosterCache(String(teamId), leagueId);
@@ -1737,7 +1689,6 @@ async joinLeagueByCode(
       try {
         const key = `lineup_team_${teamId}`;
         localStorage.setItem(key, JSON.stringify(lineupToSave));
-        console.log('[saveLineup] Saved to localStorage as fallback (Supabase unavailable)');
         
         // Still clear cache even if using localStorage fallback
         MatchupService.clearRosterCache(String(teamId), leagueId);
@@ -1760,10 +1711,8 @@ async joinLeagueByCode(
     teamId: string | number,
     leagueId: string,
     matchupId: string
-  ): Promise<{ backfilledCount: number; error: any }> {
+  ): Promise<{ backfilledCount: number; error: unknown }> {
     try {
-      console.log('[backfillMissingDailyRosters] Starting backfill for team:', teamId, 'matchup:', matchupId);
-      
       // Get matchup dates
       const { data: matchup, error: matchupError } = await supabase
         .from('matchups')
@@ -1779,7 +1728,6 @@ async joinLeagueByCode(
       // Get current lineup for this team
       const savedLineup = await this.getLineup(teamId, leagueId);
       if (!savedLineup || !savedLineup.starters) {
-        console.log('[backfillMissingDailyRosters] No saved lineup found, skipping backfill');
         return { backfilledCount: 0, error: null };
       }
       
@@ -1804,10 +1752,18 @@ async joinLeagueByCode(
         (existingRecords || []).map(r => `${r.player_id}_${r.roster_date}`)
       );
       
-      console.log('[backfillMissingDailyRosters] Found', existingKeys.size, 'existing records');
-      
       // Create records for missing days using current lineup
-      const recordsToInsert: any[] = [];
+      const recordsToInsert: Array<{
+        league_id: string;
+        team_id: string;
+        matchup_id: string;
+        player_id: number;
+        roster_date: string;
+        slot_type: 'active' | 'bench' | 'ir';
+        slot_id: string | null;
+        is_locked: boolean;
+        locked_at: string | null;
+      }> = [];
       
       for (const dateStr of weekDates) {
         // Add starters
@@ -1865,8 +1821,6 @@ async joinLeagueByCode(
         }
       }
       
-      console.log('[backfillMissingDailyRosters] Will insert', recordsToInsert.length, 'missing records');
-      
       if (recordsToInsert.length > 0) {
         // Insert with ON CONFLICT DO NOTHING to be safe
         const { error: insertError } = await supabase
@@ -1881,7 +1835,6 @@ async joinLeagueByCode(
           return { backfilledCount: 0, error: insertError };
         }
         
-        console.log('[backfillMissingDailyRosters] Successfully backfilled', recordsToInsert.length, 'records');
       }
       
       return { backfilledCount: recordsToInsert.length, error: null };
@@ -1896,10 +1849,10 @@ async joinLeagueByCode(
    * Manual backfill for ALL teams in ALL matchups for a league
    * Use this to ensure all historical data exists
    */
-  async backfillAllMatchupsForLeague(leagueId: string): Promise<{ 
-    totalBackfilled: number; 
+  async backfillAllMatchupsForLeague(leagueId: string): Promise<{
+    totalBackfilled: number;
     matchupsProcessed: number;
-    errors: any[] 
+    errors: Array<{ matchup?: string; team?: string; error: unknown }>
   }> {
     try {
       logger.debug('[LeagueService] Starting backfill for ALL matchups in league:', leagueId);
@@ -1912,7 +1865,7 @@ async joinLeagueByCode(
       
       if (matchupsError) {
         console.error('[LeagueService] Error fetching matchups:', matchupsError);
-        return { totalBackfilled: 0, matchupsProcessed: 0, errors: [matchupsError] };
+        return { totalBackfilled: 0, matchupsProcessed: 0, errors: [{ error: matchupsError }] };
       }
       
       if (!matchups || matchups.length === 0) {
@@ -1923,7 +1876,7 @@ async joinLeagueByCode(
       logger.debug(`[LeagueService] Found ${matchups.length} matchups to backfill`);
       
       let totalBackfilled = 0;
-      const errors: any[] = [];
+      const errors: Array<{ matchup?: string; team?: string; error: unknown }> = [];
       
       for (const matchup of matchups) {
         logger.debug(`[LeagueService] Processing matchup ${matchup.id}...`);
@@ -1971,7 +1924,7 @@ async joinLeagueByCode(
       return { totalBackfilled, matchupsProcessed: matchups.length, errors };
     } catch (error) {
       console.error('[LeagueService] Exception in backfillAllMatchupsForLeague:', error);
-      return { totalBackfilled: 0, matchupsProcessed: 0, errors: [error] };
+      return { totalBackfilled: 0, matchupsProcessed: 0, errors: [{ error }] };
     }
   },
 
@@ -2004,7 +1957,6 @@ async joinLeagueByCode(
         .limit(1);
       
       if (!matchups || matchups.length === 0) {
-        console.log('[createDailyRosterSnapshots] No current/future matchup found for team', teamId);
         return;
       }
       
@@ -2034,7 +1986,7 @@ async joinLeagueByCode(
           .in('player_id', allPlayerIds);
         
         if (players) {
-          players.forEach((p: any) => {
+          players.forEach((p: { player_id: number; team_abbrev: string | null }) => {
             if (p.team_abbrev) {
               playerTeamMap.set(p.player_id, p.team_abbrev);
             }
@@ -2049,17 +2001,21 @@ async joinLeagueByCode(
       // RULE 2: Today's players can only be changed BEFORE their game starts
       // RULE 3: Future dates are always updatable
       // =============================================================================
-      const rosterRecords: any[] = [];
+      const rosterRecords: Array<{
+        league_id: string;
+        team_id: string;
+        matchup_id: string;
+        player_id: number;
+        roster_date: string;
+        slot_type: 'active' | 'bench' | 'ir';
+        slot_id: string | null;
+        is_locked: boolean;
+        locked_at: string | null;
+      }> = [];
       const now = new Date();
       const todayStr = now.toISOString().split('T')[0];
       const todayDate = new Date(todayStr);
       todayDate.setHours(0, 0, 0, 0);
-      
-      console.log('[createDailyRosterSnapshots] ========================================');
-      console.log('[createDailyRosterSnapshots] ROSTER LOCKING CHECK');
-      console.log('[createDailyRosterSnapshots] Today:', todayStr);
-      console.log('[createDailyRosterSnapshots] Week dates:', weekDates.map(d => d.toISOString().split('T')[0]));
-      console.log('[createDailyRosterSnapshots] Target date (Yahoo-style):', targetDate || 'ALL future dates');
       
       // Filter to only include TODAY and FUTURE dates
       // PAST DATES ARE PERMANENTLY FROZEN - NO EXCEPTIONS
@@ -2078,23 +2034,13 @@ async joinLeagueByCode(
         futureDates = futureDates.filter(date => 
           date.toISOString().split('T')[0] === targetDate
         );
-        console.log('[createDailyRosterSnapshots] 📌 Filtered to single target date:', targetDate);
-        
         if (futureDates.length === 0) {
-          console.log('[createDailyRosterSnapshots] ⚠️ Target date is in the past or outside week, skipping');
           return;
         }
       }
       
       const pastDatesSkipped = weekDates.length - futureDates.length;
-      console.log('[createDailyRosterSnapshots] Past dates (FROZEN):', pastDatesSkipped);
-      console.log('[createDailyRosterSnapshots] Future dates (updatable):', futureDates.map(d => d.toISOString().split('T')[0]));
-      
-      if (pastDatesSkipped > 0 && !targetDate) {
-        console.log(`[createDailyRosterSnapshots] ⚠️ LOCKED: ${pastDatesSkipped} past days will NOT be modified`);
-      }
-      console.log('[createDailyRosterSnapshots] ========================================');
-      
+
       for (const date of futureDates) {
         const dateStr = date.toISOString().split('T')[0];
         const dateOnly = new Date(date);
@@ -2113,7 +2059,7 @@ async joinLeagueByCode(
         
         // Build map of team -> game info for quick lookup
         const teamGameMap = new Map<string, { gameTime?: string; status: string }>();
-        (games || []).forEach((game: any) => {
+        (games || []).forEach((game: { game_time: string | null; status: string; home_team: string | null; away_team: string | null }) => {
           if (game.home_team) {
             teamGameMap.set(game.home_team, { gameTime: game.game_time, status: game.status });
           }
@@ -2205,8 +2151,6 @@ async joinLeagueByCode(
       // CRITICAL: Query existing locked records to prevent overwriting past days
       // This prevents users from retroactively changing their lineups
       if (rosterRecords.length > 0) {
-        console.log(`[createDailyRosterSnapshots] Processing ${rosterRecords.length} roster records`);
-        
         // Query all existing records for this matchup/team that are locked
         const { data: existingLocked, error: queryError } = await supabase
           .from('fantasy_daily_rosters')
@@ -2223,8 +2167,6 @@ async joinLeagueByCode(
         const lockedSet = new Set(
           (existingLocked || []).map(r => `${r.player_id}_${r.roster_date}`)
         );
-        
-        console.log(`[createDailyRosterSnapshots] Found ${lockedSet.size} locked roster entries`);
         
         // Filter out records that are already locked
         // NEVER overwrite a locked day - this prevents score manipulation
@@ -2244,11 +2186,6 @@ async joinLeagueByCode(
           return true;
         });
         
-        const skippedCount = rosterRecords.length - recordsToUpsert.length;
-        if (skippedCount > 0) {
-          console.log(`[createDailyRosterSnapshots] Skipped ${skippedCount} locked records (preventing retroactive changes)`);
-        }
-        
         // Upsert only unlocked records
         if (recordsToUpsert.length > 0) {
           const { error } = await supabase
@@ -2260,11 +2197,7 @@ async joinLeagueByCode(
           
           if (error) {
             console.error('[createDailyRosterSnapshots] Error upserting daily rosters:', error);
-          } else {
-            console.log(`[createDailyRosterSnapshots] Successfully upserted ${recordsToUpsert.length} unlocked roster records`);
           }
-        } else {
-          console.log('[createDailyRosterSnapshots] No unlocked records to upsert (all days are locked)');
         }
       }
     } catch (error) {
@@ -2385,7 +2318,6 @@ async joinLeagueByCode(
           // No lineup in Supabase - clear any stale localStorage data
           const key = `lineup_team_${teamId}`;
           localStorage.removeItem(key);
-          console.log('[getLineup] No lineup in Supabase, cleared stale localStorage');
           return null;
         }
         // Actual error (network, permission, etc.) - fall back to localStorage
@@ -2393,7 +2325,6 @@ async joinLeagueByCode(
         const key = `lineup_team_${teamId}`;
         const saved = localStorage.getItem(key);
         if (saved) {
-          console.log('[getLineup] Loaded from localStorage fallback (Supabase error)');
           return JSON.parse(saved);
         }
         return null;
@@ -2487,7 +2418,7 @@ async joinLeagueByCode(
       const missingPlayerIds: string[] = [];
 
       // First pass: identify missing players (dropped/traded)
-      dailyRosters.forEach((entry: any) => {
+      dailyRosters.forEach((entry: { player_id: number; slot_type: string; slot_id: string | null }) => {
         const playerId = String(entry.player_id);
         if (!playerMap.has(playerId)) {
           missingPlayerIds.push(playerId);
@@ -2536,7 +2467,7 @@ async joinLeagueByCode(
       }
 
       // Second pass: build roster arrays
-      dailyRosters.forEach((entry: any) => {
+      dailyRosters.forEach((entry: { player_id: number; slot_type: string; slot_id: string | null }) => {
         const playerId = String(entry.player_id);
         const player = playerMap.get(playerId);
         if (!player) {
@@ -2595,15 +2526,16 @@ async joinLeagueByCode(
     }
     
     // Initialize all teams with 0 stats
-    const teamStats: Record<string, { 
-      pointsFor: number; 
-      pointsAgainst: number; 
-      wins: number; 
+    type TeamStatsWithHistory = {
+      pointsFor: number;
+      pointsAgainst: number;
+      wins: number;
       losses: number;
       streak: string;
       last5: { wins: number; losses: number };
       matchupHistory: Array<{ week: number; won: boolean }>; // Track matchup history for streak/last5
-    }> = {};
+    };
+    const teamStats: Record<string, TeamStatsWithHistory> = {};
     
     teams.forEach(team => {
       teamStats[team.id] = {
@@ -2820,7 +2752,7 @@ async joinLeagueByCode(
         };
         
         // Remove matchupHistory from final result (it was just for calculation)
-        delete (stats as any).matchupHistory;
+        delete (stats as Partial<TeamStatsWithHistory>).matchupHistory;
       });
     } catch (error) {
       console.error('[LeagueService] Exception calculating team standings:', error);
@@ -2829,7 +2761,7 @@ async joinLeagueByCode(
 
     // Remove matchupHistory from all teams before caching/returning
     Object.keys(teamStats).forEach(teamId => {
-      delete (teamStats[teamId] as any).matchupHistory;
+      delete (teamStats[teamId] as Partial<TeamStatsWithHistory>).matchupHistory;
     });
 
     // Cache the result for 60 seconds
@@ -2842,7 +2774,7 @@ async joinLeagueByCode(
    * Update all teams owned by a user with a new team name
    * This syncs the default_team_name from profiles to existing teams
    */
-  async updateUserTeamNames(userId: string, newTeamName: string): Promise<{ error: any; updatedCount?: number }> {
+  async updateUserTeamNames(userId: string, newTeamName: string): Promise<{ error: unknown; updatedCount?: number }> {
     try {
       if (!newTeamName || !newTeamName.trim()) {
         return { error: null, updatedCount: 0 }; // No name to update
@@ -2862,10 +2794,8 @@ async joinLeagueByCode(
       }
 
       const teamCount = existingTeams?.length || 0;
-      console.log(`Updating ${teamCount} teams for user ${userId} with new name: "${trimmedName}"`);
 
       if (teamCount === 0) {
-        console.log('No teams found for user, nothing to update');
         return { error: null, updatedCount: 0 };
       }
 
@@ -2882,12 +2812,6 @@ async joinLeagueByCode(
       }
 
       const updatedCount = data?.length || 0;
-      console.log(`Successfully updated ${updatedCount} team(s) for user ${userId}`);
-      
-      // Log the updated team names for debugging
-      if (data && data.length > 0) {
-        console.log('Updated teams:', data.map(t => ({ id: t.id, name: t.team_name })));
-      }
 
       return { error: null, updatedCount };
     } catch (error) {
@@ -2907,7 +2831,7 @@ async joinLeagueByCode(
     userId: string
   ): Promise<{ 
     lineup: { starters: string[]; bench: string[]; ir: string[]; slotAssignments: Record<string, string> } | null;
-    error: any 
+    error: unknown
   }> {
     try {
       // CRITICAL FIX: Read from roster_assignments (source of truth) instead of draft_picks
@@ -2924,7 +2848,6 @@ async joinLeagueByCode(
       }
       
       if (!rosterAssignments || rosterAssignments.length === 0) {
-        console.log(`No roster assignments found for team ${teamId}`);
         return { lineup: null, error: null };
       }
 
@@ -2932,8 +2855,6 @@ async joinLeagueByCode(
       const playerIds = rosterAssignments.map(r => r.player_id);
       const teamPlayers = allPlayers.filter(p => playerIds.includes(String(p.id)));
 
-      // DIAGNOSTIC: Log match rate to detect player loss
-      console.log(`[initializeTeamLineup] Team ${teamId}: ${rosterAssignments.length} roster_assignments, ${teamPlayers.length} matched in allPlayers (${allPlayers.length} total)`);
       if (teamPlayers.length < rosterAssignments.length) {
         const matchedIds = new Set(teamPlayers.map(p => String(p.id)));
         const unmatchedIds = playerIds.filter((id: string) => !matchedIds.has(String(id)));
@@ -2941,7 +2862,6 @@ async joinLeagueByCode(
       }
 
       if (teamPlayers.length === 0) {
-        console.log(`No players found for team ${teamId} draft picks`);
         return { lineup: null, error: null };
       }
 
@@ -3060,8 +2980,6 @@ async joinLeagueByCode(
       // (detecting that old players are being "removed"), preventing the new lineup from saving.
       await this.saveLineup(teamId, leagueId, lineup, undefined, { allowPlayerRemoval: true });
 
-      console.log(`Initialized lineup for team ${teamId}: ${starters.length} starters, ${bench.length} bench, ${ir.length} IR`);
-      
       return { lineup, error: null };
     } catch (error) {
       console.error(`Error initializing lineup for team ${teamId}:`, error);
@@ -3077,7 +2995,7 @@ async joinLeagueByCode(
     userId: string,
     playerId: string,
     source: string = 'Roster Tab'
-  ): Promise<{ success: boolean; error: any }> {
+  ): Promise<{ success: boolean; error: unknown }> {
     // Read-only guard: Block all drops for demo league
     if (leagueId === DEMO_LEAGUE_ID_FOR_GUESTS) {
       return {
@@ -3131,7 +3049,7 @@ async joinLeagueByCode(
     userId: string,
     playerId: string,
     source: string = 'Roster Tab'
-  ): Promise<{ success: boolean; error: any }> {
+  ): Promise<{ success: boolean; error: unknown }> {
     // Read-only guard: Block all adds for demo league
     if (leagueId === DEMO_LEAGUE_ID_FOR_GUESTS) {
       return { 

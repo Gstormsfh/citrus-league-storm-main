@@ -86,7 +86,8 @@ function mapStatsToCitrusPuck(
   
   // ALWAYS use NHL.com official stats exclusively (no PBP fallback)
   // This ensures we display only NHL.com data, not PBP-calculated data
-  
+  const useNhlStats = true;
+
   // Base CitrusPuckPlayerData with all fields defaulted to 0
   const citrusData: CitrusPuckPlayerData = {
     playerId: stats.player_id,
@@ -127,9 +128,27 @@ function mapStatsToCitrusPuck(
     I_F_flurryAdjustedxGoals: 0,
     I_F_scoreVenueAdjustedxGoals: 0,
     I_F_flurryScoreVenueAdjustedxGoals: 0,
-    // For assists, calculate from primary + secondary, but use NHL if available
-    I_F_primaryAssists: hasPlayed ? (stats.primary_assists || 0) : 0,
-    I_F_secondaryAssists: hasPlayed ? (stats.secondary_assists || 0) : 0,
+    // Use NHL.com official total assists for display/scoring.
+    // Scale PBP primary/secondary split to match NHL total so card shows correct assists.
+    // If NHL assists unavailable, fall back to PBP totals.
+    I_F_primaryAssists: hasPlayed ? (() => {
+      const nhlTotal = Number(stats.nhl_assists ?? 0);
+      const pbpPrimary = Number(stats.primary_assists ?? 0);
+      const pbpSecondary = Number(stats.secondary_assists ?? 0);
+      const pbpTotal = pbpPrimary + pbpSecondary;
+      if (nhlTotal > 0 && pbpTotal > 0) return Math.round(nhlTotal * (pbpPrimary / pbpTotal));
+      if (nhlTotal > 0) return nhlTotal; // No PBP split available, assign all to primary
+      return pbpPrimary; // No NHL data, fall back to PBP
+    })() : 0,
+    I_F_secondaryAssists: hasPlayed ? (() => {
+      const nhlTotal = Number(stats.nhl_assists ?? 0);
+      const pbpPrimary = Number(stats.primary_assists ?? 0);
+      const pbpSecondary = Number(stats.secondary_assists ?? 0);
+      const pbpTotal = pbpPrimary + pbpSecondary;
+      if (nhlTotal > 0 && pbpTotal > 0) return nhlTotal - Math.round(nhlTotal * (pbpPrimary / pbpTotal));
+      if (nhlTotal > 0) return 0; // No PBP split, secondary unknown
+      return pbpSecondary; // No NHL data, fall back to PBP
+    })() : 0,
     // EXCLUSIVELY use NHL.com shots on goal (no PBP fallback)
     I_F_shotsOnGoal: hasPlayed ? Number(stats.nhl_shots_on_goal ?? 0) : 0,
     I_F_missedShots: 0,
@@ -281,7 +300,7 @@ export const CitrusPuckService = {
       const [statsResponse, directoryResponse] = await Promise.all([
           (supabase as any)
             .from("player_season_stats")
-            .select("season, player_id, team_abbrev, position_code, is_goalie, games_played, nhl_toi_seconds, goals, primary_assists, secondary_assists, points, nhl_goals, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_saves, x_goals, pim, hits, blocks, saves, wins, nhl_wins, nhl_losses, nhl_ot_losses, goals_against, shutouts, save_pct, nhl_gaa, nhl_save_pct, nhl_shutouts, shots_faced, nhl_shots_faced, nhl_goals_against, goalie_gp")
+            .select("season, player_id, team_abbrev, position_code, is_goalie, games_played, nhl_toi_seconds, goals, primary_assists, secondary_assists, points, nhl_goals, nhl_assists, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_saves, x_goals, pim, hits, blocks, saves, wins, nhl_wins, nhl_losses, nhl_ot_losses, goals_against, shutouts, save_pct, nhl_gaa, nhl_save_pct, nhl_shutouts, shots_faced, nhl_shots_faced, nhl_goals_against, goalie_gp")
             .eq("season", season),
           (supabase as any)
             .from("player_directory")

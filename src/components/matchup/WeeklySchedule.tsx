@@ -67,24 +67,7 @@ export const WeeklySchedule = ({
   
   // Ensure we have exactly 7 days (Sun-Sat)
   if (dates.length !== 7) {
-    console.warn(`[WeeklySchedule] Expected 7 days but got ${dates.length}. Week: ${weekStart} to ${weekEnd}`, {
-      dates,
-      startDate: startDate.toISOString(),
-      endDate: endDate.toISOString(),
-      todayStr
-    });
-  }
-  
-  // Debug: Log first and last day to verify Sunday-Saturday
-  if (dates.length > 0) {
-    // Parse dates consistently to avoid timezone issues
-    const [firstYear, firstMonth, firstDay] = dates[0].split('-').map(Number);
-    const [lastYear, lastMonth, lastDay] = dates[dates.length - 1].split('-').map(Number);
-    const firstDayDate = new Date(firstYear, firstMonth - 1, firstDay);
-    const lastDayDate = new Date(lastYear, lastMonth - 1, lastDay);
-    const firstDayName = firstDayDate.toLocaleDateString('en-US', { weekday: 'long' });
-    const lastDayName = lastDayDate.toLocaleDateString('en-US', { weekday: 'long' });
-    console.log(`[WeeklySchedule] Week: ${dates[0]} (${firstDayName}) to ${dates[dates.length - 1]} (${lastDayName}), Today: ${todayStr}`);
+    console.warn(`[WeeklySchedule] Expected 7 days but got ${dates.length}. Week: ${weekStart} to ${weekEnd}`);
   }
 
   const formatDayLabel = (dateStr: string): string => {

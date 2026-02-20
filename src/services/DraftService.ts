@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import type { PostgrestError } from '@supabase/supabase-js';
 import { logger } from '@/utils/logger';
 import { Team, LeagueService } from './LeagueService';
 import { PlayerService } from './PlayerService';
@@ -35,12 +36,41 @@ export interface DraftState {
   sessionId?: string;
 }
 
+export interface DraftSnapshotData {
+  teams: Array<{ id: string; name: string; owner: string; color: string }>;
+  picks: Array<{
+    id: string;
+    teamId: string;
+    teamName: string;
+    playerId: string;
+    playerName: string;
+    position: string;
+    round: number;
+    pick: number;
+    timestamp: number;
+  }>;
+  leagueSettings: {
+    rounds: number;
+    draftOrder: string;
+    completedAt: string;
+  };
+}
+
+export interface DraftSnapshot {
+  id: string;
+  league_id: string;
+  draft_session_id: string;
+  snapshot_data: DraftSnapshotData;
+  created_at: string;
+  created_by: string | null;
+}
+
 export const DraftService = {
   /**
    * Get or create active draft session for a league
    * REQUIRES: User must be a member of the league
    */
-  async getActiveDraftSession(leagueId: string, userId?: string): Promise<{ sessionId: string; error: any }> {
+  async getActiveDraftSession(leagueId: string, userId?: string): Promise<{ sessionId: string; error: unknown }> {
     try {
       // CRITICAL: Validate membership BEFORE accessing draft data (skip if no userId)
       if (userId) {
@@ -98,7 +128,7 @@ export const DraftService = {
       const newSessionId = crypto.randomUUID();
       logger.log('No existing session found, creating new session:', newSessionId);
       return { sessionId: newSessionId, error: null };
-    } catch (error) {
+    } catch (error: unknown) {
       // If error occurs, create new session
       const newSessionId = crypto.randomUUID();
       logger.log('Error getting session, creating new one:', newSessionId);
@@ -110,7 +140,7 @@ export const DraftService = {
    * Get all draft picks for a league (active session only)
    * REQUIRES: User must be a member of the league
    */
-  async getDraftPicks(leagueId: string, userId: string, sessionId?: string): Promise<{ picks: DraftPick[]; error: any }> {
+  async getDraftPicks(leagueId: string, userId: string, sessionId?: string): Promise<{ picks: DraftPick[]; error: unknown }> {
     try {
       // If explicit sessionId provided, filter by it; otherwise get all active picks
       let query = supabase
@@ -128,7 +158,7 @@ export const DraftService = {
 
       if (error) throw error;
       return { picks: data || [], error: null };
-    } catch (error) {
+    } catch (error: unknown) {
       return { picks: [], error };
     }
   },
@@ -137,7 +167,7 @@ export const DraftService = {
    * Get draft order for a specific round (active session only)
    * REQUIRES: User must be a member of the league
    */
-  async getDraftOrder(leagueId: string, userId: string, roundNumber: number, sessionId?: string): Promise<{ order: DraftOrder | null; error: any }> {
+  async getDraftOrder(leagueId: string, userId: string, roundNumber: number, sessionId?: string): Promise<{ order: DraftOrder | null; error: unknown }> {
     try {
       let query = supabase
         .from('draft_order')
@@ -158,7 +188,7 @@ export const DraftService = {
 
       if (error && error.code !== 'PGRST116') throw error;
       return { order: data || null, error: null };
-    } catch (error) {
+    } catch (error: unknown) {
       return { order: null, error };
     }
   },
@@ -175,7 +205,7 @@ export const DraftService = {
     totalRounds: number,
     resetExisting: boolean = false,
     customTeamOrder?: string[]
-  ): Promise<{ error: any; sessionId?: string }> {
+  ): Promise<{ error: unknown; sessionId?: string }> {
     try {
       // Use custom order if provided, otherwise use teams array order
       const teamIds = customTeamOrder || teams.map(t => t.id);
@@ -252,7 +282,7 @@ export const DraftService = {
 
       if (error) throw error;
       return { error: null, sessionId };
-    } catch (error) {
+    } catch (error: unknown) {
       return { error, sessionId: undefined };
     }
   },
@@ -268,7 +298,7 @@ export const DraftService = {
     pickNumber: number,
     sessionId?: string,
     teamsCount?: number
-  ): Promise<{ pick: DraftPick | null; error: any; isComplete?: boolean }> {
+  ): Promise<{ pick: DraftPick | null; error: unknown; isComplete?: boolean }> {
     // Read-only guard: Block user-initiated picks for demo league
     // But allow initialization (when no picks exist yet)
     if (leagueId === '00000000-0000-0000-0000-000000000001') {
@@ -324,8 +354,8 @@ export const DraftService = {
       }
 
       // Insert the pick - try RPC first (bypasses RLS), fallback to direct insert
-      let data: any;
-      let error: any;
+      let data: DraftPick | null = null;
+      let error: PostgrestError | null = null;
 
       const { data: rpcResult, error: rpcError } = await supabase.rpc('make_draft_pick', {
         p_league_id: leagueId,
@@ -353,7 +383,7 @@ export const DraftService = {
           .select()
           .single();
 
-        data = result.data;
+        data = result.data as unknown as DraftPick | null;
         error = result.error;
       } else {
         // RPC succeeded - fetch the inserted pick
@@ -362,7 +392,7 @@ export const DraftService = {
           .select('id, league_id, team_id, player_id, round_number, pick_number, draft_session_id, picked_at, deleted_at')
           .eq('id', rpcResult)
           .single();
-        data = pickData;
+        data = pickData as DraftPick | null;
         error = fetchError;
       }
 
@@ -501,7 +531,7 @@ export const DraftService = {
               
               // CRITICAL: Verify the sync actually inserted the right number of rows
               // The RPC returns players_synced count — verify it matches draft_picks count
-              const syncData = syncResult as any;
+              const syncData = syncResult as { players_synced?: number } | null;
               if (syncData?.players_synced !== undefined) {
                 const { count: pickCount } = await supabase
                   .from('draft_picks')
@@ -527,11 +557,11 @@ export const DraftService = {
               logger.log('Initializing rosters for all teams from roster_assignments...');
               await this.initializeRostersForAllTeams(leagueId);
               logger.log('Roster initialization complete');
-            } catch (rosterError) {
+            } catch (rosterError: unknown) {
               logger.error('Error initializing rosters:', rosterError);
               // Don't fail the draft completion if roster init fails
             }
-          } catch (syncError) {
+          } catch (syncError: unknown) {
             logger.error('Error syncing roster_assignments:', syncError);
           }
           
@@ -573,7 +603,7 @@ export const DraftService = {
             } else {
               logger.warn('Could not load league data, skipping matchup generation');
             }
-          } catch (matchupGenError) {
+          } catch (matchupGenError: unknown) {
             logger.error('Error generating matchups after draft completion:', matchupGenError);
             // Don't fail the draft completion if matchup generation fails
           }
@@ -581,7 +611,7 @@ export const DraftService = {
       }
 
       return { pick: data, error: null, isComplete };
-    } catch (error) {
+    } catch (error: unknown) {
       return { pick: null, error };
     }
   },
@@ -595,7 +625,7 @@ export const DraftService = {
     totalRounds: number,
     userId?: string,
     sessionId?: string
-  ): Promise<{ state: DraftState | null; error: any }> {
+  ): Promise<{ state: DraftState | null; error: unknown }> {
     try {
       // Get all active (non-deleted) picks - no session ID filtering needed
       const { picks } = await this.getDraftPicks(leagueId, userId || '', sessionId);
@@ -641,7 +671,7 @@ export const DraftService = {
         },
         error: null,
       };
-    } catch (error) {
+    } catch (error: unknown) {
       return { state: null, error };
     }
   },
@@ -650,7 +680,7 @@ export const DraftService = {
    * Reset draft for a league (soft delete - safe for testing)
    * Creates a new session for the next draft attempt
    */
-  async resetDraft(leagueId: string): Promise<{ error: any; newSessionId?: string }> {
+  async resetDraft(leagueId: string): Promise<{ error: unknown; newSessionId?: string }> {
     try {
       // Use RPC function that runs as SECURITY DEFINER to bypass RLS
       // Direct .delete() on draft_picks silently fails because there's no DELETE RLS policy
@@ -699,7 +729,7 @@ export const DraftService = {
           .single();
 
         const currentSettings = currentLeague?.settings || {};
-        const { timerStartedAt: _, ...settingsWithoutTimer } = currentSettings as Record<string, any>;
+        const { timerStartedAt: _, ...settingsWithoutTimer } = currentSettings as Record<string, unknown>;
 
         const { error: leagueError } = await supabase
           .from('leagues')
@@ -716,7 +746,7 @@ export const DraftService = {
       // Return new session ID for next draft
       const newSessionId = crypto.randomUUID();
       return { error: null, newSessionId };
-    } catch (error) {
+    } catch (error: unknown) {
       return { error };
     }
   },
@@ -728,7 +758,7 @@ export const DraftService = {
   async undoLastPick(
     leagueId: string,
     userId: string
-  ): Promise<{ undone: DraftPick | null; error: any }> {
+  ): Promise<{ undone: DraftPick | null; error: unknown }> {
     try {
       // Get the most recent active pick
       const { data: lastPick, error: fetchError } = await supabase
@@ -756,7 +786,7 @@ export const DraftService = {
 
       logger.log('Undo last pick:', lastPick.player_id, 'from team:', lastPick.team_id);
       return { undone: lastPick, error: null };
-    } catch (error) {
+    } catch (error: unknown) {
       return { undone: null, error };
     }
   },
@@ -764,7 +794,7 @@ export const DraftService = {
   /**
    * Hard delete draft data (use with caution - for cleanup only)
    */
-  async hardDeleteDraft(leagueId: string): Promise<{ error: any }> {
+  async hardDeleteDraft(leagueId: string): Promise<{ error: unknown }> {
     try {
       // First, hard delete all draft picks for this league
       const { error: picksError } = await supabase
@@ -819,7 +849,7 @@ export const DraftService = {
       }
 
       return { error: null };
-    } catch (error) {
+    } catch (error: unknown) {
       return { error };
     }
   },
@@ -831,7 +861,7 @@ export const DraftService = {
    * Note: This uses RPC to execute SQL directly since Supabase requires WHERE clauses.
    * For a simpler approach, use the SQL script: scripts/delete-all-draft-data.sql
    */
-  async deleteAllDraftData(): Promise<{ error: any; deletedCounts?: { picks: number; orders: number; leagues: number } }> {
+  async deleteAllDraftData(): Promise<{ error: unknown; deletedCounts?: { picks: number; orders: number; leagues: number } }> {
     try {
       // Get counts before deletion for reporting
       const { count: picksCountBefore } = await supabase
@@ -902,7 +932,7 @@ export const DraftService = {
           leagues: leaguesCount || 0
         }
       };
-    } catch (error) {
+    } catch (error: unknown) {
       return { error };
     }
   },
@@ -961,7 +991,7 @@ export const DraftService = {
    * Initialize rosters for all teams in a league after draft completion
    * This ensures every team has a valid lineup saved in team_lineups table
    */
-  async initializeRostersForAllTeams(leagueId: string): Promise<{ error: any }> {
+  async initializeRostersForAllTeams(leagueId: string): Promise<{ error: unknown }> {
     try {
       logger.log(`Initializing rosters for all teams in league ${leagueId}...`);
       
@@ -1020,7 +1050,7 @@ export const DraftService = {
       logger.log(`Roster initialization complete: ${successful} successful, ${failed} failed`);
 
       return { error: null };
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Error initializing rosters for all teams:', error);
       return { error };
     }
@@ -1050,7 +1080,7 @@ export const DraftService = {
       draftOrder: string;
       completedAt: string;
     }
-  ): Promise<{ snapshotId: string | null; error: any }> {
+  ): Promise<{ snapshotId: string | null; error: unknown }> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -1093,7 +1123,7 @@ export const DraftService = {
 
       logger.log('Draft snapshot saved successfully:', data.id);
       return { snapshotId: data.id, error: null };
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Error saving draft snapshot:', error);
       return { snapshotId: null, error };
     }
@@ -1102,7 +1132,7 @@ export const DraftService = {
   /**
    * Get the most recent draft snapshot for a league
    */
-  async getDraftSnapshot(leagueId: string): Promise<{ snapshot: any | null; error: any }> {
+  async getDraftSnapshot(leagueId: string): Promise<{ snapshot: DraftSnapshot | null; error: unknown }> {
     try {
       const { data, error } = await supabase
         .from('draft_snapshots')
@@ -1118,8 +1148,8 @@ export const DraftService = {
         return { snapshot: null, error: null };
       }
 
-      return { snapshot: data, error: null };
-    } catch (error) {
+      return { snapshot: data as unknown as DraftSnapshot, error: null };
+    } catch (error: unknown) {
       logger.error('Error getting draft snapshot:', error);
       return { snapshot: null, error };
     }

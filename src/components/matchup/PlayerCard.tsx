@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { MatchupPlayer } from "./types";
 import { cn } from "@/lib/utils";
 import { getTeamColor } from "@/utils/teamColors";
@@ -83,7 +84,7 @@ const calculatePercentages = (player: MatchupPlayer) => {
   return { shotPct, pointRate };
 };
 
-export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick, selectedDate, dailyStatsMap }: PlayerCardProps) => {
+export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerClick, selectedDate, dailyStatsMap }: PlayerCardProps) => {
   if (!player) {
     return (
       <div className={cn(`player-card player-card-empty ${isUserTeam ? 'user-team' : 'opponent-team'} opacity-50`)}>
@@ -621,5 +622,6 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick,
       </div>
     </div>
   );
-};
+});
 
+PlayerCard.displayName = 'PlayerCard';

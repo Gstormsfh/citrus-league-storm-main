@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { withTimeout } from '@/utils/promiseUtils';
 import { getTodayMST, getTodayMSTDate } from '@/utils/timezoneUtils';
 import { COLUMNS } from '@/utils/queryColumns';
+import type { PostgrestError } from '@supabase/supabase-js';
 
 // Test mode: Controlled via VITE_TEST_MODE environment variable
 // Set VITE_TEST_MODE=true in .env to use test date for development
@@ -58,7 +59,7 @@ export const ScheduleService = {
   async getGamesForDateRange(
     startDate: Date,
     endDate: Date
-  ): Promise<{ games: NHLGame[]; error: any }> {
+  ): Promise<{ games: NHLGame[]; error: PostgrestError | null }> {
     try {
       // Helper to format date in local timezone (avoids UTC shift issues with toISOString)
       const formatDateLocal = (d: Date) => {
@@ -90,7 +91,7 @@ export const ScheduleService = {
       return { games: data || [], error: null };
     } catch (error) {
       console.error('Error fetching games for date range:', error);
-      return { games: [], error };
+      return { games: [], error: error as PostgrestError };
     }
   },
 
@@ -102,7 +103,7 @@ export const ScheduleService = {
     teamAbbrevs: string[],
     startDate?: Date,
     endDate?: Date
-  ): Promise<{ gamesByTeam: Map<string, NHLGame[]>; error: any }> {
+  ): Promise<{ gamesByTeam: Map<string, NHLGame[]>; error: PostgrestError | null }> {
     try {
       if (teamAbbrevs.length === 0) {
         return { gamesByTeam: new Map(), error: null };
@@ -140,15 +141,15 @@ export const ScheduleService = {
         query = query.lte('game_date', formatDateLocal(endDate));
       }
 
-      let data: any = null;
-      let error: any = null;
+      let data: NHLGame[] | null = null;
+      let error: PostgrestError | null = null;
       try {
         const result = await withTimeout(query, 10000, 'getGamesForTeams query timeout');
         data = result.data;
         error = result.error;
-      } catch (timeoutError: any) {
+      } catch (timeoutError: unknown) {
         console.error('[ScheduleService.getGamesForTeams] Query timeout:', timeoutError);
-        error = timeoutError;
+        error = timeoutError as PostgrestError;
       }
       
       if (error) {
@@ -185,7 +186,7 @@ export const ScheduleService = {
       return { gamesByTeam, error: null };
     } catch (error) {
       console.error('Error fetching games for teams:', error);
-      return { gamesByTeam: new Map(), error };
+      return { gamesByTeam: new Map(), error: error as PostgrestError };
     }
   },
 
@@ -196,7 +197,7 @@ export const ScheduleService = {
     teamAbbrev: string,
     startDate?: Date,
     endDate?: Date
-  ): Promise<{ games: NHLGame[]; error: any }> {
+  ): Promise<{ games: NHLGame[]; error: PostgrestError | null }> {
     try {
       // Helper to format date in local timezone (avoids UTC shift issues with toISOString)
       const formatDateLocal = (d: Date) => {
@@ -205,7 +206,7 @@ export const ScheduleService = {
         const day = String(d.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
       };
-      
+
       let query = supabase
         .from('nhl_games')
         .select(COLUMNS.NHL_GAME)
@@ -232,14 +233,14 @@ export const ScheduleService = {
       return { games: data || [], error: null };
     } catch (error) {
       console.error('Error fetching games for team:', error);
-      return { games: [], error };
+      return { games: [], error: error as PostgrestError };
     }
   },
 
   /**
    * Get next game for a team (including today's games)
    */
-  async getNextGameForTeam(teamAbbrev: string): Promise<{ game: NHLGame | null; error: any }> {
+  async getNextGameForTeam(teamAbbrev: string): Promise<{ game: NHLGame | null; error: PostgrestError | null }> {
     try {
       const todayStr = getTodayString();
 
@@ -264,7 +265,7 @@ export const ScheduleService = {
       return { game: data || null, error: null };
     } catch (error) {
       console.error('Error fetching next game:', error);
-      return { game: null, error };
+      return { game: null, error: error as PostgrestError };
     }
   },
 
@@ -275,7 +276,7 @@ export const ScheduleService = {
     teamAbbrev: string,
     weekStart: Date,
     weekEnd: Date
-  ): Promise<{ games: NHLGame[]; error: any }> {
+  ): Promise<{ games: NHLGame[]; error: PostgrestError | null }> {
     return this.getGamesForTeam(teamAbbrev, weekStart, weekEnd);
   },
 

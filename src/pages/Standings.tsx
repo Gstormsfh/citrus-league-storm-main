@@ -64,8 +64,6 @@ const Standings = () => {
         // State 1: Guest - show REAL demo league data from database
         // State 2: Logged in, no league - show REAL demo league data (will show CTAs in UI)
         if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
-          console.log('[Standings] Loading REAL demo league for guest/no-league user');
-          
           // Import DEMO_LEAGUE_ID_FOR_GUESTS
           const { DEMO_LEAGUE_ID_FOR_GUESTS } = await import('@/services/DemoLeagueService');
           const { COLUMNS } = await import('@/utils/queryColumns');
@@ -86,8 +84,7 @@ const Standings = () => {
           }
           
           const demoLeague = demoLeagueData as League;
-          console.log('[Standings] Demo league loaded:', demoLeague.id);
-          
+
           // Get teams from the demo league
           const { data: demoTeamsData, error: teamsError } = await supabase
             .from('teams')
@@ -103,8 +100,7 @@ const Standings = () => {
           }
           
           const demoTeamsFromDb = demoTeamsData as any[];
-          console.log('[Standings] Loaded', demoTeamsFromDb.length, 'demo teams');
-          
+
           // Get draft picks for calculating team stats
           const { data: draftPicksData } = await supabase
             .from('draft_picks')
@@ -162,7 +158,6 @@ const Standings = () => {
           });
           
           setTeams(standingsTeams);
-          console.log('[Standings] Demo standings loaded with', standingsTeams.length, 'teams');
           setLoading(false);
           return;
         }
@@ -194,7 +189,6 @@ const Standings = () => {
             // First, auto-complete matchups (this also updates scores for completed weeks)
             const { error: autoCompleteError } = await supabase.rpc('auto_complete_matchups');
             if (autoCompleteError) {
-              console.warn('[Standings] Error auto-completing matchups (non-blocking):', autoCompleteError);
               // Don't block standings load if auto-complete fails - continue with score updates and standings calculation
             }
             
@@ -205,11 +199,6 @@ const Standings = () => {
             if (updateScoresError) {
               console.error('[Standings] Failed to update matchup scores:', updateScoresError);
               // Still show standings, but they may be outdated
-            } else {
-              console.log('[Standings] Score update completed:', {
-                updatedCount: updatedCount || 0,
-                leagueId: leagueToUse
-              });
             }
           } catch (error) {
             console.error('[Standings] Exception updating scores:', error);
@@ -281,15 +270,10 @@ const Standings = () => {
           });
 
           setTeams(standingsTeams);
-          console.log('[Standings] Successfully set teams data:', {
-            teamCount: standingsTeams.length,
-            sampleTeam: standingsTeams[0]?.name || 'none'
-          });
         } else {
           // No user or wrong state - set loading to false and show empty teams
           setTeams([]);
           setLeagues([]);
-          console.log('[Standings] No active user or wrong state, showing empty teams');
         }
       } catch (err: any) {
         console.error('[Standings] Error loading standings:', err);
@@ -304,7 +288,6 @@ const Standings = () => {
       } finally {
         // CRITICAL: Always set loading to false to ensure component renders
         // Even if there were errors, we want to show the standings (or empty state)
-        console.log('[Standings] Setting loading to false, component should render now');
         setLoading(false);
       }
     };
@@ -367,7 +350,6 @@ const Standings = () => {
   const displayLoading = useMinimumLoadingTime(shouldShowLoadingScreen, 800);
   
   if (displayLoading) {
-    console.log('[Standings] Showing LoadingScreen - no data yet');
     return (
       <LoadingScreen
         character="narwhal"
@@ -379,14 +361,6 @@ const Standings = () => {
   // CRITICAL: If we reach here, we MUST render content (even if loading is still true but we have data)
   // This ensures content is always visible when data exists
   // Force render content if we have teams, regardless of loading state
-  if (teams.length > 0) {
-    console.log('[Standings] FORCING content render - teams exist, ignoring loading state');
-  }
-  
-  // Log render state for debugging
-  if (teams.length > 0) {
-    console.log('[Standings] Rendering content with', teams.length, 'teams, loading:', loading);
-  }
 
   return (
     <div className="min-h-screen bg-[#D4E8B8] relative">

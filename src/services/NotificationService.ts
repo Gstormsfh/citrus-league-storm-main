@@ -15,7 +15,7 @@ export interface Notification {
 
 export interface NotificationServiceResponse<T> {
   data: T | null;
-  error: any;
+  error: unknown;
 }
 
 /**
@@ -25,7 +25,7 @@ export const NotificationService = {
   /**
    * Verify user is authenticated
    */
-  async verifyAuth(): Promise<{ userId: string | null; error: any }> {
+  async verifyAuth(): Promise<{ userId: string | null; error: unknown }> {
     try {
       const { data: { user }, error } = await supabase.auth.getUser();
       if (error || !user) {
@@ -40,7 +40,7 @@ export const NotificationService = {
   /**
    * Verify user is a member of the league
    */
-  async verifyLeagueMembership(leagueId: string, userId: string): Promise<{ isMember: boolean; error: any }> {
+  async verifyLeagueMembership(leagueId: string, userId: string): Promise<{ isMember: boolean; error: unknown }> {
     try {
       const { data, error } = await supabase
         .from('teams')

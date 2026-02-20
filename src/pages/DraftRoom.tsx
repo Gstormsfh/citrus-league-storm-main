@@ -1741,7 +1741,6 @@ const DraftRoom = () => {
     }
 
     try {
-      console.log('[DraftRoom] Attempting to delete team:', { teamId, leagueId, userId: user.id });
       const { success, error } = await LeagueService.deleteTeam(teamId, leagueId, user.id);
       if (error) {
         console.error('[DraftRoom] Error from deleteTeam service:', error);

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import {
   Menu, X, Bell, Search, Users, LogOut, CircleUser,
   Trophy, ChevronDown, UserPlus, Calendar, BarChart3,
-  Swords, Newspaper, Sparkles, Settings
+  Swords, Newspaper, Sparkles, Settings, DollarSign
 } from 'lucide-react';
 import { CitrusLogo } from '@/components/icons/CitrusIcons';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -74,6 +74,7 @@ const Navbar = () => {
     { label: 'Players', path: '/free-agents', icon: Search },
     { label: 'GM Office', path: '/gm-office', icon: Settings },
     { label: 'Draft', path: '/draft-room', icon: Sparkles },
+    { label: 'Armchair GM', path: '/armchair-gm', icon: DollarSign },
   ];
 
   return (
@@ -272,6 +273,8 @@ const Navbar = () => {
             <button
               className="p-2.5 rounded-xl text-citrus-forest"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+              aria-expanded={mobileMenuOpen}
             >
               {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
@@ -347,7 +350,7 @@ const Navbar = () => {
                     <Link to="/profile" onClick={closeMobileMenu} className="p-2 rounded-lg bg-citrus-sage/10">
                       <CircleUser className="h-4 w-4 text-citrus-forest" />
                     </Link>
-                    <button onClick={handleSignOut} className="p-2 rounded-lg bg-red-50">
+                    <button onClick={handleSignOut} className="p-2 rounded-lg bg-red-50" aria-label="Sign out">
                       <LogOut className="h-4 w-4 text-red-500" />
                     </button>
                   </div>

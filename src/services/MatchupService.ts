@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import type { PostgrestError } from '@supabase/supabase-js';
 import { League, Team, LeagueService } from './LeagueService';
 import { DraftService } from './DraftService';
 import { PlayerService, Player } from './PlayerService';
@@ -10,6 +11,73 @@ import { withTimeout } from '@/utils/promiseUtils';
 import { getTodayMST, getTodayMSTDate, formatDateToString, isDateInRange } from '@/utils/timezoneUtils';
 import { COLUMNS } from '@/utils/queryColumns';
 import { ScoringCalculator, extractScoringSettings } from '@/utils/scoringUtils';
+
+// Shared stat shape used by calculateMatchupWeekPoints and matchup stats
+interface MatchupWeekStats {
+  goals?: number;
+  assists?: number;
+  sog?: number;
+  blocks?: number;
+  ppp?: number;
+  shp?: number;
+  hits?: number;
+  pim?: number;
+  plus_minus?: number;
+  xGoals?: number;
+  wins?: number;
+  saves?: number;
+  shutouts?: number;
+  goals_against?: number;
+}
+
+// Shape for daily projection rows returned from RPC
+interface DailyProjectionRow {
+  player_id: number;
+  is_goalie?: boolean;
+  total_projected_points?: number;
+  projected_goals?: number;
+  projected_assists?: number;
+  projected_sog?: number;
+  projected_blocks?: number;
+  projected_ppp?: number;
+  projected_shp?: number;
+  projected_hits?: number;
+  projected_pim?: number;
+  projected_xg?: number;
+  base_ppg?: number;
+  shrinkage_weight?: number;
+  finishing_multiplier?: number;
+  opponent_adjustment?: number;
+  b2b_penalty?: number;
+  home_away_adjustment?: number;
+  confidence_score?: number;
+  calculation_method?: string;
+  projected_wins?: number;
+  projected_saves?: number;
+  projected_shutouts?: number;
+  projected_goals_against?: number;
+  projected_gaa?: number;
+  projected_save_pct?: number;
+  projected_gp?: number;
+  starter_confirmed?: boolean;
+}
+
+// Shape for matchup line rows from fantasy_matchup_lines
+interface MatchupLineRow {
+  player_id: number;
+  total_points: number;
+  games_played: number;
+  games_remaining_total: number;
+  games_remaining_active: number;
+  has_live_game: boolean;
+  live_game_locked: boolean;
+  stats_breakdown?: Record<string, unknown>;
+}
+
+// Shape for raw stats breakdown JSONB from database
+interface RawStatsBreakdown {
+  [key: string]: number;
+}
 
 // Roster cache for performance optimization
 interface RosterCacheEntry {
@@ -76,18 +144,18 @@ export const MatchupService = {
   /**
    * Delete all matchups for a league (useful for regeneration)
    */
-  async deleteAllMatchupsForLeague(leagueId: string): Promise<{ error: any }> {
+  async deleteAllMatchupsForLeague(leagueId: string): Promise<{ error: PostgrestError | Error | null }> {
     try {
       const { error } = await supabase
         .from('matchups')
         .delete()
         .eq('league_id', leagueId);
-      
+
       if (error) throw error;
       return { error: null };
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('[MatchupService] Error deleting matchups:', error);
-      return { error };
+      return { error: error instanceof Error ? error : new Error(String(error)) };
     }
   },
 
@@ -190,7 +258,7 @@ export const MatchupService = {
     teams: Team[],
     firstWeekStart: Date,
     forceRegenerate: boolean = false
-  ): Promise<{ error: any }> {
+  ): Promise<{ error: PostgrestError | Error | null }> {
     try {
       // Get available weeks
       const currentYear = new Date().getFullYear();
@@ -242,7 +310,6 @@ export const MatchupService = {
       
       if (forceRegenerate || weeksWithMatchups.size === 0) {
         // Full regeneration: delete all, generate all weeks
-        console.log('[MatchupService] Full regeneration requested - deleting all existing matchups...');
         await this.deleteAllMatchupsForLeague(leagueId);
         weeksNeedingMatchups = availableWeeks;
       } else {
@@ -293,12 +360,6 @@ export const MatchupService = {
           console.error(`[MatchupService] ABORTING matchup generation to prevent incomplete data`);
           return { error: new Error(`Round-robin algorithm failed: ${missingFromPairs.length} teams missing from week ${weekNumber} pairs. Teams: ${missingFromPairs.join(', ')}`) };
         }
-        
-        console.log(`[MatchupService] Week ${weekNumber} - Verification passed: All ${numTeams} teams included in pairs ✓`);
-        
-        console.log(`[MatchupService] Week ${weekNumber} - Generated ${teamPairs.length} pairs:`, teamPairs.map(p => 
-          `${p.team1.team_name || p.team1.id} (${p.team1.id}) vs ${p.team2?.team_name || p.team2?.id || 'BYE'} (${p.team2?.id || 'null'})`
-        ).join(', '));
         
         // Insert matchups for this week
         for (const pair of teamPairs) {
@@ -354,7 +415,6 @@ export const MatchupService = {
             console.error(`[MatchupService] Failed matchup data:`, insertData);
             matchupsErrors++;
           } else {
-            console.log(`[MatchupService] Week ${weekNumber} - Successfully created matchup:`, inserted);
             matchupsCreated++;
           }
         }
@@ -417,9 +477,9 @@ export const MatchupService = {
       }
       
       return { error: null };
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('[MatchupService] Error generating matchups:', error);
-      return { error };
+      return { error: error instanceof Error ? error : new Error(String(error)) };
     }
   },
 
@@ -429,7 +489,7 @@ export const MatchupService = {
   async getMatchup(
     leagueId: string,
     weekNumber: number
-  ): Promise<{ matchup: Matchup | null; error: any }> {
+  ): Promise<{ matchup: Matchup | null; error: PostgrestError | Error | null }> {
     try {
       const { data, error } = await supabase
         .from('matchups')
@@ -440,8 +500,8 @@ export const MatchupService = {
 
       if (error) throw error;
       return { matchup: data || null, error: null };
-    } catch (error) {
-      return { matchup: null, error };
+    } catch (error: unknown) {
+      return { matchup: null, error: error instanceof Error ? error : new Error(String(error)) };
     }
   },
 
@@ -452,11 +512,11 @@ export const MatchupService = {
     leagueId: string,
     userId: string,
     weekNumber: number
-  ): Promise<{ matchup: Matchup | null; error: any }> {
+  ): Promise<{ matchup: Matchup | null; error: PostgrestError | Error | null }> {
     try {
       // First, get user's team
-      let userTeam: any = null;
-      let teamError: any = null;
+      let userTeam: { id: string } | null = null;
+      let teamError: PostgrestError | Error | null = null;
       try {
         const result = await withTimeout(
           supabase.from('teams').select('id').eq('league_id', leagueId).eq('owner_id', userId).maybeSingle(),
@@ -465,9 +525,9 @@ export const MatchupService = {
         );
         userTeam = result.data;
         teamError = result.error;
-      } catch (timeoutError: any) {
+      } catch (timeoutError: unknown) {
         console.error('[MatchupService.getUserMatchup] User team query timeout:', timeoutError);
-        teamError = timeoutError;
+        teamError = timeoutError instanceof Error ? timeoutError : new Error(String(timeoutError));
       }
 
       if (teamError) throw teamError;
@@ -475,14 +535,6 @@ export const MatchupService = {
         console.warn('[MatchupService.getUserMatchup] User team not found');
         return { matchup: null, error: null };
       }
-
-      console.log('[MatchupService.getUserMatchup] User team ID:', userTeam.id);
-      console.log('[MatchupService.getUserMatchup] Querying matchups table with:', {
-        league_id: leagueId,
-        week_number: weekNumber,
-        week_number_type: typeof weekNumber,
-        team_filter: `team1_id=${userTeam.id} OR team2_id=${userTeam.id}`
-      });
 
       // Find matchup where user's team is team1 or team2
       // Use .limit(1) instead of .maybeSingle() to handle potential duplicates gracefully
@@ -494,26 +546,26 @@ export const MatchupService = {
         .eq('week_number', weekNumber)
         .or(`team1_id.eq.${userTeam.id},team2_id.eq.${userTeam.id}`)
         .limit(1);
-      
-      let matchups: any = null;
-      let error: any = null;
+
+      let matchups: Record<string, unknown>[] | null = null;
+      let error: PostgrestError | Error | null = null;
       try {
         const result = await withTimeout(query, 5000, 'getUserMatchup query timeout');
         matchups = result.data;
         error = result.error;
-      } catch (timeoutError: any) {
+      } catch (timeoutError: unknown) {
         console.error('[MatchupService.getUserMatchup] Matchup query timeout:', timeoutError);
-        error = timeoutError;
+        error = timeoutError instanceof Error ? timeoutError : new Error(String(timeoutError));
       }
-      
+
       if (error) {
         console.error('[MatchupService.getUserMatchup] Database query error:', error);
         throw error;
       }
-      
+
       // Additional verification: Check if week_number matches what we queried for
       if (matchups && matchups.length > 0) {
-        const firstMatchup = matchups[0];
+        const firstMatchup = matchups[0] as Record<string, unknown>;
         if (firstMatchup.week_number !== weekNumber) {
           console.error('[MatchupService.getUserMatchup] WARNING: Week number mismatch!', {
             requested: weekNumber,
@@ -522,12 +574,12 @@ export const MatchupService = {
           });
         }
       }
-      
+
       const data = matchups && matchups.length > 0 ? matchups[0] : null;
-      
-      return { matchup: data || null, error: null };
-    } catch (error) {
-      return { matchup: null, error };
+
+      return { matchup: (data as Matchup) || null, error: null };
+    } catch (error: unknown) {
+      return { matchup: null, error: error instanceof Error ? error : new Error(String(error)) };
     }
   },
 
@@ -539,7 +591,7 @@ export const MatchupService = {
     matchupId: string,
     userId: string,
     timezone: string = 'America/Denver'
-  ): Promise<{ data: MatchupDataResponse | null; error: any }> {
+  ): Promise<{ data: MatchupDataResponse | null; error: PostgrestError | Error | null }> {
     try {
       // Get the matchup
       const { data: matchup, error: matchupError } = await supabase
@@ -575,13 +627,8 @@ export const MatchupService = {
         const { team } = await LeagueService.getUserTeam(matchup.league_id, userId);
         userTeam = team || null;
         isUserInMatchup = userTeam && (matchup.team1_id === userTeam.id || matchup.team2_id === userTeam.id);
-      } catch (error) {
+      } catch (error: unknown) {
         // User might not be in this league/matchup - that's okay, we'll view as team1
-        console.log('[MatchupService.getMatchupDataById] User not in matchup or league, viewing as team1:', {
-          matchupId,
-          userId,
-          error: error?.message || 'User team lookup failed'
-        });
         userTeam = null;
         isUserInMatchup = false;
       }
@@ -655,14 +702,14 @@ export const MatchupService = {
         );
 
         if (!viewingError && viewingDailyScores) {
-          const sorted = (viewingDailyScores as any[]).sort((a, b) =>
+          const sorted = (viewingDailyScores as Array<{ roster_date: string; daily_score: string | number }>).sort((a, b) =>
             new Date(a.roster_date).getTime() - new Date(b.roster_date).getTime()
           );
-          viewingDailyPoints = sorted.map(d => parseFloat(d.daily_score) || 0);
+          viewingDailyPoints = sorted.map(d => parseFloat(String(d.daily_score)) || 0);
         } else {
           viewingDailyPoints = Array(7).fill(0);
         }
-      } catch (error) {
+      } catch (error: unknown) {
         viewingDailyPoints = Array(7).fill(0);
       }
 
@@ -679,14 +726,14 @@ export const MatchupService = {
           );
 
           if (!oppError && oppDailyScores) {
-            const sorted = (oppDailyScores as any[]).sort((a, b) =>
+            const sorted = (oppDailyScores as Array<{ roster_date: string; daily_score: string | number }>).sort((a, b) =>
               new Date(a.roster_date).getTime() - new Date(b.roster_date).getTime()
             );
-            opponentDailyPoints = sorted.map(d => parseFloat(d.daily_score) || 0);
+            opponentDailyPoints = sorted.map(d => parseFloat(String(d.daily_score)) || 0);
           } else {
             opponentDailyPoints = Array(7).fill(0);
           }
-        } catch (error) {
+        } catch (error: unknown) {
           opponentDailyPoints = Array(7).fill(0);
         }
       }
@@ -723,19 +770,18 @@ export const MatchupService = {
       };
 
       return { data: response, error: null };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('[MatchupService.getMatchupDataById] Error loading matchup:', {
         matchupId,
         userId,
-        error: error?.message || error,
+        error: errorMessage,
         errorDetails: error
       });
-      
-      // Provide more detailed error message
-      const errorMessage = error?.message || 'Unknown error loading matchup';
-      return { 
-        data: null, 
-        error: new Error(`Failed to load matchup: ${errorMessage}`) 
+
+      return {
+        data: null,
+        error: new Error(`Failed to load matchup: ${errorMessage}`)
       };
     }
   },
@@ -752,18 +798,11 @@ export const MatchupService = {
     timezone: string = 'America/Denver',
     existingMatchup?: Matchup | null,
     targetDate?: string // Optional: if provided and is past date, load frozen roster for that date
-  ): Promise<{ data: MatchupDataResponse | null; error: any }> {
+  ): Promise<{ data: MatchupDataResponse | null; error: PostgrestError | Error | null }> {
     try {
-      console.log('[MatchupService.getMatchupData] Received parameters:', {
-        leagueId,
-        userId,
-        weekNumber,
-        timezone
-      });
-      
       // Get league to determine first week start
-      let league: any = null;
-      let leagueError: any = null;
+      let league: Record<string, unknown> | null = null;
+      let leagueError: PostgrestError | Error | null = null;
       try {
         const result = await withTimeout(
           supabase.from('leagues').select(COLUMNS.LEAGUE).eq('id', leagueId).maybeSingle(),
@@ -772,9 +811,9 @@ export const MatchupService = {
         );
         league = result.data;
         leagueError = result.error;
-      } catch (timeoutError: any) {
+      } catch (timeoutError: unknown) {
         console.error('[MatchupService.getMatchupData] League query timeout:', timeoutError);
-        leagueError = timeoutError;
+        leagueError = timeoutError instanceof Error ? timeoutError : new Error(String(timeoutError));
       }
 
       if (leagueError) throw leagueError;
@@ -783,15 +822,15 @@ export const MatchupService = {
       }
 
       // Get first week start date
-      const draftCompletionDate = league.updated_at ? new Date(league.updated_at) : new Date();
+      const draftCompletionDate = league.updated_at ? new Date(league.updated_at as string) : new Date();
       const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
       const currentYear = new Date().getFullYear();
       const scheduleLength = getScheduleLength(firstWeekStart, currentYear);
       const isPlayoffWeek = weekNumber > scheduleLength;
 
       // Get user's team
-      let userTeam: any = null;
-      let teamError: any = null;
+      let userTeam: Record<string, unknown> | null = null;
+      let teamError: PostgrestError | Error | null = null;
       try {
         const result = await withTimeout(
           supabase.from('teams').select(COLUMNS.TEAM).eq('league_id', leagueId).eq('owner_id', userId).maybeSingle(),
@@ -800,9 +839,9 @@ export const MatchupService = {
         );
         userTeam = result.data;
         teamError = result.error;
-      } catch (timeoutError: any) {
+      } catch (timeoutError: unknown) {
         console.error('[MatchupService.getMatchupData] User team query timeout:', timeoutError);
-        teamError = timeoutError;
+        teamError = timeoutError instanceof Error ? timeoutError : new Error(String(timeoutError));
       }
 
       if (teamError) throw teamError;
@@ -810,13 +849,14 @@ export const MatchupService = {
         return { data: null, error: new Error('User team not found') };
       }
 
+      // Cast to known shape after null check
+      const userTeamData = userTeam as { id: string; team_name: string; [key: string]: unknown };
+
       // Use existingMatchup if provided, otherwise query
       let matchup: Matchup | null = null;
       if (existingMatchup) {
-        console.log('[MatchupService.getMatchupData] Using pre-fetched matchup (avoiding redundant query)');
         matchup = existingMatchup;
       } else {
-        console.log('[MatchupService.getMatchupData] Querying matchup from DB...');
         const { matchup: queriedMatchup, error: matchupError } = await this.getUserMatchup(leagueId, userId, weekNumber);
         if (matchupError) throw matchupError;
         matchup = queriedMatchup;
@@ -826,16 +866,9 @@ export const MatchupService = {
         console.warn('[MatchupService.getMatchupData] No matchup found for week:', weekNumber);
         return { data: null, error: new Error(`No matchup found for week ${weekNumber}`) };
       }
-      
-      console.log('[MatchupService.getMatchupData] Found matchup:', {
-        id: matchup.id,
-        week_number: matchup.week_number,
-        team1_id: matchup.team1_id,
-        team2_id: matchup.team2_id
-      });
 
       // Determine which team the user is (team1 or team2)
-      const isTeam1 = matchup.team1_id === userTeam.id;
+      const isTeam1 = matchup.team1_id === userTeamData.id;
       const opponentTeamId = isTeam1 ? matchup.team2_id : matchup.team1_id;
 
       // Get opponent team object
@@ -853,7 +886,6 @@ export const MatchupService = {
       let rosterPlayers: Player[];
       if (isPastDate) {
         // For past dates: Load ALL players (needed to find dropped players in frozen lineups)
-        console.log('[MatchupService.getMatchupData] Loading ALL players for frozen roster lookup');
         rosterPlayers = await withTimeout(
           PlayerService.getAllPlayers(),
           15000,
@@ -893,7 +925,7 @@ export const MatchupService = {
               // Continue with partial roster rather than loading all players
             }
           }
-        } catch (error) {
+        } catch (error: unknown) {
           console.error('[MatchupService] Error in optimized roster loading:', error);
           // DO NOT fallback to getAllPlayers - it causes 504 timeouts
           // Return empty array and let UI show error
@@ -930,7 +962,7 @@ export const MatchupService = {
       const opponentSlotAssignments = normalizeSlotAssignments(isTeam1 ? team2SlotAssignments : team1SlotAssignments);
 
       // Get team records
-      const userRecord = await this.getTeamRecord(userTeam.id, leagueId, userId);
+      const userRecord = await this.getTeamRecord(userTeamData.id, leagueId, userId);
       const opponentRecord = opponentTeamObj ? await this.getTeamRecord(opponentTeamObj.id, leagueId, userId) : { wins: 0, losses: 0 };
 
       // Calculate daily points
@@ -954,7 +986,7 @@ export const MatchupService = {
           'calculate_daily_matchup_scores',
           {
             p_matchup_id: matchup.id,
-            p_team_id: userTeam.id,
+            p_team_id: userTeamData.id,
             p_week_start: weekStartStr,
             p_week_end: weekEndStr
           }
@@ -962,16 +994,16 @@ export const MatchupService = {
 
         if (!userError && userDailyScores) {
           // Sort by date and extract scores
-          const sorted = (userDailyScores as any[]).sort((a, b) => 
+          const sorted = (userDailyScores as Array<{ roster_date: string; daily_score: string | number }>).sort((a, b) =>
             new Date(a.roster_date).getTime() - new Date(b.roster_date).getTime()
           );
-          userDailyPoints = sorted.map(d => parseFloat(d.daily_score) || 0);
+          userDailyPoints = sorted.map(d => parseFloat(String(d.daily_score)) || 0);
         } else {
           console.warn('[getMatchupData] Error calculating user daily scores:', userError);
           // Fallback: use placeholder if calculation fails
           userDailyPoints = Array(7).fill(0);
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('[getMatchupData] Exception calculating user daily scores:', error);
         userDailyPoints = Array(7).fill(0);
       }
@@ -991,15 +1023,15 @@ export const MatchupService = {
 
           if (!oppError && oppDailyScores) {
             // Sort by date and extract scores
-            const sorted = (oppDailyScores as any[]).sort((a, b) => 
+            const sorted = (oppDailyScores as Array<{ roster_date: string; daily_score: string | number }>).sort((a, b) => 
               new Date(a.roster_date).getTime() - new Date(b.roster_date).getTime()
             );
-            opponentDailyPoints = sorted.map(d => parseFloat(d.daily_score) || 0);
+            opponentDailyPoints = sorted.map(d => parseFloat(String(d.daily_score)) || 0);
           } else {
             console.warn('[getMatchupData] Error calculating opponent daily scores:', oppError);
             opponentDailyPoints = Array(7).fill(0);
           }
-        } catch (error) {
+        } catch (error: unknown) {
           console.error('[getMatchupData] Exception calculating opponent daily scores:', error);
           opponentDailyPoints = Array(7).fill(0);
         }
@@ -1035,8 +1067,8 @@ export const MatchupService = {
         scheduleLength,
         isPlayoffWeek,
         userTeam: {
-          id: userTeam.id,
-          name: userTeam.team_name,
+          id: userTeamData.id,
+          name: userTeamData.team_name,
           roster: userRoster,
           slotAssignments: userSlotAssignments,
           record: userRecord,
@@ -1059,9 +1091,9 @@ export const MatchupService = {
       };
 
       return { data: response, error: null };
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error getting matchup data:', error);
-      return { data: null, error };
+      return { data: null, error: error instanceof Error ? error : new Error(String(error)) };
     }
   },
 
@@ -1108,7 +1140,7 @@ export const MatchupService = {
       }
       
       return (teamDraftPicks || []).map(p => p.player_id);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error getting roster player IDs:', error);
       return [];
     }
@@ -1146,7 +1178,7 @@ export const MatchupService = {
         const teamPicks = draftPicks.filter(p => p.team_id === teamId);
         const playerIds = teamPicks.map(p => p.player_id);
         // Convert string IDs to numbers for matching
-        const playerIdsAsNumbers = playerIds.map((id: any) => typeof id === 'string' ? parseInt(id) || 0 : id || 0).filter(id => id > 0);
+        const playerIdsAsNumbers = playerIds.map((id: string | number) => typeof id === 'string' ? parseInt(id) || 0 : id || 0).filter(id => id > 0);
         const teamPlayers = allPlayers.filter(p => playerIdsAsNumbers.includes(Number(p.id)));
         
         const roster = teamPlayers.map((p) => this.transformToHockeyPlayer(p));
@@ -1164,7 +1196,7 @@ export const MatchupService = {
       const numericIds: number[] = [];
       const uuidIds: string[] = [];
       
-      playerIds.forEach((id: any) => {
+      playerIds.forEach((id: string | number) => {
         if (typeof id === 'string') {
           // Check if it's a numeric string (NHL ID) or UUID
           const numId = parseInt(id);
@@ -1192,9 +1224,9 @@ export const MatchupService = {
         
         if (!uuidError && uuidPlayers) {
           // Match UUID players to allPlayers by name and team
-          uuidPlayers.forEach((uuidPlayer: any) => {
-            const matched = allPlayers.find(p => 
-              p.full_name === uuidPlayer.full_name && 
+          uuidPlayers.forEach((uuidPlayer: { id: string; full_name: string; team: string }) => {
+            const matched = allPlayers.find(p =>
+              p.full_name === uuidPlayer.full_name &&
               p.team === uuidPlayer.team
             );
             if (matched && !teamPlayers.find(tp => tp.id === matched.id)) {
@@ -1211,7 +1243,7 @@ export const MatchupService = {
       rosterCache.set(cacheKey, { roster, timestamp: now });
       
       return roster;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error getting team roster:', error);
       return [];
     }
@@ -1271,53 +1303,39 @@ export const MatchupService = {
   async getDailyProjectionsForMatchup(
     playerIds: number[],
     targetDate: string
-  ): Promise<Map<number, any>> {
+  ): Promise<Map<number, DailyProjectionRow>> {
     try {
       if (!playerIds || playerIds.length === 0) {
         console.warn('[MatchupService.getDailyProjections] No player IDs provided');
         return new Map();
       }
 
-      console.log(`[MatchupService.getDailyProjections] Calling RPC for ${playerIds.length} players on ${targetDate}`);
-      
       const { data, error } = await supabase.rpc('get_daily_projections', {
         p_player_ids: playerIds,
         p_target_date: targetDate
       });
-      
+
       if (error) {
         console.error('[MatchupService.getDailyProjections] ❌ RPC error:', error);
         return new Map(); // Return empty map on error (graceful degradation)
       }
-      
-      console.log(`[MatchupService.getDailyProjections] ✅ RPC returned ${data?.length || 0} projections`);
-      
-      // Log sample projection to verify structure
-      if (data && data.length > 0) {
-        console.log('[MatchupService.getDailyProjections] Sample projection:', {
-          player_id: data[0].player_id,
-          total_projected_points: data[0].total_projected_points,
-          is_goalie: data[0].is_goalie,
-          has_all_fields: !!(data[0].player_id && data[0].total_projected_points !== undefined)
-        });
-      } else {
+
+      if (!data || data.length === 0) {
         console.warn('[MatchupService.getDailyProjections] ⚠️ RPC returned empty array - no projections for this date');
       }
-      
+
       // Create a map for O(1) lookup during player transformation
-      const projectionMap = new Map<number, any>();
+      const projectionMap = new Map<number, DailyProjectionRow>();
       if (data && Array.isArray(data)) {
-        data.forEach((p: any) => {
+        data.forEach((p: DailyProjectionRow) => {
           if (p.player_id) {
             projectionMap.set(Number(p.player_id), p);
           }
         });
       }
-      
-      console.log(`[MatchupService.getDailyProjections] Created projection map with ${projectionMap.size} entries`);
-      
+
       return projectionMap;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('[MatchupService.getDailyProjections] ❌ Unexpected error:', error);
       return new Map(); // Return empty map on error
     }
@@ -1346,18 +1364,12 @@ export const MatchupService = {
       goals_against?: number;
     },
     garPercentage?: number,
-    dailyProjection?: any
+    dailyProjection?: DailyProjectionRow
   ): MatchupPlayer {
     // CRITICAL: Debug goalie detection and stats
     const isGoalie = player.position === 'G' || player.position === 'Goalie';
-    if (isGoalie) {
-      console.log(`[MatchupService.transformToMatchupPlayerWithGames] 🥅 GOALIE DETECTED: ${player.name} (ID: ${player.id})`);
-      console.log(`  Position: ${player.position}, matchupStats:`, matchupStats);
-      if (matchupStats) {
-        console.log(`  Goalie Stats from RPC: W=${matchupStats.wins || 0}, SV=${matchupStats.saves || 0}, SO=${matchupStats.shutouts || 0}, GA=${matchupStats.goals_against || 0}`);
-      } else {
-        console.warn(`  ⚠️ NO MATCHUP STATS for goalie ${player.name}!`);
-      }
+    if (isGoalie && !matchupStats) {
+      console.warn(`  ⚠️ NO MATCHUP STATS for goalie ${player.name}!`);
     }
     const teamAbbrev = player.teamAbbreviation || player.team || '';
     
@@ -1474,18 +1486,6 @@ export const MatchupService = {
                             (shutouts * 3) + 
                             (goals_against * -1);
             
-            // Debug: Log goalie point calculation
-            if (wins > 0 || saves > 0 || shutouts > 0) {
-              console.log(`[MatchupService.transformToMatchupPlayerWithGames] ✅ Goalie ${player.name} weekly points:`, {
-                wins,
-                saves,
-                shutouts,
-                goals_against,
-                calculation: `(${wins} * 4) + (${saves} * 0.2) + (${shutouts} * 3) + (${goals_against} * -1)`,
-                totalPoints: fantasyPoints,
-                week: `${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`
-              });
-            }
           }
         } else {
           // Skater scoring: Goals=3, Assists=2, SOG=0.4, Blocks=0.4
@@ -1511,25 +1511,6 @@ export const MatchupService = {
           }
         }
         
-        // Debug logging for first few players
-        if (Math.random() < 0.1) { // Log ~10% of players to avoid spam
-          console.log(`[MatchupService.transformToMatchupPlayerWithGames] Calculated points for ${player.name} (${isGoalie ? 'Goalie' : 'Skater'}):`, {
-            matchupStats: matchupStats ? (isGoalie ? {
-              wins: matchupStats.wins || 0,
-              saves: matchupStats.saves || 0,
-              shutouts: matchupStats.shutouts || 0,
-              goals_against: matchupStats.goals_against || 0
-            } : {
-              goals: matchupStats.goals,
-              assists: matchupStats.assists,
-              sog: matchupStats.sog,
-              blocks: matchupStats.blocks || 0
-            }) : null,
-            calculatedPoints: fantasyPoints,
-            weekStart: weekStart.toISOString().split('T')[0],
-            weekEnd: weekEnd.toISOString().split('T')[0]
-          });
-        }
       } else {
         // Log when matchupStats is missing
         if (Math.random() < 0.1) {
@@ -1578,25 +1559,6 @@ export const MatchupService = {
           goalsSavedAboveExpected: player.stats.goalsSavedAboveExpected || 0
         };
         
-        // Debug logging for goalie stats
-        if (Math.random() < 0.1) { // Log ~10% of goalies to avoid spam
-          console.log(`[MatchupService] Goalie stats for ${player.name}:`, {
-            gamesPlayed: goalieStats.gamesPlayed,
-            wins: goalieStats.wins,
-            saves: goalieStats.saves,
-            shutouts: goalieStats.shutouts,
-            gaa: goalieStats.gaa,
-            savePct: goalieStats.savePct,
-            rawPlayerStats: {
-              gamesPlayed: player.stats.gamesPlayed,
-              wins: player.stats.wins,
-              saves: player.stats.saves,
-              shutouts: player.stats.shutouts,
-              gaa: player.stats.gaa,
-              savePct: player.stats.savePct
-            }
-          });
-        }
         
         basePlayer.goalieStats = goalieStats;
         
@@ -1695,7 +1657,7 @@ export const MatchupService = {
       }
       
       return basePlayer;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(`Error transforming player ${player.name} to matchup player:`, error);
       // Return basic player info if schedule lookup fails
       return {
@@ -1746,7 +1708,7 @@ export const MatchupService = {
       }
       
       return this.transformToMatchupPlayerWithGames(player, isStarter, weekStart, weekEnd, timezone, games || [], undefined, undefined);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(`Error transforming player ${player.name} to matchup player:`, error);
       return this.transformToMatchupPlayerWithGames(player, isStarter, weekStart, weekEnd, timezone, [], undefined, undefined);
     }
@@ -1761,12 +1723,12 @@ export const MatchupService = {
     timezone: string = 'America/Denver',
     userId?: string, // Optional: required for logged-in users, not needed for guests viewing demo league
     targetDate?: string // Optional: if provided and is past date, use frozen roster for that date
-  ): Promise<{ 
-    team1Roster: MatchupPlayer[]; 
-    team2Roster: MatchupPlayer[]; 
+  ): Promise<{
+    team1Roster: MatchupPlayer[];
+    team2Roster: MatchupPlayer[];
     team1SlotAssignments: Record<string, string>;
     team2SlotAssignments: Record<string, string>;
-    error: any 
+    error: Error | null
   }> {
     try {
       // Validate: Ensure team1_id !== team2_id (prevent duplicate teams)
@@ -1821,7 +1783,7 @@ export const MatchupService = {
       let useFrozenRoster = targetDate !== undefined && targetDate !== null && targetDate < todayStr;
       
       if (useFrozenRoster && targetDate) {
-        console.log(`[MatchupService.getMatchupRosters] Using frozen roster for date: ${targetDate} (today: ${todayStr})`);
+        // Using frozen roster for past date
       } else {
         // Clear cache for current lineup (only needed when using team_lineups)
         this.clearRosterCache(matchup.team1_id, matchup.league_id);
@@ -1888,11 +1850,6 @@ export const MatchupService = {
             ...team2FrozenRoster.ir
           ].map(p => this.transformToHockeyPlayer(p)) : [];
           
-          console.log(`[MatchupService.getMatchupRosters] Using frozen rosters from LeagueService:`, {
-            team1: team1Roster.length,
-            team2: team2Roster.length,
-            date: targetDate || 'N/A'
-          });
         }
       }
       
@@ -1984,27 +1941,22 @@ export const MatchupService = {
       // This ensures all teams have lineups for future week matchups
       // SKIP for demo league - guests can't write, and lineups should already exist from migration
       if (!isDemoLeague && !team1Lineup && team1Roster.length > 0) {
-        console.log(`[MatchupService] Auto-initializing default lineup for Team1 (${matchup.team1_id})`);
         const defaultLineup = organizeRosterIntoLineup(team1Roster);
         team1Lineup = defaultLineup;
         // Save the default lineup to database
         await LeagueService.saveLineup(matchup.team1_id, matchup.league_id, defaultLineup);
-        console.log(`[MatchupService] Saved default lineup for Team1: ${defaultLineup.starters.length} starters`);
       }
 
       if (!isDemoLeague && matchup.team2_id && !team2Lineup && team2Roster.length > 0) {
-        console.log(`[MatchupService] Auto-initializing default lineup for Team2 (${matchup.team2_id})`);
         const defaultLineup = organizeRosterIntoLineup(team2Roster);
         team2Lineup = defaultLineup;
         // Save the default lineup to database
         await LeagueService.saveLineup(matchup.team2_id, matchup.league_id, defaultLineup);
-        console.log(`[MatchupService] Saved default lineup for Team2: ${defaultLineup.starters.length} starters`);
       }
 
       // Debug logging to help diagnose lineup sync issues
       if (team1Lineup) {
-        console.log(`[MatchupService] Team1 lineup loaded: ${team1Lineup.starters.length} starters, ${team1Lineup.bench.length} bench, ${team1Lineup.ir.length} IR`);
-        console.log(`[MatchupService] Team1 starter IDs:`, team1Lineup.starters);
+        // Team1 lineup loaded successfully
       } else {
         const error = new Error(`Team ${matchup.team1_id} has no saved lineup and roster is empty.`);
         console.error('[MatchupService] No lineup found for team1:', error);
@@ -2036,7 +1988,7 @@ export const MatchupService = {
         const uuidIds: string[] = [];
         
         // Separate numeric IDs from UUIDs
-        lineupIds.forEach((id: any) => {
+        lineupIds.forEach((id: string | number) => {
           if (typeof id === 'string') {
             const numId = parseInt(id);
             if (!isNaN(numId) && numId > 0 && !id.includes('-')) {
@@ -2068,23 +2020,13 @@ export const MatchupService = {
             // Match UUIDs from lineup to draft picks, then get corresponding roster player by index
             const roster = teamId === matchup.team1_id ? team1Roster : team2Roster;
             
-            console.log(`[MatchupService.convertLineupIdsToNumeric] Converting UUIDs for team ${teamId}:`, {
-              uuidIdsCount: uuidIds.length,
-              draftPicksCount: allTeamDraftPicks.length,
-              rosterLength: roster.length,
-              sampleUuids: uuidIds.slice(0, 3),
-              sampleDraftPicks: allTeamDraftPicks.slice(0, 3).map((p: any) => ({ player_id: p.player_id, pick_number: p.pick_number })),
-              sampleRosterIds: roster.slice(0, 3).map((p: any) => p.id)
-            });
-            
             uuidIds.forEach((uuid: string) => {
-              const pickIndex = allTeamDraftPicks.findIndex((p: any) => p.player_id === uuid);
+              const pickIndex = allTeamDraftPicks.findIndex((p: { player_id: string; pick_number: number }) => p.player_id === uuid);
               if (pickIndex >= 0 && pickIndex < roster.length) {
                 const rosterPlayer = roster[pickIndex];
                 if (rosterPlayer && rosterPlayer.id) {
                   const numericId = Number(rosterPlayer.id);
                   numericIds.add(numericId);
-                  console.log(`[MatchupService.convertLineupIdsToNumeric] ✅ Matched UUID ${uuid} → index ${pickIndex} → player ${rosterPlayer.name} (ID: ${numericId})`);
                 } else {
                   console.warn(`[MatchupService.convertLineupIdsToNumeric] ⚠️ Roster player at index ${pickIndex} has no ID`);
                 }
@@ -2093,11 +2035,6 @@ export const MatchupService = {
               }
             });
             
-            console.log(`[MatchupService.convertLineupIdsToNumeric] Conversion result:`, {
-              inputUuids: uuidIds.length,
-              convertedIds: numericIds.size,
-              convertedIdsList: Array.from(numericIds).slice(0, 10)
-            });
           } else {
             console.error(`[MatchupService.convertLineupIdsToNumeric] ❌ Failed to get draft picks for team ${teamId}`);
           }
@@ -2105,7 +2042,7 @@ export const MatchupService = {
           // If we still have unmatched UUIDs, try fallback to players table
           if (numericIds.size < uuidIds.length) {
             const unmatchedUuids = uuidIds.filter(uuid => {
-              const pickIndex = allTeamDraftPicks?.findIndex((p: any) => p.player_id === uuid) ?? -1;
+              const pickIndex = allTeamDraftPicks?.findIndex((p: { player_id: string; pick_number: number }) => p.player_id === uuid) ?? -1;
               return pickIndex < 0;
             });
             
@@ -2117,9 +2054,9 @@ export const MatchupService = {
                 .in('id', unmatchedUuids);
               
               if (!uuidError && uuidPlayers) {
-                uuidPlayers.forEach((uuidPlayer: any) => {
-                  const matched = allPlayers.find(p => 
-                    p.full_name === uuidPlayer.full_name && 
+                uuidPlayers.forEach((uuidPlayer: { id: string; full_name: string; team: string }) => {
+                  const matched = allPlayers.find(p =>
+                    p.full_name === uuidPlayer.full_name &&
                     p.team === uuidPlayer.team
                   );
                   if (matched) {
@@ -2130,7 +2067,7 @@ export const MatchupService = {
             }
           }
         }
-        
+
         return numericIds;
       };
       
@@ -2139,16 +2076,6 @@ export const MatchupService = {
       const team1Starters = new Set(Array.from(team1StartersNumeric).map(id => String(id)));
       
       // Debug: Log conversion results
-      console.log(`[MatchupService] Team1 lineup conversion:`, {
-        originalLineupIds: team1Lineup.starters?.slice(0, 5),
-        originalLineupIdsCount: team1Lineup.starters?.length || 0,
-        convertedNumericIds: Array.from(team1StartersNumeric).slice(0, 10),
-        convertedNumericIdsCount: team1StartersNumeric.size,
-        startersSetSize: team1Starters.size,
-        sampleStartersSet: Array.from(team1Starters).slice(0, 10),
-        allStartersSet: Array.from(team1Starters)
-      });
-      
       // Normalize slot assignment keys to numeric NHL IDs (convert UUIDs if needed)
       const rawTeam1SlotAssignments = team1Lineup.slotAssignments || {};
       const team1SlotAssignments: Record<string, string> = {};
@@ -2159,7 +2086,7 @@ export const MatchupService = {
       const team1LineupIds = team1Lineup.starters || [];
       const slotUuidIds = Object.keys(rawTeam1SlotAssignments).filter(id => id.includes('-'));
       const allUuidIds = [
-        ...team1LineupIds.filter((id: any) => typeof id === 'string' && id.includes('-')),
+        ...team1LineupIds.filter((id: string | number) => typeof id === 'string' && id.includes('-')),
         ...slotUuidIds
       ];
       
@@ -2170,9 +2097,9 @@ export const MatchupService = {
           .in('id', allUuidIds);
         
         if (uuidPlayers) {
-          uuidPlayers.forEach((uuidPlayer: any) => {
-            const matched = allPlayers.find(p => 
-              p.full_name === uuidPlayer.full_name && 
+          uuidPlayers.forEach((uuidPlayer: { id: string; full_name: string; team: string }) => {
+            const matched = allPlayers.find(p =>
+              p.full_name === uuidPlayer.full_name &&
               p.team === uuidPlayer.team
             );
             if (matched) {
@@ -2181,7 +2108,7 @@ export const MatchupService = {
           });
         }
       }
-      
+
       Object.entries(rawTeam1SlotAssignments).forEach(([playerId, slotId]) => {
         // Convert UUID to numeric ID if needed, otherwise use as-is
         const numericId = uuidToNumericMap.get(playerId) || 
@@ -2209,7 +2136,7 @@ export const MatchupService = {
         const team2LineupIds = team2Lineup.starters || [];
         const slotUuidIds2 = Object.keys(rawTeam2SlotAssignments).filter(id => id.includes('-'));
         const allUuidIds2 = [
-          ...team2LineupIds.filter((id: any) => typeof id === 'string' && id.includes('-')),
+          ...team2LineupIds.filter((id: string | number) => typeof id === 'string' && id.includes('-')),
           ...slotUuidIds2
         ];
         
@@ -2220,9 +2147,9 @@ export const MatchupService = {
             .in('id', allUuidIds2);
           
           if (uuidPlayers2) {
-            uuidPlayers2.forEach((uuidPlayer: any) => {
-              const matched = allPlayers.find(p => 
-                p.full_name === uuidPlayer.full_name && 
+            uuidPlayers2.forEach((uuidPlayer: { id: string; full_name: string; team: string }) => {
+              const matched = allPlayers.find(p =>
+                p.full_name === uuidPlayer.full_name &&
                 p.team === uuidPlayer.team
               );
               if (matched) {
@@ -2261,10 +2188,10 @@ export const MatchupService = {
       ].filter(id => id > 0);
 
       // NEW: Fetch pre-calculated matchup lines (with graceful degradation)
-      let matchupLines = new Map<number, any>();
+      let matchupLines = new Map<number, MatchupLineRow>();
       try {
         matchupLines = await this.getMatchupLines(matchup.id);
-      } catch (error) {
+      } catch (error: unknown) {
         console.warn('[MatchupService] Failed to fetch matchup lines, continuing with empty data:', error);
         // Continue with empty Map - page should still load
       }
@@ -2286,13 +2213,6 @@ export const MatchupService = {
         const weekStartStr = weekStart.toISOString().split('T')[0];
         const weekEndStr = weekEnd.toISOString().split('T')[0];
         
-        console.log('[MatchupService.getMatchupRosters] 📊 Fetching matchup stats for week:', {
-          weekStart: weekStartStr,
-          weekEnd: weekEndStr,
-          playerCount: allPlayerIds.length,
-          matchupId: matchup.id
-        });
-        
         matchupStatsMap = await this.fetchMatchupStatsForPlayers(allPlayerIds, weekStart, weekEnd);
         
         if (matchupStatsMap.size > 0) {
@@ -2308,25 +2228,8 @@ export const MatchupService = {
             return highSkaterStats || highGoalieStats;
           });
           
-          console.log('[MatchupService.getMatchupRosters] ✅ Matchup stats fetched successfully:');
-          console.log(`  Stats Map Size: ${matchupStatsMap.size}, Expected: ${allPlayerIds.length}, Coverage: ${((matchupStatsMap.size / allPlayerIds.length) * 100).toFixed(1)}%`);
-          console.log(`  Week: ${weekStartStr} to ${weekEndStr}`);
-          console.log(`  Sample Players:`);
-          playersWithStats.forEach(([id, stats]) => {
-            const looksLikeSeason = stats.goals > 20 || stats.assists > 30 || stats.sog > 100;
-            const looksLikeSeasonGoalie = (stats.wins || 0) > 7 || (stats.saves || 0) > 300;
-            const isGoalie = (stats.wins !== undefined || stats.saves !== undefined) && (stats.goals === 0 || stats.goals === undefined);
-            if (isGoalie) {
-              console.log(`    🥅 Goalie ${id}: W=${stats.wins || 0}, SV=${stats.saves || 0}, SO=${stats.shutouts || 0}, GA=${stats.goals_against || 0} ${looksLikeSeasonGoalie ? '❌ SEASON TOTAL' : '✅ Week'}`);
-            } else {
-              console.log(`    Player ${id}: G=${stats.goals}, A=${stats.assists}, SOG=${stats.sog}, Blocks=${stats.blocks || 0} ${looksLikeSeason ? '❌ SEASON TOTAL' : '✅ Week'}`);
-            }
-          });
-          
           if (highValuePlayers.length > 0) {
             console.error(`  ❌ ${highValuePlayers.length} sample players have season-total-like numbers! RPC may be broken!`);
-          } else {
-            console.log(`  ✅ All sample players look like week totals`);
           }
         } else {
           console.error('[MatchupService.getMatchupRosters] ❌ CRITICAL: Matchup stats map is EMPTY - no week data found!', {
@@ -2337,25 +2240,17 @@ export const MatchupService = {
             samplePlayerIds: allPlayerIds.slice(0, 5)
           });
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('[MatchupService] ❌ Failed to fetch matchup stats:', error);
         // Continue with empty Map - page should still load
       }
       
       // Fetch daily projections for today's games
       const todayMST = getTodayMST();
-      let dailyProjectionsMap = new Map<number, any>();
+      let dailyProjectionsMap = new Map<number, DailyProjectionRow>();
       try {
         dailyProjectionsMap = await this.getDailyProjectionsForMatchup(allPlayerIds, todayMST);
-        console.log(`[MatchupService] Fetched ${dailyProjectionsMap.size} daily projections for ${todayMST}`);
-        console.log(`[MatchupService] Projection coverage: Team1 players: ${team1Roster.length}, Team2 players: ${team2Roster.length}, Total projections: ${dailyProjectionsMap.size}`);
-        
-        // Debug: Log sample projections for both teams
-        const team1SampleIds = team1Roster.slice(0, 3).map(p => typeof p.id === 'string' ? parseInt(p.id) || 0 : p.id || 0);
-        const team2SampleIds = team2Roster.slice(0, 3).map(p => typeof p.id === 'string' ? parseInt(p.id) || 0 : p.id || 0);
-        console.log(`[MatchupService] Team1 sample projections:`, team1SampleIds.map(id => ({ id, hasProjection: dailyProjectionsMap.has(id), projection: dailyProjectionsMap.get(id) })));
-        console.log(`[MatchupService] Team2 sample projections:`, team2SampleIds.map(id => ({ id, hasProjection: dailyProjectionsMap.has(id), projection: dailyProjectionsMap.get(id) })));
-      } catch (error) {
+      } catch (error: unknown) {
         console.warn('[MatchupService] Failed to fetch daily projections, continuing without them:', error);
       }
       
@@ -2373,40 +2268,10 @@ export const MatchupService = {
           }
           const matchupStats = matchupStatsMap.get(playerId);
           
-          // CRITICAL: Log goalie stats before transformation
-          const isGoalieBeforeTransform = p.position === 'G' || p.position === 'Goalie';
-          if (isGoalieBeforeTransform) {
-            console.log(`[MatchupService.getMatchupRosters] 🥅 BEFORE TRANSFORM - Goalie ${p.name} (${playerId}):`, {
-              hasMatchupStats: !!matchupStats,
-              matchupStats: matchupStats ? {
-                wins: matchupStats.wins || 0,
-                saves: matchupStats.saves || 0,
-                shutouts: matchupStats.shutouts || 0,
-                goals_against: matchupStats.goals_against || 0
-              } : null,
-              week: `${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`
-            });
-          }
-          
           // Check if player is a starter (convert ID to string for Set lookup)
           const isStarter = team1Starters.has(String(p.id));
-          
-          // Debug first few players to verify starter detection
-          if (team1Roster.indexOf(p) < 5) {
-            const playerIdStr = String(p.id);
-            const isInSet = team1Starters.has(playerIdStr);
-            console.log(`[MatchupService] Team1 player ${p.name} (ID: ${p.id}, String: "${playerIdStr}"):`, {
-              isStarter,
-              inStartersSet: isInSet,
-              playerIdType: typeof p.id,
-              playerIdString: playerIdStr,
-              startersSetSize: team1Starters.size,
-              sampleStarters: Array.from(team1Starters).slice(0, 5),
-              isInSetCheck: team1Starters.has(playerIdStr),
-              setContains: Array.from(team1Starters).includes(playerIdStr)
-            });
-          }
-          
+          const isGoalieBeforeTransform = p.position === 'G' || p.position === 'Goalie';
+
           const transformed = this.transformToMatchupPlayerWithGames(
             p,
             isStarter,
@@ -2419,24 +2284,14 @@ export const MatchupService = {
             dailyProjection
           );
           
-          // CRITICAL: Log what transformToMatchupPlayerWithGames calculated
-          if (isGoalieBeforeTransform) {
-            console.log(`[MatchupService.getMatchupRosters] 🥅 AFTER TRANSFORM - Goalie ${p.name} (${playerId}):`, {
-              total_points_from_transform: transformed.total_points,
-              points_from_transform: transformed.points,
-              hasGoalieMatchupStats: !!transformed.goalieMatchupStats,
-              goalieMatchupStats: transformed.goalieMatchupStats
-            });
-          }
-          
           // Get calculated games remaining from transformed player (already filtered to week)
           const gamesRemaining = transformed.games_remaining_total || 0;
-          
+
           // Merge matchup line data if available
           const matchupLine = matchupLines.get(playerId);
-          
+
           // Helper function to calculate matchup week points from stats using league scoring settings
-          const calculateMatchupWeekPoints = (stats: any, isGoalie: boolean = false): number => {
+          const calculateMatchupWeekPoints = (stats: MatchupWeekStats | undefined, isGoalie: boolean = false): number => {
             if (!stats) return 0;
             
             if (isGoalie && (stats.wins !== undefined || stats.saves !== undefined)) {
@@ -2480,29 +2335,7 @@ export const MatchupService = {
               // RPC returned weekly stats - always use them (they're the source of truth)
               const isGoaliePlayer = p.position === 'G' || p.position === 'Goalie';
               
-              // CRITICAL: Log what we received from RPC for goalies
-              if (isGoaliePlayer) {
-                console.log(`[MatchupService.getMatchupRosters] 🥅 GOALIE ${p.name} (${playerId}) RPC stats:`, {
-                  wins: matchupStats.wins || 0,
-                  saves: matchupStats.saves || 0,
-                  shutouts: matchupStats.shutouts || 0,
-                  goals_against: matchupStats.goals_against || 0,
-                  week: `${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`
-                });
-              }
-              
               matchupWeekPoints = calculateMatchupWeekPoints(matchupStats, isGoaliePlayer);
-              
-              // CRITICAL: Log calculated points for goalies
-              if (isGoaliePlayer && matchupWeekPoints > 0) {
-                console.log(`[MatchupService.getMatchupRosters] ✅ GOALIE ${p.name} calculated ${matchupWeekPoints} points from:`, {
-                  wins: (matchupStats.wins || 0) * 4,
-                  saves: (matchupStats.saves || 0) * 0.2,
-                  shutouts: (matchupStats.shutouts || 0) * 3,
-                  goals_against: (matchupStats.goals_against || 0) * -1,
-                  total: matchupWeekPoints
-                });
-              }
               
               // Validate that RPC stats look reasonable for a week
               const isLikelySeasonTotal = isGoaliePlayer 
@@ -2578,14 +2411,6 @@ export const MatchupService = {
                            ((matchupStats.pim || 0) * 0.5)
               }) : null;
               
-              console.log(`[MatchupService] ✅ FINAL SET: ${p.name} (${playerId})`, {
-                databaseValue: matchupLine.total_points,
-                finalValue: matchupWeekPoints,
-                matchupStatsExists: !!matchupStats,
-                matchupStats: statsBreakdown,
-                // Verify: If matchupStats has high numbers, RPC is broken
-                rpcMayBeBroken: statsBreakdown ? (statsBreakdown.goals > 20 || statsBreakdown.assists > 30 || statsBreakdown.sog > 100) : false
-              });
             }
             
             // CRITICAL: Validate games_remaining values are reasonable (max 7 games per week)
@@ -2630,10 +2455,6 @@ export const MatchupService = {
               transformed.stats_breakdown = undefined;
             }
             
-            // Debug: Log when no matchup line exists
-            if (Math.random() < 0.1) {
-              console.log(`[MatchupService] No matchupLine for ${p.name} (${playerId}), calculated: ${calculatedPoints} from matchupStats:`, matchupStats);
-            }
             transformed.games_remaining_total = gamesRemaining;
             transformed.games_remaining_active = team1Starters.has(String(p.id)) ? gamesRemaining : 0;
           }
@@ -2658,19 +2479,7 @@ export const MatchupService = {
           
           // CRITICAL: Log goalie stats before transformation
           const isGoalieBeforeTransform = p.position === 'G' || p.position === 'Goalie';
-          if (isGoalieBeforeTransform) {
-            console.log(`[MatchupService.getMatchupRosters] 🥅 BEFORE TRANSFORM - Goalie ${p.name} (${playerId}):`, {
-              hasMatchupStats: !!matchupStats,
-              matchupStats: matchupStats ? {
-                wins: matchupStats.wins || 0,
-                saves: matchupStats.saves || 0,
-                shutouts: matchupStats.shutouts || 0,
-                goals_against: matchupStats.goals_against || 0
-              } : null,
-              week: `${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`
-            });
-          }
-          
+
           const transformed = this.transformToMatchupPlayerWithGames(
             p,
             team2Starters.has(String(p.id)),
@@ -2683,24 +2492,14 @@ export const MatchupService = {
             dailyProjection
           );
           
-          // CRITICAL: Log what transformToMatchupPlayerWithGames calculated
-          if (isGoalieBeforeTransform) {
-            console.log(`[MatchupService.getMatchupRosters] 🥅 AFTER TRANSFORM - Goalie ${p.name} (${playerId}):`, {
-              total_points_from_transform: transformed.total_points,
-              points_from_transform: transformed.points,
-              hasGoalieMatchupStats: !!transformed.goalieMatchupStats,
-              goalieMatchupStats: transformed.goalieMatchupStats
-            });
-          }
-          
           // Get calculated games remaining from transformed player (already filtered to week)
           const gamesRemaining = transformed.games_remaining_total || 0;
-          
+
           // Merge matchup line data if available
           const matchupLine = matchupLines.get(playerId);
-          
+
           // Helper function to calculate matchup week points from stats using league scoring settings
-          const calculateMatchupWeekPoints = (stats: any, isGoalie: boolean = false): number => {
+          const calculateMatchupWeekPoints = (stats: MatchupWeekStats | undefined, isGoalie: boolean = false): number => {
             if (!stats) return 0;
             
             if (isGoalie && (stats.wins !== undefined || stats.saves !== undefined)) {
@@ -2744,29 +2543,7 @@ export const MatchupService = {
               // RPC returned weekly stats - always use them (they're the source of truth)
               const isGoaliePlayer = p.position === 'G' || p.position === 'Goalie';
               
-              // CRITICAL: Log what we received from RPC for goalies
-              if (isGoaliePlayer) {
-                console.log(`[MatchupService.getMatchupRosters] 🥅 GOALIE ${p.name} (${playerId}) RPC stats:`, {
-                  wins: matchupStats.wins || 0,
-                  saves: matchupStats.saves || 0,
-                  shutouts: matchupStats.shutouts || 0,
-                  goals_against: matchupStats.goals_against || 0,
-                  week: `${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`
-                });
-              }
-              
               matchupWeekPoints = calculateMatchupWeekPoints(matchupStats, isGoaliePlayer);
-              
-              // CRITICAL: Log calculated points for goalies
-              if (isGoaliePlayer && matchupWeekPoints > 0) {
-                console.log(`[MatchupService.getMatchupRosters] ✅ GOALIE ${p.name} calculated ${matchupWeekPoints} points from:`, {
-                  wins: (matchupStats.wins || 0) * 4,
-                  saves: (matchupStats.saves || 0) * 0.2,
-                  shutouts: (matchupStats.shutouts || 0) * 3,
-                  goals_against: (matchupStats.goals_against || 0) * -1,
-                  total: matchupWeekPoints
-                });
-              }
               
               // Validate that RPC stats look reasonable for a week
               const isLikelySeasonTotal = isGoaliePlayer 
@@ -2842,14 +2619,6 @@ export const MatchupService = {
                            ((matchupStats.pim || 0) * 0.5)
               }) : null;
               
-              console.log(`[MatchupService] ✅ FINAL SET: ${p.name} (${playerId})`, {
-                databaseValue: matchupLine.total_points,
-                finalValue: matchupWeekPoints,
-                matchupStatsExists: !!matchupStats,
-                matchupStats: statsBreakdown,
-                // Verify: If matchupStats has high numbers, RPC is broken
-                rpcMayBeBroken: statsBreakdown ? (statsBreakdown.goals > 20 || statsBreakdown.assists > 30 || statsBreakdown.sog > 100) : false
-              });
             }
             
             // CRITICAL: Validate games_remaining values are reasonable (max 7 games per week)
@@ -2894,10 +2663,6 @@ export const MatchupService = {
               transformed.stats_breakdown = undefined;
             }
             
-            // Debug: Log when no matchup line exists
-            if (Math.random() < 0.1) {
-              console.log(`[MatchupService] No matchupLine for ${p.name} (${playerId}), calculated: ${calculatedPoints} from matchupStats:`, matchupStats);
-            }
             transformed.games_remaining_total = gamesRemaining;
             transformed.games_remaining_active = team2Starters.has(String(p.id)) ? gamesRemaining : 0;
           }
@@ -2916,14 +2681,14 @@ export const MatchupService = {
         team2SlotAssignments,
         error: null
       };
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error getting matchup rosters:', error);
       return {
         team1Roster: [],
         team2Roster: [],
         team1SlotAssignments: {},
         team2SlotAssignments: {},
-        error
+        error: error instanceof Error ? error : new Error(String(error))
       };
     }
   },
@@ -2939,7 +2704,6 @@ export const MatchupService = {
     dailyLineup: DailyLineupPlayer[]
   ): { starters: string[]; bench: string[]; ir: string[]; slotAssignments: Record<string, string> } | null {
     if (!dailyLineup || dailyLineup.length === 0) {
-      console.log('[MatchupService.convertDailyLineupToLineupFormat] Empty daily lineup, returning null');
       return null;
     }
     
@@ -2964,13 +2728,6 @@ export const MatchupService = {
       if (player.slot_id) {
         slotAssignments[playerId] = player.slot_id;
       }
-    });
-    
-    console.log(`[MatchupService.convertDailyLineupToLineupFormat] Converted ${dailyLineup.length} players:`, {
-      starters: starters.length,
-      bench: bench.length,
-      ir: ir.length,
-      slotAssignments: Object.keys(slotAssignments).length
     });
     
     return { starters, bench, ir, slotAssignments };
@@ -3020,7 +2777,7 @@ export const MatchupService = {
         wins: teamStanding.wins, 
         losses: teamStanding.losses 
       };
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error getting team record from standings:', error);
       return { wins: 0, losses: 0 };
     }
@@ -3042,7 +2799,7 @@ export const MatchupService = {
       team2Score: number; 
       weekStart: Date 
     }>; 
-    error: any 
+    error: PostgrestError | Error | null
   }> {
     try {
       if (!team2Id) {
@@ -3093,9 +2850,9 @@ export const MatchupService = {
       }));
 
       return { matchups, error: null };
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error getting matchup history:', error);
-      return { matchups: [], error };
+      return { matchups: [], error: error instanceof Error ? error : new Error(String(error)) };
     }
   },
 
@@ -3109,7 +2866,7 @@ export const MatchupService = {
       matchups: Matchup[];
     }>;
     bracketSize: number; // 4, 6, or 8
-    error: any;
+    error: PostgrestError | Error | null;
   }> {
     try {
       // Get league to determine schedule length
@@ -3209,43 +2966,43 @@ export const MatchupService = {
       }
 
       return { rounds, bracketSize, error: null };
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error getting playoff bracket:', error);
-      return { rounds: [], bracketSize: 0, error };
+      return { rounds: [], bracketSize: 0, error: error instanceof Error ? error : new Error(String(error)) };
     }
   },
 
   /**
    * Fetch pre-calculated matchup lines from fantasy_matchup_lines table
    */
-  async getMatchupLines(matchupId: string): Promise<Map<number, any>> {
+  async getMatchupLines(matchupId: string): Promise<Map<number, MatchupLineRow>> {
     try {
       const queryPromise = supabase
         .from('fantasy_matchup_lines')
         .select(COLUMNS.MATCHUP_LINES)
         .eq('matchup_id', matchupId);
-      
-      let data: any = null;
-      let error: any = null;
+
+      let data: MatchupLineRow[] | null = null;
+      let error: PostgrestError | Error | null = null;
       try {
         const result = await withTimeout(queryPromise, 5000, 'getMatchupLines timeout');
-        data = result.data;
+        data = result.data as MatchupLineRow[] | null;
         error = result.error;
-      } catch (timeoutError: any) {
+      } catch (timeoutError: unknown) {
         console.error('[MatchupService.getMatchupLines] Query timeout:', timeoutError);
-        error = timeoutError;
+        error = timeoutError instanceof Error ? timeoutError : new Error(String(timeoutError));
       }
-      
+
       if (error) throw error;
-      
+
       // Convert array to Map keyed by player_id for O(1) lookup
-      const linesMap = new Map<number, any>();
+      const linesMap = new Map<number, MatchupLineRow>();
       (data || []).forEach(line => {
         linesMap.set(line.player_id, line);
       });
-      
+
       return linesMap;
-    } catch (error) {
+    } catch (error: unknown) {
       console.warn('[MatchupService] getMatchupLines timeout or error:', error);
       return new Map(); // Graceful degradation
     }
@@ -3263,44 +3020,29 @@ export const MatchupService = {
       const startDateStr = startDate.toISOString().split('T')[0];
       const endDateStr = endDate.toISOString().split('T')[0];
       
-      console.log('[MatchupService.fetchMatchupStatsForPlayers] 📞 Calling RPC with:', {
-        playerCount: playerIds.length,
-        startDate: startDateStr,
-        endDate: endDateStr,
-        dateRange: `${startDateStr} to ${endDateStr}`,
-        samplePlayerIds: playerIds.slice(0, 5),
-        // CRITICAL: Verify dates are correct format (YYYY-MM-DD)
-        dateFormatCheck: {
-          startDateValid: /^\d{4}-\d{2}-\d{2}$/.test(startDateStr),
-          endDateValid: /^\d{4}-\d{2}-\d{2}$/.test(endDateStr),
-          startDateObj: startDate.toISOString(),
-          endDateObj: endDate.toISOString()
-        }
-      });
-      
       const rpcPromise = supabase.rpc('get_matchup_stats', {
         p_player_ids: playerIds,
         p_start_date: startDateStr,
         p_end_date: endDateStr
       });
       
-      let data: any = null;
-      let error: any = null;
+      let data: unknown[] | null = null;
+      let error: PostgrestError | Error | null = null;
       try {
         const result = await withTimeout(rpcPromise, 5000, 'fetchMatchupStatsForPlayers timeout');
-        data = result.data;
+        data = result.data as unknown[] | null;
         error = result.error;
-      } catch (timeoutError: any) {
+      } catch (timeoutError: unknown) {
         console.error('[MatchupService.fetchMatchupStatsForPlayers] RPC timeout:', timeoutError);
-        error = timeoutError;
+        error = timeoutError instanceof Error ? timeoutError : new Error(String(timeoutError));
       }
-      
+
       if (error) throw error;
-      
-      const statsMap = new Map<number, { 
-        goals: number; 
-        assists: number; 
-        sog: number; 
+
+      const statsMap = new Map<number, {
+        goals: number;
+        assists: number;
+        sog: number;
         blocks: number;
         // NEW: All 8 stat categories
         ppp: number;           // Power Play Points
@@ -3315,7 +3057,7 @@ export const MatchupService = {
         shutouts?: number;
         goals_against?: number;
       }>();
-      (data || []).forEach((row: any) => {
+      ((data || []) as Array<{ player_id: number; goals?: number; assists?: number; shots_on_goal?: number; blocks?: number; ppp?: number; shp?: number; hits?: number; pim?: number; plus_minus?: number; x_goals?: string | number; wins?: number; saves?: number; shutouts?: number; goals_against?: number }>).forEach((row) => {
         const goalieStats = {
           wins: Number(row.wins) || 0,
           saves: Number(row.saves) || 0,
@@ -3352,15 +3094,6 @@ export const MatchupService = {
           goalieStats.goals_against = 0;
         }
         
-        // Debug: Log goalie stats if they exist and are valid
-        if (isGoalie && !looksLikeSeasonTotal) {
-          console.log(`[MatchupService.fetchMatchupStatsForPlayers] 🥅 GOALIE STATS for player ${row.player_id}:`, {
-            ...goalieStats,
-            dateRange: `${startDateStr} to ${endDateStr}`,
-            validated: '✅ Weekly totals'
-          });
-        }
-        
         statsMap.set(row.player_id, {
           goals: row.goals || 0,
           assists: row.assists || 0,
@@ -3372,7 +3105,7 @@ export const MatchupService = {
           hits: row.hits || 0,
           pim: row.pim || 0,
           plus_minus: row.plus_minus || 0,
-          xGoals: parseFloat(row.x_goals || 0),
+          xGoals: parseFloat(String(row.x_goals || 0)),
           // Extract goalie stats from RPC response (validated to be weekly, not season)
           wins: goalieStats.wins,
           saves: goalieStats.saves,
@@ -3384,108 +3117,23 @@ export const MatchupService = {
       if (statsMap.size > 0) {
         const sampleEntry = Array.from(statsMap.entries())[0];
         const sampleStats = sampleEntry[1];
-        // Check if sample looks like season totals (high numbers)
-        // For a week, max should be: ~7 goals, ~10 assists, ~30 SOG (very high week)
-        // For goalies: max ~7 wins, ~300 saves per week
         const isGoalieSample = (sampleStats.wins !== undefined || sampleStats.saves !== undefined) && (sampleStats.goals === 0 || sampleStats.goals === undefined);
         const looksLikeSeasonTotal = isGoalieSample
           ? ((sampleStats.wins || 0) > 7 || (sampleStats.saves || 0) > 300)
           : (sampleStats.goals > 20 || sampleStats.assists > 30 || sampleStats.sog > 100);
-        
-        // Calculate expected points for sample to verify (ALL 8 categories)
-        const samplePoints = isGoalieSample
-          ? ((sampleStats.wins || 0) * 4) + ((sampleStats.saves || 0) * 0.2) + ((sampleStats.shutouts || 0) * 3) + ((sampleStats.goals_against || 0) * -1)
-          : (sampleStats.goals * 3) + 
-            (sampleStats.assists * 2) + 
-            ((sampleStats.ppp || 0) * 1) +
-            ((sampleStats.shp || 0) * 2) +
-            (sampleStats.sog * 0.4) + 
-            ((sampleStats.blocks || 0) * 0.5) +
-            ((sampleStats.hits || 0) * 0.2) +
-            ((sampleStats.pim || 0) * 0.5);
-        
-        // CRITICAL: Log explicitly to see actual values
-        console.log('[MatchupService.fetchMatchupStatsForPlayers] RPC returned:');
-        console.log(`  Total Rows: ${(data || []).length}, Stats Map Size: ${statsMap.size}, Requested Players: ${playerIds.length}`);
-        console.log(`  Date Range: ${startDateStr} to ${endDateStr}`);
-        
-        // CRITICAL: Check if all requested players are in the response
+
+        // Check if all requested players are in the response
         const missingPlayers = playerIds.filter(id => !statsMap.has(id));
         if (missingPlayers.length > 0) {
           console.warn(`  ⚠️ MISSING PLAYERS in RPC response (${missingPlayers.length}):`, missingPlayers.slice(0, 10));
-        } else {
-          console.log(`  ✅ All ${playerIds.length} requested players found in RPC response`);
         }
-        
-        console.log(`  Sample Player ID: ${sampleEntry[0]} (${isGoalieSample ? '🥅 GOALIE' : 'Skater'})`);
-        console.log(`  Sample Stats:`, isGoalieSample ? {
-          wins: sampleStats.wins || 0,
-          saves: sampleStats.saves || 0,
-          shutouts: sampleStats.shutouts || 0,
-          goals_against: sampleStats.goals_against || 0,
-          calculatedPoints: samplePoints
-        } : {
-          goals: sampleStats.goals,
-          assists: sampleStats.assists,
-          sog: sampleStats.sog,
-          blocks: sampleStats.blocks || 0,
-          xGoals: sampleStats.xGoals,
-          calculatedPoints: samplePoints
-        });
-        
-        // CRITICAL: Log raw RPC data to see what's actually being returned
-        const rawSampleRow = (data || []).find((r: any) => r.player_id === sampleEntry[0]);
-        if (rawSampleRow) {
-          console.log(`  🔍 RAW RPC DATA for sample player:`, {
-            player_id: rawSampleRow.player_id,
-            goals: rawSampleRow.goals,
-            assists: rawSampleRow.assists,
-            wins: rawSampleRow.wins,
-            saves: rawSampleRow.saves,
-            shutouts: rawSampleRow.shutouts,
-            goals_against: rawSampleRow.goals_against,
-            goalie_gp: rawSampleRow.goalie_gp,
-            allFields: Object.keys(rawSampleRow)
-          });
-        }
-        
-        // CRITICAL: Log all goalies in the response
-        const goalieRows = (data || []).filter((r: any) => (r.goalie_gp || 0) > 0 || (r.wins || 0) > 0 || (r.saves || 0) > 0);
-        if (goalieRows.length > 0) {
-          console.log(`  🥅 GOALIES in RPC response (${goalieRows.length}):`, goalieRows.map((r: any) => ({
-            player_id: r.player_id,
-            wins: r.wins || 0,
-            saves: r.saves || 0,
-            shutouts: r.shutouts || 0,
-            goals_against: r.goals_against || 0,
-            goalie_gp: r.goalie_gp || 0
-          })));
-        }
-        
+
         if (looksLikeSeasonTotal) {
           if (isGoalieSample) {
             console.error(`  ❌ RPC IS RETURNING SEASON TOTALS FOR GOALIE! Sample has W: ${sampleStats.wins || 0}, SV: ${sampleStats.saves || 0} - These are season numbers!`);
           } else {
             console.error(`  ❌ RPC IS RETURNING SEASON TOTALS! Sample has Goals: ${sampleStats.goals}, Assists: ${sampleStats.assists}, SOG: ${sampleStats.sog} - These are season numbers!`);
           }
-        } else {
-          console.log(`  ✅ Sample stats look reasonable for a week`);
-        }
-        
-        // Show additional samples
-        const additionalSamples = Array.from(statsMap.entries()).slice(1, 4);
-        if (additionalSamples.length > 0) {
-          console.log(`  Additional Samples:`);
-          additionalSamples.forEach(([id, stats]) => {
-            const isGoalie = (stats.wins !== undefined || stats.saves !== undefined) && (stats.goals === 0 || stats.goals === undefined);
-            if (isGoalie) {
-              const looksLikeSeason = (stats.wins || 0) > 7 || (stats.saves || 0) > 300;
-              console.log(`    🥅 Goalie ${id}: W=${stats.wins || 0}, SV=${stats.saves || 0}, SO=${stats.shutouts || 0}, GA=${stats.goals_against || 0} ${looksLikeSeason ? '❌ SEASON TOTAL' : '✅ Week'}`);
-            } else {
-              const looksLikeSeason = stats.goals > 20 || stats.assists > 30 || stats.sog > 100;
-              console.log(`    Player ${id}: G=${stats.goals}, A=${stats.assists}, SOG=${stats.sog} ${looksLikeSeason ? '❌ SEASON TOTAL' : '✅ Week'}`);
-            }
-          });
         }
       } else {
         console.warn('[MatchupService.fetchMatchupStatsForPlayers] ⚠️ RPC returned NO DATA:', {
@@ -3496,7 +3144,7 @@ export const MatchupService = {
       }
       
       return statsMap;
-    } catch (error) {
+    } catch (error: unknown) {
       console.warn('[MatchupService] fetchMatchupStatsForPlayers timeout or error:', error);
       return new Map(); // Graceful degradation
     }
@@ -3505,7 +3153,7 @@ export const MatchupService = {
   /**
    * Transform raw stats_breakdown JSONB to StatBreakdown interface
    */
-  transformStatsBreakdown(rawBreakdown: any): StatBreakdown | undefined {
+  transformStatsBreakdown(rawBreakdown: RawStatsBreakdown | null | undefined): StatBreakdown | undefined {
     if (!rawBreakdown || typeof rawBreakdown !== 'object') {
       return undefined;
     }
@@ -3578,7 +3226,7 @@ export const MatchupService = {
    */
   async updateMatchupScores(
     leagueId?: string
-  ): Promise<{ error: any; updatedCount?: number; results?: Array<{ matchup_id: string; team1_score: number; team2_score: number; updated: boolean }> }> {
+  ): Promise<{ error: PostgrestError | Error | null; updatedCount?: number; results?: Array<{ matchup_id: string; team1_score: number; team2_score: number; updated: boolean }> }> {
     try {
       // Input validation
       if (leagueId && typeof leagueId !== 'string') {
@@ -3595,17 +3243,17 @@ export const MatchupService = {
       }
       
       // Filter out failed updates (where updated = false) for count
-      const successfulUpdates = (data || []).filter((r: any) => r.updated === true);
+      const successfulUpdates = (data || []).filter((r: { matchup_id: string; team1_score: number; team2_score: number; updated: boolean }) => r.updated === true);
       
       return { 
         error: null, 
         updatedCount: successfulUpdates.length,
         results: data || []
       };
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('[MatchupService] Error updating matchup scores:', error);
-      return { 
-        error,
+      return {
+        error: error instanceof Error ? error : new Error(String(error)),
         updatedCount: 0
       };
     }
@@ -3629,13 +3277,10 @@ export const MatchupService = {
     // Check cache first (past lineups never change)
     const cached = DataCacheService.get<DailyLineupPlayer[]>(cacheKey);
     if (cached) {
-      console.log(`[MatchupService] getDailyLineup cache hit: ${date}, players: ${cached.length}`);
       return cached;
     }
     
     try {
-      console.log(`[MatchupService] Calling RPC get_daily_lineup for team ${teamId}, matchup ${matchupId}, date ${date}`);
-      
       const { data, error } = await supabase.rpc('get_daily_lineup', {
         p_team_id: teamId,
         p_matchup_id: matchupId,
@@ -3647,9 +3292,7 @@ export const MatchupService = {
         return [];
       }
       
-      console.log(`[MatchupService] RPC returned ${data?.length || 0} players for ${date}`, data);
-      
-      const lineup: DailyLineupPlayer[] = (data || []).map((row: any) => ({
+      const lineup: DailyLineupPlayer[] = (data || []).map((row: { player_id: number; player_name: string; player_position: string; nhl_team: string; headshot_url: string | null; slot_type: 'active' | 'bench' | 'ir'; slot_id: string | null; is_locked: boolean; daily_points: string | number; goals?: number; assists?: number; shots_on_goal?: number; blocks?: number; hits?: number; pim?: number; ppp?: number; shp?: number; wins?: number; saves?: number; goals_against?: number; shutouts?: number; is_goalie?: boolean }) => ({
         player_id: row.player_id,
         player_name: row.player_name,
         position: row.player_position,
@@ -3658,7 +3301,7 @@ export const MatchupService = {
         slot_type: row.slot_type,
         slot_id: row.slot_id,
         is_locked: row.is_locked,
-        daily_points: parseFloat(row.daily_points) || 0,
+        daily_points: parseFloat(String(row.daily_points)) || 0,
         goals: row.goals || 0,
         assists: row.assists || 0,
         shots_on_goal: row.shots_on_goal || 0,
@@ -3681,13 +3324,12 @@ export const MatchupService = {
       // Only cache non-empty results (don't cache empty arrays)
       if (lineup.length > 0) {
         DataCacheService.set(cacheKey, lineup, TTL.VERY_LONG);
-        console.log(`[MatchupService] Cached ${lineup.length} players for ${date}`);
       } else {
         console.warn(`[MatchupService] NOT caching empty lineup for ${date} - data may be missing`);
       }
       
       return lineup;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('[MatchupService] getDailyLineup exception:', error);
       return [];
     }
