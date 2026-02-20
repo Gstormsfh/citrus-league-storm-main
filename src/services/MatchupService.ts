@@ -3047,108 +3047,23 @@ export const MatchupService = {
       if (statsMap.size > 0) {
         const sampleEntry = Array.from(statsMap.entries())[0];
         const sampleStats = sampleEntry[1];
-        // Check if sample looks like season totals (high numbers)
-        // For a week, max should be: ~7 goals, ~10 assists, ~30 SOG (very high week)
-        // For goalies: max ~7 wins, ~300 saves per week
         const isGoalieSample = (sampleStats.wins !== undefined || sampleStats.saves !== undefined) && (sampleStats.goals === 0 || sampleStats.goals === undefined);
         const looksLikeSeasonTotal = isGoalieSample
           ? ((sampleStats.wins || 0) > 7 || (sampleStats.saves || 0) > 300)
           : (sampleStats.goals > 20 || sampleStats.assists > 30 || sampleStats.sog > 100);
-        
-        // Calculate expected points for sample to verify (ALL 8 categories)
-        const samplePoints = isGoalieSample
-          ? ((sampleStats.wins || 0) * 4) + ((sampleStats.saves || 0) * 0.2) + ((sampleStats.shutouts || 0) * 3) + ((sampleStats.goals_against || 0) * -1)
-          : (sampleStats.goals * 3) + 
-            (sampleStats.assists * 2) + 
-            ((sampleStats.ppp || 0) * 1) +
-            ((sampleStats.shp || 0) * 2) +
-            (sampleStats.sog * 0.4) + 
-            ((sampleStats.blocks || 0) * 0.5) +
-            ((sampleStats.hits || 0) * 0.2) +
-            ((sampleStats.pim || 0) * 0.5);
-        
-        // CRITICAL: Log explicitly to see actual values
-        console.log('[MatchupService.fetchMatchupStatsForPlayers] RPC returned:');
-        console.log(`  Total Rows: ${(data || []).length}, Stats Map Size: ${statsMap.size}, Requested Players: ${playerIds.length}`);
-        console.log(`  Date Range: ${startDateStr} to ${endDateStr}`);
-        
-        // CRITICAL: Check if all requested players are in the response
+
+        // Check if all requested players are in the response
         const missingPlayers = playerIds.filter(id => !statsMap.has(id));
         if (missingPlayers.length > 0) {
           console.warn(`  ⚠️ MISSING PLAYERS in RPC response (${missingPlayers.length}):`, missingPlayers.slice(0, 10));
-        } else {
-          console.log(`  ✅ All ${playerIds.length} requested players found in RPC response`);
         }
-        
-        console.log(`  Sample Player ID: ${sampleEntry[0]} (${isGoalieSample ? '🥅 GOALIE' : 'Skater'})`);
-        console.log(`  Sample Stats:`, isGoalieSample ? {
-          wins: sampleStats.wins || 0,
-          saves: sampleStats.saves || 0,
-          shutouts: sampleStats.shutouts || 0,
-          goals_against: sampleStats.goals_against || 0,
-          calculatedPoints: samplePoints
-        } : {
-          goals: sampleStats.goals,
-          assists: sampleStats.assists,
-          sog: sampleStats.sog,
-          blocks: sampleStats.blocks || 0,
-          xGoals: sampleStats.xGoals,
-          calculatedPoints: samplePoints
-        });
-        
-        // CRITICAL: Log raw RPC data to see what's actually being returned
-        const rawSampleRow = (data || []).find((r: any) => r.player_id === sampleEntry[0]);
-        if (rawSampleRow) {
-          console.log(`  🔍 RAW RPC DATA for sample player:`, {
-            player_id: rawSampleRow.player_id,
-            goals: rawSampleRow.goals,
-            assists: rawSampleRow.assists,
-            wins: rawSampleRow.wins,
-            saves: rawSampleRow.saves,
-            shutouts: rawSampleRow.shutouts,
-            goals_against: rawSampleRow.goals_against,
-            goalie_gp: rawSampleRow.goalie_gp,
-            allFields: Object.keys(rawSampleRow)
-          });
-        }
-        
-        // CRITICAL: Log all goalies in the response
-        const goalieRows = (data || []).filter((r: any) => (r.goalie_gp || 0) > 0 || (r.wins || 0) > 0 || (r.saves || 0) > 0);
-        if (goalieRows.length > 0) {
-          console.log(`  🥅 GOALIES in RPC response (${goalieRows.length}):`, goalieRows.map((r: any) => ({
-            player_id: r.player_id,
-            wins: r.wins || 0,
-            saves: r.saves || 0,
-            shutouts: r.shutouts || 0,
-            goals_against: r.goals_against || 0,
-            goalie_gp: r.goalie_gp || 0
-          })));
-        }
-        
+
         if (looksLikeSeasonTotal) {
           if (isGoalieSample) {
             console.error(`  ❌ RPC IS RETURNING SEASON TOTALS FOR GOALIE! Sample has W: ${sampleStats.wins || 0}, SV: ${sampleStats.saves || 0} - These are season numbers!`);
           } else {
             console.error(`  ❌ RPC IS RETURNING SEASON TOTALS! Sample has Goals: ${sampleStats.goals}, Assists: ${sampleStats.assists}, SOG: ${sampleStats.sog} - These are season numbers!`);
           }
-        } else {
-          console.log(`  ✅ Sample stats look reasonable for a week`);
-        }
-        
-        // Show additional samples
-        const additionalSamples = Array.from(statsMap.entries()).slice(1, 4);
-        if (additionalSamples.length > 0) {
-          console.log(`  Additional Samples:`);
-          additionalSamples.forEach(([id, stats]) => {
-            const isGoalie = (stats.wins !== undefined || stats.saves !== undefined) && (stats.goals === 0 || stats.goals === undefined);
-            if (isGoalie) {
-              const looksLikeSeason = (stats.wins || 0) > 7 || (stats.saves || 0) > 300;
-              console.log(`    🥅 Goalie ${id}: W=${stats.wins || 0}, SV=${stats.saves || 0}, SO=${stats.shutouts || 0}, GA=${stats.goals_against || 0} ${looksLikeSeason ? '❌ SEASON TOTAL' : '✅ Week'}`);
-            } else {
-              const looksLikeSeason = stats.goals > 20 || stats.assists > 30 || stats.sog > 100;
-              console.log(`    Player ${id}: G=${stats.goals}, A=${stats.assists}, SOG=${stats.sog} ${looksLikeSeason ? '❌ SEASON TOTAL' : '✅ Week'}`);
-            }
-          });
         }
       } else {
         console.warn('[MatchupService.fetchMatchupStatsForPlayers] ⚠️ RPC returned NO DATA:', {
@@ -3292,13 +3207,10 @@ export const MatchupService = {
     // Check cache first (past lineups never change)
     const cached = DataCacheService.get<DailyLineupPlayer[]>(cacheKey);
     if (cached) {
-      console.log(`[MatchupService] getDailyLineup cache hit: ${date}, players: ${cached.length}`);
       return cached;
     }
     
     try {
-      console.log(`[MatchupService] Calling RPC get_daily_lineup for team ${teamId}, matchup ${matchupId}, date ${date}`);
-      
       const { data, error } = await supabase.rpc('get_daily_lineup', {
         p_team_id: teamId,
         p_matchup_id: matchupId,
@@ -3309,8 +3221,6 @@ export const MatchupService = {
         console.error('[MatchupService] getDailyLineup RPC error:', error);
         return [];
       }
-      
-      console.log(`[MatchupService] RPC returned ${data?.length || 0} players for ${date}`, data);
       
       const lineup: DailyLineupPlayer[] = (data || []).map((row: any) => ({
         player_id: row.player_id,
@@ -3344,7 +3254,6 @@ export const MatchupService = {
       // Only cache non-empty results (don't cache empty arrays)
       if (lineup.length > 0) {
         DataCacheService.set(cacheKey, lineup, TTL.VERY_LONG);
-        console.log(`[MatchupService] Cached ${lineup.length} players for ${date}`);
       } else {
         console.warn(`[MatchupService] NOT caching empty lineup for ${date} - data may be missing`);
       }
