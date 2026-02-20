@@ -1,0 +1,614 @@
+import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { cn } from '@/lib/utils';
+import {
+  PlayerContract, TeamCapData, NHL_TEAMS,
+  formatCap, formatCapFull, SALARY_CAP_2025_26,
+} from '@/types/captracker';
+import { getTeamCapData } from '@/services/NHLCapService';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  ArrowLeftRight, Search, Shield, AlertTriangle, Lock,
+  ChevronDown, Loader2, RotateCcw, Check, X, SlidersHorizontal,
+} from 'lucide-react';
+
+function getAllPlayers(data: TeamCapData | undefined): PlayerContract[] {
+  if (!data) return [];
+  return [
+    ...data.forwards,
+    ...data.defense,
+    ...data.goalies,
+    ...(data.minorLeague || []),
+  ];
+}
+
+export default function TradeSimulator() {
+  const [teamA, setTeamA] = useState<string | null>(null);
+  const [teamB, setTeamB] = useState<string | null>(null);
+  const [selectedA, setSelectedA] = useState<Set<number>>(new Set());
+  const [selectedB, setSelectedB] = useState<Set<number>>(new Set());
+  const [searchA, setSearchA] = useState('');
+  const [searchB, setSearchB] = useState('');
+  const [retainA, setRetainA] = useState(0);
+  const [retainB, setRetainB] = useState(0);
+  const [showPickerA, setShowPickerA] = useState(false);
+  const [showPickerB, setShowPickerB] = useState(false);
+
+  const { data: dataA, isLoading: loadingA } = useQuery<TeamCapData>({
+    queryKey: ['teamCapData', teamA],
+    queryFn: () => getTeamCapData(teamA!),
+    enabled: !!teamA,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const { data: dataB, isLoading: loadingB } = useQuery<TeamCapData>({
+    queryKey: ['teamCapData', teamB],
+    queryFn: () => getTeamCapData(teamB!),
+    enabled: !!teamB,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const playersA = useMemo(() => getAllPlayers(dataA), [dataA]);
+  const playersB = useMemo(() => getAllPlayers(dataB), [dataB]);
+
+  const pickedA = playersA.filter(p => selectedA.has(p.playerId));
+  const pickedB = playersB.filter(p => selectedB.has(p.playerId));
+
+  const hasTrade = pickedA.length > 0 || pickedB.length > 0;
+
+  // Cap impact: Team A sends pickedA, receives pickedB
+  const impact = useMemo(() => {
+    if (!dataA || !dataB) return null;
+    const outA = pickedA.reduce((s, p) => s + p.capHit, 0);
+    const outB = pickedB.reduce((s, p) => s + p.capHit, 0);
+    const retainedByA = outA * (retainA / 100);
+    const retainedByB = outB * (retainB / 100);
+
+    const aNewHit = dataA.projectedCapHit - outA + retainedByA + (outB - retainedByB);
+    const bNewHit = dataB.projectedCapHit - outB + retainedByB + (outA - retainedByA);
+
+    return {
+      teamA: {
+        before: dataA.projectedCapHit,
+        after: aNewHit,
+        spaceBefore: dataA.capSpace,
+        spaceAfter: SALARY_CAP_2025_26 - aNewHit,
+        outgoing: outA,
+        incoming: outB - retainedByB,
+        retained: retainedByA,
+      },
+      teamB: {
+        before: dataB.projectedCapHit,
+        after: bNewHit,
+        spaceBefore: dataB.capSpace,
+        spaceAfter: SALARY_CAP_2025_26 - bNewHit,
+        outgoing: outB,
+        incoming: outA - retainedByA,
+        retained: retainedByB,
+      },
+    };
+  }, [dataA, dataB, pickedA, pickedB, retainA, retainB]);
+
+  // Clause warnings
+  const clauseWarnings = useMemo(() => {
+    const warnings: string[] = [];
+    for (const p of pickedA) {
+      if (p.clause === 'NMC') warnings.push(`${p.name} has a No-Movement Clause (must waive)`);
+      else if (p.clause === 'NTC') warnings.push(`${p.name} has a No-Trade Clause (must waive)`);
+      else if (p.clause === 'M-NTC') warnings.push(`${p.name} has a Modified No-Trade Clause`);
+    }
+    for (const p of pickedB) {
+      if (p.clause === 'NMC') warnings.push(`${p.name} has a No-Movement Clause (must waive)`);
+      else if (p.clause === 'NTC') warnings.push(`${p.name} has a No-Trade Clause (must waive)`);
+      else if (p.clause === 'M-NTC') warnings.push(`${p.name} has a Modified No-Trade Clause`);
+    }
+    return warnings;
+  }, [pickedA, pickedB]);
+
+  const handleReset = () => {
+    setSelectedA(new Set());
+    setSelectedB(new Set());
+    setRetainA(0);
+    setRetainB(0);
+    setSearchA('');
+    setSearchB('');
+  };
+
+  const togglePlayer = (side: 'A' | 'B', playerId: number) => {
+    const setter = side === 'A' ? setSelectedA : setSelectedB;
+    setter(prev => {
+      const next = new Set(prev);
+      if (next.has(playerId)) next.delete(playerId);
+      else next.add(playerId);
+      return next;
+    });
+  };
+
+  const handleSelectTeam = (side: 'A' | 'B', abbrev: string) => {
+    if (side === 'A') {
+      setTeamA(abbrev);
+      setSelectedA(new Set());
+      setRetainA(0);
+      setSearchA('');
+      setShowPickerA(false);
+    } else {
+      setTeamB(abbrev);
+      setSelectedB(new Set());
+      setRetainB(0);
+      setSearchB('');
+      setShowPickerB(false);
+    }
+  };
+
+  const filterPlayers = (players: PlayerContract[], query: string) => {
+    if (!query.trim()) return players;
+    const q = query.toLowerCase();
+    return players.filter(
+      p => p.name.toLowerCase().includes(q) || p.position.toLowerCase().includes(q)
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Instructions */}
+      {!teamA && !teamB && (
+        <div className="text-center py-8 bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-dashed border-citrus-sage/40">
+          <ArrowLeftRight className="w-10 h-10 text-citrus-sage/50 mx-auto mb-3" />
+          <h3 className="font-varsity text-lg text-citrus-forest mb-1">Trade Simulator</h3>
+          <p className="text-sm text-citrus-charcoal/60 font-display max-w-md mx-auto">
+            Select two teams below to start building a trade. See real-time cap impact, trade clause warnings, and salary retention options.
+          </p>
+        </div>
+      )}
+
+      {/* Two-Panel Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Side A */}
+        <TradePanel
+          label="Team A"
+          team={teamA}
+          players={filterPlayers(playersA, searchA)}
+          selected={selectedA}
+          search={searchA}
+          onSearch={setSearchA}
+          loading={loadingA}
+          otherTeam={teamB}
+          showPicker={showPickerA}
+          onTogglePicker={() => setShowPickerA(!showPickerA)}
+          onSelectTeam={(a) => handleSelectTeam('A', a)}
+          onTogglePlayer={(id) => togglePlayer('A', id)}
+          retention={retainA}
+          onRetention={setRetainA}
+          teamData={dataA}
+        />
+
+        {/* Swap / Divider */}
+        <div className="hidden lg:flex items-start justify-center pt-6 -mx-6">
+          <div className="flex flex-col items-center gap-2">
+            <div className="w-10 h-10 rounded-full bg-citrus-forest flex items-center justify-center shadow-lg">
+              <ArrowLeftRight className="w-5 h-5 text-citrus-cream" />
+            </div>
+          </div>
+        </div>
+
+        {/* Side B */}
+        <TradePanel
+          label="Team B"
+          team={teamB}
+          players={filterPlayers(playersB, searchB)}
+          selected={selectedB}
+          search={searchB}
+          onSearch={setSearchB}
+          loading={loadingB}
+          otherTeam={teamA}
+          showPicker={showPickerB}
+          onTogglePicker={() => setShowPickerB(!showPickerB)}
+          onSelectTeam={(a) => handleSelectTeam('B', a)}
+          onTogglePlayer={(id) => togglePlayer('B', id)}
+          retention={retainB}
+          onRetention={setRetainB}
+          teamData={dataB}
+        />
+      </div>
+
+      {/* Trade Summary */}
+      {hasTrade && impact && dataA && dataB && (
+        <div className="bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="px-4 md:px-6 py-3 bg-gradient-to-r from-citrus-forest via-citrus-forest/95 to-citrus-forest border-b-2 border-citrus-sage/30 flex items-center justify-between">
+            <h3 className="font-varsity text-lg text-citrus-cream flex items-center gap-2">
+              <ArrowLeftRight className="w-5 h-5" />
+              Trade Summary
+            </h3>
+            <button
+              onClick={handleReset}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-citrus-sage/20 hover:bg-citrus-sage/30 text-citrus-cream text-xs font-display font-bold transition-colors"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Reset
+            </button>
+          </div>
+
+          <div className="p-4 md:p-6">
+            {/* Trade cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <TradeSummaryCard
+                teamName={dataA.teamName}
+                logoUrl={dataA.logoUrl}
+                receives={pickedB}
+                sends={pickedA}
+                capBefore={impact.teamA.before}
+                capAfter={impact.teamA.after}
+                spaceBefore={impact.teamA.spaceBefore}
+                spaceAfter={impact.teamA.spaceAfter}
+                retained={impact.teamA.retained}
+                retainLabel={retainA > 0 ? `Retaining ${retainA}%` : undefined}
+              />
+              <TradeSummaryCard
+                teamName={dataB.teamName}
+                logoUrl={dataB.logoUrl}
+                receives={pickedA}
+                sends={pickedB}
+                capBefore={impact.teamB.before}
+                capAfter={impact.teamB.after}
+                spaceBefore={impact.teamB.spaceBefore}
+                spaceAfter={impact.teamB.spaceAfter}
+                retained={impact.teamB.retained}
+                retainLabel={retainB > 0 ? `Retaining ${retainB}%` : undefined}
+              />
+            </div>
+
+            {/* Trade Status */}
+            <div className="flex flex-col gap-2">
+              {impact.teamA.spaceAfter >= 0 && impact.teamB.spaceAfter >= 0 ? (
+                <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-green-50 border-2 border-green-200">
+                  <Check className="w-5 h-5 text-green-600" />
+                  <span className="text-sm font-display font-bold text-green-700">
+                    Trade is cap compliant for both teams
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-50 border-2 border-red-200">
+                  <X className="w-5 h-5 text-red-600" />
+                  <span className="text-sm font-display font-bold text-red-700">
+                    Trade puts {impact.teamA.spaceAfter < 0 ? dataA.teamName : dataB.teamName} over the cap
+                  </span>
+                </div>
+              )}
+
+              {/* Clause warnings */}
+              {clauseWarnings.map((w, i) => (
+                <div key={i} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-50 border border-amber-200">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                  <span className="text-xs font-display text-amber-700">{w}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Trade Panel (one side) ─────────────────────────── */
+
+function TradePanel({
+  label, team, players, selected, search, onSearch, loading,
+  otherTeam, showPicker, onTogglePicker, onSelectTeam, onTogglePlayer,
+  retention, onRetention, teamData,
+}: {
+  label: string;
+  team: string | null;
+  players: PlayerContract[];
+  selected: Set<number>;
+  search: string;
+  onSearch: (q: string) => void;
+  loading: boolean;
+  otherTeam: string | null;
+  showPicker: boolean;
+  onTogglePicker: () => void;
+  onSelectTeam: (abbrev: string) => void;
+  onTogglePlayer: (id: number) => void;
+  retention: number;
+  onRetention: (v: number) => void;
+  teamData: TeamCapData | undefined;
+}) {
+  const teamInfo = team ? NHL_TEAMS.find(t => t.abbrev === team) : null;
+  const [imgErr, setImgErr] = useState(false);
+
+  return (
+    <div className="bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden flex flex-col">
+      {/* Team Header */}
+      <button
+        onClick={onTogglePicker}
+        className="w-full px-4 py-3 bg-gradient-to-r from-citrus-sage/20 via-citrus-sage/10 to-citrus-sage/20 border-b-2 border-citrus-sage/30 flex items-center gap-3 hover:from-citrus-sage/25 hover:to-citrus-sage/25 transition-colors"
+      >
+        {teamInfo && !imgErr ? (
+          <img src={teamInfo.logoUrl} alt={teamInfo.abbrev} className="w-8 h-8 object-contain" onError={() => setImgErr(true)} />
+        ) : (
+          <div className="w-8 h-8 rounded-full bg-citrus-sage/20 flex items-center justify-center">
+            <Shield className="w-4 h-4 text-citrus-sage/60" />
+          </div>
+        )}
+        <div className="flex-1 text-left">
+          <div className="text-[10px] text-citrus-charcoal/50 uppercase font-display font-bold tracking-wider">{label}</div>
+          <div className="font-varsity text-base text-citrus-forest">
+            {teamInfo ? teamInfo.fullName : 'Select a team'}
+          </div>
+        </div>
+        <ChevronDown className={cn("w-4 h-4 text-citrus-charcoal/40 transition-transform", showPicker && "rotate-180")} />
+      </button>
+
+      {/* Team Picker Dropdown */}
+      {showPicker && (
+        <div className="p-2 border-b-2 border-citrus-sage/20 bg-citrus-cream/30 max-h-48 overflow-y-auto">
+          <div className="grid grid-cols-4 gap-1">
+            {NHL_TEAMS.filter(t => t.abbrev !== otherTeam).map(t => (
+              <button
+                key={t.abbrev}
+                onClick={() => onSelectTeam(t.abbrev)}
+                className={cn(
+                  "flex flex-col items-center gap-0.5 p-1.5 rounded-lg border transition-all",
+                  team === t.abbrev
+                    ? "border-citrus-sage bg-citrus-sage/20"
+                    : "border-transparent hover:border-citrus-sage/30 hover:bg-citrus-sage/5"
+                )}
+              >
+                <img src={t.logoUrl} alt={t.abbrev} className="w-6 h-6 object-contain" />
+                <span className="text-[8px] font-varsity text-citrus-forest">{t.abbrev}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Content */}
+      {team && (
+        <div className="flex-1 flex flex-col">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 text-citrus-sage animate-spin" />
+            </div>
+          ) : (
+            <>
+              {/* Search */}
+              <div className="px-3 py-2 border-b border-citrus-sage/20">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-citrus-charcoal/40" />
+                  <input
+                    type="text"
+                    placeholder="Search players..."
+                    value={search}
+                    onChange={e => onSearch(e.target.value)}
+                    className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-citrus-sage/30 bg-white/60 text-xs font-display text-citrus-forest placeholder:text-citrus-charcoal/40 focus:outline-none focus:border-citrus-sage transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Retention slider */}
+              <div className="px-3 py-2 border-b border-citrus-sage/20 bg-citrus-cream/20">
+                <div className="flex items-center gap-2">
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-citrus-charcoal/50 flex-shrink-0" />
+                  <span className="text-[9px] text-citrus-charcoal/60 font-display font-bold uppercase tracking-wider flex-shrink-0">Retain</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={50}
+                    step={5}
+                    value={retention}
+                    onChange={e => onRetention(Number(e.target.value))}
+                    className="flex-1 h-1.5 accent-citrus-sage"
+                  />
+                  <span className="text-xs font-varsity text-citrus-forest w-8 text-right">{retention}%</span>
+                </div>
+              </div>
+
+              {/* Player list */}
+              <div className="flex-1 max-h-80 overflow-y-auto">
+                {players.length === 0 ? (
+                  <div className="text-center py-8 text-xs text-citrus-charcoal/50 font-display">No players found</div>
+                ) : (
+                  players.map(p => (
+                    <TradePlayerRow
+                      key={p.playerId}
+                      player={p}
+                      isSelected={selected.has(p.playerId)}
+                      onToggle={() => onTogglePlayer(p.playerId)}
+                      retentionPct={retention}
+                    />
+                  ))
+                )}
+              </div>
+
+              {/* Selected count */}
+              {selected.size > 0 && (
+                <div className="px-3 py-2 bg-citrus-sage/15 border-t-2 border-citrus-sage/30 flex items-center justify-between">
+                  <span className="text-[10px] font-display font-bold text-citrus-forest uppercase tracking-wider">
+                    {selected.size} player{selected.size !== 1 ? 's' : ''} selected
+                  </span>
+                  <span className="font-varsity text-sm text-citrus-forest">
+                    {formatCap(players.filter(p => selected.has(p.playerId)).reduce((s, p) => s + p.capHit, 0))}
+                  </span>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Trade Player Row ───────────────────────────────── */
+
+function TradePlayerRow({
+  player, isSelected, onToggle, retentionPct,
+}: {
+  player: PlayerContract;
+  isSelected: boolean;
+  onToggle: () => void;
+  retentionPct: number;
+}) {
+  const [imgErr, setImgErr] = useState(false);
+  const headshotUrl = player.headshot || `https://cms.nhl.bamgrid.com/images/headshots/current/168x168/${player.playerId}.jpg`;
+  const effectiveCap = player.capHit * (1 - retentionPct / 100);
+
+  return (
+    <button
+      onClick={onToggle}
+      className={cn(
+        "w-full flex items-center gap-2 px-3 py-2 transition-all text-left border-b border-citrus-sage/10",
+        isSelected
+          ? "bg-citrus-sage/20 border-l-4 border-l-citrus-sage"
+          : "hover:bg-citrus-sage/5"
+      )}
+    >
+      {/* Checkbox */}
+      <div className={cn(
+        "w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors",
+        isSelected ? "bg-citrus-sage border-citrus-sage" : "border-citrus-charcoal/30"
+      )}>
+        {isSelected && <Check className="w-3 h-3 text-white" />}
+      </div>
+
+      {/* Headshot */}
+      <div className="w-7 h-7 rounded-full overflow-hidden bg-citrus-cream border border-citrus-sage/30 flex-shrink-0">
+        {!imgErr ? (
+          <img src={headshotUrl} alt={player.name} className="w-full h-full object-cover" onError={() => setImgErr(true)} loading="lazy" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center"><Shield className="w-3 h-3 text-citrus-sage/50" /></div>
+        )}
+      </div>
+
+      {/* Name + Position */}
+      <div className="flex-1 min-w-0">
+        <div className="font-display font-bold text-[11px] text-citrus-forest truncate">{player.name}</div>
+        <div className="flex items-center gap-1">
+          <Badge className="bg-citrus-sage/20 text-citrus-forest text-[7px] h-3.5 px-1 font-varsity border border-citrus-sage/40">
+            {player.position}
+          </Badge>
+          {player.clause && (
+            <Badge className={cn(
+              "text-[6px] h-3 px-1 border",
+              player.clause === 'NMC' ? "bg-red-100 text-red-700 border-red-200" :
+              player.clause === 'NTC' ? "bg-orange-100 text-orange-700 border-orange-200" :
+              "bg-amber-100 text-amber-700 border-amber-200"
+            )}>
+              {player.clause}
+            </Badge>
+          )}
+          {player.rosterStatus !== 'NHL' && (
+            <Badge className="bg-slate-500 text-white text-[6px] h-3 px-1">{player.rosterStatus}</Badge>
+          )}
+        </div>
+      </div>
+
+      {/* Cap Hit */}
+      <div className="text-right flex-shrink-0">
+        <div className="font-varsity text-xs text-citrus-forest">{formatCap(player.capHit)}</div>
+        {retentionPct > 0 && (
+          <div className="text-[8px] text-citrus-charcoal/50 font-display">
+            net {formatCap(effectiveCap)}
+          </div>
+        )}
+        <div className="text-[8px] text-citrus-charcoal/50 font-display">
+          {player.yearsRemaining}yr &middot; {player.expiryStatus}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+/* ── Trade Summary Card ─────────────────────────────── */
+
+function TradeSummaryCard({
+  teamName, logoUrl, receives, sends,
+  capBefore, capAfter, spaceBefore, spaceAfter,
+  retained, retainLabel,
+}: {
+  teamName: string;
+  logoUrl: string;
+  receives: PlayerContract[];
+  sends: PlayerContract[];
+  capBefore: number;
+  capAfter: number;
+  spaceBefore: number;
+  spaceAfter: number;
+  retained: number;
+  retainLabel?: string;
+}) {
+  const [imgErr, setImgErr] = useState(false);
+  const capDelta = capAfter - capBefore;
+
+  return (
+    <div className="bg-citrus-cream/40 rounded-xl border-2 border-citrus-sage/20 p-4">
+      {/* Team header */}
+      <div className="flex items-center gap-2 mb-3">
+        {!imgErr ? (
+          <img src={logoUrl} alt={teamName} className="w-8 h-8 object-contain" onError={() => setImgErr(true)} />
+        ) : (
+          <Shield className="w-8 h-8 text-citrus-sage/50" />
+        )}
+        <span className="font-varsity text-base text-citrus-forest">{teamName}</span>
+      </div>
+
+      {/* Receives */}
+      {receives.length > 0 && (
+        <div className="mb-2">
+          <div className="text-[9px] text-green-700 uppercase font-display font-bold tracking-wider mb-1">Acquires</div>
+          {receives.map(p => (
+            <div key={p.playerId} className="flex items-center justify-between py-0.5">
+              <span className="text-xs font-display text-citrus-forest">{p.name} <span className="text-citrus-charcoal/50">({p.position})</span></span>
+              <span className="text-xs font-varsity text-green-700">+{formatCap(p.capHit)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Sends */}
+      {sends.length > 0 && (
+        <div className="mb-3">
+          <div className="text-[9px] text-red-700 uppercase font-display font-bold tracking-wider mb-1">Sends</div>
+          {sends.map(p => (
+            <div key={p.playerId} className="flex items-center justify-between py-0.5">
+              <span className="text-xs font-display text-citrus-forest">{p.name} <span className="text-citrus-charcoal/50">({p.position})</span></span>
+              <span className="text-xs font-varsity text-red-600">-{formatCap(p.capHit)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Retention */}
+      {retainLabel && retained > 0 && (
+        <div className="px-2 py-1 mb-3 rounded-lg bg-amber-50 border border-amber-200 text-[9px] font-display text-amber-700">
+          {retainLabel} salary ({formatCap(retained)} dead cap)
+        </div>
+      )}
+
+      {/* Cap Impact */}
+      <div className="border-t border-citrus-sage/20 pt-3 space-y-1.5">
+        <div className="flex justify-between text-xs">
+          <span className="font-display text-citrus-charcoal/60">Cap Before</span>
+          <span className="font-varsity text-citrus-charcoal">{formatCapFull(capBefore)}</span>
+        </div>
+        <div className="flex justify-between text-xs">
+          <span className="font-display text-citrus-charcoal/60">Cap After</span>
+          <span className="font-varsity text-citrus-charcoal">{formatCapFull(capAfter)}</span>
+        </div>
+        <div className="flex justify-between text-xs font-bold">
+          <span className="font-display text-citrus-charcoal/60">Net Change</span>
+          <span className={cn("font-varsity", capDelta > 0 ? "text-red-600" : "text-green-600")}>
+            {capDelta > 0 ? '+' : ''}{formatCap(capDelta)}
+          </span>
+        </div>
+        <div className="flex justify-between text-xs">
+          <span className="font-display font-bold text-citrus-forest">Cap Space</span>
+          <span className={cn("font-varsity font-bold", spaceAfter < 0 ? "text-red-600" : "text-green-600")}>
+            {formatCap(spaceAfter)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
