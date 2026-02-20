@@ -163,9 +163,13 @@ const TradeAnalyzer = () => {
               const playerIds = teamRosters.get(t.id) || [];
               const roster = playerIds.map(id => playerMap.get(id)).filter((p): p is Player => !!p);
               return {
-                id: t.id,
+                id: t.id as unknown as number,
                 name: t.team_name || `Team ${idx + 1}`,
+                owner: t.owner_id || 'Unknown',
                 logo: t.team_name?.substring(0, 2).toUpperCase() || '??',
+                record: { wins: 0, losses: 0 },
+                points: 0,
+                streak: '',
                 roster
               };
             });
@@ -503,7 +507,7 @@ const TradeAnalyzer = () => {
               {/* Main Trade Analyzer Content */}
               {!loading && !draftNotCompleted && (
                 <>
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
           <div>
             <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60">
               Trade Center
@@ -512,8 +516,37 @@ const TradeAnalyzer = () => {
               Architect the perfect deal with AI-powered analysis.
             </p>
           </div>
-          
-          <div className="w-full md:w-72">
+        </div>
+
+        {/* Demo Mode Banner */}
+        {isGuestMode(userLeagueState) && (
+          <div className="mb-6">
+            <LeagueCreationCTA
+              title="You're viewing demo trade analyzer"
+              description="Sign up to analyze trades with your actual team and get AI-powered trade recommendations."
+              variant="compact"
+            />
+          </div>
+        )}
+
+        {/* Tabs: Propose / Trade Offers */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
+          <TabsList className="w-full md:w-auto">
+            <TabsTrigger value="propose" className="flex items-center gap-2">
+              <ArrowLeftRight className="h-4 w-4" /> Propose Trade
+            </TabsTrigger>
+            <TabsTrigger value="offers" className="flex items-center gap-2 relative">
+              <History className="h-4 w-4" /> Trade Offers
+              {tradeOffers.filter(o => o.status === 'pending').length > 0 && (
+                <Badge className="ml-1 h-5 min-w-[20px] px-1 text-[10px] bg-destructive text-destructive-foreground">
+                  {tradeOffers.filter(o => o.status === 'pending').length}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="propose" className="mt-4">
+          <div className="w-full md:w-72 mb-6">
              <Select value={String(selectedTeamId)} onValueChange={(val) => {
                setSelectedTeamId(val);
                setTheirSelectedPlayers([]);
@@ -533,18 +566,6 @@ const TradeAnalyzer = () => {
               </SelectContent>
             </Select>
           </div>
-        </div>
-
-        {/* Demo Mode Banner */}
-        {isGuestMode(userLeagueState) && (
-          <div className="mb-6">
-            <LeagueCreationCTA 
-              title="You're viewing demo trade analyzer"
-              description="Sign up to analyze trades with your actual team and get AI-powered trade recommendations."
-              variant="compact"
-            />
-          </div>
-        )}
 
         <div className="grid lg:grid-cols-12 gap-6 h-[calc(100vh-240px)] min-h-[600px]">
           {/* Left Column: My Team */}
@@ -814,6 +835,176 @@ const TradeAnalyzer = () => {
           isOpen={isPlayerDialogOpen}
           onClose={() => setIsPlayerDialogOpen(false)}
         />
+          </TabsContent>
+
+          {/* Trade Offers Tab */}
+          <TabsContent value="offers" className="mt-4">
+            <div className="space-y-6">
+              {tradeOffers.length === 0 ? (
+                <Card className="p-8 text-center">
+                  <History className="h-12 w-12 mx-auto mb-4 text-muted-foreground/30" />
+                  <h3 className="text-lg font-semibold mb-1">No Trade Offers</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Trade offers you send or receive will appear here.
+                  </p>
+                </Card>
+              ) : (
+                <>
+                  {/* Pending offers received */}
+                  {tradeOffers.filter(o => o.status === 'pending' && o.to_team_id === myTeamId).length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                        <TrendingUp className="h-5 w-5 text-green-500" /> Offers Received
+                      </h3>
+                      <div className="space-y-3">
+                        {tradeOffers
+                          .filter(o => o.status === 'pending' && o.to_team_id === myTeamId)
+                          .map(offer => (
+                            <Card key={offer.id} className="border-green-500/20">
+                              <CardHeader className="pb-2">
+                                <div className="flex items-center justify-between">
+                                  <CardTitle className="text-base">From: {offer.from_team_name}</CardTitle>
+                                  <Badge variant="secondary">Pending</Badge>
+                                </div>
+                                {offer.message && (
+                                  <p className="text-sm text-muted-foreground italic">"{offer.message}"</p>
+                                )}
+                              </CardHeader>
+                              <CardContent className="pb-3">
+                                <div className="grid grid-cols-2 gap-4 mb-3">
+                                  <div>
+                                    <p className="text-xs font-semibold text-green-600 mb-1">You Receive</p>
+                                    {offer.offered_players.map(p => (
+                                      <div key={p.player_id} className="text-sm flex items-center gap-1">
+                                        <Badge variant="outline" className="h-4 px-1 text-[10px]">{p.position_code}</Badge>
+                                        {p.full_name}
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <div>
+                                    <p className="text-xs font-semibold text-red-500 mb-1">You Send</p>
+                                    {offer.requested_players.map(p => (
+                                      <div key={p.player_id} className="text-sm flex items-center gap-1">
+                                        <Badge variant="outline" className="h-4 px-1 text-[10px]">{p.position_code}</Badge>
+                                        {p.full_name}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                                <Separator className="my-2" />
+                                <div className="flex gap-2 pt-1">
+                                  <Button size="sm" className="bg-green-600 hover:bg-green-500 text-white" onClick={() => handleAcceptTrade(offer.id)}>
+                                    <CheckCircle2 className="h-4 w-4 mr-1" /> Accept
+                                  </Button>
+                                  <Button size="sm" variant="destructive" onClick={() => handleRejectTrade(offer.id)}>
+                                    Reject
+                                  </Button>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Pending offers sent */}
+                  {tradeOffers.filter(o => o.status === 'pending' && o.from_team_id === myTeamId).length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                        <Send className="h-5 w-5 text-blue-500" /> Offers Sent
+                      </h3>
+                      <div className="space-y-3">
+                        {tradeOffers
+                          .filter(o => o.status === 'pending' && o.from_team_id === myTeamId)
+                          .map(offer => (
+                            <Card key={offer.id} className="border-blue-500/20">
+                              <CardHeader className="pb-2">
+                                <div className="flex items-center justify-between">
+                                  <CardTitle className="text-base">To: {offer.to_team_name}</CardTitle>
+                                  <Badge variant="secondary">Pending</Badge>
+                                </div>
+                                {offer.message && (
+                                  <p className="text-sm text-muted-foreground italic">"{offer.message}"</p>
+                                )}
+                              </CardHeader>
+                              <CardContent className="pb-3">
+                                <div className="grid grid-cols-2 gap-4 mb-3">
+                                  <div>
+                                    <p className="text-xs font-semibold text-red-500 mb-1">You Send</p>
+                                    {offer.offered_players.map(p => (
+                                      <div key={p.player_id} className="text-sm flex items-center gap-1">
+                                        <Badge variant="outline" className="h-4 px-1 text-[10px]">{p.position_code}</Badge>
+                                        {p.full_name}
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <div>
+                                    <p className="text-xs font-semibold text-green-600 mb-1">You Receive</p>
+                                    {offer.requested_players.map(p => (
+                                      <div key={p.player_id} className="text-sm flex items-center gap-1">
+                                        <Badge variant="outline" className="h-4 px-1 text-[10px]">{p.position_code}</Badge>
+                                        {p.full_name}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                                <Button size="sm" variant="outline" onClick={() => handleCancelTrade(offer.id)}>
+                                  Cancel Offer
+                                </Button>
+                              </CardContent>
+                            </Card>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Completed/rejected trades */}
+                  {tradeOffers.filter(o => o.status !== 'pending').length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold mb-3 text-muted-foreground flex items-center gap-2">
+                        <History className="h-5 w-5" /> Trade History
+                      </h3>
+                      <div className="space-y-3">
+                        {tradeOffers
+                          .filter(o => o.status !== 'pending')
+                          .map(offer => (
+                            <Card key={offer.id} className="opacity-60">
+                              <CardHeader className="pb-2">
+                                <div className="flex items-center justify-between">
+                                  <CardTitle className="text-base">
+                                    {offer.from_team_id === myTeamId ? `To: ${offer.to_team_name}` : `From: ${offer.from_team_name}`}
+                                  </CardTitle>
+                                  <Badge variant={offer.status === 'accepted' ? 'default' : 'outline'}>
+                                    {offer.status.charAt(0).toUpperCase() + offer.status.slice(1)}
+                                  </Badge>
+                                </div>
+                              </CardHeader>
+                              <CardContent className="pb-3">
+                                <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
+                                  <div>
+                                    <p className="text-xs font-semibold mb-1">Offered</p>
+                                    {offer.offered_players.map(p => (
+                                      <div key={p.player_id}>{p.full_name}</div>
+                                    ))}
+                                  </div>
+                                  <div>
+                                    <p className="text-xs font-semibold mb-1">Requested</p>
+                                    {offer.requested_players.map(p => (
+                                      <div key={p.player_id}>{p.full_name}</div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
                 </>
               )}
               </div>

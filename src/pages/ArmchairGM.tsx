@@ -105,8 +105,7 @@ const ArmchairGM = () => {
                   )}
                 >
                   {tab.icon}
-                  <span className="hidden md:inline">{tab.label}</span>
-                  <span className="md:hidden">{tab.shortLabel}</span>
+                  <span>{tab.label}</span>
                 </button>
               ))}
             </div>
