@@ -1855,7 +1855,7 @@ async joinLeagueByCode(
       
       if (matchupsError) {
         console.error('[LeagueService] Error fetching matchups:', matchupsError);
-        return { totalBackfilled: 0, matchupsProcessed: 0, errors: [matchupsError] };
+        return { totalBackfilled: 0, matchupsProcessed: 0, errors: [{ error: matchupsError }] };
       }
       
       if (!matchups || matchups.length === 0) {
@@ -1914,7 +1914,7 @@ async joinLeagueByCode(
       return { totalBackfilled, matchupsProcessed: matchups.length, errors };
     } catch (error) {
       console.error('[LeagueService] Exception in backfillAllMatchupsForLeague:', error);
-      return { totalBackfilled: 0, matchupsProcessed: 0, errors: [error] };
+      return { totalBackfilled: 0, matchupsProcessed: 0, errors: [{ error }] };
     }
   },
 
@@ -2753,7 +2753,7 @@ async joinLeagueByCode(
    * Update all teams owned by a user with a new team name
    * This syncs the default_team_name from profiles to existing teams
    */
-  async updateUserTeamNames(userId: string, newTeamName: string): Promise<{ error: any; updatedCount?: number }> {
+  async updateUserTeamNames(userId: string, newTeamName: string): Promise<{ error: unknown; updatedCount?: number }> {
     try {
       if (!newTeamName || !newTeamName.trim()) {
         return { error: null, updatedCount: 0 }; // No name to update
@@ -2810,7 +2810,7 @@ async joinLeagueByCode(
     userId: string
   ): Promise<{ 
     lineup: { starters: string[]; bench: string[]; ir: string[]; slotAssignments: Record<string, string> } | null;
-    error: any 
+    error: unknown
   }> {
     try {
       // CRITICAL FIX: Read from roster_assignments (source of truth) instead of draft_picks
@@ -2974,7 +2974,7 @@ async joinLeagueByCode(
     userId: string,
     playerId: string,
     source: string = 'Roster Tab'
-  ): Promise<{ success: boolean; error: any }> {
+  ): Promise<{ success: boolean; error: PostgrestError | Error | null }> {
     // Read-only guard: Block all drops for demo league
     if (leagueId === DEMO_LEAGUE_ID_FOR_GUESTS) {
       return {

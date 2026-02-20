@@ -383,7 +383,7 @@ export const DraftService = {
           .select()
           .single();
 
-        data = result.data;
+        data = result.data as DraftPick | null;
         error = result.error;
       } else {
         // RPC succeeded - fetch the inserted pick
@@ -392,7 +392,7 @@ export const DraftService = {
           .select('id, league_id, team_id, player_id, round_number, pick_number, draft_session_id, picked_at, deleted_at')
           .eq('id', rpcResult)
           .single();
-        data = pickData;
+        data = pickData as DraftPick | null;
         error = fetchError;
       }
 
@@ -1148,7 +1148,7 @@ export const DraftService = {
         return { snapshot: null, error: null };
       }
 
-      return { snapshot: data, error: null };
+      return { snapshot: data as unknown as DraftSnapshot, error: null };
     } catch (error: unknown) {
       logger.error('Error getting draft snapshot:', error);
       return { snapshot: null, error };

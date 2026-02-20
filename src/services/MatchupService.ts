@@ -2054,9 +2054,9 @@ export const MatchupService = {
                 .in('id', unmatchedUuids);
               
               if (!uuidError && uuidPlayers) {
-                uuidPlayers.forEach((uuidPlayer: any) => {
-                  const matched = allPlayers.find(p => 
-                    p.full_name === uuidPlayer.full_name && 
+                uuidPlayers.forEach((uuidPlayer: { id: string; full_name: string; team: string }) => {
+                  const matched = allPlayers.find(p =>
+                    p.full_name === uuidPlayer.full_name &&
                     p.team === uuidPlayer.team
                   );
                   if (matched) {
@@ -2067,7 +2067,7 @@ export const MatchupService = {
             }
           }
         }
-        
+
         return numericIds;
       };
       
@@ -2086,7 +2086,7 @@ export const MatchupService = {
       const team1LineupIds = team1Lineup.starters || [];
       const slotUuidIds = Object.keys(rawTeam1SlotAssignments).filter(id => id.includes('-'));
       const allUuidIds = [
-        ...team1LineupIds.filter((id: any) => typeof id === 'string' && id.includes('-')),
+        ...team1LineupIds.filter((id: string | number) => typeof id === 'string' && id.includes('-')),
         ...slotUuidIds
       ];
       
@@ -2097,9 +2097,9 @@ export const MatchupService = {
           .in('id', allUuidIds);
         
         if (uuidPlayers) {
-          uuidPlayers.forEach((uuidPlayer: any) => {
-            const matched = allPlayers.find(p => 
-              p.full_name === uuidPlayer.full_name && 
+          uuidPlayers.forEach((uuidPlayer: { id: string; full_name: string; team: string }) => {
+            const matched = allPlayers.find(p =>
+              p.full_name === uuidPlayer.full_name &&
               p.team === uuidPlayer.team
             );
             if (matched) {
@@ -2108,7 +2108,7 @@ export const MatchupService = {
           });
         }
       }
-      
+
       Object.entries(rawTeam1SlotAssignments).forEach(([playerId, slotId]) => {
         // Convert UUID to numeric ID if needed, otherwise use as-is
         const numericId = uuidToNumericMap.get(playerId) || 
@@ -2136,7 +2136,7 @@ export const MatchupService = {
         const team2LineupIds = team2Lineup.starters || [];
         const slotUuidIds2 = Object.keys(rawTeam2SlotAssignments).filter(id => id.includes('-'));
         const allUuidIds2 = [
-          ...team2LineupIds.filter((id: any) => typeof id === 'string' && id.includes('-')),
+          ...team2LineupIds.filter((id: string | number) => typeof id === 'string' && id.includes('-')),
           ...slotUuidIds2
         ];
         
@@ -2147,9 +2147,9 @@ export const MatchupService = {
             .in('id', allUuidIds2);
           
           if (uuidPlayers2) {
-            uuidPlayers2.forEach((uuidPlayer: any) => {
-              const matched = allPlayers.find(p => 
-                p.full_name === uuidPlayer.full_name && 
+            uuidPlayers2.forEach((uuidPlayer: { id: string; full_name: string; team: string }) => {
+              const matched = allPlayers.find(p =>
+                p.full_name === uuidPlayer.full_name &&
                 p.team === uuidPlayer.team
               );
               if (matched) {
