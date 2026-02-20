@@ -1,7 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 import { PlayerContract, TeamCapData, formatCap } from '@/types/captracker';
 import CapPlayerCard from './CapPlayerCard';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 interface RosterLineupViewProps {
   data: TeamCapData;
@@ -11,11 +13,13 @@ interface ForwardLine {
   lw: PlayerContract | null;
   c: PlayerContract | null;
   rw: PlayerContract | null;
+  lineCap: number;
 }
 
 interface DefensePair {
   ld: PlayerContract;
   rd: PlayerContract | null;
+  pairCap: number;
 }
 
 function buildLineup(data: TeamCapData) {
@@ -32,14 +36,18 @@ function buildLineup(data: TeamCapData) {
   // Build 4 forward lines
   const lines: ForwardLine[] = [];
   for (let i = 0; i < 4; i++) {
+    const lw = leftWingers[i] || null;
+    const c = centers[i] || null;
+    const rw = rightWingers[i] || null;
     lines.push({
-      lw: leftWingers[i] || null,
-      c: centers[i] || null,
-      rw: rightWingers[i] || null,
+      lw,
+      c,
+      rw,
+      lineCap: (lw?.capHit || 0) + (c?.capHit || 0) + (rw?.capHit || 0),
     });
   }
 
-  // Extra forwards that don't fit in 4 lines
+  // Extra forwards
   const usedForwards = new Set<string>();
   for (const line of lines) {
     if (line.lw) usedForwards.add(line.lw.name);
@@ -52,17 +60,16 @@ function buildLineup(data: TeamCapData) {
   const sortedD = [...defense].sort((a, b) => b.capHit - a.capHit);
   const dPairs: DefensePair[] = [];
   for (let i = 0; i < 3; i++) {
-    dPairs.push({
-      ld: sortedD[i * 2] || sortedD[0],
-      rd: sortedD[i * 2 + 1] || null,
-    });
+    const ld = sortedD[i * 2];
+    const rd = sortedD[i * 2 + 1] || null;
+    if (ld) {
+      dPairs.push({ ld, rd, pairCap: ld.capHit + (rd?.capHit || 0) });
+    }
   }
-  // Filter out empty pairs
-  const validPairs = dPairs.filter(p => p.ld);
 
   // Extra defensemen
   const usedD = new Set<string>();
-  for (const pair of validPairs) {
+  for (const pair of dPairs) {
     usedD.add(pair.ld.name);
     if (pair.rd) usedD.add(pair.rd.name);
   }
@@ -72,16 +79,11 @@ function buildLineup(data: TeamCapData) {
   const allNHL = [...forwards, ...defense, ...goalies];
   const maxCapHit = Math.max(...allNHL.map(p => p.capHit), 1);
 
-  return {
-    lines,
-    dPairs: validPairs,
-    goalies,
-    extraForwards,
-    extraDefense,
-    minorLeague,
-    maxCapHit,
-  };
+  return { lines, dPairs, goalies, extraForwards, extraDefense, minorLeague, maxCapHit };
 }
+
+const LINE_LABELS = ['1st Line', '2nd Line', '3rd Line', '4th Line'];
+const PAIR_LABELS = ['1st Pair', '2nd Pair', '3rd Pair'];
 
 export default function RosterLineupView({ data }: RosterLineupViewProps) {
   const lineup = useMemo(() => buildLineup(data), [data]);
@@ -91,52 +93,68 @@ export default function RosterLineupView({ data }: RosterLineupViewProps) {
   const goaliesCap = data.goalies.reduce((s, p) => s + p.capHit, 0);
   const minorCap = (data.minorLeague || []).reduce((s, p) => s + p.capHit, 0);
 
+  const ufaForwards = data.forwards.filter(p => p.expiryStatus === 'UFA' && p.yearsRemaining <= 1).length;
+  const rfaForwards = data.forwards.filter(p => p.expiryStatus === 'RFA' && p.yearsRemaining <= 1).length;
+  const ufaDefense = data.defense.filter(p => p.expiryStatus === 'UFA' && p.yearsRemaining <= 1).length;
+  const rfaDefense = data.defense.filter(p => p.expiryStatus === 'RFA' && p.yearsRemaining <= 1).length;
+
   return (
     <div className="space-y-6">
-      {/* Forward Lines */}
+      {/* ═══════════════════════════════════════════════════════════
+          FORWARD LINES
+         ═══════════════════════════════════════════════════════════ */}
       <LineupSection
         title="Forward Lines"
         subtitle={`${data.forwards.length} players`}
         capTotal={forwardsCap}
         icon="🏒"
+        ufaCount={ufaForwards}
+        rfaCount={rfaForwards}
       >
-        {lineup.lines.map((line, i) => (
-          <div key={i} className="space-y-1.5">
-            {/* Line label */}
-            <div className="flex items-center gap-2 px-1">
-              <span className="text-[9px] font-varsity text-citrus-charcoal/50 uppercase tracking-wider">
-                Line {i + 1}
-              </span>
-              <div className="flex-1 h-px bg-citrus-sage/20" />
-              <div className="hidden md:flex items-center gap-3 text-[8px] font-display text-citrus-charcoal/40 uppercase tracking-wider">
-                <span className="w-24 text-center">LW</span>
-                <span className="w-24 text-center">C</span>
-                <span className="w-24 text-center">RW</span>
+        <div className="space-y-5">
+          {lineup.lines.map((line, i) => (
+            <div key={i}>
+              {/* Line header */}
+              <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-5 h-5 rounded-lg bg-gradient-to-br from-citrus-sage/30 to-[#7CB518]/20 border border-citrus-sage/40 flex items-center justify-center">
+                    <span className="text-[9px] font-varsity font-black text-citrus-forest">{i + 1}</span>
+                  </div>
+                  <span className="text-[10px] font-varsity text-citrus-forest tracking-wider uppercase">
+                    {LINE_LABELS[i]}
+                  </span>
+                </div>
+                <div className="flex-1 h-px bg-gradient-to-r from-citrus-sage/30 to-transparent" />
+                <span className="text-[9px] font-varsity text-citrus-charcoal/40">
+                  {formatCap(line.lineCap)}
+                </span>
               </div>
-              <div className="flex-1 h-px bg-citrus-sage/20 hidden md:block" />
-            </div>
 
-            {/* LW - C - RW */}
-            <div className="grid grid-cols-3 gap-2">
-              <div>
-                {/* Mobile position label */}
-                <div className="md:hidden text-[7px] font-varsity text-citrus-sage/60 uppercase tracking-wider text-center mb-0.5">LW</div>
+              {/* Position column labels */}
+              <div className="grid grid-cols-3 gap-2 md:gap-3 mb-1">
+                <div className="text-center">
+                  <span className="text-[8px] font-varsity text-citrus-sage/50 uppercase tracking-[0.15em]">LW</span>
+                </div>
+                <div className="text-center">
+                  <span className="text-[8px] font-varsity text-citrus-sage/50 uppercase tracking-[0.15em]">C</span>
+                </div>
+                <div className="text-center">
+                  <span className="text-[8px] font-varsity text-citrus-sage/50 uppercase tracking-[0.15em]">RW</span>
+                </div>
+              </div>
+
+              {/* LW - C - RW cards */}
+              <div className="grid grid-cols-3 gap-2 md:gap-3">
                 {line.lw ? (
                   <CapPlayerCard player={line.lw} maxCapHit={lineup.maxCapHit} />
                 ) : (
                   <EmptySlot position="LW" />
                 )}
-              </div>
-              <div>
-                <div className="md:hidden text-[7px] font-varsity text-citrus-sage/60 uppercase tracking-wider text-center mb-0.5">C</div>
                 {line.c ? (
                   <CapPlayerCard player={line.c} maxCapHit={lineup.maxCapHit} />
                 ) : (
                   <EmptySlot position="C" />
                 )}
-              </div>
-              <div>
-                <div className="md:hidden text-[7px] font-varsity text-citrus-sage/60 uppercase tracking-wider text-center mb-0.5">RW</div>
                 {line.rw ? (
                   <CapPlayerCard player={line.rw} maxCapHit={lineup.maxCapHit} />
                 ) : (
@@ -144,57 +162,58 @@ export default function RosterLineupView({ data }: RosterLineupViewProps) {
                 )}
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
 
         {/* Extra Forwards */}
         {lineup.extraForwards.length > 0 && (
-          <div className="space-y-1.5 mt-2">
-            <div className="flex items-center gap-2 px-1">
-              <span className="text-[9px] font-varsity text-citrus-charcoal/50 uppercase tracking-wider">
-                Extra Forwards
-              </span>
-              <div className="flex-1 h-px bg-citrus-sage/20" />
-            </div>
-            <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-              {lineup.extraForwards.map((p, i) => (
-                <CapPlayerCard key={p.name + i} player={p} maxCapHit={lineup.maxCapHit} />
-              ))}
-            </div>
-          </div>
+          <ExtraPlayersSection label="Extra Forwards" players={lineup.extraForwards} maxCapHit={lineup.maxCapHit} />
         )}
       </LineupSection>
 
-      {/* Defense Pairs */}
+      {/* ═══════════════════════════════════════════════════════════
+          DEFENSE PAIRS
+         ═══════════════════════════════════════════════════════════ */}
       <LineupSection
         title="Defense Pairs"
         subtitle={`${data.defense.length} players`}
         capTotal={defenseCap}
         icon="🛡️"
+        ufaCount={ufaDefense}
+        rfaCount={rfaDefense}
       >
-        {lineup.dPairs.map((pair, i) => (
-          <div key={i} className="space-y-1.5">
-            {/* Pair label */}
-            <div className="flex items-center gap-2 px-1">
-              <span className="text-[9px] font-varsity text-citrus-charcoal/50 uppercase tracking-wider">
-                Pair {i + 1}
-              </span>
-              <div className="flex-1 h-px bg-citrus-sage/20" />
-              <div className="hidden md:flex items-center gap-3 text-[8px] font-display text-citrus-charcoal/40 uppercase tracking-wider">
-                <span className="w-24 text-center">LD</span>
-                <span className="w-24 text-center">RD</span>
+        <div className="space-y-5">
+          {lineup.dPairs.map((pair, i) => (
+            <div key={i}>
+              {/* Pair header */}
+              <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-5 h-5 rounded-lg bg-gradient-to-br from-blue-200/50 to-blue-300/30 border border-blue-400/40 flex items-center justify-center">
+                    <span className="text-[9px] font-varsity font-black text-blue-900">{i + 1}</span>
+                  </div>
+                  <span className="text-[10px] font-varsity text-citrus-forest tracking-wider uppercase">
+                    {PAIR_LABELS[i]}
+                  </span>
+                </div>
+                <div className="flex-1 h-px bg-gradient-to-r from-blue-300/30 to-transparent" />
+                <span className="text-[9px] font-varsity text-citrus-charcoal/40">
+                  {formatCap(pair.pairCap)}
+                </span>
               </div>
-              <div className="flex-1 h-px bg-citrus-sage/20 hidden md:block" />
-            </div>
 
-            {/* D - D */}
-            <div className="grid grid-cols-2 gap-2 max-w-2xl mx-auto">
-              <div>
-                <div className="md:hidden text-[7px] font-varsity text-citrus-sage/60 uppercase tracking-wider text-center mb-0.5">LD</div>
-                <CapPlayerCard player={pair.ld} maxCapHit={lineup.maxCapHit} />
+              {/* Position labels */}
+              <div className="grid grid-cols-2 gap-2 md:gap-3 max-w-2xl mx-auto mb-1">
+                <div className="text-center">
+                  <span className="text-[8px] font-varsity text-blue-400/60 uppercase tracking-[0.15em]">LD</span>
+                </div>
+                <div className="text-center">
+                  <span className="text-[8px] font-varsity text-blue-400/60 uppercase tracking-[0.15em]">RD</span>
+                </div>
               </div>
-              <div>
-                <div className="md:hidden text-[7px] font-varsity text-citrus-sage/60 uppercase tracking-wider text-center mb-0.5">RD</div>
+
+              {/* D - D cards */}
+              <div className="grid grid-cols-2 gap-2 md:gap-3 max-w-2xl mx-auto">
+                <CapPlayerCard player={pair.ld} maxCapHit={lineup.maxCapHit} />
                 {pair.rd ? (
                   <CapPlayerCard player={pair.rd} maxCapHit={lineup.maxCapHit} />
                 ) : (
@@ -202,76 +221,71 @@ export default function RosterLineupView({ data }: RosterLineupViewProps) {
                 )}
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
 
         {/* Extra Defensemen */}
         {lineup.extraDefense.length > 0 && (
-          <div className="space-y-1.5 mt-2">
-            <div className="flex items-center gap-2 px-1">
-              <span className="text-[9px] font-varsity text-citrus-charcoal/50 uppercase tracking-wider">
-                Extra Defensemen
-              </span>
-              <div className="flex-1 h-px bg-citrus-sage/20" />
-            </div>
-            <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-              {lineup.extraDefense.map((p, i) => (
-                <CapPlayerCard key={p.name + i} player={p} maxCapHit={lineup.maxCapHit} />
-              ))}
-            </div>
-          </div>
+          <ExtraPlayersSection label="Extra Defensemen" players={lineup.extraDefense} maxCapHit={lineup.maxCapHit} />
         )}
       </LineupSection>
 
-      {/* Goalies */}
+      {/* ═══════════════════════════════════════════════════════════
+          GOALIES
+         ═══════════════════════════════════════════════════════════ */}
       <LineupSection
         title="Goalies"
         subtitle={`${data.goalies.length} players`}
         capTotal={goaliesCap}
         icon="🥅"
       >
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-w-3xl mx-auto">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-3 max-w-3xl mx-auto">
           {lineup.goalies.map((g, i) => (
             <CapPlayerCard key={g.name + i} player={g} maxCapHit={lineup.maxCapHit} />
           ))}
         </div>
       </LineupSection>
 
-      {/* IR / Minor League / Other */}
+      {/* ═══════════════════════════════════════════════════════════
+          IR / MINOR LEAGUE / OTHER
+         ═══════════════════════════════════════════════════════════ */}
       {lineup.minorLeague.length > 0 && (
-        <LineupSection
+        <CollapsibleLineupSection
           title="IR / Minor League / Other"
           subtitle={`${lineup.minorLeague.length} contracts`}
           capTotal={minorCap}
           icon="📋"
-          defaultCollapsed
         >
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
             {lineup.minorLeague.map((p, i) => (
               <CapPlayerCard key={p.name + i} player={p} maxCapHit={lineup.maxCapHit} />
             ))}
           </div>
-        </LineupSection>
+        </CollapsibleLineupSection>
       )}
     </div>
   );
 }
 
-/* ── Section Wrapper ────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════
+   Section Wrapper
+   ═══════════════════════════════════════════════════════════════════ */
 
 function LineupSection({
   title,
   subtitle,
   capTotal,
   icon,
-  defaultCollapsed = false,
+  ufaCount = 0,
+  rfaCount = 0,
   children,
 }: {
   title: string;
   subtitle: string;
   capTotal: number;
   icon: string;
-  defaultCollapsed?: boolean;
+  ufaCount?: number;
+  rfaCount?: number;
   children: React.ReactNode;
 }) {
   return (
@@ -279,7 +293,7 @@ function LineupSection({
       {/* Section Header */}
       <div className="px-4 md:px-5 py-3 bg-gradient-to-r from-citrus-sage/25 via-citrus-sage/15 to-citrus-sage/25 border-b-2 border-citrus-sage/40 flex items-center gap-3">
         <span className="text-xl">{icon}</span>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <h3 className="font-varsity text-base md:text-lg text-citrus-forest tracking-tight">
             {title}
           </h3>
@@ -287,7 +301,23 @@ function LineupSection({
             {subtitle}
           </span>
         </div>
-        <div className="text-right">
+
+        {/* UFA/RFA badges */}
+        <div className="hidden md:flex items-center gap-2">
+          {ufaCount > 0 && (
+            <Badge className="bg-red-100 text-red-700 text-[8px] h-5 px-2 font-varsity border border-red-200">
+              {ufaCount} UFA
+            </Badge>
+          )}
+          {rfaCount > 0 && (
+            <Badge className="bg-amber-100 text-amber-700 text-[8px] h-5 px-2 font-varsity border border-amber-200">
+              {rfaCount} RFA
+            </Badge>
+          )}
+        </div>
+
+        {/* Total cap */}
+        <div className="text-right flex-shrink-0">
           <div className="text-[8px] text-citrus-charcoal/50 uppercase font-display font-bold tracking-wider">
             Total Cap
           </div>
@@ -298,21 +328,117 @@ function LineupSection({
       </div>
 
       {/* Content */}
-      <div className="p-3 md:p-4 space-y-4">
+      <div className="p-3 md:p-5">
         {children}
       </div>
     </div>
   );
 }
 
-/* ── Empty Slot Placeholder ─────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════
+   Collapsible Section (for IR/Minor)
+   ═══════════════════════════════════════════════════════════════════ */
+
+function CollapsibleLineupSection({
+  title,
+  subtitle,
+  capTotal,
+  icon,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  capTotal: number;
+  icon: string;
+  children: React.ReactNode;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="bg-white/50 backdrop-blur-sm rounded-2xl border-2 border-citrus-charcoal/15 shadow-sm overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full px-4 md:px-5 py-3 bg-gradient-to-r from-citrus-charcoal/5 via-transparent to-citrus-charcoal/5 border-b border-citrus-charcoal/10 flex items-center gap-3 hover:from-citrus-sage/10 hover:to-citrus-sage/10 transition-colors"
+      >
+        <span className="text-lg">{icon}</span>
+        <div className="flex-1 min-w-0 text-left">
+          <h3 className="font-varsity text-base text-citrus-forest tracking-tight">
+            {title}
+          </h3>
+          <span className="text-[10px] text-citrus-charcoal/50 font-display">
+            {subtitle}
+          </span>
+        </div>
+        <div className="text-right flex-shrink-0 mr-2">
+          <div className="text-[8px] text-citrus-charcoal/40 uppercase font-display font-bold tracking-wider">
+            Total Cap
+          </div>
+          <div className="font-varsity text-sm text-citrus-charcoal/60">
+            {formatCap(capTotal)}
+          </div>
+        </div>
+        {expanded ? (
+          <ChevronUp className="w-5 h-5 text-citrus-charcoal/40 flex-shrink-0" />
+        ) : (
+          <ChevronDown className="w-5 h-5 text-citrus-charcoal/40 flex-shrink-0" />
+        )}
+      </button>
+
+      {expanded && (
+        <div className="p-3 md:p-4 animate-in fade-in slide-in-from-top-2 duration-200">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Extra Players Section (within a lineup section)
+   ═══════════════════════════════════════════════════════════════════ */
+
+function ExtraPlayersSection({
+  label,
+  players,
+  maxCapHit,
+}: {
+  label: string;
+  players: PlayerContract[];
+  maxCapHit: number;
+}) {
+  const totalCap = players.reduce((s, p) => s + p.capHit, 0);
+
+  return (
+    <div className="mt-4 pt-4 border-t border-dashed border-citrus-sage/20">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-[10px] font-varsity text-citrus-charcoal/40 uppercase tracking-wider">
+          {label}
+        </span>
+        <div className="flex-1 h-px bg-citrus-sage/15" />
+        <span className="text-[9px] font-varsity text-citrus-charcoal/30">
+          {formatCap(totalCap)}
+        </span>
+      </div>
+      <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+        {players.map((p, i) => (
+          <CapPlayerCard key={p.name + i} player={p} maxCapHit={maxCapHit} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Empty Slot Placeholder
+   ═══════════════════════════════════════════════════════════════════ */
 
 function EmptySlot({ position }: { position: string }) {
   return (
-    <div className="bg-citrus-cream/30 rounded-xl border-2 border-dashed border-citrus-sage/20 flex items-center justify-center py-6 md:py-8">
-      <span className="text-[10px] font-display text-citrus-charcoal/30 uppercase tracking-wider">
-        {position}
-      </span>
+    <div className="rounded-2xl border-2 border-dashed border-citrus-sage/20 bg-citrus-cream/20 flex flex-col items-center justify-center py-8 md:py-10">
+      <div className="w-8 h-8 rounded-full bg-citrus-sage/10 border border-dashed border-citrus-sage/30 flex items-center justify-center mb-1.5">
+        <span className="text-[10px] font-varsity text-citrus-sage/40">{position}</span>
+      </div>
+      <span className="text-[9px] font-display text-citrus-charcoal/25">Open Slot</span>
     </div>
   );
 }

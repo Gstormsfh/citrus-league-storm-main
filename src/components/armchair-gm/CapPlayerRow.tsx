@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { Shield, ChevronDown, ChevronUp, AlertCircle, Lock, FileText } from 'lucide-react';
+import { ChevronDown, ChevronUp, Lock, FileText } from 'lucide-react';
 import { PlayerContract, formatCap, formatCapFull } from '@/types/captracker';
+import PlayerAvatar from './PlayerAvatar';
 
 interface CapPlayerRowProps {
   player: PlayerContract;
@@ -13,12 +14,8 @@ interface CapPlayerRowProps {
 
 export default function CapPlayerRow({ player, rank, maxCapHit }: CapPlayerRowProps) {
   const [expanded, setExpanded] = useState(false);
-  const [imageError, setImageError] = useState(false);
 
   const capBarPercent = Math.min((player.capHit / maxCapHit) * 100, 100);
-
-  const headshotUrl = player.headshot
-    || `https://cms.nhl.bamgrid.com/images/headshots/current/168x168/${player.playerId}.jpg`;
 
   const statusColor = {
     UFA: 'bg-red-500/80 text-white',
@@ -60,22 +57,14 @@ export default function CapPlayerRow({ player, rank, maxCapHit }: CapPlayerRowPr
           {rank}
         </span>
 
-        {/* Headshot */}
-        <div className="w-8 h-8 md:w-10 md:h-10 rounded-full overflow-hidden bg-citrus-cream border-2 border-citrus-sage/30 flex-shrink-0">
-          {!imageError ? (
-            <img
-              src={headshotUrl}
-              alt={player.name}
-              className="w-full h-full object-cover"
-              onError={() => setImageError(true)}
-              loading="lazy"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <Shield className="w-4 h-4 text-citrus-sage/50" />
-            </div>
-          )}
-        </div>
+        {/* Player Avatar */}
+        <PlayerAvatar
+          name={player.name}
+          position={player.position}
+          jerseyNumber={player.jerseyNumber}
+          size="sm"
+          className="md:w-10 md:h-10"
+        />
 
         {/* Name + Position + Status Badges */}
         <div className="min-w-0 flex flex-col">

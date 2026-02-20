@@ -8,9 +8,10 @@ import {
 import { getTeamCapData } from '@/services/NHLCapService';
 import { Badge } from '@/components/ui/badge';
 import {
-  Calculator, ChevronDown, Loader2, Shield, Search,
+  Calculator, ChevronDown, Loader2, Search,
   TrendingDown, TrendingUp, AlertCircle, DollarSign,
 } from 'lucide-react';
+import PlayerAvatar from './PlayerAvatar';
 
 interface BuyoutYear {
   season: string;
@@ -391,18 +392,13 @@ export default function BuyoutCalculator() {
 }
 
 function PlayerHeadshot({ player, size = 'md' }: { player: PlayerContract; size?: 'md' | 'lg' }) {
-  const [err, setErr] = useState(false);
-  const url = player.headshot || `https://cms.nhl.bamgrid.com/images/headshots/current/168x168/${player.playerId}.jpg`;
-  const sizeClass = size === 'lg' ? 'w-14 h-14' : 'w-10 h-10';
-
   return (
-    <div className={cn(sizeClass, "rounded-full overflow-hidden bg-citrus-cream border-2 border-citrus-sage/30 flex-shrink-0")}>
-      {!err ? (
-        <img src={url} alt={player.name} className="w-full h-full object-cover" onError={() => setErr(true)} loading="lazy" />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center"><Shield className="w-5 h-5 text-citrus-sage/50" /></div>
-      )}
-    </div>
+    <PlayerAvatar
+      name={player.name}
+      position={player.position}
+      jerseyNumber={player.jerseyNumber}
+      size={size === 'lg' ? 'lg' : 'md'}
+    />
   );
 }
 

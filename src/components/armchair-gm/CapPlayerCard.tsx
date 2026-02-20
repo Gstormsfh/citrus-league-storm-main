@@ -1,9 +1,9 @@
-import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { Shield } from 'lucide-react';
+import { Lock, FileText } from 'lucide-react';
 import { PlayerContract, formatCap, formatCapFull } from '@/types/captracker';
+import PlayerAvatar from './PlayerAvatar';
 
 interface CapPlayerCardProps {
   player: PlayerContract;
@@ -11,90 +11,102 @@ interface CapPlayerCardProps {
 }
 
 const statusColor: Record<string, string> = {
-  UFA: 'bg-red-500/80 text-white',
-  RFA: 'bg-amber-500/80 text-white',
-  ELC: 'bg-blue-500/80 text-white',
-  Signed: 'bg-citrus-sage/80 text-citrus-forest',
-  '35+': 'bg-purple-500/80 text-white',
+  UFA: 'bg-red-500 text-white',
+  RFA: 'bg-amber-500 text-white',
+  ELC: 'bg-blue-500 text-white',
+  Signed: 'bg-citrus-sage text-citrus-forest',
+  '35+': 'bg-purple-500 text-white',
 };
 
-const clauseConfig: Record<string, { label: string; color: string }> = {
-  NMC: { label: 'NMC', color: 'bg-red-100 text-red-700 border-red-200' },
-  'M-NTC': { label: 'M-NTC', color: 'bg-amber-100 text-amber-700 border-amber-200' },
-  NTC: { label: 'NTC', color: 'bg-orange-100 text-orange-700 border-orange-200' },
+const clauseConfig: Record<string, { label: string; color: string; icon: boolean }> = {
+  NMC: { label: 'NMC', color: 'bg-red-500/90 text-white border-red-600', icon: true },
+  'M-NTC': { label: 'M-NTC', color: 'bg-amber-500/90 text-white border-amber-600', icon: false },
+  NTC: { label: 'NTC', color: 'bg-orange-500/90 text-white border-orange-600', icon: false },
 };
 
-const rosterStatusBadge: Record<string, string> = {
-  IR: 'bg-red-500 text-white',
-  LTIR: 'bg-red-700 text-white',
-  AHL: 'bg-slate-500 text-white',
-  Buyout: 'bg-gray-600 text-white',
-  Retained: 'bg-gray-500 text-white',
-  NHL: '',
+const rosterStatusConfig: Record<string, { color: string; pulse?: boolean }> = {
+  IR: { color: 'bg-red-500 text-white' },
+  LTIR: { color: 'bg-red-700 text-white', pulse: true },
+  AHL: { color: 'bg-slate-500 text-white' },
+  Buyout: { color: 'bg-gray-600 text-white' },
+  Retained: { color: 'bg-gray-500 text-white' },
 };
 
 export default function CapPlayerCard({ player, maxCapHit }: CapPlayerCardProps) {
-  const [imageError, setImageError] = useState(false);
-
   const capBarPercent = Math.min((player.capHit / maxCapHit) * 100, 100);
-
-  const headshotUrl = player.headshot
-    || `https://cms.nhl.bamgrid.com/images/headshots/current/168x168/${player.playerId}.jpg`;
+  const isNonNHL = player.rosterStatus !== 'NHL';
+  const rosterConfig = rosterStatusConfig[player.rosterStatus];
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div className="bg-white/70 backdrop-blur-sm rounded-xl border-2 border-citrus-sage/30 shadow-patch overflow-hidden transition-all hover:border-citrus-sage/60 hover:shadow-varsity cursor-default group">
-          {/* Top accent bar */}
-          <div className="h-1 bg-gradient-to-r from-citrus-sage via-[#7CB518] to-citrus-sage opacity-60" />
+        <div className={cn(
+          "relative rounded-2xl overflow-hidden transition-all duration-200 cursor-default group",
+          "border-2 shadow-patch",
+          isNonNHL
+            ? "bg-white/50 border-citrus-charcoal/15 opacity-80 hover:opacity-100"
+            : "bg-white/80 backdrop-blur-sm border-citrus-sage/40 hover:border-citrus-sage hover:shadow-varsity",
+        )}>
+          {/* ─── Top accent stripe ─── */}
+          <div className="h-[3px] bg-gradient-to-r from-citrus-sage via-[#7CB518] to-citrus-sage" />
 
-          {/* Header: headshot + name + position badge */}
-          <div className="relative px-2 pt-2 pb-1.5 bg-gradient-to-br from-citrus-sage/15 via-citrus-sage/5 to-transparent">
-            {/* Position badge */}
-            <Badge className="absolute top-1 right-1 bg-gradient-to-br from-citrus-sage to-[#7CB518] border-2 border-citrus-forest text-citrus-forest font-varsity shadow-sm text-[8px] tracking-wider font-black h-4 px-1.5">
+          {/* ─── Header: Avatar + Name + Position ─── */}
+          <div className="relative px-2.5 pt-2 pb-1.5 bg-gradient-to-br from-citrus-sage/20 via-citrus-sage/8 to-transparent">
+            {/* Corduroy texture overlay */}
+            <div className="absolute inset-0 opacity-[0.04]" style={{
+              backgroundImage: 'repeating-linear-gradient(90deg, transparent, transparent 1px, rgba(0,0,0,0.1) 1px, rgba(0,0,0,0.1) 2px)',
+            }} />
+
+            {/* Position badge - top right */}
+            <Badge className="absolute top-1.5 right-1.5 bg-gradient-to-br from-citrus-sage to-[#7CB518] border-2 border-citrus-forest/80 text-citrus-forest font-varsity shadow-patch text-[9px] tracking-wider font-black h-5 px-2 z-10">
               {player.position}
             </Badge>
 
-            {/* Roster status badge */}
-            {player.rosterStatus !== 'NHL' && (
-              <Badge className={cn("absolute top-1 left-1 text-[7px] h-3.5 px-1 font-bold", rosterStatusBadge[player.rosterStatus])}>
+            {/* Non-NHL status badge - top left */}
+            {isNonNHL && rosterConfig && (
+              <Badge className={cn(
+                "absolute top-1.5 left-1.5 text-[7px] h-4 px-1.5 font-varsity font-bold tracking-wider z-10 border",
+                rosterConfig.color,
+                rosterConfig.pulse && "animate-pulse",
+              )}>
                 {player.rosterStatus}
               </Badge>
             )}
 
-            <div className="flex items-center gap-2">
-              {/* Headshot */}
-              <div className="w-10 h-10 rounded-full overflow-hidden bg-citrus-cream border-2 border-citrus-sage/40 flex-shrink-0">
-                {!imageError ? (
-                  <img
-                    src={headshotUrl}
-                    alt={player.name}
-                    className="w-full h-full object-cover"
-                    onError={() => setImageError(true)}
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Shield className="w-5 h-5 text-citrus-sage/50" />
-                  </div>
-                )}
-              </div>
+            {/* Player info row */}
+            <div className="flex items-center gap-2.5 relative z-[1]">
+              <PlayerAvatar
+                name={player.name}
+                position={player.position}
+                jerseyNumber={player.jerseyNumber}
+                size="md"
+              />
 
-              {/* Name + Jersey */}
-              <div className="min-w-0 flex-1 pr-6">
-                <div className="font-display font-bold text-[10px] md:text-[11px] leading-tight text-citrus-forest truncate">
+              <div className="min-w-0 flex-1 pr-7">
+                <div className="font-display font-extrabold text-[11px] leading-tight text-citrus-forest truncate group-hover:text-[#7CB518] transition-colors">
                   {player.name}
                 </div>
-                <div className="flex items-center gap-1 mt-0.5">
-                  <span className="text-[8px] text-citrus-charcoal/50 font-display">
-                    #{player.jerseyNumber || '—'}
-                  </span>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  {player.jerseyNumber > 0 && (
+                    <span className="text-[9px] text-citrus-sage font-varsity font-bold">
+                      #{player.jerseyNumber}
+                    </span>
+                  )}
                   {player.age > 0 && (
                     <>
-                      <span className="text-[8px] text-citrus-charcoal/30">&middot;</span>
-                      <span className="text-[8px] text-citrus-charcoal/50 font-display">
+                      <span className="text-[7px] text-citrus-charcoal/20">|</span>
+                      <span className="text-[9px] text-citrus-charcoal/50 font-display font-semibold">
                         {player.age}yr
                       </span>
+                    </>
+                  )}
+                  {player.clause && (
+                    <>
+                      <span className="text-[7px] text-citrus-charcoal/20">|</span>
+                      <Badge className={cn("text-[6px] h-3.5 px-1 font-varsity font-bold border flex items-center gap-0.5", clauseConfig[player.clause].color)}>
+                        {clauseConfig[player.clause].icon && <Lock className="w-2 h-2" />}
+                        {clauseConfig[player.clause].label}
+                      </Badge>
                     </>
                   )}
                 </div>
@@ -102,79 +114,96 @@ export default function CapPlayerCard({ player, maxCapHit }: CapPlayerCardProps)
             </div>
           </div>
 
-          {/* Cap Hit + Status */}
-          <div className="px-2 py-1.5 border-t border-citrus-sage/20">
-            {/* Cap hit */}
-            <div className="flex items-center justify-between gap-1">
-              <span className="font-varsity text-xs md:text-sm text-citrus-forest leading-none">
+          {/* ─── Cap Hit Section ─── */}
+          <div className="px-2.5 py-2 border-t-2 border-citrus-sage/20 bg-gradient-to-br from-white/60 to-citrus-cream/30">
+            {/* Cap hit + Status badge */}
+            <div className="flex items-baseline justify-between gap-1">
+              <span className="font-varsity text-base text-citrus-forest leading-none tracking-tight">
                 {formatCap(player.capHit)}
               </span>
-              <Badge className={cn("text-[7px] h-4 px-1.5 font-varsity font-bold tracking-wide", statusColor[player.expiryStatus])}>
+              <Badge className={cn("text-[7px] h-4 px-1.5 font-varsity font-bold tracking-wider border-0 shadow-sm", statusColor[player.expiryStatus])}>
                 {player.expiryStatus}
               </Badge>
             </div>
 
             {/* Cap bar */}
-            <div className="h-1.5 mt-1 bg-citrus-cream rounded-full overflow-hidden">
+            <div className="relative h-2 mt-1.5 bg-citrus-cream/60 rounded-full overflow-hidden border border-citrus-sage/20 shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-citrus-sage to-[#7CB518] transition-all duration-500"
+                className={cn(
+                  "absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out",
+                  capBarPercent > 80
+                    ? "bg-gradient-to-r from-citrus-orange via-amber-400 to-citrus-orange"
+                    : "bg-gradient-to-r from-citrus-sage via-[#7CB518] to-citrus-sage",
+                )}
                 style={{ width: `${capBarPercent}%` }}
-              />
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent" />
+              </div>
             </div>
 
-            {/* Contract term + clause */}
-            <div className="flex items-center justify-between mt-1">
-              <span className="text-[8px] text-citrus-charcoal/50 font-display">
-                {player.yearsRemaining}yr &middot; {player.expiryYear}
+            {/* Term + Expiry */}
+            <div className="flex items-center justify-between mt-1.5">
+              <span className="text-[9px] text-citrus-charcoal/50 font-display font-semibold">
+                {player.yearsRemaining}yr remaining
               </span>
-              {player.clause && (
-                <Badge className={cn("text-[6px] h-3 px-1 border", clauseConfig[player.clause].color)}>
-                  {clauseConfig[player.clause].label}
-                </Badge>
-              )}
+              <span className="text-[9px] text-citrus-charcoal/40 font-display">
+                exp. {player.expiryYear}
+              </span>
             </div>
           </div>
         </div>
       </TooltipTrigger>
-      <TooltipContent className="bg-citrus-forest text-citrus-cream p-3 max-w-xs rounded-xl border-2 border-citrus-sage/50 z-[9999]">
-        <h4 className="font-varsity text-sm border-b border-citrus-sage/30 pb-1 mb-2">
-          {player.name}
-        </h4>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-          <div className="flex justify-between">
-            <span className="font-display text-citrus-sage/80">Cap Hit:</span>
-            <span className="font-varsity">{formatCapFull(player.capHit)}</span>
+
+      {/* ─── Tooltip: Full contract details ─── */}
+      <TooltipContent
+        side="top"
+        className="bg-citrus-forest/95 backdrop-blur-md text-citrus-cream p-4 max-w-[280px] rounded-2xl border-2 border-citrus-sage/40 shadow-varsity z-[9999]"
+      >
+        {/* Tooltip header */}
+        <div className="flex items-center gap-2 border-b border-citrus-sage/30 pb-2 mb-2.5">
+          <PlayerAvatar name={player.name} position={player.position} jerseyNumber={player.jerseyNumber} size="sm" />
+          <div className="flex-1 min-w-0">
+            <h4 className="font-varsity text-sm leading-tight truncate">{player.name}</h4>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span className="text-[9px] text-citrus-sage/80 font-display">{player.position}</span>
+              {player.age > 0 && <span className="text-[9px] text-citrus-sage/60 font-display">Age {player.age}</span>}
+            </div>
           </div>
-          <div className="flex justify-between">
-            <span className="font-display text-citrus-sage/80">Base Salary:</span>
-            <span className="font-varsity">{formatCapFull(player.baseSalary)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="font-display text-citrus-sage/80">Signing Bonus:</span>
-            <span className="font-varsity">{formatCapFull(player.signingBonus)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="font-display text-citrus-sage/80">AAV:</span>
-            <span className="font-varsity">{formatCapFull(player.aav)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="font-display text-citrus-sage/80">Contract:</span>
-            <span className="font-varsity">{player.contractYears}yr total</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="font-display text-citrus-sage/80">Expires:</span>
-            <span className="font-varsity">{player.expiryYear} ({player.expiryStatus})</span>
-          </div>
+        </div>
+
+        {/* Contract grid */}
+        <div className="space-y-1.5">
+          <TooltipRow label="Cap Hit" value={formatCapFull(player.capHit)} highlight />
+          <TooltipRow label="AAV" value={formatCapFull(player.aav)} />
+          <TooltipRow label="Base Salary" value={formatCapFull(player.baseSalary)} />
+          {player.signingBonus > 0 && (
+            <TooltipRow label="Signing Bonus" value={formatCapFull(player.signingBonus)} />
+          )}
+          <div className="border-t border-citrus-sage/20 my-1.5" />
+          <TooltipRow label="Contract" value={`${player.contractYears}yr total`} />
+          <TooltipRow label="Remaining" value={`${player.yearsRemaining}yr (exp. ${player.expiryYear})`} />
+          <TooltipRow label="Status" value={player.expiryStatus === 'UFA' ? 'Unrestricted FA' : player.expiryStatus === 'RFA' ? 'Restricted FA' : player.expiryStatus} />
           {player.clause && (
-            <div className="flex justify-between col-span-2">
-              <span className="font-display text-citrus-sage/80">Clause:</span>
-              <span className="font-varsity">
-                {player.clause === 'NMC' ? 'No Movement' : player.clause === 'M-NTC' ? 'Mod. No-Trade' : 'No-Trade'}
+            <div className="flex items-center gap-1.5 pt-1">
+              <FileText className="w-3 h-3 text-citrus-sage/60" />
+              <span className="text-[10px] font-display text-citrus-sage/80">
+                {player.clause === 'NMC' ? 'No-Movement Clause' : player.clause === 'M-NTC' ? 'Modified No-Trade' : 'No-Trade Clause'}
               </span>
             </div>
           )}
         </div>
       </TooltipContent>
     </Tooltip>
+  );
+}
+
+function TooltipRow({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <div className="flex justify-between items-baseline gap-3">
+      <span className="text-[10px] font-display text-citrus-sage/70">{label}</span>
+      <span className={cn("font-varsity text-[11px]", highlight ? "text-citrus-cream" : "text-citrus-sage/90")}>
+        {value}
+      </span>
+    </div>
   );
 }
