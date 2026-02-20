@@ -5,3 +5,4 @@ export { default as CapPlayerRow } from './CapPlayerRow';
 export { default as TradeSimulator } from './TradeSimulator';
 export { default as BuyoutCalculator } from './BuyoutCalculator';
 export { default as CapProjection } from './CapProjection';
+export { default as SigningSimulator } from './SigningSimulator';

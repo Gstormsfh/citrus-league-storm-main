@@ -7,11 +7,36 @@ import {
 } from '@/types/captracker';
 import { getTeamCapData } from '@/services/NHLCapService';
 import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
-  ArrowLeftRight, Search, Shield, AlertTriangle, Lock,
+  ArrowLeftRight, Search, Shield, AlertTriangle,
   ChevronDown, Loader2, RotateCcw, Check, X, SlidersHorizontal,
+  Save, FolderOpen, Trash2, Clock,
 } from 'lucide-react';
+
+interface SavedTrade {
+  id: string;
+  name: string;
+  timestamp: number;
+  teamA: string;
+  teamB: string;
+  playerIdsA: number[];
+  playerIdsB: number[];
+  retainA: number;
+  retainB: number;
+}
+
+const STORAGE_KEY = 'citrus-armchair-gm-trades';
+
+function loadSavedTrades(): SavedTrade[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveTrades(trades: SavedTrade[]) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(trades.slice(0, 10)));
+}
 
 function getAllPlayers(data: TeamCapData | undefined): PlayerContract[] {
   if (!data) return [];
@@ -34,6 +59,8 @@ export default function TradeSimulator() {
   const [retainB, setRetainB] = useState(0);
   const [showPickerA, setShowPickerA] = useState(false);
   const [showPickerB, setShowPickerB] = useState(false);
+  const [savedTrades, setSavedTrades] = useState<SavedTrade[]>(loadSavedTrades);
+  const [showSaved, setShowSaved] = useState(false);
 
   const { data: dataA, isLoading: loadingA } = useQuery<TeamCapData>({
     queryKey: ['teamCapData', teamA],
@@ -149,10 +176,101 @@ export default function TradeSimulator() {
     );
   };
 
+  const handleSaveTrade = () => {
+    if (!teamA || !teamB || !hasTrade) return;
+    const teamAInfo = NHL_TEAMS.find(t => t.abbrev === teamA);
+    const teamBInfo = NHL_TEAMS.find(t => t.abbrev === teamB);
+    const names = [...pickedA.map(p => p.name.split(' ').pop()), ...pickedB.map(p => p.name.split(' ').pop())];
+    const label = `${teamAInfo?.name || teamA} / ${teamBInfo?.name || teamB}: ${names.slice(0, 3).join(', ')}${names.length > 3 ? '...' : ''}`;
+
+    const trade: SavedTrade = {
+      id: `trade-${Date.now()}`,
+      name: label,
+      timestamp: Date.now(),
+      teamA,
+      teamB,
+      playerIdsA: [...selectedA],
+      playerIdsB: [...selectedB],
+      retainA,
+      retainB,
+    };
+    const updated = [trade, ...savedTrades].slice(0, 10);
+    setSavedTrades(updated);
+    saveTrades(updated);
+  };
+
+  const handleLoadTrade = (trade: SavedTrade) => {
+    setTeamA(trade.teamA);
+    setTeamB(trade.teamB);
+    setSelectedA(new Set(trade.playerIdsA));
+    setSelectedB(new Set(trade.playerIdsB));
+    setRetainA(trade.retainA);
+    setRetainB(trade.retainB);
+    setSearchA('');
+    setSearchB('');
+    setShowSaved(false);
+  };
+
+  const handleDeleteTrade = (id: string) => {
+    const updated = savedTrades.filter(t => t.id !== id);
+    setSavedTrades(updated);
+    saveTrades(updated);
+  };
+
   return (
     <div className="space-y-6">
+      {/* Toolbar: Save/Load */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {hasTrade && (
+          <button
+            onClick={handleSaveTrade}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 border-citrus-sage/30 bg-white/60 hover:bg-citrus-sage/10 transition-colors text-xs font-display font-bold text-citrus-forest"
+          >
+            <Save className="w-3.5 h-3.5 text-citrus-sage" />
+            Save Scenario
+          </button>
+        )}
+        {savedTrades.length > 0 && (
+          <button
+            onClick={() => setShowSaved(!showSaved)}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 transition-colors text-xs font-display font-bold",
+              showSaved
+                ? "border-citrus-sage bg-citrus-sage/20 text-citrus-forest"
+                : "border-citrus-sage/30 bg-white/60 hover:bg-citrus-sage/10 text-citrus-forest"
+            )}
+          >
+            <FolderOpen className="w-3.5 h-3.5 text-citrus-sage" />
+            Saved ({savedTrades.length})
+          </button>
+        )}
+      </div>
+
+      {/* Saved Trades Panel */}
+      {showSaved && savedTrades.length > 0 && (
+        <div className="bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="px-4 py-2.5 bg-gradient-to-r from-citrus-sage/15 to-citrus-sage/5 border-b border-citrus-sage/20">
+            <span className="text-[10px] text-citrus-charcoal/60 uppercase font-display font-bold tracking-wider">Saved Trade Scenarios</span>
+          </div>
+          {savedTrades.map(trade => (
+            <div key={trade.id} className="flex items-center gap-2 px-4 py-2.5 border-b border-citrus-sage/10 hover:bg-citrus-sage/5 transition-colors">
+              <Clock className="w-3.5 h-3.5 text-citrus-charcoal/40 flex-shrink-0" />
+              <button onClick={() => handleLoadTrade(trade)} className="flex-1 text-left min-w-0">
+                <div className="font-display font-bold text-[11px] text-citrus-forest truncate">{trade.name}</div>
+                <div className="text-[9px] text-citrus-charcoal/40 font-display">
+                  {new Date(trade.timestamp).toLocaleDateString()} {new Date(trade.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
+              </button>
+              <button onClick={() => handleDeleteTrade(trade.id)} className="p-1 rounded-lg hover:bg-red-100 transition-colors">
+                <Trash2 className="w-3 h-3 text-red-400" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Instructions */}
-      {!teamA && !teamB && (
+      {!teamA && !teamB && !showSaved && (
         <div className="text-center py-8 bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-dashed border-citrus-sage/40">
           <ArrowLeftRight className="w-10 h-10 text-citrus-sage/50 mx-auto mb-3" />
           <h3 className="font-varsity text-lg text-citrus-forest mb-1">Trade Simulator</h3>
