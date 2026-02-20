@@ -512,11 +512,11 @@ export const MatchupService = {
     leagueId: string,
     userId: string,
     weekNumber: number
-  ): Promise<{ matchup: Matchup | null; error: any }> {
+  ): Promise<{ matchup: Matchup | null; error: PostgrestError | Error | null }> {
     try {
       // First, get user's team
-      let userTeam: any = null;
-      let teamError: any = null;
+      let userTeam: { id: string } | null = null;
+      let teamError: PostgrestError | Error | null = null;
       try {
         const result = await withTimeout(
           supabase.from('teams').select('id').eq('league_id', leagueId).eq('owner_id', userId).maybeSingle(),
@@ -525,9 +525,9 @@ export const MatchupService = {
         );
         userTeam = result.data;
         teamError = result.error;
-      } catch (timeoutError: any) {
+      } catch (timeoutError: unknown) {
         console.error('[MatchupService.getUserMatchup] User team query timeout:', timeoutError);
-        teamError = timeoutError;
+        teamError = timeoutError instanceof Error ? timeoutError : new Error(String(timeoutError));
       }
 
       if (teamError) throw teamError;
@@ -546,26 +546,26 @@ export const MatchupService = {
         .eq('week_number', weekNumber)
         .or(`team1_id.eq.${userTeam.id},team2_id.eq.${userTeam.id}`)
         .limit(1);
-      
-      let matchups: any = null;
-      let error: any = null;
+
+      let matchups: Record<string, unknown>[] | null = null;
+      let error: PostgrestError | Error | null = null;
       try {
         const result = await withTimeout(query, 5000, 'getUserMatchup query timeout');
         matchups = result.data;
         error = result.error;
-      } catch (timeoutError: any) {
+      } catch (timeoutError: unknown) {
         console.error('[MatchupService.getUserMatchup] Matchup query timeout:', timeoutError);
-        error = timeoutError;
+        error = timeoutError instanceof Error ? timeoutError : new Error(String(timeoutError));
       }
-      
+
       if (error) {
         console.error('[MatchupService.getUserMatchup] Database query error:', error);
         throw error;
       }
-      
+
       // Additional verification: Check if week_number matches what we queried for
       if (matchups && matchups.length > 0) {
-        const firstMatchup = matchups[0];
+        const firstMatchup = matchups[0] as Record<string, unknown>;
         if (firstMatchup.week_number !== weekNumber) {
           console.error('[MatchupService.getUserMatchup] WARNING: Week number mismatch!', {
             requested: weekNumber,
@@ -574,12 +574,12 @@ export const MatchupService = {
           });
         }
       }
-      
+
       const data = matchups && matchups.length > 0 ? matchups[0] : null;
-      
-      return { matchup: data || null, error: null };
-    } catch (error) {
-      return { matchup: null, error };
+
+      return { matchup: (data as Matchup) || null, error: null };
+    } catch (error: unknown) {
+      return { matchup: null, error: error instanceof Error ? error : new Error(String(error)) };
     }
   },
 
@@ -591,7 +591,7 @@ export const MatchupService = {
     matchupId: string,
     userId: string,
     timezone: string = 'America/Denver'
-  ): Promise<{ data: MatchupDataResponse | null; error: any }> {
+  ): Promise<{ data: MatchupDataResponse | null; error: PostgrestError | Error | null }> {
     try {
       // Get the matchup
       const { data: matchup, error: matchupError } = await supabase
@@ -702,7 +702,7 @@ export const MatchupService = {
         );
 
         if (!viewingError && viewingDailyScores) {
-          const sorted = (viewingDailyScores as any[]).sort((a, b) =>
+          const sorted = (viewingDailyScores as Array<{ roster_date: string; daily_score: string | number }>).sort((a, b) =>
             new Date(a.roster_date).getTime() - new Date(b.roster_date).getTime()
           );
           viewingDailyPoints = sorted.map(d => parseFloat(d.daily_score) || 0);
@@ -726,7 +726,7 @@ export const MatchupService = {
           );
 
           if (!oppError && oppDailyScores) {
-            const sorted = (oppDailyScores as any[]).sort((a, b) =>
+            const sorted = (oppDailyScores as Array<{ roster_date: string; daily_score: string | number }>).sort((a, b) =>
               new Date(a.roster_date).getTime() - new Date(b.roster_date).getTime()
             );
             opponentDailyPoints = sorted.map(d => parseFloat(d.daily_score) || 0);
@@ -770,19 +770,18 @@ export const MatchupService = {
       };
 
       return { data: response, error: null };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('[MatchupService.getMatchupDataById] Error loading matchup:', {
         matchupId,
         userId,
-        error: error?.message || error,
+        error: errorMessage,
         errorDetails: error
       });
-      
-      // Provide more detailed error message
-      const errorMessage = error?.message || 'Unknown error loading matchup';
-      return { 
-        data: null, 
-        error: new Error(`Failed to load matchup: ${errorMessage}`) 
+
+      return {
+        data: null,
+        error: new Error(`Failed to load matchup: ${errorMessage}`)
       };
     }
   },
@@ -1021,7 +1020,7 @@ export const MatchupService = {
 
           if (!oppError && oppDailyScores) {
             // Sort by date and extract scores
-            const sorted = (oppDailyScores as any[]).sort((a, b) => 
+            const sorted = (oppDailyScores as Array<{ roster_date: string; daily_score: string | number }>).sort((a, b) => 
               new Date(a.roster_date).getTime() - new Date(b.roster_date).getTime()
             );
             opponentDailyPoints = sorted.map(d => parseFloat(d.daily_score) || 0);

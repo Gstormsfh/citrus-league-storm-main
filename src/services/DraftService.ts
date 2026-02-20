@@ -128,7 +128,7 @@ export const DraftService = {
       const newSessionId = crypto.randomUUID();
       logger.log('No existing session found, creating new session:', newSessionId);
       return { sessionId: newSessionId, error: null };
-    } catch (error) {
+    } catch (error: unknown) {
       // If error occurs, create new session
       const newSessionId = crypto.randomUUID();
       logger.log('Error getting session, creating new one:', newSessionId);
@@ -158,7 +158,7 @@ export const DraftService = {
 
       if (error) throw error;
       return { picks: data || [], error: null };
-    } catch (error) {
+    } catch (error: unknown) {
       return { picks: [], error };
     }
   },
@@ -188,7 +188,7 @@ export const DraftService = {
 
       if (error && error.code !== 'PGRST116') throw error;
       return { order: data || null, error: null };
-    } catch (error) {
+    } catch (error: unknown) {
       return { order: null, error };
     }
   },
@@ -282,7 +282,7 @@ export const DraftService = {
 
       if (error) throw error;
       return { error: null, sessionId };
-    } catch (error) {
+    } catch (error: unknown) {
       return { error, sessionId: undefined };
     }
   },
@@ -557,11 +557,11 @@ export const DraftService = {
               logger.log('Initializing rosters for all teams from roster_assignments...');
               await this.initializeRostersForAllTeams(leagueId);
               logger.log('Roster initialization complete');
-            } catch (rosterError) {
+            } catch (rosterError: unknown) {
               logger.error('Error initializing rosters:', rosterError);
               // Don't fail the draft completion if roster init fails
             }
-          } catch (syncError) {
+          } catch (syncError: unknown) {
             logger.error('Error syncing roster_assignments:', syncError);
           }
           
@@ -603,7 +603,7 @@ export const DraftService = {
             } else {
               logger.warn('Could not load league data, skipping matchup generation');
             }
-          } catch (matchupGenError) {
+          } catch (matchupGenError: unknown) {
             logger.error('Error generating matchups after draft completion:', matchupGenError);
             // Don't fail the draft completion if matchup generation fails
           }
@@ -611,7 +611,7 @@ export const DraftService = {
       }
 
       return { pick: data, error: null, isComplete };
-    } catch (error) {
+    } catch (error: unknown) {
       return { pick: null, error };
     }
   },
@@ -671,7 +671,7 @@ export const DraftService = {
         },
         error: null,
       };
-    } catch (error) {
+    } catch (error: unknown) {
       return { state: null, error };
     }
   },
@@ -746,7 +746,7 @@ export const DraftService = {
       // Return new session ID for next draft
       const newSessionId = crypto.randomUUID();
       return { error: null, newSessionId };
-    } catch (error) {
+    } catch (error: unknown) {
       return { error };
     }
   },
@@ -786,7 +786,7 @@ export const DraftService = {
 
       logger.log('Undo last pick:', lastPick.player_id, 'from team:', lastPick.team_id);
       return { undone: lastPick, error: null };
-    } catch (error) {
+    } catch (error: unknown) {
       return { undone: null, error };
     }
   },
@@ -849,7 +849,7 @@ export const DraftService = {
       }
 
       return { error: null };
-    } catch (error) {
+    } catch (error: unknown) {
       return { error };
     }
   },
@@ -932,7 +932,7 @@ export const DraftService = {
           leagues: leaguesCount || 0
         }
       };
-    } catch (error) {
+    } catch (error: unknown) {
       return { error };
     }
   },
@@ -1050,7 +1050,7 @@ export const DraftService = {
       logger.log(`Roster initialization complete: ${successful} successful, ${failed} failed`);
 
       return { error: null };
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Error initializing rosters for all teams:', error);
       return { error };
     }
@@ -1123,7 +1123,7 @@ export const DraftService = {
 
       logger.log('Draft snapshot saved successfully:', data.id);
       return { snapshotId: data.id, error: null };
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Error saving draft snapshot:', error);
       return { snapshotId: null, error };
     }
@@ -1149,7 +1149,7 @@ export const DraftService = {
       }
 
       return { snapshot: data, error: null };
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Error getting draft snapshot:', error);
       return { snapshot: null, error };
     }

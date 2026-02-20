@@ -259,7 +259,7 @@ export const LeagueService = {
       waiver_type?: 'rolling' | 'faab' | 'reverse_standings';
       allow_trades_during_games?: boolean;
     }
-  ): Promise<{ league: League | null; team: Team | null; error: any }> {
+  ): Promise<{ league: League | null; team: Team | null; error: PostgrestError | Error | null }> {
     try {
       // Create the league with waiver settings
       const { data: league, error: leagueError } = await supabase
@@ -320,7 +320,7 @@ export const LeagueService = {
    * Get a league by ID
    * REQUIRES: User must be a member of the league (commissioner or team owner)
    */
-  async getLeague(leagueId: string, userId: string): Promise<{ league: League | null; error: any }> {
+  async getLeague(leagueId: string, userId: string): Promise<{ league: League | null; error: unknown }> {
     try {
       // CRITICAL: Validate membership BEFORE querying (application-level security)
       await LeagueMembershipService.requireMembership(leagueId, userId);
@@ -351,7 +351,7 @@ async joinLeagueByCode(
   joinCode: string,
   userId: string,
   teamName?: string
-): Promise<{ league: League | null; team: Team | null; error: any }> {
+): Promise<{ league: League | null; team: Team | null; error: PostgrestError | Error | null }> {
   try {
     // Validate inputs
     if (!joinCode || !joinCode.trim()) {
@@ -422,7 +422,7 @@ async joinLeagueByCode(
       waiver_type?: 'rolling' | 'faab' | 'reverse_standings';
       allow_trades_during_games?: boolean;
     }
-  ): Promise<{ success: boolean; error: any }> {
+  ): Promise<{ success: boolean; error: unknown }> {
     try {
       // CRITICAL: Verify user is commissioner (application-level security)
       await LeagueMembershipService.requireCommissioner(leagueId, userId);
@@ -434,10 +434,10 @@ async joinLeagueByCode(
         .eq('id', leagueId);
 
       if (error) throw error;
-      
+
       // Create notification for all league members
       await this.notifyLeagueMembers(leagueId, 'Commissioner changed waiver settings', 'Waiver Settings Updated');
-      
+
       return { success: true, error: null };
     } catch (error) {
       console.error('Error updating waiver settings:', error);
@@ -455,7 +455,7 @@ async joinLeagueByCode(
       skater?: Record<string, number>;
       goalie?: Record<string, number>;
     }
-  ): Promise<{ success: boolean; error: any }> {
+  ): Promise<{ success: boolean; error: unknown }> {
     try {
       // CRITICAL: Verify user is commissioner (application-level security)
       await LeagueMembershipService.requireCommissioner(leagueId, userId);
@@ -488,7 +488,7 @@ async joinLeagueByCode(
       draft_rounds?: number;
       pickTimeLimit?: number;
     }
-  ): Promise<{ success: boolean; error: any }> {
+  ): Promise<{ success: boolean; error: unknown }> {
     try {
       // CRITICAL: Verify user is commissioner (application-level security)
       await LeagueMembershipService.requireCommissioner(leagueId, userId);
@@ -590,7 +590,7 @@ async joinLeagueByCode(
   /**
    * Get all leagues the user belongs to (as commissioner or team owner)
    */
-  async getUserLeagues(userId: string): Promise<{ leagues: League[]; error: any }> {
+  async getUserLeagues(userId: string): Promise<{ leagues: League[]; error: unknown }> {
     try {
       // Get leagues where user is commissioner (exclude demo league)
       const { data: commissionerLeagues, error: commError } = await supabase
@@ -657,7 +657,7 @@ async joinLeagueByCode(
    * Get all teams in a league
    * Uses RPC function to bypass RLS and return all teams
    */
-  async getLeagueTeams(leagueId: string): Promise<{ teams: Team[]; error: any }> {
+  async getLeagueTeams(leagueId: string): Promise<{ teams: Team[]; error: unknown }> {
     try {
       logger.debug('Fetching teams for league:', leagueId);
       

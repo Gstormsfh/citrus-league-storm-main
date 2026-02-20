@@ -233,7 +233,7 @@ export const ScheduleService = {
       return { games: data || [], error: null };
     } catch (error) {
       console.error('Error fetching games for team:', error);
-      return { games: [], error };
+      return { games: [], error: error as PostgrestError };
     }
   },
 
@@ -265,7 +265,7 @@ export const ScheduleService = {
       return { game: data || null, error: null };
     } catch (error) {
       console.error('Error fetching next game:', error);
-      return { game: null, error };
+      return { game: null, error: error as PostgrestError };
     }
   },
 
