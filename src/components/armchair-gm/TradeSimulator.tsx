@@ -8,10 +8,11 @@ import {
 import { getTeamCapData } from '@/services/NHLCapService';
 import { Badge } from '@/components/ui/badge';
 import {
-  ArrowLeftRight, Search, Shield, AlertTriangle,
+  ArrowLeftRight, Search, AlertTriangle,
   ChevronDown, Loader2, RotateCcw, Check, X, SlidersHorizontal,
   Save, FolderOpen, Trash2, Clock,
 } from 'lucide-react';
+import PlayerAvatar from './PlayerAvatar';
 
 interface SavedTrade {
   id: string;
@@ -568,8 +569,6 @@ function TradePlayerRow({
   onToggle: () => void;
   retentionPct: number;
 }) {
-  const [imgErr, setImgErr] = useState(false);
-  const headshotUrl = player.headshot || `https://cms.nhl.bamgrid.com/images/headshots/current/168x168/${player.playerId}.jpg`;
   const effectiveCap = player.capHit * (1 - retentionPct / 100);
 
   return (
@@ -590,14 +589,8 @@ function TradePlayerRow({
         {isSelected && <Check className="w-3 h-3 text-white" />}
       </div>
 
-      {/* Headshot */}
-      <div className="w-7 h-7 rounded-full overflow-hidden bg-citrus-cream border border-citrus-sage/30 flex-shrink-0">
-        {!imgErr ? (
-          <img src={headshotUrl} alt={player.name} className="w-full h-full object-cover" onError={() => setImgErr(true)} loading="lazy" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center"><Shield className="w-3 h-3 text-citrus-sage/50" /></div>
-        )}
-      </div>
+      {/* Player Avatar */}
+      <PlayerAvatar name={player.name} position={player.position} jerseyNumber={player.jerseyNumber} size="xs" />
 
       {/* Name + Position */}
       <div className="flex-1 min-w-0">

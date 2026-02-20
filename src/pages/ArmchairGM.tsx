@@ -4,7 +4,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import TeamSelector from '@/components/armchair-gm/TeamSelector';
 import CapSummaryBar from '@/components/armchair-gm/CapSummaryBar';
-import TeamCapBreakdown from '@/components/armchair-gm/TeamCapBreakdown';
+import RosterLineupView from '@/components/armchair-gm/RosterLineupView';
 import TradeSimulator from '@/components/armchair-gm/TradeSimulator';
 import BuyoutCalculator from '@/components/armchair-gm/BuyoutCalculator';
 import CapProjection from '@/components/armchair-gm/CapProjection';
@@ -39,7 +39,7 @@ const ArmchairGM = () => {
   } = useQuery<TeamCapData>({
     queryKey: ['teamCapData', selectedTeam],
     queryFn: () => getTeamCapData(selectedTeam!),
-    enabled: !!selectedTeam && activeTab === 'tracker',
+    enabled: !!selectedTeam,
     staleTime: 10 * 60 * 1000,
   });
 
@@ -58,7 +58,7 @@ const ArmchairGM = () => {
 
       <main className="flex-1 w-full pt-[var(--header-height)] pb-24 lg:pb-12">
         {/* Hero Header */}
-        <div className="w-full bg-gradient-to-r from-citrus-forest via-citrus-forest/95 to-citrus-forest relative overflow-hidden">
+        <div className="w-full bg-gradient-to-r from-citrus-forest via-citrus-forest/95 to-citrus-forest relative">
           <div className="absolute inset-0 opacity-5">
             <div className="absolute inset-0" style={{
               backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.1) 20px, rgba(255,255,255,0.1) 40px)',
@@ -91,13 +91,13 @@ const ArmchairGM = () => {
 
           {/* Tab Bar */}
           <div className="max-w-7xl mx-auto px-4 md:px-6">
-            <div className="flex gap-1 -mb-[2px]">
+            <div className="flex gap-1 -mb-[2px] overflow-x-auto scrollbar-hide pb-[2px]">
               {TABS.map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={cn(
-                    "flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-sm font-display font-bold transition-all border-2 border-b-0",
+                    "flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-sm font-display font-bold transition-all border-2 border-b-0 flex-shrink-0 whitespace-nowrap",
                     activeTab === tab.id
                       ? "bg-[#E8EED9] text-citrus-forest border-citrus-sage/30 shadow-sm"
                       : "bg-citrus-forest/50 text-citrus-sage/70 border-transparent hover:bg-citrus-forest/30 hover:text-citrus-cream"
@@ -166,35 +166,7 @@ const ArmchairGM = () => {
                     <div className="space-y-6 animate-in fade-in duration-300">
                       <CapSummaryBar data={teamCapData} />
 
-                      <TeamCapBreakdown
-                        title="Forwards"
-                        players={teamCapData.forwards}
-                        positionIcon="🏒"
-                        defaultExpanded
-                      />
-
-                      <TeamCapBreakdown
-                        title="Defense"
-                        players={teamCapData.defense}
-                        positionIcon="🛡️"
-                        defaultExpanded
-                      />
-
-                      <TeamCapBreakdown
-                        title="Goalies"
-                        players={teamCapData.goalies}
-                        positionIcon="🥅"
-                        defaultExpanded
-                      />
-
-                      {teamCapData.minorLeague && teamCapData.minorLeague.length > 0 && (
-                        <TeamCapBreakdown
-                          title="Minor League / IR / Other"
-                          players={teamCapData.minorLeague}
-                          positionIcon="📋"
-                          defaultExpanded={false}
-                        />
-                      )}
+                      <RosterLineupView data={teamCapData} />
 
                       <div className="text-center py-4">
                         <p className="text-[10px] text-citrus-charcoal/40 font-display">
