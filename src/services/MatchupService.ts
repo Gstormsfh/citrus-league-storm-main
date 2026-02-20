@@ -3057,7 +3057,7 @@ export const MatchupService = {
         shutouts?: number;
         goals_against?: number;
       }>();
-      (data || []).forEach((row: Record<string, unknown>) => {
+      ((data || []) as Array<{ player_id: number; goals?: number; assists?: number; shots_on_goal?: number; blocks?: number; ppp?: number; shp?: number; hits?: number; pim?: number; plus_minus?: number; x_goals?: string | number; wins?: number; saves?: number; shutouts?: number; goals_against?: number }>).forEach((row) => {
         const goalieStats = {
           wins: Number(row.wins) || 0,
           saves: Number(row.saves) || 0,
@@ -3105,7 +3105,7 @@ export const MatchupService = {
           hits: row.hits || 0,
           pim: row.pim || 0,
           plus_minus: row.plus_minus || 0,
-          xGoals: parseFloat(row.x_goals || 0),
+          xGoals: parseFloat(String(row.x_goals || 0)),
           // Extract goalie stats from RPC response (validated to be weekly, not season)
           wins: goalieStats.wins,
           saves: goalieStats.saves,
@@ -3144,7 +3144,7 @@ export const MatchupService = {
       }
       
       return statsMap;
-    } catch (error) {
+    } catch (error: unknown) {
       console.warn('[MatchupService] fetchMatchupStatsForPlayers timeout or error:', error);
       return new Map(); // Graceful degradation
     }

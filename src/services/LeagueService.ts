@@ -1753,7 +1753,17 @@ async joinLeagueByCode(
       );
       
       // Create records for missing days using current lineup
-      const recordsToInsert: any[] = [];
+      const recordsToInsert: Array<{
+        league_id: string;
+        team_id: string;
+        matchup_id: string;
+        player_id: number;
+        roster_date: string;
+        slot_type: 'active' | 'bench' | 'ir';
+        slot_id: string | null;
+        is_locked: boolean;
+        locked_at: string | null;
+      }> = [];
       
       for (const dateStr of weekDates) {
         // Add starters
@@ -1991,7 +2001,17 @@ async joinLeagueByCode(
       // RULE 2: Today's players can only be changed BEFORE their game starts
       // RULE 3: Future dates are always updatable
       // =============================================================================
-      const rosterRecords: any[] = [];
+      const rosterRecords: Array<{
+        league_id: string;
+        team_id: string;
+        matchup_id: string;
+        player_id: number;
+        roster_date: string;
+        slot_type: 'active' | 'bench' | 'ir';
+        slot_id: string | null;
+        is_locked: boolean;
+        locked_at: string | null;
+      }> = [];
       const now = new Date();
       const todayStr = now.toISOString().split('T')[0];
       const todayDate = new Date(todayStr);
@@ -2039,7 +2059,7 @@ async joinLeagueByCode(
         
         // Build map of team -> game info for quick lookup
         const teamGameMap = new Map<string, { gameTime?: string; status: string }>();
-        (games || []).forEach((game: any) => {
+        (games || []).forEach((game: { game_time: string | null; status: string; home_team: string | null; away_team: string | null }) => {
           if (game.home_team) {
             teamGameMap.set(game.home_team, { gameTime: game.game_time, status: game.status });
           }
