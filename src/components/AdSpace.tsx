@@ -3,22 +3,9 @@ import { Card } from '@/components/ui/card';
 import { CitrusSlice, CitrusSparkle, CitrusLeaf, CitrusWedge } from '@/components/icons/CitrusIcons';
 import { cn } from '@/lib/utils';
 
-// AdSense config from environment
-const ADSENSE_PUB_ID = import.meta.env.VITE_ADSENSE_PUBLISHER_ID as string | undefined;
-const ADSENSE_ENABLED = !!ADSENSE_PUB_ID && import.meta.env.VITE_ADSENSE_ENABLED !== 'false';
-
-// Load the AdSense script once globally
-let adsenseScriptLoaded = false;
-function loadAdsenseScript() {
-  if (adsenseScriptLoaded || !ADSENSE_PUB_ID) return;
-  adsenseScriptLoaded = true;
-
-  const script = document.createElement('script');
-  script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_PUB_ID}`;
-  script.async = true;
-  script.crossOrigin = 'anonymous';
-  document.head.appendChild(script);
-}
+// AdSense publisher ID (public - embedded in page HTML)
+const ADSENSE_PUB_ID = 'ca-pub-9217677881289656';
+const ADSENSE_DISABLED = import.meta.env.VITE_ADSENSE_ENABLED === 'false';
 
 // Map our sizes to AdSense-compatible dimensions
 const adSizeMap = {
@@ -38,7 +25,7 @@ interface AdSpaceProps {
   size?: '300x250' | '728x90' | '160x600' | '300x600';
   className?: string;
   label?: string;
-  /** Google AdSense ad slot ID for this placement. When set with a valid publisher ID, renders a real ad. */
+  /** Google AdSense ad slot ID for this placement. Optional - uses auto-format if not set. */
   adSlot?: string;
 }
 
@@ -47,12 +34,10 @@ export const AdSpace = ({ size = '300x250', className, label = 'Featured Sponsor
   const [adFailed, setAdFailed] = useState(false);
   const pushedRef = useRef(false);
 
-  const shouldShowAd = ADSENSE_ENABLED && !!adSlot && !adFailed;
+  const shouldShowAd = !ADSENSE_DISABLED && !adFailed;
 
   useEffect(() => {
     if (!shouldShowAd) return;
-
-    loadAdsenseScript();
 
     // Push the ad after a short delay to let the script initialize
     const timer = setTimeout(() => {
@@ -64,14 +49,14 @@ export const AdSpace = ({ size = '300x250', className, label = 'Featured Sponsor
       } catch {
         setAdFailed(true);
       }
-    }, 150);
+    }, 300);
 
     return () => clearTimeout(timer);
   }, [shouldShowAd]);
 
   const adSize = adSizeMap[size];
 
-  // Render a real AdSense unit when configured
+  // Render a real AdSense unit
   if (shouldShowAd) {
     return (
       <div
@@ -81,9 +66,9 @@ export const AdSpace = ({ size = '300x250', className, label = 'Featured Sponsor
         <ins
           ref={adRef}
           className="adsbygoogle"
-          style={{ display: 'block', width: adSize.width, height: adSize.height }}
+          style={{ display: 'block', width: '100%', height: adSize.height }}
           data-ad-client={ADSENSE_PUB_ID}
-          data-ad-slot={adSlot}
+          {...(adSlot ? { 'data-ad-slot': adSlot } : {})}
           data-ad-format="auto"
           data-full-width-responsive="true"
         />
@@ -91,7 +76,7 @@ export const AdSpace = ({ size = '300x250', className, label = 'Featured Sponsor
     );
   }
 
-  // Fallback: branded placeholder (shown in dev or when ads aren't configured)
+  // Fallback: branded placeholder (shown when ads fail or are disabled)
   return <AdSpacePlaceholder size={size} className={className} label={label} />;
 };
 
