@@ -282,7 +282,7 @@ export default function TradeSimulator() {
       )}
 
       {/* Two-Panel Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 items-start">
         {/* Side A */}
         <TradePanel
           label="Team A"
@@ -303,11 +303,9 @@ export default function TradeSimulator() {
         />
 
         {/* Swap / Divider */}
-        <div className="hidden lg:flex items-start justify-center pt-6 -mx-6">
-          <div className="flex flex-col items-center gap-2">
-            <div className="w-10 h-10 rounded-full bg-citrus-forest flex items-center justify-center shadow-lg">
-              <ArrowLeftRight className="w-5 h-5 text-citrus-cream" />
-            </div>
+        <div className="hidden md:flex items-start justify-center pt-6">
+          <div className="w-10 h-10 rounded-full bg-citrus-forest flex items-center justify-center shadow-lg">
+            <ArrowLeftRight className="w-5 h-5 text-citrus-cream" />
           </div>
         </div>
 
