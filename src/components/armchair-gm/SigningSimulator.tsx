@@ -272,27 +272,27 @@ export default function SigningSimulator() {
                     />
                   )}
 
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-[4rem_1fr_4rem] sm:grid-cols-3 gap-2">
                     <select
                       value={formPosition}
                       onChange={e => setFormPosition(e.target.value)}
-                      className="px-2 py-2 rounded-lg border border-citrus-sage/30 bg-white/60 text-xs font-display text-citrus-forest focus:outline-none focus:border-citrus-sage"
+                      className="px-1.5 sm:px-2 py-2 rounded-lg border border-citrus-sage/30 bg-white/60 text-xs font-display text-citrus-forest focus:outline-none focus:border-citrus-sage"
                     >
                       {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
                     </select>
                     <input
                       type="text"
-                      placeholder="AAV (e.g. 5.5)"
+                      placeholder="AAV ($M)"
                       value={formAAV}
                       onChange={e => setFormAAV(e.target.value)}
-                      className="px-2 py-2 rounded-lg border border-citrus-sage/30 bg-white/60 text-xs font-display text-citrus-forest placeholder:text-citrus-charcoal/40 focus:outline-none focus:border-citrus-sage"
+                      className="px-2 py-2 rounded-lg border border-citrus-sage/30 bg-white/60 text-xs font-display text-citrus-forest placeholder:text-citrus-charcoal/40 focus:outline-none focus:border-citrus-sage min-w-0"
                     />
                     <input
                       type="text"
-                      placeholder="Years"
+                      placeholder="Yrs"
                       value={formTerm}
                       onChange={e => setFormTerm(e.target.value)}
-                      className="px-2 py-2 rounded-lg border border-citrus-sage/30 bg-white/60 text-xs font-display text-citrus-forest placeholder:text-citrus-charcoal/40 focus:outline-none focus:border-citrus-sage"
+                      className="px-1.5 sm:px-2 py-2 rounded-lg border border-citrus-sage/30 bg-white/60 text-xs font-display text-citrus-forest placeholder:text-citrus-charcoal/40 focus:outline-none focus:border-citrus-sage min-w-0"
                     />
                   </div>
 
@@ -573,7 +573,7 @@ export default function SigningSimulator() {
                   <PenLine className="w-8 h-8 text-citrus-sage/30 mb-2" />
                   <p className="text-sm text-citrus-charcoal/50 font-display mb-1">No signings yet</p>
                   <p className="text-[10px] text-citrus-charcoal/40 font-display">
-                    Use the buttons on the left to add signings
+                    Use the buttons above to add signings
                   </p>
                 </div>
               )}

@@ -153,7 +153,7 @@ export default function CapProjection() {
 
         {showTeamPicker && (
           <div className="p-2 border-t border-citrus-sage/20 max-h-48 overflow-y-auto">
-            <div className="grid grid-cols-8 gap-1">
+            <div className="grid grid-cols-4 sm:grid-cols-8 gap-1">
               {NHL_TEAMS.map(t => (
                 <button
                   key={t.abbrev}
@@ -200,7 +200,11 @@ export default function CapProjection() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#A4C4A0" strokeOpacity={0.3} />
                     <XAxis
                       dataKey="name"
-                      tick={{ fontSize: 11, fill: '#5C5C5C', fontFamily: 'Montserrat' }}
+                      tick={{ fontSize: 9, fill: '#5C5C5C', fontFamily: 'Montserrat' }}
+                      interval={0}
+                      angle={-35}
+                      textAnchor="end"
+                      height={40}
                     />
                     <YAxis
                       tick={{ fontSize: 10, fill: '#5C5C5C', fontFamily: 'Montserrat' }}

@@ -15,19 +15,19 @@ export default function CapSummaryBar({ data }: CapSummaryBarProps) {
   return (
     <div className="bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden">
       {/* Team Header */}
-      <div className="px-4 md:px-6 py-4 bg-gradient-to-r from-citrus-sage/20 via-citrus-sage/10 to-citrus-sage/20 border-b-2 border-citrus-sage/30">
-        <div className="flex items-center gap-4">
+      <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 bg-gradient-to-r from-citrus-sage/20 via-citrus-sage/10 to-citrus-sage/20 border-b-2 border-citrus-sage/30">
+        <div className="flex items-center gap-3 sm:gap-4">
           <img
             src={data.logoUrl}
             alt={data.teamName}
-            className="w-12 h-12 md:w-14 md:h-14 object-contain drop-shadow-md"
+            className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 object-contain drop-shadow-md"
           />
           <div className="flex-1 min-w-0">
-            <h2 className="font-varsity text-xl md:text-2xl text-citrus-forest tracking-tight truncate">
+            <h2 className="font-varsity text-lg sm:text-xl md:text-2xl text-citrus-forest tracking-tight truncate">
               {data.teamName}
             </h2>
-            <p className="text-xs text-citrus-charcoal/60 font-display">
-              {data.conference} Conference &middot; {data.division} Division
+            <p className="text-[10px] sm:text-xs text-citrus-charcoal/60 font-display">
+              {data.conference} &middot; {data.division}
             </p>
           </div>
           <div className="hidden md:block text-right">
@@ -42,23 +42,23 @@ export default function CapSummaryBar({ data }: CapSummaryBarProps) {
       </div>
 
       {/* Cap Bar Section */}
-      <div className="px-4 md:px-6 py-4">
+      <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4">
         {/* Numbers Row */}
         <div className="flex items-end justify-between mb-2">
           <div>
-            <div className="text-[10px] text-citrus-charcoal/50 uppercase font-display font-bold tracking-wider">
+            <div className="text-[9px] sm:text-[10px] text-citrus-charcoal/50 uppercase font-display font-bold tracking-wider">
               Projected Cap Hit
             </div>
-            <div className="font-varsity text-lg md:text-xl text-citrus-forest">
+            <div className="font-varsity text-base sm:text-lg md:text-xl text-citrus-forest">
               {formatCapFull(data.projectedCapHit)}
             </div>
           </div>
           <div className="text-right">
-            <div className="text-[10px] text-citrus-charcoal/50 uppercase font-display font-bold tracking-wider">
+            <div className="text-[9px] sm:text-[10px] text-citrus-charcoal/50 uppercase font-display font-bold tracking-wider">
               Cap Space
             </div>
             <div className={cn(
-              "font-varsity text-lg md:text-xl",
+              "font-varsity text-base sm:text-lg md:text-xl",
               isOverCap ? "text-red-600" : isNearCap ? "text-amber-600" : "text-citrus-sage"
             )}>
               {isOverCap ? '-' : ''}{formatCapFull(Math.abs(data.capSpace))}
@@ -140,7 +140,7 @@ export default function CapSummaryBar({ data }: CapSummaryBarProps) {
         </Tooltip>
 
         {/* Quick Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 mt-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 sm:gap-2 md:gap-3 mt-3 sm:mt-4">
           <QuickStat
             icon={<Users className="w-4 h-4" />}
             label="Active Roster"
@@ -189,23 +189,23 @@ function QuickStat({
 }) {
   return (
     <div className={cn(
-      "flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 transition-colors",
+      "flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 sm:py-2.5 rounded-xl border-2 transition-colors",
       warning
         ? "bg-red-50/50 border-red-200 text-red-700"
         : "bg-citrus-sage/10 border-citrus-sage/30 text-citrus-forest"
     )}>
       <div className={cn(
-        "p-1.5 rounded-lg",
+        "p-1 sm:p-1.5 rounded-lg flex-shrink-0",
         warning ? "bg-red-100" : "bg-citrus-sage/20"
       )}>
         {icon}
       </div>
       <div className="min-w-0">
-        <div className="text-[9px] uppercase font-display font-bold tracking-wider opacity-60">{label}</div>
+        <div className="text-[8px] sm:text-[9px] uppercase font-display font-bold tracking-wider opacity-60 truncate">{label}</div>
         <div className="flex items-baseline gap-1">
-          <span className="font-varsity text-sm">{value}</span>
+          <span className="font-varsity text-xs sm:text-sm">{value}</span>
           {subValue && (
-            <span className="text-[9px] font-display opacity-50">{subValue}</span>
+            <span className="text-[8px] sm:text-[9px] font-display opacity-50">{subValue}</span>
           )}
         </div>
       </div>
