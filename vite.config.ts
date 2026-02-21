@@ -9,8 +9,10 @@ function removeCrossorigin(): Plugin {
   return {
     name: "remove-crossorigin",
     transformIndexHtml(html) {
+      // Only strip bare crossorigin attributes (added by Vite to module/preload tags).
+      // Preserve crossorigin="anonymous" required by third-party scripts like AdSense.
       let result = html
-        .replace(/\s+crossorigin(?:="[^"]*")?/g, "");
+        .replace(/\s+crossorigin(?!=)/g, "");
       
       // Reorder modulepreload links to ensure React loads first
       const reactPreload = result.match(/<link rel="modulepreload" href="[^"]*vendor-react[^"]*">/);
