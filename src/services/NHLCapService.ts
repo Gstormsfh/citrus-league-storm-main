@@ -39,6 +39,58 @@ interface NHLRosterResponse {
   goalies: NHLApiPlayer[];
 }
 
+// Normalize name for matching: strip accents, dots, hyphens, extra spaces
+function normalizeName(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove accents (é → e)
+    .replace(/[.'-]/g, '')  // Remove dots, apostrophes, hyphens (J.T. → JT, O'Reilly → OReilly)
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Cache for birth date lookups to avoid redundant API calls
+const birthDateCache = new Map<string, string | null>();
+
+// Look up a player's birth date via NHL search API
+async function lookupPlayerBirthDate(name: string): Promise<string | null> {
+  const cacheKey = name.toLowerCase();
+  if (birthDateCache.has(cacheKey)) {
+    return birthDateCache.get(cacheKey)!;
+  }
+
+  try {
+    const resp = await fetch(
+      `https://search.d3.nhle.com/api/v1/search/player?culture=en-us&limit=1&q=${encodeURIComponent(name)}&active=true`
+    );
+    if (!resp.ok) {
+      birthDateCache.set(cacheKey, null);
+      return null;
+    }
+    const results = await resp.json();
+    if (Array.isArray(results) && results.length > 0 && results[0].birthDate) {
+      birthDateCache.set(cacheKey, results[0].birthDate);
+      return results[0].birthDate;
+    }
+    // Try again without active filter (for retired/buyout players)
+    const resp2 = await fetch(
+      `https://search.d3.nhle.com/api/v1/search/player?culture=en-us&limit=1&q=${encodeURIComponent(name)}`
+    );
+    if (resp2.ok) {
+      const results2 = await resp2.json();
+      if (Array.isArray(results2) && results2.length > 0 && results2[0].birthDate) {
+        birthDateCache.set(cacheKey, results2[0].birthDate);
+        return results2[0].birthDate;
+      }
+    }
+    birthDateCache.set(cacheKey, null);
+    return null;
+  } catch {
+    birthDateCache.set(cacheKey, null);
+    return null;
+  }
+}
+
 // Fetch the live roster from NHL API
 async function fetchNHLRoster(teamAbbrev: string): Promise<NHLApiPlayer[]> {
   // Utah uses UTA in the NHL API
@@ -67,6 +119,7 @@ async function fetchNHLRoster(teamAbbrev: string): Promise<NHLApiPlayer[]> {
 // Calculate age from birthDate string
 function calculateAge(birthDate: string): number {
   const birth = new Date(birthDate);
+  if (isNaN(birth.getTime())) return 0;
   const today = new Date();
   let age = today.getFullYear() - birth.getFullYear();
   const monthDiff = today.getMonth() - birth.getMonth();
@@ -77,14 +130,17 @@ function calculateAge(birthDate: string): number {
 }
 
 // Merge NHL API data with contract data
-function mergePlayerData(
+async function mergePlayerData(
   apiPlayers: NHLApiPlayer[],
   contracts: PlayerContract[],
   teamAbbrev: string
-): PlayerContract[] {
-  const contractMap = new Map<string, PlayerContract>();
+): Promise<PlayerContract[]> {
+  // Build contract maps: exact lowercase + normalized for fuzzy matching
+  const contractMapExact = new Map<string, PlayerContract>();
+  const contractMapNorm = new Map<string, PlayerContract>();
   for (const c of contracts) {
-    contractMap.set(c.name.toLowerCase(), c);
+    contractMapExact.set(c.name.toLowerCase(), c);
+    contractMapNorm.set(normalizeName(c.name), c);
   }
 
   const merged: PlayerContract[] = [];
@@ -93,8 +149,11 @@ function mergePlayerData(
   // First, match API players to contracts
   for (const apiPlayer of apiPlayers) {
     const fullName = `${apiPlayer.firstName.default} ${apiPlayer.lastName.default}`;
-    const key = fullName.toLowerCase();
-    const contract = contractMap.get(key);
+    const exactKey = fullName.toLowerCase();
+    const normKey = normalizeName(fullName);
+
+    // Try exact match first, then normalized match
+    const contract = contractMapExact.get(exactKey) || contractMapNorm.get(normKey);
 
     if (contract) {
       // Merge: prefer API data for headshot, jersey, position; contract data for financials
@@ -107,7 +166,7 @@ function mergePlayerData(
         positionGroup: getPositionGroup(apiPlayer.positionCode || contract.position),
         age: calculateAge(apiPlayer.birthDate) || contract.age,
       });
-      usedContractNames.add(key);
+      usedContractNames.add(contract.name.toLowerCase());
     } else {
       // API player without contract data - create a placeholder
       merged.push({
@@ -135,15 +194,33 @@ function mergePlayerData(
     }
   }
 
-  // Add any contract players not found in API (IR, LTIR, AHL, etc.)
-  // Give them unique negative IDs to avoid collisions with real NHL player IDs
+  // Collect unmatched contract players (IR, LTIR, AHL, buyouts, etc.)
   let syntheticId = -1;
+  const unmatchedPlayers: PlayerContract[] = [];
   for (const contract of contracts) {
     if (!usedContractNames.has(contract.name.toLowerCase())) {
-      merged.push({ ...contract, playerId: syntheticId-- });
+      unmatchedPlayers.push({ ...contract, playerId: syntheticId-- });
     }
   }
 
+  // Look up birth dates for unmatched players via NHL search API
+  if (unmatchedPlayers.length > 0) {
+    // Batch lookups in parallel (max ~15 concurrent to be respectful)
+    const BATCH_SIZE = 15;
+    for (let i = 0; i < unmatchedPlayers.length; i += BATCH_SIZE) {
+      const batch = unmatchedPlayers.slice(i, i + BATCH_SIZE);
+      const birthDates = await Promise.all(
+        batch.map(p => lookupPlayerBirthDate(p.name))
+      );
+      for (let j = 0; j < batch.length; j++) {
+        if (birthDates[j]) {
+          batch[j].age = calculateAge(birthDates[j]!);
+        }
+      }
+    }
+  }
+
+  merged.push(...unmatchedPlayers);
   return merged;
 }
 
@@ -159,7 +236,7 @@ export async function getTeamCapData(teamAbbrev: string): Promise<TeamCapData> {
   ]);
 
   const teamContracts = allContracts[teamAbbrev] || [];
-  const players = mergePlayerData(apiPlayers, teamContracts, teamAbbrev);
+  const players = await mergePlayerData(apiPlayers, teamContracts, teamAbbrev);
 
   // Sort by cap hit descending within each group
   const forwards = players
