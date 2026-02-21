@@ -221,6 +221,24 @@ async function mergePlayerData(
   }
 
   merged.push(...unmatchedPlayers);
+
+  // Fallback: look up birth dates for any merged players still missing age
+  const missingAge = merged.filter(p => !p.age);
+  if (missingAge.length > 0) {
+    const BATCH_SIZE = 15;
+    for (let i = 0; i < missingAge.length; i += BATCH_SIZE) {
+      const batch = missingAge.slice(i, i + BATCH_SIZE);
+      const birthDates = await Promise.all(
+        batch.map(p => lookupPlayerBirthDate(p.name))
+      );
+      for (let j = 0; j < batch.length; j++) {
+        if (birthDates[j]) {
+          batch[j].age = calculateAge(birthDates[j]!);
+        }
+      }
+    }
+  }
+
   return merged;
 }
 
