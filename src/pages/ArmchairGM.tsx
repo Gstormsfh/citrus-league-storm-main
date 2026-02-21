@@ -101,7 +101,7 @@ const ArmchairGM = () => {
                     "flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-sm font-display font-bold transition-all border-2 border-b-0 flex-shrink-0 whitespace-nowrap cursor-pointer",
                     activeTab === tab.id
                       ? "bg-[#E8EED9] text-citrus-forest border-citrus-sage/30 shadow-sm"
-                      : "bg-citrus-forest/50 text-citrus-sage/70 border-transparent hover:bg-citrus-forest/30 hover:text-citrus-cream"
+                      : "bg-citrus-forest/50 text-citrus-cream border-transparent hover:bg-citrus-forest/30 hover:text-white"
                   )}
                 >
                   {tab.icon}

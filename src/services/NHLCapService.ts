@@ -100,6 +100,7 @@ function mergePlayerData(
       // Merge: prefer API data for headshot, jersey, position; contract data for financials
       merged.push({
         ...contract,
+        playerId: apiPlayer.id,
         headshot: apiPlayer.headshot || contract.headshot,
         jerseyNumber: apiPlayer.sweaterNumber || contract.jerseyNumber,
         position: apiPlayer.positionCode || contract.position,
@@ -135,9 +136,11 @@ function mergePlayerData(
   }
 
   // Add any contract players not found in API (IR, LTIR, AHL, etc.)
+  // Give them unique negative IDs to avoid collisions with real NHL player IDs
+  let syntheticId = -1;
   for (const contract of contracts) {
     if (!usedContractNames.has(contract.name.toLowerCase())) {
-      merged.push(contract);
+      merged.push({ ...contract, playerId: syntheticId-- });
     }
   }
 
