@@ -1101,9 +1101,9 @@ const DraftRoom = () => {
   };
 
   const currentTeam = useMemo(() => {
-    if (!draftState?.nextTeamId || !teams || teams.length === 0) return null;
-    return teams.find(t => t.id === draftState.nextTeamId) || null;
-  }, [draftState?.nextTeamId, teams]);
+    if (!draftState?.nextTeamId || teamsById.size === 0) return null;
+    return teamsById.get(draftState.nextTeamId) || null;
+  }, [draftState?.nextTeamId, teamsById]);
 
   // Track the last pick number to prevent unnecessary timer resets
   const lastPickNumberRef = useRef<number>(0);
@@ -1120,6 +1120,8 @@ const DraftRoom = () => {
   // Refs for stale closure prevention in realtime subscription callbacks
   const pickTimeLimitRef = useRef(draftSettings.pickTimeLimit);
   const draftTimerStartedRef = useRef(false);
+  // Track pending retry timeouts from handleStartDraft for cleanup on unmount
+  const startDraftRetryRef = useRef<NodeJS.Timeout | null>(null);
   // Ref for handleAutoDraft to avoid stale closures in timer intervals
   const handleAutoDraftRef = useRef<() => void>(() => {});
 
@@ -1215,6 +1217,10 @@ const DraftRoom = () => {
       if (autoPickTimeoutRef.current) {
         clearTimeout(autoPickTimeoutRef.current);
         autoPickTimeoutRef.current = null;
+      }
+      if (startDraftRetryRef.current) {
+        clearTimeout(startDraftRetryRef.current);
+        startDraftRetryRef.current = null;
       }
       timerRunningRef.current = false;
     };
@@ -1504,15 +1510,15 @@ const DraftRoom = () => {
         return;
       }
 
+      // Prevent concurrent auto-draft calls (race condition guard)
+      // Set flags FIRST before any async work to prevent two calls slipping through
+      if (autoPickInProgressRef.current) {
+        logger.log('handleAutoDraft: Skipping - auto-pick already in progress');
+        return;
+      }
       // Skip if we already attempted this exact pick number (timer effect fires multiple times per pick)
       if (draftState.currentPick === lastAutoPickedNumberRef.current) {
         logger.log('handleAutoDraft: Skipping - already attempted pick #' + draftState.currentPick);
-        return;
-      }
-
-      // Prevent concurrent auto-draft calls (race condition guard)
-      if (autoPickInProgressRef.current) {
-        logger.log('handleAutoDraft: Skipping - auto-pick already in progress');
         return;
       }
       autoPickInProgressRef.current = true;
@@ -2093,15 +2099,16 @@ const DraftRoom = () => {
       setDraftTimerStarted(false); // Reset so commissioner must click "Start Draft Timer"
 
       // Load draft state immediately and keep retrying until it works
+      // Uses ref-tracked timeouts so unmount can cancel pending retries
       const loadStateAfterStart = async (retryCount: number = 0) => {
         try {
           // Verify draft order exists
           const { order: verifyOrder, error: orderError } = await DraftService.getDraftOrder(leagueId, user.id, 1);
-          
+
           if (orderError || !verifyOrder) {
             if (retryCount < 10) {
               logger.log(`Draft order not found, retrying (${retryCount + 1}/10)...`);
-              setTimeout(() => loadStateAfterStart(retryCount + 1), 500);
+              startDraftRetryRef.current = setTimeout(() => loadStateAfterStart(retryCount + 1), 500);
               return;
             } else {
               logger.error('Draft order not found after max retries');
@@ -2115,25 +2122,25 @@ const DraftRoom = () => {
             .select('draft_status')
             .eq('id', leagueId)
             .single();
-          
+
           if (updatedLeague?.draft_status === 'in_progress') {
             const loadedState = await loadDraftState();
             if (loadedState) {
               logger.log('Draft state loaded successfully after start');
             } else if (retryCount < 10) {
-              setTimeout(() => loadStateAfterStart(retryCount + 1), 500);
+              startDraftRetryRef.current = setTimeout(() => loadStateAfterStart(retryCount + 1), 500);
             }
           }
         } catch (stateError: unknown) {
           logger.error('Error loading draft state after start:', stateError);
           if (retryCount < 10) {
-            setTimeout(() => loadStateAfterStart(retryCount + 1), 500);
+            startDraftRetryRef.current = setTimeout(() => loadStateAfterStart(retryCount + 1), 500);
           }
         }
       };
-      
+
       // Start loading state immediately
-      setTimeout(() => loadStateAfterStart(0), 500);
+      startDraftRetryRef.current = setTimeout(() => loadStateAfterStart(0), 500);
 
       // SOC 2 CC7.2: Audit log draft start
       import('@/services/AuditService').then(({ AuditService }) => 

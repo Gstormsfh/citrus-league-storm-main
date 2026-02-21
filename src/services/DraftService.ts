@@ -980,7 +980,13 @@ export const DraftService = {
           callback(payload.new as DraftPick);
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR') {
+          logger.error(`Draft picks subscription error for league ${leagueId}`);
+        } else if (status === 'TIMED_OUT') {
+          logger.warn(`Draft picks subscription timed out for league ${leagueId}, retrying...`);
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
