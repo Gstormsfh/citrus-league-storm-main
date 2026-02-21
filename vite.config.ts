@@ -10,9 +10,7 @@ function removeCrossorigin(): Plugin {
     name: "remove-crossorigin",
     transformIndexHtml(html) {
       let result = html
-        .replace(/\s+crossorigin/g, "")
-        .replace(/crossorigin\s+/g, "")
-        .replace(/crossorigin/g, "");
+        .replace(/\s+crossorigin(?:="[^"]*")?/g, "");
       
       // Reorder modulepreload links to ensure React loads first
       const reactPreload = result.match(/<link rel="modulepreload" href="[^"]*vendor-react[^"]*">/);
