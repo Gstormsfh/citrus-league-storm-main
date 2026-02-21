@@ -1,4 +1,4 @@
-import { useState, useMemo, memo } from 'react';
+import { useState, useMemo, useRef, memo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -167,6 +167,24 @@ export const PlayerPool = ({
 
     return filtered;
   }, [searchTerm, selectedPosition, sortBy, sortDirection, draftedSet, showDrafted, availablePlayers]);
+
+  // PERF: Paginate to avoid rendering 500+ DOM nodes at once
+  const PAGE_SIZE = 75;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+
+  // Reset visible count when filters change (user expects fresh results from top)
+  const filterKey = `${searchTerm}|${selectedPosition}|${sortBy}|${sortDirection}|${showDrafted}`;
+  const prevFilterKey = useRef(filterKey);
+  if (filterKey !== prevFilterKey.current) {
+    prevFilterKey.current = filterKey;
+    if (visibleCount !== PAGE_SIZE) setVisibleCount(PAGE_SIZE);
+  }
+
+  const visiblePlayers = useMemo(
+    () => filteredAndSortedPlayers.slice(0, visibleCount),
+    [filteredAndSortedPlayers, visibleCount]
+  );
+  const hasMore = visibleCount < filteredAndSortedPlayers.length;
 
   const handleHeaderClick = (stat: string) => {
     if (sortBy === stat) {
@@ -451,9 +469,17 @@ export const PlayerPool = ({
 
       {/* Mobile: Card list view */}
       <div className="md:hidden border border-fantasy-border rounded-lg overflow-hidden bg-[#E8EED9]/50 backdrop-blur-sm max-h-[60vh] overflow-y-auto scrollbar-styled">
-        {filteredAndSortedPlayers.map(player => (
+        {visiblePlayers.map(player => (
           <PlayerCard key={player.id} player={player} />
         ))}
+        {hasMore && (
+          <button
+            onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+            className="w-full py-2.5 text-xs font-display font-bold text-citrus-forest bg-citrus-sage/10 hover:bg-citrus-sage/20 transition-colors"
+          >
+            Show more ({filteredAndSortedPlayers.length - visibleCount} remaining)
+          </button>
+        )}
         {filteredAndSortedPlayers.length === 0 && (
           <div className="text-center py-8 text-muted-foreground text-sm">
             No players found.
@@ -699,12 +725,20 @@ export const PlayerPool = ({
               </tr>
             </thead>
             <tbody>
-              {filteredAndSortedPlayers.map(player => (
+              {visiblePlayers.map(player => (
                 <PlayerRow key={player.id} player={player} />
               ))}
             </tbody>
           </table>
         </div>
+        {hasMore && (
+          <button
+            onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+            className="w-full py-2 text-xs font-display font-bold text-citrus-forest bg-citrus-sage/10 hover:bg-citrus-sage/20 border-t border-fantasy-border transition-colors"
+          >
+            Show more ({filteredAndSortedPlayers.length - visibleCount} remaining)
+          </button>
+        )}
         {filteredAndSortedPlayers.length === 0 && (
           <div className="text-center py-12 text-muted-foreground">
             No players found. Try adjusting your filters.

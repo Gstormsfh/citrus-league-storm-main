@@ -120,6 +120,13 @@ export const RosterDepthChart = ({
     return { starters, bench };
   }, [draftedPlayers]);
 
+  // PERF: O(1) lookup for draft round by player ID instead of O(n) find per slot
+  const picksByPlayerId = useMemo(() => {
+    const map = new Map<string, DraftPick>();
+    draftPicks.forEach(p => map.set(p.player_id, p));
+    return map;
+  }, [draftPicks]);
+
   return (
     <Card className="border-fantasy-border bg-fantasy-surface">
       <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6">
@@ -173,7 +180,7 @@ export const RosterDepthChart = ({
                               {player ? player.points : '-'}
                             </td>
                             <td className="px-2 sm:px-3 py-1.5 text-xs text-right hidden sm:table-cell">
-                              {player ? draftPicks.find(p => p.player_id === player.id)?.round_number : '-'}
+                              {player ? picksByPlayerId.get(player.id)?.round_number : '-'}
                             </td>
                           </tr>
                         );
@@ -217,7 +224,7 @@ export const RosterDepthChart = ({
                           {player.points}
                         </td>
                         <td className="px-2 sm:px-3 py-1.5 text-xs text-right hidden sm:table-cell">
-                          {draftPicks.find(p => p.player_id === player.id)?.round_number || '-'}
+                          {picksByPlayerId.get(player.id)?.round_number || '-'}
                         </td>
                       </tr>
                     );
