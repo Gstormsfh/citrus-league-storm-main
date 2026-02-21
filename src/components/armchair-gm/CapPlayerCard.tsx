@@ -50,22 +50,22 @@ export default function CapPlayerCard({ player, maxCapHit }: CapPlayerCardProps)
           {/* ─── Top accent stripe ─── */}
           <div className="h-[3px] bg-gradient-to-r from-citrus-sage via-[#7CB518] to-citrus-sage" />
 
-          {/* ─── Header: Avatar + Name + Position ─── */}
-          <div className="relative px-2.5 pt-2 pb-1.5 bg-gradient-to-br from-citrus-sage/20 via-citrus-sage/8 to-transparent">
+          {/* ─── Header: Name + Position ─── */}
+          <div className="relative px-2 md:px-2.5 pt-1.5 md:pt-2 pb-1 md:pb-1.5 bg-gradient-to-br from-citrus-sage/20 via-citrus-sage/8 to-transparent">
             {/* Corduroy texture overlay */}
             <div className="absolute inset-0 opacity-[0.04]" style={{
               backgroundImage: 'repeating-linear-gradient(90deg, transparent, transparent 1px, rgba(0,0,0,0.1) 1px, rgba(0,0,0,0.1) 2px)',
             }} />
 
             {/* Position badge - top right */}
-            <Badge className="absolute top-1.5 right-1.5 bg-gradient-to-br from-citrus-sage to-[#7CB518] border-2 border-citrus-forest/80 text-citrus-forest font-varsity shadow-patch text-[9px] tracking-wider font-black h-5 px-2 z-10">
+            <Badge className="absolute top-1 right-1 md:top-1.5 md:right-1.5 bg-gradient-to-br from-citrus-sage to-[#7CB518] border md:border-2 border-citrus-forest/80 text-citrus-forest font-varsity shadow-patch text-[7px] md:text-[9px] tracking-wider font-black h-4 md:h-5 px-1 md:px-2 z-10">
               {player.position}
             </Badge>
 
             {/* Non-NHL status badge - top left */}
             {isNonNHL && rosterConfig && (
               <Badge className={cn(
-                "absolute top-1.5 left-1.5 text-[7px] h-4 px-1.5 font-varsity font-bold tracking-wider z-10 border",
+                "absolute top-1 left-1 md:top-1.5 md:left-1.5 text-[6px] md:text-[7px] h-3.5 md:h-4 px-1 md:px-1.5 font-varsity font-bold tracking-wider z-10 border",
                 rosterConfig.color,
                 rosterConfig.pulse && "animate-pulse",
               )}>
@@ -74,36 +74,39 @@ export default function CapPlayerCard({ player, maxCapHit }: CapPlayerCardProps)
             )}
 
             {/* Player info row */}
-            <div className="flex items-center gap-2.5 relative z-[1]">
-              <PlayerAvatar
-                name={player.name}
-                position={player.position}
-                jerseyNumber={player.jerseyNumber}
-                size="md"
-              />
+            <div className="flex items-center gap-1.5 md:gap-2.5 relative z-[1]">
+              {/* Avatar: hidden on small tablets, shown on md+ */}
+              <div className="hidden md:block">
+                <PlayerAvatar
+                  name={player.name}
+                  position={player.position}
+                  jerseyNumber={player.jerseyNumber}
+                  size="md"
+                />
+              </div>
 
-              <div className="min-w-0 flex-1 pr-7">
-                <div className="font-display font-extrabold text-[11px] leading-tight text-citrus-forest truncate group-hover:text-[#7CB518] transition-colors">
+              <div className="min-w-0 flex-1 pr-6 md:pr-7">
+                <div className="font-display font-extrabold text-[10px] md:text-[11px] leading-tight text-citrus-forest truncate group-hover:text-[#7CB518] transition-colors">
                   {player.name}
                 </div>
-                <div className="flex items-center gap-1.5 mt-0.5">
+                <div className="flex items-center gap-1 md:gap-1.5 mt-0.5">
                   {player.jerseyNumber > 0 && (
-                    <span className="text-[9px] text-citrus-sage font-varsity font-bold">
+                    <span className="text-[8px] md:text-[9px] text-citrus-sage font-varsity font-bold">
                       #{player.jerseyNumber}
                     </span>
                   )}
                   {player.age > 0 && (
                     <>
                       <span className="text-[7px] text-citrus-charcoal/20">|</span>
-                      <span className="text-[9px] text-citrus-charcoal/50 font-display font-semibold">
+                      <span className="text-[8px] md:text-[9px] text-citrus-charcoal/50 font-display font-semibold">
                         {player.age}yr
                       </span>
                     </>
                   )}
                   {player.clause && (
                     <>
-                      <span className="text-[7px] text-citrus-charcoal/20">|</span>
-                      <Badge className={cn("text-[6px] h-3.5 px-1 font-varsity font-bold border flex items-center gap-0.5", clauseConfig[player.clause].color)}>
+                      <span className="hidden md:inline text-[7px] text-citrus-charcoal/20">|</span>
+                      <Badge className={cn("hidden md:flex text-[6px] h-3.5 px-1 font-varsity font-bold border items-center gap-0.5", clauseConfig[player.clause].color)}>
                         {clauseConfig[player.clause].icon && <Lock className="w-2 h-2" />}
                         {clauseConfig[player.clause].label}
                       </Badge>
@@ -115,19 +118,19 @@ export default function CapPlayerCard({ player, maxCapHit }: CapPlayerCardProps)
           </div>
 
           {/* ─── Cap Hit Section ─── */}
-          <div className="px-2.5 py-2 border-t-2 border-citrus-sage/20 bg-gradient-to-br from-white/60 to-citrus-cream/30">
+          <div className="px-2 md:px-2.5 py-1.5 md:py-2 border-t-2 border-citrus-sage/20 bg-gradient-to-br from-white/60 to-citrus-cream/30">
             {/* Cap hit + Status badge */}
             <div className="flex items-baseline justify-between gap-1">
-              <span className="font-varsity text-base text-citrus-forest leading-none tracking-tight">
+              <span className="font-varsity text-xs md:text-base text-citrus-forest leading-none tracking-tight">
                 {formatCap(player.capHit)}
               </span>
-              <Badge className={cn("text-[7px] h-4 px-1.5 font-varsity font-bold tracking-wider border-0 shadow-sm", statusColor[player.expiryStatus])}>
+              <Badge className={cn("text-[6px] md:text-[7px] h-3.5 md:h-4 px-1 md:px-1.5 font-varsity font-bold tracking-wider border-0 shadow-sm", statusColor[player.expiryStatus])}>
                 {player.expiryStatus}
               </Badge>
             </div>
 
             {/* Cap bar */}
-            <div className="relative h-2 mt-1.5 bg-citrus-cream/60 rounded-full overflow-hidden border border-citrus-sage/20 shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]">
+            <div className="relative h-1.5 md:h-2 mt-1 md:mt-1.5 bg-citrus-cream/60 rounded-full overflow-hidden border border-citrus-sage/20 shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]">
               <div
                 className={cn(
                   "absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out",
@@ -142,11 +145,11 @@ export default function CapPlayerCard({ player, maxCapHit }: CapPlayerCardProps)
             </div>
 
             {/* Term + Expiry */}
-            <div className="flex items-center justify-between mt-1.5">
-              <span className="text-[9px] text-citrus-charcoal/50 font-display font-semibold">
-                {player.yearsRemaining}yr remaining
+            <div className="flex items-center justify-between mt-1 md:mt-1.5">
+              <span className="text-[8px] md:text-[9px] text-citrus-charcoal/50 font-display font-semibold">
+                {player.yearsRemaining}yr
               </span>
-              <span className="text-[9px] text-citrus-charcoal/40 font-display">
+              <span className="text-[8px] md:text-[9px] text-citrus-charcoal/40 font-display">
                 exp. {player.expiryYear}
               </span>
             </div>

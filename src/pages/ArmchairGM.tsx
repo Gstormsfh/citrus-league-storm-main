@@ -65,32 +65,38 @@ const ArmchairGM = () => {
             }}
           />
 
-          <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8 relative z-10">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-2xl bg-citrus-sage/20 border-2 border-citrus-sage/30">
-                <DollarSign className="w-7 h-7 md:w-8 md:h-8 text-citrus-sage" />
+          <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8 relative z-10">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="p-2 sm:p-3 rounded-xl sm:rounded-2xl bg-citrus-sage/20 border-2 border-citrus-sage/30">
+                <DollarSign className="w-5 h-5 sm:w-7 sm:h-7 md:w-8 md:h-8 text-citrus-sage" />
               </div>
               <div>
-                <h1 className="font-varsity text-2xl md:text-3xl text-white tracking-tight">
+                <h1 className="font-varsity text-xl sm:text-2xl md:text-3xl text-white tracking-tight">
                   Armchair GM
                 </h1>
-                <p className="text-sm text-white/70 font-display mt-0.5">
+                <p className="text-xs sm:text-sm text-white/70 font-display mt-0.5">
                   NHL Salary Cap Toolkit &middot; {formatCap(SALARY_CAP_2025_26)} cap
                 </p>
               </div>
             </div>
 
-            {/* Quick stats bar */}
-            <div className="flex flex-wrap gap-3 md:gap-6 mt-4">
+            {/* Quick stats bar - hidden on smallest phones, shown as scrollable on sm+ */}
+            <div className="hidden sm:flex flex-wrap gap-3 md:gap-6 mt-4">
               <HeroBadge label="Salary Cap" value={formatCap(SALARY_CAP_2025_26)} />
               <HeroBadge label="Cap Floor" value="$70.6M" />
               <HeroBadge label="Max Contracts" value="50" />
               <HeroBadge label="Season" value="2025-26" />
             </div>
+            {/* Condensed mobile stats row */}
+            <div className="flex sm:hidden gap-2 mt-3 overflow-x-auto scrollbar-hide">
+              <HeroBadge label="Cap" value={formatCap(SALARY_CAP_2025_26)} />
+              <HeroBadge label="Floor" value="$70.6M" />
+              <HeroBadge label="Season" value="25-26" />
+            </div>
           </div>
 
           {/* Tab Bar */}
-          <div className="max-w-7xl mx-auto px-4 md:px-6 relative z-10">
+          <div className="max-w-7xl mx-auto px-2 sm:px-4 md:px-6 relative z-10">
             <div className="flex gap-1 -mb-[2px] overflow-x-auto scrollbar-hide pb-[2px]">
               {TABS.map(tab => (
                 <button
@@ -98,15 +104,15 @@ const ArmchairGM = () => {
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
                   className={cn(
-                    "flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-sm font-display font-bold transition-all border-2 border-b-0 flex-shrink-0 whitespace-nowrap cursor-pointer",
+                    "flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2.5 min-h-[44px] rounded-t-xl text-xs sm:text-sm font-display font-bold transition-all border-2 border-b-0 flex-shrink-0 whitespace-nowrap cursor-pointer",
                     activeTab === tab.id
                       ? "bg-[#E8EED9] text-citrus-forest border-citrus-sage/30 shadow-sm"
-                      : "bg-white/15 text-white border-transparent hover:bg-white/25"
+                      : "bg-white/20 text-white border-white/10 hover:bg-white/30 hover:border-white/20"
                   )}
                 >
                   {tab.icon}
                   <span className="hidden md:inline">{tab.label}</span>
-                  <span className="md:hidden">{tab.shortLabel}</span>
+                  <span className="hidden sm:inline md:hidden">{tab.shortLabel}</span>
                 </button>
               ))}
             </div>
@@ -114,7 +120,7 @@ const ArmchairGM = () => {
         </div>
 
         {/* Content Area */}
-        <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 space-y-6">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
           {/* Cap Tracker Tab */}
           {activeTab === 'tracker' && (
             <>
@@ -204,9 +210,9 @@ const ArmchairGM = () => {
 
 function HeroBadge({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/10 border border-white/20">
-      <span className="text-[10px] text-white/70 font-display uppercase tracking-wider">{label}</span>
-      <span className="font-varsity text-sm text-white">{value}</span>
+    <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-white/10 border border-white/20 flex-shrink-0">
+      <span className="text-[8px] sm:text-[10px] text-white/70 font-display uppercase tracking-wider">{label}</span>
+      <span className="font-varsity text-xs sm:text-sm text-white">{value}</span>
     </div>
   );
 }
