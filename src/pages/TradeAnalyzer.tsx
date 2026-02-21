@@ -34,8 +34,6 @@ import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { isGuestMode } from '@/utils/guestHelpers';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
-import { CitrusBackground } from '@/components/CitrusBackground';
-import { CitrusSparkle, CitrusLeaf, CitrusWedge } from '@/components/icons/CitrusIcons';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { AdSpace } from '@/components/AdSpace';
@@ -44,7 +42,7 @@ import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 const TradeAnalyzer = () => {
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
-  const { userLeagueState, activeLeagueId, activeLeague } = useLeague();
+  const { userLeagueState, activeLeagueId } = useLeague();
   const { toast } = useToast();
   
   const [selectedTeamId, setSelectedTeamId] = useState<string | number>("");
@@ -390,13 +388,11 @@ const TradeAnalyzer = () => {
   const valueDiff = theirTotalValue - myTotalValue;
   const isFair = Math.abs(valueDiff) < 20; // Adjusted threshold
   
-  const filteredMyTeam = myTeamRoster.filter(p => 
-    !mySelectedPlayers.includes(p.id) && 
+  const filteredMyTeam = myTeamRoster.filter(p =>
     p.full_name.toLowerCase().includes(searchMyTeam.toLowerCase())
   );
 
-  const filteredTheirTeam = selectedPartnerTeam?.roster.filter(p => 
-    !theirSelectedPlayers.includes(p.id) &&
+  const filteredTheirTeam = selectedPartnerTeam?.roster.filter(p =>
     p.full_name.toLowerCase().includes(searchTheirTeam.toLowerCase())
   ) || [];
 
@@ -531,11 +527,11 @@ const TradeAnalyzer = () => {
 
         {/* Tabs: Propose / Trade Offers */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
-          <TabsList className="w-full md:w-auto">
-            <TabsTrigger value="propose" className="flex items-center gap-2">
+          <TabsList className="w-full md:w-auto bg-citrus-sage/30 border border-citrus-sage/50">
+            <TabsTrigger value="propose" className="flex items-center gap-2 text-citrus-forest font-semibold data-[state=active]:bg-white data-[state=active]:text-citrus-forest data-[state=active]:shadow">
               <ArrowLeftRight className="h-4 w-4" /> Propose Trade
             </TabsTrigger>
-            <TabsTrigger value="offers" className="flex items-center gap-2 relative">
+            <TabsTrigger value="offers" className="flex items-center gap-2 relative text-citrus-forest font-semibold data-[state=active]:bg-white data-[state=active]:text-citrus-forest data-[state=active]:shadow">
               <History className="h-4 w-4" /> Trade Offers
               {tradeOffers.filter(o => o.status === 'pending').length > 0 && (
                 <Badge className="ml-1 h-5 min-w-[20px] px-1 text-[10px] bg-destructive text-destructive-foreground">
@@ -587,35 +583,46 @@ const TradeAnalyzer = () => {
             <CardContent className="flex-1 overflow-hidden p-0">
               <ScrollArea className="h-full px-4 pb-4">
                 <div className="space-y-2">
-                  {filteredMyTeam.map(player => (
-                    <div 
-                      key={player.id} 
-                      onClick={() => toggleMyPlayer(player.id)}
-                      className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent cursor-pointer transition-colors group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-9 w-9 cursor-pointer hover:ring-2 hover:ring-primary" onClick={(e) => handlePlayerClick(e, player)}>
-                          <AvatarImage src={player.headshot_url} />
-                          <AvatarFallback>{player.full_name.substring(0,2)}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <div 
-                            className="font-medium text-sm hover:underline hover:text-primary cursor-pointer"
-                            onClick={(e) => handlePlayerClick(e, player)}
-                          >
-                            {player.full_name}
+                  {filteredMyTeam.map(player => {
+                    const isSelected = mySelectedPlayers.includes(player.id);
+                    return (
+                      <div
+                        key={player.id}
+                        onClick={() => toggleMyPlayer(player.id)}
+                        className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors group ${
+                          isSelected
+                            ? 'bg-red-500/10 border-red-500/30'
+                            : 'bg-card hover:bg-accent'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-9 w-9 cursor-pointer hover:ring-2 hover:ring-primary" onClick={(e) => handlePlayerClick(e, player)}>
+                            <AvatarImage src={player.headshot_url} />
+                            <AvatarFallback>{player.full_name.substring(0,2)}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <div
+                              className="font-medium text-sm hover:underline hover:text-primary cursor-pointer"
+                              onClick={(e) => handlePlayerClick(e, player)}
+                            >
+                              {player.full_name}
+                            </div>
+                            <div className="text-xs text-muted-foreground">{player.position} • {player.points} pts</div>
                           </div>
-                          <div className="text-xs text-muted-foreground">{player.position} • {player.points} pts</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                           <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground" onClick={(e) => handlePlayerClick(e, player)}>
+                             <Info className="h-4 w-4" />
+                           </Button>
+                           {isSelected ? (
+                             <CheckCircle2 className="h-4 w-4 text-red-500" />
+                           ) : (
+                             <UserPlus className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                         <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground" onClick={(e) => handlePlayerClick(e, player)}>
-                           <Info className="h-4 w-4" />
-                         </Button>
-                         <UserPlus className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                   {filteredMyTeam.length === 0 && (
                     <div className="text-center p-4 text-muted-foreground text-sm">
                       {loading ? "Loading roster..." : "No players found"}
@@ -745,6 +752,12 @@ const TradeAnalyzer = () => {
                     </div>
                   )}
                   
+                  <Input
+                    placeholder="Add a message to your trade offer (optional)"
+                    className="bg-white/10 border-white/20 text-slate-200 placeholder:text-slate-500"
+                    value={tradeMessage}
+                    onChange={(e) => setTradeMessage(e.target.value)}
+                  />
                   <Button
                     className="w-full bg-blue-600 hover:bg-blue-500 text-white mt-2"
                     disabled={myAssets.length === 0 || theirAssets.length === 0 || !selectedPartnerTeam}
@@ -785,35 +798,46 @@ const TradeAnalyzer = () => {
                {selectedPartnerTeam ? (
                   <ScrollArea className="h-full px-4 pb-4">
                     <div className="space-y-2">
-                      {filteredTheirTeam.map(player => (
-                        <div 
-                          key={player.id} 
-                          onClick={() => toggleTheirPlayer(player.id)}
-                          className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent cursor-pointer transition-colors group"
-                        >
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-9 w-9 cursor-pointer hover:ring-2 hover:ring-primary" onClick={(e) => handlePlayerClick(e, player)}>
-                              <AvatarImage src={player.headshot_url} />
-                              <AvatarFallback>{player.full_name.substring(0,2)}</AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <div 
-                                className="font-medium text-sm hover:underline hover:text-primary cursor-pointer"
-                                onClick={(e) => handlePlayerClick(e, player)}
-                              >
-                                {player.full_name}
+                      {filteredTheirTeam.map(player => {
+                        const isSelected = theirSelectedPlayers.includes(player.id);
+                        return (
+                          <div
+                            key={player.id}
+                            onClick={() => toggleTheirPlayer(player.id)}
+                            className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors group ${
+                              isSelected
+                                ? 'bg-green-500/10 border-green-500/30'
+                                : 'bg-card hover:bg-accent'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-9 w-9 cursor-pointer hover:ring-2 hover:ring-primary" onClick={(e) => handlePlayerClick(e, player)}>
+                                <AvatarImage src={player.headshot_url} />
+                                <AvatarFallback>{player.full_name.substring(0,2)}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <div
+                                  className="font-medium text-sm hover:underline hover:text-primary cursor-pointer"
+                                  onClick={(e) => handlePlayerClick(e, player)}
+                                >
+                                  {player.full_name}
+                                </div>
+                                <div className="text-xs text-muted-foreground">{player.position} • {player.points} pts</div>
                               </div>
-                              <div className="text-xs text-muted-foreground">{player.position} • {player.points} pts</div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                               <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground" onClick={(e) => handlePlayerClick(e, player)}>
+                                 <Info className="h-4 w-4" />
+                               </Button>
+                               {isSelected ? (
+                                 <CheckCircle2 className="h-4 w-4 text-green-500" />
+                               ) : (
+                                 <UserPlus className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                               )}
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                             <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground" onClick={(e) => handlePlayerClick(e, player)}>
-                               <Info className="h-4 w-4" />
-                             </Button>
-                             <UserPlus className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                       {filteredTheirTeam.length === 0 && (
                         <div className="text-center p-4 text-muted-foreground text-sm">No players found</div>
                       )}
