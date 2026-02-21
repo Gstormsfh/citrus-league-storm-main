@@ -1,14 +1,111 @@
+import { useEffect, useRef, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { CitrusSlice, CitrusSparkle, CitrusLeaf, CitrusWedge } from '@/components/icons/CitrusIcons';
 import { cn } from '@/lib/utils';
+
+// AdSense config from environment
+const ADSENSE_PUB_ID = import.meta.env.VITE_ADSENSE_PUBLISHER_ID as string | undefined;
+const ADSENSE_ENABLED = !!ADSENSE_PUB_ID && import.meta.env.VITE_ADSENSE_ENABLED !== 'false';
+
+// Load the AdSense script once globally
+let adsenseScriptLoaded = false;
+function loadAdsenseScript() {
+  if (adsenseScriptLoaded || !ADSENSE_PUB_ID) return;
+  adsenseScriptLoaded = true;
+
+  const script = document.createElement('script');
+  script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_PUB_ID}`;
+  script.async = true;
+  script.crossOrigin = 'anonymous';
+  document.head.appendChild(script);
+}
+
+// Map our sizes to AdSense-compatible dimensions
+const adSizeMap = {
+  '300x250': { width: 300, height: 250 },
+  '728x90':  { width: 728, height: 90 },
+  '160x600': { width: 160, height: 600 },
+  '300x600': { width: 300, height: 600 },
+} as const;
+
+declare global {
+  interface Window {
+    adsbygoogle?: Record<string, unknown>[];
+  }
+}
 
 interface AdSpaceProps {
   size?: '300x250' | '728x90' | '160x600' | '300x600';
   className?: string;
   label?: string;
+  /** Google AdSense ad slot ID for this placement. When set with a valid publisher ID, renders a real ad. */
+  adSlot?: string;
 }
 
-export const AdSpace = ({ size = '300x250', className, label = 'Featured Sponsor' }: AdSpaceProps) => {
+export const AdSpace = ({ size = '300x250', className, label = 'Featured Sponsor', adSlot }: AdSpaceProps) => {
+  const adRef = useRef<HTMLModElement>(null);
+  const [adFailed, setAdFailed] = useState(false);
+  const pushedRef = useRef(false);
+
+  const shouldShowAd = ADSENSE_ENABLED && !!adSlot && !adFailed;
+
+  useEffect(() => {
+    if (!shouldShowAd) return;
+
+    loadAdsenseScript();
+
+    // Push the ad after a short delay to let the script initialize
+    const timer = setTimeout(() => {
+      try {
+        if (!pushedRef.current && adRef.current) {
+          (window.adsbygoogle = window.adsbygoogle || []).push({});
+          pushedRef.current = true;
+        }
+      } catch {
+        setAdFailed(true);
+      }
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [shouldShowAd]);
+
+  const adSize = adSizeMap[size];
+
+  // Render a real AdSense unit when configured
+  if (shouldShowAd) {
+    return (
+      <div
+        className={cn('flex items-center justify-center overflow-hidden rounded-2xl', className)}
+        style={{ minHeight: adSize.height }}
+      >
+        <ins
+          ref={adRef}
+          className="adsbygoogle"
+          style={{ display: 'block', width: adSize.width, height: adSize.height }}
+          data-ad-client={ADSENSE_PUB_ID}
+          data-ad-slot={adSlot}
+          data-ad-format="auto"
+          data-full-width-responsive="true"
+        />
+      </div>
+    );
+  }
+
+  // Fallback: branded placeholder (shown in dev or when ads aren't configured)
+  return <AdSpacePlaceholder size={size} className={className} label={label} />;
+};
+
+// ── Branded placeholder (shown when ads aren't configured) ──────────────
+
+function AdSpacePlaceholder({
+  size,
+  className,
+  label,
+}: {
+  size: '300x250' | '728x90' | '160x600' | '300x600';
+  className?: string;
+  label: string;
+}) {
   const sizeConfig = {
     '300x250': {
       container: 'min-h-[280px] w-full',
@@ -40,7 +137,7 @@ export const AdSpace = ({ size = '300x250', className, label = 'Featured Sponsor
   const isHorizontal = size === '728x90';
 
   return (
-    <Card 
+    <Card
       className={cn(
         "overflow-hidden bg-gradient-to-br from-citrus-sage/10 via-citrus-cream to-citrus-peach/10 corduroy-texture border-4 border-citrus-orange rounded-[1.5rem] shadow-[0_6px_0_rgba(223,117,54,0.3)] relative hover:shadow-[0_8px_0_rgba(223,117,54,0.4)] hover:-translate-y-1 transition-all duration-300",
         config.container,
@@ -57,7 +154,7 @@ export const AdSpace = ({ size = '300x250', className, label = 'Featured Sponsor
       <div className="absolute bottom-2 right-2">
         <CitrusLeaf className="w-20 h-20 text-citrus-peach/20 -rotate-12" />
       </div>
-      
+
       <div className={cn(
         "text-center p-6 relative z-10",
         isHorizontal && "flex items-center justify-between"
@@ -68,13 +165,13 @@ export const AdSpace = ({ size = '300x250', className, label = 'Featured Sponsor
           isHorizontal && "mb-0"
         )}>
           <span className="font-varsity text-xs text-[#E8EED9] uppercase tracking-wider whitespace-nowrap">
-            ⭐ {label}
+            {label}
           </span>
         </div>
-        
+
         {/* Main Ad Container */}
         <div className={cn(
-          "w-full bg-[#E8EED9]/50 backdrop-blur-sm/80 backdrop-blur-sm rounded-xl border-3 border-citrus-sage shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)] flex flex-col items-center justify-center",
+          "w-full bg-[#E8EED9]/50 backdrop-blur-sm rounded-xl border-3 border-citrus-sage shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)] flex flex-col items-center justify-center",
           config.inner,
           isHorizontal ? "mb-0" : "mb-3"
         )}>
@@ -99,7 +196,7 @@ export const AdSpace = ({ size = '300x250', className, label = 'Featured Sponsor
             </div>
           </div>
         </div>
-        
+
         {/* CTA */}
         {!isHorizontal && (
           <div className="font-display text-[10px] text-citrus-orange uppercase tracking-wide">
@@ -109,4 +206,4 @@ export const AdSpace = ({ size = '300x250', className, label = 'Featured Sponsor
       </div>
     </Card>
   );
-};
+}

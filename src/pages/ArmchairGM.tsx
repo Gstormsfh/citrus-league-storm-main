@@ -71,10 +71,10 @@ const ArmchairGM = () => {
                 <DollarSign className="w-7 h-7 md:w-8 md:h-8 text-citrus-sage" />
               </div>
               <div>
-                <h1 className="font-varsity text-2xl md:text-3xl text-citrus-cream tracking-tight">
+                <h1 className="font-varsity text-2xl md:text-3xl text-white tracking-tight">
                   Armchair GM
                 </h1>
-                <p className="text-sm text-citrus-sage/80 font-display mt-0.5">
+                <p className="text-sm text-white/70 font-display mt-0.5">
                   NHL Salary Cap Toolkit &middot; {formatCap(SALARY_CAP_2025_26)} cap
                 </p>
               </div>
@@ -101,11 +101,12 @@ const ArmchairGM = () => {
                     "flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-sm font-display font-bold transition-all border-2 border-b-0 flex-shrink-0 whitespace-nowrap cursor-pointer",
                     activeTab === tab.id
                       ? "bg-[#E8EED9] text-citrus-forest border-citrus-sage/30 shadow-sm"
-                      : "bg-citrus-forest/50 text-citrus-cream border-transparent hover:bg-citrus-forest/30 hover:text-white"
+                      : "bg-white/15 text-white border-transparent hover:bg-white/25"
                   )}
                 >
                   {tab.icon}
-                  <span>{tab.label}</span>
+                  <span className="hidden md:inline">{tab.label}</span>
+                  <span className="md:hidden">{tab.shortLabel}</span>
                 </button>
               ))}
             </div>
@@ -203,9 +204,9 @@ const ArmchairGM = () => {
 
 function HeroBadge({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-citrus-sage/10 border border-citrus-sage/20">
-      <span className="text-[10px] text-citrus-sage/60 font-display uppercase tracking-wider">{label}</span>
-      <span className="font-varsity text-sm text-citrus-cream">{value}</span>
+    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/10 border border-white/20">
+      <span className="text-[10px] text-white/70 font-display uppercase tracking-wider">{label}</span>
+      <span className="font-varsity text-sm text-white">{value}</span>
     </div>
   );
 }
