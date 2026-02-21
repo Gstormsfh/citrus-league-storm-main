@@ -23,8 +23,8 @@ const TABS: { id: GMTab; label: string; shortLabel: string; icon: React.ReactNod
   { id: 'tracker', label: 'Cap Tracker', shortLabel: 'Cap', icon: <BarChart3 className="w-4 h-4" />, description: 'View team rosters & cap details' },
   { id: 'trade', label: 'Trade Simulator', shortLabel: 'Trade', icon: <ArrowLeftRight className="w-4 h-4" />, description: 'Simulate trades between teams' },
   { id: 'signing', label: 'Signing Sim', shortLabel: 'Sign', icon: <PenLine className="w-4 h-4" />, description: 'Simulate free agent signings' },
-  { id: 'buyout', label: 'Buyout Calculator', shortLabel: 'Buyout', icon: <Calculator className="w-4 h-4" />, description: 'Calculate buyout costs & savings' },
-  { id: 'projection', label: 'Cap Projection', shortLabel: 'Project', icon: <CalendarRange className="w-4 h-4" />, description: 'Multi-year cap commitments' },
+  { id: 'buyout', label: 'Buyout Calculator', shortLabel: 'Buy', icon: <Calculator className="w-4 h-4" />, description: 'Calculate buyout costs & savings' },
+  { id: 'projection', label: 'Cap Projection', shortLabel: 'Proj', icon: <CalendarRange className="w-4 h-4" />, description: 'Multi-year cap commitments' },
 ];
 
 const ArmchairGM = () => {
@@ -112,7 +112,7 @@ const ArmchairGM = () => {
                 >
                   {tab.icon}
                   <span className="hidden md:inline">{tab.label}</span>
-                  <span className="hidden sm:inline md:hidden">{tab.shortLabel}</span>
+                  <span className="inline md:hidden text-[10px] sm:text-xs">{tab.shortLabel}</span>
                 </button>
               ))}
             </div>

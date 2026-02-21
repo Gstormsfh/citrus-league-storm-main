@@ -307,7 +307,17 @@ export default function CapProjection() {
                   </div>
 
                   {/* Mobile summary */}
-                  <div className="md:hidden flex items-center gap-2">
+                  <div className="md:hidden flex items-center gap-1.5 flex-wrap justify-end">
+                    {year.ufaCount > 0 && (
+                      <Badge className="bg-red-100 text-red-700 text-[7px] h-4 px-1 font-varsity border border-red-200">
+                        {year.ufaCount} UFA
+                      </Badge>
+                    )}
+                    {year.rfaCount > 0 && (
+                      <Badge className="bg-amber-100 text-amber-700 text-[7px] h-4 px-1 font-varsity border border-amber-200">
+                        {year.rfaCount} RFA
+                      </Badge>
+                    )}
                     <span className={cn(
                       "font-varsity text-sm",
                       year.projectedSpace < 0 ? "text-red-600" : "text-green-600"
