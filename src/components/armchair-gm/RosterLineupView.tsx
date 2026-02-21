@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { PlayerContract, TeamCapData, formatCap } from '@/types/captracker';
 import CapPlayerCard from './CapPlayerCard';
+import PlayerAvatar from './PlayerAvatar';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 
 interface RosterLineupViewProps {
@@ -130,36 +131,57 @@ export default function RosterLineupView({ data }: RosterLineupViewProps) {
                 </span>
               </div>
 
-              {/* Position column labels */}
-              <div className="grid grid-cols-3 gap-2 md:gap-3 mb-1">
-                <div className="text-center">
-                  <span className="text-[8px] font-varsity text-citrus-sage/50 uppercase tracking-[0.15em]">LW</span>
-                </div>
-                <div className="text-center">
-                  <span className="text-[8px] font-varsity text-citrus-sage/50 uppercase tracking-[0.15em]">C</span>
-                </div>
-                <div className="text-center">
-                  <span className="text-[8px] font-varsity text-citrus-sage/50 uppercase tracking-[0.15em]">RW</span>
-                </div>
+              {/* Mobile: Compact row list (< sm) */}
+              <div className="sm:hidden space-y-1">
+                {[
+                  { pos: 'LW', player: line.lw },
+                  { pos: 'C', player: line.c },
+                  { pos: 'RW', player: line.rw },
+                ].map(({ pos, player }) =>
+                  player ? (
+                    <CompactPlayerRow key={player.name} player={player} maxCapHit={lineup.maxCapHit} />
+                  ) : (
+                    <div key={pos} className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-dashed border-citrus-sage/20 bg-citrus-cream/20">
+                      <span className="text-[10px] font-varsity text-citrus-sage/40 w-7 text-center">{pos}</span>
+                      <span className="text-[10px] font-display text-citrus-charcoal/25">Open Slot</span>
+                    </div>
+                  )
+                )}
               </div>
 
-              {/* LW - C - RW cards */}
-              <div className="grid grid-cols-3 gap-2 md:gap-3">
-                {line.lw ? (
-                  <CapPlayerCard player={line.lw} maxCapHit={lineup.maxCapHit} />
-                ) : (
-                  <EmptySlot position="LW" />
-                )}
-                {line.c ? (
-                  <CapPlayerCard player={line.c} maxCapHit={lineup.maxCapHit} />
-                ) : (
-                  <EmptySlot position="C" />
-                )}
-                {line.rw ? (
-                  <CapPlayerCard player={line.rw} maxCapHit={lineup.maxCapHit} />
-                ) : (
-                  <EmptySlot position="RW" />
-                )}
+              {/* Desktop: 3-column card grid (sm+) */}
+              <div className="hidden sm:block">
+                {/* Position column labels */}
+                <div className="grid grid-cols-3 gap-2 md:gap-3 mb-1">
+                  <div className="text-center">
+                    <span className="text-[8px] font-varsity text-citrus-sage/50 uppercase tracking-[0.15em]">LW</span>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-[8px] font-varsity text-citrus-sage/50 uppercase tracking-[0.15em]">C</span>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-[8px] font-varsity text-citrus-sage/50 uppercase tracking-[0.15em]">RW</span>
+                  </div>
+                </div>
+
+                {/* LW - C - RW cards */}
+                <div className="grid grid-cols-3 gap-2 md:gap-3">
+                  {line.lw ? (
+                    <CapPlayerCard player={line.lw} maxCapHit={lineup.maxCapHit} />
+                  ) : (
+                    <EmptySlot position="LW" />
+                  )}
+                  {line.c ? (
+                    <CapPlayerCard player={line.c} maxCapHit={lineup.maxCapHit} />
+                  ) : (
+                    <EmptySlot position="C" />
+                  )}
+                  {line.rw ? (
+                    <CapPlayerCard player={line.rw} maxCapHit={lineup.maxCapHit} />
+                  ) : (
+                    <EmptySlot position="RW" />
+                  )}
+                </div>
               </div>
             </div>
           ))}
@@ -201,24 +223,40 @@ export default function RosterLineupView({ data }: RosterLineupViewProps) {
                 </span>
               </div>
 
-              {/* Position labels */}
-              <div className="grid grid-cols-2 gap-2 md:gap-3 max-w-2xl mx-auto mb-1">
-                <div className="text-center">
-                  <span className="text-[8px] font-varsity text-blue-400/60 uppercase tracking-[0.15em]">LD</span>
-                </div>
-                <div className="text-center">
-                  <span className="text-[8px] font-varsity text-blue-400/60 uppercase tracking-[0.15em]">RD</span>
-                </div>
+              {/* Mobile: Compact row list (< sm) */}
+              <div className="sm:hidden space-y-1">
+                <CompactPlayerRow player={pair.ld} maxCapHit={lineup.maxCapHit} />
+                {pair.rd ? (
+                  <CompactPlayerRow player={pair.rd} maxCapHit={lineup.maxCapHit} />
+                ) : (
+                  <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-dashed border-citrus-sage/20 bg-citrus-cream/20">
+                    <span className="text-[10px] font-varsity text-citrus-sage/40 w-7 text-center">D</span>
+                    <span className="text-[10px] font-display text-citrus-charcoal/25">Open Slot</span>
+                  </div>
+                )}
               </div>
 
-              {/* D - D cards */}
-              <div className="grid grid-cols-2 gap-2 md:gap-3 max-w-2xl mx-auto">
-                <CapPlayerCard player={pair.ld} maxCapHit={lineup.maxCapHit} />
-                {pair.rd ? (
-                  <CapPlayerCard player={pair.rd} maxCapHit={lineup.maxCapHit} />
-                ) : (
-                  <EmptySlot position="D" />
-                )}
+              {/* Desktop: 2-column card grid (sm+) */}
+              <div className="hidden sm:block">
+                {/* Position labels */}
+                <div className="grid grid-cols-2 gap-2 md:gap-3 max-w-2xl mx-auto mb-1">
+                  <div className="text-center">
+                    <span className="text-[8px] font-varsity text-blue-400/60 uppercase tracking-[0.15em]">LD</span>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-[8px] font-varsity text-blue-400/60 uppercase tracking-[0.15em]">RD</span>
+                  </div>
+                </div>
+
+                {/* D - D cards */}
+                <div className="grid grid-cols-2 gap-2 md:gap-3 max-w-2xl mx-auto">
+                  <CapPlayerCard player={pair.ld} maxCapHit={lineup.maxCapHit} />
+                  {pair.rd ? (
+                    <CapPlayerCard player={pair.rd} maxCapHit={lineup.maxCapHit} />
+                  ) : (
+                    <EmptySlot position="D" />
+                  )}
+                </div>
               </div>
             </div>
           ))}
@@ -239,7 +277,14 @@ export default function RosterLineupView({ data }: RosterLineupViewProps) {
         capTotal={goaliesCap}
         icon="🥅"
       >
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-3 max-w-3xl mx-auto">
+        {/* Mobile: Compact rows */}
+        <div className="sm:hidden space-y-1">
+          {lineup.goalies.map((g, i) => (
+            <CompactPlayerRow key={g.name + i} player={g} maxCapHit={lineup.maxCapHit} />
+          ))}
+        </div>
+        {/* Desktop: Card grid */}
+        <div className="hidden sm:grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-3 max-w-3xl mx-auto">
           {lineup.goalies.map((g, i) => (
             <CapPlayerCard key={g.name + i} player={g} maxCapHit={lineup.maxCapHit} />
           ))}
@@ -256,7 +301,14 @@ export default function RosterLineupView({ data }: RosterLineupViewProps) {
           capTotal={minorCap}
           icon="📋"
         >
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+          {/* Mobile: Compact rows */}
+          <div className="sm:hidden space-y-1">
+            {lineup.minorLeague.map((p, i) => (
+              <CompactPlayerRow key={p.name + i} player={p} maxCapHit={lineup.maxCapHit} />
+            ))}
+          </div>
+          {/* Desktop: Card grid */}
+          <div className="hidden sm:grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
             {lineup.minorLeague.map((p, i) => (
               <CapPlayerCard key={p.name + i} player={p} maxCapHit={lineup.maxCapHit} />
             ))}
@@ -419,7 +471,14 @@ function ExtraPlayersSection({
           {formatCap(totalCap)}
         </span>
       </div>
-      <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+      {/* Mobile: Compact rows */}
+      <div className="sm:hidden space-y-1">
+        {players.map((p, i) => (
+          <CompactPlayerRow key={p.name + i} player={p} maxCapHit={maxCapHit} />
+        ))}
+      </div>
+      {/* Desktop: Card grid */}
+      <div className="hidden sm:grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
         {players.map((p, i) => (
           <CapPlayerCard key={p.name + i} player={p} maxCapHit={maxCapHit} />
         ))}
@@ -439,6 +498,87 @@ function EmptySlot({ position }: { position: string }) {
         <span className="text-[10px] font-varsity text-citrus-sage/40">{position}</span>
       </div>
       <span className="text-[9px] font-display text-citrus-charcoal/25">Open Slot</span>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Compact Player Row (mobile only)
+   Clean horizontal row: position | name | cap hit + status
+   ═══════════════════════════════════════════════════════════════════ */
+
+const statusColorCompact: Record<string, string> = {
+  UFA: 'text-red-600',
+  RFA: 'text-amber-600',
+  ELC: 'text-blue-600',
+  Signed: 'text-citrus-sage',
+  '35+': 'text-purple-600',
+};
+
+const rosterStatusCompact: Record<string, string> = {
+  IR: 'bg-red-500 text-white',
+  LTIR: 'bg-red-700 text-white',
+  AHL: 'bg-slate-500 text-white',
+  Buyout: 'bg-gray-600 text-white',
+  Retained: 'bg-gray-500 text-white',
+};
+
+function CompactPlayerRow({ player, maxCapHit }: { player: PlayerContract; maxCapHit: number }) {
+  const capBarPercent = Math.min((player.capHit / maxCapHit) * 100, 100);
+  const isNonNHL = player.rosterStatus !== 'NHL';
+
+  return (
+    <div className={cn(
+      "flex items-center gap-2 px-2.5 py-2 rounded-xl border transition-all",
+      isNonNHL
+        ? "bg-white/40 border-citrus-charcoal/10 opacity-80"
+        : "bg-white/70 border-citrus-sage/30",
+    )}>
+      {/* Position pill */}
+      <span className="text-[9px] font-varsity font-black text-citrus-forest bg-citrus-sage/20 border border-citrus-sage/30 rounded-md px-1.5 py-0.5 w-7 text-center flex-shrink-0">
+        {player.position}
+      </span>
+
+      {/* Name + contract info */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <span className="font-display font-bold text-[11px] text-citrus-forest truncate">
+            {player.name}
+          </span>
+          {isNonNHL && (
+            <Badge className={cn("text-[6px] h-3 px-1 font-varsity font-bold border-0 flex-shrink-0", rosterStatusCompact[player.rosterStatus])}>
+              {player.rosterStatus}
+            </Badge>
+          )}
+        </div>
+        {/* Mini cap bar */}
+        <div className="h-1 mt-0.5 bg-citrus-cream/60 rounded-full overflow-hidden">
+          <div
+            className={cn(
+              "h-full rounded-full",
+              capBarPercent > 80
+                ? "bg-gradient-to-r from-citrus-orange to-amber-400"
+                : "bg-gradient-to-r from-citrus-sage to-[#7CB518]",
+            )}
+            style={{ width: `${capBarPercent}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Cap hit + status */}
+      <div className="text-right flex-shrink-0">
+        <span className="font-varsity text-[11px] text-citrus-forest leading-none">
+          {formatCap(player.capHit)}
+        </span>
+        <div className="flex items-center justify-end gap-1 mt-0.5">
+          <span className={cn("text-[8px] font-varsity font-bold", statusColorCompact[player.expiryStatus])}>
+            {player.expiryStatus}
+          </span>
+          <span className="text-[8px] text-citrus-charcoal/40 font-display">
+            {player.yearsRemaining}yr
+          </span>
+        </div>
+      </div>
     </div>
   );
 }

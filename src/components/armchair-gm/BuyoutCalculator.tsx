@@ -231,18 +231,25 @@ export default function BuyoutCalculator() {
             <div className="space-y-4 animate-in fade-in duration-300">
               {/* Player Card */}
               <div className="bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden">
-                <div className="px-4 md:px-6 py-4 bg-gradient-to-r from-citrus-forest via-citrus-forest/95 to-citrus-forest">
-                  <div className="flex items-center gap-4">
-                    <PlayerHeadshot player={selectedPlayer} size="lg" />
-                    <div className="flex-1">
-                      <h3 className="font-varsity text-xl text-citrus-cream">{selectedPlayer.name}</h3>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge className="bg-citrus-sage/30 text-citrus-cream text-[9px] font-varsity">{selectedPlayer.position}</Badge>
-                        <span className="text-xs text-citrus-sage/80 font-display">Age {selectedPlayer.age}</span>
-                        <span className="text-xs text-citrus-sage/80 font-display">&middot;</span>
-                        <span className="text-xs text-citrus-sage/80 font-display">
+                <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 bg-gradient-to-r from-citrus-forest via-citrus-forest/95 to-citrus-forest">
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <div className="hidden sm:block">
+                      <PlayerHeadshot player={selectedPlayer} size="lg" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-varsity text-lg sm:text-xl text-citrus-cream truncate">{selectedPlayer.name}</h3>
+                      <div className="flex items-center gap-1.5 sm:gap-2 mt-0.5 sm:mt-1 flex-wrap">
+                        <Badge className="bg-citrus-sage/30 text-citrus-cream text-[8px] sm:text-[9px] font-varsity">{selectedPlayer.position}</Badge>
+                        <span className="text-[10px] sm:text-xs text-citrus-sage/80 font-display">Age {selectedPlayer.age}</span>
+                        <span className="text-[10px] sm:text-xs text-citrus-sage/80 font-display">&middot;</span>
+                        <span className="text-[10px] sm:text-xs text-citrus-sage/80 font-display">
                           {selectedPlayer.age >= 26 ? 'Standard' : 'Under-26'} buyout
                         </span>
+                      </div>
+                      {/* Mobile-only cap hit */}
+                      <div className="sm:hidden mt-1">
+                        <span className="font-varsity text-sm text-citrus-cream">{formatCap(selectedPlayer.capHit)}</span>
+                        <span className="text-[9px] text-citrus-sage/60 font-display ml-1">cap hit</span>
                       </div>
                     </div>
                     <div className="hidden md:block text-right">
@@ -275,34 +282,40 @@ export default function BuyoutCalculator() {
               )}
 
               {/* Summary Cards */}
-              <div className="grid grid-cols-3 gap-3">
-                <div className="bg-green-50 rounded-xl border-2 border-green-200 p-4 text-center">
-                  <TrendingDown className="w-5 h-5 text-green-600 mx-auto mb-1" />
-                  <div className="text-[9px] text-green-700 uppercase font-display font-bold tracking-wider">
-                    Year 1 Savings
-                  </div>
-                  <div className="font-varsity text-lg text-green-700">
-                    {buyoutResult.years[0]?.capSavings > 0 ? formatCap(buyoutResult.years[0].capSavings) : '$0'}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
+                <div className="bg-green-50 rounded-xl border-2 border-green-200 p-3 sm:p-4 flex sm:flex-col items-center sm:items-center gap-3 sm:gap-0 sm:text-center">
+                  <TrendingDown className="w-5 h-5 text-green-600 flex-shrink-0 sm:mb-1" />
+                  <div className="flex-1 sm:flex-none">
+                    <div className="text-[9px] text-green-700 uppercase font-display font-bold tracking-wider">
+                      Year 1 Savings
+                    </div>
+                    <div className="font-varsity text-base sm:text-lg text-green-700">
+                      {buyoutResult.years[0]?.capSavings > 0 ? formatCap(buyoutResult.years[0].capSavings) : '$0'}
+                    </div>
                   </div>
                 </div>
-                <div className="bg-red-50 rounded-xl border-2 border-red-200 p-4 text-center">
-                  <DollarSign className="w-5 h-5 text-red-600 mx-auto mb-1" />
-                  <div className="text-[9px] text-red-700 uppercase font-display font-bold tracking-wider">Total Dead Cap</div>
-                  <div className="font-varsity text-lg text-red-700">{formatCap(buyoutResult.totalDeadCap)}</div>
+                <div className="bg-red-50 rounded-xl border-2 border-red-200 p-3 sm:p-4 flex sm:flex-col items-center sm:items-center gap-3 sm:gap-0 sm:text-center">
+                  <DollarSign className="w-5 h-5 text-red-600 flex-shrink-0 sm:mb-1" />
+                  <div className="flex-1 sm:flex-none">
+                    <div className="text-[9px] text-red-700 uppercase font-display font-bold tracking-wider">Total Dead Cap</div>
+                    <div className="font-varsity text-base sm:text-lg text-red-700">{formatCap(buyoutResult.totalDeadCap)}</div>
+                  </div>
                 </div>
                 <div className={cn(
-                  "rounded-xl border-2 p-4 text-center",
+                  "rounded-xl border-2 p-3 sm:p-4 flex sm:flex-col items-center sm:items-center gap-3 sm:gap-0 sm:text-center",
                   buyoutResult.totalSavings > 0
                     ? "bg-green-50 border-green-200"
                     : "bg-red-50 border-red-200"
                 )}>
-                  <TrendingUp className="w-5 h-5 text-citrus-forest mx-auto mb-1" />
-                  <div className="text-[9px] text-citrus-charcoal/70 uppercase font-display font-bold tracking-wider">Net Cap Impact</div>
-                  <div className={cn(
-                    "font-varsity text-lg",
-                    buyoutResult.totalSavings > 0 ? "text-green-700" : "text-red-700"
-                  )}>
-                    {buyoutResult.totalSavings > 0 ? '+' : ''}{formatCap(buyoutResult.totalSavings)}
+                  <TrendingUp className="w-5 h-5 text-citrus-forest flex-shrink-0 sm:mb-1" />
+                  <div className="flex-1 sm:flex-none">
+                    <div className="text-[9px] text-citrus-charcoal/70 uppercase font-display font-bold tracking-wider">Net Cap Impact</div>
+                    <div className={cn(
+                      "font-varsity text-base sm:text-lg",
+                      buyoutResult.totalSavings > 0 ? "text-green-700" : "text-red-700"
+                    )}>
+                      {buyoutResult.totalSavings > 0 ? '+' : ''}{formatCap(buyoutResult.totalSavings)}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -314,11 +327,11 @@ export default function BuyoutCalculator() {
                 </div>
 
                 {/* Table Header */}
-                <div className="grid grid-cols-4 gap-2 px-4 py-2 bg-citrus-sage/10 border-b border-citrus-sage/20">
-                  <span className="text-[9px] text-citrus-charcoal/50 uppercase font-display font-bold">Season</span>
-                  <span className="text-[9px] text-citrus-charcoal/50 uppercase font-display font-bold text-right">Cap Charge</span>
-                  <span className="text-[9px] text-citrus-charcoal/50 uppercase font-display font-bold text-right">Cap Savings</span>
-                  <span className="text-[9px] text-citrus-charcoal/50 uppercase font-display font-bold text-right">Cash Cost</span>
+                <div className="grid grid-cols-[1fr_4.5rem_4.5rem_4.5rem] sm:grid-cols-4 gap-1 sm:gap-2 px-2 sm:px-4 py-2 bg-citrus-sage/10 border-b border-citrus-sage/20">
+                  <span className="text-[8px] sm:text-[9px] text-citrus-charcoal/50 uppercase font-display font-bold">Season</span>
+                  <span className="text-[8px] sm:text-[9px] text-citrus-charcoal/50 uppercase font-display font-bold text-right">Charge</span>
+                  <span className="text-[8px] sm:text-[9px] text-citrus-charcoal/50 uppercase font-display font-bold text-right">Savings</span>
+                  <span className="text-[8px] sm:text-[9px] text-citrus-charcoal/50 uppercase font-display font-bold text-right">Cash</span>
                 </div>
 
                 {/* Rows */}
@@ -326,44 +339,44 @@ export default function BuyoutCalculator() {
                   <div
                     key={year.season}
                     className={cn(
-                      "grid grid-cols-4 gap-2 px-4 py-2.5 border-b border-citrus-sage/10",
+                      "grid grid-cols-[1fr_4.5rem_4.5rem_4.5rem] sm:grid-cols-4 gap-1 sm:gap-2 px-2 sm:px-4 py-2 sm:py-2.5 border-b border-citrus-sage/10",
                       year.isPostContract ? "bg-red-50/30" : i % 2 === 0 ? "bg-white/40" : "bg-citrus-cream/30"
                     )}
                   >
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-display font-semibold text-citrus-forest">{year.season}</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] sm:text-xs font-display font-semibold text-citrus-forest">{year.season}</span>
                       {year.isPostContract && (
-                        <Badge className="bg-red-100 text-red-700 text-[7px] h-3.5 px-1 border border-red-200">
+                        <Badge className="bg-red-100 text-red-700 text-[6px] sm:text-[7px] h-3 sm:h-3.5 px-0.5 sm:px-1 border border-red-200">
                           Post
                         </Badge>
                       )}
                     </div>
-                    <span className="text-xs font-varsity text-red-600 text-right">{formatCap(year.capCharge)}</span>
+                    <span className="text-[10px] sm:text-xs font-varsity text-red-600 text-right">{formatCap(year.capCharge)}</span>
                     <span className={cn(
-                      "text-xs font-varsity text-right",
+                      "text-[10px] sm:text-xs font-varsity text-right",
                       year.capSavings > 0 ? "text-green-600" : "text-red-600"
                     )}>
                       {year.capSavings > 0 ? '+' : ''}{formatCap(year.capSavings)}
                     </span>
-                    <span className="text-xs font-varsity text-citrus-charcoal text-right">
+                    <span className="text-[10px] sm:text-xs font-varsity text-citrus-charcoal text-right">
                       {formatCap(year.actualCost)}
                     </span>
                   </div>
                 ))}
 
                 {/* Total Row */}
-                <div className="grid grid-cols-4 gap-2 px-4 py-3 bg-gradient-to-r from-citrus-sage/15 to-citrus-sage/10 border-t-2 border-citrus-sage/30">
-                  <span className="text-xs font-display font-bold text-citrus-forest uppercase">Total</span>
-                  <span className="text-xs font-varsity text-red-600 font-bold text-right">
+                <div className="grid grid-cols-[1fr_4.5rem_4.5rem_4.5rem] sm:grid-cols-4 gap-1 sm:gap-2 px-2 sm:px-4 py-2.5 sm:py-3 bg-gradient-to-r from-citrus-sage/15 to-citrus-sage/10 border-t-2 border-citrus-sage/30">
+                  <span className="text-[10px] sm:text-xs font-display font-bold text-citrus-forest uppercase">Total</span>
+                  <span className="text-[10px] sm:text-xs font-varsity text-red-600 font-bold text-right">
                     {formatCap(buyoutResult.totalDeadCap)}
                   </span>
                   <span className={cn(
-                    "text-xs font-varsity font-bold text-right",
+                    "text-[10px] sm:text-xs font-varsity font-bold text-right",
                     buyoutResult.totalSavings > 0 ? "text-green-600" : "text-red-600"
                   )}>
                     {buyoutResult.totalSavings > 0 ? '+' : ''}{formatCap(buyoutResult.totalSavings)}
                   </span>
-                  <span className="text-xs font-varsity text-citrus-charcoal font-bold text-right">
+                  <span className="text-[10px] sm:text-xs font-varsity text-citrus-charcoal font-bold text-right">
                     {formatCap(buyoutResult.totalCost)}
                   </span>
                 </div>

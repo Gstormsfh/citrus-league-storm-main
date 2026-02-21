@@ -163,13 +163,13 @@ export default function TeamSelector({ selectedTeam, onSelectTeam }: TeamSelecto
           </div>
 
           {/* Table Header */}
-          <div className="grid grid-cols-[2rem_2.5rem_1fr_6rem_6rem_4rem] md:grid-cols-[2rem_2.5rem_1fr_7rem_7rem_5rem] items-center gap-1 md:gap-2 px-3 py-2 bg-citrus-sage/10 border-b border-citrus-sage/20">
-            <span className="text-[8px] text-citrus-charcoal/40 uppercase font-display font-bold text-center">#</span>
+          <div className="grid grid-cols-[1.5rem_2rem_1fr_4.5rem_4.5rem] sm:grid-cols-[2rem_2.5rem_1fr_6rem_6rem_4rem] md:grid-cols-[2rem_2.5rem_1fr_7rem_7rem_5rem] items-center gap-1 md:gap-2 px-2 sm:px-3 py-2 bg-citrus-sage/10 border-b border-citrus-sage/20">
+            <span className="text-[7px] sm:text-[8px] text-citrus-charcoal/40 uppercase font-display font-bold text-center">#</span>
             <span></span>
             <SortHeader label="Team" sortKey="name" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
             <SortHeader label="Cap Hit" sortKey="capHit" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} align="right" />
-            <SortHeader label="Cap Space" sortKey="capSpace" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} align="right" />
-            <SortHeader label="Roster" sortKey="roster" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} align="center" />
+            <SortHeader label="Space" sortKey="capSpace" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} align="right" />
+            <SortHeader label="Roster" sortKey="roster" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} align="center" className="hidden sm:flex" />
           </div>
 
           {/* Table Rows */}
@@ -185,16 +185,16 @@ export default function TeamSelector({ selectedTeam, onSelectTeam }: TeamSelecto
                   key={team.teamAbbrev}
                   onClick={() => onSelectTeam(team.teamAbbrev)}
                   className={cn(
-                    "w-full grid grid-cols-[2rem_2.5rem_1fr_6rem_6rem_4rem] md:grid-cols-[2rem_2.5rem_1fr_7rem_7rem_5rem] items-center gap-1 md:gap-2 px-3 py-2.5 text-left transition-all border-b border-citrus-sage/10",
+                    "w-full grid grid-cols-[1.5rem_2rem_1fr_4.5rem_4.5rem] sm:grid-cols-[2rem_2.5rem_1fr_6rem_6rem_4rem] md:grid-cols-[2rem_2.5rem_1fr_7rem_7rem_5rem] items-center gap-1 md:gap-2 px-2 sm:px-3 py-2 sm:py-2.5 text-left transition-all border-b border-citrus-sage/10",
                     selectedTeam === team.teamAbbrev ? "bg-citrus-sage/20" : "hover:bg-citrus-sage/5",
                     i % 2 === 0 ? "bg-white/40" : "bg-citrus-cream/20"
                   )}
                 >
-                  <span className="text-[10px] text-citrus-charcoal/50 font-display font-semibold text-center">{i + 1}</span>
-                  <img src={info?.logoUrl || ''} alt={team.teamAbbrev} className="w-6 h-6 object-contain" />
+                  <span className="text-[9px] sm:text-[10px] text-citrus-charcoal/50 font-display font-semibold text-center">{i + 1}</span>
+                  <img src={info?.logoUrl || ''} alt={team.teamAbbrev} className="w-5 h-5 sm:w-6 sm:h-6 object-contain" />
                   <div className="min-w-0">
-                    <span className="font-display font-bold text-xs text-citrus-forest truncate block">{team.teamName}</span>
-                    <div className="h-1 mt-1 bg-citrus-cream rounded-full overflow-hidden">
+                    <span className="font-display font-bold text-[10px] sm:text-xs text-citrus-forest truncate block">{team.teamName}</span>
+                    <div className="h-1 mt-0.5 sm:mt-1 bg-citrus-cream rounded-full overflow-hidden">
                       <div
                         className={cn(
                           "h-full rounded-full transition-all",
@@ -204,14 +204,14 @@ export default function TeamSelector({ selectedTeam, onSelectTeam }: TeamSelecto
                       />
                     </div>
                   </div>
-                  <span className="font-varsity text-xs text-citrus-forest text-right">{formatCap(team.projectedCapHit)}</span>
+                  <span className="font-varsity text-[10px] sm:text-xs text-citrus-forest text-right">{formatCap(team.projectedCapHit)}</span>
                   <span className={cn(
-                    "font-varsity text-xs text-right",
+                    "font-varsity text-[10px] sm:text-xs text-right",
                     isOverCap ? "text-red-600" : isNearCap ? "text-amber-600" : "text-green-600"
                   )}>
                     {isOverCap ? '-' : ''}{formatCap(Math.abs(team.capSpace))}
                   </span>
-                  <span className="font-varsity text-xs text-citrus-charcoal/70 text-center">{team.activeRosterSize}</span>
+                  <span className="hidden sm:block font-varsity text-xs text-citrus-charcoal/70 text-center">{team.activeRosterSize}</span>
                 </button>
               );
             })}
@@ -223,7 +223,7 @@ export default function TeamSelector({ selectedTeam, onSelectTeam }: TeamSelecto
 }
 
 function SortHeader({
-  label, sortKey: key, currentKey, dir, onToggle, align = 'left',
+  label, sortKey: key, currentKey, dir, onToggle, align = 'left', className,
 }: {
   label: string;
   sortKey: SortKey;
@@ -231,16 +231,18 @@ function SortHeader({
   dir: SortDir;
   onToggle: (key: SortKey) => void;
   align?: 'left' | 'right' | 'center';
+  className?: string;
 }) {
   const isActive = currentKey === key;
   return (
     <button
       onClick={() => onToggle(key)}
       className={cn(
-        "flex items-center gap-0.5 text-[8px] uppercase font-display font-bold tracking-wider transition-colors",
+        "flex items-center gap-0.5 text-[7px] sm:text-[8px] uppercase font-display font-bold tracking-wider transition-colors",
         isActive ? "text-citrus-forest" : "text-citrus-charcoal/40 hover:text-citrus-charcoal/60",
         align === 'right' && "justify-end",
-        align === 'center' && "justify-center"
+        align === 'center' && "justify-center",
+        className,
       )}
     >
       {label}
