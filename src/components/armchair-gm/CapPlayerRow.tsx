@@ -1,10 +1,25 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { ChevronDown, ChevronUp, Lock, FileText } from 'lucide-react';
+import { ChevronDown, ChevronUp, Lock, FileText, X } from 'lucide-react';
 import { PlayerContract, formatCap, formatCapFull } from '@/types/captracker';
 import PlayerAvatar from './PlayerAvatar';
+
+// Hook to detect mobile/tablet
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  return isMobile;
+};
 
 interface CapPlayerRowProps {
   player: PlayerContract;
@@ -14,6 +29,8 @@ interface CapPlayerRowProps {
 
 export default function CapPlayerRow({ player, rank, maxCapHit }: CapPlayerRowProps) {
   const [expanded, setExpanded] = useState(false);
+  const [capTooltipOpen, setCapTooltipOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   const capBarPercent = Math.min((player.capHit / maxCapHit) * 100, 100);
 
@@ -99,24 +116,61 @@ export default function CapPlayerRow({ player, rank, maxCapHit }: CapPlayerRowPr
         </span>
 
         {/* Cap Hit with mini bar */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className="flex flex-col gap-0.5">
-              <span className="font-varsity text-xs md:text-sm text-citrus-forest text-right">
-                {formatCap(player.capHit)}
-              </span>
-              <div className="h-1.5 bg-citrus-cream rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-citrus-sage to-[#7CB518] transition-all duration-500"
-                  style={{ width: `${capBarPercent}%` }}
-                />
+        {isMobile ? (
+          <Popover open={capTooltipOpen} onOpenChange={setCapTooltipOpen}>
+            <PopoverTrigger asChild>
+              <button
+                className="flex flex-col gap-0.5 w-full touch-manipulation"
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
+              >
+                <span className="font-varsity text-xs md:text-sm text-citrus-forest text-right">
+                  {formatCap(player.capHit)}
+                </span>
+                <div className="h-1.5 bg-citrus-cream rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-citrus-sage to-[#7CB518] transition-all duration-500"
+                    style={{ width: `${capBarPercent}%` }}
+                  />
+                </div>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              side="top"
+              align="center"
+              sideOffset={4}
+              className="bg-citrus-forest text-citrus-cream text-xs p-2 w-auto !z-[9999]"
+              onOpenAutoFocus={(e) => e.preventDefault()}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span>Cap Hit: {formatCapFull(player.capHit)}</span>
+                <button onClick={(e) => { e.stopPropagation(); setCapTooltipOpen(false); }} className="text-citrus-sage/60 hover:text-citrus-cream transition-colors">
+                  <X className="h-3 w-3" />
+                </button>
               </div>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent className="bg-citrus-forest text-citrus-cream text-xs p-2">
-            Cap Hit: {formatCapFull(player.capHit)}
-          </TooltipContent>
-        </Tooltip>
+            </PopoverContent>
+          </Popover>
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex flex-col gap-0.5">
+                <span className="font-varsity text-xs md:text-sm text-citrus-forest text-right">
+                  {formatCap(player.capHit)}
+                </span>
+                <div className="h-1.5 bg-citrus-cream rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-citrus-sage to-[#7CB518] transition-all duration-500"
+                    style={{ width: `${capBarPercent}%` }}
+                  />
+                </div>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent className="bg-citrus-forest text-citrus-cream text-xs p-2">
+              Cap Hit: {formatCapFull(player.capHit)}
+            </TooltipContent>
+          </Tooltip>
+        )}
 
         {/* Years Remaining */}
         <div className="flex flex-col items-center">
@@ -138,7 +192,7 @@ export default function CapPlayerRow({ player, rank, maxCapHit }: CapPlayerRowPr
           {expanded ? (
             <ChevronUp className="w-3.5 h-3.5 text-citrus-charcoal/40" />
           ) : (
-            <ChevronDown className="w-3.5 h-3.5 text-citrus-charcoal/40 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <ChevronDown className="w-3.5 h-3.5 text-citrus-charcoal/40 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity" />
           )}
         </div>
       </div>

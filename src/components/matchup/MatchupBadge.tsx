@@ -15,6 +15,23 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useState, useEffect } from "react";
+import { X } from "lucide-react";
+
+// Hook to detect mobile/tablet (matches other tooltip components)
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  return isMobile;
+};
 
 interface MatchupBadgeProps {
   difficulty: number; // 0.8 to 1.2 scale
@@ -24,13 +41,16 @@ interface MatchupBadgeProps {
   className?: string;
 }
 
-export const MatchupBadge = ({ 
-  difficulty, 
-  opponent, 
+export const MatchupBadge = ({
+  difficulty,
+  opponent,
   size = 'sm',
   showLabel = false,
-  className 
+  className
 }: MatchupBadgeProps) => {
+  const [open, setOpen] = useState(false);
+  const isMobile = useIsMobile();
+
   // Determine color and label - CITRUS THEME COLORS!
   const getConfig = (diff: number) => {
     if (diff <= 0.95) {
@@ -106,28 +126,64 @@ export const MatchupBadge = ({
     </div>
   );
 
-  // Wrap with tooltip for detailed info
+  const tooltipContent = (
+    <div className="text-xs space-y-1.5">
+      <div className="font-varsity flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className={cn("w-2.5 h-2.5 rounded-full shadow-sm", config.color)} />
+          <span className="uppercase tracking-wide">{config.label} Matchup</span>
+          {opponent && <span className="text-citrus-sage font-display">vs {opponent}</span>}
+        </div>
+        {isMobile && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setOpen(false); }}
+            className="text-[#E8EED9] hover:text-citrus-cream transition-colors"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+      <div className="text-[#E8EED9]/90 font-display">{config.description}</div>
+      <div className="text-citrus-sage text-[10px] font-display">
+        Difficulty: {difficulty.toFixed(2)}
+      </div>
+    </div>
+  );
+
+  // Mobile: Use Popover (tap to open, tap outside to close)
+  if (isMobile) {
+    return (
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button className="touch-manipulation" onClick={(e) => e.stopPropagation()}>
+            {badge}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          side="top"
+          align="center"
+          sideOffset={8}
+          className="bg-citrus-forest text-[#E8EED9] p-3 rounded-varsity shadow-varsity border-2 border-citrus-sage w-auto max-w-[260px] !z-[9999]"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
+          {tooltipContent}
+        </PopoverContent>
+      </Popover>
+    );
+  }
+
+  // Desktop: Use Tooltip (hover)
   return (
     <TooltipProvider>
       <Tooltip delayDuration={200}>
         <TooltipTrigger asChild>
           {badge}
         </TooltipTrigger>
-        <TooltipContent 
-          side="top" 
+        <TooltipContent
+          side="top"
           className="bg-citrus-forest text-[#E8EED9] p-3 rounded-varsity shadow-varsity border-2 border-citrus-sage"
         >
-          <div className="text-xs space-y-1.5">
-            <div className="font-varsity flex items-center gap-2">
-              <span className={cn("w-2.5 h-2.5 rounded-full shadow-sm", config.color)} />
-              <span className="uppercase tracking-wide">{config.label} Matchup</span>
-              {opponent && <span className="text-citrus-sage font-display">vs {opponent}</span>}
-            </div>
-            <div className="text-[#E8EED9]/90 font-display">{config.description}</div>
-            <div className="text-citrus-sage text-[10px] font-display">
-              Difficulty: {difficulty.toFixed(2)}
-            </div>
-          </div>
+          {tooltipContent}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
@@ -157,44 +213,88 @@ interface ROSProjectionProps {
   className?: string;
 }
 
-export const ROSProjection = ({ 
-  totalPoints, 
-  gamesRemaining, 
+export const ROSProjection = ({
+  totalPoints,
+  gamesRemaining,
   avgPpg,
-  className 
+  className
 }: ROSProjectionProps) => {
+  const [open, setOpen] = useState(false);
+  const isMobile = useIsMobile();
+
+  const trigger = (
+    <div className={cn(
+      "inline-flex items-center gap-1 text-xs bg-slate-800 px-2 py-1 rounded-md",
+      className
+    )}>
+      <span className="text-slate-400">ROS:</span>
+      <span className="font-bold text-white">{totalPoints.toFixed(1)}</span>
+      <span className="text-slate-500">pts</span>
+    </div>
+  );
+
+  const content = (
+    <div className="text-xs space-y-1">
+      <div className="flex items-center justify-between">
+        <span className="font-semibold">Rest of Season Projection</span>
+        {isMobile && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setOpen(false); }}
+            className="text-slate-400 hover:text-white transition-colors ml-2"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-x-4 text-slate-300">
+        <span>Total Points:</span>
+        <span className="font-bold text-white">{totalPoints.toFixed(1)}</span>
+        <span>Games Left:</span>
+        <span className="font-bold text-white">{gamesRemaining}</span>
+        {avgPpg !== undefined && (
+          <>
+            <span>Avg PPG:</span>
+            <span className="font-bold text-white">{avgPpg.toFixed(2)}</span>
+          </>
+        )}
+      </div>
+    </div>
+  );
+
+  // Mobile: Use Popover (tap to open, tap outside to close)
+  if (isMobile) {
+    return (
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button className="touch-manipulation" onClick={(e) => e.stopPropagation()}>
+            {trigger}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          side="top"
+          align="center"
+          sideOffset={8}
+          className="bg-slate-900 text-white p-2 rounded-lg shadow-lg border-0 w-auto max-w-[240px] !z-[9999]"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
+          {content}
+        </PopoverContent>
+      </Popover>
+    );
+  }
+
+  // Desktop: Use Tooltip (hover)
   return (
     <TooltipProvider>
       <Tooltip delayDuration={200}>
         <TooltipTrigger asChild>
-          <div className={cn(
-            "inline-flex items-center gap-1 text-xs bg-slate-800 px-2 py-1 rounded-md",
-            className
-          )}>
-            <span className="text-slate-400">ROS:</span>
-            <span className="font-bold text-white">{totalPoints.toFixed(1)}</span>
-            <span className="text-slate-500">pts</span>
-          </div>
+          {trigger}
         </TooltipTrigger>
-        <TooltipContent 
-          side="top" 
+        <TooltipContent
+          side="top"
           className="bg-slate-900 text-white p-2 rounded-lg shadow-lg border-0"
         >
-          <div className="text-xs space-y-1">
-            <div className="font-semibold">Rest of Season Projection</div>
-            <div className="grid grid-cols-2 gap-x-4 text-slate-300">
-              <span>Total Points:</span>
-              <span className="font-bold text-white">{totalPoints.toFixed(1)}</span>
-              <span>Games Left:</span>
-              <span className="font-bold text-white">{gamesRemaining}</span>
-              {avgPpg !== undefined && (
-                <>
-                  <span>Avg PPG:</span>
-                  <span className="font-bold text-white">{avgPpg.toFixed(2)}</span>
-                </>
-              )}
-            </div>
-          </div>
+          {content}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

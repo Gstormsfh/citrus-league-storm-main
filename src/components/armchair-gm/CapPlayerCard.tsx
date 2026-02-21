@@ -1,9 +1,25 @@
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { Lock, FileText } from 'lucide-react';
+import { Lock, FileText, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { PlayerContract, formatCap, formatCapFull } from '@/types/captracker';
 import PlayerAvatar from './PlayerAvatar';
+
+// Hook to detect mobile/tablet
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  return isMobile;
+};
 
 interface CapPlayerCardProps {
   player: PlayerContract;
@@ -33,13 +49,13 @@ const rosterStatusConfig: Record<string, { color: string; pulse?: boolean }> = {
 };
 
 export default function CapPlayerCard({ player, maxCapHit }: CapPlayerCardProps) {
+  const [open, setOpen] = useState(false);
+  const isMobile = useIsMobile();
   const capBarPercent = Math.min((player.capHit / maxCapHit) * 100, 100);
   const isNonNHL = player.rosterStatus !== 'NHL';
   const rosterConfig = rosterStatusConfig[player.rosterStatus];
 
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
+  const cardContent = (
         <div className={cn(
           "relative rounded-2xl overflow-hidden transition-all duration-200 cursor-default group",
           "border-2 shadow-patch",
@@ -155,46 +171,89 @@ export default function CapPlayerCard({ player, maxCapHit }: CapPlayerCardProps)
             </div>
           </div>
         </div>
-      </TooltipTrigger>
+  );
 
-      {/* ─── Tooltip: Full contract details ─── */}
-      <TooltipContent
-        side="top"
-        className="bg-citrus-forest/95 backdrop-blur-md text-citrus-cream p-4 max-w-[280px] rounded-2xl border-2 border-citrus-sage/40 shadow-varsity z-[9999]"
-      >
-        {/* Tooltip header */}
-        <div className="flex items-center gap-2 border-b border-citrus-sage/30 pb-2 mb-2.5">
-          <PlayerAvatar name={player.name} position={player.position} jerseyNumber={player.jerseyNumber} size="sm" />
-          <div className="flex-1 min-w-0">
-            <h4 className="font-varsity text-sm leading-tight truncate">{player.name}</h4>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="text-[9px] text-citrus-sage/80 font-display">{player.position}</span>
-              {player.age > 0 && <span className="text-[9px] text-citrus-sage/60 font-display">Age {player.age}</span>}
-            </div>
+  const detailContent = (
+    <div>
+      {/* Tooltip header */}
+      <div className="flex items-center gap-2 border-b border-citrus-sage/30 pb-2 mb-2.5">
+        <PlayerAvatar name={player.name} position={player.position} jerseyNumber={player.jerseyNumber} size="sm" />
+        <div className="flex-1 min-w-0">
+          <h4 className="font-varsity text-sm leading-tight truncate">{player.name}</h4>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <span className="text-[9px] text-citrus-sage/80 font-display">{player.position}</span>
+            {player.age > 0 && <span className="text-[9px] text-citrus-sage/60 font-display">Age {player.age}</span>}
           </div>
         </div>
+        {isMobile && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setOpen(false); }}
+            className="text-citrus-sage/60 hover:text-citrus-cream transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
 
-        {/* Contract grid */}
-        <div className="space-y-1.5">
-          <TooltipRow label="Cap Hit" value={formatCapFull(player.capHit)} highlight />
-          <TooltipRow label="AAV" value={formatCapFull(player.aav)} />
-          <TooltipRow label="Base Salary" value={formatCapFull(player.baseSalary)} />
-          {player.signingBonus > 0 && (
-            <TooltipRow label="Signing Bonus" value={formatCapFull(player.signingBonus)} />
-          )}
-          <div className="border-t border-citrus-sage/20 my-1.5" />
-          <TooltipRow label="Contract" value={`${player.contractYears}yr total`} />
-          <TooltipRow label="Remaining" value={`${player.yearsRemaining}yr (exp. ${player.expiryYear})`} />
-          <TooltipRow label="Status" value={player.expiryStatus === 'UFA' ? 'Unrestricted FA' : player.expiryStatus === 'RFA' ? 'Restricted FA' : player.expiryStatus} />
-          {player.clause && (
-            <div className="flex items-center gap-1.5 pt-1">
-              <FileText className="w-3 h-3 text-citrus-sage/60" />
-              <span className="text-[10px] font-display text-citrus-sage/80">
-                {player.clause === 'NMC' ? 'No-Movement Clause' : player.clause === 'M-NTC' ? 'Modified No-Trade' : 'No-Trade Clause'}
-              </span>
-            </div>
-          )}
-        </div>
+      {/* Contract grid */}
+      <div className="space-y-1.5">
+        <TooltipRow label="Cap Hit" value={formatCapFull(player.capHit)} highlight />
+        <TooltipRow label="AAV" value={formatCapFull(player.aav)} />
+        <TooltipRow label="Base Salary" value={formatCapFull(player.baseSalary)} />
+        {player.signingBonus > 0 && (
+          <TooltipRow label="Signing Bonus" value={formatCapFull(player.signingBonus)} />
+        )}
+        <div className="border-t border-citrus-sage/20 my-1.5" />
+        <TooltipRow label="Contract" value={`${player.contractYears}yr total`} />
+        <TooltipRow label="Remaining" value={`${player.yearsRemaining}yr (exp. ${player.expiryYear})`} />
+        <TooltipRow label="Status" value={player.expiryStatus === 'UFA' ? 'Unrestricted FA' : player.expiryStatus === 'RFA' ? 'Restricted FA' : player.expiryStatus} />
+        {player.clause && (
+          <div className="flex items-center gap-1.5 pt-1">
+            <FileText className="w-3 h-3 text-citrus-sage/60" />
+            <span className="text-[10px] font-display text-citrus-sage/80">
+              {player.clause === 'NMC' ? 'No-Movement Clause' : player.clause === 'M-NTC' ? 'Modified No-Trade' : 'No-Trade Clause'}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const popoverClasses = "bg-citrus-forest/95 backdrop-blur-md text-citrus-cream p-4 max-w-[280px] rounded-2xl border-2 border-citrus-sage/40 shadow-varsity !z-[9999]";
+
+  // Mobile: Use Popover (tap to open, tap outside to close)
+  if (isMobile) {
+    return (
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button className="touch-manipulation text-left w-full" onClick={(e) => e.stopPropagation()}>
+            {cardContent}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          side="top"
+          align="center"
+          sideOffset={8}
+          className={popoverClasses}
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
+          {detailContent}
+        </PopoverContent>
+      </Popover>
+    );
+  }
+
+  // Desktop: Use Tooltip (hover)
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {cardContent}
+      </TooltipTrigger>
+      <TooltipContent
+        side="top"
+        className={popoverClasses}
+      >
+        {detailContent}
       </TooltipContent>
     </Tooltip>
   );

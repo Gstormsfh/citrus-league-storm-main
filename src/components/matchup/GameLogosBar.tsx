@@ -1,6 +1,68 @@
 import { NHLGame } from "@/services/ScheduleService";
 import { getTeamColor } from "@/utils/teamColors";
 import { getTodayMST, getTodayMSTDate, isTodayMST, formatTimeMST } from "@/utils/timezoneUtils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useState, useEffect } from "react";
+import { X } from "lucide-react";
+
+// Hook to detect mobile/tablet
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  return isMobile;
+};
+
+/** Wrapper that shows a Popover on mobile tap, title tooltip on desktop */
+const GameLogoWithTooltip = ({
+  tooltipText,
+  isMobile,
+  children,
+}: {
+  tooltipText: string;
+  isMobile: boolean;
+  children: React.ReactNode;
+}) => {
+  const [open, setOpen] = useState(false);
+
+  if (!isMobile) {
+    // Desktop: just use native title tooltip
+    return <>{children}</>;
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button className="touch-manipulation" onClick={(e) => e.stopPropagation()}>
+          {children}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        side="top"
+        align="center"
+        sideOffset={6}
+        className="bg-citrus-forest/95 backdrop-blur-md text-citrus-cream text-xs p-2.5 rounded-varsity border-2 border-citrus-sage/40 shadow-varsity w-auto max-w-[220px] !z-[9999]"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-display">{tooltipText}</span>
+          <button
+            onClick={(e) => { e.stopPropagation(); setOpen(false); }}
+            className="text-citrus-sage/60 hover:text-citrus-cream transition-colors flex-shrink-0"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+};
 
 interface GameLogosBarProps {
   games: NHLGame[]; // Games for the matchup week
@@ -9,6 +71,8 @@ interface GameLogosBarProps {
 }
 
 export const GameLogosBar = ({ games, playerTeam, selectedDate }: GameLogosBarProps) => {
+  const isMobile = useIsMobile();
+
   if (!games || games.length === 0 || !playerTeam) {
     return null;
   }
@@ -238,11 +302,12 @@ export const GameLogosBar = ({ games, playerTeam, selectedDate }: GameLogosBarPr
           }
           
           return (
-            <div key={idx} className="flex flex-col items-center gap-0.5">
+            <GameLogoWithTooltip key={idx} tooltipText={tooltipText} isMobile={isMobile}>
+            <div className="flex flex-col items-center gap-0.5">
               <div
                 className={`${containerClasses} ${glowEffect} group cursor-pointer`}
                 style={borderStyle}
-                title={tooltipText}
+                title={isMobile ? undefined : tooltipText}
               >
                 {/* Premium Gradient Overlay on Hover */}
                 <div className="absolute inset-0 rounded-lg bg-gradient-to-br from-citrus-sage/0 to-citrus-orange/0 group-hover:from-citrus-sage/10 group-hover:to-citrus-orange/10 transition-all duration-300"></div>
@@ -305,15 +370,16 @@ export const GameLogosBar = ({ games, playerTeam, selectedDate }: GameLogosBarPr
               
               {/* Date Display */}
               <span className={`text-[8px] lg:text-[9px] leading-tight whitespace-nowrap font-display font-semibold ${
-                isPlayed 
-                  ? 'text-citrus-charcoal/40' 
+                isPlayed
+                  ? 'text-citrus-charcoal/40'
                   : isSelectedDate && (isSelectedDateScheduled || isLive)
-                    ? 'text-citrus-forest' 
+                    ? 'text-citrus-forest'
                     : 'text-citrus-charcoal/60'
               }`}>
                 {displayDate}
               </span>
             </div>
+            </GameLogoWithTooltip>
           );
         } catch (error) {
           console.warn('Error rendering game logo:', error, game);
