@@ -112,7 +112,7 @@ export default function CapPlayerRow({ player, rank, maxCapHit }: CapPlayerRowPr
 
         {/* Age */}
         <span className="text-[10px] md:text-xs text-citrus-charcoal/70 font-display text-center">
-          {player.age}
+          {player.age > 0 ? player.age : '—'}
         </span>
 
         {/* Cap Hit with mini bar */}

@@ -209,7 +209,7 @@ export default function BuyoutCalculator() {
                             <Badge className="bg-citrus-sage/20 text-citrus-forest text-[7px] h-3.5 px-1 font-varsity border border-citrus-sage/40">
                               {p.position}
                             </Badge>
-                            <span className="text-[9px] text-citrus-charcoal/50 font-display">Age {p.age}</span>
+                            {p.age > 0 && <span className="text-[9px] text-citrus-charcoal/50 font-display">Age {p.age}</span>}
                           </div>
                         </div>
                         <div className="text-right">
@@ -240,11 +240,15 @@ export default function BuyoutCalculator() {
                       <h3 className="font-varsity text-lg sm:text-xl text-citrus-cream truncate">{selectedPlayer.name}</h3>
                       <div className="flex items-center gap-1.5 sm:gap-2 mt-0.5 sm:mt-1 flex-wrap">
                         <Badge className="bg-citrus-sage/30 text-citrus-cream text-[8px] sm:text-[9px] font-varsity">{selectedPlayer.position}</Badge>
-                        <span className="text-[10px] sm:text-xs text-citrus-sage/80 font-display">Age {selectedPlayer.age}</span>
-                        <span className="text-[10px] sm:text-xs text-citrus-sage/80 font-display">&middot;</span>
-                        <span className="text-[10px] sm:text-xs text-citrus-sage/80 font-display">
-                          {selectedPlayer.age >= 26 ? 'Standard' : 'Under-26'} buyout
-                        </span>
+                        {selectedPlayer.age > 0 && (
+                          <>
+                            <span className="text-[10px] sm:text-xs text-citrus-sage/80 font-display">Age {selectedPlayer.age}</span>
+                            <span className="text-[10px] sm:text-xs text-citrus-sage/80 font-display">&middot;</span>
+                            <span className="text-[10px] sm:text-xs text-citrus-sage/80 font-display">
+                              {selectedPlayer.age >= 26 ? 'Standard' : 'Under-26'} buyout
+                            </span>
+                          </>
+                        )}
                       </div>
                       {/* Mobile-only cap hit */}
                       <div className="sm:hidden mt-1">

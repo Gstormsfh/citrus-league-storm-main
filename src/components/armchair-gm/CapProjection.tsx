@@ -364,7 +364,7 @@ export default function CapProjection() {
                               <Badge className="bg-citrus-sage/20 text-citrus-forest text-[7px] h-3.5 px-1 font-varsity border border-citrus-sage/40">
                                 {p.position}
                               </Badge>
-                              <span className="text-[9px] text-citrus-charcoal/50 font-display">Age {p.age + (year.expiryYear - 2026)}</span>
+                              {p.age > 0 && <span className="text-[9px] text-citrus-charcoal/50 font-display">Age {p.age + (year.expiryYear - 2026)}</span>}
                             </div>
                           </div>
                           <div className="text-right">
