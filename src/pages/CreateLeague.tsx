@@ -20,10 +20,10 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import {
-  Trophy, Users, Settings, CheckCircle, AlertCircle, UserPlus,
-  Loader2, Copy, Sparkles, Target, Shield, BarChart3,
-  Zap, Crown, DollarSign, Shuffle, ArrowDown, Bot, FileEdit,
-  ChevronDown, ChevronUp, Info, Lock, Unlock,
+  Trophy, CheckCircle, AlertCircle, UserPlus,
+  Copy, Sparkles, Target, Shield, BarChart3,
+  Crown, DollarSign, Shuffle, ArrowDown, Bot, FileEdit,
+  ChevronDown, ChevronUp, Info,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -157,6 +157,7 @@ const CreateLeague = () => {
     waiver_game_lock: true,
     waiver_type: 'rolling' as 'rolling' | 'faab' | 'reverse_standings',
     allow_trades_during_games: true,
+    faab_budget: 100,
   });
 
   // ---- Scoring Stats ----
@@ -177,11 +178,16 @@ const CreateLeague = () => {
     if (code) setJoinCode(code);
   }, [searchParams]);
 
-  // Reset format settings when league type changes
+  // Reset format settings and smart defaults when league type changes
   useEffect(() => {
     if (leagueType === 'fantasy') {
       setScoringFormat('h2h-points');
       setDraftType('snake');
+      setTeamsCount('12');
+    } else if (leagueType === 'pickem' || leagueType === 'confidence-pool') {
+      setTeamsCount('20');
+    } else if (leagueType === 'survivor') {
+      setTeamsCount('30');
     }
   }, [leagueType]);
 
@@ -1230,6 +1236,24 @@ const CreateLeague = () => {
                             </SelectContent>
                           </Select>
                         </div>
+
+                        {/* FAAB Budget - only shown when waiver type is FAAB */}
+                        {waiverSettings.waiver_type === 'faab' && (
+                          <div className="space-y-2">
+                            <Label>FAAB Budget ($)</Label>
+                            <Input
+                              type="number"
+                              value={waiverSettings.faab_budget}
+                              onChange={(e) => setWaiverSettings(prev => ({ ...prev, faab_budget: parseInt(e.target.value) || 100 }))}
+                              className="h-10 font-mono"
+                              min={25}
+                              max={500}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Each team gets this budget to bid on free agents all season. Budget does not replenish.
+                            </p>
+                          </div>
+                        )}
 
                         <div className="space-y-2">
                           <Label>Game Lock</Label>

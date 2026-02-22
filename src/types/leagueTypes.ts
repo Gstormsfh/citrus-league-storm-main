@@ -359,15 +359,32 @@ export function extractFormatSettings(settings: Record<string, unknown>): Partia
     teamsCount: (settings.teamsCount as number) || 12,
     draftRounds: (settings.draftRounds as number) || 21,
     pickTimeLimit: (settings.pickTimeLimit as number) || 90,
+
+    // Auction
     auctionBudget: (settings.auctionBudget as number) || 200,
+    auctionMinBid: (settings.auctionMinBid as number) || 1,
+    auctionNominationTime: (settings.auctionNominationTime as number) || 30,
+
+    // Season
     playoffTeams: (settings.playoffTeams as number) ?? 6,
+    playoffWeeks: (settings.playoffWeeks as number) ?? 3,
     tradeDeadlineWeek: (settings.tradeDeadlineWeek as number) ?? 0,
+    regularSeasonWeeks: (settings.regularSeasonWeeks as number) || undefined,
+
+    // Keeper / Dynasty
     keeperEnabled: (settings.keeperEnabled as boolean) || false,
     keeperCount: (settings.keeperCount as number) || 0,
     keeperPenalty: (settings.keeperPenalty as 'none' | 'round-cost' | 'round-escalation') || 'none',
     dynastyMode: (settings.dynastyMode as boolean) || false,
+
+    // Best Ball
     bestBallEnabled: (settings.bestBallEnabled as boolean) || false,
+
+    // Categories / Roto
     categories: (settings.categories as string[]) || [...DEFAULT_ROTO_CATEGORIES],
+    minGoalieGames: (settings.minGoalieGames as number) ?? 3,
+
+    // Pool settings
     pickemFormat: (settings.pickemFormat as PickemFormat) || 'straight-up',
     picksPerWeek: (settings.picksPerWeek as number) || 10,
     survivorLives: (settings.survivorLives as number) || 1,
