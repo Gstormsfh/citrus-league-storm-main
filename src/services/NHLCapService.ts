@@ -52,7 +52,9 @@ function normalizeName(name: string): string {
 // Cache for birth date lookups to avoid redundant API calls
 const birthDateCache = new Map<string, string | null>();
 
-// Look up a player's birth date via NHL search API
+// Look up a player's birth date via NHL search API → player detail endpoint
+// The search API doesn't return birthDate, so we use it to get the playerId,
+// then fetch the player detail endpoint which does have birthDate.
 async function lookupPlayerBirthDate(name: string): Promise<string | null> {
   const cacheKey = name.toLowerCase();
   if (birthDateCache.has(cacheKey)) {
@@ -60,29 +62,49 @@ async function lookupPlayerBirthDate(name: string): Promise<string | null> {
   }
 
   try {
+    // Step 1: Search for the player to get their playerId
+    let playerId: number | null = null;
+
     const resp = await fetch(
       `https://search.d3.nhle.com/api/v1/search/player?culture=en-us&limit=1&q=${encodeURIComponent(name)}&active=true`
     );
-    if (!resp.ok) {
+    if (resp.ok) {
+      const results = await resp.json();
+      if (Array.isArray(results) && results.length > 0 && results[0].playerId) {
+        playerId = results[0].playerId;
+      }
+    }
+
+    // Try without active filter if not found
+    if (!playerId) {
+      const resp2 = await fetch(
+        `https://search.d3.nhle.com/api/v1/search/player?culture=en-us&limit=1&q=${encodeURIComponent(name)}`
+      );
+      if (resp2.ok) {
+        const results2 = await resp2.json();
+        if (Array.isArray(results2) && results2.length > 0 && results2[0].playerId) {
+          playerId = results2[0].playerId;
+        }
+      }
+    }
+
+    if (!playerId) {
       birthDateCache.set(cacheKey, null);
       return null;
     }
-    const results = await resp.json();
-    if (Array.isArray(results) && results.length > 0 && results[0].birthDate) {
-      birthDateCache.set(cacheKey, results[0].birthDate);
-      return results[0].birthDate;
-    }
-    // Try again without active filter (for retired/buyout players)
-    const resp2 = await fetch(
-      `https://search.d3.nhle.com/api/v1/search/player?culture=en-us&limit=1&q=${encodeURIComponent(name)}`
+
+    // Step 2: Fetch player detail to get birthDate
+    const detailResp = await fetch(
+      `https://api-web.nhle.com/v1/player/${playerId}/landing`
     );
-    if (resp2.ok) {
-      const results2 = await resp2.json();
-      if (Array.isArray(results2) && results2.length > 0 && results2[0].birthDate) {
-        birthDateCache.set(cacheKey, results2[0].birthDate);
-        return results2[0].birthDate;
+    if (detailResp.ok) {
+      const detail = await detailResp.json();
+      if (detail.birthDate) {
+        birthDateCache.set(cacheKey, detail.birthDate);
+        return detail.birthDate;
       }
     }
+
     birthDateCache.set(cacheKey, null);
     return null;
   } catch {
@@ -164,6 +186,7 @@ async function mergePlayerData(
         jerseyNumber: apiPlayer.sweaterNumber || contract.jerseyNumber,
         position: apiPlayer.positionCode || contract.position,
         positionGroup: getPositionGroup(apiPlayer.positionCode || contract.position),
+        birthDate: apiPlayer.birthDate || contract.birthDate,
         age: calculateAge(apiPlayer.birthDate) || contract.age,
       });
       usedContractNames.add(contract.name.toLowerCase());
@@ -175,6 +198,7 @@ async function mergePlayerData(
         position: apiPlayer.positionCode,
         positionGroup: getPositionGroup(apiPlayer.positionCode),
         jerseyNumber: apiPlayer.sweaterNumber,
+        birthDate: apiPlayer.birthDate,
         age: calculateAge(apiPlayer.birthDate),
         team: teamAbbrev,
         headshot: apiPlayer.headshot,
@@ -205,8 +229,8 @@ async function mergePlayerData(
 
   // Look up birth dates for unmatched players via NHL search API
   if (unmatchedPlayers.length > 0) {
-    // Batch lookups in parallel (max ~15 concurrent to be respectful)
-    const BATCH_SIZE = 15;
+    // Batch lookups in parallel (max ~8 concurrent — each lookup is 2-3 API calls)
+    const BATCH_SIZE = 8;
     for (let i = 0; i < unmatchedPlayers.length; i += BATCH_SIZE) {
       const batch = unmatchedPlayers.slice(i, i + BATCH_SIZE);
       const birthDates = await Promise.all(
@@ -214,6 +238,7 @@ async function mergePlayerData(
       );
       for (let j = 0; j < batch.length; j++) {
         if (birthDates[j]) {
+          batch[j].birthDate = birthDates[j]!;
           batch[j].age = calculateAge(birthDates[j]!);
         }
       }
@@ -221,24 +246,6 @@ async function mergePlayerData(
   }
 
   merged.push(...unmatchedPlayers);
-
-  // Fallback: look up birth dates for any merged players still missing age
-  const missingAge = merged.filter(p => !p.age);
-  if (missingAge.length > 0) {
-    const BATCH_SIZE = 15;
-    for (let i = 0; i < missingAge.length; i += BATCH_SIZE) {
-      const batch = missingAge.slice(i, i + BATCH_SIZE);
-      const birthDates = await Promise.all(
-        batch.map(p => lookupPlayerBirthDate(p.name))
-      );
-      for (let j = 0; j < batch.length; j++) {
-        if (birthDates[j]) {
-          batch[j].age = calculateAge(birthDates[j]!);
-        }
-      }
-    }
-  }
-
   return merged;
 }
 
