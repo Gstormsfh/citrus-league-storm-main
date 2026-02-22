@@ -14,6 +14,7 @@ export interface PlayerContract {
   positionGroup: PositionGroup;
   jerseyNumber: number;
   age: number;
+  birthDate?: string;      // YYYY-MM-DD format, used to calculate age
   team: string;            // Team abbreviation (e.g. "TOR", "EDM")
   headshot?: string;
 
