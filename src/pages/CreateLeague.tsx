@@ -200,6 +200,14 @@ const CreateLeague = () => {
     }
   }, [scoringFormat]);
 
+  // Confidence Pool: max confidence points should match picks per week
+  // (you assign values 1 through N for N picks, each used once)
+  useEffect(() => {
+    if (leagueType === 'confidence-pool') {
+      setConfidenceMaxPoints(picksPerWeek);
+    }
+  }, [picksPerWeek, leagueType]);
+
   // Derived state
   const isFantasy = leagueType === 'fantasy';
   const isPool = !isFantasy;
@@ -693,17 +701,13 @@ const CreateLeague = () => {
                         </div>
                         <div className="space-y-3">
                           <Label>Max Confidence Points</Label>
-                          <Select value={confidenceMaxPoints} onValueChange={setConfidenceMaxPoints}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="5">5 points max</SelectItem>
-                              <SelectItem value="10">10 points max</SelectItem>
-                              <SelectItem value="15">15 points max</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-md border">
+                            <span className="text-sm font-semibold">{confidenceMaxPoints} points max</span>
+                            <span className="text-xs text-muted-foreground">(auto-linked to picks per week)</span>
+                          </div>
                           <p className="text-xs text-muted-foreground">
-                            Assign confidence points (1 to max) to each pick. Higher confidence = more points if correct.
-                            Each value can only be used once per week.
+                            Assign confidence points 1 through {confidenceMaxPoints} to each pick. Higher confidence = more points if correct.
+                            Each value can only be used once per week. This is always equal to your picks per week.
                           </p>
                         </div>
                       </div>
@@ -1125,9 +1129,10 @@ const CreateLeague = () => {
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-4 border-l-2 border-primary/20">
                                 <div className="space-y-2">
                                   <Label>Keepers Per Team</Label>
-                                  <Select value={keeperCount} onValueChange={setKeeperCount}>
+                                  <Select value={keeperCount} onValueChange={setKeeperCount} disabled={dynastyMode}>
                                     <SelectTrigger><SelectValue /></SelectTrigger>
                                     <SelectContent>
+                                      <SelectItem value="0">Unlimited (Dynasty)</SelectItem>
                                       <SelectItem value="1">1 Keeper</SelectItem>
                                       <SelectItem value="2">2 Keepers</SelectItem>
                                       <SelectItem value="3">3 Keepers</SelectItem>
@@ -1136,6 +1141,11 @@ const CreateLeague = () => {
                                       <SelectItem value="10">10 Keepers</SelectItem>
                                     </SelectContent>
                                   </Select>
+                                  {dynastyMode && (
+                                    <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                                      Dynasty mode: entire roster is kept between seasons.
+                                    </p>
+                                  )}
                                 </div>
                                 <div className="space-y-2">
                                   <Label>Keeper Draft Penalty</Label>
@@ -1170,7 +1180,10 @@ const CreateLeague = () => {
                               </div>
                               <Switch checked={dynastyMode} onCheckedChange={(v) => {
                                 setDynastyMode(v);
-                                if (v) setKeeperEnabled(true);
+                                if (v) {
+                                  setKeeperEnabled(true);
+                                  setKeeperCount('0'); // Dynasty = unlimited keepers (keep entire roster)
+                                }
                               }} />
                             </div>
                           </div>
