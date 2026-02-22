@@ -46,6 +46,11 @@ const WaiverWire = () => {
   const [dropPlayer, setDropPlayer] = useState<number | null>(null);
   const [myRoster, setMyRoster] = useState<any[]>([]);
 
+  // FAAB state
+  const [isFAAB, setIsFAAB] = useState(false);
+  const [faabBudget, setFaabBudget] = useState<number | null>(null);
+  const [faabBidAmount, setFaabBidAmount] = useState(0);
+
   // Load data on mount
   useEffect(() => {
     if (user && activeLeagueId) {
@@ -205,6 +210,13 @@ const WaiverWire = () => {
       const settings = await WaiverService.getLeagueWaiverSettings(activeLeagueId, user.id);
       setWaiverSettings(settings);
 
+      // Detect FAAB mode and load budget
+      if (settings?.waiver_type === 'faab' && team) {
+        setIsFAAB(true);
+        const budget = await WaiverService.getFAABBudget(activeLeagueId, team.id);
+        setFaabBudget(budget);
+      }
+
     } catch (error) {
       console.error('Error loading waiver data:', error);
     } finally {
@@ -259,7 +271,36 @@ const WaiverWire = () => {
       return;
     }
 
-    // Use smart addPlayer function that handles both free agent and waiver claims
+    // FAAB mode: submit a bid instead of a priority-based claim
+    if (isFAAB) {
+      const bidResult = await WaiverService.submitFAABBid(
+        activeLeagueId,
+        myTeamId,
+        selectedPlayer.player_id,
+        faabBidAmount,
+        dropPlayer
+      );
+
+      if (bidResult.success) {
+        toast({
+          title: "FAAB Bid Submitted",
+          description: `$${faabBidAmount} bid for ${selectedPlayer.full_name} submitted. Processes at waiver time.`,
+        });
+        setSelectedPlayer(null);
+        setDropPlayer(null);
+        setFaabBidAmount(0);
+        loadWaiverData();
+      } else {
+        toast({
+          title: "Bid Failed",
+          description: bidResult.error,
+          variant: "destructive"
+        });
+      }
+      return;
+    }
+
+    // Standard mode: use smart addPlayer function that handles both free agent and waiver claims
     const result = await WaiverService.addPlayer(
       activeLeagueId,
       myTeamId,
@@ -480,6 +521,94 @@ const WaiverWire = () => {
                 )}
               </CardContent>
             </Card>
+
+            {/* Claim Confirmation (shown when a player is selected) */}
+            {selectedPlayer && (
+              <Card className="bg-citrus-cream corduroy-texture border-4 border-citrus-orange rounded-[2rem] shadow-patch animate-in slide-in-from-top-2">
+                <CardHeader>
+                  <CardTitle className="font-varsity font-black text-citrus-forest uppercase flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-citrus-orange" />
+                    {isFAAB ? 'Place FAAB Bid' : 'Confirm Claim'}
+                  </CardTitle>
+                  <CardDescription className="text-citrus-charcoal font-display">
+                    {isFAAB
+                      ? `Bid on ${selectedPlayer.full_name} — Budget: $${faabBudget ?? 0}`
+                      : `Add ${selectedPlayer.full_name} to your roster`
+                    }
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between p-4 bg-citrus-sage/10 rounded-varsity border-2 border-citrus-sage/30 mb-4">
+                    <div>
+                      <div className="font-varsity font-bold text-citrus-forest">
+                        {selectedPlayer.full_name}
+                      </div>
+                      <div className="text-sm font-display text-citrus-charcoal">
+                        {selectedPlayer.position_code} - {selectedPlayer.team_abbrev}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* FAAB Bid Amount */}
+                  {isFAAB && (
+                    <div className="mb-4">
+                      <label className="text-sm font-bold text-citrus-forest mb-1 block">Bid Amount ($)</label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          min={0}
+                          max={faabBudget ?? 100}
+                          value={faabBidAmount}
+                          onChange={(e) => setFaabBidAmount(Math.max(0, parseInt(e.target.value) || 0))}
+                          className="w-28"
+                          placeholder="$0"
+                        />
+                        <span className="text-xs text-muted-foreground">of ${faabBudget ?? 0} remaining</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Drop player selector */}
+                  {myRoster.length > 0 && (
+                    <div className="mb-4">
+                      <label className="text-sm font-bold text-citrus-forest mb-1 block">Drop Player (optional)</label>
+                      <Select
+                        value={dropPlayer?.toString() || 'none'}
+                        onValueChange={(val) => setDropPlayer(val === 'none' ? null : Number(val))}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select player to drop" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No drop</SelectItem>
+                          {myRoster.map(p => (
+                            <SelectItem key={p.player_id} value={p.player_id.toString()}>
+                              {p.full_name} ({p.position_code} - {p.team_abbrev})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={handleSubmitClaim}
+                      className="bg-citrus-orange border-2 border-citrus-forest rounded-varsity font-varsity font-bold flex-1"
+                    >
+                      {isFAAB ? `Submit $${faabBidAmount} Bid` : 'Submit Claim'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => { setSelectedPlayer(null); setDropPlayer(null); setFaabBidAmount(0); }}
+                      className="rounded-varsity font-varsity"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Active Waiver Claims */}
             <Card className="bg-citrus-cream corduroy-texture border-4 border-citrus-forest rounded-[2rem] shadow-patch">

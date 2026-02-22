@@ -94,6 +94,9 @@ const ResetPassword = lazyWithErrorHandling(() => import("./pages/ResetPassword"
 const VerifyEmail = lazyWithErrorHandling(() => import("./pages/VerifyEmail"));
 const LeagueDashboard = lazyWithErrorHandling(() => import("./pages/LeagueDashboard"));
 const Waitlist = lazyWithErrorHandling(() => import("./pages/Waitlist"));
+const PoolPickem = lazyWithErrorHandling(() => import("./pages/PoolPickem"));
+const PoolSurvivor = lazyWithErrorHandling(() => import("./pages/PoolSurvivor"));
+const PoolConfidence = lazyWithErrorHandling(() => import("./pages/PoolConfidence"));
 
 // Use the picturesque LoadingScreen as the Suspense fallback for lazy-loaded routes
 const PageLoader = () => <LoadingScreen />;
@@ -185,6 +188,9 @@ const App = () => {
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                 <Route path="/waitlist" element={<Waitlist />} />
+                <Route path="/pool/pickem" element={<PoolPickem />} />
+                <Route path="/pool/survivor" element={<PoolSurvivor />} />
+                <Route path="/pool/confidence" element={<PoolConfidence />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

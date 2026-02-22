@@ -301,6 +301,11 @@ export function getDefaultSettings(leagueType: LeagueType): LeagueFormatSettings
         confidenceMaxPoints: 10,
         stats: [],
       };
+    default: {
+      // Exhaustive check — ensures compile-time safety if a new LeagueType is added
+      const _exhaustive: never = leagueType;
+      throw new Error(`Unknown league type: ${_exhaustive}`);
+    }
   }
 }
 

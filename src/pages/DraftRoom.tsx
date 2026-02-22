@@ -87,6 +87,13 @@ const DraftRoom = () => {
   const [timeRemaining, setTimeRemaining] = useState(90); // Will be updated from league settings when loaded
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [isCommissioner, setIsCommissioner] = useState(false);
+  const [isAuctionDraft, setIsAuctionDraft] = useState(false);
+  const [auctionState, setAuctionState] = useState<{
+    budgets: Array<{ team_id: string; remaining_budget: number; players_won: number }>;
+    currentNomination: { player_id: string; player_name: string; current_high_bid: number; current_high_bidder_team_id: string | null; expires_at: string } | null;
+    myBudget: number;
+  } | null>(null);
+  const [bidAmount, setBidAmount] = useState(1);
   const [draftSettings, setDraftSettings] = useState<DraftSettings>({
     rounds: 21, // Will be updated from league settings
     pickTimeLimit: 90,
@@ -380,6 +387,18 @@ const DraftRoom = () => {
       setLeague(leagueData);
       setIsCommissioner(leagueData.commissioner_id === user.id);
       
+      // Detect auction draft type
+      const draftTypeFromSettings = (leagueData.settings as any)?.draftType;
+      if (draftTypeFromSettings === 'auction') {
+        setIsAuctionDraft(true);
+        const budget = (leagueData.settings as any)?.auctionBudget ?? 200;
+        setAuctionState({
+          budgets: [],
+          currentNomination: null,
+          myBudget: budget,
+        });
+      }
+
       // Update draft settings with league's draft_rounds and pickTimeLimit
       setDraftSettings(prev => ({
         ...prev,
@@ -2916,11 +2935,83 @@ const DraftRoom = () => {
                       </TabsTrigger>
                     </TabsList>
 
+                    {/* Auction Draft Bidding Panel */}
+                    {isAuctionDraft && auctionState && draftPhase === DraftPhase.ACTIVE && (
+                      <div className="mb-4 p-4 rounded-lg border-2 border-amber-400 bg-amber-50 dark:bg-amber-900/20">
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="font-bold text-sm flex items-center gap-2">
+                            <span className="text-amber-600">$</span> Auction Draft
+                          </h3>
+                          <Badge variant="outline" className="text-xs font-bold">
+                            Budget: ${auctionState.myBudget}
+                          </Badge>
+                        </div>
+
+                        {auctionState.currentNomination ? (
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between p-3 rounded-lg bg-white dark:bg-background border">
+                              <div>
+                                <div className="font-bold">{auctionState.currentNomination.player_name}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  Current bid: <span className="font-bold text-amber-600">${auctionState.currentNomination.current_high_bid}</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  min={auctionState.currentNomination.current_high_bid + 1}
+                                  max={auctionState.myBudget}
+                                  value={bidAmount}
+                                  onChange={(e) => setBidAmount(Math.max(1, parseInt(e.target.value) || 1))}
+                                  className="w-20 h-8 text-center text-sm border rounded px-2"
+                                />
+                                <Button
+                                  size="sm"
+                                  className="bg-amber-500 hover:bg-amber-600 text-white font-bold"
+                                  disabled={bidAmount <= auctionState.currentNomination.current_high_bid || bidAmount > auctionState.myBudget}
+                                  onClick={async () => {
+                                    // Bid logic would be connected to AuctionDraftService
+                                    toast({ title: 'Bid Placed', description: `You bid $${bidAmount}` });
+                                  }}
+                                >
+                                  Bid ${bidAmount}
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-center py-4 text-sm text-muted-foreground">
+                            <p className="font-medium">No active nomination</p>
+                            <p className="text-xs mt-1">Select a player below to nominate them for bidding.</p>
+                          </div>
+                        )}
+
+                        {/* Budget overview for all teams */}
+                        {auctionState.budgets.length > 0 && (
+                          <div className="mt-3 pt-3 border-t">
+                            <div className="text-xs font-semibold text-muted-foreground mb-2">Team Budgets</div>
+                            <div className="grid grid-cols-2 gap-1">
+                              {auctionState.budgets.slice(0, 6).map(b => (
+                                <div key={b.team_id} className="flex justify-between text-xs p-1 rounded bg-muted/30">
+                                  <span className="truncate">{b.team_id.slice(0, 8)}...</span>
+                                  <span className="font-bold">${b.remaining_budget}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Always render players tab */}
                     <TabsContent value="players" className="space-y-0">
-                      <PlayerPool 
+                      <PlayerPool
                         onPlayerSelect={setSelectedPlayer}
-                        onPlayerDraft={handlePlayerDraft}
+                        onPlayerDraft={isAuctionDraft ? (player) => {
+                          // In auction mode, selecting a player nominates them
+                          setSelectedPlayer(player);
+                          toast({ title: 'Player Selected', description: `${player.full_name} selected for nomination. Click "Nominate" to start bidding.` });
+                        } : handlePlayerDraft}
                         selectedPlayer={selectedPlayer}
                         draftedPlayers={Array.from(draftedPlayerIds)}
                         isDraftActive={draftPhase === DraftPhase.ACTIVE}

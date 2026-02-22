@@ -14,7 +14,15 @@ import { DraftService } from '@/services/DraftService';
 import { PlayerService } from '@/services/PlayerService';
 import { MatchupService } from '@/services/MatchupService';
 import { Loader2, RefreshCw } from 'lucide-react';
-import { type ScoringFormat, type LeagueType, SCORING_FORMAT_LABELS, FORMAT_HAS_MATCHUPS } from '@/types/leagueTypes';
+import {
+  type ScoringFormat,
+  type LeagueType,
+  SCORING_FORMAT_LABELS,
+  FORMAT_HAS_MATCHUPS,
+  AVAILABLE_CATEGORIES,
+  DEFAULT_ROTO_CATEGORIES,
+  extractFormatSettings,
+} from '@/types/leagueTypes';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import LoadingScreen from '@/components/LoadingScreen';
@@ -58,6 +66,7 @@ const Standings = () => {
   const isPPG = leagueFormat.scoringFormat === 'points-per-game';
   const isSeasonPoints = leagueFormat.scoringFormat === 'total-points' || isPPG;
   const isPool = leagueFormat.leagueType !== 'fantasy';
+  const isCategories = leagueFormat.scoringFormat === 'h2h-categories';
   
   // Auto-complete matchups and load standings
   useEffect(() => {
@@ -247,10 +256,36 @@ const Standings = () => {
 
               // Choose data path based on scoring format
               const fmt = getLeagueFormat(leagueData);
+              const fmtSettings = extractFormatSettings(leagueData.settings || {});
               const isNonMatchup = !FORMAT_HAS_MATCHUPS[fmt.scoringFormat];
 
-              if (isNonMatchup) {
-                // Roto / Total Points / PPG: no matchups, just cumulative points
+              // Build category metadata for H2H-Cat and Roto
+              const categoryMeta: Record<string, { higherIsBetter: boolean }> = {};
+              AVAILABLE_CATEGORIES.forEach(c => {
+                categoryMeta[c.id] = { higherIsBetter: c.higherIsBetter };
+              });
+              const leagueCategories = fmtSettings.categories || [...DEFAULT_ROTO_CATEGORIES];
+
+              if (fmt.scoringFormat === 'h2h-categories') {
+                // H2H Categories: each stat is a separate W/L/T
+                teamStats = await LeagueService.calculateCategoryStandings(
+                  leagueToUse,
+                  leagueTeamsData,
+                  leagueCategories,
+                  categoryMeta
+                );
+              } else if (fmt.scoringFormat === 'roto') {
+                // Roto: season-long category rankings summed
+                teamStats = await LeagueService.calculateRotoStandingsFromDB(
+                  leagueToUse,
+                  leagueTeamsData,
+                  draftPicks,
+                  allPlayers,
+                  leagueCategories,
+                  categoryMeta
+                );
+              } else if (isNonMatchup) {
+                // Total Points / PPG: no matchups, just cumulative points
                 teamStats = await LeagueService.calculateSeasonPointsStandings(
                   leagueToUse,
                   leagueTeamsData,
@@ -258,7 +293,7 @@ const Standings = () => {
                   allPlayers
                 );
               } else {
-                // H2H Points / H2H Categories / Best Ball: use matchup-based standings
+                // H2H Points / Best Ball: use matchup-based standings
                 teamStats = await LeagueService.calculateTeamStandings(
                   leagueToUse,
                   leagueTeamsData,
@@ -527,12 +562,14 @@ const Standings = () => {
                     <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Team</th>
                     {hasMatchups && (
                       <>
-                        <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Record</th>
+                        <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">
+                          {isCategories ? 'Cat W-L-T' : 'Record'}
+                        </th>
                         <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Win %</th>
                       </>
                     )}
                     <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-right">
-                      {isRoto ? 'Roto Pts' : 'PF'}
+                      {isRoto ? 'Roto Pts' : isCategories ? 'Total PF' : 'PF'}
                     </th>
                     {hasMatchups && (
                       <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-right">PA</th>
