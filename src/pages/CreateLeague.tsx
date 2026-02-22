@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLeague } from "@/contexts/LeagueContext";
@@ -19,13 +19,89 @@ import {
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
-import { Trophy, Users, Settings, CheckCircle, AlertCircle, UserPlus, Loader2, Copy, Sparkles } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Trophy, Users, Settings, CheckCircle, AlertCircle, UserPlus,
+  Loader2, Copy, Sparkles, Target, Shield, BarChart3,
+  Zap, Crown, DollarSign, Shuffle, ArrowDown, Bot, FileEdit,
+  ChevronDown, ChevronUp, Info, Lock, Unlock,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import WaitlistSignup from "@/components/WaitlistSignup";
+import {
+  type LeagueType,
+  type ScoringFormat,
+  type DraftType,
+  type PickemFormat,
+  LEAGUE_TYPE_LABELS,
+  LEAGUE_TYPE_DESCRIPTIONS,
+  SCORING_FORMAT_LABELS,
+  SCORING_FORMAT_DESCRIPTIONS,
+  DRAFT_TYPE_LABELS,
+  DRAFT_TYPE_DESCRIPTIONS,
+  FORMAT_HAS_MATCHUPS,
+  AVAILABLE_CATEGORIES,
+  DEFAULT_ROTO_CATEGORIES,
+  getDefaultSettings,
+  requiresDraft,
+  requiresRoster,
+  usesPointValues,
+  hasWaivers,
+} from "@/types/leagueTypes";
 
+// ============================================================================
+// LEAGUE TYPE CARD ICONS
+// ============================================================================
+const LEAGUE_TYPE_ICONS: Record<LeagueType, React.ReactNode> = {
+  'fantasy': <Trophy className="w-8 h-8" />,
+  'pickem': <Target className="w-8 h-8" />,
+  'survivor': <Shield className="w-8 h-8" />,
+  'confidence-pool': <BarChart3 className="w-8 h-8" />,
+};
+
+const DRAFT_TYPE_ICONS: Record<DraftType, React.ReactNode> = {
+  'snake': <Shuffle className="h-5 w-5" />,
+  'linear': <ArrowDown className="h-5 w-5" />,
+  'auction': <DollarSign className="h-5 w-5" />,
+  'autopick': <Bot className="h-5 w-5" />,
+  'offline': <FileEdit className="h-5 w-5" />,
+};
+
+// ============================================================================
+// STAT DEFINITIONS (reusable across formats)
+// ============================================================================
+const DEFAULT_LEAGUE_STATS = [
+  { id: "g", name: "Goals", points: 3, default: true, category: "Offense", enabled: true },
+  { id: "a", name: "Assists", points: 2, default: true, category: "Offense", enabled: true },
+  { id: "ppp", name: "Power Play Points", points: 1, default: true, category: "Offense", enabled: true },
+  { id: "shg", name: "Shorthanded Points", points: 2, default: true, category: "Offense", enabled: true },
+  { id: "sog", name: "Shots on Goal", points: 0.4, default: true, category: "Offense", enabled: true },
+  { id: "blk", name: "Blocks", points: 0.5, default: true, category: "Defense", enabled: true },
+  { id: "hit", name: "Hits", points: 0.2, default: true, category: "Defense", enabled: true },
+  { id: "pim", name: "Penalty Minutes", points: 0.5, default: false, category: "Defense", enabled: false },
+  { id: "w", name: "Wins", points: 4, default: true, category: "Goalie", enabled: true },
+  { id: "so", name: "Shutouts", points: 3, default: true, category: "Goalie", enabled: true },
+  { id: "sv", name: "Saves", points: 0.2, default: true, category: "Goalie", enabled: true },
+  { id: "ga", name: "Goals Against", points: -1, default: true, category: "Goalie", enabled: true },
+];
+
+// ============================================================================
+// SECTION HEADER COMPONENT
+// ============================================================================
+const SectionHeader = ({ title, subtitle, badge }: { title: string; subtitle: string; badge?: React.ReactNode }) => (
+  <div className="flex items-center justify-between mb-6">
+    <div>
+      <h3 className="text-xl font-bold">{title}</h3>
+      <p className="text-muted-foreground text-sm">{subtitle}</p>
+    </div>
+    {badge}
+  </div>
+);
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
 const CreateLeague = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -36,15 +112,45 @@ const CreateLeague = () => {
   const [error, setError] = useState<string | null>(null);
   const [defaultTab, setDefaultTab] = useState<"create" | "join">("create");
 
-  // Create League Form State
+  // ---- Core Settings ----
   const [leagueName, setLeagueName] = useState("");
+  const [leagueType, setLeagueType] = useState<LeagueType>("fantasy");
+  const [scoringFormat, setScoringFormat] = useState<ScoringFormat>("h2h-points");
+  const [draftType, setDraftType] = useState<DraftType>("snake");
   const [teamsCount, setTeamsCount] = useState("12");
   const [draftRounds, setDraftRounds] = useState("21");
-  const [scoringType, setScoringType] = useState("h2h-points");
-  const [draftType, setDraftType] = useState("snake");
   const [pickTimeLimit, setPickTimeLimit] = useState("90");
-  
-  // Waiver Settings State
+
+  // ---- Auction Draft Settings ----
+  const [auctionBudget, setAuctionBudget] = useState("200");
+  const [auctionMinBid, setAuctionMinBid] = useState("1");
+  const [auctionNominationTime, setAuctionNominationTime] = useState("30");
+
+  // ---- Season Settings ----
+  const [playoffTeams, setPlayoffTeams] = useState("6");
+  const [playoffWeeks, setPlayoffWeeks] = useState("3");
+  const [tradeDeadlineWeek, setTradeDeadlineWeek] = useState("0");
+
+  // ---- Keeper / Dynasty Settings ----
+  const [keeperEnabled, setKeeperEnabled] = useState(false);
+  const [keeperCount, setKeeperCount] = useState("3");
+  const [keeperPenalty, setKeeperPenalty] = useState<'none' | 'round-cost' | 'round-escalation'>('none');
+  const [dynastyMode, setDynastyMode] = useState(false);
+
+  // ---- Best Ball Setting ----
+  const [bestBallEnabled, setBestBallEnabled] = useState(false);
+
+  // ---- Category / Roto Settings ----
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([...DEFAULT_ROTO_CATEGORIES]);
+  const [minGoalieGames, setMinGoalieGames] = useState("3");
+
+  // ---- Pool Settings ----
+  const [pickemFormat, setPickemFormat] = useState<PickemFormat>("straight-up");
+  const [picksPerWeek, setPicksPerWeek] = useState("10");
+  const [survivorLives, setSurvivorLives] = useState("1");
+  const [confidenceMaxPoints, setConfidenceMaxPoints] = useState("10");
+
+  // ---- Waiver Settings ----
   const [waiverSettings, setWaiverSettings] = useState({
     waiver_process_time: '03:00:00',
     waiver_period_hours: 48,
@@ -53,54 +159,77 @@ const CreateLeague = () => {
     allow_trades_during_games: true,
   });
 
-  // Join League Form State
+  // ---- Scoring Stats ----
+  const [leagueStats, setLeagueStats] = useState([...DEFAULT_LEAGUE_STATS]);
+
+  // ---- Join League ----
   const [joinCode, setJoinCode] = useState("");
   const [teamNameForJoin, setTeamNameForJoin] = useState("");
 
-  // Read query params for tab and pre-filled join code
+  // ---- Collapsible sections ----
+  const [showAdvancedSeason, setShowAdvancedSeason] = useState(false);
+
+  // Read query params
   useEffect(() => {
     const tab = searchParams.get('tab');
     const code = searchParams.get('code');
-    
-    if (tab === 'join') {
-      setDefaultTab('join');
-    }
-    
-    if (code) {
-      setJoinCode(code);
-    }
+    if (tab === 'join') setDefaultTab('join');
+    if (code) setJoinCode(code);
   }, [searchParams]);
 
-  // Only tracked stats (removed unsupported: fights, hat tricks, broken sticks, etc.)
-  const [leagueStats, setLeagueStats] = useState([
-    // Skater Stats (actually tracked in database)
-    { id: "g", name: "Goals", points: 3, default: true, category: "Offense", enabled: true },
-    { id: "a", name: "Assists", points: 2, default: true, category: "Offense", enabled: true },
-    { id: "ppp", name: "Power Play Points", points: 1, default: true, category: "Offense", enabled: true },
-    { id: "shg", name: "Shorthanded Points", points: 2, default: true, category: "Offense", enabled: true },
-    { id: "sog", name: "Shots on Goal", points: 0.4, default: true, category: "Offense", enabled: true },
-    { id: "blk", name: "Blocks", points: 0.5, default: true, category: "Defense", enabled: true },
-    { id: "hit", name: "Hits", points: 0.2, default: true, category: "Defense", enabled: true },
-    { id: "pim", name: "Penalty Minutes", points: 0.5, default: false, category: "Defense", enabled: false },
-    
-    // Goalie Stats (actually tracked in database)
-    { id: "w", name: "Wins", points: 4, default: true, category: "Goalie", enabled: true },
-    { id: "so", name: "Shutouts", points: 3, default: true, category: "Goalie", enabled: true },
-    { id: "sv", name: "Saves", points: 0.2, default: true, category: "Goalie", enabled: true },
-    { id: "ga", name: "Goals Against", points: -1, default: true, category: "Goalie", enabled: true },
-  ]);
+  // Reset format settings when league type changes
+  useEffect(() => {
+    if (leagueType === 'fantasy') {
+      setScoringFormat('h2h-points');
+      setDraftType('snake');
+    }
+  }, [leagueType]);
 
+  // Auto-enable best ball when scoring format is best-ball
+  useEffect(() => {
+    if (scoringFormat === 'best-ball') {
+      setBestBallEnabled(true);
+    } else {
+      setBestBallEnabled(false);
+    }
+  }, [scoringFormat]);
+
+  // Derived state
+  const isFantasy = leagueType === 'fantasy';
+  const isPool = !isFantasy;
+  const showPointValues = isFantasy && usesPointValues(scoringFormat);
+  const showCategories = isFantasy && (scoringFormat === 'h2h-categories' || scoringFormat === 'roto');
+  const showMatchupSettings = isFantasy && FORMAT_HAS_MATCHUPS[scoringFormat];
+  const showDraftSettings = requiresDraft(leagueType);
+  const showWaiverSettings = hasWaivers(leagueType);
+  const isAuction = draftType === 'auction';
+
+  const statsByCategory = useMemo(() => ({
+    Offense: leagueStats.filter(s => s.category === "Offense"),
+    Defense: leagueStats.filter(s => s.category === "Defense"),
+    Goalie: leagueStats.filter(s => s.category === "Goalie"),
+  }), [leagueStats]);
+
+  // ---- Handlers ----
   const handleStatToggle = (id: string) => {
-    setLeagueStats(prev => prev.map(stat => 
+    setLeagueStats(prev => prev.map(stat =>
       stat.id === id ? { ...stat, enabled: !stat.enabled } : stat
     ));
   };
 
   const handleStatPointsChange = (id: string, value: string) => {
     const numValue = parseFloat(value);
-    setLeagueStats(prev => prev.map(stat => 
+    setLeagueStats(prev => prev.map(stat =>
       stat.id === id ? { ...stat, points: isNaN(numValue) ? 0 : numValue } : stat
     ));
+  };
+
+  const handleCategoryToggle = (categoryId: string) => {
+    setSelectedCategories(prev =>
+      prev.includes(categoryId)
+        ? prev.filter(c => c !== categoryId)
+        : [...prev, categoryId]
+    );
   };
 
   const handleCreateLeague = async () => {
@@ -121,26 +250,56 @@ const CreateLeague = () => {
       return;
     }
 
-    // Prevent duplicate submissions
-    if (loading) {
-      return;
-    }
+    if (loading) return;
 
     setLoading(true);
     setError(null);
 
     try {
       const enabledStats = leagueStats.filter(s => s.enabled);
-      const settings = {
+
+      // Build comprehensive settings object - this is the single source of truth
+      const settings: Record<string, unknown> = {
+        // Core format identifiers
+        leagueType,
+        scoringFormat,
+        draftType: isFantasy ? draftType : 'none',
         teamsCount: parseInt(teamsCount),
-        scoringType: "h2h-points", // Only implemented format
-        draftType: "snake", // Only implemented format
         stats: enabledStats,
-        pickTimeLimit: parseInt(pickTimeLimit), // Store pick time limit in settings
+        pickTimeLimit: parseInt(pickTimeLimit),
+
+        // Auction settings (persisted regardless, only used if draftType === 'auction')
+        auctionBudget: parseInt(auctionBudget),
+        auctionMinBid: parseInt(auctionMinBid),
+        auctionNominationTime: parseInt(auctionNominationTime),
+
+        // Season settings
+        playoffTeams: parseInt(playoffTeams),
+        playoffWeeks: parseInt(playoffWeeks),
+        tradeDeadlineWeek: parseInt(tradeDeadlineWeek),
+
+        // Keeper / Dynasty
+        keeperEnabled,
+        keeperCount: parseInt(keeperCount),
+        keeperPenalty,
+        dynastyMode,
+
+        // Best Ball
+        bestBallEnabled,
+
+        // Category / Roto settings
+        categories: selectedCategories,
+        minGoalieGames: parseInt(minGoalieGames),
+
+        // Pool settings
+        pickemFormat,
+        picksPerWeek: parseInt(picksPerWeek),
+        survivorLives: parseInt(survivorLives),
+        confidenceMaxPoints: parseInt(confidenceMaxPoints),
       };
 
-      // Transform leagueStats array to scoring_settings JSONB format
-      const scoringSettings = {
+      // Build scoring_settings JSONB (for points-based formats)
+      const scoringSettings = showPointValues ? {
         skater: {
           goals: leagueStats.find(s => s.id === 'g')?.points || 3,
           assists: leagueStats.find(s => s.id === 'a')?.points || 2,
@@ -157,38 +316,34 @@ const CreateLeague = () => {
           saves: leagueStats.find(s => s.id === 'sv')?.points || 0.2,
           goals_against: leagueStats.find(s => s.id === 'ga')?.points || -1
         }
-      };
+      } : undefined;
 
       const { league, team, error: createError } = await LeagueService.createLeague(
         leagueName.trim(),
         user.id,
-        parseInt(draftRounds), // Roster size per team (matches draft rounds)
-        parseInt(draftRounds), // Draft rounds from user selection
+        isFantasy ? parseInt(draftRounds) : 0,
+        isFantasy ? parseInt(draftRounds) : 0,
         settings,
-        scoringSettings, // Pass transformed scoring settings
-        waiverSettings // Pass waiver settings
+        scoringSettings,
+        isFantasy ? waiverSettings : undefined
       );
 
       if (createError) throw createError;
       if (!league) throw new Error("Failed to create league");
 
-      // Refresh leagues list to include the newly created league
       await refreshLeagues();
 
-      // Show success message
       toast({
         title: "League Created!",
         description: `${league.name} has been created successfully.`,
       });
 
-      // Navigate to league dashboard (include query param for LeagueContext)
       navigate(`/league/${league.id}?league=${league.id}`);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Failed to create league";
       setError(errorMessage);
       setLoading(false);
-      
-      // Also show toast for errors
+
       toast({
         title: "Error Creating League",
         description: errorMessage,
@@ -228,23 +383,19 @@ const CreateLeague = () => {
       if (joinError) throw joinError;
       if (!league || !team) throw new Error("Failed to join league");
 
-      // Refresh leagues list to include the newly joined league
       await refreshLeagues();
 
-      // Show success message
       toast({
         title: "Joined League!",
         description: `Welcome to ${league.name}! Your team "${team.team_name}" has been created.`,
       });
 
-      // Navigate to league dashboard (include query param for LeagueContext)
       navigate(`/league/${league.id}?league=${league.id}`);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Failed to join league";
       setError(errorMessage);
       setLoading(false);
-      
-      // Also show toast for errors
+
       toast({
         title: "Error Joining League",
         description: errorMessage,
@@ -253,12 +404,9 @@ const CreateLeague = () => {
     }
   };
 
-  const statsByCategory = {
-    Offense: leagueStats.filter(s => s.category === "Offense"),
-    Defense: leagueStats.filter(s => s.category === "Defense"),
-    Goalie: leagueStats.filter(s => s.category === "Goalie"),
-  };
-
+  // ============================================================================
+  // RENDER
+  // ============================================================================
   return (
     <div className="min-h-screen bg-[#D4E8B8] relative">
       {/* Decorative Background */}
@@ -274,7 +422,7 @@ const CreateLeague = () => {
 
       <main className="lg:pt-32 lg:pb-20 pt-4 pb-[calc(5rem+env(safe-area-inset-bottom))] px-4">
         <div className="container mx-auto max-w-4xl">
-          
+
           <div className="mb-8 text-center">
             <h1 className="text-4xl md:text-5xl font-bold mb-4 citrus-gradient-text">
               Create or Join a League
@@ -288,7 +436,7 @@ const CreateLeague = () => {
           <Alert className="mb-6 bg-citrus-orange/20 border-2 border-citrus-orange/40">
             <Sparkles className="h-4 w-4 text-citrus-orange" />
             <AlertDescription className="text-citrus-forest">
-              <span className="font-bold">We're in testing phase!</span> Your league will be filled with AI teams so you can experience the full platform. Try the complete draft experience and draft against AI opponents. 
+              <span className="font-bold">We're in testing phase!</span> Your league will be filled with AI teams so you can experience the full platform. Try the complete draft experience and draft against AI opponents.
               <span className="block mt-2 text-sm">
                 Sign up for the waitlist to be notified when full service launches with real multiplayer leagues.
               </span>
@@ -314,399 +462,941 @@ const CreateLeague = () => {
                   </TabsTrigger>
                 </TabsList>
 
-                {/* CREATE LEAGUE TAB */}
+                {/* ============================================================ */}
+                {/* CREATE LEAGUE TAB                                            */}
+                {/* ============================================================ */}
                 <TabsContent value="create" className="space-y-8 animate-fade-in">
-                {/* ERROR MESSAGE */}
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
+                  {error && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                  )}
 
-                {/* BASIC SETTINGS */}
-                <div className="space-y-6">
-                  <div className="space-y-3">
-                    <Label htmlFor="league-name" className="text-base">League Name</Label>
-                    <Input 
-                      id="league-name" 
-                      placeholder="e.g. The Frozen Pond" 
-                      className="h-12 text-lg"
-                      value={leagueName}
-                      onChange={(e) => setLeagueName(e.target.value)}
+                  {/* ======================================================== */}
+                  {/* SECTION 1: LEAGUE TYPE SELECTION                          */}
+                  {/* ======================================================== */}
+                  <div>
+                    <SectionHeader
+                      title="Choose Your League Type"
+                      subtitle="Select the format that fits your group"
                     />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {(Object.keys(LEAGUE_TYPE_LABELS) as LeagueType[]).map((type) => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => setLeagueType(type)}
+                          className={`relative text-left rounded-xl border-2 p-5 transition-all duration-200 ${
+                            leagueType === type
+                              ? 'border-primary bg-primary/5 shadow-md ring-2 ring-primary/20'
+                              : 'border-muted bg-transparent hover:border-primary/40 hover:bg-muted/20'
+                          }`}
+                        >
+                          {leagueType === type && (
+                            <div className="absolute top-3 right-3">
+                              <CheckCircle className="w-5 h-5 text-primary" />
+                            </div>
+                          )}
+                          <div className={`mb-3 ${leagueType === type ? 'text-primary' : 'text-muted-foreground'}`}>
+                            {LEAGUE_TYPE_ICONS[type]}
+                          </div>
+                          <h4 className="font-bold text-base mb-1">{LEAGUE_TYPE_LABELS[type]}</h4>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            {LEAGUE_TYPE_DESCRIPTIONS[type]}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* ======================================================== */}
+                  {/* SECTION 2: LEAGUE NAME + BASIC INFO                      */}
+                  {/* ======================================================== */}
+                  <div className="border-t pt-6 space-y-6">
                     <div className="space-y-3">
-                      <Label htmlFor="teams-count" className="text-base">Number of Teams</Label>
-                      <Select value={teamsCount} onValueChange={setTeamsCount}>
-                        <SelectTrigger id="teams-count" className="h-12">
-                          <SelectValue placeholder="Select teams" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="8">8 Teams</SelectItem>
-                          <SelectItem value="10">10 Teams</SelectItem>
-                          <SelectItem value="12">12 Teams</SelectItem>
-                          <SelectItem value="14">14 Teams</SelectItem>
-                          <SelectItem value="16">16 Teams</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Label htmlFor="league-name" className="text-base">League Name</Label>
+                      <Input
+                        id="league-name"
+                        placeholder={isFantasy ? "e.g. The Frozen Pond" : "e.g. Office Hockey Pool"}
+                        className="h-12 text-lg"
+                        value={leagueName}
+                        onChange={(e) => setLeagueName(e.target.value)}
+                      />
                     </div>
 
-                    <div className="space-y-3">
-                      <Label htmlFor="draft-rounds" className="text-base">Draft Rounds</Label>
-                      <Select value={draftRounds} onValueChange={setDraftRounds}>
-                        <SelectTrigger id="draft-rounds" className="h-12">
-                          <SelectValue placeholder="Select rounds" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="16">16 Rounds</SelectItem>
-                          <SelectItem value="18">18 Rounds</SelectItem>
-                          <SelectItem value="21">21 Rounds</SelectItem>
-                          <SelectItem value="24">24 Rounds</SelectItem>
-                          <SelectItem value="30">30 Rounds</SelectItem>
-                        </SelectContent>
-                      </Select>
+                    {/* Teams Count - always visible */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-3">
+                        <Label htmlFor="teams-count" className="text-base">
+                          {isPool ? 'Max Participants' : 'Number of Teams'}
+                        </Label>
+                        <Select value={teamsCount} onValueChange={setTeamsCount}>
+                          <SelectTrigger id="teams-count" className="h-12">
+                            <SelectValue placeholder="Select" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {isPool ? (
+                              <>
+                                <SelectItem value="10">10 Players</SelectItem>
+                                <SelectItem value="20">20 Players</SelectItem>
+                                <SelectItem value="30">30 Players</SelectItem>
+                                <SelectItem value="50">50 Players</SelectItem>
+                                <SelectItem value="100">100 Players</SelectItem>
+                              </>
+                            ) : (
+                              <>
+                                <SelectItem value="4">4 Teams</SelectItem>
+                                <SelectItem value="6">6 Teams</SelectItem>
+                                <SelectItem value="8">8 Teams</SelectItem>
+                                <SelectItem value="10">10 Teams</SelectItem>
+                                <SelectItem value="12">12 Teams</SelectItem>
+                                <SelectItem value="14">14 Teams</SelectItem>
+                                <SelectItem value="16">16 Teams</SelectItem>
+                                <SelectItem value="18">18 Teams</SelectItem>
+                                <SelectItem value="20">20 Teams</SelectItem>
+                              </>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Scoring Format - Fantasy only */}
+                      {isFantasy && (
+                        <div className="space-y-3">
+                          <Label htmlFor="scoring-format" className="text-base">Scoring Format</Label>
+                          <Select value={scoringFormat} onValueChange={(v) => setScoringFormat(v as ScoringFormat)}>
+                            <SelectTrigger id="scoring-format" className="h-12">
+                              <SelectValue placeholder="Select format" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(Object.keys(SCORING_FORMAT_LABELS) as ScoringFormat[]).map((format) => (
+                                <SelectItem key={format} value={format}>
+                                  <div className="flex items-center gap-2">
+                                    {SCORING_FORMAT_LABELS[format]}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            {SCORING_FORMAT_DESCRIPTIONS[scoringFormat]}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* ======================================================== */}
+                  {/* SECTION 3: POOL-SPECIFIC SETTINGS                        */}
+                  {/* ======================================================== */}
+                  {leagueType === 'pickem' && (
+                    <div className="border-t pt-6">
+                      <SectionHeader
+                        title="Pick'em Settings"
+                        subtitle="Configure how picks work each week"
+                      />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-3">
+                          <Label>Pick Format</Label>
+                          <Select value={pickemFormat} onValueChange={(v) => setPickemFormat(v as PickemFormat)}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="straight-up">Straight Up (pick the winner)</SelectItem>
+                              <SelectItem value="against-the-spread">Against the Spread (ATS)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            {pickemFormat === 'straight-up'
+                              ? 'Simply pick which team wins each game. 1 point per correct pick.'
+                              : 'Pick winners against the point spread for more challenging predictions.'
+                            }
+                          </p>
+                        </div>
+                        <div className="space-y-3">
+                          <Label>Games Per Week</Label>
+                          <Select value={picksPerWeek} onValueChange={setPicksPerWeek}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="5">5 games</SelectItem>
+                              <SelectItem value="10">10 games</SelectItem>
+                              <SelectItem value="15">15 games (all games)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            Number of games participants pick each week.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {leagueType === 'survivor' && (
+                    <div className="border-t pt-6">
+                      <SectionHeader
+                        title="Survivor Pool Settings"
+                        subtitle="Configure elimination rules"
+                      />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-3">
+                          <Label>Lives (Strikes Before Elimination)</Label>
+                          <Select value={survivorLives} onValueChange={setSurvivorLives}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="1">1 life (classic - one wrong and out)</SelectItem>
+                              <SelectItem value="2">2 lives (one mulligan)</SelectItem>
+                              <SelectItem value="3">3 lives (two mulligans)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            In classic survivor, one wrong pick eliminates you. Extra lives give second chances.
+                          </p>
+                        </div>
+                        <div className="space-y-3 flex items-start pt-8">
+                          <div className="bg-muted/30 rounded-lg p-4">
+                            <div className="flex items-start gap-2">
+                              <Info className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                              <p className="text-sm text-muted-foreground">
+                                Each week, pick one NHL team to win. You cannot pick the same team more than once all season.
+                                Last person standing wins!
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {leagueType === 'confidence-pool' && (
+                    <div className="border-t pt-6">
+                      <SectionHeader
+                        title="Confidence Pool Settings"
+                        subtitle="Configure confidence point rules"
+                      />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-3">
+                          <Label>Games Per Week</Label>
+                          <Select value={picksPerWeek} onValueChange={setPicksPerWeek}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="5">5 games</SelectItem>
+                              <SelectItem value="10">10 games</SelectItem>
+                              <SelectItem value="15">15 games (all games)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-3">
+                          <Label>Max Confidence Points</Label>
+                          <Select value={confidenceMaxPoints} onValueChange={setConfidenceMaxPoints}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="5">5 points max</SelectItem>
+                              <SelectItem value="10">10 points max</SelectItem>
+                              <SelectItem value="15">15 points max</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            Assign confidence points (1 to max) to each pick. Higher confidence = more points if correct.
+                            Each value can only be used once per week.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ======================================================== */}
+                  {/* SECTION 4: DRAFT SETTINGS (Fantasy Only)                 */}
+                  {/* ======================================================== */}
+                  {showDraftSettings && (
+                    <div className="border-t pt-6">
+                      <SectionHeader
+                        title="Draft Settings"
+                        subtitle="Choose how teams build their rosters"
+                      />
+
+                      {/* Draft Type - Radio Cards */}
+                      <div className="space-y-4 mb-6">
+                        <Label className="text-base font-semibold">Draft Type</Label>
+                        <RadioGroup
+                          value={draftType}
+                          onValueChange={(v) => setDraftType(v as DraftType)}
+                          className="grid grid-cols-1 gap-3"
+                        >
+                          {(Object.keys(DRAFT_TYPE_LABELS) as DraftType[]).map((type) => (
+                            <div key={type}>
+                              <RadioGroupItem value={type} id={`draft-${type}`} className="peer sr-only" />
+                              <Label
+                                htmlFor={`draft-${type}`}
+                                className={`flex items-start gap-4 rounded-xl border-2 p-4 cursor-pointer transition-all
+                                  ${draftType === type
+                                    ? 'border-primary bg-primary/5 shadow-sm'
+                                    : 'border-muted bg-transparent hover:bg-muted/20 hover:border-primary/40'
+                                  }`}
+                              >
+                                <div className={`mt-0.5 ${draftType === type ? 'text-primary' : 'text-muted-foreground'}`}>
+                                  {DRAFT_TYPE_ICONS[type]}
+                                </div>
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-semibold">{DRAFT_TYPE_LABELS[type]}</span>
+                                    {type === 'snake' && (
+                                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Most Popular</Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                                    {DRAFT_TYPE_DESCRIPTIONS[type]}
+                                  </p>
+                                </div>
+                                {draftType === type && (
+                                  <CheckCircle className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                                )}
+                              </Label>
+                            </div>
+                          ))}
+                        </RadioGroup>
+                      </div>
+
+                      {/* Draft Config Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {draftType !== 'offline' && (
+                          <div className="space-y-3">
+                            <Label>Draft Rounds</Label>
+                            <Select value={draftRounds} onValueChange={setDraftRounds}>
+                              <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="14">14 Rounds</SelectItem>
+                                <SelectItem value="16">16 Rounds</SelectItem>
+                                <SelectItem value="18">18 Rounds</SelectItem>
+                                <SelectItem value="21">21 Rounds</SelectItem>
+                                <SelectItem value="24">24 Rounds</SelectItem>
+                                <SelectItem value="30">30 Rounds</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+
+                        {(draftType === 'snake' || draftType === 'linear') && (
+                          <div className="space-y-3">
+                            <Label>Pick Time Limit</Label>
+                            <Select value={pickTimeLimit} onValueChange={setPickTimeLimit}>
+                              <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="30">30 seconds</SelectItem>
+                                <SelectItem value="60">60 seconds</SelectItem>
+                                <SelectItem value="90">90 seconds</SelectItem>
+                                <SelectItem value="120">120 seconds</SelectItem>
+                                <SelectItem value="180">3 minutes</SelectItem>
+                                <SelectItem value="300">5 minutes</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+
+                        {draftType === 'offline' && (
+                          <div className="md:col-span-3">
+                            <div className="bg-muted/30 rounded-lg p-4">
+                              <div className="flex items-start gap-2">
+                                <Info className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                                <p className="text-sm text-muted-foreground">
+                                  With offline draft, the commissioner will manually enter draft results after your
+                                  external draft event. Set up your own draft board, do it live, or use any method you prefer.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Auction-Specific Settings */}
+                      {isAuction && (
+                        <div className="mt-6 p-4 rounded-xl border-2 border-dashed border-primary/30 bg-primary/5">
+                          <h4 className="font-semibold text-sm mb-4 flex items-center gap-2">
+                            <DollarSign className="w-4 h-4 text-primary" />
+                            Auction Settings
+                          </h4>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                              <Label className="text-sm">Salary Budget ($)</Label>
+                              <Input
+                                type="number"
+                                value={auctionBudget}
+                                onChange={(e) => setAuctionBudget(e.target.value)}
+                                className="h-10 font-mono"
+                                min={50}
+                                max={1000}
+                              />
+                              <p className="text-xs text-muted-foreground">Budget per team</p>
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-sm">Minimum Bid ($)</Label>
+                              <Input
+                                type="number"
+                                value={auctionMinBid}
+                                onChange={(e) => setAuctionMinBid(e.target.value)}
+                                className="h-10 font-mono"
+                                min={0}
+                                max={10}
+                              />
+                              <p className="text-xs text-muted-foreground">Minimum bid on any player</p>
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-sm">Nomination Timer</Label>
+                              <Select value={auctionNominationTime} onValueChange={setAuctionNominationTime}>
+                                <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="15">15 seconds</SelectItem>
+                                  <SelectItem value="30">30 seconds</SelectItem>
+                                  <SelectItem value="45">45 seconds</SelectItem>
+                                  <SelectItem value="60">60 seconds</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <p className="text-xs text-muted-foreground">Time to nominate a player</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ======================================================== */}
+                  {/* SECTION 5: SCORING SETTINGS (Points-Based Formats)       */}
+                  {/* ======================================================== */}
+                  {showPointValues && (
+                    <div className="border-t pt-6">
+                      <SectionHeader
+                        title="Scoring Settings"
+                        subtitle="Toggle stats and adjust point values"
+                        badge={
+                          <Badge variant="secondary" className="bg-primary/10 text-primary">
+                            {leagueStats.filter(s => s.enabled).length} Active Stats
+                          </Badge>
+                        }
+                      />
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {Object.entries(statsByCategory).map(([category, stats]) => (
+                          <div key={category} className="space-y-3">
+                            <h4 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">
+                              {category} Stats
+                            </h4>
+                            <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
+                              {stats.map((stat) => (
+                                <div
+                                  key={stat.id}
+                                  className={`flex items-center justify-between p-3 border-b last:border-0 transition-colors ${
+                                    stat.enabled ? 'bg-primary/5' : 'opacity-60'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <Switch
+                                      checked={stat.enabled}
+                                      onCheckedChange={() => handleStatToggle(stat.id)}
+                                    />
+                                    <span className={`font-medium ${stat.enabled ? 'text-foreground' : 'text-muted-foreground'}`}>
+                                      {stat.name}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs text-muted-foreground">Pts:</span>
+                                    <Input
+                                      type="number"
+                                      className="h-8 w-16 text-right font-mono"
+                                      value={stat.points}
+                                      onChange={(e) => handleStatPointsChange(stat.id, e.target.value)}
+                                      disabled={!stat.enabled}
+                                      step="0.1"
+                                    />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ======================================================== */}
+                  {/* SECTION 5b: CATEGORY SETTINGS (H2H-Cat / Roto)           */}
+                  {/* ======================================================== */}
+                  {showCategories && (
+                    <div className="border-t pt-6">
+                      <SectionHeader
+                        title={scoringFormat === 'roto' ? 'Rotisserie Categories' : 'Head-to-Head Categories'}
+                        subtitle={
+                          scoringFormat === 'roto'
+                            ? 'Select which stat categories to rank teams in. Teams earn roto points based on their ranking in each category.'
+                            : 'Select which stat categories count as individual matchups each week. Each category is a separate win/loss/tie.'
+                        }
+                        badge={
+                          <Badge variant="secondary" className="bg-primary/10 text-primary">
+                            {selectedCategories.length} Categories
+                          </Badge>
+                        }
+                      />
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Skater Categories */}
+                        <div className="space-y-3">
+                          <h4 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">
+                            Skater Categories
+                          </h4>
+                          <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
+                            {AVAILABLE_CATEGORIES.filter(c => !c.isGoalie).map((cat) => (
+                              <div
+                                key={cat.id}
+                                className={`flex items-center justify-between p-3 border-b last:border-0 transition-colors ${
+                                  selectedCategories.includes(cat.id) ? 'bg-primary/5' : 'opacity-60'
+                                }`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <Switch
+                                    checked={selectedCategories.includes(cat.id)}
+                                    onCheckedChange={() => handleCategoryToggle(cat.id)}
+                                  />
+                                  <span className={`font-medium ${
+                                    selectedCategories.includes(cat.id) ? 'text-foreground' : 'text-muted-foreground'
+                                  }`}>
+                                    {cat.name}
+                                  </span>
+                                </div>
+                                <Badge variant="outline" className="font-mono text-xs">
+                                  {cat.abbreviation}
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Goalie Categories */}
+                        <div className="space-y-3">
+                          <h4 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">
+                            Goalie Categories
+                          </h4>
+                          <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
+                            {AVAILABLE_CATEGORIES.filter(c => c.isGoalie).map((cat) => (
+                              <div
+                                key={cat.id}
+                                className={`flex items-center justify-between p-3 border-b last:border-0 transition-colors ${
+                                  selectedCategories.includes(cat.id) ? 'bg-primary/5' : 'opacity-60'
+                                }`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <Switch
+                                    checked={selectedCategories.includes(cat.id)}
+                                    onCheckedChange={() => handleCategoryToggle(cat.id)}
+                                  />
+                                  <span className={`font-medium ${
+                                    selectedCategories.includes(cat.id) ? 'text-foreground' : 'text-muted-foreground'
+                                  }`}>
+                                    {cat.name}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className="font-mono text-xs">
+                                    {cat.abbreviation}
+                                  </Badge>
+                                  {!cat.higherIsBetter && (
+                                    <Badge variant="secondary" className="text-[10px]">Lower is better</Badge>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {scoringFormat === 'roto' && (
+                            <div className="space-y-3 pt-2">
+                              <Label>Minimum Goalie Games</Label>
+                              <Select value={minGoalieGames} onValueChange={setMinGoalieGames}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="0">No minimum</SelectItem>
+                                  <SelectItem value="2">2 games</SelectItem>
+                                  <SelectItem value="3">3 games</SelectItem>
+                                  <SelectItem value="5">5 games</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <p className="text-xs text-muted-foreground">
+                                Minimum goalie starts required for rate stats (GAA, SV%) to count.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ======================================================== */}
+                  {/* SECTION 6: SEASON & PLAYOFF SETTINGS (Fantasy Only)      */}
+                  {/* ======================================================== */}
+                  {isFantasy && (
+                    <div className="border-t pt-6">
+                      <SectionHeader
+                        title="Season Settings"
+                        subtitle="Playoffs, trade deadline, and keeper rules"
+                      />
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {/* Playoff Teams */}
+                        {showMatchupSettings && (
+                          <div className="space-y-3">
+                            <Label>Playoff Teams</Label>
+                            <Select value={playoffTeams} onValueChange={setPlayoffTeams}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="0">No Playoffs</SelectItem>
+                                <SelectItem value="4">4 Teams</SelectItem>
+                                <SelectItem value="6">6 Teams</SelectItem>
+                                <SelectItem value="8">8 Teams</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+
+                        {/* Playoff Weeks */}
+                        {showMatchupSettings && parseInt(playoffTeams) > 0 && (
+                          <div className="space-y-3">
+                            <Label>Playoff Weeks</Label>
+                            <Select value={playoffWeeks} onValueChange={setPlayoffWeeks}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="2">2 Weeks</SelectItem>
+                                <SelectItem value="3">3 Weeks</SelectItem>
+                                <SelectItem value="4">4 Weeks</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+
+                        {/* Trade Deadline */}
+                        <div className="space-y-3">
+                          <Label>Trade Deadline</Label>
+                          <Select value={tradeDeadlineWeek} onValueChange={setTradeDeadlineWeek}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="0">No Deadline</SelectItem>
+                              <SelectItem value="8">Week 8</SelectItem>
+                              <SelectItem value="10">Week 10</SelectItem>
+                              <SelectItem value="12">Week 12</SelectItem>
+                              <SelectItem value="14">Week 14</SelectItem>
+                              <SelectItem value="16">Week 16</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            No trades allowed after this week.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Advanced: Keeper / Dynasty */}
+                      <div className="mt-6">
+                        <button
+                          type="button"
+                          onClick={() => setShowAdvancedSeason(!showAdvancedSeason)}
+                          className="flex items-center gap-2 text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
+                        >
+                          {showAdvancedSeason ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          Advanced: Keeper & Dynasty Settings
+                        </button>
+
+                        {showAdvancedSeason && (
+                          <div className="mt-4 p-4 rounded-xl border-2 border-dashed border-muted bg-muted/10 space-y-6">
+                            {/* Keeper Toggle */}
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <Label className="text-base font-semibold">Keeper League</Label>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Teams keep a set number of players between seasons.
+                                </p>
+                              </div>
+                              <Switch checked={keeperEnabled} onCheckedChange={(v) => {
+                                setKeeperEnabled(v);
+                                if (!v) setDynastyMode(false);
+                              }} />
+                            </div>
+
+                            {keeperEnabled && (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-4 border-l-2 border-primary/20">
+                                <div className="space-y-2">
+                                  <Label>Keepers Per Team</Label>
+                                  <Select value={keeperCount} onValueChange={setKeeperCount}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="1">1 Keeper</SelectItem>
+                                      <SelectItem value="2">2 Keepers</SelectItem>
+                                      <SelectItem value="3">3 Keepers</SelectItem>
+                                      <SelectItem value="5">5 Keepers</SelectItem>
+                                      <SelectItem value="8">8 Keepers</SelectItem>
+                                      <SelectItem value="10">10 Keepers</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Keeper Draft Penalty</Label>
+                                  <Select value={keeperPenalty} onValueChange={(v) => setKeeperPenalty(v as typeof keeperPenalty)}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="none">No Penalty (free keepers)</SelectItem>
+                                      <SelectItem value="round-cost">Round Cost (kept at drafted round)</SelectItem>
+                                      <SelectItem value="round-escalation">Escalation (cost goes up 1 round each year)</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <p className="text-xs text-muted-foreground">
+                                    {keeperPenalty === 'none' && 'Keepers have no draft pick cost.'}
+                                    {keeperPenalty === 'round-cost' && 'Keeping a player costs the round they were originally drafted in.'}
+                                    {keeperPenalty === 'round-escalation' && 'Keeper cost increases by one round each season.'}
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Dynasty Toggle */}
+                            <div className="flex items-center justify-between pt-2 border-t">
+                              <div>
+                                <Label className="text-base font-semibold flex items-center gap-2">
+                                  <Crown className="w-4 h-4 text-amber-500" />
+                                  Dynasty Mode
+                                </Label>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Keep your entire roster between seasons. Only rookies are drafted each year.
+                                  The ultimate long-term commitment.
+                                </p>
+                              </div>
+                              <Switch checked={dynastyMode} onCheckedChange={(v) => {
+                                setDynastyMode(v);
+                                if (v) setKeeperEnabled(true);
+                              }} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ======================================================== */}
+                  {/* SECTION 7: WAIVER & TRADE SETTINGS (Fantasy Only)        */}
+                  {/* ======================================================== */}
+                  {showWaiverSettings && (
+                    <div className="border-t pt-6">
+                      <SectionHeader
+                        title="Waiver & Trade Settings"
+                        subtitle="Configure free agency and trade rules"
+                      />
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <Label>Waiver Process Time (EST)</Label>
+                          <Select
+                            value={waiverSettings.waiver_process_time}
+                            onValueChange={(value) => setWaiverSettings(prev => ({ ...prev, waiver_process_time: value }))}
+                          >
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="00:00:00">12:00 AM (Midnight)</SelectItem>
+                              <SelectItem value="03:00:00">3:00 AM</SelectItem>
+                              <SelectItem value="06:00:00">6:00 AM</SelectItem>
+                              <SelectItem value="09:00:00">9:00 AM</SelectItem>
+                              <SelectItem value="12:00:00">12:00 PM (Noon)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Waiver Period (Hours)</Label>
+                          <Select
+                            value={waiverSettings.waiver_period_hours.toString()}
+                            onValueChange={(value) => setWaiverSettings(prev => ({ ...prev, waiver_period_hours: parseInt(value) }))}
+                          >
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="24">24 hours (1 day)</SelectItem>
+                              <SelectItem value="48">48 hours (2 days)</SelectItem>
+                              <SelectItem value="72">72 hours (3 days)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Waiver Type</Label>
+                          <Select
+                            value={waiverSettings.waiver_type}
+                            onValueChange={(value: 'rolling' | 'faab' | 'reverse_standings') => setWaiverSettings(prev => ({ ...prev, waiver_type: value }))}
+                          >
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="rolling">Rolling Priority</SelectItem>
+                              <SelectItem value="reverse_standings">Reverse Standings</SelectItem>
+                              <SelectItem value="faab">FAAB (Bidding)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Game Lock</Label>
+                          <div className="flex items-center space-x-2 pt-2">
+                            <Switch
+                              checked={waiverSettings.waiver_game_lock}
+                              onCheckedChange={(checked) => setWaiverSettings(prev => ({ ...prev, waiver_game_lock: checked }))}
+                            />
+                            <span className="text-sm text-muted-foreground">Lock players during/after games</span>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Allow Trades During Games</Label>
+                          <div className="flex items-center space-x-2 pt-2">
+                            <Switch
+                              checked={waiverSettings.allow_trades_during_games}
+                              onCheckedChange={(checked) => setWaiverSettings(prev => ({ ...prev, allow_trades_during_games: checked }))}
+                            />
+                            <span className="text-sm text-muted-foreground">Players can be traded even if game-locked</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ======================================================== */}
+                  {/* CREATE BUTTON                                             */}
+                  {/* ======================================================== */}
+                  <div className="pt-4 flex justify-between items-center">
+                    {/* Summary badges */}
+                    <div className="hidden md:flex flex-wrap gap-2">
+                      <Badge variant="outline">{LEAGUE_TYPE_LABELS[leagueType]}</Badge>
+                      {isFantasy && <Badge variant="outline">{SCORING_FORMAT_LABELS[scoringFormat]}</Badge>}
+                      {isFantasy && <Badge variant="outline">{DRAFT_TYPE_LABELS[draftType]}</Badge>}
+                      {keeperEnabled && <Badge variant="secondary">Keeper</Badge>}
+                      {dynastyMode && <Badge variant="secondary">Dynasty</Badge>}
+                      {bestBallEnabled && <Badge variant="secondary">Best Ball</Badge>}
                     </div>
 
-                    <div className="space-y-3">
-                      <Label htmlFor="scoring-type" className="text-base">Scoring Format</Label>
-                      <Select value={scoringType} onValueChange={setScoringType} disabled>
-                        <SelectTrigger id="scoring-type" className="h-12">
-                          <SelectValue placeholder="Select format" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="h2h-points">
-                            <div className="flex items-center gap-2">
-                              Head-to-Head Points
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="h2h-categories" disabled>
-                            <div className="flex items-center gap-2">
-                              Head-to-Head Categories
-                              <Badge variant="secondary" className="ml-auto">Coming Soon</Badge>
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="roto" disabled>
-                            <div className="flex items-center gap-2">
-                              Rotisserie
-                              <Badge variant="secondary" className="ml-auto">Coming Soon</Badge>
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="season-points" disabled>
-                            <div className="flex items-center gap-2">
-                              Total Season Points
-                              <Badge variant="secondary" className="ml-auto">Coming Soon</Badge>
-                            </div>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
+                    <Button
+                      size="lg"
+                      className="rounded-full px-8 min-w-[200px]"
+                      onClick={handleCreateLeague}
+                      disabled={loading || !leagueName}
+                    >
+                      {loading ? (
+                        <div className="flex items-center">
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
+                          Creating...
+                        </div>
+                      ) : (
+                        <>Create League <CheckCircle className="ml-2 w-4 h-4" /></>
+                      )}
+                    </Button>
+                  </div>
+                </TabsContent>
+
+                {/* ============================================================ */}
+                {/* JOIN LEAGUE TAB                                              */}
+                {/* ============================================================ */}
+                <TabsContent value="join" className="space-y-6">
+                  {error && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  <div className="text-center pb-4">
+                    <UserPlus className="w-12 h-12 mx-auto mb-4 text-primary" />
+                    <h2 className="text-2xl font-bold mb-2">Join a League</h2>
+                    <p className="text-muted-foreground">
+                      Enter the join code provided by your league commissioner
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="join-code" className="text-base font-semibold">Join Code</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="join-code"
+                          placeholder="Paste join code here..."
+                          value={joinCode}
+                          onChange={(e) => setJoinCode(e.target.value)}
+                          disabled={loading}
+                          className="font-mono text-base h-12 text-lg"
+                        />
+                        {joinCode && (
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => {
+                              navigator.clipboard.writeText(joinCode);
+                              toast({
+                                title: 'Copied!',
+                                description: 'Join code copied to clipboard',
+                              });
+                            }}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground">
-                        Head-to-Head Points is currently available. Other formats coming soon!
+                        Ask your commissioner for the league join code, or paste it from an invite link
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="team-name-join" className="text-base">
+                        Team Name <span className="text-muted-foreground font-normal">(optional)</span>
+                      </Label>
+                      <Input
+                        id="team-name-join"
+                        placeholder="e.g. Ice Warriors"
+                        value={teamNameForJoin}
+                        onChange={(e) => setTeamNameForJoin(e.target.value)}
+                        disabled={loading}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Leave blank to use your default team name
                       </p>
                     </div>
                   </div>
-                </div>
 
-                {/* Draft Settings */}
-                <div className="pt-2">
-                  <div className="space-y-4">
-                    <Label className="text-base font-semibold">Draft Type</Label>
-                    <RadioGroup value={draftType} onValueChange={setDraftType} className="grid grid-cols-1 gap-3">
+                  <div className="bg-muted/30 rounded-lg p-4 space-y-2">
+                    <div className="flex items-start gap-2">
+                      <CheckCircle className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
                       <div>
-                        <RadioGroupItem value="snake" id="snake" className="peer sr-only" />
-                        <Label
-                          htmlFor="snake"
-                          className="flex items-center justify-between rounded-xl border-2 border-muted bg-transparent p-3 hover:bg-muted/20 hover:border-primary/50 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 cursor-pointer transition-all"
-                        >
-                          <div className="flex items-center gap-3">
-                            <Settings className="h-5 w-5 text-muted-foreground peer-data-[state=checked]:text-primary" />
-                            <span className="font-semibold">Snake Draft</span>
-                          </div>
-                        </Label>
-                      </div>
-                      <div className="relative">
-                        <RadioGroupItem value="auction" id="auction" className="peer sr-only" disabled />
-                        <Label
-                          htmlFor="auction"
-                          className="flex items-center justify-between rounded-xl border-2 border-muted bg-transparent p-3 opacity-60 cursor-not-allowed transition-all"
-                        >
-                          <div className="flex items-center gap-3">
-                            <Users className="h-5 w-5 text-muted-foreground" />
-                            <span className="font-semibold">Auction Draft</span>
-                            <Badge variant="secondary" className="ml-auto">Coming Soon</Badge>
-                          </div>
-                        </Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                </div>
-
-                {/* Waiver Settings Section */}
-                <div className="border-t pt-6">
-                  <div className="mb-6">
-                    <h3 className="text-xl font-bold mb-2">Waiver Settings</h3>
-                    <p className="text-muted-foreground text-sm">Configure how waivers work in your league</p>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label>Waiver Process Time (EST)</Label>
-                      <Select 
-                        value={waiverSettings.waiver_process_time}
-                        onValueChange={(value) => setWaiverSettings(prev => ({ ...prev, waiver_process_time: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="00:00:00">12:00 AM (Midnight)</SelectItem>
-                          <SelectItem value="03:00:00">3:00 AM</SelectItem>
-                          <SelectItem value="06:00:00">6:00 AM</SelectItem>
-                          <SelectItem value="09:00:00">9:00 AM</SelectItem>
-                          <SelectItem value="12:00:00">12:00 PM (Noon)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Waiver Period (Hours)</Label>
-                      <Select 
-                        value={waiverSettings.waiver_period_hours.toString()}
-                        onValueChange={(value) => setWaiverSettings(prev => ({ ...prev, waiver_period_hours: parseInt(value) }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="24">24 hours (1 day)</SelectItem>
-                          <SelectItem value="48">48 hours (2 days)</SelectItem>
-                          <SelectItem value="72">72 hours (3 days)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Waiver Type</Label>
-                      <Select 
-                        value={waiverSettings.waiver_type}
-                        onValueChange={(value: 'rolling' | 'faab' | 'reverse_standings') => setWaiverSettings(prev => ({ ...prev, waiver_type: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="rolling">Rolling Priority</SelectItem>
-                          <SelectItem value="reverse_standings">Reverse Standings</SelectItem>
-                          <SelectItem value="faab">FAAB (Bidding)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Game Lock</Label>
-                      <div className="flex items-center space-x-2 pt-2">
-                        <Switch
-                          checked={waiverSettings.waiver_game_lock}
-                          onCheckedChange={(checked) => setWaiverSettings(prev => ({ ...prev, waiver_game_lock: checked }))}
-                        />
-                        <span className="text-sm text-muted-foreground">Lock players during/after games</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Allow Trades During Games</Label>
-                      <div className="flex items-center space-x-2 pt-2">
-                        <Switch
-                          checked={waiverSettings.allow_trades_during_games}
-                          onCheckedChange={(checked) => setWaiverSettings(prev => ({ ...prev, allow_trades_during_games: checked }))}
-                        />
-                        <span className="text-sm text-muted-foreground">Players can be traded even if game-locked</span>
+                        <p className="font-medium">Before joining:</p>
+                        <ul className="text-sm text-muted-foreground space-y-1 mt-1">
+                          <li>- Make sure you trust the league commissioner</li>
+                          <li>- Check if the draft has already happened</li>
+                          <li>- You can only own one team per league</li>
+                        </ul>
                       </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="border-t pt-6">
-                  <div className="flex items-center justify-between mb-6">
-                     <div>
-                       <h3 className="text-xl font-bold">Scoring Settings</h3>
-                       <p className="text-muted-foreground text-sm">Toggle stats and adjust point values</p>
-                     </div>
-                     <Badge variant="secondary" className="bg-primary/10 text-primary">
-                       {leagueStats.filter(s => s.enabled).length} Active Stats
-                     </Badge>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {Object.entries(statsByCategory).map(([category, stats]) => (
-                      <div key={category} className="space-y-3">
-                        <h4 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                          {category} Stats
-                        </h4>
-                        <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
-                          {stats.map((stat) => (
-                            <div 
-                              key={stat.id} 
-                              className={`flex items-center justify-between p-3 border-b last:border-0 transition-colors ${stat.enabled ? 'bg-primary/5' : 'opacity-60'}`}
-                            >
-                              <div className="flex items-center gap-3">
-                                <Switch 
-                                  checked={stat.enabled} 
-                                  onCheckedChange={() => handleStatToggle(stat.id)} 
-                                />
-                                <span className={`font-medium ${stat.enabled ? 'text-foreground' : 'text-muted-foreground'}`}>
-                                  {stat.name}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-muted-foreground">Pts:</span>
-                                <Input 
-                                  type="number" 
-                                  className="h-8 w-16 text-right font-mono" 
-                                  value={stat.points}
-                                  onChange={(e) => handleStatPointsChange(stat.id, e.target.value)}
-                                  disabled={!stat.enabled}
-                                  step="0.1"
-                                />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="pt-4 flex justify-end items-center">
-                  <Button 
-                    size="lg" 
-                    className="rounded-full px-8 min-w-[200px]"
-                    onClick={handleCreateLeague}
-                    disabled={loading || !leagueName}
-                  >
-                    {loading ? (
-                      <div className="flex items-center">
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
-                        Creating...
-                      </div>
-                    ) : (
-                      <>Create League <CheckCircle className="ml-2 w-4 h-4" /></>
-                    )}
-                  </Button>
-                </div>
-              </TabsContent>
-
-              {/* JOIN LEAGUE TAB */}
-              <TabsContent value="join" className="space-y-6">
-                {/* ERROR MESSAGE */}
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-
-                <div className="text-center pb-4">
-                  <UserPlus className="w-12 h-12 mx-auto mb-4 text-primary" />
-                  <h2 className="text-2xl font-bold mb-2">Join a League</h2>
-                  <p className="text-muted-foreground">
-                    Enter the join code provided by your league commissioner
-                  </p>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="join-code" className="text-base font-semibold">Join Code</Label>
-                    <div className="flex items-center gap-2">
-                      <Input 
-                        id="join-code" 
-                        placeholder="Paste join code here..." 
-                        value={joinCode}
-                        onChange={(e) => setJoinCode(e.target.value)}
-                        disabled={loading}
-                        className="font-mono text-base h-12 text-lg"
-                      />
-                      {joinCode && (
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => {
-                            navigator.clipboard.writeText(joinCode);
-                            toast({
-                              title: 'Copied!',
-                              description: 'Join code copied to clipboard',
-                            });
-                          }}
-                        >
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Ask your commissioner for the league join code, or paste it from an invite link
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="team-name-join" className="text-base">
-                      Team Name <span className="text-muted-foreground font-normal">(optional)</span>
-                    </Label>
-                    <Input 
-                      id="team-name-join" 
-                      placeholder="e.g. Ice Warriors" 
-                      value={teamNameForJoin}
-                      onChange={(e) => setTeamNameForJoin(e.target.value)}
+                  <div className="pt-4 flex justify-end items-center gap-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => navigate('/gm-office')}
                       disabled={loading}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Leave blank to use your default team name
-                    </p>
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="lg"
+                      className="rounded-full px-8 min-w-[200px]"
+                      onClick={handleJoinLeague}
+                      disabled={loading || !joinCode.trim()}
+                    >
+                      {loading ? (
+                        <div className="flex items-center">
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
+                          Joining...
+                        </div>
+                      ) : (
+                        <>Join League <UserPlus className="ml-2 w-4 h-4" /></>
+                      )}
+                    </Button>
                   </div>
-                </div>
-
-                <div className="bg-muted/30 rounded-lg p-4 space-y-2">
-                  <div className="flex items-start gap-2">
-                    <CheckCircle className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="font-medium">Before joining:</p>
-                      <ul className="text-sm text-muted-foreground space-y-1 mt-1">
-                        <li>• Make sure you trust the league commissioner</li>
-                        <li>• Check if the draft has already happened</li>
-                        <li>• You can only own one team per league</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-4 flex justify-end items-center gap-4">
-                  <Button 
-                    variant="outline"
-                    onClick={() => navigate('/gm-office')}
-                    disabled={loading}
-                  >
-                    Cancel
-                  </Button>
-                  <Button 
-                    size="lg" 
-                    className="rounded-full px-8 min-w-[200px]"
-                    onClick={handleJoinLeague} 
-                    disabled={loading || !joinCode.trim()}
-                  >
-                    {loading ? (
-                      <div className="flex items-center">
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
-                        Joining...
-                      </div>
-                    ) : (
-                      <>Join League <UserPlus className="ml-2 w-4 h-4" /></>
-                    )}
-                  </Button>
-                </div>
-              </TabsContent>
-            </Tabs>
+                </TabsContent>
+              </Tabs>
 
             </CardContent>
           </Card>

@@ -577,28 +577,38 @@ export const DraftService = {
             // For now, we'll skip membership check here since this is called after draft completion
             const { league } = await LeagueService.getLeague(leagueId, userId);
             if (league) {
-              const draftCompletionDate = getDraftCompletionDate(league);
-              if (draftCompletionDate) {
-                const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
-                
-                // Get all teams
-                const { teams } = await LeagueService.getLeagueTeams(leagueId);
-                
-                // Generate matchups for all weeks
-                const { error: matchupError } = await MatchupService.generateMatchupsForLeague(
-                  leagueId,
-                  teams,
-                  firstWeekStart,
-                  false // Don't force regenerate
-                );
-                
-                if (matchupError) {
-                  logger.error('Error generating matchups:', matchupError);
-                } else {
-                  logger.log('Matchups generated successfully for entire season');
-                }
+              // Check if this league format uses weekly matchups
+              const { getLeagueFormat } = await import('./LeagueService');
+              const { FORMAT_HAS_MATCHUPS } = await import('@/types/leagueTypes');
+              const fmt = getLeagueFormat(league);
+              const needsMatchups = FORMAT_HAS_MATCHUPS[fmt.scoringFormat] ?? true;
+
+              if (!needsMatchups) {
+                logger.log(`League format "${fmt.scoringFormat}" does not use weekly matchups - skipping generation`);
               } else {
-                logger.warn('Could not determine draft completion date, skipping matchup generation');
+                const draftCompletionDate = getDraftCompletionDate(league);
+                if (draftCompletionDate) {
+                  const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
+
+                  // Get all teams
+                  const { teams } = await LeagueService.getLeagueTeams(leagueId);
+
+                  // Generate matchups for all weeks
+                  const { error: matchupError } = await MatchupService.generateMatchupsForLeague(
+                    leagueId,
+                    teams,
+                    firstWeekStart,
+                    false // Don't force regenerate
+                  );
+
+                  if (matchupError) {
+                    logger.error('Error generating matchups:', matchupError);
+                  } else {
+                    logger.log('Matchups generated successfully for entire season');
+                  }
+                } else {
+                  logger.warn('Could not determine draft completion date, skipping matchup generation');
+                }
               }
             } else {
               logger.warn('Could not load league data, skipping matchup generation');

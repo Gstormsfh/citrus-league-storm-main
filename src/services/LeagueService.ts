@@ -7,6 +7,8 @@ import { RosterCacheService } from "./RosterCacheService";
 import { LeagueMembershipService } from "./LeagueMembershipService";
 import { DEMO_LEAGUE_ID_FOR_GUESTS } from "./DemoLeagueService";
 import { logger } from "@/utils/logger";
+import type { LeagueType, ScoringFormat, DraftType as LeagueDraftType } from "@/types/leagueTypes";
+import { extractFormatSettings } from "@/types/leagueTypes";
 
 export interface League {
   id: string;
@@ -17,7 +19,7 @@ export interface League {
   roster_size: number;
   draft_rounds: number;
   settings: Record<string, unknown>;
-  // Waiver settings (added for world-class waiver system)
+  // Waiver settings
   waiver_process_time?: string;
   waiver_period_hours?: number;
   waiver_game_lock?: boolean;
@@ -43,6 +45,23 @@ export interface League {
   scheduled_draft_time?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Helper to extract league format info from a league's settings JSONB.
+ * Returns typed format identifiers with safe defaults for backward compatibility.
+ */
+export function getLeagueFormat(league: League): {
+  leagueType: LeagueType;
+  scoringFormat: ScoringFormat;
+  draftType: LeagueDraftType;
+} {
+  const fmt = extractFormatSettings(league.settings || {});
+  return {
+    leagueType: fmt.leagueType || 'fantasy',
+    scoringFormat: fmt.scoringFormat || 'h2h-points',
+    draftType: fmt.draftType || 'snake',
+  };
 }
 
 export interface Team {
@@ -2498,6 +2517,12 @@ async joinLeagueByCode(
 
   /**
    * Calculate team standings stats from completed matchup results.
+   *
+   * Format-aware behavior:
+   * - H2H Points / H2H Categories / Best Ball: Standard W/L from matchup scores
+   * - Roto / Total Points / PPG: No matchups; standings based on cumulative points
+   * - Pool formats: Not applicable (no player-based scoring)
+   *
    * Points for/against come from actual matchup scores (team1_score, team2_score).
    * Wins/losses determined by higher score in each matchup.
    * Also calculates streak and last 5 games.
