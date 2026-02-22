@@ -2963,9 +2963,9 @@ async joinLeagueByCode(
       const { data: playerStats } = playerIds.length > 0
         ? await supabase
             .from('player_directory')
-            .select('player_id, goals, assists, points, plus_minus, shots_on_goal, hits, blocks, pim, power_play_points, short_handed_points, position_code, wins, saves, shutouts, goals_against')
+            .select('player_id, goals, assists, points, plus_minus, shots_on_goal, hits, blocks, pim, power_play_points, short_handed_points, position_code, wins, saves, shutouts, goals_against, save_pct')
             .in('player_id', playerIds)
-            .eq('season', new Date().getFullYear() > 6 ? 2025 : 2025)
+            .eq('season', 2025)
         : { data: [] };
 
       // Map player stats by ID
@@ -2985,12 +2985,33 @@ async joinLeagueByCode(
         plus_minus: 'plus_minus', ppp: 'power_play_points', shp: 'short_handed_points',
         sog: 'shots_on_goal', hits: 'hits', blocks: 'blocks', pim: 'pim',
         wins: 'wins', saves: 'saves', shutouts: 'shutouts', gaa: 'goals_against',
+        save_pct: 'save_pct',
       };
+
+      // Fetch league settings for minGoalieGames
+      const { data: leagueRow } = await supabase
+        .from('leagues')
+        .select('format_settings')
+        .eq('id', leagueId)
+        .single();
+      const minGoalieGames = (leagueRow?.format_settings as any)?.minGoalieGames ?? 0;
+
+      // Goalie stat categories (affected by minimum appearances)
+      const goalieCategories = new Set(['wins', 'saves', 'shutouts', 'gaa', 'save_pct']);
 
       (allAssignments || []).forEach(a => {
         const stats = playerStatsMap.get(String(a.player_id));
         if (!stats || !teamCategoryTotals[a.team_id]) return;
+
+        // Check if player is a goalie below minimum appearances
+        const isGoalie = stats.position_code === 'G';
+        const goalieGames = isGoalie ? (stats.wins ?? 0) + (stats.saves ? 1 : 0) : 0;
+        const belowMinGoalieGames = isGoalie && minGoalieGames > 0 && goalieGames < minGoalieGames;
+
         categories.forEach(cat => {
+          // Skip goalie stat categories if below minimum appearances (industry standard)
+          if (belowMinGoalieGames && goalieCategories.has(cat)) return;
+
           const col = catColumnMap[cat] || cat;
           teamCategoryTotals[a.team_id][cat] += (stats[col] ?? 0);
         });
@@ -3151,18 +3172,30 @@ async joinLeagueByCode(
         plus_minus: 'plus_minus', ppp: 'power_play_points', shp: 'short_handed_points',
         sog: 'shots_on_goal', hits: 'hits', blocks: 'blocks', pim: 'pim',
         wins: 'wins', saves: 'saves', shutouts: 'shutouts', gaa: 'goals_against',
+        save_pct: 'save_pct',
       };
 
       const { data: rotoPlayerStats } = rotoPlayerIds.length > 0
         ? await supabase
             .from('player_directory')
-            .select('player_id, goals, assists, points, plus_minus, shots_on_goal, hits, blocks, pim, power_play_points, short_handed_points, wins, saves, shutouts, goals_against')
+            .select('player_id, goals, assists, points, plus_minus, shots_on_goal, hits, blocks, pim, power_play_points, short_handed_points, position_code, wins, saves, shutouts, goals_against, save_pct')
             .in('player_id', rotoPlayerIds)
             .eq('season', 2025)
         : { data: [] };
 
       const rotoPlayerMap = new Map<string, any>();
       (rotoPlayerStats || []).forEach((p: any) => rotoPlayerMap.set(String(p.player_id), p));
+
+      // Fetch league settings for minGoalieGames
+      const { data: rotoLeagueRow } = await supabase
+        .from('leagues')
+        .select('format_settings')
+        .eq('id', leagueId)
+        .single();
+      const rotoMinGoalieGames = (rotoLeagueRow?.format_settings as any)?.minGoalieGames ?? 0;
+
+      // Goalie stat categories (affected by minimum appearances)
+      const rotoGoalieCategories = new Set(['wins', 'saves', 'shutouts', 'gaa', 'save_pct']);
 
       // Build team category stats
       const teamStats: Record<string, Partial<Record<string, number>>> = {};
@@ -3174,7 +3207,14 @@ async joinLeagueByCode(
       (rotoAssignments || []).forEach(a => {
         const stats = rotoPlayerMap.get(String(a.player_id));
         if (!stats || !teamStats[a.team_id]) return;
+
+        // Check if goalie below minimum appearances (industry standard)
+        const isGoalie = stats.position_code === 'G';
+        const goalieGames = isGoalie ? (stats.wins ?? 0) + (stats.saves ? 1 : 0) : 0;
+        const belowMinGoalie = isGoalie && rotoMinGoalieGames > 0 && goalieGames < rotoMinGoalieGames;
+
         categories.forEach(cat => {
+          if (belowMinGoalie && rotoGoalieCategories.has(cat)) return;
           const col = catColumnMap[cat] || cat;
           (teamStats[a.team_id] as any)[cat] = ((teamStats[a.team_id] as any)[cat] || 0) + (stats[col] ?? 0);
         });

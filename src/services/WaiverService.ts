@@ -309,6 +309,17 @@ export class WaiverService {
     dropPlayerId: number | null = null
   ): Promise<{ success: boolean; error?: string; claimId?: string }> {
     try {
+      // Best Ball leagues prohibit waivers (industry standard: zero management)
+      const { data: leagueCheck } = await supabase
+        .from('leagues')
+        .select('format_settings')
+        .eq('id', leagueId)
+        .single();
+
+      if (leagueCheck?.format_settings?.bestBallEnabled) {
+        return { success: false, error: 'Waivers are not allowed in Best Ball leagues.' };
+      }
+
       // Get team's waiver priority
       const { data: priority } = await supabase
         .from('waiver_priority')
@@ -693,6 +704,17 @@ export class WaiverService {
     dropPlayerId: number | null = null
   ): Promise<{ success: boolean; error?: string; claimId?: string }> {
     try {
+      // Best Ball leagues prohibit FAAB bidding (industry standard: zero management)
+      const { data: bbCheck } = await supabase
+        .from('leagues')
+        .select('format_settings')
+        .eq('id', leagueId)
+        .single();
+
+      if (bbCheck?.format_settings?.bestBallEnabled) {
+        return { success: false, error: 'FAAB bidding is not allowed in Best Ball leagues.' };
+      }
+
       // Validate bid amount
       if (bidAmount < 0) {
         return { success: false, error: 'Bid amount cannot be negative.' };

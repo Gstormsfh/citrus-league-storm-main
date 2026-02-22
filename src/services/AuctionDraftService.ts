@@ -333,14 +333,27 @@ export class AuctionDraftService {
       if (bidErr) return { success: false, error: bidErr.message };
 
       // Update the nomination's current high bid
+      // Anti-sniping: only extend timer if bid placed in last 10 seconds (ESPN/Yahoo standard)
+      const updateFields: Record<string, unknown> = {
+        current_high_bid: bidAmount,
+        current_high_bidder_team_id: teamId,
+      };
+
+      // Check if within last 10 seconds — if so, extend to 15 seconds
+      if (nomination.expires_at) {
+        const expiresAt = new Date(nomination.expires_at).getTime();
+        const now = Date.now();
+        const remainingMs = expiresAt - now;
+        if (remainingMs <= 10000) {
+          // Anti-snipe: extend by 15 seconds from now
+          updateFields.expires_at = new Date(now + 15000).toISOString();
+        }
+        // If more than 10s remaining, keep original expiration
+      }
+
       const { error: updateErr } = await supabase
         .from('auction_nominations')
-        .update({
-          current_high_bid: bidAmount,
-          current_high_bidder_team_id: teamId,
-          // Extend timer by 15 seconds on new bid (anti-sniping)
-          expires_at: new Date(Date.now() + 15000).toISOString(),
-        })
+        .update(updateFields)
         .eq('id', nominationId);
 
       if (updateErr) return { success: false, error: updateErr.message };

@@ -260,6 +260,12 @@ export class PoolService {
   }
 
   /** Score completed games for a week — marks each pick correct/incorrect. */
+  /**
+   * Score Pick'em picks for a week.
+   * gameResults: winning_team = team abbreviation, or 'TIE' for tie games,
+   *              or 'POSTPONED' for postponed games.
+   * Industry standard (ESPN/CBS): tie = both sides incorrect; postponed = 0 points.
+   */
   static async scorePickemWeek(
     leagueId: string,
     weekNumber: number,
@@ -270,7 +276,7 @@ export class PoolService {
 
       const { data: picks, error: fetchErr } = await supabase
         .from('pool_picks')
-        .select('id, game_id, picked_team')
+        .select('id, game_id, picked_team, spread_value')
         .eq('league_id', leagueId)
         .eq('week_number', weekNumber);
 
@@ -280,7 +286,16 @@ export class PoolService {
       for (const pick of (picks ?? [])) {
         const winner = resultMap.get(pick.game_id);
         if (winner === undefined) continue; // game not finished
-        const isCorrect = pick.picked_team === winner;
+
+        // Tie game: both teams count as loss (ESPN/CBS standard)
+        // Postponed: treated as incorrect (0 points)
+        let isCorrect = false;
+        if (winner === 'TIE' || winner === 'POSTPONED') {
+          isCorrect = false;
+        } else {
+          isCorrect = pick.picked_team === winner;
+        }
+
         await supabase
           .from('pool_picks')
           .update({ is_correct: isCorrect })
@@ -291,6 +306,84 @@ export class PoolService {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       console.error('[PoolService] scorePickemWeek error:', message);
+      return { scored: 0, error: message };
+    }
+  }
+
+  /**
+   * Score Pick'em picks for ATS (Against the Spread) mode.
+   * Industry standard: Half-point spreads eliminate ties.
+   * A pick is correct if the picked team covers the spread.
+   *
+   * Example: Team A (-3.5) vs Team B (+3.5)
+   *   If you picked Team A and they win by 4+, you're correct.
+   *   If you picked Team B and they lose by 3 or fewer (or win), you're correct.
+   *
+   * gameResults must include scores for spread calculation.
+   */
+  static async scorePickemWeekATS(
+    leagueId: string,
+    weekNumber: number,
+    gameResults: Array<{
+      game_id: string;
+      home_team: string;
+      away_team: string;
+      home_score: number;
+      away_score: number;
+      status: string; // 'final', 'postponed', 'tie'
+    }>
+  ): Promise<{ scored: number; error?: string }> {
+    try {
+      const resultMap = new Map(gameResults.map(g => [g.game_id, g]));
+
+      const { data: picks, error: fetchErr } = await supabase
+        .from('pool_picks')
+        .select('id, game_id, picked_team, spread_value')
+        .eq('league_id', leagueId)
+        .eq('week_number', weekNumber);
+
+      if (fetchErr) return { scored: 0, error: fetchErr.message };
+
+      let scored = 0;
+      for (const pick of (picks ?? [])) {
+        const game = resultMap.get(pick.game_id);
+        if (!game || game.status === 'postponed') {
+          // Postponed = incorrect (0 points)
+          if (game?.status === 'postponed') {
+            await supabase
+              .from('pool_picks')
+              .update({ is_correct: false })
+              .eq('id', pick.id);
+            scored++;
+          }
+          continue;
+        }
+
+        const spread = pick.spread_value ?? 0;
+
+        // Calculate if picked team covers the spread
+        // Spread is from the perspective of the picked team
+        // If picked_team is home: adjusted_score = home_score + spread
+        // If picked_team is away: adjusted_score = away_score + spread
+        let isCorrect = false;
+        if (pick.picked_team === game.home_team) {
+          // Home team picked with spread
+          isCorrect = (game.home_score + spread) > game.away_score;
+        } else if (pick.picked_team === game.away_team) {
+          // Away team picked with spread
+          isCorrect = (game.away_score + spread) > game.home_score;
+        }
+
+        await supabase
+          .from('pool_picks')
+          .update({ is_correct: isCorrect })
+          .eq('id', pick.id);
+        scored++;
+      }
+      return { scored };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('[PoolService] scorePickemWeekATS error:', message);
       return { scored: 0, error: message };
     }
   }
@@ -333,7 +426,12 @@ export class PoolService {
           accuracy: stats.total > 0 ? (stats.correct / stats.total) * 100 : 0,
           current_week_correct: 0, // caller can enrich from current week data
         }))
-        .sort((a, b) => b.correct_picks - a.correct_picks);
+        .sort((a, b) => {
+          // Primary: most correct picks
+          if (b.correct_picks !== a.correct_picks) return b.correct_picks - a.correct_picks;
+          // Tiebreaker: highest accuracy (fewer total picks with same correct = better)
+          return b.accuracy - a.accuracy;
+        });
     } catch (err) {
       console.error('[PoolService] getPickemStandings error:', err);
       return [];
@@ -598,6 +696,15 @@ export class PoolService {
         return { success: false, error: 'Each pick must have a unique confidence point value.' };
       }
 
+      // Validate sequential 1-to-N (industry standard: ESPN/Yahoo/CBS)
+      const n = picks.length;
+      const expectedSet = new Set(Array.from({ length: n }, (_, i) => i + 1));
+      for (const pts of pointSet) {
+        if (!expectedSet.has(pts)) {
+          return { success: false, error: `Confidence values must be sequential 1 to ${n}. Invalid value: ${pts}` };
+        }
+      }
+
       const rows = picks.map(p => ({
         league_id: leagueId,
         user_id: userId,
@@ -645,7 +752,11 @@ export class PoolService {
     }
   }
 
-  /** Score confidence picks for a week. Points earned = confidence_points if correct. */
+  /**
+   * Score confidence picks for a week.
+   * Points earned = confidence_points if correct, 0 otherwise.
+   * Tie/postponed games = 0 points (industry standard).
+   */
   static async scoreConfidenceWeek(
     leagueId: string,
     weekNumber: number,
@@ -666,7 +777,8 @@ export class PoolService {
       for (const pick of (picks ?? [])) {
         const winner = resultMap.get(pick.game_id);
         if (winner === undefined) continue;
-        const isCorrect = pick.picked_team === winner;
+        // Tie/postponed = incorrect (0 points), matching ESPN/CBS standard
+        const isCorrect = winner !== 'TIE' && winner !== 'POSTPONED' && pick.picked_team === winner;
         const pointsEarned = isCorrect ? pick.confidence_points : 0;
         await supabase
           .from('confidence_picks')
@@ -722,7 +834,14 @@ export class PoolService {
           current_week_points: 0,
           weeks_played: stats.weeks.size,
         }))
-        .sort((a, b) => b.total_points - a.total_points);
+        .sort((a, b) => {
+          // Primary: most total points
+          if (b.total_points !== a.total_points) return b.total_points - a.total_points;
+          // Tiebreaker: higher efficiency (points earned / possible points)
+          const effA = a.possible_points > 0 ? a.total_points / a.possible_points : 0;
+          const effB = b.possible_points > 0 ? b.total_points / b.possible_points : 0;
+          return effB - effA;
+        });
     } catch (err) {
       console.error('[PoolService] getConfidenceStandings error:', err);
       return [];
