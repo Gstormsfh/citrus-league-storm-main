@@ -2811,15 +2811,33 @@ const DraftRoom = () => {
                         <span className="font-bold text-sm truncate">{selectedPlayer.full_name}</span>
                         <span className="text-xs text-muted-foreground flex-shrink-0">{selectedPlayer.team}</span>
                       </div>
-                      {/* Compact stat pills - scrollable on mobile */}
-                      <div className="flex items-center gap-1.5 mt-1 overflow-x-auto text-[10px] md:text-xs pb-0.5">
-                        <span className="flex-shrink-0 font-bold text-sm">{selectedPlayer.points} PTS</span>
-                        <span className="text-muted-foreground">|</span>
-                        <span className="flex-shrink-0">{selectedPlayer.goals}G</span>
-                        <span className="flex-shrink-0">{selectedPlayer.assists}A</span>
-                        <span className="hidden sm:inline flex-shrink-0">{selectedPlayer.shots}SOG</span>
-                        <span className="hidden sm:inline flex-shrink-0">{selectedPlayer.hits}HIT</span>
-                        <span className="hidden md:inline flex-shrink-0">{selectedPlayer.blocks}BLK</span>
+                      {/* Compact stat pills - scrollable on mobile to see ALL stats */}
+                      <div className="flex items-center gap-1.5 mt-1 overflow-x-auto text-[10px] md:text-xs pb-0.5 scrollbar-styled">
+                        {selectedPlayer.position === 'G' ? (
+                          <>
+                            <span className="flex-shrink-0 font-bold text-sm">{selectedPlayer.wins || 0}W</span>
+                            <span className="text-muted-foreground">|</span>
+                            <span className="flex-shrink-0">{selectedPlayer.losses || 0}L</span>
+                            <span className="flex-shrink-0">{selectedPlayer.goals_against_average ? selectedPlayer.goals_against_average.toFixed(2) : '0.00'} GAA</span>
+                            <span className="flex-shrink-0">{selectedPlayer.save_percentage ? (selectedPlayer.save_percentage * 100).toFixed(1) : '0.0'}%</span>
+                            <span className="flex-shrink-0">{selectedPlayer.saves || 0}SV</span>
+                            <span className="flex-shrink-0">{selectedPlayer.shutouts || 0}SO</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="flex-shrink-0 font-bold text-sm">{selectedPlayer.points} PTS</span>
+                            <span className="text-muted-foreground">|</span>
+                            <span className="flex-shrink-0">{selectedPlayer.goals}G</span>
+                            <span className="flex-shrink-0">{selectedPlayer.assists}A</span>
+                            <span className="flex-shrink-0">{selectedPlayer.plus_minus > 0 ? '+' : ''}{selectedPlayer.plus_minus}</span>
+                            <span className="flex-shrink-0">{selectedPlayer.ppp || 0}PPP</span>
+                            <span className="flex-shrink-0">{selectedPlayer.shp || 0}SHP</span>
+                            <span className="flex-shrink-0">{selectedPlayer.shots}SOG</span>
+                            <span className="flex-shrink-0">{selectedPlayer.hits}HIT</span>
+                            <span className="flex-shrink-0">{selectedPlayer.blocks}BLK</span>
+                            <span className="flex-shrink-0">{selectedPlayer.pim || 0}PIM</span>
+                          </>
+                        )}
                       </div>
                     </div>
                     {currentTeam?.owner_id === user?.id && userLeagueState === 'active-user' && (
