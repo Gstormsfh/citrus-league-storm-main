@@ -99,18 +99,40 @@ const PoolConfidence = () => {
   const handleSubmitPicks = async () => {
     if (!activeLeagueId || !user) return;
 
-    // Validate all games have picks
+    // Validate all pickable games have picks (industry standard: must pick ALL games)
     const picksArray = Array.from(picks.values());
+    const pickableGames = games.filter(g => {
+      const locked = g.status === 'live' || g.status === 'final' || (g.game_time && new Date(`${g.game_date}T${g.game_time}`) <= new Date());
+      return !locked;
+    });
+
     if (picksArray.length === 0) {
       toast({ title: 'Error', description: 'Make at least one pick before submitting.', variant: 'destructive' });
       return;
     }
 
-    // Validate unique confidence points
+    // Count picks for unlocked games only
+    const unlockedPicks = picksArray.filter(p => {
+      const game = games.find(g => String(g.id) === p.game_id);
+      if (!game) return true;
+      const locked = game.status === 'live' || game.status === 'final' || (game.game_time && new Date(`${game.game_date}T${game.game_time}`) <= new Date());
+      return !locked;
+    });
+
+    if (pickableGames.length > 0 && unlockedPicks.length < pickableGames.length) {
+      toast({
+        title: 'Incomplete Picks',
+        description: `You must pick all ${pickableGames.length} available games. You've picked ${unlockedPicks.length}.`,
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    // Validate unique confidence points (1 to N sequential)
     const points = picksArray.map(p => p.confidence_points);
     const uniquePoints = new Set(points);
     if (uniquePoints.size !== points.length) {
-      toast({ title: 'Error', description: 'Each pick must have a unique confidence value.', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Each pick must have a unique confidence value (1 to N).', variant: 'destructive' });
       return;
     }
 

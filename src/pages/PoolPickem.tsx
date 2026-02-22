@@ -168,10 +168,11 @@ const PoolPickem = () => {
                         const gameId = String(game.id);
                         const picked = picks.get(gameId);
                         const existingPick = existingPicks.find(p => p.game_id === gameId);
-                        const locked = game.status === 'live' || game.status === 'final' || (game.game_time && new Date(`${game.game_date}T${game.game_time}`) <= new Date());
+                        const isPostponed = game.status === 'postponed';
+                        const locked = isPostponed || game.status === 'live' || game.status === 'final' || (game.game_time && new Date(`${game.game_date}T${game.game_time}`) <= new Date());
 
                         return (
-                          <div key={gameId} className={`flex items-center justify-between p-4 rounded-xl bg-muted/20 border border-transparent hover:border-primary/10 transition-colors ${locked ? 'opacity-60' : ''}`}>
+                          <div key={gameId} className={`flex items-center justify-between p-4 rounded-xl bg-muted/20 border border-transparent hover:border-primary/10 transition-colors ${locked ? 'opacity-60' : ''} ${isPostponed ? 'line-through' : ''}`}>
                             <Button
                               variant={picked === game.away_team ? 'default' : 'outline'}
                               size="sm"
@@ -193,7 +194,7 @@ const PoolPickem = () => {
                               {game.game_time && (
                                 <div className="text-[10px] text-muted-foreground">
                                   {locked ? (
-                                    <span className="flex items-center gap-1"><Lock className="w-3 h-3" /> {game.status === 'final' ? 'Final' : game.status === 'live' ? 'Live' : 'Locked'}</span>
+                                    <span className="flex items-center gap-1"><Lock className="w-3 h-3" /> {isPostponed ? 'PPD' : game.status === 'final' ? 'Final' : game.status === 'live' ? 'Live' : 'Locked'}</span>
                                   ) : (
                                     new Date(`${game.game_date}T${game.game_time}`).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
                                   )}

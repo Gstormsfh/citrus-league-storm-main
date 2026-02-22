@@ -436,6 +436,34 @@ export class AuctionDraftService {
         })
         .eq('id', sessionId);
 
+      // Check if auction is complete (all teams have filled their rosters)
+      const { data: allBudgets } = await supabase
+        .from('auction_budgets')
+        .select('players_won')
+        .eq('league_id', leagueId);
+
+      const { data: leagueInfo } = await supabase
+        .from('leagues')
+        .select('roster_size')
+        .eq('id', leagueId)
+        .single();
+
+      const rosterSize = leagueInfo?.roster_size ?? 21;
+      const allFilled = (allBudgets ?? []).every(b => b.players_won >= rosterSize);
+
+      if (allFilled) {
+        // Mark draft as completed
+        await supabase
+          .from('draft_sessions')
+          .update({ status: 'completed' })
+          .eq('id', sessionId);
+
+        await supabase
+          .from('leagues')
+          .update({ draft_status: 'completed' })
+          .eq('id', leagueId);
+      }
+
       return { success: true, winner_team_id: winnerTeamId, amount: winAmount };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -460,6 +488,58 @@ export class AuctionDraftService {
     } catch (err) {
       console.error('[AuctionDraftService] getBidHistory error:', err);
       return [];
+    }
+  }
+
+  /**
+   * Auto-nominate for a team when their nomination timer expires.
+   * ESPN/Yahoo standard: nominates the highest-ranked available player.
+   * Called by the timer expiration handler.
+   */
+  static async autoNominate(
+    leagueId: string,
+    sessionId: string,
+    teamId: string,
+    nominationTimerSeconds: number = 30
+  ): Promise<{ success: boolean; nomination?: AuctionNomination; error?: string }> {
+    try {
+      // Get already-drafted player IDs
+      const { data: draftedPicks } = await supabase
+        .from('draft_picks')
+        .select('player_id')
+        .eq('league_id', leagueId)
+        .is('deleted_at', null);
+
+      const draftedIds = new Set((draftedPicks ?? []).map(p => p.player_id));
+
+      // Get the top available player (highest fantasy points, not yet drafted)
+      const { data: topPlayers } = await supabase
+        .from('player_directory')
+        .select('player_id, full_name, points')
+        .eq('season', 2025)
+        .order('points', { ascending: false })
+        .limit(50);
+
+      const available = (topPlayers ?? []).find(p => !draftedIds.has(String(p.player_id)));
+
+      if (!available) {
+        return { success: false, error: 'No available players to auto-nominate.' };
+      }
+
+      // Nominate the player
+      return await this.nominatePlayer(
+        leagueId,
+        sessionId,
+        teamId,
+        String(available.player_id),
+        available.full_name || `Player ${available.player_id}`,
+        1, // minimum $1 opening bid
+        nominationTimerSeconds
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[AuctionDraftService] autoNominate error:', msg);
+      return { success: false, error: msg };
     }
   }
 

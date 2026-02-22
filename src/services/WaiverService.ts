@@ -881,20 +881,38 @@ export class WaiverService {
       });
 
       const results: Array<{ player_id: number; winner_team_id: string; bid: number }> = [];
-      const processedTeams = new Set<string>();
+
+      // Fetch standings for tiebreaker (inverse standings: worst team wins ties)
+      // ESPN/Yahoo/Sleeper standard: equal bids broken by worst record
+      const { data: standingsData } = await supabase
+        .from('teams')
+        .select('id, wins, losses')
+        .eq('league_id', leagueId);
+
+      // Lower win pct = higher priority (inverse standings)
+      const teamStandingsRank = new Map<string, number>();
+      if (standingsData) {
+        const sorted = [...standingsData].sort((a, b) => {
+          const pctA = (a.wins || 0) / Math.max(1, (a.wins || 0) + (a.losses || 0));
+          const pctB = (b.wins || 0) / Math.max(1, (b.wins || 0) + (b.losses || 0));
+          return pctA - pctB; // Worst record first (best tiebreaker position)
+        });
+        sorted.forEach((t, i) => teamStandingsRank.set(t.id, i));
+      }
 
       // Process each player
       for (const [playerId, bids] of playerClaims) {
-        // Sort by bid amount desc (priority column stores bid amount)
-        bids.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+        // Sort by bid amount desc, then by inverse standings (worst team first) for ties
+        bids.sort((a, b) => {
+          const bidDiff = (b.priority ?? 0) - (a.priority ?? 0);
+          if (bidDiff !== 0) return bidDiff;
+          // Tiebreaker: lower standings rank = worse team = wins tie
+          return (teamStandingsRank.get(a.team_id) ?? 999) - (teamStandingsRank.get(b.team_id) ?? 999);
+        });
 
         // Find first eligible bidder
         let winner = null;
         for (const bid of bids) {
-          // Skip if team already won a player this processing round
-          // (they can bid on multiple but only win one at a time in strict mode)
-          // For now, allow multiple wins per processing round (industry standard)
-
           // Verify budget is still sufficient
           const budget = await this.getFAABBudget(leagueId, bid.team_id);
           if (budget !== null && budget >= (bid.priority ?? 0)) {

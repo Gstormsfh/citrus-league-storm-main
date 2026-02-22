@@ -56,14 +56,22 @@ function getCurrentWeekNumber(seasonStartYear: number = 2025): number {
 
 /**
  * Check if a game has started (cannot pick after game time).
+ * Also locks postponed games (industry standard: postponed = 0 points).
  */
 function isGameLocked(game: NHLGame): boolean {
-  if (game.status === 'live' || game.status === 'final') return true;
+  if (game.status === 'live' || game.status === 'final' || game.status === 'postponed') return true;
   if (!game.game_time) return false;
 
   // Parse game date + time and compare to now
   const gameDateTime = new Date(`${game.game_date}T${game.game_time}`);
   return new Date() >= gameDateTime;
+}
+
+/**
+ * Check if a game is postponed (used for scoring — postponed = no winner).
+ */
+function isPostponed(game: NHLGame): boolean {
+  return game.status === 'postponed';
 }
 
 // ============================================================================
