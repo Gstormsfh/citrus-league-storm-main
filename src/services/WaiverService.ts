@@ -676,7 +676,6 @@ export class WaiverService {
       return { leagues: [], error: error instanceof Error ? error.message : String(error) };
     }
   }
-}
 
   // ==========================================================================
   // FAAB (Free Agent Acquisition Budget) Waivers
@@ -905,13 +904,82 @@ export class WaiverService {
         }
 
         if (winner) {
-          // Mark winner as successful
+          const bidAmount = winner.priority ?? 0;
+
+          // 1. Execute the roster move (add player, optionally drop)
+          try {
+            // Get team owner for the roster move
+            const { data: teamData } = await supabase
+              .from('teams')
+              .select('owner_id')
+              .eq('id', winner.team_id)
+              .single();
+
+            if (teamData?.owner_id) {
+              const moveResult = await this.addFreeAgent(
+                leagueId,
+                winner.team_id,
+                playerId,
+                winner.drop_player_id,
+                teamData.owner_id
+              );
+
+              if (!moveResult.success) {
+                // Roster move failed — mark as failed
+                await supabase
+                  .from('waiver_claims')
+                  .update({
+                    status: 'failed',
+                    processed_at: new Date().toISOString(),
+                    failure_reason: `Roster move failed: ${moveResult.error}`,
+                  })
+                  .eq('id', winner.id);
+
+                // Try next bidder
+                const loserIds = bids.map(b => b.id);
+                if (loserIds.length > 0) {
+                  await supabase
+                    .from('waiver_claims')
+                    .update({
+                      status: 'failed',
+                      processed_at: new Date().toISOString(),
+                      failure_reason: 'All bidders failed roster move',
+                    })
+                    .in('id', loserIds);
+                }
+                continue;
+              }
+            }
+          } catch (moveErr) {
+            console.error('[WaiverService] FAAB roster move error:', moveErr);
+          }
+
+          // 2. Deduct FAAB budget from winner
+          const { data: budgetRow } = await supabase
+            .from('faab_budgets')
+            .select('remaining_budget')
+            .eq('league_id', leagueId)
+            .eq('team_id', winner.team_id)
+            .maybeSingle();
+
+          if (budgetRow) {
+            await supabase
+              .from('faab_budgets')
+              .update({
+                remaining_budget: Math.max(0, budgetRow.remaining_budget - bidAmount),
+                updated_at: new Date().toISOString(),
+              })
+              .eq('league_id', leagueId)
+              .eq('team_id', winner.team_id);
+          }
+
+          // 3. Mark winner claim as successful
           await supabase
             .from('waiver_claims')
             .update({ status: 'successful', processed_at: new Date().toISOString() })
             .eq('id', winner.id);
 
-          // Mark all other bids for this player as failed
+          // 4. Mark all other bids for this player as failed
           const loserIds = bids.filter(b => b.id !== winner!.id).map(b => b.id);
           if (loserIds.length > 0) {
             await supabase
@@ -927,7 +995,7 @@ export class WaiverService {
           results.push({
             player_id: playerId,
             winner_team_id: winner.team_id,
-            bid: winner.priority ?? 0,
+            bid: bidAmount,
           });
         } else {
           // No eligible bidder

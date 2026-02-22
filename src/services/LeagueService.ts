@@ -2947,10 +2947,54 @@ async joinLeagueByCode(
       (pastResult.data ?? []).forEach(m => { if (m.id && !matchupMap.has(m.id)) matchupMap.set(m.id, m); });
       const matchups = Array.from(matchupMap.values()).sort((a: any, b: any) => a.week_number - b.week_number);
 
-      // For each matchup, simulate category comparison using stored scores
-      // In production, you'd fetch per-category stats from a dedicated table.
-      // Here we use total scores as a proxy and compare them for the overall W/L.
-      // If category-level data exists in daily_rosters or matchup_lines, it would be used.
+      // Import category comparison function from scoringUtils
+      const { compareCategoryMatchup } = await import('@/utils/scoringUtils');
+
+      // For each matchup, compute per-category W/L/T using roster-based stats.
+      // Fetch all roster assignments and player stats for per-category comparisons.
+      const { data: allAssignments } = await supabase
+        .from('roster_assignments')
+        .select('team_id, player_id')
+        .eq('league_id', leagueId);
+
+      const playerIds = [...new Set((allAssignments || []).map(a => Number(a.player_id)))];
+
+      // Build per-team season totals per category from player_directory stats
+      const { data: playerStats } = playerIds.length > 0
+        ? await supabase
+            .from('player_directory')
+            .select('player_id, goals, assists, points, plus_minus, shots_on_goal, hits, blocks, pim, power_play_points, short_handed_points, position_code, wins, saves, shutouts, goals_against')
+            .in('player_id', playerIds)
+            .eq('season', new Date().getFullYear() > 6 ? 2025 : 2025)
+        : { data: [] };
+
+      // Map player stats by ID
+      const playerStatsMap = new Map<string, any>();
+      (playerStats || []).forEach((p: any) => playerStatsMap.set(String(p.player_id), p));
+
+      // Build per-team category totals
+      const teamCategoryTotals: Record<string, Record<string, number>> = {};
+      teams.forEach(t => {
+        teamCategoryTotals[t.id] = {};
+        categories.forEach(c => { teamCategoryTotals[t.id][c] = 0; });
+      });
+
+      // Map category IDs to player_directory column names
+      const catColumnMap: Record<string, string> = {
+        goals: 'goals', assists: 'assists', points: 'points',
+        plus_minus: 'plus_minus', ppp: 'power_play_points', shp: 'short_handed_points',
+        sog: 'shots_on_goal', hits: 'hits', blocks: 'blocks', pim: 'pim',
+        wins: 'wins', saves: 'saves', shutouts: 'shutouts', gaa: 'goals_against',
+      };
+
+      (allAssignments || []).forEach(a => {
+        const stats = playerStatsMap.get(String(a.player_id));
+        if (!stats || !teamCategoryTotals[a.team_id]) return;
+        categories.forEach(cat => {
+          const col = catColumnMap[cat] || cat;
+          teamCategoryTotals[a.team_id][cat] += (stats[col] ?? 0);
+        });
+      });
 
       for (const matchup of matchups) {
         if (!matchup.team2_id) continue; // skip byes
@@ -2965,39 +3009,37 @@ async joinLeagueByCode(
         if (result[t2]) result[t2].pointsFor += s2;
         if (result[t2]) result[t2].pointsAgainst += s1;
 
-        // For category matchups, we distribute category wins proportionally
-        // based on the score differential until proper per-category data exists.
-        const totalCats = categories.length;
-        let team1CatWins = 0;
-        let team2CatWins = 0;
-        let catTies = 0;
+        // Compare per-category stats using real data
+        const t1Stats = teamCategoryTotals[t1] || {};
+        const t2Stats = teamCategoryTotals[t2] || {};
+        const catResult = compareCategoryMatchup(t1Stats, t2Stats, categories, categoryMeta);
 
-        if (s1 > s2) {
-          // Team 1 wins majority of categories proportionally
-          team1CatWins = Math.ceil(totalCats * 0.6);
-          team2CatWins = Math.floor(totalCats * 0.3);
-          catTies = totalCats - team1CatWins - team2CatWins;
-        } else if (s2 > s1) {
-          team2CatWins = Math.ceil(totalCats * 0.6);
-          team1CatWins = Math.floor(totalCats * 0.3);
-          catTies = totalCats - team1CatWins - team2CatWins;
-        } else {
-          catTies = totalCats;
-        }
-
-        // Record matchup-level category W/L/T
+        // Record per-category W/L/T for each team
         if (result[t1]) {
-          result[t1].wins += team1CatWins;
-          result[t1].losses += team2CatWins;
-          result[t1].ties += catTies;
-          const overallResult = team1CatWins > team2CatWins ? 'win' : team2CatWins > team1CatWins ? 'loss' : 'tie';
+          result[t1].wins += catResult.team1Wins;
+          result[t1].losses += catResult.team2Wins;
+          result[t1].ties += catResult.ties;
+          // Per-category detail
+          categories.forEach(cat => {
+            const detail = catResult.details[cat];
+            if (detail === 'team1') result[t1].categoryRecord[cat].wins++;
+            else if (detail === 'team2') result[t1].categoryRecord[cat].losses++;
+            else result[t1].categoryRecord[cat].ties++;
+          });
+          const overallResult = catResult.team1Wins > catResult.team2Wins ? 'win' : catResult.team2Wins > catResult.team1Wins ? 'loss' : 'tie';
           result[t1].matchupHistory.push({ week: matchup.week_number, result: overallResult });
         }
         if (result[t2]) {
-          result[t2].wins += team2CatWins;
-          result[t2].losses += team1CatWins;
-          result[t2].ties += catTies;
-          const overallResult = team2CatWins > team1CatWins ? 'win' : team1CatWins > team2CatWins ? 'loss' : 'tie';
+          result[t2].wins += catResult.team2Wins;
+          result[t2].losses += catResult.team1Wins;
+          result[t2].ties += catResult.ties;
+          categories.forEach(cat => {
+            const detail = catResult.details[cat];
+            if (detail === 'team2') result[t2].categoryRecord[cat].wins++;
+            else if (detail === 'team1') result[t2].categoryRecord[cat].losses++;
+            else result[t2].categoryRecord[cat].ties++;
+          });
+          const overallResult = catResult.team2Wins > catResult.team1Wins ? 'win' : catResult.team1Wins > catResult.team2Wins ? 'loss' : 'tie';
           result[t2].matchupHistory.push({ week: matchup.week_number, result: overallResult });
         }
       }
@@ -3092,21 +3134,54 @@ async joinLeagueByCode(
         }
       });
 
-      // For proper Roto, we'd need per-category season totals per team.
-      // Use the imported calculateRotoStandings for the ranking algorithm.
-      // Build team category stats from player data.
+      // Build per-team, per-category season totals from roster data
       const { calculateRotoStandings: calcRoto } = await import('@/utils/scoringUtils');
 
-      // Placeholder: use total points as a single "category" until per-cat data is available
+      // Fetch all roster assignments to build per-team category stats
+      const { data: rotoAssignments } = await supabase
+        .from('roster_assignments')
+        .select('team_id, player_id')
+        .eq('league_id', leagueId);
+
+      const rotoPlayerIds = [...new Set((rotoAssignments || []).map(a => Number(a.player_id)))];
+
+      // Map category IDs to player_directory column names
+      const catColumnMap: Record<string, string> = {
+        goals: 'goals', assists: 'assists', points: 'points',
+        plus_minus: 'plus_minus', ppp: 'power_play_points', shp: 'short_handed_points',
+        sog: 'shots_on_goal', hits: 'hits', blocks: 'blocks', pim: 'pim',
+        wins: 'wins', saves: 'saves', shutouts: 'shutouts', gaa: 'goals_against',
+      };
+
+      const { data: rotoPlayerStats } = rotoPlayerIds.length > 0
+        ? await supabase
+            .from('player_directory')
+            .select('player_id, goals, assists, points, plus_minus, shots_on_goal, hits, blocks, pim, power_play_points, short_handed_points, wins, saves, shutouts, goals_against')
+            .in('player_id', rotoPlayerIds)
+            .eq('season', 2025)
+        : { data: [] };
+
+      const rotoPlayerMap = new Map<string, any>();
+      (rotoPlayerStats || []).forEach((p: any) => rotoPlayerMap.set(String(p.player_id), p));
+
+      // Build team category stats
       const teamStats: Record<string, Partial<Record<string, number>>> = {};
       teams.forEach(t => {
-        teamStats[t.id] = { total_points: result[t.id].pointsFor };
+        teamStats[t.id] = {};
+        categories.forEach(cat => { teamStats[t.id][cat] = 0; });
       });
 
-      const roto = calcRoto(teamStats as any, ['total_points', ...categories.slice(0, 0)], {
-        total_points: { higherIsBetter: true },
-        ...categoryMeta,
+      (rotoAssignments || []).forEach(a => {
+        const stats = rotoPlayerMap.get(String(a.player_id));
+        if (!stats || !teamStats[a.team_id]) return;
+        categories.forEach(cat => {
+          const col = catColumnMap[cat] || cat;
+          (teamStats[a.team_id] as any)[cat] = ((teamStats[a.team_id] as any)[cat] || 0) + (stats[col] ?? 0);
+        });
       });
+
+      // Use all configured categories (not the broken empty slice)
+      const roto = calcRoto(teamStats as any, categories, categoryMeta);
 
       // Merge roto results
       Object.entries(roto).forEach(([teamId, rotoResult]) => {

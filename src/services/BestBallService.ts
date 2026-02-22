@@ -121,7 +121,19 @@ export class BestBallService {
     };
 
     try {
-      // Get the team's rostered players
+      // Get the team's rostered players (exclude IR players — they don't count in Best Ball)
+      const { data: lineup } = await supabase
+        .from('team_lineups')
+        .select('starters, bench, ir')
+        .eq('league_id', leagueId)
+        .eq('team_id', teamId)
+        .maybeSingle();
+
+      // IR players should be excluded from Best Ball optimization
+      const irPlayerIds = new Set<string>(
+        ((lineup?.ir as string[]) || []).map(String)
+      );
+
       const { data: assignments } = await supabase
         .from('roster_assignments')
         .select('player_id')
@@ -130,13 +142,24 @@ export class BestBallService {
 
       if (!assignments || assignments.length === 0) return emptyResult;
 
-      const playerIds = assignments.map(a => a.player_id);
+      // Filter out IR players
+      const playerIds = assignments
+        .map(a => a.player_id)
+        .filter(pid => !irPlayerIds.has(String(pid)));
+
+      if (playerIds.length === 0) return emptyResult;
+
+      // Determine current season dynamically
+      const currentYear = new Date().getFullYear();
+      const currentMonth = new Date().getMonth();
+      // NHL season spans Oct-Jun: if month is Jan-Jun, season started previous year
+      const season = currentMonth >= 9 ? currentYear : currentYear - 1;
 
       // Get player positions
       const { data: players } = await supabase
         .from('player_directory')
         .select('player_id, position_code')
-        .eq('season', 2025)
+        .eq('season', season)
         .in('player_id', playerIds.map(Number));
 
       const posMap = new Map<string, string>();

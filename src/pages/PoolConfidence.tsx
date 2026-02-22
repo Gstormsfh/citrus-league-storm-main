@@ -11,8 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { PoolService, ConfidencePick, ConfidenceStanding } from '@/services/PoolService';
-import { ScheduleService, NHLGame } from '@/services/ScheduleService';
-import { Loader2, BarChart3, ArrowUpDown, CheckCircle, XCircle } from 'lucide-react';
+import { NHLGame } from '@/services/ScheduleService';
+import { Loader2, BarChart3, ArrowUpDown, CheckCircle, XCircle, ChevronLeft, ChevronRight, Lock } from 'lucide-react';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import LoadingScreen from '@/components/LoadingScreen';
 
@@ -28,7 +28,7 @@ const PoolConfidence = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [currentWeek, setCurrentWeek] = useState(1);
+  const [currentWeek, setCurrentWeek] = useState(() => PoolService.getCurrentWeek());
   const [games, setGames] = useState<NHLGame[]>([]);
   const [picks, setPicks] = useState<Map<string, PickWithConfidence>>(new Map());
   const [existingPicks, setExistingPicks] = useState<ConfidencePick[]>([]);
@@ -43,8 +43,8 @@ const PoolConfidence = () => {
       }
 
       try {
-        const todayGames = await ScheduleService.getTodaysGames();
-        setGames(todayGames || []);
+        const weekGames = await PoolService.getWeekGames(currentWeek);
+        setGames(weekGames || []);
 
         const userPicks = await PoolService.getConfidencePicks(
           activeLeagueId, user.id, currentWeek
@@ -169,7 +169,15 @@ const PoolConfidence = () => {
               </h2>
               <p className="text-muted-foreground text-sm">Pick winners and rank by confidence. Higher confidence = more points.</p>
             </div>
-            <Badge variant="outline" className="text-sm">Week {currentWeek}</Badge>
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="sm" onClick={() => setCurrentWeek(w => Math.max(1, w - 1))} disabled={currentWeek <= 1}>
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <Badge variant="outline" className="text-sm">Week {currentWeek}</Badge>
+              <Button variant="ghost" size="sm" onClick={() => setCurrentWeek(w => w + 1)}>
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -198,9 +206,10 @@ const PoolConfidence = () => {
                         const gameId = String(game.id);
                         const pick = picks.get(gameId);
                         const existingPick = existingPicks.find(p => p.game_id === gameId);
+                        const locked = game.status === 'live' || game.status === 'final' || (game.game_time && new Date(`${game.game_date}T${game.game_time}`) <= new Date());
 
                         return (
-                          <div key={gameId} className="flex items-center gap-3 p-4 rounded-xl bg-muted/20 border border-transparent hover:border-primary/10 transition-colors">
+                          <div key={gameId} className={`flex items-center gap-3 p-4 rounded-xl bg-muted/20 border border-transparent hover:border-primary/10 transition-colors ${locked ? 'opacity-60' : ''}`}>
                             {/* Team selection */}
                             <div className="flex items-center gap-2 flex-1">
                               <Button
@@ -208,15 +217,20 @@ const PoolConfidence = () => {
                                 size="sm"
                                 className="min-w-[80px] text-xs"
                                 onClick={() => handleTeamPick(gameId, game.away_team)}
+                                disabled={!!locked}
                               >
                                 {game.away_team}
                               </Button>
-                              <span className="text-xs text-muted-foreground">@</span>
+                              <div className="text-center">
+                                <span className="text-xs text-muted-foreground">@</span>
+                                {locked && <div className="text-[10px] text-muted-foreground flex items-center gap-0.5"><Lock className="w-3 h-3" />{game.status === 'final' ? 'Final' : 'Locked'}</div>}
+                              </div>
                               <Button
                                 variant={pick?.picked_team === game.home_team ? 'default' : 'outline'}
                                 size="sm"
                                 className="min-w-[80px] text-xs"
                                 onClick={() => handleTeamPick(gameId, game.home_team)}
+                                disabled={!!locked}
                               >
                                 {game.home_team}
                               </Button>
@@ -227,7 +241,7 @@ const PoolConfidence = () => {
                               <Select
                                 value={pick?.confidence_points?.toString() || ''}
                                 onValueChange={(val) => handleConfidenceChange(gameId, parseInt(val))}
-                                disabled={!pick?.picked_team}
+                                disabled={!pick?.picked_team || !!locked}
                               >
                                 <SelectTrigger className="h-8 text-xs">
                                   <SelectValue placeholder="Pts" />

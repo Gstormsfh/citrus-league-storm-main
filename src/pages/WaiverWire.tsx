@@ -375,8 +375,14 @@ const WaiverWire = () => {
                 <Trophy className="w-10 h-10 text-citrus-sage" />
               </div>
               <p className="text-lg font-display text-citrus-charcoal">
-                Manage waiver claims and priorities
+                {isFAAB ? 'Place FAAB bids on free agents' : 'Manage waiver claims and priorities'}
               </p>
+              {isFAAB && faabBudget !== null && (
+                <div className="mt-2 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-citrus-orange/10 border border-citrus-orange/30">
+                  <span className="text-sm font-bold text-citrus-forest">FAAB Budget:</span>
+                  <span className="text-lg font-varsity font-black text-citrus-orange">${faabBudget}</span>
+                </div>
+              )}
             </div>
 
             {/* Demo Mode Banner */}
@@ -559,7 +565,10 @@ const WaiverWire = () => {
                           min={0}
                           max={faabBudget ?? 100}
                           value={faabBidAmount}
-                          onChange={(e) => setFaabBidAmount(Math.max(0, parseInt(e.target.value) || 0))}
+                          onChange={(e) => {
+                            const val = Math.max(0, parseInt(e.target.value) || 0);
+                            setFaabBidAmount(Math.min(val, faabBudget ?? 100));
+                          }}
                           className="w-28"
                           placeholder="$0"
                         />

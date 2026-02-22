@@ -10,7 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { PoolService, SurvivorStanding } from '@/services/PoolService';
-import { Loader2, Shield, Heart, Skull, CheckCircle, XCircle } from 'lucide-react';
+import { PoolService } from '@/services/PoolService';
+import { Loader2, Shield, Heart, Skull, CheckCircle, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import LoadingScreen from '@/components/LoadingScreen';
 
@@ -28,9 +29,10 @@ const PoolSurvivor = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [currentWeek, setCurrentWeek] = useState(1);
+  const [currentWeek, setCurrentWeek] = useState(() => PoolService.getCurrentWeek());
   const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
   const [usedTeams, setUsedTeams] = useState<string[]>([]);
+  const [pickHistory, setPickHistory] = useState<Array<{ week: number; team: string; is_correct: boolean | null }>>([]);
   const [isEliminated, setIsEliminated] = useState(false);
   const [standings, setStandings] = useState<SurvivorStanding[]>([]);
   const [activeTab, setActiveTab] = useState('pick');
@@ -47,9 +49,13 @@ const PoolSurvivor = () => {
         const eliminated = await PoolService.isSurvivorEliminated(activeLeagueId, user.id);
         setIsEliminated(eliminated);
 
-        // Load used teams
+        // Load used teams and pick history
         const used = await PoolService.getSurvivorUsedTeams(activeLeagueId, user.id);
         setUsedTeams(used);
+
+        // Load full pick history with results
+        const history = await PoolService.getSurvivorPickHistory(activeLeagueId, user.id);
+        setPickHistory(history);
 
         // Load standings
         const standingsData = await PoolService.getSurvivorStandings(activeLeagueId);
@@ -121,7 +127,13 @@ const PoolSurvivor = () => {
               <p className="text-muted-foreground text-sm">Pick one team to win each week. Can't repeat teams.</p>
             </div>
             <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setCurrentWeek(w => Math.max(1, w - 1))} disabled={currentWeek <= 1}>
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
               <Badge variant="outline" className="text-sm">Week {currentWeek}</Badge>
+              <Button variant="ghost" size="sm" onClick={() => setCurrentWeek(w => w + 1)}>
+                <ChevronRight className="w-4 h-4" />
+              </Button>
               {isEliminated && (
                 <Badge variant="destructive" className="text-sm">
                   <Skull className="w-3 h-3 mr-1" /> Eliminated
@@ -259,19 +271,21 @@ const PoolSurvivor = () => {
                   <CardTitle className="text-lg">Your Pick History</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {usedTeams.length === 0 ? (
+                  {pickHistory.length === 0 ? (
                     <div className="text-center py-12 text-muted-foreground">
                       <p>No picks made yet. Make your first pick!</p>
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      {usedTeams.map((team, i) => (
-                        <div key={team} className="flex items-center justify-between p-3 rounded-lg bg-muted/20">
+                      {pickHistory.map((pick) => (
+                        <div key={pick.week} className="flex items-center justify-between p-3 rounded-lg bg-muted/20">
                           <div className="flex items-center gap-3">
-                            <span className="text-sm font-medium text-muted-foreground">Week {i + 1}</span>
-                            <span className="font-bold">{team}</span>
+                            <span className="text-sm font-medium text-muted-foreground">Week {pick.week}</span>
+                            <span className="font-bold">{pick.team}</span>
                           </div>
-                          <CheckCircle className="w-5 h-5 text-green-500" />
+                          {pick.is_correct === true && <CheckCircle className="w-5 h-5 text-green-500" />}
+                          {pick.is_correct === false && <XCircle className="w-5 h-5 text-red-500" />}
+                          {pick.is_correct === null && <span className="text-xs text-muted-foreground">Pending</span>}
                         </div>
                       ))}
                     </div>

@@ -12,6 +12,59 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { ScheduleService, NHLGame } from '@/services/ScheduleService';
+
+// ============================================================================
+// Week / Deadline Helpers
+// ============================================================================
+
+/**
+ * Calculate NHL week start/end dates for a given week number.
+ * NHL regular season starts in early October; weeks are Monday-Sunday.
+ * Week 1 starts on the first Monday of October.
+ */
+function getWeekDateRange(weekNumber: number, seasonStartYear: number = 2025): { start: Date; end: Date } {
+  // Find the first Monday on or after October 1
+  const oct1 = new Date(seasonStartYear, 9, 1); // October 1
+  const dayOfWeek = oct1.getDay();
+  const daysUntilMonday = dayOfWeek === 0 ? 1 : dayOfWeek === 1 ? 0 : 8 - dayOfWeek;
+  const firstMonday = new Date(oct1);
+  firstMonday.setDate(oct1.getDate() + daysUntilMonday);
+
+  const start = new Date(firstMonday);
+  start.setDate(firstMonday.getDate() + (weekNumber - 1) * 7);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6); // Sunday
+  return { start, end };
+}
+
+/**
+ * Calculate the current NHL week number based on today's date.
+ */
+function getCurrentWeekNumber(seasonStartYear: number = 2025): number {
+  const oct1 = new Date(seasonStartYear, 9, 1);
+  const dayOfWeek = oct1.getDay();
+  const daysUntilMonday = dayOfWeek === 0 ? 1 : dayOfWeek === 1 ? 0 : 8 - dayOfWeek;
+  const firstMonday = new Date(oct1);
+  firstMonday.setDate(oct1.getDate() + daysUntilMonday);
+
+  const today = new Date();
+  const diffMs = today.getTime() - firstMonday.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  return Math.max(1, Math.floor(diffDays / 7) + 1);
+}
+
+/**
+ * Check if a game has started (cannot pick after game time).
+ */
+function isGameLocked(game: NHLGame): boolean {
+  if (game.status === 'live' || game.status === 'final') return true;
+  if (!game.game_time) return false;
+
+  // Parse game date + time and compare to now
+  const gameDateTime = new Date(`${game.game_date}T${game.game_time}`);
+  return new Date() >= gameDateTime;
+}
 
 // ============================================================================
 // Pick'em Pool
@@ -95,17 +148,61 @@ export interface ConfidenceStanding {
 
 export class PoolService {
   // --------------------------------------------------------------------------
+  // Shared Helpers
+  // --------------------------------------------------------------------------
+
+  /** Get the current NHL week number. */
+  static getCurrentWeek(): number {
+    return getCurrentWeekNumber();
+  }
+
+  /** Get all games for a given week number. */
+  static async getWeekGames(weekNumber: number): Promise<NHLGame[]> {
+    const { start, end } = getWeekDateRange(weekNumber);
+    const { games } = await ScheduleService.getGamesForDateRange(start, end);
+    return games;
+  }
+
+  /** Filter out games that have already started (locked). */
+  static getPickableGames(games: NHLGame[]): NHLGame[] {
+    return games.filter(g => !isGameLocked(g));
+  }
+
+  // --------------------------------------------------------------------------
   // Pick'em Pool
   // --------------------------------------------------------------------------
 
-  /** Submit or update a batch of picks for a given week. */
+  /** Submit or update a batch of picks for a given week. Rejects picks for started games. */
   static async submitPickemPicks(
     leagueId: string,
     userId: string,
     weekNumber: number,
-    picks: Array<{ game_id: string; picked_team: string; spread_value?: number }>
+    inputPicks: Array<{ game_id: string; picked_team: string; spread_value?: number }>
   ): Promise<{ success: boolean; error?: string }> {
+    let picks = inputPicks;
     try {
+      // Deadline enforcement: fetch games to verify none have started
+      const weekGames = await this.getWeekGames(weekNumber);
+      const gameMap = new Map(weekGames.map(g => [String(g.id), g]));
+
+      // Reject picks for games that have already started
+      const lockedGameIds: string[] = [];
+      for (const pick of picks) {
+        const game = gameMap.get(pick.game_id);
+        if (game && isGameLocked(game)) {
+          lockedGameIds.push(pick.game_id);
+        }
+      }
+
+      if (lockedGameIds.length > 0) {
+        const validPicks = picks.filter(p => !lockedGameIds.includes(p.game_id));
+        if (validPicks.length === 0) {
+          return { success: false, error: 'All selected games have already started. Picks are locked after game time.' };
+        }
+        // Only submit picks for unlocked games
+        picks = validPicks;
+      }
+
       // Upsert each pick — unique on (league_id, user_id, week_number, game_id)
       const rows = picks.map(p => ({
         league_id: leagueId,
@@ -421,6 +518,31 @@ export class PoolService {
     }
   }
 
+  /** Get full pick history with results for survivor pool. */
+  static async getSurvivorPickHistory(
+    leagueId: string,
+    userId: string
+  ): Promise<Array<{ week: number; team: string; is_correct: boolean | null }>> {
+    try {
+      const { data, error } = await supabase
+        .from('survivor_selections')
+        .select('week_number, picked_team, is_correct')
+        .eq('league_id', leagueId)
+        .eq('user_id', userId)
+        .order('week_number');
+
+      if (error) throw error;
+      return (data ?? []).map(d => ({
+        week: d.week_number,
+        team: d.picked_team,
+        is_correct: d.is_correct,
+      }));
+    } catch (err) {
+      console.error('[PoolService] getSurvivorPickHistory error:', err);
+      return [];
+    }
+  }
+
   /** Get teams already used by a user in survivor pool. */
   static async getSurvivorUsedTeams(leagueId: string, userId: string): Promise<string[]> {
     try {
@@ -442,14 +564,26 @@ export class PoolService {
   // Confidence Pool
   // --------------------------------------------------------------------------
 
-  /** Submit ranked confidence picks for a week. */
+  /** Submit ranked confidence picks for a week. Rejects picks for started games. */
   static async submitConfidencePicks(
     leagueId: string,
     userId: string,
     weekNumber: number,
-    picks: Array<{ game_id: string; picked_team: string; confidence_points: number }>
+    inputPicks: Array<{ game_id: string; picked_team: string; confidence_points: number }>
   ): Promise<{ success: boolean; error?: string }> {
     try {
+      // Deadline enforcement: reject picks for games that have started
+      const weekGames = await this.getWeekGames(weekNumber);
+      const gameMap = new Map(weekGames.map(g => [String(g.id), g]));
+      const picks = inputPicks.filter(p => {
+        const game = gameMap.get(p.game_id);
+        return !game || !isGameLocked(game);
+      });
+
+      if (picks.length === 0 && inputPicks.length > 0) {
+        return { success: false, error: 'All selected games have already started. Picks are locked after game time.' };
+      }
+
       // Validate uniqueness of confidence points
       const pointSet = new Set(picks.map(p => p.confidence_points));
       if (pointSet.size !== picks.length) {

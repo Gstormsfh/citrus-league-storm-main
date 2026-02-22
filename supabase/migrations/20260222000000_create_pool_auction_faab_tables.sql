@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS pool_picks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     league_id UUID NOT NULL REFERENCES leagues(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    week_number INTEGER NOT NULL,
+    week_number INTEGER NOT NULL CHECK (week_number > 0),
     game_id TEXT NOT NULL,            -- nhl_games.id or external game identifier
     picked_team TEXT NOT NULL,        -- team abbreviation (e.g. 'TOR')
     is_correct BOOLEAN DEFAULT NULL,  -- NULL = not yet scored
@@ -35,13 +35,15 @@ CREATE TABLE IF NOT EXISTS survivor_selections (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     league_id UUID NOT NULL REFERENCES leagues(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    week_number INTEGER NOT NULL,
+    week_number INTEGER NOT NULL CHECK (week_number > 0),
     picked_team TEXT NOT NULL,
     is_correct BOOLEAN DEFAULT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
     -- One pick per user per week
-    UNIQUE (league_id, user_id, week_number)
+    UNIQUE (league_id, user_id, week_number),
+    -- No repeat teams within a season (enforced at DB level)
+    UNIQUE (league_id, user_id, picked_team)
 );
 
 CREATE INDEX IF NOT EXISTS idx_survivor_league_week
@@ -56,10 +58,10 @@ CREATE TABLE IF NOT EXISTS confidence_picks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     league_id UUID NOT NULL REFERENCES leagues(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    week_number INTEGER NOT NULL,
+    week_number INTEGER NOT NULL CHECK (week_number > 0),
     game_id TEXT NOT NULL,
     picked_team TEXT NOT NULL,
-    confidence_points INTEGER NOT NULL,   -- 1 = least confident, N = most
+    confidence_points INTEGER NOT NULL CHECK (confidence_points > 0),  -- 1 = least confident, N = most
     is_correct BOOLEAN DEFAULT NULL,
     points_earned INTEGER NOT NULL DEFAULT 0,  -- confidence_points if correct, 0 otherwise
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -80,9 +82,9 @@ CREATE TABLE IF NOT EXISTS auction_budgets (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     league_id UUID NOT NULL REFERENCES leagues(id) ON DELETE CASCADE,
     team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
-    initial_budget NUMERIC NOT NULL DEFAULT 200,
-    remaining_budget NUMERIC NOT NULL DEFAULT 200,
-    players_won INTEGER NOT NULL DEFAULT 0,
+    initial_budget NUMERIC NOT NULL DEFAULT 200 CHECK (initial_budget > 0),
+    remaining_budget NUMERIC NOT NULL DEFAULT 200 CHECK (remaining_budget >= 0),
+    players_won INTEGER NOT NULL DEFAULT 0 CHECK (players_won >= 0),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
     UNIQUE (league_id, team_id)
@@ -101,8 +103,8 @@ CREATE TABLE IF NOT EXISTS auction_nominations (
     nominated_by_team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
     player_id TEXT NOT NULL,
     player_name TEXT NOT NULL,
-    minimum_bid NUMERIC NOT NULL DEFAULT 1,
-    current_high_bid NUMERIC NOT NULL DEFAULT 1,
+    minimum_bid NUMERIC NOT NULL DEFAULT 1 CHECK (minimum_bid > 0),
+    current_high_bid NUMERIC NOT NULL DEFAULT 1 CHECK (current_high_bid > 0),
     current_high_bidder_team_id UUID REFERENCES teams(id),
     status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'sold', 'no_sale')),
     nomination_number INTEGER NOT NULL,
@@ -123,7 +125,7 @@ CREATE TABLE IF NOT EXISTS auction_bids (
     league_id UUID NOT NULL REFERENCES leagues(id) ON DELETE CASCADE,
     nomination_id UUID NOT NULL REFERENCES auction_nominations(id) ON DELETE CASCADE,
     team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
-    bid_amount NUMERIC NOT NULL,
+    bid_amount NUMERIC NOT NULL CHECK (bid_amount > 0),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -139,8 +141,8 @@ CREATE TABLE IF NOT EXISTS faab_budgets (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     league_id UUID NOT NULL REFERENCES leagues(id) ON DELETE CASCADE,
     team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
-    initial_budget NUMERIC NOT NULL DEFAULT 100,
-    remaining_budget NUMERIC NOT NULL DEFAULT 100,
+    initial_budget NUMERIC NOT NULL DEFAULT 100 CHECK (initial_budget > 0),
+    remaining_budget NUMERIC NOT NULL DEFAULT 100 CHECK (remaining_budget >= 0),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
     UNIQUE (league_id, team_id)
@@ -160,6 +162,10 @@ ALTER TABLE auction_budgets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE auction_nominations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE auction_bids ENABLE ROW LEVEL SECURITY;
 ALTER TABLE faab_budgets ENABLE ROW LEVEL SECURITY;
+
+-- NOTE: System-level scoring operations (scorePickemWeek, processFAABWaivers, etc.)
+-- should use the Supabase service_role key which bypasses RLS entirely.
+-- The policies below protect normal user access.
 
 -- Pool tables: users can read all picks in their league, insert/update their own
 CREATE POLICY "pool_picks_select" ON pool_picks FOR SELECT

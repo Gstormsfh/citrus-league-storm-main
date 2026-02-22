@@ -10,8 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { PoolService, PickemPick, PickemStanding } from '@/services/PoolService';
-import { ScheduleService, NHLGame } from '@/services/ScheduleService';
-import { Loader2, CheckCircle, XCircle, Target } from 'lucide-react';
+import { NHLGame } from '@/services/ScheduleService';
+import { Loader2, CheckCircle, XCircle, Target, ChevronLeft, ChevronRight, Lock } from 'lucide-react';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import LoadingScreen from '@/components/LoadingScreen';
 
@@ -21,7 +21,7 @@ const PoolPickem = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [currentWeek, setCurrentWeek] = useState(1);
+  const [currentWeek, setCurrentWeek] = useState(() => PoolService.getCurrentWeek());
   const [games, setGames] = useState<NHLGame[]>([]);
   const [picks, setPicks] = useState<Map<string, string>>(new Map());
   const [existingPicks, setExistingPicks] = useState<PickemPick[]>([]);
@@ -36,9 +36,9 @@ const PoolPickem = () => {
       }
 
       try {
-        // Load games for current week
-        const todayGames = await ScheduleService.getTodaysGames();
-        setGames(todayGames || []);
+        // Load games for current week (week-based, not today-only)
+        const weekGames = await PoolService.getWeekGames(currentWeek);
+        setGames(weekGames || []);
 
         // Load existing picks
         const userPicks = await PoolService.getPickemPicks(
@@ -133,7 +133,15 @@ const PoolPickem = () => {
               </h2>
               <p className="text-muted-foreground text-sm">Pick the winners of NHL games each week</p>
             </div>
-            <Badge variant="outline" className="text-sm">Week {currentWeek}</Badge>
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="sm" onClick={() => setCurrentWeek(w => Math.max(1, w - 1))} disabled={currentWeek <= 1}>
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <Badge variant="outline" className="text-sm">Week {currentWeek}</Badge>
+              <Button variant="ghost" size="sm" onClick={() => setCurrentWeek(w => w + 1)}>
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -160,14 +168,16 @@ const PoolPickem = () => {
                         const gameId = String(game.id);
                         const picked = picks.get(gameId);
                         const existingPick = existingPicks.find(p => p.game_id === gameId);
+                        const locked = game.status === 'live' || game.status === 'final' || (game.game_time && new Date(`${game.game_date}T${game.game_time}`) <= new Date());
 
                         return (
-                          <div key={gameId} className="flex items-center justify-between p-4 rounded-xl bg-muted/20 border border-transparent hover:border-primary/10 transition-colors">
+                          <div key={gameId} className={`flex items-center justify-between p-4 rounded-xl bg-muted/20 border border-transparent hover:border-primary/10 transition-colors ${locked ? 'opacity-60' : ''}`}>
                             <Button
                               variant={picked === game.away_team ? 'default' : 'outline'}
                               size="sm"
                               className="min-w-[100px]"
                               onClick={() => handlePick(gameId, game.away_team)}
+                              disabled={!!locked}
                             >
                               {game.away_team}
                               {existingPick?.is_correct === true && existingPick.picked_team === game.away_team && (
@@ -178,13 +188,28 @@ const PoolPickem = () => {
                               )}
                             </Button>
 
-                            <span className="text-xs text-muted-foreground font-medium">@</span>
+                            <div className="text-center">
+                              <span className="text-xs text-muted-foreground font-medium">@</span>
+                              {game.game_time && (
+                                <div className="text-[10px] text-muted-foreground">
+                                  {locked ? (
+                                    <span className="flex items-center gap-1"><Lock className="w-3 h-3" /> {game.status === 'final' ? 'Final' : game.status === 'live' ? 'Live' : 'Locked'}</span>
+                                  ) : (
+                                    new Date(`${game.game_date}T${game.game_time}`).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+                                  )}
+                                </div>
+                              )}
+                              {game.status === 'final' && (
+                                <div className="text-[10px] font-bold">{game.away_score}-{game.home_score}</div>
+                              )}
+                            </div>
 
                             <Button
                               variant={picked === game.home_team ? 'default' : 'outline'}
                               size="sm"
                               className="min-w-[100px]"
                               onClick={() => handlePick(gameId, game.home_team)}
+                              disabled={!!locked}
                             >
                               {game.home_team}
                               {existingPick?.is_correct === true && existingPick.picked_team === game.home_team && (
