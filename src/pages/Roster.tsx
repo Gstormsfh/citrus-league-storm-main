@@ -257,6 +257,7 @@ const Roster = () => {
   const [analyticsLoaded, setAnalyticsLoaded] = useState(false);
   const [userTeamId, setUserTeamId] = useState<string | number | null>(null);
   const [userTeam, setUserTeam] = useState<{ id: string; league_id: string; team_name: string } | null>(null);
+  const [bestBallEnabled, setBestBallEnabled] = useState(false);
   const [teamStats, setTeamStats] = useState({
     record: "0-0-0",
     rank: "-",
@@ -513,6 +514,11 @@ const Roster = () => {
             setUserTeam(userTeamData);
             setLoading(false);
             return;
+          }
+
+          // Detect Best Ball mode
+          if (leagueData.settings && (leagueData.settings as any).bestBallEnabled) {
+            setBestBallEnabled(true);
           }
 
           teamId = userTeamData.id;
@@ -2157,6 +2163,16 @@ const Roster = () => {
     const { active, over } = event;
     setActiveId(null);
 
+    // Best Ball guard: lineups are auto-optimized, no manual changes
+    if (bestBallEnabled) {
+      toast({
+        title: "Best Ball League",
+        description: "Lineups are automatically optimized each day. No manual changes needed!",
+        variant: "default",
+      });
+      return;
+    }
+
     // Read-only guard: Block drag-and-drop for guests and demo league
     if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
       toast({
@@ -2875,10 +2891,21 @@ const Roster = () => {
                   
                   // Main roster content
                   return (
-                  // Mobile: clean list view with tap-to-swap
-                  // Desktop: grid with drag-and-drop
-                  // Demo league: read-only (no DnD, no swap)
-                  isMobile ? (
+                  <>
+                  {bestBallEnabled && (
+                    <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-800">
+                      <div className="flex items-center gap-2">
+                        <span className="text-amber-600 dark:text-amber-400 font-bold text-sm">Best Ball Mode</span>
+                      </div>
+                      <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                        Your lineup is automatically optimized each day to maximize points. No manual roster management needed — just draft well!
+                      </p>
+                    </div>
+                  )}
+                  {/* Mobile: clean list view with tap-to-swap */}
+                  {/* Desktop: grid with drag-and-drop */}
+                  {/* Demo league: read-only (no DnD, no swap) */}
+                  {isMobile ? (
                     <div>
                       {/* Mobile tap-to-swap cancel bar */}
                       {tapSelectedPlayerId && (
@@ -2968,7 +2995,8 @@ const Roster = () => {
                       ) : null}
                     </DragOverlay>
                   </DndContext>
-                  )
+                  )}
+                  </>
                   );
                 })()}
                 </TabsContent>

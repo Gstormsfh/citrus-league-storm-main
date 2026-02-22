@@ -232,10 +232,175 @@ export function extractScoringSettings(league: any): ScoringSettings {
 /**
  * Create a ScoringCalculator instance from a league object
  * Convenience method for common use case
- * 
+ *
  * @param league - League object with optional scoring_settings
  * @returns New ScoringCalculator instance
  */
 export function createScorerFromLeague(league: any): ScoringCalculator {
   return new ScoringCalculator(extractScoringSettings(league));
+}
+
+// ============================================================================
+// CATEGORY-BASED & ROTISSERIE SCORING
+// ============================================================================
+
+/**
+ * Raw stat values for a team across a time period (week or season).
+ * Used by H2H Categories and Rotisserie formats.
+ */
+export interface CategoryStats {
+  goals: number;
+  assists: number;
+  points: number;
+  plus_minus: number;
+  ppp: number;
+  shp: number;
+  sog: number;
+  hits: number;
+  blocks: number;
+  pim: number;
+  wins: number;
+  saves: number;
+  shutouts: number;
+  gaa: number;
+  save_pct: number;
+}
+
+/** Default empty category stats */
+export const EMPTY_CATEGORY_STATS: CategoryStats = {
+  goals: 0, assists: 0, points: 0, plus_minus: 0, ppp: 0, shp: 0,
+  sog: 0, hits: 0, blocks: 0, pim: 0, wins: 0, saves: 0, shutouts: 0,
+  gaa: 0, save_pct: 0,
+};
+
+/**
+ * Compare two teams across selected categories for H2H Categories format.
+ * Returns { team1Wins, team2Wins, ties } for a single weekly matchup.
+ *
+ * @param team1Stats - Raw category stats for team 1
+ * @param team2Stats - Raw category stats for team 2
+ * @param categories - Array of category IDs to compare
+ * @param categoryMeta - Metadata for each category (higherIsBetter)
+ */
+export function compareCategoryMatchup(
+  team1Stats: Partial<CategoryStats>,
+  team2Stats: Partial<CategoryStats>,
+  categories: string[],
+  categoryMeta: Record<string, { higherIsBetter: boolean }>
+): { team1Wins: number; team2Wins: number; ties: number; details: Record<string, 'team1' | 'team2' | 'tie'> } {
+  let team1Wins = 0;
+  let team2Wins = 0;
+  let ties = 0;
+  const details: Record<string, 'team1' | 'team2' | 'tie'> = {};
+
+  for (const cat of categories) {
+    const v1 = (team1Stats as any)[cat] ?? 0;
+    const v2 = (team2Stats as any)[cat] ?? 0;
+    const higher = categoryMeta[cat]?.higherIsBetter ?? true;
+
+    if (v1 === v2) {
+      ties++;
+      details[cat] = 'tie';
+    } else if ((higher && v1 > v2) || (!higher && v1 < v2)) {
+      team1Wins++;
+      details[cat] = 'team1';
+    } else {
+      team2Wins++;
+      details[cat] = 'team2';
+    }
+  }
+
+  return { team1Wins, team2Wins, ties, details };
+}
+
+/**
+ * Calculate rotisserie standings from season-long category totals.
+ * Each team earns ranking points (N = first, 1 = last) per category.
+ *
+ * @param teamStats - Map of teamId -> CategoryStats for the season
+ * @param categories - Array of category IDs to rank
+ * @param categoryMeta - Metadata for each category (higherIsBetter)
+ * @returns Map of teamId -> { rotoPoints, categoryRanks }
+ */
+export function calculateRotoStandings(
+  teamStats: Record<string, Partial<CategoryStats>>,
+  categories: string[],
+  categoryMeta: Record<string, { higherIsBetter: boolean }>
+): Record<string, { rotoPoints: number; categoryRanks: Record<string, number> }> {
+  const teamIds = Object.keys(teamStats);
+  const numTeams = teamIds.length;
+  const result: Record<string, { rotoPoints: number; categoryRanks: Record<string, number> }> = {};
+
+  // Initialize
+  teamIds.forEach(id => {
+    result[id] = { rotoPoints: 0, categoryRanks: {} };
+  });
+
+  // For each category, rank all teams and assign points
+  for (const cat of categories) {
+    const higher = categoryMeta[cat]?.higherIsBetter ?? true;
+
+    // Sort teams by their stat value
+    const sorted = [...teamIds].sort((a, b) => {
+      const va = (teamStats[a] as any)?.[cat] ?? 0;
+      const vb = (teamStats[b] as any)?.[cat] ?? 0;
+      return higher ? vb - va : va - vb; // Descending for "higher is better", ascending otherwise
+    });
+
+    // Assign ranking points (handle ties by averaging)
+    let rank = 1;
+    let i = 0;
+    while (i < sorted.length) {
+      // Find tied group
+      let j = i;
+      const val = (teamStats[sorted[i]] as any)?.[cat] ?? 0;
+      while (j < sorted.length && ((teamStats[sorted[j]] as any)?.[cat] ?? 0) === val) {
+        j++;
+      }
+
+      // Average the ranking points for the tied group
+      // Points go from numTeams (1st) down to 1 (last)
+      let totalPoints = 0;
+      for (let k = i; k < j; k++) {
+        totalPoints += numTeams - k; // numTeams for 1st, numTeams-1 for 2nd, etc.
+      }
+      const avgPoints = totalPoints / (j - i);
+
+      for (let k = i; k < j; k++) {
+        const teamId = sorted[k];
+        result[teamId].rotoPoints += avgPoints;
+        result[teamId].categoryRanks[cat] = avgPoints;
+      }
+
+      rank += (j - i);
+      i = j;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Calculate total season points standings (for Total Points / Points Per Game formats).
+ * Simple accumulation - no matchups needed.
+ *
+ * @param teamTotalPoints - Map of teamId -> total fantasy points
+ * @param teamGamesPlayed - Map of teamId -> games played (for PPG format)
+ * @returns Sorted array of { teamId, totalPoints, gamesPlayed, ppg }
+ */
+export function calculateSeasonPointsStandings(
+  teamTotalPoints: Record<string, number>,
+  teamGamesPlayed?: Record<string, number>
+): Array<{ teamId: string; totalPoints: number; gamesPlayed: number; ppg: number }> {
+  return Object.entries(teamTotalPoints)
+    .map(([teamId, totalPoints]) => {
+      const gp = teamGamesPlayed?.[teamId] ?? 0;
+      return {
+        teamId,
+        totalPoints,
+        gamesPlayed: gp,
+        ppg: gp > 0 ? totalPoints / gp : 0,
+      };
+    })
+    .sort((a, b) => b.totalPoints - a.totalPoints);
 }

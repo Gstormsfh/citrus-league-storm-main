@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
-import { LeagueService, League } from '@/services/LeagueService';
+import { LeagueService, League, getLeagueFormat } from '@/services/LeagueService';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { DEMO_LEAGUE_ID, DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeagueService';
 import { MatchupService } from '@/services/MatchupService';
@@ -8,6 +8,7 @@ import { RosterCacheService } from '@/services/RosterCacheService';
 import { PlayerService } from '@/services/PlayerService';
 import { LeagueMembershipService } from '@/services/LeagueMembershipService';
 import { useToast } from '@/hooks/use-toast';
+import type { LeagueType, ScoringFormat, DraftType } from '@/types/leagueTypes';
 
 export type UserLeagueState = 'guest' | 'logged-in-no-league' | 'active-user';
 
@@ -18,9 +19,17 @@ export const isDemoLeague = (leagueId: string | null | undefined): boolean => {
   return leagueId === DEMO_LEAGUE_ID;
 };
 
+/** Active league's format info, derived from settings JSONB */
+interface ActiveLeagueFormat {
+  leagueType: LeagueType;
+  scoringFormat: ScoringFormat;
+  draftType: DraftType;
+}
+
 interface LeagueContextType {
   activeLeagueId: string | null;
   activeLeague: League | null;
+  activeLeagueFormat: ActiveLeagueFormat;
   userLeagues: League[];
   setActiveLeagueId: (leagueId: string | null) => void;
   loading: boolean;
@@ -32,10 +41,17 @@ interface LeagueContextType {
   isDemoLeague: (leagueId: string | null | undefined) => boolean;
 }
 
+const DEFAULT_FORMAT: ActiveLeagueFormat = {
+  leagueType: 'fantasy',
+  scoringFormat: 'h2h-points',
+  draftType: 'snake',
+};
+
 // Default context value to prevent errors during initialization
 const defaultContextValue: LeagueContextType = {
   activeLeagueId: null,
   activeLeague: null,
+  activeLeagueFormat: DEFAULT_FORMAT,
   userLeagues: [],
   setActiveLeagueId: () => {},
   loading: true,
@@ -305,9 +321,16 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     }
   }, [urlLeagueId, userLeagues, user, activeLeagueId, loading, navigate, toast]);
 
+  // Derive league format from active league (memoized to avoid unnecessary re-renders)
+  const activeLeagueFormat: ActiveLeagueFormat = useMemo(() => {
+    if (!activeLeague) return DEFAULT_FORMAT;
+    return getLeagueFormat(activeLeague);
+  }, [activeLeague]);
+
   const value: LeagueContextType = {
     activeLeagueId,
     activeLeague,
+    activeLeagueFormat,
     userLeagues,
     setActiveLeagueId,
     loading,

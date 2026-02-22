@@ -9,11 +9,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { LeagueService, League, Team } from '@/services/LeagueService';
+import { LeagueService, League, Team, getLeagueFormat } from '@/services/LeagueService';
 import { DraftService } from '@/services/DraftService';
 import { PlayerService } from '@/services/PlayerService';
 import { MatchupService } from '@/services/MatchupService';
 import { Loader2, RefreshCw } from 'lucide-react';
+import { type ScoringFormat, type LeagueType, SCORING_FORMAT_LABELS, FORMAT_HAS_MATCHUPS } from '@/types/leagueTypes';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import LoadingScreen from '@/components/LoadingScreen';
@@ -28,13 +29,14 @@ interface StandingsTeam {
   name: string;
   owner: string;
   logo: string;
-  record: { wins: number; losses: number };
+  record: { wins: number; losses: number; ties: number };
   points: number;
   pointsFor: number;
   pointsAgainst: number;
   streak: string;
   winPercentage: number;
-  last5: { wins: number; losses: number };
+  last5: { wins: number; losses: number; ties: number };
+  gamesPlayed?: number; // For PPG format
 }
 
 const Standings = () => {
@@ -46,8 +48,16 @@ const Standings = () => {
   const [leagues, setLeagues] = useState<League[]>([]);
   const [teams, setTeams] = useState<StandingsTeam[]>([]);
   const [leagueTeams, setLeagueTeams] = useState<(Team & { owner_name?: string })[]>([]);
+  const [leagueFormat, setLeagueFormat] = useState<{ leagueType: LeagueType; scoringFormat: ScoringFormat; playoffTeams: number }>({ leagueType: 'fantasy', scoringFormat: 'h2h-points', playoffTeams: 6 });
   const hasInitializedRef = useRef(false);
   const navigate = useNavigate();
+
+  // Derived format flags
+  const hasMatchups = FORMAT_HAS_MATCHUPS[leagueFormat.scoringFormat] ?? true;
+  const isRoto = leagueFormat.scoringFormat === 'roto';
+  const isPPG = leagueFormat.scoringFormat === 'points-per-game';
+  const isSeasonPoints = leagueFormat.scoringFormat === 'total-points' || isPPG;
+  const isPool = leagueFormat.leagueType !== 'fantasy';
   
   // Auto-complete matchups and load standings
   useEffect(() => {
@@ -126,37 +136,38 @@ const Standings = () => {
           
           // Convert to standings format with real calculated stats
           const standingsTeams: StandingsTeam[] = demoTeamsFromDb.map((team, index) => {
-            const stats = teamStats[team.id] || { 
-              pointsFor: 0, 
-              pointsAgainst: 0, 
-              wins: 0, 
+            const stats = teamStats[team.id] || {
+              pointsFor: 0,
+              pointsAgainst: 0,
+              wins: 0,
               losses: 0,
+              ties: 0,
               streak: '-',
-              last5: { wins: 0, losses: 0 }
+              last5: { wins: 0, losses: 0, ties: 0 }
             };
-            
+
             const teamData = LEAGUE_TEAMS_DATA[index];
-            
-            const totalGames = (stats.wins || 0) + (stats.losses || 0);
-            const winPercentage = totalGames > 0 
-              ? ((stats.wins || 0) / totalGames) * 100 
+
+            const totalGames = (stats.wins || 0) + (stats.losses || 0) + (stats.ties || 0);
+            const winPercentage = totalGames > 0
+              ? ((stats.wins || 0) / totalGames) * 100
               : 0;
-            
+
             return {
               id: team.id,
               name: team.team_name,
               owner: teamData?.owner || 'Demo Owner',
               logo: team.team_name.substring(0, 2).toUpperCase(),
-              record: { wins: stats.wins, losses: stats.losses },
+              record: { wins: stats.wins, losses: stats.losses, ties: stats.ties || 0 },
               points: stats.pointsFor,
               pointsFor: parseFloat((stats.pointsFor || 0).toFixed(1)),
               pointsAgainst: parseFloat((stats.pointsAgainst || 0).toFixed(1)),
               streak: stats.streak || '-',
               winPercentage: winPercentage !== undefined && !isNaN(winPercentage) ? parseFloat(winPercentage.toFixed(1)) : 0,
-              last5: stats.last5 || { wins: 0, losses: 0 },
+              last5: { wins: stats.last5?.wins || 0, losses: stats.last5?.losses || 0, ties: (stats.last5 as any)?.ties || 0 },
             };
           });
-          
+
           setTeams(standingsTeams);
           setLoading(false);
           return;
@@ -205,9 +216,16 @@ const Standings = () => {
             // Still show standings, but they may be outdated
           }
 
-          // Get league to check draft status
+          // Get league to check draft status and format
           const { league: leagueData, error: leagueError } = await LeagueService.getLeague(leagueToUse, user.id);
           if (leagueError) throw leagueError;
+
+          // Detect league format for conditional rendering
+          if (leagueData) {
+            const fmt = getLeagueFormat(leagueData);
+            const playoffTeams = (leagueData.settings as any)?.playoffTeams ?? 6;
+            setLeagueFormat({ leagueType: fmt.leagueType, scoringFormat: fmt.scoringFormat, playoffTeams });
+          }
 
           // Get teams for selected league with owner information
           const { teams: leagueTeamsData, error: teamsError } = await LeagueService.getLeagueTeamsWithOwners(leagueToUse);
@@ -217,56 +235,76 @@ const Standings = () => {
           setLeagueTeams(leagueTeamsData);
 
           // Only calculate stats if draft is completed
-          let teamStats: Record<string, { pointsFor: number; pointsAgainst: number; wins: number; losses: number }> = {};
-          
+          let teamStats: Record<string, { pointsFor: number; pointsAgainst: number; wins: number; losses: number; ties?: number; streak?: string; last5?: { wins: number; losses: number; ties?: number }; gamesPlayed?: number }> = {};
+
           if (leagueData && leagueData.draft_status === 'completed') {
             // Get draft picks for this league to calculate team stats
             const { picks: draftPicks } = await DraftService.getDraftPicks(leagueToUse, user.id);
-            
+
             if (draftPicks && draftPicks.length > 0) {
               // Get all players to calculate points
               const allPlayers = await PlayerService.getAllPlayers();
 
-              // Calculate team standings from drafted players
-              teamStats = await LeagueService.calculateTeamStandings(
-                leagueToUse,
-                leagueTeamsData,
-                draftPicks,
-                allPlayers
-              );
+              // Choose data path based on scoring format
+              const fmt = getLeagueFormat(leagueData);
+              const isNonMatchup = !FORMAT_HAS_MATCHUPS[fmt.scoringFormat];
+
+              if (isNonMatchup) {
+                // Roto / Total Points / PPG: no matchups, just cumulative points
+                teamStats = await LeagueService.calculateSeasonPointsStandings(
+                  leagueToUse,
+                  leagueTeamsData,
+                  draftPicks,
+                  allPlayers
+                );
+              } else {
+                // H2H Points / H2H Categories / Best Ball: use matchup-based standings
+                teamStats = await LeagueService.calculateTeamStandings(
+                  leagueToUse,
+                  leagueTeamsData,
+                  draftPicks,
+                  allPlayers
+                );
+              }
             }
           }
 
           // Convert database teams to standings format with calculated stats
           const standingsTeams: StandingsTeam[] = leagueTeamsData.map((team, index) => {
-            const stats = teamStats[team.id] || { 
-              pointsFor: 0, 
-              pointsAgainst: 0, 
-              wins: 0, 
+            const stats = teamStats[team.id] || {
+              pointsFor: 0,
+              pointsAgainst: 0,
+              wins: 0,
               losses: 0,
+              ties: 0,
               streak: '-',
-              last5: { wins: 0, losses: 0 }
+              last5: { wins: 0, losses: 0, ties: 0 },
+              gamesPlayed: 0,
             };
-            
-            // Calculate win percentage
-            const totalGames = (stats.wins || 0) + (stats.losses || 0);
-            const winPercentage = totalGames > 0 
-              ? ((stats.wins || 0) / totalGames) * 100 
+
+            // Calculate win percentage (ties count as half a win)
+            const totalGames = (stats.wins || 0) + (stats.losses || 0) + ((stats.ties as number) || 0);
+            const winPercentage = totalGames > 0
+              ? (((stats.wins || 0) + ((stats.ties as number) || 0) * 0.5) / totalGames) * 100
               : 0;
+
+            // For PPG: use gamesPlayed from season standings if available
+            const gp = (stats as any).gamesPlayed || totalGames || 0;
 
             return {
               id: team.id,
               name: team.team_name,
               owner: (team as any).owner_name || (team.owner_id ? 'User' : 'AI Team'),
               logo: team.team_name.substring(0, 2).toUpperCase(),
-              record: { wins: stats.wins, losses: stats.losses },
-              points: stats.pointsFor, // Total points for ranking
+              record: { wins: stats.wins, losses: stats.losses, ties: (stats.ties as number) || 0 },
+              points: stats.pointsFor,
               pointsFor: parseFloat((stats.pointsFor || 0).toFixed(1)),
               pointsAgainst: parseFloat((stats.pointsAgainst || 0).toFixed(1)),
-              streak: stats.streak || '-',
+              streak: (stats as any).streak || '-',
               winPercentage: winPercentage !== undefined && !isNaN(winPercentage) ? parseFloat(winPercentage.toFixed(1)) : 0,
-              last5: stats.last5 || { wins: 0, losses: 0 },
-            };
+              last5: { wins: (stats as any).last5?.wins || 0, losses: (stats as any).last5?.losses || 0, ties: (stats as any).last5?.ties || 0 },
+              gamesPlayed: gp,
+            } as StandingsTeam;
           });
 
           setTeams(standingsTeams);
@@ -331,11 +369,25 @@ const Standings = () => {
     };
   }, [teams.length]); // Re-run when teams change to ensure new elements get animated
   
-  // Sort teams by winning record (memoized to avoid re-sorting on every render)
+  // Sort teams by format-appropriate criteria (memoized)
   const sortedTeams = useMemo(() => [...teams].sort((a, b) => {
+    // PPG: sort by average points per game (efficiency), not total
+    if (isPPG) {
+      const aGP = a.gamesPlayed || (a.record.wins + a.record.losses + a.record.ties) || 1;
+      const bGP = b.gamesPlayed || (b.record.wins + b.record.losses + b.record.ties) || 1;
+      const aPPG = a.pointsFor / aGP;
+      const bPPG = b.pointsFor / bGP;
+      if (bPPG !== aPPG) return bPPG - aPPG;
+      return b.pointsFor - a.pointsFor; // Tiebreak by total points
+    }
+    // For season-long formats (roto, total points), sort by total points
+    if (isRoto || isSeasonPoints) {
+      return b.points - a.points;
+    }
+    // For H2H formats, sort by wins first, then by points
     if (b.record.wins !== a.record.wins) return b.record.wins - a.record.wins;
     return b.points - a.points;
-  }), [teams]);
+  }), [teams, isRoto, isSeasonPoints, isPPG]);
 
   const selectedLeague = leagues.find(l => l.id === activeLeagueId);
   
@@ -402,7 +454,14 @@ const Standings = () => {
               <h2 className="text-2xl font-bold text-foreground">
                 {userLeagueState === 'active-user' && selectedLeague ? selectedLeague.name : 'CitrusSports League'}
               </h2>
-              <p className="text-muted-foreground">Regular Season Standings</p>
+              <p className="text-muted-foreground">
+                {leagueFormat.scoringFormat !== 'h2h-points' && (
+                  <span className="inline-flex items-center gap-1.5 mr-2 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                    {SCORING_FORMAT_LABELS[leagueFormat.scoringFormat]}
+                  </span>
+                )}
+                Regular Season Standings
+              </p>
               {/* League selector removed - use global Navbar selector instead */}
             </div>
             
@@ -466,18 +525,33 @@ const Standings = () => {
                   <tr className="text-left">
                     <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Rank</th>
                     <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Team</th>
-                    <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Record</th>
-                    <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Win %</th>
-                    <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-right">PF</th>
-                    <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-right">PA</th>
-                    <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Streak</th>
-                    <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Last 5</th>
+                    {hasMatchups && (
+                      <>
+                        <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Record</th>
+                        <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Win %</th>
+                      </>
+                    )}
+                    <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-right">
+                      {isRoto ? 'Roto Pts' : 'PF'}
+                    </th>
+                    {hasMatchups && (
+                      <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-right">PA</th>
+                    )}
+                    {isSeasonPoints && (
+                      <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-right">PPG</th>
+                    )}
+                    {hasMatchups && (
+                      <>
+                        <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Streak</th>
+                        <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Last 5</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40" style={{ visibility: 'visible', opacity: 1 }}>
                   {sortedTeams.length === 0 ? (
                     <tr style={{ visibility: 'visible', opacity: 1 }}>
-                      <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground" style={{ visibility: 'visible', opacity: 1 }}>
+                      <td colSpan={hasMatchups ? 8 : (isSeasonPoints ? 4 : 3)} className="px-6 py-12 text-center text-muted-foreground" style={{ visibility: 'visible', opacity: 1 }}>
                         No teams found in this league.
                       </td>
                     </tr>
@@ -495,10 +569,10 @@ const Standings = () => {
                       >
                         <td className="px-6 py-4 font-medium">
                           <div className="flex items-center gap-2">
-                            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${index < 4 ? 'bg-primary text-white' : 'text-muted-foreground bg-muted'}`}>
+                            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${(hasMatchups && index < leagueFormat.playoffTeams) ? 'bg-primary text-white' : 'text-muted-foreground bg-muted'}`}>
                               {index + 1}
                             </span>
-                            {index < 4 && (
+                            {hasMatchups && index < leagueFormat.playoffTeams && (
                               <span className="text-[10px] font-bold text-primary tracking-tight">PO</span>
                             )}
                           </div>
@@ -517,32 +591,49 @@ const Standings = () => {
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-center font-medium" style={{ visibility: 'visible', opacity: 1 }}>
-                          {team.record.wins}-{team.record.losses}
-                        </td>
-                        <td className="px-6 py-4 text-center text-muted-foreground" style={{ visibility: 'visible', opacity: 1 }}>
-                          {(team.winPercentage ?? 0).toFixed(1)}%
-                        </td>
+                        {hasMatchups && (
+                          <>
+                            <td className="px-6 py-4 text-center font-medium" style={{ visibility: 'visible', opacity: 1 }}>
+                              {team.record.wins}-{team.record.losses}{team.record.ties > 0 ? `-${team.record.ties}` : ''}
+                            </td>
+                            <td className="px-6 py-4 text-center text-muted-foreground" style={{ visibility: 'visible', opacity: 1 }}>
+                              {(team.winPercentage ?? 0).toFixed(1)}%
+                            </td>
+                          </>
+                        )}
                         <td className="px-6 py-4 text-right font-bold tabular-nums" style={{ visibility: 'visible', opacity: 1 }}>
                           {team.pointsFor.toFixed(1)}
                         </td>
-                        <td className="px-6 py-4 text-right font-medium tabular-nums text-muted-foreground" style={{ visibility: 'visible', opacity: 1 }}>
-                          {team.pointsAgainst.toFixed(1)}
-                        </td>
-                        <td className="px-6 py-4 text-center" style={{ visibility: 'visible', opacity: 1 }}>
-                          <span className={`inline-flex px-2.5 py-1 text-[10px] font-bold rounded-full border ${
-                            team.streak.startsWith('W') 
-                              ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' 
-                              : team.streak.startsWith('L')
-                              ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800'
-                              : 'bg-muted text-muted-foreground border-border'
-                          }`} style={{ visibility: 'visible', opacity: 1 }}>
-                            {team.streak}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-center text-muted-foreground font-medium" style={{ visibility: 'visible', opacity: 1 }}>
-                          {team.last5.wins}-{team.last5.losses}
-                        </td>
+                        {hasMatchups && (
+                          <td className="px-6 py-4 text-right font-medium tabular-nums text-muted-foreground" style={{ visibility: 'visible', opacity: 1 }}>
+                            {team.pointsAgainst.toFixed(1)}
+                          </td>
+                        )}
+                        {isSeasonPoints && (
+                          <td className="px-6 py-4 text-right font-medium tabular-nums text-muted-foreground" style={{ visibility: 'visible', opacity: 1 }}>
+                            {team.pointsFor > 0
+                              ? (team.pointsFor / Math.max(1, team.gamesPlayed || (team.record.wins + team.record.losses + team.record.ties) || 1)).toFixed(1)
+                              : '0.0'}
+                          </td>
+                        )}
+                        {hasMatchups && (
+                          <>
+                            <td className="px-6 py-4 text-center" style={{ visibility: 'visible', opacity: 1 }}>
+                              <span className={`inline-flex px-2.5 py-1 text-[10px] font-bold rounded-full border ${
+                                team.streak.startsWith('W')
+                                  ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800'
+                                  : team.streak.startsWith('L')
+                                  ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800'
+                                  : 'bg-muted text-muted-foreground border-border'
+                              }`} style={{ visibility: 'visible', opacity: 1 }}>
+                                {team.streak}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-center text-muted-foreground font-medium" style={{ visibility: 'visible', opacity: 1 }}>
+                              {team.last5.wins}-{team.last5.losses}{team.last5.ties > 0 ? `-${team.last5.ties}` : ''}
+                            </td>
+                          </>
+                        )}
                       </tr>
                     );
                   })
@@ -557,12 +648,12 @@ const Standings = () => {
               <CardHeader className="bg-primary/5 pb-4 border-b border-border/40">
                 <CardTitle className="text-lg font-bold flex items-center gap-2">
                   <span className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">🏆</span>
-                  Playoff Picture
+                  {hasMatchups ? 'Playoff Picture' : 'Top Contenders'}
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-6">
                 <div className="space-y-3">
-                  {sortedTeams.slice(0, 4).map((team, i) => (
+                  {sortedTeams.slice(0, hasMatchups ? leagueFormat.playoffTeams : 5).map((team, i) => (
                     <div key={team.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/20 hover:bg-muted/40 transition-colors border border-transparent hover:border-primary/10">
                       <div className="flex items-center gap-3">
                         <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold shadow-sm">
@@ -571,14 +662,16 @@ const Standings = () => {
                         <div className="font-semibold text-sm">{team.name}</div>
                       </div>
                       <div className="text-xs font-bold bg-[#E8EED9]/60 backdrop-blur-sm px-2 py-1 rounded-md shadow-sm border border-citrus-sage/20">
-                        {team.record.wins}-{team.record.losses}
+                        {hasMatchups
+                          ? `${team.record.wins}-${team.record.losses}${team.record.ties > 0 ? `-${team.record.ties}` : ''}`
+                          : `${team.pointsFor.toFixed(1)} pts`}
                       </div>
                     </div>
                   ))}
                   <div className="mt-4 pt-4 border-t border-border/40">
                     <div className="text-center text-xs text-muted-foreground font-medium flex items-center justify-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
-                      Top 4 teams qualify
+                      {hasMatchups ? `Top ${leagueFormat.playoffTeams} teams qualify` : `Ranked by ${isRoto ? 'roto points' : 'total points'}`}
                     </div>
                   </div>
                 </div>
