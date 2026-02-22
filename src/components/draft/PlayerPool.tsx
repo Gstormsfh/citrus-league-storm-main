@@ -220,21 +220,28 @@ export const PlayerPool = ({
               <Badge variant="outline" className="text-[10px] flex-shrink-0 px-1 py-0">{normalizePosition(player.position)}</Badge>
               <span className="text-[10px] text-muted-foreground flex-shrink-0">{player.team}</span>
             </div>
-            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-muted-foreground">
+            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-muted-foreground overflow-x-auto scrollbar-styled pb-0.5">
               {player.position === 'G' ? (
                 <>
-                  <span className="font-semibold text-foreground">{player.wins || 0}W</span>
-                  <span>{player.losses || 0}L</span>
-                  <span>{player.goals_against_average ? player.goals_against_average.toFixed(2) : '0.00'} GAA</span>
-                  <span>{player.save_percentage ? (player.save_percentage * 100).toFixed(1) : '0.0'}%</span>
+                  <span className="font-semibold text-foreground flex-shrink-0">{player.wins || 0}W</span>
+                  <span className="flex-shrink-0">{player.losses || 0}L</span>
+                  <span className="flex-shrink-0">{player.goals_against_average ? player.goals_against_average.toFixed(2) : '0.00'} GAA</span>
+                  <span className="flex-shrink-0">{player.save_percentage ? (player.save_percentage * 100).toFixed(1) : '0.0'}%</span>
+                  <span className="flex-shrink-0">{player.saves || 0}SV</span>
+                  <span className="flex-shrink-0">{player.shutouts || 0}SO</span>
                 </>
               ) : (
                 <>
-                  <span className="font-semibold text-foreground">{player.points} PTS</span>
-                  <span>{player.goals}G</span>
-                  <span>{player.assists}A</span>
-                  <span>{player.plus_minus > 0 ? '+' : ''}{player.plus_minus}</span>
-                  <span>{player.shots}SOG</span>
+                  <span className="font-semibold text-foreground flex-shrink-0">{player.points} PTS</span>
+                  <span className="flex-shrink-0">{player.goals}G</span>
+                  <span className="flex-shrink-0">{player.assists}A</span>
+                  <span className="flex-shrink-0">{player.plus_minus > 0 ? '+' : ''}{player.plus_minus}</span>
+                  <span className="flex-shrink-0">{player.ppp || 0}PPP</span>
+                  <span className="flex-shrink-0">{player.shp || 0}SHP</span>
+                  <span className="flex-shrink-0">{player.shots}SOG</span>
+                  <span className="flex-shrink-0">{player.hits}HIT</span>
+                  <span className="flex-shrink-0">{player.blocks}BLK</span>
+                  <span className="flex-shrink-0">{player.pim || 0}PIM</span>
                 </>
               )}
             </div>
@@ -432,7 +439,7 @@ export const PlayerPool = ({
           </Select>
         </div>
 
-        {/* Mobile sort select */}
+        {/* Mobile sort select - ALL stats available */}
         <Select value={sortBy} onValueChange={(value) => { setSortBy(value); setSortDirection('desc'); }}>
           <SelectTrigger className="sm:hidden w-[80px] h-9 bg-[#E8EED9]/50 backdrop-blur-sm border-fantasy-border text-xs">
             <SelectValue placeholder="Sort" />
@@ -441,16 +448,28 @@ export const PlayerPool = ({
             {selectedPosition === 'G' ? (
               <>
                 <SelectItem value="wins">W</SelectItem>
+                <SelectItem value="losses">L</SelectItem>
                 <SelectItem value="gaa">GAA</SelectItem>
                 <SelectItem value="savePct">SV%</SelectItem>
+                <SelectItem value="saves">SV</SelectItem>
+                <SelectItem value="shutouts">SO</SelectItem>
+                <SelectItem value="name">Name</SelectItem>
               </>
             ) : (
               <>
                 <SelectItem value="points">PTS</SelectItem>
                 <SelectItem value="goals">G</SelectItem>
                 <SelectItem value="assists">A</SelectItem>
+                <SelectItem value="plusMinus">+/-</SelectItem>
+                <SelectItem value="ppp">PPP</SelectItem>
+                <SelectItem value="shp">SHP</SelectItem>
                 <SelectItem value="shots">SOG</SelectItem>
                 <SelectItem value="hits">HIT</SelectItem>
+                <SelectItem value="blocks">BLK</SelectItem>
+                <SelectItem value="pim">PIM</SelectItem>
+                <SelectItem value="toi">TOI</SelectItem>
+                <SelectItem value="xGoals">xG</SelectItem>
+                <SelectItem value="name">Name</SelectItem>
               </>
             )}
           </SelectContent>
