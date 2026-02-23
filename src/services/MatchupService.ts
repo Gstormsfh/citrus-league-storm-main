@@ -3260,6 +3260,33 @@ export const MatchupService = {
   },
 
   /**
+   * Calculate Best Ball optimized score for a team's matchup.
+   * Fetches all rostered players' stats for the week and selects the optimal lineup.
+   * Only called for leagues with bestBallEnabled = true.
+   */
+  async calculateBestBallMatchupScore(
+    leagueId: string,
+    teamId: string,
+    weekNumber: number,
+    scoringSettings?: any
+  ): Promise<{ optimized_points: number; starters: string[]; error?: string }> {
+    try {
+      const { BestBallService } = await import('./BestBallService');
+      const result = await BestBallService.calculateWeeklyBestBall(
+        leagueId, teamId, weekNumber, scoringSettings
+      );
+      return {
+        optimized_points: result.optimized_points,
+        starters: result.optimized_starters,
+      };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[MatchupService] Best Ball calculation error:', msg);
+      return { optimized_points: 0, starters: [], error: msg };
+    }
+  },
+
+  /**
    * Get daily lineup for a team on a specific date (Yahoo/Sleeper architecture)
    * Returns complete player data ready for display - zero client-side calculation
    * Uses DataCacheService for caching (15+ minutes for past days)

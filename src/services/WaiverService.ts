@@ -309,6 +309,17 @@ export class WaiverService {
     dropPlayerId: number | null = null
   ): Promise<{ success: boolean; error?: string; claimId?: string }> {
     try {
+      // Best Ball leagues prohibit waivers (industry standard: zero management)
+      const { data: leagueCheck } = await supabase
+        .from('leagues')
+        .select('format_settings')
+        .eq('id', leagueId)
+        .single();
+
+      if (leagueCheck?.format_settings?.bestBallEnabled) {
+        return { success: false, error: 'Waivers are not allowed in Best Ball leagues.' };
+      }
+
       // Get team's waiver priority
       const { data: priority } = await supabase
         .from('waiver_priority')
@@ -674,6 +685,393 @@ export class WaiverService {
     } catch (error: unknown) {
       console.error('[WaiverService] Error getting waiver status:', error);
       return { leagues: [], error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  // ==========================================================================
+  // FAAB (Free Agent Acquisition Budget) Waivers
+  // ==========================================================================
+
+  /**
+   * Submit a FAAB waiver bid. Instead of priority-based claims, teams bid
+   * a dollar amount from their FAAB budget. Highest bid wins.
+   */
+  static async submitFAABBid(
+    leagueId: string,
+    teamId: string,
+    playerId: number,
+    bidAmount: number,
+    dropPlayerId: number | null = null,
+    isConditionalDrop: boolean = false
+  ): Promise<{ success: boolean; error?: string; claimId?: string }> {
+    try {
+      // Best Ball leagues prohibit FAAB bidding (industry standard: zero management)
+      const { data: bbCheck } = await supabase
+        .from('leagues')
+        .select('format_settings')
+        .eq('id', leagueId)
+        .single();
+
+      if (bbCheck?.format_settings?.bestBallEnabled) {
+        return { success: false, error: 'FAAB bidding is not allowed in Best Ball leagues.' };
+      }
+
+      // Validate bid amount
+      if (bidAmount < 0) {
+        return { success: false, error: 'Bid amount cannot be negative.' };
+      }
+
+      // Check remaining FAAB budget
+      const budget = await this.getFAABBudget(leagueId, teamId);
+      if (budget === null) {
+        return { success: false, error: 'FAAB budget not found for this team.' };
+      }
+
+      if (bidAmount > budget) {
+        return { success: false, error: `Bid of $${bidAmount} exceeds remaining budget of $${budget}.` };
+      }
+
+      // Check for existing pending bid on this player
+      const { data: existingClaim } = await supabase
+        .from('waiver_claims')
+        .select('id')
+        .eq('league_id', leagueId)
+        .eq('team_id', teamId)
+        .eq('player_id', playerId)
+        .eq('status', 'pending')
+        .maybeSingle();
+
+      if (existingClaim) {
+        // Update existing bid
+        const { error } = await supabase
+          .from('waiver_claims')
+          .update({
+            priority: bidAmount, // Reuse priority column for FAAB bid amount
+            drop_player_id: dropPlayerId,
+            is_conditional_drop: isConditionalDrop,
+          })
+          .eq('id', existingClaim.id);
+
+        if (error) return { success: false, error: error.message };
+        return { success: true, claimId: existingClaim.id };
+      }
+
+      // Create new bid
+      const { data, error } = await supabase
+        .from('waiver_claims')
+        .insert({
+          league_id: leagueId,
+          team_id: teamId,
+          player_id: playerId,
+          drop_player_id: dropPlayerId,
+          priority: bidAmount, // Store bid amount in priority column
+          status: 'pending',
+          is_conditional_drop: isConditionalDrop,
+        })
+        .select()
+        .single();
+
+      if (error) return { success: false, error: error.message };
+      return { success: true, claimId: data.id };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[WaiverService] submitFAABBid error:', msg);
+      return { success: false, error: msg };
+    }
+  }
+
+  /**
+   * Get the remaining FAAB budget for a team.
+   * Budget is tracked in the team's league settings or a dedicated column.
+   */
+  static async getFAABBudget(leagueId: string, teamId: string): Promise<number | null> {
+    try {
+      // Try to get from faab_budgets table first
+      const { data: budgetRow } = await supabase
+        .from('faab_budgets')
+        .select('remaining_budget')
+        .eq('league_id', leagueId)
+        .eq('team_id', teamId)
+        .maybeSingle();
+
+      if (budgetRow) return budgetRow.remaining_budget;
+
+      // Fallback: initialize from league settings
+      const { data: league } = await supabase
+        .from('leagues')
+        .select('settings')
+        .eq('id', leagueId)
+        .single();
+
+      const settings = league?.settings as any;
+      const initialBudget = settings?.faabBudget ?? settings?.auctionBudget ?? 100;
+
+      // Calculate spent budget from completed FAAB claims
+      const { data: completedClaims } = await supabase
+        .from('waiver_claims')
+        .select('priority')
+        .eq('league_id', leagueId)
+        .eq('team_id', teamId)
+        .eq('status', 'successful');
+
+      const totalSpent = (completedClaims ?? []).reduce(
+        (sum, c) => sum + (c.priority ?? 0), 0
+      );
+
+      return Math.max(0, initialBudget - totalSpent);
+    } catch (err) {
+      console.error('[WaiverService] getFAABBudget error:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Get all FAAB budgets for every team in a league.
+   */
+  static async getAllFAABBudgets(
+    leagueId: string
+  ): Promise<Array<{ team_id: string; team_name: string; remaining_budget: number; total_spent: number }>> {
+    try {
+      // Get league settings for initial budget
+      const { data: league } = await supabase
+        .from('leagues')
+        .select('settings')
+        .eq('id', leagueId)
+        .single();
+
+      const settings = league?.settings as any;
+      const initialBudget = settings?.faabBudget ?? settings?.auctionBudget ?? 100;
+
+      // Get all teams
+      const { data: teams } = await supabase
+        .from('teams')
+        .select('id, team_name')
+        .eq('league_id', leagueId);
+
+      if (!teams) return [];
+
+      // Get all completed FAAB claims in this league
+      const { data: completedClaims } = await supabase
+        .from('waiver_claims')
+        .select('team_id, priority')
+        .eq('league_id', leagueId)
+        .eq('status', 'successful');
+
+      // Aggregate spent per team
+      const spentMap = new Map<string, number>();
+      (completedClaims ?? []).forEach(c => {
+        const prev = spentMap.get(c.team_id) || 0;
+        spentMap.set(c.team_id, prev + (c.priority ?? 0));
+      });
+
+      return teams.map(t => {
+        const spent = spentMap.get(t.id) || 0;
+        return {
+          team_id: t.id,
+          team_name: t.team_name,
+          remaining_budget: Math.max(0, initialBudget - spent),
+          total_spent: spent,
+        };
+      }).sort((a, b) => b.remaining_budget - a.remaining_budget);
+    } catch (err) {
+      console.error('[WaiverService] getAllFAABBudgets error:', err);
+      return [];
+    }
+  }
+
+  /**
+   * Process FAAB waivers for a league. Highest bid wins.
+   * Ties broken by reverse standings order (worst team wins).
+   */
+  static async processFAABWaivers(
+    leagueId: string
+  ): Promise<{ processed: number; results: Array<{ player_id: number; winner_team_id: string; bid: number }>; error?: string }> {
+    try {
+      // Get all pending claims for this league (include conditional drop flag)
+      const { data: claims, error: fetchErr } = await supabase
+        .from('waiver_claims')
+        .select('id, team_id, player_id, priority, drop_player_id, is_conditional_drop')
+        .eq('league_id', leagueId)
+        .eq('status', 'pending')
+        .order('priority', { ascending: false }); // Highest bids first
+
+      if (fetchErr) return { processed: 0, results: [], error: fetchErr.message };
+      if (!claims || claims.length === 0) return { processed: 0, results: [] };
+
+      // Group claims by player_id
+      const playerClaims = new Map<number, typeof claims>();
+      claims.forEach(c => {
+        if (!playerClaims.has(c.player_id)) playerClaims.set(c.player_id, []);
+        playerClaims.get(c.player_id)!.push(c);
+      });
+
+      const results: Array<{ player_id: number; winner_team_id: string; bid: number }> = [];
+
+      // Fetch standings for tiebreaker (inverse standings: worst team wins ties)
+      // ESPN/Yahoo/Sleeper standard: equal bids broken by worst record
+      const { data: standingsData } = await supabase
+        .from('teams')
+        .select('id, wins, losses')
+        .eq('league_id', leagueId);
+
+      // Lower win pct = higher priority (inverse standings)
+      const teamStandingsRank = new Map<string, number>();
+      if (standingsData) {
+        const sorted = [...standingsData].sort((a, b) => {
+          const pctA = (a.wins || 0) / Math.max(1, (a.wins || 0) + (a.losses || 0));
+          const pctB = (b.wins || 0) / Math.max(1, (b.wins || 0) + (b.losses || 0));
+          return pctA - pctB; // Worst record first (best tiebreaker position)
+        });
+        sorted.forEach((t, i) => teamStandingsRank.set(t.id, i));
+      }
+
+      // Process each player
+      for (const [playerId, bids] of playerClaims) {
+        // Sort by bid amount desc, then by inverse standings (worst team first) for ties
+        bids.sort((a, b) => {
+          const bidDiff = (b.priority ?? 0) - (a.priority ?? 0);
+          if (bidDiff !== 0) return bidDiff;
+          // Tiebreaker: lower standings rank = worse team = wins tie
+          return (teamStandingsRank.get(a.team_id) ?? 999) - (teamStandingsRank.get(b.team_id) ?? 999);
+        });
+
+        // Find first eligible bidder
+        let winner = null;
+        for (const bid of bids) {
+          // Verify budget is still sufficient
+          const budget = await this.getFAABBudget(leagueId, bid.team_id);
+          if (budget !== null && budget >= (bid.priority ?? 0)) {
+            winner = bid;
+            break;
+          }
+        }
+
+        if (winner) {
+          const bidAmount = winner.priority ?? 0;
+
+          // 1. Execute the roster move (add player, optionally drop)
+          try {
+            // Get team owner for the roster move
+            const { data: teamData } = await supabase
+              .from('teams')
+              .select('owner_id')
+              .eq('id', winner.team_id)
+              .single();
+
+            if (teamData?.owner_id) {
+              // Conditional drop logic (ESPN/Yahoo standard):
+              // When is_conditional_drop is true, the drop_player_id is only
+              // dropped if the add succeeds. First try adding without drop,
+              // then with drop if roster is full.
+              const dropId = winner.is_conditional_drop
+                ? winner.drop_player_id  // conditional: include drop to make space
+                : winner.drop_player_id; // non-conditional: always include drop
+
+              const moveResult = await this.addFreeAgent(
+                leagueId,
+                winner.team_id,
+                playerId,
+                dropId,
+                teamData.owner_id
+              );
+
+              if (!moveResult.success) {
+                // If conditional and drop was included but still failed,
+                // mark as failed with specific reason
+                const reason = winner.is_conditional_drop
+                  ? `Conditional claim failed: ${moveResult.error}`
+                  : `Roster move failed: ${moveResult.error}`;
+
+                await supabase
+                  .from('waiver_claims')
+                  .update({
+                    status: 'failed',
+                    processed_at: new Date().toISOString(),
+                    failure_reason: reason,
+                  })
+                  .eq('id', winner.id);
+
+                // Try next bidder
+                const loserIds = bids.filter(b => b.id !== winner!.id).map(b => b.id);
+                if (loserIds.length > 0) {
+                  await supabase
+                    .from('waiver_claims')
+                    .update({
+                      status: 'failed',
+                      processed_at: new Date().toISOString(),
+                      failure_reason: 'Outbid or prior bidder claimed',
+                    })
+                    .in('id', loserIds);
+                }
+                continue;
+              }
+            }
+          } catch (moveErr) {
+            console.error('[WaiverService] FAAB roster move error:', moveErr);
+          }
+
+          // 2. Deduct FAAB budget from winner
+          const { data: budgetRow } = await supabase
+            .from('faab_budgets')
+            .select('remaining_budget')
+            .eq('league_id', leagueId)
+            .eq('team_id', winner.team_id)
+            .maybeSingle();
+
+          if (budgetRow) {
+            await supabase
+              .from('faab_budgets')
+              .update({
+                remaining_budget: Math.max(0, budgetRow.remaining_budget - bidAmount),
+                updated_at: new Date().toISOString(),
+              })
+              .eq('league_id', leagueId)
+              .eq('team_id', winner.team_id);
+          }
+
+          // 3. Mark winner claim as successful
+          await supabase
+            .from('waiver_claims')
+            .update({ status: 'successful', processed_at: new Date().toISOString() })
+            .eq('id', winner.id);
+
+          // 4. Mark all other bids for this player as failed
+          const loserIds = bids.filter(b => b.id !== winner!.id).map(b => b.id);
+          if (loserIds.length > 0) {
+            await supabase
+              .from('waiver_claims')
+              .update({
+                status: 'failed',
+                processed_at: new Date().toISOString(),
+                failure_reason: 'Outbid',
+              })
+              .in('id', loserIds);
+          }
+
+          results.push({
+            player_id: playerId,
+            winner_team_id: winner.team_id,
+            bid: bidAmount,
+          });
+        } else {
+          // No eligible bidder
+          const allIds = bids.map(b => b.id);
+          await supabase
+            .from('waiver_claims')
+            .update({
+              status: 'failed',
+              processed_at: new Date().toISOString(),
+              failure_reason: 'Insufficient budget',
+            })
+            .in('id', allIds);
+        }
+      }
+
+      return { processed: results.length, results };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[WaiverService] processFAABWaivers error:', msg);
+      return { processed: 0, results: [], error: msg };
     }
   }
 }

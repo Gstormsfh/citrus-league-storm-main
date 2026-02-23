@@ -52,6 +52,17 @@ export class TradeService {
     message?: string
   ): Promise<{ success: boolean; error?: string; tradeId?: string }> {
     try {
+      // Best Ball leagues prohibit trades (industry standard: zero management after draft)
+      const { data: league } = await supabase
+        .from('leagues')
+        .select('format_settings')
+        .eq('id', leagueId)
+        .single();
+
+      if (league?.format_settings?.bestBallEnabled) {
+        return { success: false, error: 'Trades are not allowed in Best Ball leagues.' };
+      }
+
       // Set expiration to 7 days from now
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7);

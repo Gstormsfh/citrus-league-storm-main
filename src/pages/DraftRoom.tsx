@@ -5,6 +5,7 @@ import { useLeague } from '@/contexts/LeagueContext';
 import { LeagueService, League, Team, LEAGUE_TEAMS_DATA } from '@/services/LeagueService';
 import { DraftService, DraftPick, DraftState } from '@/services/DraftService';
 import { PlayerService, Player } from '@/services/PlayerService';
+import { AuctionDraftService } from '@/services/AuctionDraftService';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
@@ -87,6 +88,18 @@ const DraftRoom = () => {
   const [timeRemaining, setTimeRemaining] = useState(90); // Will be updated from league settings when loaded
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [isCommissioner, setIsCommissioner] = useState(false);
+  const [isAuctionDraft, setIsAuctionDraft] = useState(false);
+  const [auctionSessionId, setAuctionSessionId] = useState<string | null>(null);
+  const [auctionNominationId, setAuctionNominationId] = useState<string | null>(null);
+  const [auctionState, setAuctionState] = useState<{
+    budgets: Array<{ team_id: string; team_name: string; remaining_budget: number; players_won: number }>;
+    currentNomination: { id: string; player_id: string; player_name: string; current_high_bid: number; current_high_bidder_team_id: string | null; expires_at: string } | null;
+    myBudget: number;
+    isMyTurnToNominate: boolean;
+    bidHistory?: Array<{ team_id: string; bid_amount: number; created_at: string }>;
+  } | null>(null);
+  const [bidAmount, setBidAmount] = useState(1);
+  const [auctionTimeRemaining, setAuctionTimeRemaining] = useState<number | null>(null);
   const [draftSettings, setDraftSettings] = useState<DraftSettings>({
     rounds: 21, // Will be updated from league settings
     pickTimeLimit: 90,
@@ -380,6 +393,62 @@ const DraftRoom = () => {
       setLeague(leagueData);
       setIsCommissioner(leagueData.commissioner_id === user.id);
       
+      // Detect auction draft type
+      const draftTypeFromSettings = (leagueData.settings as any)?.draftType;
+      if (draftTypeFromSettings === 'auction') {
+        setIsAuctionDraft(true);
+        const defaultBudget = (leagueData.settings as any)?.auctionBudget ?? 200;
+        setAuctionState({
+          budgets: [],
+          currentNomination: null,
+          myBudget: defaultBudget,
+          isMyTurnToNominate: false,
+        });
+
+        // Load live auction state if draft is in progress
+        if (leagueData.draft_status === 'in_progress') {
+          try {
+            const { sessionId: activeSessionId } = await DraftService.getActiveDraftSession(leagueId, user.id);
+            if (activeSessionId) {
+              setAuctionSessionId(activeSessionId);
+              const aState = await AuctionDraftService.getAuctionState(leagueId, activeSessionId);
+              if (aState) {
+                const myBudgetEntry = aState.budgets.find(b => b.team_id === userTeamData?.id);
+                const currentNominator = aState.nomination_order[aState.current_nominator_index];
+                // Get team names for budget display
+                const budgetsWithNames = aState.budgets.map(b => {
+                  const team = (teamsData || []).find(t => t.id === b.team_id);
+                  return {
+                    team_id: b.team_id,
+                    team_name: team?.team_name || b.team_id.slice(0, 8),
+                    remaining_budget: b.remaining_budget,
+                    players_won: b.players_won,
+                  };
+                });
+                setAuctionState({
+                  budgets: budgetsWithNames,
+                  currentNomination: aState.current_nomination ? {
+                    id: aState.current_nomination.id || '',
+                    player_id: aState.current_nomination.player_id,
+                    player_name: aState.current_nomination.player_name,
+                    current_high_bid: aState.current_nomination.current_high_bid,
+                    current_high_bidder_team_id: aState.current_nomination.current_high_bidder_team_id,
+                    expires_at: aState.current_nomination.expires_at,
+                  } : null,
+                  myBudget: myBudgetEntry?.remaining_budget ?? defaultBudget,
+                  isMyTurnToNominate: currentNominator === userTeamData?.id && !aState.current_nomination,
+                });
+                if (aState.current_nomination?.id) {
+                  setAuctionNominationId(aState.current_nomination.id);
+                }
+              }
+            }
+          } catch (auctionErr) {
+            logger.error('DraftRoom: Error loading auction state:', auctionErr);
+          }
+        }
+      }
+
       // Update draft settings with league's draft_rounds and pickTimeLimit
       setDraftSettings(prev => ({
         ...prev,
@@ -801,6 +870,66 @@ const DraftRoom = () => {
       sessionStorage.setItem(`draft_timer_${leagueId}`, String(draftTimerStarted));
     }
   }, [draftTimerStarted, leagueId]);
+
+  // Auction Draft: Timer countdown + auto-close expired nominations + bid history polling
+  useEffect(() => {
+    if (!isAuctionDraft || !auctionState?.currentNomination || draftPhase !== DraftPhase.ACTIVE) {
+      setAuctionTimeRemaining(null);
+      return;
+    }
+
+    const nomination = auctionState.currentNomination;
+    const expiresAt = new Date(nomination.expires_at).getTime();
+
+    const tick = async () => {
+      const now = Date.now();
+      const remaining = Math.max(0, Math.ceil((expiresAt - now) / 1000));
+      setAuctionTimeRemaining(remaining);
+
+      // Timer expired — auto-close the nomination
+      if (remaining <= 0 && leagueId && auctionSessionId && nomination.id) {
+        const closeResult = await AuctionDraftService.closeNomination(leagueId, auctionSessionId, nomination.id);
+        if (closeResult.success) {
+          toast({ title: 'Nomination Closed', description: closeResult.winner_team_id ? `Sold for $${closeResult.amount}!` : 'No bids — player returned to pool.' });
+          // Refresh auction state to advance to next nominator
+          const refreshed = await AuctionDraftService.getAuctionState(leagueId, auctionSessionId);
+          if (refreshed) {
+            const myBudget = refreshed.budgets.find(b => b.team_id === userTeam?.id);
+            const isMyTurn = userTeam?.id ? refreshed.nomination_order[refreshed.current_nominator_index] === userTeam.id : false;
+            setAuctionState(prev => prev ? {
+              ...prev,
+              currentNomination: refreshed.current_nomination ? {
+                id: refreshed.current_nomination.id || '',
+                player_id: refreshed.current_nomination.player_id,
+                player_name: refreshed.current_nomination.player_name,
+                current_high_bid: refreshed.current_nomination.current_high_bid,
+                current_high_bidder_team_id: refreshed.current_nomination.current_high_bidder_team_id,
+                expires_at: refreshed.current_nomination.expires_at,
+              } : null,
+              myBudget: myBudget?.remaining_budget ?? prev.myBudget,
+              isMyTurnToNominate: isMyTurn,
+              bidHistory: [],
+            } : prev);
+          }
+        }
+      }
+    };
+
+    // Tick immediately, then every second
+    tick();
+    const interval = setInterval(tick, 1000);
+
+    // Also poll bid history every 3 seconds for real-time transparency
+    const loadBidHistory = async () => {
+      if (!nomination.id) return;
+      const bids = await AuctionDraftService.getBidHistory(nomination.id);
+      setAuctionState(prev => prev ? { ...prev, bidHistory: bids.map(b => ({ team_id: b.team_id, bid_amount: b.bid_amount, created_at: b.created_at || '' })) } : prev);
+    };
+    loadBidHistory();
+    const bidPoll = setInterval(loadBidHistory, 3000);
+
+    return () => { clearInterval(interval); clearInterval(bidPoll); };
+  }, [isAuctionDraft, auctionState?.currentNomination?.id, auctionState?.currentNomination?.expires_at, draftPhase, leagueId, auctionSessionId]);
 
   // Real-time subscription to league status changes
   // This allows non-commissioner members to auto-transition when the draft starts
@@ -2916,11 +3045,192 @@ const DraftRoom = () => {
                       </TabsTrigger>
                     </TabsList>
 
+                    {/* Auction Draft Bidding Panel */}
+                    {isAuctionDraft && auctionState && draftPhase === DraftPhase.ACTIVE && (
+                      <div className="mb-4 p-4 rounded-lg border-2 border-amber-400 bg-amber-50 dark:bg-amber-900/20">
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="font-bold text-sm flex items-center gap-2">
+                            <span className="text-amber-600">$</span> Auction Draft
+                          </h3>
+                          <Badge variant="outline" className="text-xs font-bold">
+                            Budget: ${auctionState.myBudget}
+                          </Badge>
+                        </div>
+
+                        {auctionState.currentNomination ? (
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between p-3 rounded-lg bg-white dark:bg-background border">
+                              <div>
+                                <div className="font-bold">{auctionState.currentNomination.player_name}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  Current bid: <span className="font-bold text-amber-600">${auctionState.currentNomination.current_high_bid}</span>
+                                </div>
+                                <div className={`text-[10px] font-bold ${(auctionTimeRemaining ?? 99) <= 10 ? 'text-red-500 animate-pulse' : 'text-muted-foreground'}`}>
+                                  {auctionTimeRemaining !== null ? `${auctionTimeRemaining}s remaining` : `Expires: ${new Date(auctionState.currentNomination.expires_at).toLocaleTimeString()}`}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  min={auctionState.currentNomination.current_high_bid + 1}
+                                  max={auctionState.myBudget}
+                                  value={bidAmount}
+                                  onChange={(e) => setBidAmount(Math.max(1, parseInt(e.target.value) || 1))}
+                                  className="w-20 h-8 text-center text-sm border rounded px-2"
+                                />
+                                <Button
+                                  size="sm"
+                                  className="bg-amber-500 hover:bg-amber-600 text-white font-bold"
+                                  disabled={bidAmount <= auctionState.currentNomination.current_high_bid || bidAmount > auctionState.myBudget}
+                                  onClick={async () => {
+                                    if (!auctionState.currentNomination?.id || !userTeam?.id || !leagueId) return;
+                                    const result = await AuctionDraftService.placeBid(
+                                      leagueId,
+                                      auctionState.currentNomination.id,
+                                      userTeam.id,
+                                      bidAmount
+                                    );
+                                    if (result.success) {
+                                      toast({ title: 'Bid Placed', description: `You bid $${bidAmount}` });
+                                      // Refresh auction state
+                                      if (auctionSessionId) {
+                                        const refreshed = await AuctionDraftService.getAuctionState(leagueId, auctionSessionId);
+                                        if (refreshed) {
+                                          const myBudget = refreshed.budgets.find(b => b.team_id === userTeam.id);
+                                          setAuctionState(prev => prev ? {
+                                            ...prev,
+                                            currentNomination: refreshed.current_nomination ? {
+                                              id: refreshed.current_nomination.id || '',
+                                              player_id: refreshed.current_nomination.player_id,
+                                              player_name: refreshed.current_nomination.player_name,
+                                              current_high_bid: refreshed.current_nomination.current_high_bid,
+                                              current_high_bidder_team_id: refreshed.current_nomination.current_high_bidder_team_id,
+                                              expires_at: refreshed.current_nomination.expires_at,
+                                            } : null,
+                                            myBudget: myBudget?.remaining_budget ?? prev.myBudget,
+                                          } : prev);
+                                        }
+                                      }
+                                    } else {
+                                      toast({ title: 'Bid Failed', description: result.error || 'Could not place bid', variant: 'destructive' });
+                                    }
+                                  }}
+                                >
+                                  Bid ${bidAmount}
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-center py-4 text-sm text-muted-foreground">
+                            {auctionState.isMyTurnToNominate && selectedPlayer ? (
+                              <Button
+                                className="bg-amber-500 hover:bg-amber-600 text-white font-bold"
+                                onClick={async () => {
+                                  if (!leagueId || !auctionSessionId || !userTeam?.id || !selectedPlayer) return;
+                                  const result = await AuctionDraftService.nominatePlayer(
+                                    leagueId,
+                                    auctionSessionId,
+                                    userTeam.id,
+                                    String(selectedPlayer.id),
+                                    selectedPlayer.full_name,
+                                    1, // opening bid
+                                    30  // timer seconds
+                                  );
+                                  if (result.success && result.nomination) {
+                                    toast({ title: 'Player Nominated', description: `${selectedPlayer.full_name} is up for bidding!` });
+                                    setAuctionNominationId(result.nomination.id || null);
+                                    setBidAmount(2); // Set to minimum overbid
+                                    // Refresh auction state
+                                    const refreshed = await AuctionDraftService.getAuctionState(leagueId, auctionSessionId);
+                                    if (refreshed) {
+                                      const myBudget = refreshed.budgets.find(b => b.team_id === userTeam.id);
+                                      setAuctionState(prev => prev ? {
+                                        ...prev,
+                                        currentNomination: refreshed.current_nomination ? {
+                                          id: refreshed.current_nomination.id || '',
+                                          player_id: refreshed.current_nomination.player_id,
+                                          player_name: refreshed.current_nomination.player_name,
+                                          current_high_bid: refreshed.current_nomination.current_high_bid,
+                                          current_high_bidder_team_id: refreshed.current_nomination.current_high_bidder_team_id,
+                                          expires_at: refreshed.current_nomination.expires_at,
+                                        } : null,
+                                        myBudget: myBudget?.remaining_budget ?? prev.myBudget,
+                                        isMyTurnToNominate: false,
+                                      } : prev);
+                                    }
+                                  } else {
+                                    toast({ title: 'Error', description: result.error || 'Could not nominate player', variant: 'destructive' });
+                                  }
+                                }}
+                              >
+                                Nominate {selectedPlayer.full_name}
+                              </Button>
+                            ) : auctionState.isMyTurnToNominate ? (
+                              <>
+                                <p className="font-medium text-amber-600">Your turn to nominate!</p>
+                                <p className="text-xs mt-1">Select a player below to nominate them for bidding.</p>
+                              </>
+                            ) : (
+                              <>
+                                <p className="font-medium">Waiting for nomination...</p>
+                                <p className="text-xs mt-1">Another team is selecting a player to nominate.</p>
+                              </>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Bid History — real-time transparency */}
+                        {auctionState.bidHistory && auctionState.bidHistory.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-amber-200">
+                            <div className="text-xs font-semibold text-muted-foreground mb-2">Bid History</div>
+                            <div className="space-y-1 max-h-32 overflow-y-auto">
+                              {auctionState.bidHistory.map((bid, i) => {
+                                const teamName = auctionState.budgets.find(b => b.team_id === bid.team_id)?.team_name || 'Unknown';
+                                return (
+                                  <div key={i} className={`flex justify-between text-xs p-1.5 rounded ${i === 0 ? 'bg-amber-100 dark:bg-amber-900/30 font-bold' : 'bg-muted/30'}`}>
+                                    <span className="truncate">{teamName}</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-bold text-amber-600">${bid.bid_amount}</span>
+                                      {bid.created_at && <span className="text-muted-foreground">{new Date(bid.created_at).toLocaleTimeString()}</span>}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Budget overview for all teams */}
+                        {auctionState.budgets.length > 0 && (
+                          <div className="mt-3 pt-3 border-t">
+                            <div className="text-xs font-semibold text-muted-foreground mb-2">Team Budgets</div>
+                            <div className="grid grid-cols-2 gap-1">
+                              {auctionState.budgets.map(b => (
+                                <div key={b.team_id} className="flex justify-between text-xs p-1 rounded bg-muted/30">
+                                  <span className="truncate">{b.team_name}</span>
+                                  <span className="font-bold">${b.remaining_budget}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Always render players tab */}
                     <TabsContent value="players" className="space-y-0">
-                      <PlayerPool 
+                      <PlayerPool
                         onPlayerSelect={setSelectedPlayer}
-                        onPlayerDraft={handlePlayerDraft}
+                        onPlayerDraft={isAuctionDraft ? (player) => {
+                          // In auction mode, selecting a player queues them for nomination
+                          setSelectedPlayer(player);
+                          if (auctionState?.isMyTurnToNominate) {
+                            toast({ title: 'Player Selected', description: `Click "Nominate ${player.full_name}" above to start bidding.` });
+                          } else {
+                            toast({ title: 'Player Selected', description: `${player.full_name} selected. You can nominate when it's your turn.` });
+                          }
+                        } : handlePlayerDraft}
                         selectedPlayer={selectedPlayer}
                         draftedPlayers={Array.from(draftedPlayerIds)}
                         isDraftActive={draftPhase === DraftPhase.ACTIVE}

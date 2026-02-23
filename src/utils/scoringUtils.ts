@@ -287,7 +287,7 @@ export function compareCategoryMatchup(
   team2Stats: Partial<CategoryStats>,
   categories: string[],
   categoryMeta: Record<string, { higherIsBetter: boolean }>
-): { team1Wins: number; team2Wins: number; ties: number; details: Record<string, 'team1' | 'team2' | 'tie'> } {
+): { team1Wins: number; team2Wins: number; ties: number; details: Record<string, 'team1' | 'team2' | 'tie'>; mostCategoriesWinner?: 'team1' | 'team2' | 'tie' } {
   let team1Wins = 0;
   let team2Wins = 0;
   let ties = 0;
@@ -310,7 +310,44 @@ export function compareCategoryMatchup(
     }
   }
 
-  return { team1Wins, team2Wins, ties, details };
+  // "Most Categories" outcome: overall matchup winner is team with more category wins
+  // ESPN/Yahoo standard — used for H2H-Categories standings and playoff tiebreakers
+  const mostCategoriesWinner: 'team1' | 'team2' | 'tie' =
+    team1Wins > team2Wins ? 'team1' : team2Wins > team1Wins ? 'team2' : 'tie';
+
+  return { team1Wins, team2Wins, ties, details, mostCategoriesWinner };
+}
+
+/**
+ * Resolve H2H Category playoff tiebreakers.
+ * ESPN/Yahoo standard order:
+ *   1. Head-to-head record between tied teams
+ *   2. Total category wins during regular season
+ *   3. Total points scored (higher wins)
+ *
+ * @returns Positive if team1 wins tiebreak, negative if team2 wins, 0 if still tied
+ */
+export function resolveCategoryPlayoffTiebreaker(
+  team1: { wins: number; losses: number; ties: number; pointsFor: number; categoryWins?: number },
+  team2: { wins: number; losses: number; ties: number; pointsFor: number; categoryWins?: number },
+  h2hRecord?: { team1Wins: number; team2Wins: number }
+): number {
+  // Tiebreaker 1: Head-to-head record (if available)
+  if (h2hRecord) {
+    if (h2hRecord.team1Wins !== h2hRecord.team2Wins) {
+      return h2hRecord.team1Wins - h2hRecord.team2Wins;
+    }
+  }
+
+  // Tiebreaker 2: Total category wins across all matchups
+  if (team1.categoryWins !== undefined && team2.categoryWins !== undefined) {
+    if (team1.categoryWins !== team2.categoryWins) {
+      return team1.categoryWins - team2.categoryWins;
+    }
+  }
+
+  // Tiebreaker 3: Total points scored (higher wins)
+  return team1.pointsFor - team2.pointsFor;
 }
 
 /**
