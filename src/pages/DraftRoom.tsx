@@ -96,8 +96,10 @@ const DraftRoom = () => {
     currentNomination: { id: string; player_id: string; player_name: string; current_high_bid: number; current_high_bidder_team_id: string | null; expires_at: string } | null;
     myBudget: number;
     isMyTurnToNominate: boolean;
+    bidHistory?: Array<{ team_id: string; bid_amount: number; created_at: string }>;
   } | null>(null);
   const [bidAmount, setBidAmount] = useState(1);
+  const [auctionTimeRemaining, setAuctionTimeRemaining] = useState<number | null>(null);
   const [draftSettings, setDraftSettings] = useState<DraftSettings>({
     rounds: 21, // Will be updated from league settings
     pickTimeLimit: 90,
@@ -868,6 +870,66 @@ const DraftRoom = () => {
       sessionStorage.setItem(`draft_timer_${leagueId}`, String(draftTimerStarted));
     }
   }, [draftTimerStarted, leagueId]);
+
+  // Auction Draft: Timer countdown + auto-close expired nominations + bid history polling
+  useEffect(() => {
+    if (!isAuctionDraft || !auctionState?.currentNomination || draftPhase !== DraftPhase.ACTIVE) {
+      setAuctionTimeRemaining(null);
+      return;
+    }
+
+    const nomination = auctionState.currentNomination;
+    const expiresAt = new Date(nomination.expires_at).getTime();
+
+    const tick = async () => {
+      const now = Date.now();
+      const remaining = Math.max(0, Math.ceil((expiresAt - now) / 1000));
+      setAuctionTimeRemaining(remaining);
+
+      // Timer expired — auto-close the nomination
+      if (remaining <= 0 && leagueId && auctionSessionId && nomination.id) {
+        const closeResult = await AuctionDraftService.closeNomination(leagueId, auctionSessionId, nomination.id);
+        if (closeResult.success) {
+          toast({ title: 'Nomination Closed', description: closeResult.winner_team_id ? `Sold for $${closeResult.amount}!` : 'No bids — player returned to pool.' });
+          // Refresh auction state to advance to next nominator
+          const refreshed = await AuctionDraftService.getAuctionState(leagueId, auctionSessionId);
+          if (refreshed) {
+            const myBudget = refreshed.budgets.find(b => b.team_id === userTeam?.id);
+            const isMyTurn = userTeam?.id ? refreshed.nomination_order[refreshed.current_nominator_index] === userTeam.id : false;
+            setAuctionState(prev => prev ? {
+              ...prev,
+              currentNomination: refreshed.current_nomination ? {
+                id: refreshed.current_nomination.id || '',
+                player_id: refreshed.current_nomination.player_id,
+                player_name: refreshed.current_nomination.player_name,
+                current_high_bid: refreshed.current_nomination.current_high_bid,
+                current_high_bidder_team_id: refreshed.current_nomination.current_high_bidder_team_id,
+                expires_at: refreshed.current_nomination.expires_at,
+              } : null,
+              myBudget: myBudget?.remaining_budget ?? prev.myBudget,
+              isMyTurnToNominate: isMyTurn,
+              bidHistory: [],
+            } : prev);
+          }
+        }
+      }
+    };
+
+    // Tick immediately, then every second
+    tick();
+    const interval = setInterval(tick, 1000);
+
+    // Also poll bid history every 3 seconds for real-time transparency
+    const loadBidHistory = async () => {
+      if (!nomination.id) return;
+      const bids = await AuctionDraftService.getBidHistory(nomination.id);
+      setAuctionState(prev => prev ? { ...prev, bidHistory: bids.map(b => ({ team_id: b.team_id, bid_amount: b.bid_amount, created_at: b.created_at || '' })) } : prev);
+    };
+    loadBidHistory();
+    const bidPoll = setInterval(loadBidHistory, 3000);
+
+    return () => { clearInterval(interval); clearInterval(bidPoll); };
+  }, [isAuctionDraft, auctionState?.currentNomination?.id, auctionState?.currentNomination?.expires_at, draftPhase, leagueId, auctionSessionId]);
 
   // Real-time subscription to league status changes
   // This allows non-commissioner members to auto-transition when the draft starts
@@ -3003,8 +3065,8 @@ const DraftRoom = () => {
                                 <div className="text-xs text-muted-foreground">
                                   Current bid: <span className="font-bold text-amber-600">${auctionState.currentNomination.current_high_bid}</span>
                                 </div>
-                                <div className="text-[10px] text-muted-foreground">
-                                  Expires: {new Date(auctionState.currentNomination.expires_at).toLocaleTimeString()}
+                                <div className={`text-[10px] font-bold ${(auctionTimeRemaining ?? 99) <= 10 ? 'text-red-500 animate-pulse' : 'text-muted-foreground'}`}>
+                                  {auctionTimeRemaining !== null ? `${auctionTimeRemaining}s remaining` : `Expires: ${new Date(auctionState.currentNomination.expires_at).toLocaleTimeString()}`}
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
@@ -3115,6 +3177,27 @@ const DraftRoom = () => {
                                 <p className="text-xs mt-1">Another team is selecting a player to nominate.</p>
                               </>
                             )}
+                          </div>
+                        )}
+
+                        {/* Bid History — real-time transparency */}
+                        {auctionState.bidHistory && auctionState.bidHistory.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-amber-200">
+                            <div className="text-xs font-semibold text-muted-foreground mb-2">Bid History</div>
+                            <div className="space-y-1 max-h-32 overflow-y-auto">
+                              {auctionState.bidHistory.map((bid, i) => {
+                                const teamName = auctionState.budgets.find(b => b.team_id === bid.team_id)?.team_name || 'Unknown';
+                                return (
+                                  <div key={i} className={`flex justify-between text-xs p-1.5 rounded ${i === 0 ? 'bg-amber-100 dark:bg-amber-900/30 font-bold' : 'bg-muted/30'}`}>
+                                    <span className="truncate">{teamName}</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-bold text-amber-600">${bid.bid_amount}</span>
+                                      {bid.created_at && <span className="text-muted-foreground">{new Date(bid.created_at).toLocaleTimeString()}</span>}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
                         )}
 

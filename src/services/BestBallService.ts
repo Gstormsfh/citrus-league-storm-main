@@ -121,7 +121,10 @@ export class BestBallService {
     };
 
     try {
-      // Get the team's rostered players (exclude IR players — they don't count in Best Ball)
+      // Get the team's rostered players
+      // IR players are included but score 0 (ESPN/Yahoo standard for Best Ball)
+      // This ensures they appear in player_scores for transparency but never
+      // get optimized into the lineup since the greedy algorithm picks higher scorers.
       const { data: lineup } = await supabase
         .from('team_lineups')
         .select('starters, bench, ir')
@@ -129,7 +132,7 @@ export class BestBallService {
         .eq('team_id', teamId)
         .maybeSingle();
 
-      // IR players should be excluded from Best Ball optimization
+      // Track IR players so we can force their score to 0
       const irPlayerIds = new Set<string>(
         ((lineup?.ir as string[]) || []).map(String)
       );
@@ -142,10 +145,8 @@ export class BestBallService {
 
       if (!assignments || assignments.length === 0) return emptyResult;
 
-      // Filter out IR players
-      const playerIds = assignments
-        .map(a => a.player_id)
-        .filter(pid => !irPlayerIds.has(String(pid)));
+      // Include ALL rostered players (IR players will get 0 points below)
+      const playerIds = assignments.map(a => a.player_id);
 
       if (playerIds.length === 0) return emptyResult;
 
@@ -175,10 +176,12 @@ export class BestBallService {
       if (!weeklyStats || weeklyStats.length === 0) return emptyResult;
 
       // Calculate fantasy points for each player
+      // IR players score 0 — they're tracked but never optimized into the lineup
       const playerScores: PlayerScore[] = weeklyStats.map((s: any) => {
         const pos = posMap.get(String(s.player_id)) || 'UTIL';
         const isGoalie = pos === 'G' || pos === 'Goalie';
-        const points = scorer.calculatePoints(s, isGoalie);
+        const isOnIR = irPlayerIds.has(String(s.player_id));
+        const points = isOnIR ? 0 : scorer.calculatePoints(s, isGoalie);
         return {
           player_id: String(s.player_id),
           position: pos,

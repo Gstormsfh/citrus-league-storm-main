@@ -10,8 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { PoolService, SurvivorStanding } from '@/services/PoolService';
-import { PoolService } from '@/services/PoolService';
-import { Loader2, Shield, Heart, Skull, CheckCircle, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, Shield, Heart, Skull, CheckCircle, XCircle, ChevronLeft, ChevronRight, Lock } from 'lucide-react';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import LoadingScreen from '@/components/LoadingScreen';
 
@@ -35,6 +34,7 @@ const PoolSurvivor = () => {
   const [pickHistory, setPickHistory] = useState<Array<{ week: number; team: string; is_correct: boolean | null }>>([]);
   const [isEliminated, setIsEliminated] = useState(false);
   const [standings, setStandings] = useState<SurvivorStanding[]>([]);
+  const [lockedTeams, setLockedTeams] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState('pick');
 
   useEffect(() => {
@@ -60,6 +60,22 @@ const PoolSurvivor = () => {
         // Load standings
         const standingsData = await PoolService.getSurvivorStandings(activeLeagueId);
         setStandings(standingsData);
+
+        // Determine which teams are game-locked (per-game lock enforcement)
+        try {
+          const weekGames = await PoolService.getWeekGames(currentWeek);
+          const locked = new Set<string>();
+          const now = new Date();
+          for (const game of weekGames) {
+            const gameStart = game.game_time ? new Date(`${game.game_date}T${game.game_time}`) : null;
+            const isLocked = game.status === 'live' || game.status === 'final' || (gameStart && gameStart <= now);
+            if (isLocked) {
+              locked.add(game.home_team);
+              locked.add(game.away_team);
+            }
+          }
+          setLockedTeams(locked);
+        } catch { /* non-critical */ }
       } catch (err) {
         console.error('[PoolSurvivor] Error:', err);
       } finally {
@@ -167,6 +183,8 @@ const PoolSurvivor = () => {
                     <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 mb-6">
                       {NHL_TEAMS.map(team => {
                         const isUsed = usedTeams.includes(team);
+                        const isLocked = lockedTeams.has(team);
+                        const isDisabled = isUsed || isLocked;
                         const isSelected = selectedTeam === team;
 
                         return (
@@ -174,11 +192,13 @@ const PoolSurvivor = () => {
                             key={team}
                             variant={isSelected ? 'default' : 'outline'}
                             size="sm"
-                            className={`text-xs font-bold ${isUsed ? 'opacity-30 cursor-not-allowed line-through' : ''}`}
-                            disabled={isUsed}
+                            className={`text-xs font-bold relative ${isUsed ? 'opacity-30 cursor-not-allowed line-through' : ''} ${isLocked && !isUsed ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            disabled={isDisabled}
                             onClick={() => setSelectedTeam(isSelected ? null : team)}
+                            title={isLocked ? `${team}'s game has started` : isUsed ? `Already used ${team}` : `Pick ${team}`}
                           >
                             {team}
+                            {isLocked && !isUsed && <Lock className="w-2.5 h-2.5 absolute top-0.5 right-0.5 text-red-400" />}
                           </Button>
                         );
                       })}

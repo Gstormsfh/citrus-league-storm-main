@@ -417,6 +417,25 @@ export class PoolService {
 
       const nameMap = new Map((profiles ?? []).map(p => [p.id, p.display_name || 'Unknown']));
 
+      // Also fetch per-week breakdown for the current standings display
+      const { data: allPicks } = await supabase
+        .from('pool_picks')
+        .select('user_id, week_number, is_correct')
+        .eq('league_id', leagueId)
+        .not('is_correct', 'is', null);
+
+      // Build per-user, per-week counts
+      const weeklyMap = new Map<string, Map<number, number>>();
+      for (const p of (allPicks ?? [])) {
+        if (!weeklyMap.has(p.user_id)) weeklyMap.set(p.user_id, new Map());
+        const weeks = weeklyMap.get(p.user_id)!;
+        if (p.is_correct) {
+          weeks.set(p.week_number, (weeks.get(p.week_number) || 0) + 1);
+        } else if (!weeks.has(p.week_number)) {
+          weeks.set(p.week_number, 0);
+        }
+      }
+
       return [...map.entries()]
         .map(([uid, stats]) => ({
           user_id: uid,
@@ -424,7 +443,8 @@ export class PoolService {
           correct_picks: stats.correct,
           total_picks: stats.total,
           accuracy: stats.total > 0 ? (stats.correct / stats.total) * 100 : 0,
-          current_week_correct: 0, // caller can enrich from current week data
+          current_week_correct: 0,
+          weekly_correct: Object.fromEntries(weeklyMap.get(uid)?.entries() || []) as Record<number, number>,
         }))
         .sort((a, b) => {
           // Primary: most correct picks
@@ -453,6 +473,22 @@ export class PoolService {
       // Check if user is eliminated
       const eliminated = await this.isSurvivorEliminated(leagueId, userId);
       if (eliminated) return { success: false, error: 'You have been eliminated from this pool.' };
+
+      // Per-game lock: prevent picking a team whose game has already started (ESPN/Yahoo standard)
+      const weekGames = await this.getWeekGames(weekNumber);
+      const teamGame = weekGames.find(
+        g => g.home_team === pickedTeam || g.away_team === pickedTeam
+      );
+      if (teamGame) {
+        const gameStart = teamGame.game_time
+          ? new Date(`${teamGame.game_date}T${teamGame.game_time}`)
+          : null;
+        const gameLocked = teamGame.status === 'live' || teamGame.status === 'final' ||
+          (gameStart && gameStart <= new Date());
+        if (gameLocked) {
+          return { success: false, error: `${pickedTeam}'s game has already started. Pick a team whose game hasn't begun yet.` };
+        }
+      }
 
       // Check for duplicate team usage
       const { data: previous } = await supabase

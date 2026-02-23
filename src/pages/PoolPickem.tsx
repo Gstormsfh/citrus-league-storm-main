@@ -260,28 +260,33 @@ const PoolPickem = () => {
                         <TableRow>
                           <TableHead className="w-12">Rank</TableHead>
                           <TableHead>Player</TableHead>
+                          <TableHead className="text-center">Wk {currentWeek}</TableHead>
                           <TableHead className="text-center">Correct</TableHead>
                           <TableHead className="text-center">Total</TableHead>
                           <TableHead className="text-right">Accuracy</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {standings.map((s, i) => (
-                          <TableRow key={s.user_id} className={s.user_id === user?.id ? 'bg-primary/5' : ''}>
-                            <TableCell>
-                              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${i < 3 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'}`}>
-                                {i + 1}
-                              </span>
-                            </TableCell>
-                            <TableCell className="font-medium">
-                              {s.display_name}
-                              {s.user_id === user?.id && <Badge variant="outline" className="ml-2 text-[10px]">YOU</Badge>}
-                            </TableCell>
-                            <TableCell className="text-center font-bold text-primary">{s.correct_picks}</TableCell>
-                            <TableCell className="text-center text-muted-foreground">{s.total_picks}</TableCell>
-                            <TableCell className="text-right font-medium">{s.accuracy.toFixed(1)}%</TableCell>
-                          </TableRow>
-                        ))}
+                        {standings.map((s, i) => {
+                          const weekCorrect = (s as any).weekly_correct?.[currentWeek] ?? '-';
+                          return (
+                            <TableRow key={s.user_id} className={s.user_id === user?.id ? 'bg-primary/5' : ''}>
+                              <TableCell>
+                                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${i < 3 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'}`}>
+                                  {i + 1}
+                                </span>
+                              </TableCell>
+                              <TableCell className="font-medium">
+                                {s.display_name}
+                                {s.user_id === user?.id && <Badge variant="outline" className="ml-2 text-[10px]">YOU</Badge>}
+                              </TableCell>
+                              <TableCell className="text-center font-bold text-amber-600">{weekCorrect}</TableCell>
+                              <TableCell className="text-center font-bold text-primary">{s.correct_picks}</TableCell>
+                              <TableCell className="text-center text-muted-foreground">{s.total_picks}</TableCell>
+                              <TableCell className="text-right font-medium">{s.accuracy.toFixed(1)}%</TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   )}

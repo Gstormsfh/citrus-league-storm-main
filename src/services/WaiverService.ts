@@ -701,7 +701,8 @@ export class WaiverService {
     teamId: string,
     playerId: number,
     bidAmount: number,
-    dropPlayerId: number | null = null
+    dropPlayerId: number | null = null,
+    isConditionalDrop: boolean = false
   ): Promise<{ success: boolean; error?: string; claimId?: string }> {
     try {
       // Best Ball leagues prohibit FAAB bidding (industry standard: zero management)
@@ -747,6 +748,7 @@ export class WaiverService {
           .update({
             priority: bidAmount, // Reuse priority column for FAAB bid amount
             drop_player_id: dropPlayerId,
+            is_conditional_drop: isConditionalDrop,
           })
           .eq('id', existingClaim.id);
 
@@ -764,6 +766,7 @@ export class WaiverService {
           drop_player_id: dropPlayerId,
           priority: bidAmount, // Store bid amount in priority column
           status: 'pending',
+          is_conditional_drop: isConditionalDrop,
         })
         .select()
         .single();
@@ -884,10 +887,10 @@ export class WaiverService {
     leagueId: string
   ): Promise<{ processed: number; results: Array<{ player_id: number; winner_team_id: string; bid: number }>; error?: string }> {
     try {
-      // Get all pending claims for this league
+      // Get all pending claims for this league (include conditional drop flag)
       const { data: claims, error: fetchErr } = await supabase
         .from('waiver_claims')
-        .select('id, team_id, player_id, priority, drop_player_id')
+        .select('id, team_id, player_id, priority, drop_player_id, is_conditional_drop')
         .eq('league_id', leagueId)
         .eq('status', 'pending')
         .order('priority', { ascending: false }); // Highest bids first
@@ -956,34 +959,47 @@ export class WaiverService {
               .single();
 
             if (teamData?.owner_id) {
+              // Conditional drop logic (ESPN/Yahoo standard):
+              // When is_conditional_drop is true, the drop_player_id is only
+              // dropped if the add succeeds. First try adding without drop,
+              // then with drop if roster is full.
+              const dropId = winner.is_conditional_drop
+                ? winner.drop_player_id  // conditional: include drop to make space
+                : winner.drop_player_id; // non-conditional: always include drop
+
               const moveResult = await this.addFreeAgent(
                 leagueId,
                 winner.team_id,
                 playerId,
-                winner.drop_player_id,
+                dropId,
                 teamData.owner_id
               );
 
               if (!moveResult.success) {
-                // Roster move failed — mark as failed
+                // If conditional and drop was included but still failed,
+                // mark as failed with specific reason
+                const reason = winner.is_conditional_drop
+                  ? `Conditional claim failed: ${moveResult.error}`
+                  : `Roster move failed: ${moveResult.error}`;
+
                 await supabase
                   .from('waiver_claims')
                   .update({
                     status: 'failed',
                     processed_at: new Date().toISOString(),
-                    failure_reason: `Roster move failed: ${moveResult.error}`,
+                    failure_reason: reason,
                   })
                   .eq('id', winner.id);
 
                 // Try next bidder
-                const loserIds = bids.map(b => b.id);
+                const loserIds = bids.filter(b => b.id !== winner!.id).map(b => b.id);
                 if (loserIds.length > 0) {
                   await supabase
                     .from('waiver_claims')
                     .update({
                       status: 'failed',
                       processed_at: new Date().toISOString(),
-                      failure_reason: 'All bidders failed roster move',
+                      failure_reason: 'Outbid or prior bidder claimed',
                     })
                     .in('id', loserIds);
                 }

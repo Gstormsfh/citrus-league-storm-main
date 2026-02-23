@@ -300,9 +300,20 @@ const PoolConfidence = () => {
 
                   {games.length > 0 && (
                     <div className="mt-6 flex items-center justify-between pt-4 border-t">
-                      <span className="text-sm text-muted-foreground">
-                        {picks.size} of {games.length} games picked
-                      </span>
+                      {/* Current-week points earned (live display) */}
+                      <div className="flex items-center gap-4">
+                        <span className="text-sm text-muted-foreground">
+                          {picks.size} of {games.length} games picked
+                        </span>
+                        {existingPicks.some(p => p.is_correct !== null) && (
+                          <span className="text-sm font-bold text-primary">
+                            This week: {existingPicks.reduce((sum, p) => sum + (p.is_correct ? (p.confidence_points || 0) : 0), 0)} pts
+                            <span className="text-muted-foreground font-normal ml-1">
+                              / {existingPicks.reduce((sum, p) => sum + (p.confidence_points || 0), 0)} possible
+                            </span>
+                          </span>
+                        )}
+                      </div>
                       <Button
                         onClick={handleSubmitPicks}
                         disabled={picks.size === 0 || submitting}

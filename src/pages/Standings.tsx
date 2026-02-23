@@ -45,6 +45,8 @@ interface StandingsTeam {
   winPercentage: number;
   last5: { wins: number; losses: number; ties: number };
   gamesPlayed?: number; // For PPG format
+  categoryRanks?: Record<string, number>; // For Roto: per-category ranking points
+  categoryRecord?: Record<string, { wins: number; losses: number; ties: number }>; // For H2H-Cat
 }
 
 const Standings = () => {
@@ -57,6 +59,7 @@ const Standings = () => {
   const [teams, setTeams] = useState<StandingsTeam[]>([]);
   const [leagueTeams, setLeagueTeams] = useState<(Team & { owner_name?: string })[]>([]);
   const [leagueFormat, setLeagueFormat] = useState<{ leagueType: LeagueType; scoringFormat: ScoringFormat; playoffTeams: number }>({ leagueType: 'fantasy', scoringFormat: 'h2h-points', playoffTeams: 6 });
+  const [leagueCategories, setLeagueCategories] = useState<string[]>([]);
   const hasInitializedRef = useRef(false);
   const navigate = useNavigate();
 
@@ -264,7 +267,9 @@ const Standings = () => {
               AVAILABLE_CATEGORIES.forEach(c => {
                 categoryMeta[c.id] = { higherIsBetter: c.higherIsBetter };
               });
-              const leagueCategories = fmtSettings.categories || [...DEFAULT_ROTO_CATEGORIES];
+              const leagueCats = fmtSettings.categories || [...DEFAULT_ROTO_CATEGORIES];
+              setLeagueCategories(leagueCats);
+              const leagueCategories = leagueCats;
 
               if (fmt.scoringFormat === 'h2h-categories') {
                 // H2H Categories: each stat is a separate W/L/T
@@ -339,6 +344,8 @@ const Standings = () => {
               winPercentage: winPercentage !== undefined && !isNaN(winPercentage) ? parseFloat(winPercentage.toFixed(1)) : 0,
               last5: { wins: (stats as any).last5?.wins || 0, losses: (stats as any).last5?.losses || 0, ties: (stats as any).last5?.ties || 0 },
               gamesPlayed: gp,
+              categoryRanks: (stats as any).categoryRanks || undefined,
+              categoryRecord: (stats as any).categoryRecord || undefined,
             } as StandingsTeam;
           });
 
@@ -612,6 +619,13 @@ const Standings = () => {
                             {hasMatchups && index < leagueFormat.playoffTeams && (
                               <span className="text-[10px] font-bold text-primary tracking-tight">PO</span>
                             )}
+                            {/* Roto: Co-champion label when tied at 1st */}
+                            {isRoto && index === 0 && sortedTeams.length > 1 && sortedTeams[1].points === team.points && (
+                              <span className="text-[9px] font-bold text-amber-600 bg-amber-100 dark:bg-amber-900/30 px-1 py-0.5 rounded">CO-CHAMP</span>
+                            )}
+                            {isRoto && index > 0 && sortedTeams[0].points === team.points && (
+                              <span className="text-[9px] font-bold text-amber-600 bg-amber-100 dark:bg-amber-900/30 px-1 py-0.5 rounded">CO-CHAMP</span>
+                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4" style={{ visibility: 'visible', opacity: 1 }}>
@@ -680,6 +694,54 @@ const Standings = () => {
             </div>
           </Card>
           
+          {/* Per-Category Roto Breakdown */}
+          {isRoto && leagueCategories.length > 0 && sortedTeams.some(t => t.categoryRanks) && (
+            <Card className="max-w-5xl mx-auto mt-6 overflow-hidden animated-element animate card-citrus p-0 border-none shadow-md">
+              <CardHeader className="bg-primary/5 pb-3 border-b border-border/40">
+                <CardTitle className="text-sm font-bold">Category Rankings</CardTitle>
+              </CardHeader>
+              <div className="overflow-x-auto">
+                <Table>
+                  <thead className="bg-muted/30 border-b border-border/50">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-left">Team</th>
+                      {leagueCategories.map(cat => {
+                        const catDef = AVAILABLE_CATEGORIES.find(c => c.id === cat);
+                        return (
+                          <th key={cat} className="px-3 py-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center" title={catDef?.name}>
+                            {catDef?.abbreviation || cat}
+                          </th>
+                        );
+                      })}
+                      <th className="px-4 py-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/40">
+                    {sortedTeams.map((team) => {
+                      const isUserTeam = user && leagueTeams.some(t => t.id === team.id && t.owner_id === user.id);
+                      return (
+                        <tr key={team.id} className={isUserTeam ? 'bg-primary/5' : 'hover:bg-muted/30'}>
+                          <td className="px-4 py-2 text-sm font-medium truncate max-w-[140px]">{team.name}</td>
+                          {leagueCategories.map(cat => {
+                            const rank = team.categoryRanks?.[cat];
+                            const maxRank = sortedTeams.length;
+                            const isTop = rank !== undefined && rank >= maxRank - 0.5;
+                            return (
+                              <td key={cat} className={`px-3 py-2 text-center text-sm tabular-nums ${isTop ? 'font-bold text-primary' : 'text-muted-foreground'}`}>
+                                {rank !== undefined ? rank.toFixed(1) : '-'}
+                              </td>
+                            );
+                          })}
+                          <td className="px-4 py-2 text-right text-sm font-bold tabular-nums">{team.pointsFor.toFixed(1)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </Table>
+              </div>
+            </Card>
+          )}
+
           <div className="max-w-5xl mx-auto mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card className="animated-element animate card-citrus p-0 border-none shadow-md overflow-hidden h-full">
               <CardHeader className="bg-primary/5 pb-4 border-b border-border/40">

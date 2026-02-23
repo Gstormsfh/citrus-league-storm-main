@@ -340,8 +340,8 @@ export class AuctionDraftService {
       };
 
       // Check if within last 10 seconds — if so, extend to 15 seconds
-      if (nomination.expires_at) {
-        const expiresAt = new Date(nomination.expires_at).getTime();
+      if (nom.expires_at) {
+        const expiresAt = new Date(nom.expires_at).getTime();
         const now = Date.now();
         const remainingMs = expiresAt - now;
         if (remainingMs <= 10000) {
