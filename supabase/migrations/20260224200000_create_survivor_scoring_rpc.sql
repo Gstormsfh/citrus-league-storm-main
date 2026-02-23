@@ -372,26 +372,17 @@ GRANT EXECUTE ON FUNCTION public.score_all_pools_for_week(INT) TO authenticated;
 -- Week calculation: Sunday-Saturday, season starts first Sunday on/after Oct 1.
 -- ============================================================================
 
-DO $$
+DO $cron_setup$
 BEGIN
   PERFORM cron.schedule(
     'score-weekly-pools',
     '0 8 * * 2',  -- Tuesday 8 AM UTC (3 AM EST)
-    $$
-      -- Calculate the previous week number to score
-      -- Season starts first Sunday on/after Oct 1, 2025
-      -- Oct 1, 2025 = Wednesday, so first Sunday = Oct 5
-      SELECT score_all_pools_for_week(
-        GREATEST(1, FLOOR(
-          EXTRACT(EPOCH FROM (NOW() - DATE '2025-10-05')) / (7 * 86400)
-        )::INT)
-      );
-    $$
+    'SELECT score_all_pools_for_week(GREATEST(1, FLOOR(EXTRACT(EPOCH FROM (NOW() - DATE ''2025-10-05'')) / (7 * 86400))::INT))'
   );
   RAISE NOTICE '  Scheduled: score-weekly-pools (Tuesdays 8 AM UTC)';
 EXCEPTION WHEN others THEN
   RAISE NOTICE '  pg_cron not available, skipping pool scoring schedule';
-END $$;
+END $cron_setup$;
 
 -- ============================================================================
 -- VERIFICATION

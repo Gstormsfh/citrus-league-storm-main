@@ -295,17 +295,17 @@ GRANT EXECUTE ON FUNCTION public.process_all_faab_waivers() TO authenticated;
 -- can set any hour and it will be respected.
 -- ============================================================================
 
-DO $$
+DO $cron_setup$
 BEGIN
   PERFORM cron.schedule(
     'process-faab-waivers',
     '0 * * * *',  -- Every hour, on the hour
-    $$SELECT * FROM public.process_all_faab_waivers()$$
+    'SELECT * FROM public.process_all_faab_waivers()'
   );
   RAISE NOTICE '  Scheduled: process-faab-waivers (hourly, commissioner-aware)';
 EXCEPTION WHEN others THEN
   RAISE NOTICE '  pg_cron not available, skipping FAAB cron schedule';
-END $$;
+END $cron_setup$;
 
 -- ============================================================================
 -- VERIFICATION
