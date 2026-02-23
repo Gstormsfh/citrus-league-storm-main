@@ -11,12 +11,44 @@
 --   score_pickem_week(p_league_id, p_week_number)   — Score pick'em picks
 --   score_confidence_week(p_league_id, p_week_number) — Score confidence picks
 --   score_all_pools_for_week(p_week_number)          — Score all pool types
+--
+-- Week boundaries: Sunday-Saturday (matching app-wide standard)
 -- ============================================================================
+
+-- ============================================================================
+-- Helper: Calculate week date range (Sunday-Saturday)
+-- ============================================================================
+-- Week 1 starts on the first Sunday on/after Oct 1, 2025.
+-- This matches the app-wide Sunday-Saturday week boundary
+-- (see migration 20260216000000_shift_weeks_to_sunday_saturday.sql).
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION public.get_pool_week_dates(p_week_number INT)
+RETURNS TABLE (week_start DATE, week_end DATE) AS $$
+DECLARE
+  v_season_start DATE := DATE '2025-10-01';
+  v_first_sunday DATE;
+BEGIN
+  -- Find the first Sunday on or after Oct 1
+  -- EXTRACT(DOW ...) returns 0 for Sunday
+  IF EXTRACT(DOW FROM v_season_start) = 0 THEN
+    v_first_sunday := v_season_start;
+  ELSE
+    v_first_sunday := v_season_start + ((7 - EXTRACT(DOW FROM v_season_start)::INT) % 7) * INTERVAL '1 day';
+  END IF;
+
+  week_start := v_first_sunday + ((p_week_number - 1) * 7) * INTERVAL '1 day';
+  week_end := week_start + INTERVAL '6 days';  -- Saturday
+  RETURN NEXT;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
 
 -- ============================================================================
 -- 1. Score survivor selections for a specific league and week
 -- ============================================================================
--- Looks at nhl_games with status='final' to determine which teams won.
+-- NHL survivor scoring: A team plays 3-4 games per week.
+-- A pick is correct if the team has a WINNING RECORD for the week
+-- (more wins than losses). Equal wins/losses = survived (benefit of doubt).
 -- Updates survivor_selections.is_correct accordingly.
 -- ============================================================================
 
@@ -29,29 +61,21 @@ RETURNS TABLE (
   user_id UUID,
   picked_team TEXT,
   is_correct BOOLEAN,
-  opponent TEXT,
-  score TEXT
+  record TEXT
 ) AS $$
 DECLARE
   v_sel RECORD;
-  v_game RECORD;
   v_won BOOLEAN;
   v_scored INT := 0;
   v_week_start DATE;
   v_week_end DATE;
+  v_wins INT;
+  v_losses INT;
+  v_total_games INT;
 BEGIN
-  -- Calculate week date range (Monday-Sunday based on Oct 2025 season start)
-  -- Week 1 starts on the first Monday on/after Oct 1
-  v_week_start := (
-    SELECT d + ((p_week_number - 1) * 7) * INTERVAL '1 day'
-    FROM (
-      SELECT CASE
-        WHEN EXTRACT(DOW FROM DATE '2025-10-01') = 1 THEN DATE '2025-10-01'
-        ELSE DATE '2025-10-01' + ((8 - EXTRACT(DOW FROM DATE '2025-10-01')::INT) % 7) * INTERVAL '1 day'
-      END AS d
-    ) sub
-  );
-  v_week_end := v_week_start + INTERVAL '6 days';
+  -- Get week boundaries (Sunday-Saturday)
+  SELECT wd.week_start, wd.week_end INTO v_week_start, v_week_end
+  FROM get_pool_week_dates(p_week_number) wd;
 
   -- Process each unscored selection for this league/week
   FOR v_sel IN
@@ -61,26 +85,29 @@ BEGIN
       AND ss.week_number = p_week_number
       AND ss.is_correct IS NULL  -- Only score unscored selections
   LOOP
-    v_won := NULL;
-
-    -- Find the team's game this week and check if they won
-    -- Check as home team
-    SELECT ng.* INTO v_game
+    -- Count wins and losses for this team during the week
+    SELECT
+      COUNT(*) FILTER (WHERE
+        (ng.home_team = v_sel.picked_team AND ng.home_score > ng.away_score) OR
+        (ng.away_team = v_sel.picked_team AND ng.away_score > ng.home_score)
+      ),
+      COUNT(*) FILTER (WHERE
+        (ng.home_team = v_sel.picked_team AND ng.home_score < ng.away_score) OR
+        (ng.away_team = v_sel.picked_team AND ng.away_score < ng.home_score)
+      ),
+      COUNT(*)
+    INTO v_wins, v_losses, v_total_games
     FROM nhl_games ng
     WHERE ng.game_date >= v_week_start
       AND ng.game_date <= v_week_end
       AND ng.status = 'final'
-      AND (ng.home_team = v_sel.picked_team OR ng.away_team = v_sel.picked_team)
-    ORDER BY ng.game_date
-    LIMIT 1;
+      AND (ng.home_team = v_sel.picked_team OR ng.away_team = v_sel.picked_team);
 
-    IF v_game IS NOT NULL THEN
-      -- Determine if the picked team won
-      IF v_sel.picked_team = v_game.home_team THEN
-        v_won := v_game.home_score > v_game.away_score;
-      ELSE
-        v_won := v_game.away_score > v_game.home_score;
-      END IF;
+    -- Only score if the team had at least one completed game this week
+    IF v_total_games > 0 THEN
+      -- Winning record = survived; even record = survived (benefit of doubt)
+      -- Only eliminated if more losses than wins
+      v_won := v_wins >= v_losses;
 
       -- Update the selection
       UPDATE survivor_selections
@@ -94,11 +121,7 @@ BEGIN
         v_sel.user_id,
         v_sel.picked_team,
         v_won,
-        CASE
-          WHEN v_sel.picked_team = v_game.home_team THEN v_game.away_team
-          ELSE v_game.home_team
-        END,
-        (v_game.home_team || ' ' || v_game.home_score || '-' || v_game.away_score || ' ' || v_game.away_team)::TEXT;
+        (v_wins || '-' || v_losses)::TEXT;
     END IF;
   END LOOP;
 
@@ -139,7 +162,7 @@ BEGIN
       AND pp.week_number = p_week_number
       AND pp.is_correct IS NULL
   LOOP
-    -- Look up the game result
+    -- Look up the game result (nhl_games.id is UUID, pool_picks.game_id is TEXT)
     SELECT ng.* INTO v_game
     FROM nhl_games ng
     WHERE ng.id::TEXT = v_pick.game_id
@@ -283,7 +306,7 @@ DECLARE
 BEGIN
   -- Score survivor pools
   FOR v_league IN
-    SELECT DISTINCT ss.league_id, l.league_name
+    SELECT DISTINCT ss.league_id, l.name AS league_name
     FROM survivor_selections ss
     JOIN leagues l ON l.id = ss.league_id
     WHERE ss.week_number = p_week_number
@@ -301,7 +324,7 @@ BEGIN
 
   -- Score pick'em pools
   FOR v_league IN
-    SELECT DISTINCT pp.league_id, l.league_name
+    SELECT DISTINCT pp.league_id, l.name AS league_name
     FROM pool_picks pp
     JOIN leagues l ON l.id = pp.league_id
     WHERE pp.week_number = p_week_number
@@ -319,7 +342,7 @@ BEGIN
 
   -- Score confidence pools
   FOR v_league IN
-    SELECT DISTINCT cp.league_id, l.league_name
+    SELECT DISTINCT cp.league_id, l.name AS league_name
     FROM confidence_picks cp
     JOIN leagues l ON l.id = cp.league_id
     WHERE cp.week_number = p_week_number
@@ -345,9 +368,8 @@ GRANT EXECUTE ON FUNCTION public.score_all_pools_for_week(INT) TO authenticated;
 -- 5. Schedule pool scoring via pg_cron
 -- ============================================================================
 -- Runs Tuesday at 8 AM UTC (3 AM EST) — after Monday night games finish.
--- Scores the previous week's pools. Week calculation:
---   Current week = floor((now - first_monday_oct) / 7) + 1
---   Previous week = current week - 1 (what we want to score)
+-- Scores the previous week's pools.
+-- Week calculation: Sunday-Saturday, season starts first Sunday on/after Oct 1.
 -- ============================================================================
 
 DO $$
@@ -357,15 +379,11 @@ BEGIN
     '0 8 * * 2',  -- Tuesday 8 AM UTC (3 AM EST)
     $$
       -- Calculate the previous week number to score
-      -- Season starts first Monday on/after Oct 1, 2025
+      -- Season starts first Sunday on/after Oct 1, 2025
+      -- Oct 1, 2025 = Wednesday, so first Sunday = Oct 5
       SELECT score_all_pools_for_week(
         GREATEST(1, FLOOR(
-          EXTRACT(EPOCH FROM (NOW() - (
-            CASE
-              WHEN EXTRACT(DOW FROM DATE '2025-10-01') = 1 THEN DATE '2025-10-01'
-              ELSE DATE '2025-10-01' + ((8 - EXTRACT(DOW FROM DATE '2025-10-01')::INT) % 7) * INTERVAL '1 day'
-            END
-          ))) / (7 * 86400)
+          EXTRACT(EPOCH FROM (NOW() - DATE '2025-10-05')) / (7 * 86400)
         )::INT)
       );
     $$
@@ -385,8 +403,13 @@ BEGIN
   RAISE NOTICE '  POOL SCORING RPCs + CRON — COMPLETE';
   RAISE NOTICE '============================================================';
   RAISE NOTICE '';
+  RAISE NOTICE '  Week boundaries: Sunday-Saturday (app-wide standard)';
+  RAISE NOTICE '';
   RAISE NOTICE '  Functions created:';
+  RAISE NOTICE '    get_pool_week_dates(week_number) — week start/end dates';
   RAISE NOTICE '    score_survivor_week(league_id, week_number)';
+  RAISE NOTICE '      - Checks ALL games for team that week (3-4 per week)';
+  RAISE NOTICE '      - Winning record (W >= L) = survived';
   RAISE NOTICE '    score_pickem_week(league_id, week_number)';
   RAISE NOTICE '    score_confidence_week(league_id, week_number)';
   RAISE NOTICE '    score_all_pools_for_week(week_number)';
@@ -394,13 +417,8 @@ BEGIN
   RAISE NOTICE '  pg_cron: score-weekly-pools (Tuesdays 8 AM UTC)';
   RAISE NOTICE '';
   RAISE NOTICE '  Usage:';
-  RAISE NOTICE '    -- Score a specific league/week:';
   RAISE NOTICE '    SELECT * FROM score_survivor_week(league_id, 5);';
-  RAISE NOTICE '';
-  RAISE NOTICE '    -- Score all pools for a week:';
   RAISE NOTICE '    SELECT * FROM score_all_pools_for_week(5);';
-  RAISE NOTICE '';
-  RAISE NOTICE '    -- Frontend RPC:';
   RAISE NOTICE '    supabase.rpc("score_survivor_week",';
   RAISE NOTICE '      { p_league_id: "...", p_week_number: 5 })';
   RAISE NOTICE '============================================================';

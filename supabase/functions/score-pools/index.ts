@@ -34,18 +34,19 @@ function makeJsonResponse(body: Record<string, unknown>, status = 200): Response
 
 /**
  * Calculate the current NHL week number.
- * Week 1 starts on the first Monday on/after Oct 1, 2025.
+ * Week 1 starts on the first Sunday on/after Oct 1, 2025.
+ * Weeks run Sunday-Saturday (matching app-wide standard).
  */
 function getCurrentWeekNumber(): number {
   const oct1 = new Date(2025, 9, 1); // October 1, 2025
   const dayOfWeek = oct1.getDay(); // 0=Sun, 1=Mon, ...
-  const daysUntilMonday =
-    dayOfWeek === 0 ? 1 : dayOfWeek === 1 ? 0 : 8 - dayOfWeek;
-  const firstMonday = new Date(oct1);
-  firstMonday.setDate(oct1.getDate() + daysUntilMonday);
+  // Find first Sunday on or after Oct 1
+  const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+  const firstSunday = new Date(oct1);
+  firstSunday.setDate(oct1.getDate() + daysUntilSunday);
 
   const now = new Date();
-  const diffMs = now.getTime() - firstMonday.getTime();
+  const diffMs = now.getTime() - firstSunday.getTime();
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
   return Math.max(1, Math.floor(diffDays / 7) + 1);
 }

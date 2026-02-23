@@ -72,9 +72,26 @@ BEGIN
         wc.priority AS bid_amount,  -- FAAB stores bid in priority column
         wc.drop_player_id,
         wc.is_conditional_drop,
-        COALESCE(t.wins, 0)::NUMERIC / GREATEST(1, COALESCE(t.wins, 0) + COALESCE(t.losses, 0)) AS win_pct
+        -- Derive win pct from matchups table (teams table has no wins/losses columns)
+        COALESCE(standings.wins, 0)::NUMERIC /
+          GREATEST(1, COALESCE(standings.wins, 0) + COALESCE(standings.losses, 0)) AS win_pct
       FROM waiver_claims wc
       JOIN teams t ON t.id = wc.team_id
+      LEFT JOIN LATERAL (
+        SELECT
+          COUNT(*) FILTER (WHERE
+            (m.team1_id = t.id AND m.team1_score > m.team2_score) OR
+            (m.team2_id = t.id AND m.team2_score > m.team1_score)
+          ) AS wins,
+          COUNT(*) FILTER (WHERE
+            (m.team1_id = t.id AND m.team1_score < m.team2_score) OR
+            (m.team2_id = t.id AND m.team2_score < m.team1_score)
+          ) AS losses
+        FROM matchups m
+        WHERE m.league_id = p_league_id
+          AND m.status = 'completed'
+          AND (m.team1_id = t.id OR m.team2_id = t.id)
+      ) standings ON true
       WHERE wc.league_id = p_league_id
         AND wc.player_id = v_player_record.player_id
         AND wc.status = 'pending'
@@ -237,7 +254,7 @@ DECLARE
   v_count INT;
 BEGIN
   FOR v_league IN
-    SELECT l.id, l.league_name, l.waiver_process_time
+    SELECT l.id, l.name, l.waiver_process_time
     FROM leagues l
     WHERE l.waiver_type = 'faab'
       AND EXISTS (
@@ -258,7 +275,7 @@ BEGIN
     FROM process_faab_waivers_for_league(v_league.id);
 
     league_id := v_league.id;
-    league_name := v_league.league_name;
+    league_name := v_league.name;
     claims_processed := v_count;
     status := 'completed';
     RETURN NEXT;
