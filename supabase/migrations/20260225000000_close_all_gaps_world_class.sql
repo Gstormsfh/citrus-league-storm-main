@@ -909,11 +909,16 @@ CREATE TABLE IF NOT EXISTS player_autopick_rankings (
   tier INT DEFAULT 1,         -- tier grouping for ADP
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-  -- Each player has one rank per context
-  UNIQUE (COALESCE(league_id, '00000000-0000-0000-0000-000000000000'),
-          COALESCE(team_id, '00000000-0000-0000-0000-000000000000'),
-          player_id)
+  -- Each player has one rank per context (enforced via unique index below)
 );
+
+-- Unique index using expressions to handle NULLs (can't use COALESCE in table UNIQUE constraint)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_autopick_rankings_unique
+  ON player_autopick_rankings (
+    COALESCE(league_id, '00000000-0000-0000-0000-000000000000'),
+    COALESCE(team_id, '00000000-0000-0000-0000-000000000000'),
+    player_id
+  );
 
 CREATE INDEX IF NOT EXISTS idx_autopick_rankings_league ON player_autopick_rankings (league_id, rank_position);
 CREATE INDEX IF NOT EXISTS idx_autopick_rankings_global ON player_autopick_rankings (rank_position) WHERE league_id IS NULL;
