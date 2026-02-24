@@ -907,9 +907,7 @@ CREATE TABLE IF NOT EXISTS player_autopick_rankings (
   rank_position INT NOT NULL,
   position_code TEXT,
   tier INT DEFAULT 1,         -- tier grouping for ADP
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-
-  -- Each player has one rank per context (enforced via unique index below)
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Unique index using expressions to handle NULLs (can't use COALESCE in table UNIQUE constraint)
