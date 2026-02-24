@@ -946,7 +946,7 @@ CREATE OR REPLACE FUNCTION public.autopick_next_player(
 RETURNS TABLE (
   picked_player_id INT,
   player_name TEXT,
-  position TEXT,
+  "position" TEXT,
   pick_id UUID
 ) AS $autopick$
 DECLARE
