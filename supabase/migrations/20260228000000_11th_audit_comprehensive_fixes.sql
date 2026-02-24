@@ -496,13 +496,16 @@ GRANT EXECUTE ON FUNCTION public.join_league_with_code(TEXT, UUID, TEXT) TO auth
 -- ============================================================================
 -- 5. FIX: calculate_h2h_category_matchup nested DECLARE inside IF (invalid syntax)
 --    Move variables to outer DECLARE block and use plain BEGIN/END for the nested block
+--    Must DROP first because CREATE OR REPLACE cannot change parameter names
 -- ============================================================================
 
+DROP FUNCTION IF EXISTS public.calculate_h2h_category_matchup(UUID, UUID, UUID, UUID, DATE, DATE, TEXT[]);
+
 CREATE OR REPLACE FUNCTION public.calculate_h2h_category_matchup(
+  p_league_id UUID,
   p_matchup_id UUID,
   p_team1_id UUID,
   p_team2_id UUID,
-  p_league_id UUID,
   p_week_start DATE,
   p_week_end DATE,
   p_categories TEXT[]
@@ -795,33 +798,66 @@ GRANT EXECUTE ON FUNCTION public.run_full_autopick_draft(UUID) TO authenticated;
 
 -- ============================================================================
 -- 8. FIX: record_player_transaction() -- add team ownership validation
+--    Original signature: (INTEGER, UUID, UUID, TEXT, TEXT, TEXT, TEXT, TEXT) RETURNS UUID
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.record_player_transaction(
-  p_player_id INT,
-  p_team_id UUID,
-  p_league_id UUID,
-  p_transaction_type TEXT
+    p_player_id INTEGER,
+    p_league_id UUID,
+    p_team_id UUID,
+    p_transaction_type TEXT,
+    p_source TEXT DEFAULT 'free_agent',
+    p_player_name TEXT DEFAULT NULL,
+    p_player_team TEXT DEFAULT NULL,
+    p_player_position TEXT DEFAULT NULL
 )
-RETURNS void AS $$
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_transaction_id UUID;
 BEGIN
-  -- Validate that the caller owns this team
-  IF NOT EXISTS (
-    SELECT 1 FROM teams WHERE id = p_team_id AND owner_id = auth.uid()
-  ) THEN
-    RAISE EXCEPTION 'You do not own this team.';
-  END IF;
+    -- Validate that the caller owns this team
+    IF NOT EXISTS (
+      SELECT 1 FROM teams WHERE id = p_team_id AND owner_id = auth.uid()
+    ) THEN
+      RAISE EXCEPTION 'You do not own this team.';
+    END IF;
 
-  INSERT INTO player_transactions (player_id, team_id, league_id, transaction_type, user_id, created_at)
-  VALUES (p_player_id, p_team_id, p_league_id, p_transaction_type, auth.uid(), NOW());
+    INSERT INTO player_transactions (
+        player_id,
+        league_id,
+        team_id,
+        user_id,
+        transaction_type,
+        source,
+        player_name,
+        player_team,
+        player_position
+    )
+    VALUES (
+        p_player_id,
+        p_league_id,
+        p_team_id,
+        auth.uid(),
+        p_transaction_type,
+        p_source,
+        p_player_name,
+        p_player_team,
+        p_player_position
+    )
+    RETURNING id INTO v_transaction_id;
+
+    RETURN v_transaction_id;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER
-SET search_path = public;
+$$;
 
-GRANT EXECUTE ON FUNCTION public.record_player_transaction(INT, UUID, UUID, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.record_player_transaction(INTEGER, UUID, UUID, TEXT, TEXT, TEXT, TEXT, TEXT) TO authenticated;
 
 -- Revoke anon access from get_trending_players
-REVOKE EXECUTE ON FUNCTION public.get_trending_players(INT, INT) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.get_trending_players(INTEGER, INTEGER, TEXT) FROM anon;
 
 
 -- ============================================================================
@@ -918,21 +954,21 @@ DO $$ BEGIN
 EXCEPTION WHEN undefined_function THEN NULL;
 END $$;
 
--- validate_keeper_selections
+-- validate_keeper_selections (UUID, UUID, INT)
 DO $$ BEGIN
-  ALTER FUNCTION public.validate_keeper_selections(UUID) SET search_path = public;
+  ALTER FUNCTION public.validate_keeper_selections(UUID, UUID, INT) SET search_path = public;
 EXCEPTION WHEN undefined_function THEN NULL;
 END $$;
 
--- get_keeper_draft_costs
+-- get_keeper_draft_costs (UUID, UUID, INT)
 DO $$ BEGIN
-  ALTER FUNCTION public.get_keeper_draft_costs(UUID) SET search_path = public;
+  ALTER FUNCTION public.get_keeper_draft_costs(UUID, UUID, INT) SET search_path = public;
 EXCEPTION WHEN undefined_function THEN NULL;
 END $$;
 
--- lock_keepers_for_season
+-- lock_keepers_for_season (UUID, INT)
 DO $$ BEGIN
-  ALTER FUNCTION public.lock_keepers_for_season(UUID) SET search_path = public;
+  ALTER FUNCTION public.lock_keepers_for_season(UUID, INT) SET search_path = public;
 EXCEPTION WHEN undefined_function THEN NULL;
 END $$;
 
@@ -971,7 +1007,7 @@ EXCEPTION WHEN undefined_function THEN NULL;
 END $$;
 
 DO $$ BEGIN
-  ALTER FUNCTION public.score_all_pools_for_week(UUID, INT) SET search_path = public;
+  ALTER FUNCTION public.score_all_pools_for_week(INT) SET search_path = public;
 EXCEPTION WHEN undefined_function THEN NULL;
 END $$;
 
