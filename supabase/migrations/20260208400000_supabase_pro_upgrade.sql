@@ -122,7 +122,7 @@ END $$;
 
 -- 3a. Clean up expired draft pick reservations (every 2 minutes)
 -- Prevents stale reservations from blocking draft picks
-DO $$
+DO $cron_3a$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'cleanup_expired_draft_reservations') THEN
     PERFORM cron.schedule(
@@ -134,11 +134,11 @@ BEGIN
   ELSE
     RAISE NOTICE '⏭️  Skipped: cleanup_expired_draft_reservations() does not exist';
   END IF;
-END $$;
+END $cron_3a$;
 
 -- 3b. Process pending waiver claims (daily at 3:00 AM UTC)
 -- Standard fantasy: waivers process overnight
-DO $$
+DO $cron_3b$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'process_all_pending_waivers') THEN
     PERFORM cron.schedule(
@@ -150,11 +150,11 @@ BEGIN
   ELSE
     RAISE NOTICE '⏭️  Skipped: process_all_pending_waivers() does not exist';
   END IF;
-END $$;
+END $cron_3b$;
 
 -- 3c. Data integrity check (every 6 hours)
 -- Catches roster/lineup inconsistencies early
-DO $$
+DO $cron_3c$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'check_data_integrity') THEN
     PERFORM cron.schedule(
@@ -166,10 +166,10 @@ BEGIN
   ELSE
     RAISE NOTICE '⏭️  Skipped: check_data_integrity() does not exist';
   END IF;
-END $$;
+END $cron_3c$;
 
 -- 3d. Auto-fix integrity issues (daily at 4:00 AM UTC, after waiver processing)
-DO $$
+DO $cron_3d$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'auto_fix_integrity_issues') THEN
     PERFORM cron.schedule(
@@ -181,7 +181,7 @@ BEGIN
   ELSE
     RAISE NOTICE '⏭️  Skipped: auto_fix_integrity_issues() does not exist';
   END IF;
-END $$;
+END $cron_3d$;
 
 -- 3e. VACUUM ANALYZE hot tables (weekly on Sunday at 5:00 AM UTC)
 -- Reclaims dead row space and updates query planner statistics
@@ -203,7 +203,7 @@ SELECT cron.schedule(
 
 -- 3f. Audit log retention: purge entries older than 90 days (SOC 2 compliant)
 -- Monthly on the 1st at 6:00 AM UTC
-DO $$
+DO $cron_3f$
 BEGIN
   PERFORM cron.schedule(
     'audit-log-retention',
@@ -211,7 +211,7 @@ BEGIN
     $$
       DELETE FROM public.audit_logs
       WHERE created_at < now() - interval '90 days';
-      
+
       DELETE FROM public.security_audit_log
       WHERE created_at < now() - interval '90 days';
     $$
@@ -219,11 +219,11 @@ BEGIN
   RAISE NOTICE '✅ Scheduled: audit-log-retention (monthly, 90-day window)';
 EXCEPTION WHEN undefined_table THEN
   RAISE NOTICE '⏭️  Skipped: audit log tables do not exist yet';
-END $$;
+END $cron_3f$;
 
 -- 3g. Clear expired player waiver periods (every hour)
 -- Players on waivers whose period has expired become free agents
-DO $$
+DO $cron_3g$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'player_waiver_status' AND table_schema = 'public') THEN
     PERFORM cron.schedule(
@@ -240,7 +240,7 @@ BEGIN
   ELSE
     RAISE NOTICE '⏭️  Skipped: player_waiver_status table does not exist';
   END IF;
-END $$;
+END $cron_3g$;
 
 -- 3h. Reset pg_stat_statements weekly (Monday 2:00 AM UTC)
 -- Keeps the query performance dashboard fresh and focused on recent patterns
