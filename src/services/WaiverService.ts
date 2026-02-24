@@ -1074,6 +1074,110 @@ export class WaiverService {
       return { processed: 0, results: [], error: msg };
     }
   }
+  // ============================================================================
+  // REVERSE STANDINGS WAIVER SUPPORT
+  // ============================================================================
+
+  /**
+   * Trigger reverse standings priority recalculation.
+   * This is called automatically by the process_waiver_claims RPC for
+   * reverse_standings leagues, but can also be triggered manually.
+   *
+   * Priority is based on actual matchup records — worst team gets priority 1.
+   * All settings are read dynamically from league configuration.
+   */
+  static async recalculateReverseStandingsPriority(
+    leagueId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { error } = await supabase.rpc('recalculate_reverse_standings_priority', {
+        p_league_id: leagueId,
+      });
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error: unknown) {
+      console.error('[WaiverService] recalculateReverseStandingsPriority error:', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  /**
+   * Commissioner: update waiver settings for the league.
+   * Sends notification to league members when settings change.
+   *
+   * All waiver settings are commissioner-configurable:
+   *   - waiver_type: 'rolling' | 'faab' | 'reverse_standings'
+   *   - waiver_process_time: When waivers process (time of day)
+   *   - waiver_period_hours: How long players are on waivers
+   *   - waiver_game_lock: Lock players during active games
+   *   - allow_trades_during_games: Bypass game lock for trades
+   */
+  static async updateWaiverSettings(
+    leagueId: string,
+    commissionerId: string,
+    settings: Partial<LeagueWaiverSettings>
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Verify commissioner
+      const { data: league } = await supabase
+        .from('leagues')
+        .select('commissioner_id')
+        .eq('id', leagueId)
+        .single();
+
+      if (!league || league.commissioner_id !== commissionerId) {
+        return { success: false, error: 'Only the commissioner can update waiver settings' };
+      }
+
+      const { error } = await supabase
+        .from('leagues')
+        .update(settings)
+        .eq('id', leagueId);
+
+      if (error) throw error;
+
+      // Notify league members about the change
+      const typeLabels: Record<string, string> = {
+        rolling: 'Rolling Priority',
+        faab: 'FAAB Bidding',
+        reverse_standings: 'Reverse Standings',
+      };
+
+      const changedFields = Object.entries(settings)
+        .map(([k, v]) => {
+          if (k === 'waiver_type') return `Waiver type: ${typeLabels[v as string] || v}`;
+          if (k === 'waiver_period_hours') return `Waiver period: ${v} hours`;
+          if (k === 'waiver_game_lock') return `Game lock: ${v ? 'enabled' : 'disabled'}`;
+          if (k === 'allow_trades_during_games') return `Trades during games: ${v ? 'allowed' : 'blocked'}`;
+          return null;
+        })
+        .filter(Boolean);
+
+      if (changedFields.length > 0) {
+        try {
+          await supabase.rpc('notify_league_members', {
+            p_league_id: leagueId,
+            p_title: 'Waiver Settings Updated',
+            p_message: changedFields.join('. '),
+            p_notification_type: 'SYSTEM',
+          });
+        } catch {
+          // Non-critical
+        }
+      }
+
+      // If switching to reverse_standings, recalculate priority immediately
+      if (settings.waiver_type === 'reverse_standings') {
+        await this.recalculateReverseStandingsPriority(leagueId);
+      }
+
+      return { success: true };
+    } catch (error: unknown) {
+      console.error('[WaiverService] updateWaiverSettings error:', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
 }
 
 export default WaiverService;

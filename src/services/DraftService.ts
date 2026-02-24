@@ -1170,5 +1170,164 @@ export const DraftService = {
       return { snapshot: null, error };
     }
   },
+
+  // ============================================================================
+  // AUTOPICK DRAFT SUPPORT
+  // ============================================================================
+
+  /**
+   * Autopick the next player for a specific team.
+   * Uses the autopick_next_player RPC which respects:
+   *   1. Team-specific rankings (if commissioner/owner set custom rankings)
+   *   2. League-level rankings
+   *   3. Global default rankings
+   *   4. Fallback: projected stats
+   *
+   * All ranking tiers are configurable by commissioners in league settings.
+   */
+  async autopickForTeam(
+    leagueId: string,
+    teamId: string,
+    sessionId: string,
+    roundNumber: number,
+    pickNumber: number
+  ): Promise<{ playerId: number | null; playerName: string | null; position: string | null; pickId: string | null; error: unknown }> {
+    try {
+      const { data, error } = await supabase.rpc('autopick_next_player', {
+        p_league_id: leagueId,
+        p_team_id: teamId,
+        p_draft_session_id: sessionId,
+        p_round_number: roundNumber,
+        p_pick_number: pickNumber,
+      });
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const result = data[0];
+        return {
+          playerId: result.picked_player_id,
+          playerName: result.player_name,
+          position: result.position,
+          pickId: result.pick_id,
+          error: null,
+        };
+      }
+
+      return { playerId: null, playerName: null, position: null, pickId: null, error: new Error('No available players for autopick') };
+    } catch (error: unknown) {
+      logger.error('Autopick failed:', error);
+      return { playerId: null, playerName: null, position: null, pickId: null, error };
+    }
+  },
+
+  /**
+   * Run a full autopick draft for the entire league.
+   * Uses the run_full_autopick_draft RPC which handles:
+   * - Snake draft order for all rounds
+   * - Automatic player selection based on rankings
+   * - Roster assignment sync on completion
+   *
+   * Commissioner-configurable: draft rounds, team order are read from league settings.
+   */
+  async runFullAutopickDraft(
+    leagueId: string
+  ): Promise<{ picks: Array<{ round: number; pick: number; teamId: string; playerId: number; playerName: string }>; error: unknown }> {
+    try {
+      const { data, error } = await supabase.rpc('run_full_autopick_draft', {
+        p_league_id: leagueId,
+      });
+
+      if (error) throw error;
+
+      const picks = (data || []).map((row: any) => ({
+        round: row.round_number,
+        pick: row.pick_number,
+        teamId: row.team_id,
+        playerId: row.player_id,
+        playerName: row.player_name,
+      }));
+
+      return { picks, error: null };
+    } catch (error: unknown) {
+      logger.error('Full autopick draft failed:', error);
+      return { picks: [], error };
+    }
+  },
+
+  /**
+   * Save or update autopick rankings for a team.
+   * Allows team owners to customize their draft preferences.
+   * Commissioner can also set league-wide default rankings.
+   *
+   * @param leagueId - League UUID (null for global rankings)
+   * @param teamId - Team UUID (null for league/global defaults)
+   * @param rankings - Array of { playerId, rank, positionCode }
+   */
+  async saveAutopickRankings(
+    leagueId: string | null,
+    teamId: string | null,
+    rankings: Array<{ playerId: number; rank: number; positionCode: string }>
+  ): Promise<{ error: unknown }> {
+    try {
+      const rows = rankings.map(r => ({
+        league_id: leagueId,
+        team_id: teamId,
+        player_id: r.playerId,
+        rank_position: r.rank,
+        position_code: r.positionCode,
+        updated_at: new Date().toISOString(),
+      }));
+
+      const { error } = await supabase
+        .from('player_autopick_rankings')
+        .upsert(rows, { onConflict: 'league_id,team_id,player_id' });
+
+      if (error) throw error;
+      return { error: null };
+    } catch (error: unknown) {
+      logger.error('Error saving autopick rankings:', error);
+      return { error };
+    }
+  },
+
+  /**
+   * Get autopick rankings for a team (team-specific > league > global fallback).
+   */
+  async getAutopickRankings(
+    leagueId: string,
+    teamId?: string
+  ): Promise<{ rankings: Array<{ playerId: number; rank: number; positionCode: string; tier: number }>; error: unknown }> {
+    try {
+      let query = supabase
+        .from('player_autopick_rankings')
+        .select('player_id, rank_position, position_code, tier')
+        .order('rank_position', { ascending: true });
+
+      if (teamId) {
+        // Get team-specific rankings
+        query = query.eq('league_id', leagueId).eq('team_id', teamId);
+      } else {
+        // Get league-level rankings
+        query = query.eq('league_id', leagueId).is('team_id', null);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      const rankings = (data || []).map((row: any) => ({
+        playerId: row.player_id,
+        rank: row.rank_position,
+        positionCode: row.position_code,
+        tier: row.tier || 1,
+      }));
+
+      return { rankings, error: null };
+    } catch (error: unknown) {
+      logger.error('Error fetching autopick rankings:', error);
+      return { rankings: [], error };
+    }
+  },
 };
 
