@@ -379,17 +379,9 @@ class StormyServiceImpl {
             .limit(200),  // Fetch more to filter out rostered ones
         ];
 
-        // Also get weekly projections + schedule if week exists
-        if (weekStart && weekEnd) {
-          parallelQueries.push(
-            // 6g. Weekly projections
-            supabase.rpc("get_weekly_projections" as any, {
-              p_player_ids: playerIds,
-              p_start_date: weekStart.toISOString().split("T")[0],
-              p_end_date: weekEnd.toISOString().split("T")[0],
-            }).then(() => null as any).catch(() => null),
-          );
-        }
+        // Weekly projections: get_weekly_projections RPC does not exist;
+        // use get_daily_projections or player_projected_stats table instead.
+        // Omitted until the RPC is implemented.
 
         const results = await Promise.allSettled(parallelQueries);
 

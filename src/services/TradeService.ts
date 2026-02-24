@@ -56,11 +56,11 @@ export class TradeService {
       // Also fetch settings for dynamic trade expiration (commissioner-configurable)
       const { data: league } = await supabase
         .from('leagues')
-        .select('format_settings, settings')
+        .select('settings')
         .eq('id', leagueId)
         .single();
 
-      if (league?.format_settings?.bestBallEnabled) {
+      if ((league?.settings as any)?.bestBallEnabled) {
         return { success: false, error: 'Trades are not allowed in Best Ball leagues.' };
       }
 

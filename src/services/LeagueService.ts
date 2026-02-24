@@ -3164,10 +3164,10 @@ async joinLeagueByCode(
       // Fetch league settings for minGoalieGames
       const { data: leagueRow } = await supabase
         .from('leagues')
-        .select('format_settings')
+        .select('settings')
         .eq('id', leagueId)
         .single();
-      const minGoalieGames = (leagueRow?.format_settings as any)?.minGoalieGames ?? 0;
+      const minGoalieGames = (leagueRow?.settings as any)?.minGoalieGames ?? 0;
 
       // Goalie stat categories (affected by minimum appearances)
       const goalieCategories = new Set(['wins', 'saves', 'shutouts', 'gaa', 'save_pct']);
@@ -3362,10 +3362,10 @@ async joinLeagueByCode(
       // Fetch league settings for minGoalieGames
       const { data: rotoLeagueRow } = await supabase
         .from('leagues')
-        .select('format_settings')
+        .select('settings')
         .eq('id', leagueId)
         .single();
-      const rotoMinGoalieGames = (rotoLeagueRow?.format_settings as any)?.minGoalieGames ?? 0;
+      const rotoMinGoalieGames = (rotoLeagueRow?.settings as any)?.minGoalieGames ?? 0;
 
       // Goalie stat categories (affected by minimum appearances)
       const rotoGoalieCategories = new Set(['wins', 'saves', 'shutouts', 'gaa', 'save_pct']);

@@ -110,7 +110,7 @@ export const PROFILE_COLUMNS = 'id, username, first_name, last_name, phone, loca
 // ============================================================================
 // DRAFT ORDER COLUMNS
 // ============================================================================
-export const DRAFT_ORDER_COLUMNS = 'id, league_id, team_id, round_number, pick_position, created_at';
+export const DRAFT_ORDER_COLUMNS = 'id, league_id, round_number, team_order, created_at';
 
 // ============================================================================
 // COUNT-ONLY QUERIES (use with { count: 'exact', head: true })

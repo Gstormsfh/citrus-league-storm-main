@@ -193,7 +193,7 @@ GRANT EXECUTE ON FUNCTION public.expire_stale_trade_offers() TO service_role;
 
 -- Schedule trade expiration cron (every 15 minutes)
 -- Uses pg_cron if available
-DO $$
+DO $cron_expire$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
     -- Remove existing cron job if present
@@ -203,13 +203,13 @@ BEGIN
     PERFORM cron.schedule(
       'expire-stale-trades',
       '*/15 * * * *',
-      $$SELECT public.expire_stale_trade_offers()$$
+      'SELECT public.expire_stale_trade_offers()'
     );
   END IF;
 EXCEPTION WHEN OTHERS THEN
   -- pg_cron not available, skip scheduling
   RAISE NOTICE 'pg_cron not available, trade expiration cron not scheduled';
-END $$;
+END $cron_expire$;
 
 
 -- ============================================================================

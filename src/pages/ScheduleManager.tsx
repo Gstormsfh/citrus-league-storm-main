@@ -41,7 +41,7 @@ const ScheduleManager = () => {
         .gte('game_date', today.toISOString().split('T')[0])
         .lte('game_date', nextWeek.toISOString().split('T')[0])
         .order('game_date', { ascending: true })
-        .order('start_time_utc', { ascending: true });
+        .order('game_time', { ascending: true });
 
       setNhlGames(games || []);
 
@@ -57,11 +57,7 @@ const ScheduleManager = () => {
         if (team) {
           const { data: roster } = await supabase
             .from('team_lineups')
-            .select(`
-              player_id,
-              roster_slot,
-              player_directory!inner(id, first_name, last_name, position, current_team_abbrev)
-            `)
+            .select('starters, bench, ir, slot_assignments')
             .eq('team_id', team.id)
             .eq('league_id', activeLeagueId);
 
@@ -75,21 +71,10 @@ const ScheduleManager = () => {
     }
   };
 
-  const upcomingMatchups = [
-    { week: "Week 12", opponent: "Ice Warriors", date: "Dec 28 - Jan 3", status: "upcoming", projection: "145.2 - 138.5" },
-    { week: "Week 13", opponent: "Frozen Fury", date: "Jan 4 - Jan 10", status: "upcoming", projection: "140.1 - 142.8" },
-    { week: "Week 14", opponent: "Blizzard Kings", date: "Jan 11 - Jan 17", status: "upcoming", projection: "155.0 - 130.2" },
-    { week: "Week 15", opponent: "Avalanche Elite", date: "Jan 18 - Jan 24", status: "upcoming", projection: "138.9 - 139.1" }
-  ];
-
-  const recentResults = [
-    { week: "Week 11", opponent: "Puck Dynasty", score: "145-132", result: "win" },
-    { week: "Week 10", opponent: "Hockey Legends", score: "128-138", result: "loss" },
-    { week: "Week 9", opponent: "Goal Crushers", score: "156-142", result: "win" },
-    { week: "Week 8", opponent: "Zamboni Drivers", score: "130-110", result: "win" },
-    { week: "Week 7", opponent: "Net Minders", score: "115-125", result: "loss" }
-  ];
-
+  // Matchup data is loaded dynamically from Matchup/Standings pages.
+  // This page focuses on the NHL schedule for lineup planning.
+  const upcomingMatchups: { week: string; opponent: string; date: string; status: string; projection: string }[] = [];
+  const recentResults: { week: string; opponent: string; score: string; result: string }[] = [];
   const currentMatchup = upcomingMatchups[0];
 
   return (
@@ -155,15 +140,15 @@ const ScheduleManager = () => {
                               {format(new Date(game.game_date), 'MMM d')}
                             </Badge>
                             <div className="font-varsity font-bold text-citrus-forest">
-                              {game.away_team_abbrev} @ {game.home_team_abbrev}
+                              {game.away_team} @ {game.home_team}
                             </div>
                           </div>
                           <div className="text-sm font-display text-citrus-charcoal mt-1">
-                            {game.start_time_utc && format(new Date(game.start_time_utc), 'h:mm a')}
+                            {game.game_time && format(new Date(game.game_time), 'h:mm a')}
                           </div>
                         </div>
                         <Badge variant="outline" className="font-mono text-xs border-citrus-sage">
-                          {game.game_status || 'Scheduled'}
+                          {game.status || 'Scheduled'}
                         </Badge>
                       </div>
                     ))}
@@ -188,23 +173,17 @@ const ScheduleManager = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex flex-col items-center justify-center py-6">
-                      <div className="text-xl font-semibold mb-2">{currentMatchup.week}</div>
-                      <div className="text-3xl font-bold mb-4">vs {currentMatchup.opponent}</div>
-                      <div className="text-muted-foreground mb-6">{currentMatchup.date}</div>
-                      
-                      <div className="w-full bg-background/50 rounded-lg p-4 border flex justify-between items-center">
-                        <div className="text-center">
-                          <div className="text-xs text-muted-foreground uppercase">Your Proj</div>
-                          <div className="font-bold text-lg text-green-600">145.2</div>
-                        </div>
-                        <div className="text-xs text-muted-foreground">vs</div>
-                        <div className="text-center">
-                          <div className="text-xs text-muted-foreground uppercase">Opp Proj</div>
-                          <div className="font-bold text-lg text-red-600">138.5</div>
-                        </div>
+                    {currentMatchup ? (
+                      <div className="flex flex-col items-center justify-center py-6">
+                        <div className="text-xl font-semibold mb-2">{currentMatchup.week}</div>
+                        <div className="text-3xl font-bold mb-4">vs {currentMatchup.opponent}</div>
+                        <div className="text-muted-foreground mb-6">{currentMatchup.date}</div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="text-center py-6 text-muted-foreground">
+                        Visit the Matchup page to see your next matchup details.
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -215,11 +194,13 @@ const ScheduleManager = () => {
                       <CardTitle className="text-sm font-medium text-muted-foreground">Current Record</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-4xl font-bold">8-3-0</div>
-                      <p className="text-sm text-muted-foreground mt-1">2nd in Division • 94% Playoff Odds</p>
+                      <div className="text-center py-4 text-muted-foreground">
+                        Visit the Standings page to view your record.
+                      </div>
                     </CardContent>
                   </Card>
 
+                  {recentResults.length > 0 && (
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
@@ -233,12 +214,13 @@ const ScheduleManager = () => {
                           <div className="font-semibold text-lg">vs {recentResults[0].opponent}</div>
                           <div className="text-sm text-muted-foreground">{recentResults[0].score}</div>
                         </div>
-                        <div className="px-3 py-1 bg-green-100 text-green-700 rounded-full font-bold text-sm">
-                          WIN
+                        <div className={`px-3 py-1 ${recentResults[0].result === 'win' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'} rounded-full font-bold text-sm`}>
+                          {recentResults[0].result === 'win' ? 'WIN' : 'LOSS'}
                         </div>
                       </div>
                     </CardContent>
                   </Card>
+                  )}
                 </div>
               </div>
             )}
