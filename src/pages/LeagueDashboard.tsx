@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Trophy, Users, Calendar, Settings, Play, Copy, CheckCircle, Clock, Shield, RefreshCw, UserPlus, Crown, Mail } from 'lucide-react';
+import { Loader2, Trophy, Users, Calendar, Settings, Play, Copy, CheckCircle, Clock, Shield, RefreshCw, UserPlus, Crown, Mail, ArrowLeftRight, Layers } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
@@ -20,6 +20,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
+import { TradeService } from '@/services/TradeService';
+import { extractFormatSettings, AVAILABLE_CATEGORIES, DEFAULT_ROSTER_SLOTS } from '@/types/leagueTypes';
 
 const LeagueDashboard = () => {
   const { leagueId } = useParams<{ leagueId: string }>();
@@ -61,6 +63,27 @@ const LeagueDashboard = () => {
   const [rosterCounts, setRosterCounts] = useState<Record<string, number>>({});
   const [loadingRosterCounts, setLoadingRosterCounts] = useState(false);
   
+  // Trade review settings state
+  const [tradeSettings, setTradeSettings] = useState({
+    trade_review_type: 'none' as 'none' | 'commissioner' | 'league_vote',
+    trade_review_period_hours: 48,
+    trade_veto_threshold: 0.5,
+  });
+
+  // Keeper/Dynasty settings state
+  const [keeperSettings, setKeeperSettings] = useState({
+    keeperEnabled: false,
+    keeperCount: 0,
+    keeperPenalty: 'none' as 'none' | 'round-cost' | 'round-escalation',
+    dynastyMode: false,
+  });
+
+  // Category settings state
+  const [categorySettings, setCategorySettings] = useState<string[]>([]);
+
+  // Roster slot settings state
+  const [rosterSlotSettings, setRosterSlotSettings] = useState<Record<string, number>>({});
+
   // Active settings tab
   const [activeSettingsTab, setActiveSettingsTab] = useState('waivers');
 
@@ -135,6 +158,37 @@ const LeagueDashboard = () => {
         draft_rounds: leagueData.draft_rounds || 21,
         pickTimeLimit: (leagueData.settings as any)?.pickTimeLimit || 90,
       });
+
+      // Update trade review settings
+      const fmt = extractFormatSettings((leagueData.settings as Record<string, unknown>) || {});
+      setTradeSettings({
+        trade_review_type: (fmt.tradeReviewType || 'none') as 'none' | 'commissioner' | 'league_vote',
+        trade_review_period_hours: fmt.tradeReviewPeriodHours || 48,
+        trade_veto_threshold: fmt.tradeVetoThreshold || 0.5,
+      });
+
+      // Update keeper/dynasty settings
+      setKeeperSettings({
+        keeperEnabled: fmt.keeperEnabled || false,
+        keeperCount: fmt.keeperCount || 0,
+        keeperPenalty: (fmt.keeperPenalty || 'none') as 'none' | 'round-cost' | 'round-escalation',
+        dynastyMode: fmt.dynastyMode || false,
+      });
+
+      // Update category settings
+      if (fmt.categories && fmt.categories.length > 0) {
+        setCategorySettings(fmt.categories);
+      }
+
+      // Update roster slot settings
+      if (fmt.rosterSlots) {
+        setRosterSlotSettings(fmt.rosterSlots);
+      } else {
+        // Set defaults from DEFAULT_ROSTER_SLOTS
+        const defaults: Record<string, number> = {};
+        DEFAULT_ROSTER_SLOTS.forEach(s => { defaults[s.slot] = s.count; });
+        setRosterSlotSettings(defaults);
+      }
 
       // Load teams
       const { teams: teamsData, error: teamsError } = await LeagueService.getLeagueTeams(leagueId);
@@ -309,6 +363,38 @@ const LeagueDashboard = () => {
         );
         saved = success;
         errorMessage = saveError?.message || 'Failed to save draft settings';
+      } else if (activeSettingsTab === 'trades') {
+        const { success, error: tradeErr } = await TradeService.updateTradeReviewSettings(
+          leagueId,
+          user.id,
+          tradeSettings
+        );
+        saved = success;
+        errorMessage = tradeErr || 'Failed to save trade settings';
+      } else if (activeSettingsTab === 'keeper') {
+        const { success, error: keeperErr } = await LeagueService.updateKeeperSettings(
+          leagueId,
+          user.id,
+          keeperSettings
+        );
+        saved = success;
+        errorMessage = keeperErr?.message || 'Failed to save keeper settings';
+      } else if (activeSettingsTab === 'categories') {
+        const { success, error: catErr } = await LeagueService.updateCategorySettings(
+          leagueId,
+          user.id,
+          categorySettings
+        );
+        saved = success;
+        errorMessage = catErr?.message || 'Failed to save category settings';
+      } else if (activeSettingsTab === 'rosterslots') {
+        const { success, error: slotErr } = await LeagueService.updateRosterSlotSettings(
+          leagueId,
+          user.id,
+          rosterSlotSettings
+        );
+        saved = success;
+        errorMessage = slotErr?.message || 'Failed to save roster slot settings';
       }
 
       if (!saved) {
@@ -515,12 +601,16 @@ const LeagueDashboard = () => {
                       </DialogHeader>
                       
                       <Tabs value={activeSettingsTab} onValueChange={setActiveSettingsTab} className="w-full">
-                        <TabsList className="grid w-full grid-cols-4">
-                          <TabsTrigger value="waivers">Waivers</TabsTrigger>
-                          <TabsTrigger value="scoring">Scoring</TabsTrigger>
-                          <TabsTrigger value="draft">Draft</TabsTrigger>
-                          <TabsTrigger value="rosters">Rosters</TabsTrigger>
-                        </TabsList>
+                        <div className="overflow-x-auto -mx-2 px-2">
+                          <TabsList className="inline-flex w-auto min-w-full">
+                            <TabsTrigger value="waivers">Waivers</TabsTrigger>
+                            <TabsTrigger value="scoring">Scoring</TabsTrigger>
+                            <TabsTrigger value="draft">Draft</TabsTrigger>
+                            <TabsTrigger value="trades">Trades</TabsTrigger>
+                            <TabsTrigger value="rosterslots">Roster Slots</TabsTrigger>
+                            <TabsTrigger value="rosters">Rosters</TabsTrigger>
+                          </TabsList>
+                        </div>
                         
                         {/* Waiver Settings Tab */}
                         <TabsContent value="waivers" className="space-y-6 py-4">
@@ -895,6 +985,125 @@ const LeagueDashboard = () => {
                           </div>
                         </TabsContent>
                         
+                        {/* Trade Review Settings Tab */}
+                        <TabsContent value="trades" className="space-y-6 py-4">
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <Label className="flex items-center gap-2">
+                                <ArrowLeftRight className="h-4 w-4" />
+                                Trade Review Type
+                              </Label>
+                              <Select
+                                value={tradeSettings.trade_review_type}
+                                onValueChange={(value: 'none' | 'commissioner' | 'league_vote') =>
+                                  setTradeSettings(prev => ({ ...prev, trade_review_type: value }))
+                                }
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">Instant (no review)</SelectItem>
+                                  <SelectItem value="commissioner">Commissioner Approval</SelectItem>
+                                  <SelectItem value="league_vote">League Vote</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <p className="text-xs text-muted-foreground">
+                                {tradeSettings.trade_review_type === 'none' && 'Trades are executed immediately when accepted.'}
+                                {tradeSettings.trade_review_type === 'commissioner' && 'Trades require commissioner approval before being processed.'}
+                                {tradeSettings.trade_review_type === 'league_vote' && 'League members vote on trades during the review window.'}
+                              </p>
+                            </div>
+
+                            {tradeSettings.trade_review_type === 'league_vote' && (
+                              <>
+                                <div className="space-y-2">
+                                  <Label>Review Period (Hours)</Label>
+                                  <Select
+                                    value={tradeSettings.trade_review_period_hours.toString()}
+                                    onValueChange={(value) =>
+                                      setTradeSettings(prev => ({ ...prev, trade_review_period_hours: parseInt(value) }))
+                                    }
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="24">24 hours</SelectItem>
+                                      <SelectItem value="48">48 hours</SelectItem>
+                                      <SelectItem value="72">72 hours</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <p className="text-xs text-muted-foreground">
+                                    How long league members have to vote on trades
+                                  </p>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <Label>Veto Threshold</Label>
+                                  <Select
+                                    value={tradeSettings.trade_veto_threshold.toString()}
+                                    onValueChange={(value) =>
+                                      setTradeSettings(prev => ({ ...prev, trade_veto_threshold: parseFloat(value) }))
+                                    }
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="0.25">25% (easy veto)</SelectItem>
+                                      <SelectItem value="0.5">50% (majority)</SelectItem>
+                                      <SelectItem value="0.67">67% (super-majority)</SelectItem>
+                                      <SelectItem value="0.75">75% (strong consensus)</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <p className="text-xs text-muted-foreground">
+                                    Percentage of league members needed to veto a trade
+                                  </p>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </TabsContent>
+
+                        {/* Roster Slot Configuration Tab */}
+                        <TabsContent value="rosterslots" className="space-y-6 py-4">
+                          <div className="space-y-4">
+                            <div>
+                              <h3 className="text-lg font-semibold mb-1">Roster Slot Configuration</h3>
+                              <p className="text-xs text-muted-foreground mb-4">
+                                Customize the number of each position slot.
+                                {league?.draft_status === 'completed' && ' Some changes may affect active rosters.'}
+                              </p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              {DEFAULT_ROSTER_SLOTS.map((slot) => (
+                                <div key={slot.slot} className="space-y-1">
+                                  <Label>{slot.label} ({slot.slot})</Label>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    max={10}
+                                    value={rosterSlotSettings[slot.slot] ?? slot.count}
+                                    onChange={(e) =>
+                                      setRosterSlotSettings(prev => ({
+                                        ...prev,
+                                        [slot.slot]: parseInt(e.target.value) || 0,
+                                      }))
+                                    }
+                                    disabled={league?.draft_status === 'completed'}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                            {league?.draft_status === 'completed' && (
+                              <p className="text-xs text-amber-600">
+                                Roster slots are locked after the draft is completed.
+                              </p>
+                            )}
+                          </div>
+                        </TabsContent>
+
                         {/* Roster Overview Tab */}
                         <TabsContent value="rosters" className="space-y-6 py-4">
                           <div className="space-y-4">
@@ -1017,7 +1226,7 @@ Your Commissioner`);
                         <Button variant="outline" onClick={() => setSettingsOpen(false)}>
                           Cancel
                         </Button>
-                        {activeSettingsTab !== 'rosters' && (
+                        {activeSettingsTab !== 'rosters' && !(activeSettingsTab === 'rosterslots' && league?.draft_status === 'completed') && (
                           <Button onClick={handleSaveSettings} disabled={savingSettings}>
                             {savingSettings ? (
                               <>

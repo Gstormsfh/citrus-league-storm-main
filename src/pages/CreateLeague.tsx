@@ -48,6 +48,7 @@ import {
   requiresRoster,
   usesPointValues,
   hasWaivers,
+  DEFAULT_ROSTER_SLOTS,
 } from "@/types/leagueTypes";
 
 // ============================================================================
@@ -158,6 +159,13 @@ const CreateLeague = () => {
     waiver_type: 'rolling' as 'rolling' | 'faab' | 'reverse_standings',
     allow_trades_during_games: true,
     faab_budget: 100,
+  });
+
+  // ---- Roster Slot Configuration ----
+  const [rosterSlots, setRosterSlots] = useState<Record<string, number>>(() => {
+    const defaults: Record<string, number> = {};
+    DEFAULT_ROSTER_SLOTS.forEach(s => { defaults[s.slot] = s.count; });
+    return defaults;
   });
 
   // ---- Scoring Stats ----
@@ -310,6 +318,9 @@ const CreateLeague = () => {
         picksPerWeek: parseInt(picksPerWeek),
         survivorLives: parseInt(survivorLives),
         confidenceMaxPoints: parseInt(confidenceMaxPoints),
+
+        // Roster slot configuration
+        rosterSlots: isFantasy ? rosterSlots : undefined,
       };
 
       // Build scoring_settings JSONB (for points-based formats)
@@ -332,10 +343,15 @@ const CreateLeague = () => {
         }
       } : undefined;
 
+      // Calculate roster size from slot configuration
+      const rosterSize = isFantasy
+        ? Object.values(rosterSlots).reduce((sum, count) => sum + count, 0)
+        : 0;
+
       const { league, team, error: createError } = await LeagueService.createLeague(
         leagueName.trim(),
         user.id,
-        isFantasy ? parseInt(draftRounds) : 0,
+        isFantasy ? rosterSize : 0,
         isFantasy ? parseInt(draftRounds) : 0,
         settings,
         scoringSettings,
@@ -1289,6 +1305,43 @@ const CreateLeague = () => {
                             <span className="text-sm text-muted-foreground">Players can be traded even if game-locked</span>
                           </div>
                         </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ======================================================== */}
+                  {/* SECTION 8: ROSTER SLOT CONFIG (Fantasy Only)             */}
+                  {/* ======================================================== */}
+                  {isFantasy && (
+                    <div className="border-t pt-6">
+                      <SectionHeader
+                        title="Roster Slots"
+                        subtitle="Customize how many of each position slot"
+                        badge={
+                          <Badge variant="secondary" className="bg-primary/10 text-primary">
+                            {Object.values(rosterSlots).reduce((a, b) => a + b, 0)} Total
+                          </Badge>
+                        }
+                      />
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {DEFAULT_ROSTER_SLOTS.map((slot) => (
+                          <div key={slot.slot} className="space-y-1">
+                            <Label className="text-sm">{slot.label} ({slot.slot})</Label>
+                            <Input
+                              type="number"
+                              min={0}
+                              max={10}
+                              value={rosterSlots[slot.slot] ?? slot.count}
+                              onChange={(e) =>
+                                setRosterSlots(prev => ({
+                                  ...prev,
+                                  [slot.slot]: parseInt(e.target.value) || 0,
+                                }))
+                              }
+                              className="h-10 font-mono"
+                            />
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}

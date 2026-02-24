@@ -466,6 +466,7 @@ async joinLeagueByCode(
 
   /**
    * Update scoring settings for a league (commissioner only)
+   * LOCKED after games have started (matchups exist for completed draft).
    */
   async updateScoringSettings(
     leagueId: string,
@@ -479,6 +480,28 @@ async joinLeagueByCode(
       // CRITICAL: Verify user is commissioner (application-level security)
       await LeagueMembershipService.requireCommissioner(leagueId, userId);
 
+      // Server-side lock: block scoring changes after games have started
+      const { data: league } = await supabase
+        .from('leagues')
+        .select('draft_status')
+        .eq('id', leagueId)
+        .single();
+
+      if (league?.draft_status === 'completed') {
+        // Check if any matchups have been scored (games have started)
+        const { count } = await supabase
+          .from('fantasy_daily_rosters')
+          .select('*', { count: 'exact', head: true })
+          .eq('league_id', leagueId);
+
+        if (count && count > 0) {
+          return {
+            success: false,
+            error: new Error('Scoring settings cannot be changed after games have started. This protects the integrity of existing scores.'),
+          };
+        }
+      }
+
       // Update the scoring settings
       const { error } = await supabase
         .from('leagues')
@@ -486,10 +509,10 @@ async joinLeagueByCode(
         .eq('id', leagueId);
 
       if (error) throw error;
-      
+
       // Create notification for all league members
       await this.notifyLeagueMembers(leagueId, 'Commissioner changed scoring settings', 'Scoring Settings Updated');
-      
+
       return { success: true, error: null };
     } catch (error) {
       console.error('Error updating scoring settings:', error);
@@ -546,6 +569,156 @@ async joinLeagueByCode(
       return { success: true, error: null };
     } catch (error) {
       console.error('Error updating draft settings:', error);
+      return { success: false, error };
+    }
+  },
+
+  /**
+   * Update keeper/dynasty settings for a league (commissioner only)
+   * Locked after draft has completed.
+   */
+  async updateKeeperSettings(
+    leagueId: string,
+    userId: string,
+    keeperSettings: {
+      keeperEnabled: boolean;
+      keeperCount: number;
+      keeperPenalty: 'none' | 'round-cost' | 'round-escalation';
+      dynastyMode: boolean;
+    }
+  ): Promise<{ success: boolean; error: unknown }> {
+    try {
+      await LeagueMembershipService.requireCommissioner(leagueId, userId);
+
+      // Block changes after draft is completed
+      const { data: currentLeague } = await supabase
+        .from('leagues')
+        .select('settings, draft_status')
+        .eq('id', leagueId)
+        .single();
+
+      if (currentLeague?.draft_status === 'completed') {
+        return { success: false, error: new Error('Keeper settings cannot be changed after the draft is completed') };
+      }
+
+      const currentSettings = (currentLeague?.settings as Record<string, unknown>) || {};
+
+      const { error } = await supabase
+        .from('leagues')
+        .update({
+          settings: {
+            ...currentSettings,
+            keeperEnabled: keeperSettings.keeperEnabled,
+            keeperCount: keeperSettings.keeperCount,
+            keeperPenalty: keeperSettings.keeperPenalty,
+            dynastyMode: keeperSettings.dynastyMode,
+          },
+        })
+        .eq('id', leagueId);
+
+      if (error) throw error;
+
+      await this.notifyLeagueMembers(leagueId, 'Commissioner updated keeper/dynasty settings', 'Keeper Settings Updated');
+      return { success: true, error: null };
+    } catch (error) {
+      console.error('Error updating keeper settings:', error);
+      return { success: false, error };
+    }
+  },
+
+  /**
+   * Update category settings for a league (commissioner only)
+   * For H2H-Categories and Roto leagues.
+   * Locked after draft is completed.
+   */
+  async updateCategorySettings(
+    leagueId: string,
+    userId: string,
+    categories: string[]
+  ): Promise<{ success: boolean; error: unknown }> {
+    try {
+      await LeagueMembershipService.requireCommissioner(leagueId, userId);
+
+      const { data: currentLeague } = await supabase
+        .from('leagues')
+        .select('settings, draft_status')
+        .eq('id', leagueId)
+        .single();
+
+      if (currentLeague?.draft_status === 'completed') {
+        return { success: false, error: new Error('Category settings cannot be changed after the draft is completed') };
+      }
+
+      if (!categories || categories.length < 2) {
+        return { success: false, error: new Error('At least 2 categories are required') };
+      }
+
+      const currentSettings = (currentLeague?.settings as Record<string, unknown>) || {};
+
+      const { error } = await supabase
+        .from('leagues')
+        .update({
+          settings: {
+            ...currentSettings,
+            categories,
+          },
+        })
+        .eq('id', leagueId);
+
+      if (error) throw error;
+
+      await this.notifyLeagueMembers(leagueId, `Commissioner updated stat categories (${categories.length} categories)`, 'Category Settings Updated');
+      return { success: true, error: null };
+    } catch (error) {
+      console.error('Error updating category settings:', error);
+      return { success: false, error };
+    }
+  },
+
+  /**
+   * Update roster slot configuration for a league (commissioner only)
+   * Locked after draft is completed.
+   */
+  async updateRosterSlotSettings(
+    leagueId: string,
+    userId: string,
+    rosterSlots: Record<string, number>
+  ): Promise<{ success: boolean; error: unknown }> {
+    try {
+      await LeagueMembershipService.requireCommissioner(leagueId, userId);
+
+      const { data: currentLeague } = await supabase
+        .from('leagues')
+        .select('settings, draft_status')
+        .eq('id', leagueId)
+        .single();
+
+      if (currentLeague?.draft_status === 'completed') {
+        return { success: false, error: new Error('Roster slots cannot be changed after the draft is completed') };
+      }
+
+      const currentSettings = (currentLeague?.settings as Record<string, unknown>) || {};
+
+      // Calculate new roster size from slots
+      const totalSlots = Object.values(rosterSlots).reduce((sum, count) => sum + count, 0);
+
+      const { error } = await supabase
+        .from('leagues')
+        .update({
+          roster_size: totalSlots,
+          settings: {
+            ...currentSettings,
+            rosterSlots,
+          },
+        })
+        .eq('id', leagueId);
+
+      if (error) throw error;
+
+      await this.notifyLeagueMembers(leagueId, `Commissioner updated roster slot configuration (${totalSlots} total slots)`, 'Roster Slots Updated');
+      return { success: true, error: null };
+    } catch (error) {
+      console.error('Error updating roster slot settings:', error);
       return { success: false, error };
     }
   },
