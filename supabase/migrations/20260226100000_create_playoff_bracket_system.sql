@@ -1144,7 +1144,7 @@ BEGIN
             GROUP BY t2.id
             ORDER BY sub_wins DESC
             OFFSET v_playoff_teams - 1 LIMIT 1
-          ) sub)
+          ) sub))
         THEN 'clinched'
         -- Eliminated if max possible wins < current playoff cutoff
         WHEN (wins + v_remaining_weeks) < (
