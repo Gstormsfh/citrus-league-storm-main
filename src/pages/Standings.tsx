@@ -29,6 +29,7 @@ import LoadingScreen from '@/components/LoadingScreen';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { supabase } from '@/integrations/supabase/client';
 import { AdSpace } from '@/components/AdSpace';
+import { PlayoffService, type PlayoffPictureTeam, type PlayoffBracket as BracketType } from '@/services/PlayoffService';
 // Citrus decorative imports removed — cleaner layout
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 
@@ -60,6 +61,9 @@ const Standings = () => {
   const [leagueTeams, setLeagueTeams] = useState<(Team & { owner_name?: string })[]>([]);
   const [leagueFormat, setLeagueFormat] = useState<{ leagueType: LeagueType; scoringFormat: ScoringFormat; playoffTeams: number }>({ leagueType: 'fantasy', scoringFormat: 'h2h-points', playoffTeams: 6 });
   const [leagueCategories, setLeagueCategories] = useState<string[]>([]);
+  const [playoffPictureTeams, setPlayoffPictureTeams] = useState<PlayoffPictureTeam[]>([]);
+  const [playoffBracket, setPlayoffBracket] = useState<BracketType | null>(null);
+  const [playoffPictureLoaded, setPlayoffPictureLoaded] = useState(false);
   const hasInitializedRef = useRef(false);
   const navigate = useNavigate();
 
@@ -350,6 +354,20 @@ const Standings = () => {
           });
 
           setTeams(standingsTeams);
+
+          // Load playoff picture data (non-blocking)
+          // Use local fmt variable since hasMatchups uses state that may not be updated yet
+          const localHasMatchups = leagueData ? (FORMAT_HAS_MATCHUPS[getLeagueFormat(leagueData).scoringFormat] ?? true) : true;
+          if (localHasMatchups && leagueToUse) {
+            PlayoffService.getPlayoffPicture(leagueToUse).then(({ picture }) => {
+              if (picture?.teams) setPlayoffPictureTeams(picture.teams);
+              setPlayoffPictureLoaded(true);
+            }).catch(() => setPlayoffPictureLoaded(true));
+
+            PlayoffService.getBracket(leagueToUse).then(({ bracket: b }) => {
+              if (b) setPlayoffBracket(b);
+            }).catch(() => {});
+          }
         } else {
           // No user or wrong state - set loading to false and show empty teams
           setTeams([]);
@@ -616,9 +634,20 @@ const Standings = () => {
                             <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${(hasMatchups && index < leagueFormat.playoffTeams) ? 'bg-primary text-white' : 'text-muted-foreground bg-muted'}`}>
                               {index + 1}
                             </span>
-                            {hasMatchups && index < leagueFormat.playoffTeams && (
-                              <span className="text-[10px] font-bold text-primary tracking-tight">PO</span>
-                            )}
+                            {hasMatchups && index < leagueFormat.playoffTeams && (() => {
+                              const ppTeam = playoffPictureTeams.find(p => p.team_id === team.id);
+                              if (ppTeam?.clinch_status === 'clinched') {
+                                return <span className="text-[10px] font-bold text-green-600 tracking-tight" title="Clinched playoff berth">x</span>;
+                              }
+                              return <span className="text-[10px] font-bold text-primary tracking-tight">PO</span>;
+                            })()}
+                            {hasMatchups && index >= leagueFormat.playoffTeams && (() => {
+                              const ppTeam = playoffPictureTeams.find(p => p.team_id === team.id);
+                              if (ppTeam?.clinch_status === 'eliminated') {
+                                return <span className="text-[10px] font-bold text-red-500 tracking-tight" title="Eliminated from playoff contention">e</span>;
+                              }
+                              return null;
+                            })()}
                             {/* Roto: Co-champion label when tied at 1st */}
                             {isRoto && index === 0 && sortedTeams.length > 1 && sortedTeams[1].points === team.points && (
                               <span className="text-[9px] font-bold text-amber-600 bg-amber-100 dark:bg-amber-900/30 px-1 py-0.5 rounded">CO-CHAMP</span>
@@ -748,29 +777,98 @@ const Standings = () => {
                 <CardTitle className="text-lg font-bold flex items-center gap-2">
                   <span className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">🏆</span>
                   {hasMatchups ? 'Playoff Picture' : 'Top Contenders'}
+                  {playoffBracket && (
+                    <span
+                      className="ml-auto text-xs font-bold text-primary cursor-pointer hover:underline"
+                      onClick={() => activeLeagueId && navigate(`/league/${activeLeagueId}/playoffs`)}
+                    >
+                      View Bracket →
+                    </span>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-6">
-                <div className="space-y-3">
-                  {sortedTeams.slice(0, hasMatchups ? leagueFormat.playoffTeams : 5).map((team, i) => (
-                    <div key={team.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/20 hover:bg-muted/40 transition-colors border border-transparent hover:border-primary/10">
-                      <div className="flex items-center gap-3">
-                        <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold shadow-sm">
-                          {i+1}
+                <div className="space-y-2">
+                  {/* Use playoff picture data if available, otherwise fall back to sorted teams */}
+                  {(playoffPictureLoaded && playoffPictureTeams.length > 0 ? playoffPictureTeams : sortedTeams.map((t, idx) => ({
+                    team_id: t.id,
+                    team_name: t.name,
+                    rank: idx + 1,
+                    wins: t.record.wins,
+                    losses: t.record.losses,
+                    ties: t.record.ties,
+                    pf: t.pointsFor,
+                    pa: t.pointsAgainst,
+                    clinch_status: 'in_contention' as const,
+                    magic_number: 0,
+                  }))).map((team, i) => {
+                    const isInPlayoffZone = hasMatchups && i < leagueFormat.playoffTeams;
+                    const isBubble = hasMatchups && (i === leagueFormat.playoffTeams - 1 || i === leagueFormat.playoffTeams);
+                    const clinchStatus = (team as PlayoffPictureTeam).clinch_status;
+                    const magicNum = (team as PlayoffPictureTeam).magic_number;
+
+                    return (
+                      <div
+                        key={team.team_id || (team as any).id}
+                        className={cn(
+                          'flex items-center justify-between p-2.5 rounded-lg transition-colors',
+                          isInPlayoffZone ? 'bg-green-50/50 dark:bg-green-950/10 hover:bg-green-100/50 dark:hover:bg-green-950/20' : 'bg-muted/10 hover:bg-muted/20',
+                          isBubble && 'border-l-2 border-amber-400',
+                          clinchStatus === 'clinched' && 'bg-green-100/50 dark:bg-green-900/20 border-l-2 border-green-500',
+                          clinchStatus === 'eliminated' && 'bg-red-50/30 dark:bg-red-950/10 opacity-60',
+                          i === leagueFormat.playoffTeams - 1 && hasMatchups && 'border-b-2 border-dashed border-primary/30 rounded-b-none pb-3 mb-1',
+                        )}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <div className={cn(
+                            'w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0',
+                            isInPlayoffZone ? 'bg-primary text-white' : 'text-muted-foreground bg-muted',
+                          )}>
+                            {i + 1}
+                          </div>
+                          <div className="font-semibold text-sm truncate">{team.team_name || (team as any).name}</div>
+                          {/* Clinch/elimination badges */}
+                          {clinchStatus === 'clinched' && (
+                            <span className="text-[9px] font-bold text-green-700 bg-green-100 dark:bg-green-900/40 dark:text-green-400 px-1.5 py-0.5 rounded shrink-0">
+                              CLINCHED
+                            </span>
+                          )}
+                          {clinchStatus === 'eliminated' && (
+                            <span className="text-[9px] font-bold text-red-600 bg-red-100 dark:bg-red-900/40 dark:text-red-400 px-1.5 py-0.5 rounded shrink-0">
+                              ELIMINATED
+                            </span>
+                          )}
                         </div>
-                        <div className="font-semibold text-sm">{team.name}</div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {/* Magic number */}
+                          {hasMatchups && clinchStatus === 'in_contention' && magicNum > 0 && isInPlayoffZone && (
+                            <span className="text-[10px] font-bold text-amber-600 bg-amber-100/80 dark:bg-amber-900/30 dark:text-amber-400 px-1.5 py-0.5 rounded" title="Magic number to clinch">
+                              M{magicNum}
+                            </span>
+                          )}
+                          <div className="text-xs font-bold bg-[#E8EED9]/60 backdrop-blur-sm px-2 py-1 rounded-md shadow-sm border border-citrus-sage/20 tabular-nums">
+                            {hasMatchups
+                              ? `${team.wins}-${team.losses}${team.ties > 0 ? `-${team.ties}` : ''}`
+                              : `${team.pf?.toFixed?.(1) ?? (team as any).pointsFor?.toFixed(1)} pts`}
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-xs font-bold bg-[#E8EED9]/60 backdrop-blur-sm px-2 py-1 rounded-md shadow-sm border border-citrus-sage/20">
-                        {hasMatchups
-                          ? `${team.record.wins}-${team.record.losses}${team.record.ties > 0 ? `-${team.record.ties}` : ''}`
-                          : `${team.pointsFor.toFixed(1)} pts`}
+                    );
+                  })}
+                  <div className="mt-3 pt-3 border-t border-border/40">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+                        {hasMatchups ? `Top ${leagueFormat.playoffTeams} qualify` : `Ranked by ${isRoto ? 'roto points' : 'total points'}`}
                       </div>
-                    </div>
-                  ))}
-                  <div className="mt-4 pt-4 border-t border-border/40">
-                    <div className="text-center text-xs text-muted-foreground font-medium flex items-center justify-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
-                      {hasMatchups ? `Top ${leagueFormat.playoffTeams} teams qualify` : `Ranked by ${isRoto ? 'roto points' : 'total points'}`}
+                      {hasMatchups && activeLeagueId && (
+                        <button
+                          className="font-medium text-primary hover:underline"
+                          onClick={() => navigate(`/league/${activeLeagueId}/playoffs`)}
+                        >
+                          Bracket →
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
