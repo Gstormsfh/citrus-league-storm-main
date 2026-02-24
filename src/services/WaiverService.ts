@@ -312,11 +312,11 @@ export class WaiverService {
       // Best Ball leagues prohibit waivers (industry standard: zero management)
       const { data: leagueCheck } = await supabase
         .from('leagues')
-        .select('format_settings')
+        .select('settings')
         .eq('id', leagueId)
         .single();
 
-      if (leagueCheck?.format_settings?.bestBallEnabled) {
+      if ((leagueCheck?.settings as any)?.bestBallEnabled) {
         return { success: false, error: 'Waivers are not allowed in Best Ball leagues.' };
       }
 
@@ -708,11 +708,11 @@ export class WaiverService {
       // Best Ball leagues prohibit FAAB bidding (industry standard: zero management)
       const { data: bbCheck } = await supabase
         .from('leagues')
-        .select('format_settings')
+        .select('settings')
         .eq('id', leagueId)
         .single();
 
-      if (bbCheck?.format_settings?.bestBallEnabled) {
+      if ((bbCheck?.settings as any)?.bestBallEnabled) {
         return { success: false, error: 'FAAB bidding is not allowed in Best Ball leagues.' };
       }
 
