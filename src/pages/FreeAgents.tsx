@@ -1323,8 +1323,8 @@ const FreeAgents = () => {
                                       .sort((a: NHLGame, b: NHLGame) => new Date(a.game_date).getTime() - new Date(b.game_date).getTime())
                                       .slice(0, 4)
                                       .map((game: NHLGame, idx: number) => {
-                                        const isHome = game.home_team_abbrev === player.team;
-                                        const opponentAbbrev = isHome ? game.away_team_abbrev : game.home_team_abbrev;
+                                        const isHome = game.home_team === player.team;
+                                        const opponentAbbrev = isHome ? game.away_team : game.home_team;
                                         return (
                                           <div key={idx} className="flex items-center gap-0.5 bg-muted/50 rounded px-1 py-0.5">
                                             <span className="text-[8px] text-muted-foreground">{isHome ? 'vs' : '@'}</span>
@@ -1389,8 +1389,8 @@ const FreeAgents = () => {
                                         .filter((game: NHLGame) => game && game.game_date)
                                         .sort((a: NHLGame, b: NHLGame) => new Date(a.game_date).getTime() - new Date(b.game_date).getTime())
                                         .map((game: NHLGame, idx: number) => {
-                                          const isHome = game.home_team_abbrev === player.team;
-                                          const opponentAbbrev = isHome ? game.away_team_abbrev : game.home_team_abbrev;
+                                          const isHome = game.home_team === player.team;
+                                          const opponentAbbrev = isHome ? game.away_team : game.home_team;
                                           return (
                                             <div key={idx} className="flex items-center gap-0.5 bg-muted/30 rounded px-1.5 py-0.5">
                                               <span className="text-[9px] text-muted-foreground">{isHome ? 'vs' : '@'}</span>
