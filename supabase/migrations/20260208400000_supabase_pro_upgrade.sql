@@ -56,7 +56,7 @@ CREATE INDEX IF NOT EXISTS idx_draft_picks_league_session
 
 -- 2b. Draft picks: active picks per league (used everywhere in draft flow)
 CREATE INDEX IF NOT EXISTS idx_draft_picks_league_active
-  ON public.draft_picks(league_id, created_at DESC)
+  ON public.draft_picks(league_id, picked_at DESC)
   WHERE deleted_at IS NULL;
 
 -- 2c. Draft picks: player lookup per league (used by roster sync, waiver checks)
