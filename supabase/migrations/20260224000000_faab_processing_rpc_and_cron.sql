@@ -26,7 +26,7 @@ RETURNS TABLE (
   bid_amount NUMERIC,
   status TEXT,
   failure_reason TEXT
-) AS $$
+) AS $faab_league$
 DECLARE
   v_lock_acquired BOOLEAN;
   v_player_record RECORD;
@@ -230,7 +230,7 @@ BEGIN
   RAISE NOTICE 'Processed % FAAB claims for league %', v_processed, p_league_id;
   RETURN;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$faab_league$ LANGUAGE plpgsql SECURITY DEFINER;
 
 GRANT EXECUTE ON FUNCTION public.process_faab_waivers_for_league(UUID) TO authenticated;
 
@@ -248,7 +248,7 @@ RETURNS TABLE (
   league_name TEXT,
   claims_processed INT,
   status TEXT
-) AS $$
+) AS $faab_all$
 DECLARE
   v_league RECORD;
   v_count INT;
@@ -283,7 +283,7 @@ BEGIN
 
   RETURN;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$faab_all$ LANGUAGE plpgsql SECURITY DEFINER;
 
 GRANT EXECUTE ON FUNCTION public.process_all_faab_waivers() TO authenticated;
 
@@ -310,7 +310,7 @@ END $cron_setup$;
 -- ============================================================================
 -- VERIFICATION
 -- ============================================================================
-DO $$
+DO $verify$
 BEGIN
   RAISE NOTICE '';
   RAISE NOTICE '============================================================';
@@ -339,4 +339,4 @@ BEGIN
   RAISE NOTICE '    supabase.rpc("process_faab_waivers_for_league",';
   RAISE NOTICE '      { p_league_id: "..." })';
   RAISE NOTICE '============================================================';
-END $$;
+END $verify$;

@@ -3363,6 +3363,143 @@ export const MatchupService = {
   }
 };
 
+// ============================================================================
+// H2H CATEGORIES & ROTO SCORING SUPPORT
+// ============================================================================
+
+/**
+ * H2H Category matchup result from RPC
+ */
+export interface CategoryMatchupResult {
+  category: string;
+  team1_value: number;
+  team2_value: number;
+  winner: 'team1' | 'team2' | 'tie';
+}
+
+/**
+ * Roto standings result from RPC
+ */
+export interface RotoStandingRow {
+  team_id: string;
+  team_name: string;
+  category_name: string;
+  stat_value: number;
+  category_rank: number;
+  roto_points: number;
+}
+
+export const CategoryScoringService = {
+  /**
+   * Calculate H2H category matchup results for a specific matchup.
+   * Calls the calculate_h2h_category_matchup RPC which reads league settings dynamically.
+   *
+   * @param leagueId - League UUID
+   * @param matchupId - Matchup UUID
+   * @param team1Id - Team 1 UUID
+   * @param team2Id - Team 2 UUID
+   * @param weekStart - Week start date (YYYY-MM-DD)
+   * @param weekEnd - Week end date (YYYY-MM-DD)
+   * @param categories - Category IDs from league settings (commissioner-configured)
+   */
+  async getH2HCategoryResults(
+    leagueId: string,
+    matchupId: string,
+    team1Id: string,
+    team2Id: string,
+    weekStart: string,
+    weekEnd: string,
+    categories: string[]
+  ): Promise<{ results: CategoryMatchupResult[]; error: unknown }> {
+    try {
+      const { data, error } = await supabase.rpc('calculate_h2h_category_matchup', {
+        p_league_id: leagueId,
+        p_matchup_id: matchupId,
+        p_team1_id: team1Id,
+        p_team2_id: team2Id,
+        p_week_start: weekStart,
+        p_week_end: weekEnd,
+        p_categories: categories,
+      });
+
+      if (error) throw error;
+      return { results: (data || []) as CategoryMatchupResult[], error: null };
+    } catch (error: unknown) {
+      console.error('[CategoryScoringService] getH2HCategoryResults error:', error);
+      return { results: [], error };
+    }
+  },
+
+  /**
+   * Calculate roto standings for a league across all categories.
+   * Categories are read from league settings (commissioner-configured).
+   *
+   * @param leagueId - League UUID
+   * @param categories - Category IDs from league settings
+   * @param throughWeek - Optional: limit to stats through this week number
+   */
+  async getRotoStandings(
+    leagueId: string,
+    categories: string[],
+    throughWeek?: number
+  ): Promise<{ standings: RotoStandingRow[]; error: unknown }> {
+    try {
+      const { data, error } = await supabase.rpc('calculate_roto_standings', {
+        p_league_id: leagueId,
+        p_categories: categories,
+        p_through_week: throughWeek ?? null,
+      });
+
+      if (error) throw error;
+      return { standings: (data || []) as RotoStandingRow[], error: null };
+    } catch (error: unknown) {
+      console.error('[CategoryScoringService] getRotoStandings error:', error);
+      return { standings: [], error };
+    }
+  },
+
+  /**
+   * Aggregate roto standings into per-team totals.
+   * Returns teams sorted by total roto points (highest first).
+   */
+  aggregateRotoStandings(
+    standings: RotoStandingRow[]
+  ): Array<{
+    team_id: string;
+    team_name: string;
+    total_roto_points: number;
+    category_breakdown: Record<string, { value: number; rank: number; points: number }>;
+  }> {
+    const teamMap = new Map<string, {
+      team_name: string;
+      total_roto_points: number;
+      category_breakdown: Record<string, { value: number; rank: number; points: number }>;
+    }>();
+
+    for (const row of standings) {
+      if (!teamMap.has(row.team_id)) {
+        teamMap.set(row.team_id, {
+          team_name: row.team_name,
+          total_roto_points: 0,
+          category_breakdown: {},
+        });
+      }
+      const entry = teamMap.get(row.team_id)!;
+      entry.total_roto_points += row.roto_points;
+      entry.category_breakdown[row.category_name] = {
+        value: row.stat_value,
+        rank: row.category_rank,
+        points: row.roto_points,
+      };
+    }
+
+    return Array.from(teamMap.entries())
+      .map(([team_id, data]) => ({ team_id, ...data }))
+      .sort((a, b) => b.total_roto_points - a.total_roto_points);
+  },
+};
+
+
 // Type for daily lineup player returned by RPC
 export interface DailyLineupPlayer {
   player_id: number;

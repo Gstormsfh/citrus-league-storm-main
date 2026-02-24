@@ -265,4 +265,77 @@ export class BestBallService {
 
     return result;
   }
+
+  // ============================================================================
+  // SERVER-SIDE OPTIMIZATION (via RPC)
+  // ============================================================================
+  // The optimize_best_ball_daily_rosters RPC runs on the server and uses
+  // DYNAMIC scoring weights from leagues.scoring_settings (commissioner-configured).
+  // It also reads roster slot config from leagues.settings.rosterSlots.
+  // This runs automatically via pg_cron daily at 7 AM UTC (2 AM EST).
+  // The methods below allow on-demand triggering from the frontend.
+  // ============================================================================
+
+  /**
+   * Trigger server-side Best Ball optimization for a specific date.
+   * Uses the optimize_best_ball_daily_rosters RPC which reads:
+   *   - Scoring weights from leagues.scoring_settings (commissioner-configured)
+   *   - Roster slot configuration from leagues.settings.rosterSlots (commissioner-configured)
+   *
+   * This ensures the optimizer always uses the latest league settings.
+   */
+  static async triggerServerOptimization(
+    leagueId: string,
+    date: string  // YYYY-MM-DD format
+  ): Promise<{
+    results: Array<{ teamId: string; playersOptimized: number; totalPoints: number }>;
+    error?: string;
+  }> {
+    try {
+      const { data, error } = await supabase.rpc('optimize_best_ball_daily_rosters', {
+        p_league_id: leagueId,
+        p_roster_date: date,
+      });
+
+      if (error) throw error;
+
+      const results = (data || []).map((row: any) => ({
+        teamId: row.team_id,
+        playersOptimized: row.players_optimized,
+        totalPoints: row.total_points,
+      }));
+
+      return { results };
+    } catch (error: unknown) {
+      console.error('[BestBallService] triggerServerOptimization error:', error);
+      return { results: [], error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  /**
+   * Trigger server-side optimization for an entire week's date range.
+   * Optimizes each day in the week sequentially.
+   */
+  static async triggerWeekOptimization(
+    leagueId: string,
+    weekStartDate: string,  // YYYY-MM-DD
+    weekEndDate: string     // YYYY-MM-DD
+  ): Promise<{ daysOptimized: number; error?: string }> {
+    try {
+      let daysOptimized = 0;
+      const start = new Date(weekStartDate);
+      const end = new Date(weekEndDate);
+
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const dateStr = d.toISOString().split('T')[0];
+        const { error } = await this.triggerServerOptimization(leagueId, dateStr);
+        if (!error) daysOptimized++;
+      }
+
+      return { daysOptimized };
+    } catch (error: unknown) {
+      console.error('[BestBallService] triggerWeekOptimization error:', error);
+      return { daysOptimized: 0, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
 }
