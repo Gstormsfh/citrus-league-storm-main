@@ -3497,6 +3497,38 @@ export const CategoryScoringService = {
       .map(([team_id, data]) => ({ team_id, ...data }))
       .sort((a, b) => b.total_roto_points - a.total_roto_points);
   },
+  /**
+   * Calculate PPG (Points-Per-Game) standings for a league.
+   * Calls the calculate_ppg_standings RPC which ranks teams by average
+   * fantasy points per matchup week played.
+   */
+  async getPPGStandings(
+    leagueId: string,
+    throughWeek?: number
+  ): Promise<{
+    standings: Array<{
+      team_id: string;
+      team_name: string;
+      total_points: number;
+      games_played: number;
+      ppg: number;
+      rank: number;
+    }>;
+    error: unknown;
+  }> {
+    try {
+      const { data, error } = await supabase.rpc('calculate_ppg_standings', {
+        p_league_id: leagueId,
+        p_through_week: throughWeek ?? null,
+      });
+
+      if (error) throw error;
+      return { standings: (data || []) as any[], error: null };
+    } catch (error: unknown) {
+      console.error('[CategoryScoringService] getPPGStandings error:', error);
+      return { standings: [], error };
+    }
+  },
 };
 
 

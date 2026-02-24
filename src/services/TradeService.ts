@@ -10,7 +10,7 @@ export interface TradeOffer {
   to_team_id: string;
   offered_player_ids: number[];
   requested_player_ids: number[];
-  status: 'pending' | 'accepted' | 'rejected' | 'countered' | 'cancelled' | 'expired';
+  status: 'pending' | 'accepted' | 'rejected' | 'countered' | 'cancelled' | 'expired' | 'under_review' | 'vetoed';
   message: string | null;
   created_at: string;
   expires_at: string | null;
@@ -62,6 +62,23 @@ export class TradeService {
 
       if (league?.format_settings?.bestBallEnabled) {
         return { success: false, error: 'Trades are not allowed in Best Ball leagues.' };
+      }
+
+      // Check trade deadline (also enforced by DB trigger, but give a friendly message)
+      const tradeDeadlineWeek = (league?.settings as any)?.tradeDeadlineWeek ?? 0;
+      if (tradeDeadlineWeek > 0) {
+        const { data: latestMatchup } = await supabase
+          .from('matchups')
+          .select('week_number')
+          .eq('league_id', leagueId)
+          .in('status', ['in_progress', 'completed'])
+          .order('week_number', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const currentWeek = latestMatchup?.week_number ?? 0;
+        if (currentWeek >= tradeDeadlineWeek) {
+          return { success: false, error: `The trade deadline has passed (Week ${tradeDeadlineWeek}). No new trades allowed.` };
+        }
       }
 
       // Trade expiration: read from league settings (commissioner-configurable), default 7 days
@@ -141,6 +158,30 @@ export class TradeService {
         }
       }
 
+      // Check if league requires trade review before execution
+      const { data: league } = await supabase
+        .from('leagues')
+        .select('trade_review_type, trade_review_period_hours')
+        .eq('id', trade.league_id)
+        .single();
+
+      const reviewType = league?.trade_review_type || 'none';
+
+      if (reviewType !== 'none') {
+        // Route through review process instead of immediate execution
+        const reviewResult = await this.submitTradeForReview(tradeId, trade.league_id);
+        if (!reviewResult.success) {
+          return { success: false, error: reviewResult.error };
+        }
+        return {
+          success: true,
+          error: reviewType === 'commissioner'
+            ? 'Trade accepted — awaiting commissioner approval.'
+            : `Trade accepted — under league review for ${league?.trade_review_period_hours || 48} hours.`
+        };
+      }
+
+      // No review required — execute immediately
       // Update trade status to accepted
       const { error: updateError } = await supabase
         .from('trade_offers')
