@@ -53,9 +53,10 @@ export class TradeService {
   ): Promise<{ success: boolean; error?: string; tradeId?: string }> {
     try {
       // Best Ball leagues prohibit trades (industry standard: zero management after draft)
+      // Also fetch settings for dynamic trade expiration (commissioner-configurable)
       const { data: league } = await supabase
         .from('leagues')
-        .select('format_settings')
+        .select('format_settings, settings')
         .eq('id', leagueId)
         .single();
 
@@ -63,9 +64,10 @@ export class TradeService {
         return { success: false, error: 'Trades are not allowed in Best Ball leagues.' };
       }
 
-      // Set expiration to 7 days from now
+      // Trade expiration: read from league settings (commissioner-configurable), default 7 days
+      const tradeExpirationDays = (league?.settings as any)?.tradeExpirationDays ?? 7;
       const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 7);
+      expiresAt.setDate(expiresAt.getDate() + tradeExpirationDays);
 
       const { data, error } = await supabase
         .from('trade_offers')

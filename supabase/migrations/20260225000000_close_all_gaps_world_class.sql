@@ -388,6 +388,7 @@ BEGIN
     RAISE NOTICE 'Waiver processing already in progress for league %', p_league_id;
     RETURN;
   END IF;
+  RAISE NOTICE 'Advisory lock acquired for league %', p_league_id;
 
   -- STEP 2: GET LEAGUE SETTINGS
   SELECT
@@ -406,9 +407,16 @@ BEGIN
   v_waiver_type := COALESCE(v_league.waiver_type, 'rolling');
 
   -- STEP 2.5: RECALCULATE REVERSE STANDINGS PRIORITY (NEW)
-  -- For reverse_standings leagues, update waiver priority based on actual record
+  -- For reverse_standings leagues, update waiver priority based on actual record.
+  -- Wrapped in error handling to ensure claim processing still proceeds even if
+  -- recalculation fails (e.g., no matchup data yet). Falls back to existing priorities.
   IF v_waiver_type = 'reverse_standings' THEN
-    PERFORM recalculate_reverse_standings_priority(p_league_id);
+    BEGIN
+      PERFORM recalculate_reverse_standings_priority(p_league_id);
+      RAISE NOTICE 'Reverse standings priority recalculated for league %', p_league_id;
+    EXCEPTION WHEN others THEN
+      RAISE NOTICE 'Reverse standings recalculation failed for league %, using existing priorities: %', p_league_id, SQLERRM;
+    END;
   END IF;
 
   -- STEP 3: PROCESS CLAIMS

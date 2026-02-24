@@ -216,7 +216,8 @@ export interface LeagueFormatSettings {
   survivorLives?: number;        // 1 = standard, 2+ = mulligan variant
   confidenceMaxPoints?: number;  // Max confidence points (usually = number of games)
 
-  // === Trade Review Settings (Commissioner-configurable) ===
+  // === Trade Settings (Commissioner-configurable) ===
+  tradeExpirationDays?: number;    // How many days before a trade offer expires (default: 7)
   tradeReviewType?: 'none' | 'commissioner' | 'league_vote';  // How trades are reviewed
   tradeReviewPeriodHours?: number;  // Voting window (default: 48h)
   tradeVetoThreshold?: number;     // Fraction needed to veto (0-1, default: 0.5)
@@ -403,7 +404,8 @@ export function extractFormatSettings(settings: Record<string, unknown>): Partia
     survivorLives: (settings.survivorLives as number) || 1,
     confidenceMaxPoints: (settings.confidenceMaxPoints as number) || 10,
 
-    // Trade review (commissioner-configurable)
+    // Trade settings (commissioner-configurable)
+    tradeExpirationDays: (settings.tradeExpirationDays as number) || 7,
     tradeReviewType: (settings.tradeReviewType as 'none' | 'commissioner' | 'league_vote') || 'none',
     tradeReviewPeriodHours: (settings.tradeReviewPeriodHours as number) || 48,
     tradeVetoThreshold: (settings.tradeVetoThreshold as number) || 0.5,
