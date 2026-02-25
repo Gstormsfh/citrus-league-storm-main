@@ -458,29 +458,27 @@ def generate_traceability_log_for_rejection(
         opponent_team = away_team if home_team == player_team else home_team
         is_home = home_team == player_team
     
-    # Get player season stats
+    # Get player season stats (use official nhl_* columns)
     season_stats = db.select(
         "player_season_stats",
-        select="goals,primary_assists,secondary_assists,shots_on_goal,blocks,games_played",
+        select="nhl_goals,nhl_assists,nhl_shots_on_goal,nhl_blocks,games_played",
         filters=[("player_id", "eq", player_id), ("season", "eq", season)],
         limit=1
     )
-    
+
     gp = 0
     goals = 0
     assists = 0
     sog = 0
     blocks = 0
-    
+
     if season_stats and len(season_stats) > 0:
         stats = season_stats[0]
         gp = int(stats.get("games_played", 0))
-        goals = int(stats.get("goals", 0))
-        primary_assists = int(stats.get("primary_assists", 0))
-        secondary_assists = int(stats.get("secondary_assists", 0))
-        assists = primary_assists + secondary_assists
-        sog = int(stats.get("shots_on_goal", 0))
-        blocks = int(stats.get("blocks", 0))
+        goals = int(stats.get("nhl_goals", 0))
+        assists = int(stats.get("nhl_assists", 0))
+        sog = int(stats.get("nhl_shots_on_goal", 0))
+        blocks = int(stats.get("nhl_blocks", 0))
     
     # Build traceability log
     traceability = {
