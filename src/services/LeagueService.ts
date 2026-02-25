@@ -330,6 +330,19 @@ export const LeagueService = {
 
       if (teamError) throw teamError;
 
+      // Initialize FAAB budget if league uses FAAB waivers
+      if (waiverSettings?.waiver_type === 'faab') {
+        const faabBudget = (settings?.faabBudget as number) || 100;
+        await supabase
+          .from('faab_budgets')
+          .insert({
+            league_id: league.id,
+            team_id: team.id,
+            initial_budget: faabBudget,
+            remaining_budget: faabBudget,
+          });
+      }
+
       return { league, team, error: null };
     } catch (error) {
       console.error('Error creating league:', error);

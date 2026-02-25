@@ -321,6 +321,9 @@ const CreateLeague = () => {
 
         // Roster slot configuration
         rosterSlots: isFantasy ? rosterSlots : undefined,
+
+        // FAAB budget (persisted so SQL RPCs can read it)
+        faabBudget: waiverSettings.faab_budget,
       };
 
       // Build scoring_settings JSONB (for points-based formats)
