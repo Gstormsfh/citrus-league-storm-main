@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { PlayerService } from './PlayerService';
 import { LeagueMembershipService } from './LeagueMembershipService';
 import { COLUMNS } from '@/utils/queryColumns';
+import type { LeagueSettings } from '@/types/leagueTypes';
 
 export interface TradeOffer {
   id: string;
@@ -64,12 +65,12 @@ export class TradeService {
         return { success: false, error: 'League not found.' };
       }
 
-      if ((league.settings as any)?.bestBallEnabled) {
+      if ((league.settings as LeagueSettings)?.bestBallEnabled) {
         return { success: false, error: 'Trades are not allowed in Best Ball leagues.' };
       }
 
       // Check trade deadline (also enforced by DB trigger, but give a friendly message)
-      const tradeDeadlineWeek = (league.settings as any)?.tradeDeadlineWeek ?? 0;
+      const tradeDeadlineWeek = (league.settings as LeagueSettings)?.tradeDeadlineWeek ?? 0;
       if (tradeDeadlineWeek > 0) {
         const { data: latestMatchup } = await supabase
           .from('matchups')
@@ -86,7 +87,7 @@ export class TradeService {
       }
 
       // Trade expiration: read from league settings (commissioner-configurable), default 7 days
-      const tradeExpirationDays = (league?.settings as any)?.tradeExpirationDays ?? 7;
+      const tradeExpirationDays = (league?.settings as LeagueSettings)?.tradeExpirationDays ?? 7;
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + tradeExpirationDays);
 

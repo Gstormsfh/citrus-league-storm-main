@@ -173,7 +173,7 @@ const Profile = () => {
   const [syncingRosters, setSyncingRosters] = useState(false);
   const [loadingCommSettings, setLoadingCommSettings] = useState(false);
   const [commWaiverSettings, setCommWaiverSettings] = useState({
-    waiver_process_time: '03:00:00',
+    waiver_process_time: '02:00:00',
     waiver_period_hours: 48,
     waiver_game_lock: true,
     waiver_type: 'rolling' as 'rolling' | 'faab' | 'reverse_standings',
@@ -220,7 +220,7 @@ const Profile = () => {
         // Initialize waiver settings from league data
         if (leagueData?.settings) {
           setCommWaiverSettings({
-            waiver_process_time: leagueData.settings.waiver_process_time || '03:00:00',
+            waiver_process_time: leagueData.settings.waiver_process_time || '02:00:00',
             waiver_period_hours: leagueData.settings.waiver_period_hours || 48,
             waiver_game_lock: leagueData.settings.waiver_game_lock ?? true,
             waiver_type: leagueData.settings.waiver_type || 'rolling',
@@ -1273,7 +1273,7 @@ const Profile = () => {
                               <div className="space-y-2">
                                 <Label className="flex items-center gap-2">
                                   <Clock className="h-4 w-4" />
-                                  Waiver Process Time (EST)
+                                  Waiver Process Time (MT)
                                 </Label>
                                 <Select
                                   value={commWaiverSettings.waiver_process_time}
@@ -1284,13 +1284,14 @@ const Profile = () => {
                                   </SelectTrigger>
                                   <SelectContent>
                                     <SelectItem value="00:00:00">12:00 AM (Midnight)</SelectItem>
+                                    <SelectItem value="02:00:00">2:00 AM (Default)</SelectItem>
                                     <SelectItem value="03:00:00">3:00 AM</SelectItem>
                                     <SelectItem value="06:00:00">6:00 AM</SelectItem>
                                     <SelectItem value="09:00:00">9:00 AM</SelectItem>
                                     <SelectItem value="12:00:00">12:00 PM (Noon)</SelectItem>
                                   </SelectContent>
                                 </Select>
-                                <p className="text-xs text-muted-foreground">Time when waiver claims are processed daily</p>
+                                <p className="text-xs text-muted-foreground">Time when waiver claims are processed daily (Mountain Time)</p>
                               </div>
 
                               <div className="space-y-2">

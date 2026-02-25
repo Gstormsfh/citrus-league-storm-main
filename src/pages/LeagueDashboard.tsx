@@ -21,7 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { TradeService } from '@/services/TradeService';
-import { extractFormatSettings, AVAILABLE_CATEGORIES, DEFAULT_ROSTER_SLOTS } from '@/types/leagueTypes';
+import { extractFormatSettings, AVAILABLE_CATEGORIES, DEFAULT_ROSTER_SLOTS, type LeagueSettings } from '@/types/leagueTypes';
 
 const LeagueDashboard = () => {
   const { leagueId } = useParams<{ leagueId: string }>();
@@ -40,7 +40,7 @@ const LeagueDashboard = () => {
   const [savingSettings, setSavingSettings] = useState(false);
   const [processingWaivers, setProcessingWaivers] = useState(false);
   const [waiverSettings, setWaiverSettings] = useState({
-    waiver_process_time: '03:00:00',
+    waiver_process_time: '02:00:00',
     waiver_period_hours: 48,
     waiver_game_lock: true,
     waiver_type: 'rolling' as 'rolling' | 'faab' | 'reverse_standings',
@@ -139,7 +139,7 @@ const LeagueDashboard = () => {
       if (!leagueData) throw new Error('League not found');
 
       // Guard: redirect pool leagues to their proper pages
-      const leagueTypeFromSettings = (leagueData.settings as Record<string, unknown>)?.leagueType;
+      const leagueTypeFromSettings = (leagueData.settings as LeagueSettings)?.leagueType;
       if (leagueTypeFromSettings && leagueTypeFromSettings !== 'fantasy') {
         const poolRoutes: Record<string, string> = {
           'pickem': '/pool/pickem',
@@ -157,7 +157,7 @@ const LeagueDashboard = () => {
 
       // Update waiver settings from league data
       setWaiverSettings({
-        waiver_process_time: leagueData.waiver_process_time || '03:00:00',
+        waiver_process_time: leagueData.waiver_process_time || '02:00:00',
         waiver_period_hours: leagueData.waiver_period_hours || 48,
         waiver_game_lock: leagueData.waiver_game_lock ?? true,
         waiver_type: leagueData.waiver_type || 'rolling',
@@ -172,11 +172,11 @@ const LeagueDashboard = () => {
       // Update draft settings from league data
       setDraftSettings({
         draft_rounds: leagueData.draft_rounds || 21,
-        pickTimeLimit: (leagueData.settings as any)?.pickTimeLimit || 90,
+        pickTimeLimit: (leagueData.settings as LeagueSettings)?.pickTimeLimit as number || 90,
       });
 
       // Update trade review settings
-      const fmt = extractFormatSettings((leagueData.settings as Record<string, unknown>) || {});
+      const fmt = extractFormatSettings((leagueData.settings as LeagueSettings) || {});
       setTradeSettings({
         trade_review_type: (fmt.tradeReviewType || 'none') as 'none' | 'commissioner' | 'league_vote',
         trade_review_period_hours: fmt.tradeReviewPeriodHours || 48,
@@ -634,7 +634,7 @@ const LeagueDashboard = () => {
                         <div className="space-y-2">
                           <Label className="flex items-center gap-2">
                             <Clock className="h-4 w-4" />
-                            Waiver Process Time (EST)
+                            Waiver Process Time (MT)
                           </Label>
                           <Select 
                             value={waiverSettings.waiver_process_time}
@@ -645,6 +645,7 @@ const LeagueDashboard = () => {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="00:00:00">12:00 AM (Midnight)</SelectItem>
+                              <SelectItem value="02:00:00">2:00 AM (Default)</SelectItem>
                               <SelectItem value="03:00:00">3:00 AM</SelectItem>
                               <SelectItem value="06:00:00">6:00 AM</SelectItem>
                               <SelectItem value="09:00:00">9:00 AM</SelectItem>

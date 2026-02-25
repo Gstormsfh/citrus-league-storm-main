@@ -9,7 +9,7 @@ import { DEMO_LEAGUE_ID_FOR_GUESTS } from "./DemoLeagueService";
 import { logger } from "@/utils/logger";
 import { getTodayMST } from "@/utils/timezoneUtils";
 import { CURRENT_SEASON } from "@/utils/seasonConstants";
-import type { LeagueType, ScoringFormat, DraftType as LeagueDraftType } from "@/types/leagueTypes";
+import type { LeagueType, ScoringFormat, DraftType as LeagueDraftType, LeagueSettings } from "@/types/leagueTypes";
 import { extractFormatSettings } from "@/types/leagueTypes";
 
 export interface League {
@@ -20,7 +20,7 @@ export interface League {
   join_code: string;
   roster_size: number;
   draft_rounds: number;
-  settings: Record<string, unknown>;
+  settings: LeagueSettings;
   // Waiver settings
   waiver_process_time?: string;
   waiver_period_hours?: number;
@@ -271,7 +271,7 @@ export const LeagueService = {
     commissionerId: string,
     rosterSize: number = 21,
     draftRounds: number = 21,
-    settings: Record<string, unknown> = {},
+    settings: LeagueSettings = {},
     scoringSettings?: Record<string, number>,
     waiverSettings?: {
       waiver_process_time?: string;
@@ -293,7 +293,7 @@ export const LeagueService = {
           settings,
           scoring_settings: scoringSettings,
           // Include waiver settings if provided
-          waiver_process_time: waiverSettings?.waiver_process_time || '03:00:00',
+          waiver_process_time: waiverSettings?.waiver_process_time || '02:00:00',
           waiver_period_hours: waiverSettings?.waiver_period_hours || 48,
           waiver_game_lock: waiverSettings?.waiver_game_lock !== undefined ? waiverSettings.waiver_game_lock : true,
           waiver_type: waiverSettings?.waiver_type || 'rolling',
@@ -332,7 +332,7 @@ export const LeagueService = {
 
       // Initialize FAAB budget if league uses FAAB waivers
       if (waiverSettings?.waiver_type === 'faab') {
-        const faabBudget = (settings?.faabBudget as number) || 100;
+        const faabBudget = (settings?.faabBudget ?? 100) as number;
         const { error: faabError } = await supabase
           .from('faab_budgets')
           .insert({
@@ -558,10 +558,10 @@ async joinLeagueByCode(
         .eq('id', leagueId)
         .single();
 
-      const currentSettings = (currentLeague?.settings as Record<string, unknown>) || {};
-      
+      const currentSettings = (currentLeague?.settings as LeagueSettings) || {};
+
       // Update the draft settings
-      const updateData: { draft_rounds?: number; settings?: Record<string, unknown> } = {};
+      const updateData: { draft_rounds?: number; settings?: LeagueSettings } = {};
       if (draftSettings.draft_rounds !== undefined) {
         updateData.draft_rounds = draftSettings.draft_rounds;
       }
@@ -617,7 +617,7 @@ async joinLeagueByCode(
         return { success: false, error: new Error('Keeper settings cannot be changed after the draft is completed') };
       }
 
-      const currentSettings = (currentLeague?.settings as Record<string, unknown>) || {};
+      const currentSettings = (currentLeague?.settings as LeagueSettings) || {};
 
       const { error } = await supabase
         .from('leagues')
@@ -669,7 +669,7 @@ async joinLeagueByCode(
         return { success: false, error: new Error('At least 2 categories are required') };
       }
 
-      const currentSettings = (currentLeague?.settings as Record<string, unknown>) || {};
+      const currentSettings = (currentLeague?.settings as LeagueSettings) || {};
 
       const { error } = await supabase
         .from('leagues')
@@ -713,7 +713,7 @@ async joinLeagueByCode(
         return { success: false, error: new Error('Roster slots cannot be changed after the draft is completed') };
       }
 
-      const currentSettings = (currentLeague?.settings as Record<string, unknown>) || {};
+      const currentSettings = (currentLeague?.settings as LeagueSettings) || {};
 
       // Calculate new roster size from slots
       const totalSlots = Object.values(rosterSlots).reduce((sum, count) => sum + count, 0);
@@ -3204,7 +3204,7 @@ async joinLeagueByCode(
         .select('settings')
         .eq('id', leagueId)
         .single();
-      const minGoalieGames = (leagueRow?.settings as any)?.minGoalieGames ?? 0;
+      const minGoalieGames = (leagueRow?.settings as LeagueSettings)?.minGoalieGames ?? 0;
 
       // Goalie stat categories (affected by minimum appearances)
       const goalieCategories = new Set(['wins', 'saves', 'shutouts', 'gaa', 'save_pct']);
@@ -3402,7 +3402,7 @@ async joinLeagueByCode(
         .select('settings')
         .eq('id', leagueId)
         .single();
-      const rotoMinGoalieGames = (rotoLeagueRow?.settings as any)?.minGoalieGames ?? 0;
+      const rotoMinGoalieGames = (rotoLeagueRow?.settings as LeagueSettings)?.minGoalieGames ?? 0;
 
       // Goalie stat categories (affected by minimum appearances)
       const rotoGoalieCategories = new Set(['wins', 'saves', 'shutouts', 'gaa', 'save_pct']);

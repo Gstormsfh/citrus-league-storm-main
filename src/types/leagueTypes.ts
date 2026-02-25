@@ -225,6 +225,9 @@ export interface LeagueFormatSettings {
   // === Roster Slot Configuration (Commissioner-configurable) ===
   rosterSlots?: Record<string, number>;  // e.g., { C: 2, LW: 2, RW: 2, D: 4, G: 2, UTIL: 2 }
 
+  // === FAAB Budget ===
+  faabBudget?: number;             // FAAB budget per team (default: 100)
+
   // === Scoring Point Values (for points-based formats) ===
   stats: Array<{
     id: string;
@@ -234,7 +237,16 @@ export interface LeagueFormatSettings {
     category: string;
     enabled: boolean;
   }>;
+
+  // Allow additional keys from the JSONB column without breaking type safety
+  [key: string]: unknown;
 }
+
+/**
+ * Convenience alias for league.settings JSONB.
+ * Use this everywhere instead of `Record<string, unknown>` or `as any`.
+ */
+export type LeagueSettings = Partial<LeagueFormatSettings>;
 
 // ============================================================================
 // DEFAULT SETTINGS PER LEAGUE TYPE
@@ -412,5 +424,8 @@ export function extractFormatSettings(settings: Record<string, unknown>): Partia
 
     // Roster slots (commissioner-configurable)
     rosterSlots: (settings.rosterSlots as Record<string, number>) || undefined,
+
+    // FAAB
+    faabBudget: (settings.faabBudget as number) || 100,
   };
 }

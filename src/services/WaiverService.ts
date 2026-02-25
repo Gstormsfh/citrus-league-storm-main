@@ -4,6 +4,7 @@ import { COLUMNS } from '@/utils/queryColumns';
 import { GameLockService } from './GameLockService';
 import { LeagueMembershipService } from './LeagueMembershipService';
 import { CURRENT_SEASON } from '@/utils/seasonConstants';
+import type { LeagueSettings } from '@/types/leagueTypes';
 
 export interface WaiverClaim {
   id: string;
@@ -301,7 +302,7 @@ export class WaiverService {
 
   /**
    * Submit a waiver claim (for game-locked players or players on waivers)
-   * Claim will be processed at league's waiver_process_time (default 3 AM)
+   * Claim will be processed at league's waiver_process_time (default 2 AM MT)
    */
   static async submitWaiverClaim(
     leagueId: string,
@@ -321,7 +322,7 @@ export class WaiverService {
         return { success: false, error: 'League not found.' };
       }
 
-      if ((leagueCheck.settings as any)?.bestBallEnabled) {
+      if ((leagueCheck.settings as LeagueSettings)?.bestBallEnabled) {
         return { success: false, error: 'Waivers are not allowed in Best Ball leagues.' };
       }
 
@@ -721,7 +722,7 @@ export class WaiverService {
         return { success: false, error: 'League not found.' };
       }
 
-      if ((bbCheck.settings as any)?.bestBallEnabled) {
+      if ((bbCheck.settings as LeagueSettings)?.bestBallEnabled) {
         return { success: false, error: 'FAAB bidding is not allowed in Best Ball leagues.' };
       }
 
@@ -812,7 +813,7 @@ export class WaiverService {
         .eq('id', leagueId)
         .single();
 
-      const settings = league?.settings as any;
+      const settings = league?.settings as LeagueSettings | undefined;
       const initialBudget = settings?.faabBudget ?? settings?.auctionBudget ?? 100;
 
       // Calculate spent budget from completed FAAB claims
@@ -848,7 +849,7 @@ export class WaiverService {
         .eq('id', leagueId)
         .single();
 
-      const settings = league?.settings as any;
+      const settings = league?.settings as LeagueSettings | undefined;
       const initialBudget = settings?.faabBudget ?? settings?.auctionBudget ?? 100;
 
       // Get all teams
