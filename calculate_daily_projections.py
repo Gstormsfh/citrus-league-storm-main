@@ -51,6 +51,11 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 
 DEFAULT_SEASON = int(os.getenv("CITRUS_DEFAULT_SEASON", "2025"))
 
+# Cache version: Bump this whenever the projection data sources or model change.
+# This invalidates all cached projections from previous versions, forcing recalculation.
+# v3.0 = switched from PBP-derived columns to official nhl_* columns (Feb 2026)
+CACHE_VERSION = "3.0"
+
 
 def supabase_client() -> SupabaseRest:
     return SupabaseRest(SUPABASE_URL, SUPABASE_KEY)
@@ -2073,18 +2078,21 @@ def load_physical_projection(
 ) -> Optional[Dict[str, Any]]:
     """
     Load physical projection from projection_cache table if it exists.
-    
+    Validates data_source_hash against current CACHE_VERSION to reject stale entries.
+
     Args:
         db: Supabase client
         player_id: Player ID
         game_id: Game ID
         projection_date: Projection date
         season: Season year
-    
+
     Returns:
-        Physical projection dict if found in cache, None otherwise
+        Physical projection dict if found in cache and version matches, None otherwise
     """
     try:
+        import hashlib
+
         cached = db.select(
             "projection_cache",
             select="*",
@@ -2096,9 +2104,19 @@ def load_physical_projection(
             ],
             limit=1
         )
-        
+
         if cached and len(cached) > 0:
             cache_entry = cached[0]
+
+            # Validate cache version via data_source_hash
+            expected_hash_input = f"v{CACHE_VERSION}_{player_id}_{game_id}_{projection_date}_{season}"
+            expected_hash = hashlib.md5(expected_hash_input.encode()).hexdigest()
+            stored_hash = cache_entry.get("data_source_hash", "")
+
+            if stored_hash != expected_hash:
+                # Stale cache entry from older version — treat as cache miss
+                return None
+
             return {
                 "goals": float(cache_entry.get("projected_goals", 0.0)),
                 "assists": float(cache_entry.get("projected_assists", 0.0)),
@@ -2154,8 +2172,9 @@ def save_physical_projection(
             # The projection will still be saved to player_projected_stats (no constraint there)
             return True
         
-        # Generate data source hash for integrity checking
-        hash_input = f"{player_id}_{game_id}_{projection_date}_{season}"
+        # Generate versioned data source hash — includes CACHE_VERSION so that
+        # bumping the version auto-invalidates all prior cached entries on load
+        hash_input = f"v{CACHE_VERSION}_{player_id}_{game_id}_{projection_date}_{season}"
         data_source_hash = hashlib.md5(hash_input.encode()).hexdigest()
         
         # Prepare data for insert/update
