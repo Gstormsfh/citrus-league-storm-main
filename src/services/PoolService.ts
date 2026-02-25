@@ -14,6 +14,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { ScheduleService, NHLGame } from '@/services/ScheduleService';
 import { SEASON_START_YEAR } from '@/utils/seasonConstants';
+import type { LeagueSettings } from '@/types/leagueTypes';
 
 // ============================================================================
 // Week / Deadline Helpers
@@ -534,7 +535,7 @@ export class PoolService {
         .eq('id', leagueId)
         .single();
 
-      const maxLives = (league?.settings as any)?.survivorLives ?? 1;
+      const maxLives = (league?.settings as LeagueSettings)?.survivorLives ?? 1;
 
       // Count incorrect picks
       const { count, error } = await supabase
@@ -595,7 +596,7 @@ export class PoolService {
         .eq('id', leagueId)
         .single();
 
-      const maxLives = (league?.settings as any)?.survivorLives ?? 1;
+      const maxLives = (league?.settings as LeagueSettings)?.survivorLives ?? 1;
 
       const { data: selections, error } = await supabase
         .from('survivor_selections')

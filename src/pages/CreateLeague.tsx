@@ -153,7 +153,7 @@ const CreateLeague = () => {
 
   // ---- Waiver Settings ----
   const [waiverSettings, setWaiverSettings] = useState({
-    waiver_process_time: '03:00:00',
+    waiver_process_time: '02:00:00',
     waiver_period_hours: 48,
     waiver_game_lock: true,
     waiver_type: 'rolling' as 'rolling' | 'faab' | 'reverse_standings',
@@ -321,6 +321,9 @@ const CreateLeague = () => {
 
         // Roster slot configuration
         rosterSlots: isFantasy ? rosterSlots : undefined,
+
+        // FAAB budget (persisted so SQL RPCs can read it)
+        faabBudget: waiverSettings.faab_budget,
       };
 
       // Build scoring_settings JSONB (for points-based formats)
@@ -1239,7 +1242,7 @@ const CreateLeague = () => {
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
-                          <Label>Waiver Process Time (EST)</Label>
+                          <Label>Waiver Process Time (MT)</Label>
                           <Select
                             value={waiverSettings.waiver_process_time}
                             onValueChange={(value) => setWaiverSettings(prev => ({ ...prev, waiver_process_time: value }))}
@@ -1247,6 +1250,7 @@ const CreateLeague = () => {
                             <SelectTrigger><SelectValue /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="00:00:00">12:00 AM (Midnight)</SelectItem>
+                              <SelectItem value="02:00:00">2:00 AM (Default)</SelectItem>
                               <SelectItem value="03:00:00">3:00 AM</SelectItem>
                               <SelectItem value="06:00:00">6:00 AM</SelectItem>
                               <SelectItem value="09:00:00">9:00 AM</SelectItem>

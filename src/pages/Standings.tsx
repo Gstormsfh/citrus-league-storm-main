@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { LeagueService, League, Team, getLeagueFormat } from '@/services/LeagueService';
+import type { LeagueSettings } from '@/types/leagueTypes';
 import { DraftService } from '@/services/DraftService';
 import { PlayerService } from '@/services/PlayerService';
 import { MatchupService } from '@/services/MatchupService';
@@ -240,7 +241,7 @@ const Standings = () => {
           // Detect league format for conditional rendering
           if (leagueData) {
             const fmt = getLeagueFormat(leagueData);
-            const playoffTeams = (leagueData.settings as any)?.playoffTeams ?? 6;
+            const playoffTeams = (leagueData.settings as LeagueSettings)?.playoffTeams ?? 6;
             setLeagueFormat({ leagueType: fmt.leagueType, scoringFormat: fmt.scoringFormat, playoffTeams });
           }
 

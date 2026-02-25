@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import { LeagueService, League, Team, LEAGUE_TEAMS_DATA } from '@/services/LeagueService';
+import type { LeagueSettings } from '@/types/leagueTypes';
 import { DraftService, DraftPick, DraftState } from '@/services/DraftService';
 import { PlayerService, Player } from '@/services/PlayerService';
 import { AuctionDraftService } from '@/services/AuctionDraftService';
@@ -402,10 +403,10 @@ const DraftRoom = () => {
       setIsCommissioner(leagueData.commissioner_id === user.id);
       
       // Detect auction draft type
-      const draftTypeFromSettings = (leagueData.settings as any)?.draftType;
+      const draftTypeFromSettings = (leagueData.settings as LeagueSettings)?.draftType;
       if (draftTypeFromSettings === 'auction') {
         setIsAuctionDraft(true);
-        const defaultBudget = (leagueData.settings as any)?.auctionBudget ?? 200;
+        const defaultBudget = (leagueData.settings as LeagueSettings)?.auctionBudget ?? 200;
         setAuctionState({
           budgets: [],
           currentNomination: null,
@@ -2010,7 +2011,7 @@ const DraftRoom = () => {
           || randomizedTeamOrder
           || undefined;
         
-        const leagueDraftType = (league?.settings as any)?.draftType || 'snake';
+        const leagueDraftType = (league?.settings as LeagueSettings)?.draftType || 'snake';
         const { error: initError } = await DraftService.initializeDraftOrder(
           leagueId,
           user.id,
@@ -2181,7 +2182,7 @@ const DraftRoom = () => {
         draftRounds
       });
 
-      const startDraftType = (league?.settings as any)?.draftType || 'snake';
+      const startDraftType = (league?.settings as LeagueSettings)?.draftType || 'snake';
       const { error: initError } = await DraftService.initializeDraftOrder(
         leagueId,
         user.id,
@@ -3273,7 +3274,7 @@ const DraftRoom = () => {
                            currentRound={draftState?.currentRound || 1}
                            totalRounds={league?.draft_rounds || draftSettings.rounds || 21}
                            onPlayerClick={handlePlayerClick}
-                           draftType={((league?.settings as any)?.draftType || 'snake') as 'snake' | 'linear'}
+                           draftType={((league?.settings as LeagueSettings)?.draftType || 'snake') as 'snake' | 'linear'}
                          />
                        </TabsContent>
                      )}
@@ -3635,7 +3636,7 @@ const DraftRoom = () => {
                            currentRound={draftState?.currentRound || 1}
                            totalRounds={league?.draft_rounds || draftSettings.rounds || 21}
                            onPlayerClick={handlePlayerClick}
-                           draftType={((league?.settings as any)?.draftType || 'snake') as 'snake' | 'linear'}
+                           draftType={((league?.settings as LeagueSettings)?.draftType || 'snake') as 'snake' | 'linear'}
                         />
                      </CardContent>
                   </Card>

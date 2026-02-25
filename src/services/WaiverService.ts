@@ -4,6 +4,7 @@ import { COLUMNS } from '@/utils/queryColumns';
 import { GameLockService } from './GameLockService';
 import { LeagueMembershipService } from './LeagueMembershipService';
 import { CURRENT_SEASON } from '@/utils/seasonConstants';
+import type { LeagueSettings } from '@/types/leagueTypes';
 
 export interface WaiverClaim {
   id: string;
@@ -301,7 +302,7 @@ export class WaiverService {
 
   /**
    * Submit a waiver claim (for game-locked players or players on waivers)
-   * Claim will be processed at league's waiver_process_time (default 3 AM)
+   * Claim will be processed at league's waiver_process_time (default 2 AM MT)
    */
   static async submitWaiverClaim(
     leagueId: string,
@@ -311,13 +312,17 @@ export class WaiverService {
   ): Promise<{ success: boolean; error?: string; claimId?: string }> {
     try {
       // Best Ball leagues prohibit waivers (industry standard: zero management)
-      const { data: leagueCheck } = await supabase
+      const { data: leagueCheck, error: leagueCheckErr } = await supabase
         .from('leagues')
         .select('settings')
         .eq('id', leagueId)
         .single();
 
-      if ((leagueCheck?.settings as any)?.bestBallEnabled) {
+      if (leagueCheckErr || !leagueCheck) {
+        return { success: false, error: 'League not found.' };
+      }
+
+      if ((leagueCheck.settings as LeagueSettings)?.bestBallEnabled) {
         return { success: false, error: 'Waivers are not allowed in Best Ball leagues.' };
       }
 
@@ -707,13 +712,17 @@ export class WaiverService {
   ): Promise<{ success: boolean; error?: string; claimId?: string }> {
     try {
       // Best Ball leagues prohibit FAAB bidding (industry standard: zero management)
-      const { data: bbCheck } = await supabase
+      const { data: bbCheck, error: bbCheckErr } = await supabase
         .from('leagues')
         .select('settings')
         .eq('id', leagueId)
         .single();
 
-      if ((bbCheck?.settings as any)?.bestBallEnabled) {
+      if (bbCheckErr || !bbCheck) {
+        return { success: false, error: 'League not found.' };
+      }
+
+      if ((bbCheck.settings as LeagueSettings)?.bestBallEnabled) {
         return { success: false, error: 'FAAB bidding is not allowed in Best Ball leagues.' };
       }
 
@@ -804,7 +813,7 @@ export class WaiverService {
         .eq('id', leagueId)
         .single();
 
-      const settings = league?.settings as any;
+      const settings = league?.settings as LeagueSettings | undefined;
       const initialBudget = settings?.faabBudget ?? settings?.auctionBudget ?? 100;
 
       // Calculate spent budget from completed FAAB claims
@@ -840,7 +849,7 @@ export class WaiverService {
         .eq('id', leagueId)
         .single();
 
-      const settings = league?.settings as any;
+      const settings = league?.settings as LeagueSettings | undefined;
       const initialBudget = settings?.faabBudget ?? settings?.auctionBudget ?? 100;
 
       // Get all teams
@@ -961,24 +970,42 @@ export class WaiverService {
 
             if (teamData?.owner_id) {
               // Conditional drop logic (ESPN/Yahoo standard):
-              // When is_conditional_drop is true, the drop_player_id is only
-              // dropped if the add succeeds. First try adding without drop,
-              // then with drop if roster is full.
-              const dropId = winner.is_conditional_drop
-                ? winner.drop_player_id  // conditional: include drop to make space
-                : winner.drop_player_id; // non-conditional: always include drop
+              // - Non-conditional: always include the drop player
+              // - Conditional: try add-only first; if roster is full, retry with drop
+              let moveResult: { success: boolean; error?: string };
 
-              const moveResult = await this.addFreeAgent(
-                leagueId,
-                winner.team_id,
-                playerId,
-                dropId,
-                teamData.owner_id
-              );
+              if (winner.is_conditional_drop && winner.drop_player_id) {
+                // Try add-only first (no drop)
+                moveResult = await this.addFreeAgent(
+                  leagueId,
+                  winner.team_id,
+                  playerId,
+                  null,
+                  teamData.owner_id
+                );
+
+                // If add-only failed (likely roster full), retry with the drop
+                if (!moveResult.success) {
+                  moveResult = await this.addFreeAgent(
+                    leagueId,
+                    winner.team_id,
+                    playerId,
+                    winner.drop_player_id,
+                    teamData.owner_id
+                  );
+                }
+              } else {
+                // Non-conditional: always include the drop
+                moveResult = await this.addFreeAgent(
+                  leagueId,
+                  winner.team_id,
+                  playerId,
+                  winner.drop_player_id,
+                  teamData.owner_id
+                );
+              }
 
               if (!moveResult.success) {
-                // If conditional and drop was included but still failed,
-                // mark as failed with specific reason
                 const reason = winner.is_conditional_drop
                   ? `Conditional claim failed: ${moveResult.error}`
                   : `Roster move failed: ${moveResult.error}`;

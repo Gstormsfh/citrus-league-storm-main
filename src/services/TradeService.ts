@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { PlayerService } from './PlayerService';
 import { LeagueMembershipService } from './LeagueMembershipService';
 import { COLUMNS } from '@/utils/queryColumns';
+import type { LeagueSettings } from '@/types/leagueTypes';
 
 export interface TradeOffer {
   id: string;
@@ -54,18 +55,22 @@ export class TradeService {
     try {
       // Best Ball leagues prohibit trades (industry standard: zero management after draft)
       // Also fetch settings for dynamic trade expiration (commissioner-configurable)
-      const { data: league } = await supabase
+      const { data: league, error: leagueErr } = await supabase
         .from('leagues')
         .select('settings')
         .eq('id', leagueId)
         .single();
 
-      if ((league?.settings as any)?.bestBallEnabled) {
+      if (leagueErr || !league) {
+        return { success: false, error: 'League not found.' };
+      }
+
+      if ((league.settings as LeagueSettings)?.bestBallEnabled) {
         return { success: false, error: 'Trades are not allowed in Best Ball leagues.' };
       }
 
       // Check trade deadline (also enforced by DB trigger, but give a friendly message)
-      const tradeDeadlineWeek = (league?.settings as any)?.tradeDeadlineWeek ?? 0;
+      const tradeDeadlineWeek = (league.settings as LeagueSettings)?.tradeDeadlineWeek ?? 0;
       if (tradeDeadlineWeek > 0) {
         const { data: latestMatchup } = await supabase
           .from('matchups')
@@ -82,7 +87,7 @@ export class TradeService {
       }
 
       // Trade expiration: read from league settings (commissioner-configurable), default 7 days
-      const tradeExpirationDays = (league?.settings as any)?.tradeExpirationDays ?? 7;
+      const tradeExpirationDays = (league?.settings as LeagueSettings)?.tradeExpirationDays ?? 7;
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + tradeExpirationDays);
 
@@ -319,7 +324,9 @@ export class TradeService {
       ];
 
       // Best-effort logging — don't fail the trade if ledger insert fails
-      await supabase.from('transaction_ledger').insert(txnEntries).catch(() => {});
+      await supabase.from('transaction_ledger').insert(txnEntries).catch((err) => {
+        console.error('[TradeService] Transaction ledger insert failed:', err);
+      });
 
       // 4. Record in trade history
       await supabase

@@ -438,7 +438,7 @@ const WaiverWire = () => {
                   <div className="flex items-center justify-between p-3 bg-citrus-sage/10 rounded-varsity border-2 border-citrus-sage/30">
                     <span className="text-sm font-display text-citrus-charcoal">Process Time</span>
                     <span className="font-varsity font-bold text-citrus-forest">
-                      {waiverSettings?.waiver_process_time || '3:00 AM'} EST
+                      {waiverSettings?.waiver_process_time || '2:00 AM'} MT
                     </span>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-citrus-peach/10 rounded-varsity border-2 border-citrus-peach/30">

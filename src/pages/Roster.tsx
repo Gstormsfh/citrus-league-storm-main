@@ -31,6 +31,7 @@ import { useToast } from '@/hooks/use-toast';
 import HockeyPlayerCard from '@/components/roster/HockeyPlayerCard';
 import { PlayerService, Player } from '@/services/PlayerService';
 import { LeagueService, Transaction, LEAGUE_TEAMS_DATA } from '@/services/LeagueService';
+import type { LeagueSettings } from '@/types/leagueTypes';
 import { DraftService } from '@/services/DraftService';
 import { CitrusPuckService } from '@/services/CitrusPuckService';
 import { ScheduleService } from '@/services/ScheduleService';
@@ -518,7 +519,7 @@ const Roster = () => {
           }
 
           // Detect Best Ball mode
-          if (leagueData.settings && (leagueData.settings as any).bestBallEnabled) {
+          if (leagueData.settings && (leagueData.settings as LeagueSettings).bestBallEnabled) {
             setBestBallEnabled(true);
           }
 
