@@ -10,6 +10,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { CURRENT_SEASON } from '@/utils/seasonConstants';
 
 // ============================================================================
 // TYPES
@@ -130,7 +131,7 @@ export const PlayoffService = {
         .from('playoff_brackets')
         .select('*')
         .eq('league_id', leagueId)
-        .eq('season', new Date().getFullYear())
+        .eq('season', CURRENT_SEASON)
         .maybeSingle();
 
       if (bracketError) throw bracketError;

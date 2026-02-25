@@ -173,22 +173,20 @@ export const TeamIntelHub = () => {
         // Get all players
         const allPlayers = await PlayerService.getAllPlayers();
 
-        // Get roster from draft_picks
-        const { data: allDraftPicks, error: picksError } = await supabase
-          .from('draft_picks')
-          .select('*')
+        // Use roster_assignments (source of truth) instead of draft_picks
+        const { data: rosterAssignments, error: rosterError } = await supabase
+          .from('roster_assignments')
+          .select('player_id')
           .eq('league_id', activeLeagueId)
-          .eq('team_id', userTeam.id)
-          .is('deleted_at', null)
-          .order('pick_number', { ascending: true });
+          .eq('team_id', userTeam.id);
 
         let players: Player[] = [];
 
-        if (picksError) {
-          console.error('Error fetching draft picks:', picksError);
-        } else if (allDraftPicks && allDraftPicks.length > 0) {
-          const playerIds = allDraftPicks.map(p => p.player_id);
-          players = allPlayers.filter(p => playerIds.includes(p.id));
+        if (rosterError) {
+          console.error('Error fetching roster assignments:', rosterError);
+        } else if (rosterAssignments && rosterAssignments.length > 0) {
+          const playerIds = rosterAssignments.map((r: { player_id: string }) => String(r.player_id));
+          players = allPlayers.filter(p => playerIds.includes(String(p.id)));
         }
 
         if (players.length === 0) {

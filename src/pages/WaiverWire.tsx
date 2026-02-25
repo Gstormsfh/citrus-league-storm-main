@@ -656,7 +656,7 @@ const WaiverWire = () => {
                                 </div>
                               )}
                               <div>
-                                Priority #{claim.priority}
+                                {isFAAB ? `Bid: $${claim.priority}` : `Priority #${claim.priority}`}
                               </div>
                             </div>
                           </div>

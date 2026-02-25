@@ -12,6 +12,7 @@ import SigningSimulator from '@/components/armchair-gm/SigningSimulator';
 import { getTeamCapData } from '@/services/NHLCapService';
 import { TeamCapData, formatCap, SALARY_CAP_2025_26 } from '@/types/captracker';
 import { cn } from '@/lib/utils';
+import { SEASON_LABEL } from '@/utils/seasonConstants';
 import {
   DollarSign, TrendingUp, ChevronLeft, Loader2, AlertCircle,
   ArrowLeftRight, Calculator, CalendarRange, BarChart3, PenLine,
@@ -85,13 +86,13 @@ const ArmchairGM = () => {
               <HeroBadge label="Salary Cap" value={formatCap(SALARY_CAP_2025_26)} />
               <HeroBadge label="Cap Floor" value="$70.6M" />
               <HeroBadge label="Max Contracts" value="50" />
-              <HeroBadge label="Season" value="2025-26" />
+              <HeroBadge label="Season" value={SEASON_LABEL} />
             </div>
             {/* Condensed mobile stats row */}
             <div className="flex sm:hidden gap-2 mt-3 overflow-x-auto scrollbar-hide">
               <HeroBadge label="Cap" value={formatCap(SALARY_CAP_2025_26)} />
               <HeroBadge label="Floor" value="$70.6M" />
-              <HeroBadge label="Season" value="25-26" />
+              <HeroBadge label="Season" value={SEASON_LABEL.slice(2)} />
             </div>
           </div>
 

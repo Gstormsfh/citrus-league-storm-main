@@ -7,6 +7,7 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
+import { CURRENT_SEASON } from "@/utils/seasonConstants";
 import {
   getFirstWeekStartDate,
   getCurrentWeekNumber,
@@ -242,10 +243,7 @@ class StormyServiceImpl {
         weekStart = getWeekStartDate(currentWeek, firstWeekStart);
         weekEnd = getWeekEndDate(currentWeek, firstWeekStart);
         weekLabel = getWeekLabel(currentWeek, firstWeekStart);
-        totalWeeks = getScheduleLength(
-          firstWeekStart,
-          new Date().getFullYear(),
-        );
+        totalWeeks = getScheduleLength(firstWeekStart);
       }
 
       // ── 3. All teams in league + all roster assignments (parallel) ──
@@ -342,7 +340,7 @@ class StormyServiceImpl {
             .from("player_directory")
             .select("player_id, full_name, position_code, team_abbrev")
             .in("player_id", allNeededPlayerIds)
-            .eq("season", 2025),
+            .eq("season", CURRENT_SEASON),
           // 6b. User lineup status
           supabase
             .from("team_lineups")
@@ -355,13 +353,13 @@ class StormyServiceImpl {
             .from("player_season_stats")
             .select("player_id, games_played, nhl_goals, nhl_assists, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_ppp, nhl_shp, goalie_gp, nhl_wins, nhl_saves, nhl_goals_against, nhl_shutouts, nhl_save_pct")
             .in("player_id", allNeededPlayerIds)
-            .eq("season", 2025),
+            .eq("season", CURRENT_SEASON),
           // 6d. Injury/talent status for roster players
           supabase
             .from("player_talent_metrics")
             .select("player_id, roster_status, is_ir_eligible, vopa_score")
             .in("player_id", playerIds)
-            .eq("season", 2025),
+            .eq("season", CURRENT_SEASON),
           // 6e. All matchups for standings calculation
           supabase
             .from("matchups")
@@ -372,7 +370,7 @@ class StormyServiceImpl {
           supabase
             .from("player_ros_projections")
             .select("player_id, player_name, position, team_abbrev, total_projected_points, avg_points_per_game, games_remaining")
-            .eq("season", 2025)
+            .eq("season", CURRENT_SEASON)
             .gt("total_projected_points", 0)
             .gt("games_remaining", 0)
             .order("total_projected_points", { ascending: false })
@@ -450,6 +448,9 @@ class StormyServiceImpl {
                 const ppg = (ss.nhl_points / ss.games_played).toFixed(1);
                 line += ` ${ppg}PPG`;
                 if (ss.nhl_ppp > 0) line += ` ${ss.nhl_ppp}PPP`;
+                if (ss.nhl_shp > 0) line += ` ${ss.nhl_shp}SHP`;
+                // Include peripheral stats used in fantasy scoring
+                line += ` ${ss.nhl_shots_on_goal}SOG ${ss.nhl_hits}HIT ${ss.nhl_blocks}BLK ${ss.nhl_pim}PIM`;
               }
             }
 

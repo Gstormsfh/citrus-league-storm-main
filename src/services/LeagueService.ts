@@ -7,6 +7,8 @@ import { RosterCacheService } from "./RosterCacheService";
 import { LeagueMembershipService } from "./LeagueMembershipService";
 import { DEMO_LEAGUE_ID_FOR_GUESTS } from "./DemoLeagueService";
 import { logger } from "@/utils/logger";
+import { getTodayMST } from "@/utils/timezoneUtils";
+import { CURRENT_SEASON } from "@/utils/seasonConstants";
 import type { LeagueType, ScoringFormat, DraftType as LeagueDraftType } from "@/types/leagueTypes";
 import { extractFormatSettings } from "@/types/leagueTypes";
 
@@ -2153,7 +2155,7 @@ async joinLeagueByCode(
         .select('id, week_start_date, week_end_date, team1_id, team2_id')
         .eq('league_id', leagueId)
         .or(`team1_id.eq.${teamId},team2_id.eq.${teamId}`)
-        .gte('week_end_date', new Date().toISOString().split('T')[0]) // Current or future weeks
+        .gte('week_end_date', getTodayMST()) // Current or future weeks
         .order('week_start_date', { ascending: true })
         .limit(1);
       
@@ -2763,7 +2765,7 @@ async joinLeagueByCode(
       // Query all completed matchups OR past matchups (week_end_date < CURRENT_DATE) for this league
       // This ensures Week 1 and Week 2 are both included even if Week 1 wasn't marked as completed
       // CRITICAL: Include past weeks regardless of status to ensure all historical data is included
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = getTodayMST();
       
       // Use two separate queries and combine: completed matchups OR past matchups
       // This is more reliable than complex .or() syntax
@@ -3012,8 +3014,20 @@ async joinLeagueByCode(
       const playerPointsMap = new Map<string, number>();
       allPlayers.forEach(p => playerPointsMap.set(p.id, p.points || 0));
 
-      // Sum points for each team based on their drafted players
-      draftPicks.forEach(pick => {
+      // CRITICAL FIX: Use roster_assignments (source of truth) instead of draftPicks parameter.
+      // draftPicks misses players acquired via waivers/trades, causing incorrect standings.
+      const { data: rosterAssignments, error: rosterError } = await supabase
+        .from('roster_assignments')
+        .select('player_id, team_id')
+        .eq('league_id', leagueId);
+
+      const rosterData = rosterError ? draftPicks : (rosterAssignments || []).map((r: { player_id: string; team_id: string }) => ({
+        team_id: r.team_id,
+        player_id: String(r.player_id)
+      }));
+
+      // Sum points for each team based on their current roster
+      rosterData.forEach((pick: { team_id: string; player_id: string }) => {
         if (result[pick.team_id]) {
           const pts = playerPointsMap.get(pick.player_id) || 0;
           result[pick.team_id].pointsFor += pts;
@@ -3046,7 +3060,7 @@ async joinLeagueByCode(
           .from('matchups')
           .select('week_number')
           .eq('league_id', leagueId)
-          .lt('week_end_date', new Date().toISOString().split('T')[0]);
+          .lt('week_end_date', getTodayMST());
 
         if (matchupData && matchupData.length > 0) {
           const maxWeek = Math.max(...matchupData.map((m: any) => m.week_number));
@@ -3112,7 +3126,7 @@ async joinLeagueByCode(
     });
 
     try {
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = getTodayMST();
 
       // Fetch completed and past matchups
       const [completedResult, pastResult] = await Promise.all([
@@ -3147,7 +3161,7 @@ async joinLeagueByCode(
             .from('player_directory')
             .select('player_id, goals, assists, points, plus_minus, shots_on_goal, hits, blocks, pim, power_play_points, short_handed_points, position_code, wins, saves, shutouts, goals_against, save_pct')
             .in('player_id', playerIds)
-            .eq('season', 2025)
+            .eq('season', CURRENT_SEASON)
         : { data: [] };
 
       // Map player stats by ID
@@ -3362,7 +3376,7 @@ async joinLeagueByCode(
             .from('player_directory')
             .select('player_id, goals, assists, points, plus_minus, shots_on_goal, hits, blocks, pim, power_play_points, short_handed_points, position_code, wins, saves, shutouts, goals_against, save_pct')
             .in('player_id', rotoPlayerIds)
-            .eq('season', 2025)
+            .eq('season', CURRENT_SEASON)
         : { data: [] };
 
       const rotoPlayerMap = new Map<string, any>();

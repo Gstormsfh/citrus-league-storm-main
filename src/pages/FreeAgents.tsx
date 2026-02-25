@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
@@ -90,6 +90,24 @@ const FreeAgents = () => {
   const [selectedPlayer, setSelectedPlayer] = useState<HockeyPlayer | null>(null);
   const [isPlayerDialogOpen, setIsPlayerDialogOpen] = useState(false);
 
+  // Infinite scroll pagination
+  const PAGE_SIZE = 50;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const loadMoreRef = useCallback((node: HTMLDivElement | null) => {
+    if (observerRef.current) observerRef.current.disconnect();
+    if (!node) return;
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleCount(prev => prev + PAGE_SIZE);
+        }
+      },
+      { rootMargin: '200px' }
+    );
+    observerRef.current.observe(node);
+  }, []);
+
   useEffect(() => {
     // Skip if league is changing
     if (isChangingLeague) {
@@ -120,6 +138,11 @@ const FreeAgents = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [players.length, activeLeagueId]);
+
+  // Reset visible count when search/position filter changes
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [searchQuery, positionFilter, activeTab]);
 
   // Fetch platform-wide trending data (real add counts)
   useEffect(() => {
@@ -169,20 +192,17 @@ const FreeAgents = () => {
         try {
           const allPlayers = await PlayerService.getAllPlayers();
           
-          // CRITICAL: Include top goalies AND top skaters
-          // Goalies have 0 points, so we can't just sort by points
+          // Show ALL players — skaters sorted by points, goalies sorted by wins
           const skaters = allPlayers.filter(p => p.position !== 'G');
           const goalies = allPlayers.filter(p => p.position === 'G');
-          
-          const topSkaters = [...skaters]
-            .sort((a, b) => (b.points || 0) - (a.points || 0))
-            .slice(0, 170); // Top 170 skaters
-          
-          const topGoalies = [...goalies]
-            .sort((a, b) => (b.wins || 0) - (a.wins || 0))
-            .slice(0, 30); // Top 30 goalies
-          
-          const sortedPlayers = [...topSkaters, ...topGoalies];
+
+          const sortedSkaters = [...skaters]
+            .sort((a, b) => (b.points || 0) - (a.points || 0));
+
+          const sortedGoalies = [...goalies]
+            .sort((a, b) => (b.wins || 0) - (a.wins || 0));
+
+          const sortedPlayers = [...sortedSkaters, ...sortedGoalies];
           setPlayers(sortedPlayers);
           setLoading(false);
           return;
@@ -1050,6 +1070,11 @@ const FreeAgents = () => {
   };
 
   const filteredPlayers = sortPlayers(getFilteredPlayers(players));
+  const visiblePlayers = useMemo(
+    () => filteredPlayers.slice(0, visibleCount),
+    [filteredPlayers, visibleCount]
+  );
+  const hasMorePlayers = visibleCount < filteredPlayers.length;
 
   const handlePlayerClick = async (player: Player) => {
     // Fetch fresh season stats using unified helper (same as Matchup tab)
@@ -1100,11 +1125,11 @@ const FreeAgents = () => {
       // Fallback uses season PPG * games this week (not the broken points/20 formula)
       const seasonPPG = p.games_played > 0 ? (p.points || 0) / p.games_played : 0;
       const isGoalie = p.position === 'G';
-      // Goalies: estimate ~4 pts/game (W=4 + saves*0.2 + SO bonus), skaters: use actual PPG with scoring multiplier
+      // Goalies: W*4 + SV*0.2 + SO*3 + GA*-1. Skaters: full fantasy scoring formula.
       const estimatedFantasyPPG = isGoalie
-        ? ((p.wins || 0) > 0 && p.games_played > 0 ? ((p.wins || 0) * 4 + (p.saves || 0) * 0.2 + (p.shutouts || 0) * 3) / p.games_played : 3.0)
+        ? ((p.wins || 0) > 0 && p.games_played > 0 ? ((p.wins || 0) * 4 + (p.saves || 0) * 0.2 + (p.shutouts || 0) * 3 + (p.goals_against || 0) * -1) / p.games_played : 3.0)
         : (p.games_played > 0
-          ? ((p.goals || 0) * 3 + (p.assists || 0) * 2 + (p.ppp || 0) * 1 + (p.shp || 0) * 2 + (p.shots || 0) * 0.4 + (p.blocks || 0) * 0.5 + (p.hits || 0) * 0.2) / p.games_played
+          ? ((p.goals || 0) * 3 + (p.assists || 0) * 2 + (p.ppp || 0) * 1 + (p.shp || 0) * 2 + (p.shots || 0) * 0.4 + (p.blocks || 0) * 0.5 + (p.hits || 0) * 0.2 + (p.pim || 0) * 0.5) / p.games_played
           : 0);
       const weeklyProjection = gamesThisWeek === 0
         ? 0
@@ -1601,13 +1626,13 @@ const FreeAgents = () => {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {filteredPlayers.map((player) => {
+                            {visiblePlayers.map((player) => {
                               const isGoalie = player.position === 'G';
                               return (
                                 <TableRow key={player.id} className="hover:bg-muted/50">
                                   <TableCell className="font-medium">
                                     <div className="flex flex-col">
-                                      <span 
+                                      <span
                                         className="hover:underline hover:text-primary cursor-pointer"
                                         onClick={() => handlePlayerClick(player)}
                                       >
@@ -1642,9 +1667,9 @@ const FreeAgents = () => {
                                   )}
                                   <TableCell>
                                     <div className="flex gap-1 justify-end">
-                                      <Button 
-                                        size="icon" 
-                                        variant="ghost" 
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
                                         className={`h-8 w-8 ${watchlist.has(player.id) ? 'text-yellow-500' : 'text-muted-foreground'}`}
                                         onClick={() => toggleWatchlist(player)}
                                       >
@@ -1664,6 +1689,15 @@ const FreeAgents = () => {
                           </TableBody>
                         </Table>
                       </div>
+                      {/* Infinite scroll sentinel + count */}
+                      <div className="text-center py-3 text-sm text-muted-foreground">
+                        Showing {visiblePlayers.length} of {filteredPlayers.length} players
+                      </div>
+                      {hasMorePlayers && (
+                        <div ref={loadMoreRef} className="flex justify-center py-4">
+                          <div className="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1774,9 +1808,9 @@ const FreeAgents = () => {
                           const gw = player.gamesThisWeek || 0;
                           const isG = player.position === 'G';
                           const estPPG = isG
-                            ? ((player.wins || 0) > 0 && player.games_played > 0 ? ((player.wins || 0) * 4 + (player.saves || 0) * 0.2 + (player.shutouts || 0) * 3) / player.games_played : 3.0)
+                            ? ((player.wins || 0) > 0 && player.games_played > 0 ? ((player.wins || 0) * 4 + (player.saves || 0) * 0.2 + (player.shutouts || 0) * 3 + (player.goals_against || 0) * -1) / player.games_played : 3.0)
                             : (player.games_played > 0
-                              ? ((player.goals || 0) * 3 + (player.assists || 0) * 2 + (player.ppp || 0) * 1 + (player.shp || 0) * 2 + (player.shots || 0) * 0.4 + (player.blocks || 0) * 0.5 + (player.hits || 0) * 0.2) / player.games_played
+                              ? ((player.goals || 0) * 3 + (player.assists || 0) * 2 + (player.ppp || 0) * 1 + (player.shp || 0) * 2 + (player.shots || 0) * 0.4 + (player.blocks || 0) * 0.5 + (player.hits || 0) * 0.2 + (player.pim || 0) * 0.5) / player.games_played
                               : 0);
                           const weeklyProjection = gw === 0
                             ? 0
@@ -1800,7 +1834,11 @@ const FreeAgents = () => {
                           return b.weeklyProjection - a.weeklyProjection;
                         });
                         
-                        return sorted.map((player, index) => {
+                        const visibleSorted = sorted.slice(0, visibleCount);
+                        const hasMoreSchedule = visibleCount < sorted.length;
+                        return (
+                          <>
+                          {visibleSorted.map((player, index) => {
                            const isGoalie = player.position === 'G';
                            const isTopPick = index < 3; // Highlight top 3
                            return (
@@ -1817,7 +1855,7 @@ const FreeAgents = () => {
                                      </span>
                                    )}
                                    <div className="flex flex-col">
-                                     <span 
+                                     <span
                                        className="hover:underline hover:text-primary cursor-pointer font-semibold"
                                        onClick={() => handlePlayerClick(player)}
                                      >
@@ -1920,11 +1958,33 @@ const FreeAgents = () => {
                                </TableCell>
                              </TableRow>
                            );
-                         });
+                         })}
+                         </>
+                        );
                        })()}
                      </TableBody>
                    </Table>
                  </div>
+                 {/* Schedule tab: count + infinite scroll sentinel */}
+                 {(() => {
+                   const totalSchedule = scheduleMaximizers.filter(player => {
+                     const normalizedPos = formatPositionForDisplay(player.position);
+                     return positionFilter === 'ALL' ||
+                       (positionFilter === 'W' ? (normalizedPos === 'LW' || normalizedPos === 'RW') : normalizedPos === positionFilter);
+                   }).length;
+                   return (
+                     <>
+                       <div className="text-center py-3 text-sm text-muted-foreground">
+                         Showing {Math.min(visibleCount, totalSchedule)} of {totalSchedule} players
+                       </div>
+                       {visibleCount < totalSchedule && (
+                         <div ref={loadMoreRef} className="flex justify-center py-4">
+                           <div className="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
+                         </div>
+                       )}
+                     </>
+                   );
+                 })()}
                </div>
              )}
           </TabsContent>

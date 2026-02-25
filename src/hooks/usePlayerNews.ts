@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { PlayerService, Player } from '@/services/PlayerService';
+import { CURRENT_SEASON } from '@/utils/seasonConstants';
 
 export interface PlayerNewsItem {
   player_id: number;
@@ -51,7 +52,7 @@ export function usePlayerNews(
       const { data: metrics, error } = await supabase
         .from('player_talent_metrics')
         .select('player_id, roster_status, is_ir_eligible, roster_status_updated_at')
-        .eq('season', 2025)
+        .eq('season', CURRENT_SEASON)
         .in('player_id', playerIds);
 
       if (error) {
@@ -150,7 +151,7 @@ export function usePlayerNews(
           event: 'UPDATE',
           schema: 'public',
           table: 'player_talent_metrics',
-          filter: `season=eq.2025`,
+          filter: `season=eq.${CURRENT_SEASON}`,
         },
         (payload) => {
           // Debounce rapid updates
@@ -160,8 +161,8 @@ export function usePlayerNews(
 
           debounceTimeoutRef.current = setTimeout(() => {
             // Check if this update affects one of our roster players
-            const updatedPlayerId = (payload.new as { player_id?: string })?.player_id;
-            if (playerIds.includes(updatedPlayerId)) {
+            const updatedPlayerId = Number((payload.new as { player_id?: string })?.player_id);
+            if (!isNaN(updatedPlayerId) && playerIds.includes(updatedPlayerId)) {
               // Refresh news feed
               fetchPlayerNews();
             }

@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowRight, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { CitrusLogo } from '@/components/icons/CitrusIcons';
+import { CURRENT_SEASON, SEASON_LABEL } from '@/utils/seasonConstants';
 import WaitlistSignup from '@/components/WaitlistSignup';
 
 const HeroSection = () => {
@@ -21,7 +22,7 @@ const HeroSection = () => {
           {/* Vintage badge */}
           <div className="inline-flex items-center gap-2 bg-citrus-sage/40 border-2 border-citrus-sage rounded-varsity px-4 py-2 mb-6">
             <CitrusLogo className="w-5 h-5 animate-pulse" />
-            <span className="font-display font-bold text-xs uppercase tracking-wider text-citrus-forest">Live Fantasy Hockey • 2025</span>
+            <span className="font-display font-bold text-xs uppercase tracking-wider text-citrus-forest">Live Fantasy Hockey • {CURRENT_SEASON}</span>
           </div>
           
           <h1 className="text-5xl md:text-6xl lg:text-7xl font-varsity font-black leading-none uppercase mb-6 text-citrus-forest tracking-tight drop-shadow-[0_2px_2px_rgba(255,255,255,0.3)]">

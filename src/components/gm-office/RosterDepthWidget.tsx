@@ -113,42 +113,27 @@ export const RosterDepthWidget = () => {
         // Get all players
         const allPlayers = await PlayerService.getAllPlayers();
 
-        // Get roster from draft_picks (same approach as Roster.tsx)
-        const { data: allDraftPicks, error: picksError } = await supabase
-          .from('draft_picks')
-          .select('*')
+        // Use roster_assignments (source of truth) instead of draft_picks
+        const { data: rosterAssignments, error: picksError } = await supabase
+          .from('roster_assignments')
+          .select('player_id')
           .eq('league_id', activeLeagueId)
-          .eq('team_id', userTeam.id)
-          .is('deleted_at', null)
-          .order('pick_number', { ascending: true });
+          .eq('team_id', userTeam.id);
 
         let rosterPlayers: Player[] = [];
 
         if (picksError) {
-          console.error('Error fetching draft picks:', picksError);
-          // Fallback: try using DraftService
-          try {
-            const { DraftService } = await import('@/services/DraftService');
-            const { picks: draftPicks } = await DraftService.getDraftPicks(activeLeagueId, user.id);
-            const teamPicks = draftPicks.filter(p => p.team_id === userTeam.id);
-            const playerIds = teamPicks.map(p => p.player_id);
-            rosterPlayers = allPlayers.filter(p => playerIds.includes(p.id));
-          } catch (fallbackError) {
-            console.error('Fallback also failed:', fallbackError);
-            setLoading(false);
-            return;
-          }
+          console.error('Error fetching roster assignments:', picksError);
+          setLoading(false);
+          return;
         } else {
-          if (!allDraftPicks || allDraftPicks.length === 0) {
+          if (!rosterAssignments || rosterAssignments.length === 0) {
             setLoading(false);
             return;
           }
 
-          // Get player IDs from draft picks
-          const playerIds = allDraftPicks.map(p => p.player_id);
-
-          // Filter players by roster IDs
-          rosterPlayers = allPlayers.filter(p => playerIds.includes(p.id));
+          const playerIds = rosterAssignments.map((r: { player_id: string }) => String(r.player_id));
+          rosterPlayers = allPlayers.filter(p => playerIds.includes(String(p.id)));
         }
 
         if (rosterPlayers.length === 0) {

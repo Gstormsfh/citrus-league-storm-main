@@ -1,4 +1,5 @@
 import { League } from '@/services/LeagueService';
+import { DEFAULT_TEST_DATE } from '@/utils/seasonConstants';
 
 /**
  * Get the date when the draft was completed
@@ -12,13 +13,17 @@ export function getDraftCompletionDate(league: League): Date | null {
 }
 
 /**
- * Get the test first week start date (December 7, 2025 - Sunday)
- * This is used for testing when today is December 7th, 2025
+ * Get the test first week start date.
+ * Finds the first Sunday on or after the DEFAULT_TEST_DATE.
  */
 export function getTestFirstWeekStartDate(): Date {
-  // December 7, 2025 is a Sunday
-  const testDate = new Date('2025-12-07T00:00:00');
+  const testDate = new Date(DEFAULT_TEST_DATE + 'T00:00:00');
   testDate.setHours(0, 0, 0, 0);
+  // Advance to Sunday if not already Sunday
+  const dow = testDate.getDay();
+  if (dow !== 0) {
+    testDate.setDate(testDate.getDate() + (7 - dow));
+  }
   return testDate;
 }
 
@@ -26,42 +31,40 @@ export function getTestFirstWeekStartDate(): Date {
  * Get the Sunday of the first week after draft completion
  * If draft completes on Sunday, that Sunday is the start
  * Otherwise, it's the next Sunday
- * 
- * For testing: If today is December 7, 2025 or later and draft was completed before/on that date,
- * use December 7, 2025 as the first week start
+ *
+ * For testing: If today is past the test anchor date and draft was completed before/on that date,
+ * use the test anchor Sunday as the first week start
  */
 export function getFirstWeekStartDate(draftCompletionDate: Date): Date {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
-  // Test date: December 7, 2025 (Sunday)
-  const testDate = new Date('2025-12-07T00:00:00');
-  testDate.setHours(0, 0, 0, 0);
-  
-  // If today is December 7, 2025 or later, and draft was completed on or before that date,
-  // use December 7, 2025 as the first week start for testing
-  if (today >= testDate) {
+
+  const testAnchor = getTestFirstWeekStartDate();
+
+  // If today is past the test anchor and draft was completed on or before it,
+  // pin to the test anchor Sunday
+  if (today >= testAnchor) {
     const draftDate = new Date(draftCompletionDate);
     draftDate.setHours(0, 0, 0, 0);
-    
-    if (draftDate <= testDate) {
-      return testDate;
+
+    if (draftDate <= testAnchor) {
+      return testAnchor;
     }
   }
-  
+
   // Normal logic: calculate Sunday after draft completion
   const date = new Date(draftCompletionDate);
   date.setHours(0, 0, 0, 0);
-  
+
   // Get day of week (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
   const dayOfWeek = date.getDay();
-  
+
   // Calculate days to add to get to Sunday
   // If it's Sunday (0), add 0 days
   // If it's Saturday (6), add 1 day
   // Otherwise, add (7 - dayOfWeek) days to get to next Sunday
   const daysToAdd = dayOfWeek === 0 ? 0 : (dayOfWeek === 6 ? 1 : (7 - dayOfWeek));
-  
+
   date.setDate(date.getDate() + daysToAdd);
   return date;
 }
@@ -119,10 +122,9 @@ export function getCurrentWeekNumber(firstWeekStart: Date): number {
  * - Season starts Oct 6, 2025 → Regular season ends Apr 15, 2026 (≈27 weeks)
  * 
  * @param firstWeekStart - The Sunday date of the first week of the season
- * @param currentYear - The current calendar year (used for context, but calculation is based on firstWeekStart)
  * @returns Array of week numbers (1-based) from week 1 to the last week of regular season
  */
-export function getAvailableWeeks(firstWeekStart: Date, currentYear: number): number[] {
+export function getAvailableWeeks(firstWeekStart: Date): number[] {
   const weeks: number[] = [];
   
   // Determine the season year based on when the first week starts
@@ -163,8 +165,8 @@ export function getAvailableWeeks(firstWeekStart: Date, currentYear: number): nu
  * Get the total number of regular season weeks (schedule length)
  * This is the length of the array returned by getAvailableWeeks
  */
-export function getScheduleLength(firstWeekStart: Date, currentYear: number): number {
-  const weeks = getAvailableWeeks(firstWeekStart, currentYear);
+export function getScheduleLength(firstWeekStart: Date): number {
+  const weeks = getAvailableWeeks(firstWeekStart);
   return weeks.length;
 }
 

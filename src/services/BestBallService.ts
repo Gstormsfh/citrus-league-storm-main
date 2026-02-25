@@ -14,6 +14,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { ScoringCalculator, extractScoringSettings } from '@/utils/scoringUtils';
 import { DEFAULT_ROSTER_SLOTS, type RosterSlotConfig } from '@/types/leagueTypes';
+import { CURRENT_SEASON } from '@/utils/seasonConstants';
 
 // Mapping of roster slot codes to eligible player positions
 const SLOT_ELIGIBLE_POSITIONS: Record<string, string[]> = {
@@ -150,11 +151,7 @@ export class BestBallService {
 
       if (playerIds.length === 0) return emptyResult;
 
-      // Determine current season dynamically
-      const currentYear = new Date().getFullYear();
-      const currentMonth = new Date().getMonth();
-      // NHL season spans Oct-Jun: if month is Jan-Jun, season started previous year
-      const season = currentMonth >= 9 ? currentYear : currentYear - 1;
+      const season = CURRENT_SEASON;
 
       // Get player positions
       const { data: players } = await supabase

@@ -3,6 +3,7 @@ import { PlayerService } from './PlayerService';
 import { COLUMNS } from '@/utils/queryColumns';
 import { GameLockService } from './GameLockService';
 import { LeagueMembershipService } from './LeagueMembershipService';
+import { CURRENT_SEASON } from '@/utils/seasonConstants';
 
 export interface WaiverClaim {
   id: string;
@@ -94,7 +95,7 @@ export class WaiverService {
       const { data: player } = await supabase
         .from('player_directory')
         .select('team_abbrev')
-        .eq('season', 2025)
+        .eq('season', CURRENT_SEASON)
         .eq('player_id', playerId)
         .maybeSingle();
 

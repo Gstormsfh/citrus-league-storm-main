@@ -11,6 +11,7 @@ import { withTimeout } from '@/utils/promiseUtils';
 import { getTodayMST, getTodayMSTDate, formatDateToString, isDateInRange } from '@/utils/timezoneUtils';
 import { COLUMNS } from '@/utils/queryColumns';
 import { ScoringCalculator, extractScoringSettings } from '@/utils/scoringUtils';
+import { DEFAULT_TEST_DATE } from '@/utils/seasonConstants';
 
 // Shared stat shape used by calculateMatchupWeekPoints and matchup stats
 interface MatchupWeekStats {
@@ -261,8 +262,7 @@ export const MatchupService = {
   ): Promise<{ error: PostgrestError | Error | null }> {
     try {
       // Get available weeks
-      const currentYear = new Date().getFullYear();
-      const availableWeeks = getAvailableWeeks(firstWeekStart, currentYear);
+      const availableWeeks = getAvailableWeeks(firstWeekStart);
 
       if (teams.length < 2) {
         return { error: new Error('Need at least 2 teams to generate matchups') };
@@ -614,8 +614,7 @@ export const MatchupService = {
       // Get first week start date
       const draftCompletionDate = league.updated_at ? new Date(league.updated_at) : new Date();
       const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
-      const currentYear = new Date().getFullYear();
-      const scheduleLength = getScheduleLength(firstWeekStart, currentYear);
+      const scheduleLength = getScheduleLength(firstWeekStart);
       const isPlayoffWeek = matchup.week_number > scheduleLength;
 
       // Get user's team to determine which side they're on (if they're in this matchup)
@@ -824,8 +823,7 @@ export const MatchupService = {
       // Get first week start date
       const draftCompletionDate = league.updated_at ? new Date(league.updated_at as string) : new Date();
       const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
-      const currentYear = new Date().getFullYear();
-      const scheduleLength = getScheduleLength(firstWeekStart, currentYear);
+      const scheduleLength = getScheduleLength(firstWeekStart);
       const isPlayoffWeek = weekNumber > scheduleLength;
 
       // Get user's team
@@ -1040,7 +1038,7 @@ export const MatchupService = {
       }
 
       // Calculate navigation metadata
-      const availableWeeks = getAvailableWeeks(firstWeekStart, currentYear);
+      const availableWeeks = getAvailableWeeks(firstWeekStart);
       const currentWeekIndex = availableWeeks.indexOf(weekNumber);
       const previousWeek = currentWeekIndex > 0 ? availableWeeks[currentWeekIndex - 1] : null;
       const nextWeek = currentWeekIndex < availableWeeks.length - 1 ? availableWeeks[currentWeekIndex + 1] : null;
@@ -1127,19 +1125,20 @@ export const MatchupService = {
    */
   async getRosterPlayerIds(teamId: string, leagueId: string): Promise<string[]> {
     try {
-      const { data: teamDraftPicks, error: picksError } = await supabase
-        .from('draft_picks')
+      // CRITICAL FIX: Use roster_assignments (source of truth) instead of draft_picks.
+      // draft_picks misses players acquired via trades (TradeService only updates roster_assignments).
+      const { data: assignments, error: assignError } = await supabase
+        .from('roster_assignments')
         .select('player_id')
         .eq('league_id', leagueId)
-        .eq('team_id', teamId)
-        .is('deleted_at', null);
-      
-      if (picksError) {
-        console.error('Error fetching roster player IDs:', picksError);
+        .eq('team_id', teamId);
+
+      if (assignError) {
+        console.error('Error fetching roster player IDs:', assignError);
         return [];
       }
-      
-      return (teamDraftPicks || []).map(p => p.player_id);
+
+      return (assignments || []).map((a: { player_id: string }) => String(a.player_id));
     } catch (error: unknown) {
       console.error('Error getting roster player IDs:', error);
       return [];
@@ -1161,15 +1160,13 @@ export const MatchupService = {
         return cached.roster;
       }
 
-      // Optimized: Query draft picks directly for this team (not all league picks)
-      // This matches the efficient pattern used in Roster.tsx
+      // CRITICAL FIX: Use roster_assignments (source of truth) instead of draft_picks.
+      // draft_picks misses players acquired via trades (TradeService only updates roster_assignments).
       const { data: teamDraftPicks, error: picksError } = await supabase
-        .from('draft_picks')
-        .select(COLUMNS.DRAFT_PICK)
+        .from('roster_assignments')
+        .select('player_id, team_id, league_id')
         .eq('league_id', leagueId)
-        .eq('team_id', teamId)
-        .is('deleted_at', null)
-        .order('pick_number', { ascending: true });
+        .eq('team_id', teamId);
       
       if (picksError) {
         console.error('Error fetching draft picks for team:', picksError);
@@ -1292,7 +1289,9 @@ export const MatchupService = {
       status: p.status === 'injured' ? 'IR' : (p.status === 'active' ? null : 'WVR'),
       image: p.headshot_url || undefined,
       nextGame: { opponent: 'vs OPP', isToday: false },
-      projectedPoints: (p.points || 0) / 20
+      projectedPoints: p.games_played > 0
+        ? ((p.goals || 0) * 3 + (p.assists || 0) * 2 + (p.shots || 0) * 0.4 + (p.blocks || 0) * 0.5 + (p.hits || 0) * 0.2 + (p.pim || 0) * 0.5) / p.games_played
+        : 0
     };
   },
 
@@ -1378,7 +1377,7 @@ export const MatchupService = {
       // Calculate games remaining (scheduled or live games from today onwards)
       // Test mode controlled via VITE_TEST_MODE environment variable (defaults to false)
       const TEST_MODE = import.meta.env.VITE_TEST_MODE === 'true';
-      const TEST_DATE = import.meta.env.VITE_TEST_DATE || '2025-12-08';
+      const TEST_DATE = import.meta.env.VITE_TEST_DATE || DEFAULT_TEST_DATE;
       const getTodayString = () => TEST_MODE ? TEST_DATE : getTodayMST(); // Use MST instead of UTC
       const getTodayDate = () => {
         if (TEST_MODE) {
@@ -2884,8 +2883,7 @@ export const MatchupService = {
       // Get first week start date
       const draftCompletionDate = league.updated_at ? new Date(league.updated_at) : new Date();
       const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
-      const currentYear = new Date().getFullYear();
-      const scheduleLength = getScheduleLength(firstWeekStart, currentYear);
+      const scheduleLength = getScheduleLength(firstWeekStart);
 
       // Get all teams to determine bracket size
       const { teams } = await LeagueService.getLeagueTeams(leagueId);
