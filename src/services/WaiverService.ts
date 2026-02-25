@@ -43,6 +43,8 @@ export interface LeagueWaiverSettings {
   waiver_game_lock: boolean;
   waiver_type: 'rolling' | 'faab' | 'reverse_standings';
   allow_trades_during_games: boolean;
+  weeklyAddLimit?: number;   // 0 = unlimited (industry standard)
+  seasonAddLimit?: number;   // 0 = unlimited (industry standard)
 }
 
 export class WaiverService {
