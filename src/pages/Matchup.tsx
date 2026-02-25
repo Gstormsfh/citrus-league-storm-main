@@ -492,8 +492,7 @@ const Matchup = () => {
         setFirstWeekStart(firstWeek);
         
         // Get available weeks (same as logged-in users)
-        const currentYear = new Date().getFullYear();
-        const weeks = getAvailableWeeks(firstWeek, currentYear);
+        const weeks = getAvailableWeeks(firstWeek);
         log(` Calculated ${weeks.length} available weeks:`, weeks);
         setAvailableWeeks(weeks);
         
@@ -3741,8 +3740,7 @@ const Matchup = () => {
         setFirstWeekStart(firstWeek);
 
         // Get available weeks
-        const currentYear = new Date().getFullYear();
-        const weeks = getAvailableWeeks(firstWeek, currentYear);
+        const weeks = getAvailableWeeks(firstWeek);
         log(` Calculated ${weeks.length} available weeks:`, weeks);
         setAvailableWeeks(weeks);
 

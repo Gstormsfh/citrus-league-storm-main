@@ -1156,8 +1156,7 @@ const Roster = () => {
         }
 
         const firstWeek = getFirstWeekStartDate(draftCompletionDate);
-        const currentYear = new Date().getFullYear();
-        const weeks = getAvailableWeeks(firstWeek, currentYear);
+        const weeks = getAvailableWeeks(firstWeek);
         const currentWeek = getCurrentWeekNumber(firstWeek);
         
         setFirstWeekStart(firstWeek);

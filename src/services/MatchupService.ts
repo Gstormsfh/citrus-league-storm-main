@@ -262,8 +262,7 @@ export const MatchupService = {
   ): Promise<{ error: PostgrestError | Error | null }> {
     try {
       // Get available weeks
-      const currentYear = new Date().getFullYear();
-      const availableWeeks = getAvailableWeeks(firstWeekStart, currentYear);
+      const availableWeeks = getAvailableWeeks(firstWeekStart);
 
       if (teams.length < 2) {
         return { error: new Error('Need at least 2 teams to generate matchups') };
@@ -615,8 +614,7 @@ export const MatchupService = {
       // Get first week start date
       const draftCompletionDate = league.updated_at ? new Date(league.updated_at) : new Date();
       const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
-      const currentYear = new Date().getFullYear();
-      const scheduleLength = getScheduleLength(firstWeekStart, currentYear);
+      const scheduleLength = getScheduleLength(firstWeekStart);
       const isPlayoffWeek = matchup.week_number > scheduleLength;
 
       // Get user's team to determine which side they're on (if they're in this matchup)
@@ -825,8 +823,7 @@ export const MatchupService = {
       // Get first week start date
       const draftCompletionDate = league.updated_at ? new Date(league.updated_at as string) : new Date();
       const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
-      const currentYear = new Date().getFullYear();
-      const scheduleLength = getScheduleLength(firstWeekStart, currentYear);
+      const scheduleLength = getScheduleLength(firstWeekStart);
       const isPlayoffWeek = weekNumber > scheduleLength;
 
       // Get user's team
@@ -1041,7 +1038,7 @@ export const MatchupService = {
       }
 
       // Calculate navigation metadata
-      const availableWeeks = getAvailableWeeks(firstWeekStart, currentYear);
+      const availableWeeks = getAvailableWeeks(firstWeekStart);
       const currentWeekIndex = availableWeeks.indexOf(weekNumber);
       const previousWeek = currentWeekIndex > 0 ? availableWeeks[currentWeekIndex - 1] : null;
       const nextWeek = currentWeekIndex < availableWeeks.length - 1 ? availableWeeks[currentWeekIndex + 1] : null;
@@ -2886,8 +2883,7 @@ export const MatchupService = {
       // Get first week start date
       const draftCompletionDate = league.updated_at ? new Date(league.updated_at) : new Date();
       const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
-      const currentYear = new Date().getFullYear();
-      const scheduleLength = getScheduleLength(firstWeekStart, currentYear);
+      const scheduleLength = getScheduleLength(firstWeekStart);
 
       // Get all teams to determine bracket size
       const { teams } = await LeagueService.getLeagueTeams(leagueId);

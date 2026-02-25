@@ -122,10 +122,9 @@ export function getCurrentWeekNumber(firstWeekStart: Date): number {
  * - Season starts Oct 6, 2025 → Regular season ends Apr 15, 2026 (≈27 weeks)
  * 
  * @param firstWeekStart - The Sunday date of the first week of the season
- * @param currentYear - The current calendar year (used for context, but calculation is based on firstWeekStart)
  * @returns Array of week numbers (1-based) from week 1 to the last week of regular season
  */
-export function getAvailableWeeks(firstWeekStart: Date, currentYear: number): number[] {
+export function getAvailableWeeks(firstWeekStart: Date): number[] {
   const weeks: number[] = [];
   
   // Determine the season year based on when the first week starts
@@ -166,8 +165,8 @@ export function getAvailableWeeks(firstWeekStart: Date, currentYear: number): nu
  * Get the total number of regular season weeks (schedule length)
  * This is the length of the array returned by getAvailableWeeks
  */
-export function getScheduleLength(firstWeekStart: Date, currentYear: number): number {
-  const weeks = getAvailableWeeks(firstWeekStart, currentYear);
+export function getScheduleLength(firstWeekStart: Date): number {
+  const weeks = getAvailableWeeks(firstWeekStart);
   return weeks.length;
 }
 

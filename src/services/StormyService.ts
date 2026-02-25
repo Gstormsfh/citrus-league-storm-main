@@ -243,10 +243,7 @@ class StormyServiceImpl {
         weekStart = getWeekStartDate(currentWeek, firstWeekStart);
         weekEnd = getWeekEndDate(currentWeek, firstWeekStart);
         weekLabel = getWeekLabel(currentWeek, firstWeekStart);
-        totalWeeks = getScheduleLength(
-          firstWeekStart,
-          new Date().getFullYear(),
-        );
+        totalWeeks = getScheduleLength(firstWeekStart);
       }
 
       // ── 3. All teams in league + all roster assignments (parallel) ──
