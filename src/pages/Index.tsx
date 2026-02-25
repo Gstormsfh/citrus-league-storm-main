@@ -42,7 +42,7 @@ const Index = () => {
         <Suspense fallback={<div>Loading Navbar...</div>}>
           <Navbar />
         </Suspense>
-        <main className="pt-[92px]">
+        <main className="pt-[92px] pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">
           <TestingPhaseBanner />
           <Suspense fallback={<div>Loading sections...</div>}>
             <HeroSection />

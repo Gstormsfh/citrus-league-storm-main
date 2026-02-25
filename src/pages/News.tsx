@@ -61,7 +61,7 @@ const News = () => {
     <div className="min-h-screen flex flex-col">
       <Navbar />
 
-      <main className="pt-24 pb-16 flex-grow">
+      <main className="pt-24 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-16 flex-grow">
         <div className="container mx-auto px-4 max-w-6xl">
           {/* Header */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">

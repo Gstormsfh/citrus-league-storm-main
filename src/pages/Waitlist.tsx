@@ -15,7 +15,7 @@ const Waitlist = () => {
       <CitrusBackground density="medium" animated={true} />
       <Navbar />
 
-      <main className="pt-[92px] pb-20">
+      <main className="pt-[92px] pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-20">
         {/* Hero Section */}
         <section className="relative overflow-hidden">
           <div className="container mx-auto px-4 py-16 md:py-24">
