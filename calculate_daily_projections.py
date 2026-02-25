@@ -2,10 +2,11 @@
 """
 calculate_daily_projections.py
 
-Citrus Projections 2.0 - Core Calculation Engine
+Citrus Projections 3.0 - Core Calculation Engine
 Builds high-performance, daily-focused fantasy point projections using:
+- Official NHL.com stats as source of truth (nhl_* columns)
 - Bayesian shrinkage for small-sample size volatility
-- xG-based finishing talent adjustments
+- xG v3 finishing talent adjustments (31-feature model with pass context)
 - Daily contextual factors (opponent, B2B, home/away)
 
 Usage:
@@ -49,6 +50,11 @@ if not SUPABASE_URL or not SUPABASE_KEY:
     raise RuntimeError("Missing VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment.")
 
 DEFAULT_SEASON = int(os.getenv("CITRUS_DEFAULT_SEASON", "2025"))
+
+# Cache version: Bump this whenever the projection data sources or model change.
+# This invalidates all cached projections from previous versions, forcing recalculation.
+# v3.0 = switched from PBP-derived columns to official nhl_* columns (Feb 2026)
+CACHE_VERSION = "3.0"
 
 
 def supabase_client() -> SupabaseRest:
@@ -399,10 +405,10 @@ def calculate_hybrid_base(
     Returns:
         Dict with base projections: goals, assists, sog, blocks, ppp, shp, hits, pim, ppg
     """
-    # Get player's season stats (ALL 8 categories)
+    # Get player's season stats (ALL 8 categories) - MUST use nhl_* official columns
     player_stats = db.select(
         "player_season_stats",
-        select="goals,primary_assists,secondary_assists,shots_on_goal,blocks,ppp,shp,hits,pim,games_played",
+        select="nhl_goals,nhl_assists,nhl_shots_on_goal,nhl_blocks,nhl_ppp,nhl_shp,nhl_hits,nhl_pim,games_played",
         filters=[("player_id", "eq", player_id), ("season", "eq", season)],
         limit=1
     )
@@ -424,16 +430,16 @@ def calculate_hybrid_base(
             "ppp": 0.0, "shp": 0.0, "hits": 0.0, "pim": 0.0
         }
     else:
-        # Calculate per-game rates for ALL 8 stats
+        # Calculate per-game rates for ALL 8 stats using official NHL.com values
         player_history = {
-            "goals": float(stats.get("goals", 0)) / gp,
-            "assists": (float(stats.get("primary_assists", 0)) + float(stats.get("secondary_assists", 0))) / gp,
-            "sog": float(stats.get("shots_on_goal", 0)) / gp,
-            "blocks": float(stats.get("blocks", 0)) / gp,
-            "ppp": float(stats.get("ppp", 0)) / gp,
-            "shp": float(stats.get("shp", 0)) / gp,
-            "hits": float(stats.get("hits", 0)) / gp,
-            "pim": float(stats.get("pim", 0)) / gp,
+            "goals": float(stats.get("nhl_goals", 0)) / gp,
+            "assists": float(stats.get("nhl_assists", 0)) / gp,
+            "sog": float(stats.get("nhl_shots_on_goal", 0)) / gp,
+            "blocks": float(stats.get("nhl_blocks", 0)) / gp,
+            "ppp": float(stats.get("nhl_ppp", 0)) / gp,
+            "shp": float(stats.get("nhl_shp", 0)) / gp,
+            "hits": float(stats.get("nhl_hits", 0)) / gp,
+            "pim": float(stats.get("nhl_pim", 0)) / gp,
         }
     
     # Get league averages
@@ -516,18 +522,18 @@ def calculate_finishing_talent(db: SupabaseRest, player_id: int, season: int) ->
     Returns:
         Multiplier (typically 0.7 to 1.5, capped)
     """
-    # Get player's actual goals from season stats
+    # Get player's actual goals from season stats (official NHL.com)
     player_stats = db.select(
         "player_season_stats",
-        select="goals",
+        select="nhl_goals",
         filters=[("player_id", "eq", player_id), ("season", "eq", season)],
         limit=1
     )
-    
+
     if not player_stats or len(player_stats) == 0:
         return 1.0
-    
-    actual_goals = float(player_stats[0].get("goals", 0))
+
+    actual_goals = float(player_stats[0].get("nhl_goals", 0))
     
     # Get xG total from raw_shots (prefer shooting_talent_adjusted_xg)
     try:
@@ -601,10 +607,10 @@ def get_opposing_goalie_save_pct(
         # In the future, if goalie projections are added to player_projected_stats,
         # we can query them here using the same pattern as skater projections.
         
-        # Team baseline - get top 2 goalies by games_played
+        # Team baseline - get top 2 goalies by games_played (official NHL.com SV%)
         goalie_season_stats = db.select(
             "player_season_stats",
-            select="player_id,save_pct,goalie_gp",
+            select="player_id,nhl_save_pct,goalie_gp",
             filters=[("season", "eq", season)],
             limit=1000
         )
@@ -625,12 +631,12 @@ def get_opposing_goalie_save_pct(
                     limit=100
                 )
                 
-                # Map goalie stats by player_id
+                # Map goalie stats by player_id (official NHL.com SV%)
                 goalie_stats_map = {}
                 for gss in goalie_season_stats:
                     pid = int(gss.get("player_id", 0))
                     goalie_stats_map[pid] = {
-                        "save_pct": float(gss.get("save_pct", 0)) if gss.get("save_pct") else 0,
+                        "save_pct": float(gss.get("nhl_save_pct", 0)) if gss.get("nhl_save_pct") else 0,
                         "goalie_gp": int(gss.get("goalie_gp", 0))
                     }
                 
@@ -1519,23 +1525,23 @@ def calculate_goalie_projection(
         opponent_team = game.get("away_team") if game.get("home_team") == goalie_team else game.get("home_team")
         is_home = game.get("home_team") == goalie_team
         
-        # Get goalie's season stats
+        # Get goalie's season stats (official NHL.com)
         goalie_stats = db.select(
             "player_season_stats",
-            select="goalie_gp,wins,saves,shots_faced,goals_against,shutouts",
+            select="goalie_gp,nhl_wins,nhl_saves,nhl_shots_faced,nhl_goals_against,nhl_shutouts",
             filters=[("player_id", "eq", player_id), ("season", "eq", season)],
             limit=1
         )
-        
+
         if not goalie_stats or len(goalie_stats) == 0:
             print(f"⚠️  No season stats found for goalie {player_id}")
             return None
-        
+
         stats = goalie_stats[0]
         games_played = int(stats.get("goalie_gp", 0))
-        total_saves = int(stats.get("saves", 0))
-        total_shots_faced = int(stats.get("shots_faced", 0))
-        total_goals_against = int(stats.get("goals_against", 0))
+        total_saves = int(stats.get("nhl_saves", 0))
+        total_shots_faced = int(stats.get("nhl_shots_faced", 0))
+        total_goals_against = int(stats.get("nhl_goals_against", 0))
         
         # Calculate goalie SV% with Bayesian shrinkage
         # Fetch dynamic league baseline
@@ -2009,14 +2015,14 @@ def calculate_goalie_physical_projection(
         db, canonical_opponent, season, last_n_games=10, debug=False
     ) or 30.0
     
-    # Get goalie's SV% trend
+    # Get goalie's SV% trend (official NHL.com)
     goalie_stats = db.select(
         "player_season_stats",
-        select="save_pct",
+        select="nhl_save_pct",
         filters=[("player_id", "eq", player_id), ("season", "eq", season)],
         limit=1
     )
-    goalie_sv_pct = float(goalie_stats[0].get("save_pct") or 0.91) if goalie_stats else 0.91
+    goalie_sv_pct = float(goalie_stats[0].get("nhl_save_pct") or 0.91) if goalie_stats else 0.91
     
     # Get goalie's GSAx factor (simplified - can use actual GSAx from goalie_gsax table)
     goalie_gsax = get_goalie_gsax(db, player_id, debug=False)
@@ -2072,18 +2078,21 @@ def load_physical_projection(
 ) -> Optional[Dict[str, Any]]:
     """
     Load physical projection from projection_cache table if it exists.
-    
+    Validates data_source_hash against current CACHE_VERSION to reject stale entries.
+
     Args:
         db: Supabase client
         player_id: Player ID
         game_id: Game ID
         projection_date: Projection date
         season: Season year
-    
+
     Returns:
-        Physical projection dict if found in cache, None otherwise
+        Physical projection dict if found in cache and version matches, None otherwise
     """
     try:
+        import hashlib
+
         cached = db.select(
             "projection_cache",
             select="*",
@@ -2095,9 +2104,19 @@ def load_physical_projection(
             ],
             limit=1
         )
-        
+
         if cached and len(cached) > 0:
             cache_entry = cached[0]
+
+            # Validate cache version via data_source_hash
+            expected_hash_input = f"v{CACHE_VERSION}_{player_id}_{game_id}_{projection_date}_{season}"
+            expected_hash = hashlib.md5(expected_hash_input.encode()).hexdigest()
+            stored_hash = cache_entry.get("data_source_hash", "")
+
+            if stored_hash != expected_hash:
+                # Stale cache entry from older version — treat as cache miss
+                return None
+
             return {
                 "goals": float(cache_entry.get("projected_goals", 0.0)),
                 "assists": float(cache_entry.get("projected_assists", 0.0)),
@@ -2153,8 +2172,9 @@ def save_physical_projection(
             # The projection will still be saved to player_projected_stats (no constraint there)
             return True
         
-        # Generate data source hash for integrity checking
-        hash_input = f"{player_id}_{game_id}_{projection_date}_{season}"
+        # Generate versioned data source hash — includes CACHE_VERSION so that
+        # bumping the version auto-invalidates all prior cached entries on load
+        hash_input = f"v{CACHE_VERSION}_{player_id}_{game_id}_{projection_date}_{season}"
         data_source_hash = hashlib.md5(hash_input.encode()).hexdigest()
         
         # Prepare data for insert/update
@@ -2948,16 +2968,16 @@ def calculate_daily_projection(
         # Get league baselines for defensive value
         league_baselines = get_latest_baselines(db, season)
         
-        # Get player's projected TOI for this game (in minutes)
+        # Get player's projected TOI for this game (in minutes, official NHL.com)
         # Use season average TOI as projection (can be enhanced with game-specific TOI projection)
         player_season = db.select(
             "player_season_stats",
-            select="icetime_seconds,games_played",
+            select="nhl_toi_seconds,games_played",
             filters=[("player_id", "eq", player_id), ("season", "eq", season)],
             limit=1
         )
         if player_season and len(player_season) > 0:
-            season_toi_seconds = int(player_season[0].get("icetime_seconds", 0))
+            season_toi_seconds = int(player_season[0].get("nhl_toi_seconds", 0))
             season_gp = int(player_season[0].get("games_played", 0))
             if season_gp > 0:
                 projected_toi_minutes = (season_toi_seconds / season_gp) / 60.0

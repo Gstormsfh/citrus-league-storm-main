@@ -33,13 +33,13 @@ else:
     # Try player_season_stats
     pss = db.select(
         "player_season_stats",
-        select="player_id,team_abbrev,season,goals,games_played",
+        select="player_id,team_abbrev,season,nhl_goals,games_played",
         filters=[("season", "eq", 2025)],
         limit=5
     )
-    
+
     if pss:
         print(f"Found {len(pss)} season stats records:")
         for s in pss:
-            print(f"  Player {s['player_id']} - Team: {s['team_abbrev']}, {s['goals']}G in {s['games_played']}GP")
+            print(f"  Player {s['player_id']} - Team: {s['team_abbrev']}, {s['nhl_goals']}G in {s['games_played']}GP")
 

@@ -180,10 +180,10 @@ def fetch_player_stats(db: SupabaseRest, season: int) -> Dict[int, Dict]:
     print(f"  Fetching player stats...")
     
     while True:
-        # Use actual column names from player_season_stats table
+        # Use official NHL.com column names from player_season_stats table
         stats = db.select(
             "player_season_stats",
-            select="player_id,games_played,goals,primary_assists,secondary_assists,shots_on_goal,blocks,hits,pim,ppp,shp",
+            select="player_id,games_played,nhl_goals,nhl_assists,nhl_shots_on_goal,nhl_blocks,nhl_hits,nhl_pim,nhl_ppp,nhl_shp",
             filters=[("season", "eq", season)],
             limit=FETCH_BATCH_SIZE,
             offset=offset

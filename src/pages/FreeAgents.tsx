@@ -1097,9 +1097,18 @@ const FreeAgents = () => {
       const gamesThisWeek = projectionGameCount > 0 ? projectionGameCount : (scheduleData?.gamesThisWeek || 0);
 
       // 0 games remaining = 0 projected points — tied to our internal projection model
+      // Fallback uses season PPG * games this week (not the broken points/20 formula)
+      const seasonPPG = p.games_played > 0 ? (p.points || 0) / p.games_played : 0;
+      const isGoalie = p.position === 'G';
+      // Goalies: estimate ~4 pts/game (W=4 + saves*0.2 + SO bonus), skaters: use actual PPG with scoring multiplier
+      const estimatedFantasyPPG = isGoalie
+        ? ((p.wins || 0) > 0 && p.games_played > 0 ? ((p.wins || 0) * 4 + (p.saves || 0) * 0.2 + (p.shutouts || 0) * 3) / p.games_played : 3.0)
+        : (p.games_played > 0
+          ? ((p.goals || 0) * 3 + (p.assists || 0) * 2 + (p.ppp || 0) * 1 + (p.shp || 0) * 2 + (p.shots || 0) * 0.4 + (p.blocks || 0) * 0.5 + (p.hits || 0) * 0.2) / p.games_played
+          : 0);
       const weeklyProjection = gamesThisWeek === 0
         ? 0
-        : ((realProjection && realProjection > 0) ? realProjection : ((p.points || 0) / 20));
+        : ((realProjection && realProjection > 0) ? realProjection : (estimatedFantasyPPG * gamesThisWeek));
 
       return {
         ...p,
@@ -1761,10 +1770,17 @@ const FreeAgents = () => {
                         const sorted = [...positionFiltered].map(player => {
                           const numericId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
                           const realProjection = weeklyProjections.get(numericId);
-                          // 0 games remaining = 0 projected points
-                          const weeklyProjection = (player.gamesThisWeek || 0) === 0
+                          // Fallback uses actual fantasy PPG * games (not broken points/20)
+                          const gw = player.gamesThisWeek || 0;
+                          const isG = player.position === 'G';
+                          const estPPG = isG
+                            ? ((player.wins || 0) > 0 && player.games_played > 0 ? ((player.wins || 0) * 4 + (player.saves || 0) * 0.2 + (player.shutouts || 0) * 3) / player.games_played : 3.0)
+                            : (player.games_played > 0
+                              ? ((player.goals || 0) * 3 + (player.assists || 0) * 2 + (player.ppp || 0) * 1 + (player.shp || 0) * 2 + (player.shots || 0) * 0.4 + (player.blocks || 0) * 0.5 + (player.hits || 0) * 0.2) / player.games_played
+                              : 0);
+                          const weeklyProjection = gw === 0
                             ? 0
-                            : ((realProjection && realProjection > 0) ? realProjection : ((player.points || 0) / 20));
+                            : ((realProjection && realProjection > 0) ? realProjection : (estPPG * gw));
                           return { ...player, weeklyProjection };
                         }).sort((a, b) => {
                           if (sortColumn === 'weeklyProjection' || !sortColumn) {

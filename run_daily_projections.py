@@ -2,7 +2,7 @@
 """
 run_daily_projections.py
 
-Citrus Projections 2.0 - Batch Daily Projections with Parallel Processing
+Citrus Projections 3.0 - Batch Daily Projections with Parallel Processing
 Calculates daily fantasy point projections for all rostered players across all leagues.
 Uses multiprocessing for sub-60-second execution on 600+ players.
 
@@ -458,29 +458,27 @@ def generate_traceability_log_for_rejection(
         opponent_team = away_team if home_team == player_team else home_team
         is_home = home_team == player_team
     
-    # Get player season stats
+    # Get player season stats (use official nhl_* columns)
     season_stats = db.select(
         "player_season_stats",
-        select="goals,primary_assists,secondary_assists,shots_on_goal,blocks,games_played",
+        select="nhl_goals,nhl_assists,nhl_shots_on_goal,nhl_blocks,games_played",
         filters=[("player_id", "eq", player_id), ("season", "eq", season)],
         limit=1
     )
-    
+
     gp = 0
     goals = 0
     assists = 0
     sog = 0
     blocks = 0
-    
+
     if season_stats and len(season_stats) > 0:
         stats = season_stats[0]
         gp = int(stats.get("games_played", 0))
-        goals = int(stats.get("goals", 0))
-        primary_assists = int(stats.get("primary_assists", 0))
-        secondary_assists = int(stats.get("secondary_assists", 0))
-        assists = primary_assists + secondary_assists
-        sog = int(stats.get("shots_on_goal", 0))
-        blocks = int(stats.get("blocks", 0))
+        goals = int(stats.get("nhl_goals", 0))
+        assists = int(stats.get("nhl_assists", 0))
+        sog = int(stats.get("nhl_shots_on_goal", 0))
+        blocks = int(stats.get("nhl_blocks", 0))
     
     # Build traceability log
     traceability = {
@@ -738,7 +736,7 @@ def main():
         max_workers = max(4, min(cpu_count * 2, 16))
     
     print("=" * 80)
-    print("CITRUS PROJECTIONS 2.0 - BATCH DAILY PROJECTIONS")
+    print("CITRUS PROJECTIONS 3.0 - BATCH DAILY PROJECTIONS")
     print("=" * 80)
     print(f"Target Date: {target_date}")
     print(f"Season: {args.season}")

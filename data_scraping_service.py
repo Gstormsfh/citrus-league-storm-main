@@ -417,7 +417,10 @@ def run_unified_loop() -> Tuple[str, int]:
     # Sequential execution ensures data accuracy:
     #   1. Reconcile recent games (catch NHL stat corrections)
     #   2. Re-aggregate season stats from per-game data
-    #   3. Update PPP/SHP from Landing Endpoint (authoritative source)
+    #   3. Sync per-game PPP/SHP from Game-Log API (last 3 days)
+    #   4. True-up ALL stats from Landing Endpoint (authoritative source)
+    #      Writes: Goals, Assists, Points, SOG, PIM, PPP, SHP, TOI, +/-,
+    #              Wins, Losses, OTL, Saves, GA, GAA, SV%, Shutouts
     # =========================================================================
     
     # 6. DATA RECONCILIATION (00:00-00:03)
@@ -462,15 +465,44 @@ def run_unified_loop() -> Tuple[str, int]:
         except Exception as e:
             logger.error(f"[AGGREGATE] Error: {e}")
 
-    # 8. LANDING STATS UPDATE - PPP/SHP (00:06-00:10)
-    # Fetch authoritative PPP/SHP from NHL Landing Endpoint
-    if now.hour == 0 and 6 <= now.minute < 10:
-        logger.info("[LANDING] Fetching PPP/SHP from NHL Landing Endpoint...")
+    # 8. PER-GAME PPP/SHP SYNC FROM GAME-LOG (00:06-00:08)
+    # Populate per-game nhl_ppp and nhl_shp from NHL Game-Log API
+    # (Boxscore API only has PP goals, not PP assists — game-log has full PPP/SHP)
+    if now.hour == 0 and 6 <= now.minute < 8:
+        logger.info("[PPP-SYNC] Syncing per-game PPP/SHP from NHL Game-Log API (last 3 days)...")
+        try:
+            import subprocess
+            result = subprocess.run(
+                [sys.executable, "sync_ppp_from_gamelog.py", "--days", "3"],
+                capture_output=True,
+                text=True,
+                timeout=600  # 10 min timeout
+            )
+            if result.returncode == 0:
+                logger.info("[PPP-SYNC] Per-game PPP/SHP sync complete.")
+                if result.stdout:
+                    for line in result.stdout.strip().split('\n')[-3:]:
+                        if line.strip():
+                            logger.info(f"  {line}")
+            else:
+                logger.error(f"[PPP-SYNC] FAILED with code {result.returncode}")
+                if result.stderr:
+                    logger.error(f"  Error: {result.stderr[:500]}")
+        except subprocess.TimeoutExpired:
+            logger.error("[PPP-SYNC] TIMEOUT after 10 minutes")
+        except Exception as e:
+            logger.error(f"[PPP-SYNC] Error: {e}")
+
+    # 9. LANDING STATS TRUE-UP - ALL STATS (00:08-00:12)
+    # Fetch ALL authoritative stats from NHL Landing Endpoint (source of truth)
+    # Overwrites aggregated values with official NHL.com data for every player
+    if now.hour == 0 and 8 <= now.minute < 12:
+        logger.info("[LANDING] True-up ALL stats from NHL Landing Endpoint (Goals, Assists, PPP, SHP, SOG, PIM, TOI, Goalie stats)...")
         try:
             from fetch_nhl_stats_from_landing import main as fetch_landing_stats
             result = fetch_landing_stats()
             if result == 0:
-                logger.info("[LANDING] PPP/SHP update complete.")
+                logger.info("[LANDING] ALL stats true-up complete (official NHL.com source of truth).")
             else:
                 logger.error(f"[LANDING] FAILED with code {result}")
         except Exception as e:
