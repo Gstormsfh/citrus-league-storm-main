@@ -47,6 +47,90 @@ export interface LeagueWaiverSettings {
 
 export class WaiverService {
   /**
+   * Check if a team has exceeded its weekly or season add limit.
+   * Industry standard: ESPN, Yahoo, and Sleeper all support configurable
+   * per-week and per-season acquisition limits set by the commissioner.
+   *
+   * Counts ADD transactions from the transaction_ledger table.
+   * Returns { allowed: true } or { allowed: false, reason: '...' }.
+   */
+  static async checkTransactionLimits(
+    leagueId: string,
+    teamId: string
+  ): Promise<{ allowed: boolean; reason?: string; weeklyAdds?: number; seasonAdds?: number }> {
+    try {
+      // Get league settings for limits
+      const { data: league } = await supabase
+        .from('leagues')
+        .select('settings')
+        .eq('id', leagueId)
+        .single();
+
+      if (!league) return { allowed: true }; // fail open if league not found
+
+      const settings = league.settings as LeagueSettings | undefined;
+      const weeklyLimit = settings?.weeklyAddLimit ?? 0;
+      const seasonLimit = settings?.seasonAddLimit ?? 0;
+
+      // 0 = unlimited (no cap) — skip the DB queries entirely
+      if (weeklyLimit === 0 && seasonLimit === 0) {
+        return { allowed: true };
+      }
+
+      // Check weekly limit
+      if (weeklyLimit > 0) {
+        // Calculate start of current NHL week (Monday 00:00 UTC)
+        const now = new Date();
+        const dayOfWeek = now.getUTCDay(); // 0=Sun, 1=Mon, ...
+        const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        const weekStart = new Date(now);
+        weekStart.setUTCDate(now.getUTCDate() - daysSinceMonday);
+        weekStart.setUTCHours(0, 0, 0, 0);
+
+        const { count, error } = await supabase
+          .from('transaction_ledger')
+          .select('*', { count: 'exact', head: true })
+          .eq('league_id', leagueId)
+          .eq('team_id', teamId)
+          .eq('type', 'ADD')
+          .gte('created_at', weekStart.toISOString());
+
+        if (!error && count !== null && count >= weeklyLimit) {
+          return {
+            allowed: false,
+            reason: `Weekly add limit reached (${count}/${weeklyLimit}). Resets Monday.`,
+            weeklyAdds: count,
+          };
+        }
+      }
+
+      // Check season limit
+      if (seasonLimit > 0) {
+        const { count, error } = await supabase
+          .from('transaction_ledger')
+          .select('*', { count: 'exact', head: true })
+          .eq('league_id', leagueId)
+          .eq('team_id', teamId)
+          .eq('type', 'ADD');
+
+        if (!error && count !== null && count >= seasonLimit) {
+          return {
+            allowed: false,
+            reason: `Season add limit reached (${count}/${seasonLimit}).`,
+            seasonAdds: count,
+          };
+        }
+      }
+
+      return { allowed: true };
+    } catch (err) {
+      console.error('[WaiverService] checkTransactionLimits error:', err);
+      // Fail open — don't block adds if the check itself fails
+      return { allowed: true };
+    }
+  }
+
+  /**
    * Check if a player is available for waiver claim or free agent pickup
    * Respects game lock and waiver period rules
    * REQUIRES: User must be a member of the league
@@ -221,6 +305,12 @@ export class WaiverService {
       // NOTE: Availability check is done in addPlayer() before this is called.
       // No need to check again here — avoids redundant API calls.
 
+      // Enforce weekly/season add limits (ESPN/Yahoo/Sleeper industry standard)
+      const limitCheck = await this.checkTransactionLimits(leagueId, teamId);
+      if (!limitCheck.allowed) {
+        return { success: false, error: limitCheck.reason };
+      }
+
       // Use process_roster_move RPC (atomic transaction engine)
       // This ensures roster_assignments (source of truth) stays in sync
       const { data: result, error: rpcError } = await supabase.rpc('process_roster_move', {
@@ -324,6 +414,12 @@ export class WaiverService {
 
       if ((leagueCheck.settings as LeagueSettings)?.bestBallEnabled) {
         return { success: false, error: 'Waivers are not allowed in Best Ball leagues.' };
+      }
+
+      // Enforce weekly/season add limits (ESPN/Yahoo/Sleeper industry standard)
+      const limitCheck = await this.checkTransactionLimits(leagueId, teamId);
+      if (!limitCheck.allowed) {
+        return { success: false, error: limitCheck.reason };
       }
 
       // Get team's waiver priority
@@ -724,6 +820,12 @@ export class WaiverService {
 
       if ((bbCheck.settings as LeagueSettings)?.bestBallEnabled) {
         return { success: false, error: 'FAAB bidding is not allowed in Best Ball leagues.' };
+      }
+
+      // Enforce weekly/season add limits (ESPN/Yahoo/Sleeper industry standard)
+      const limitCheck = await this.checkTransactionLimits(leagueId, teamId);
+      if (!limitCheck.allowed) {
+        return { success: false, error: limitCheck.reason };
       }
 
       // Validate bid amount

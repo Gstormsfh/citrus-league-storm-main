@@ -161,6 +161,10 @@ const CreateLeague = () => {
     faab_budget: 100,
   });
 
+  // ---- Transaction Limit Settings (industry standard: ESPN/Yahoo/Sleeper) ----
+  const [weeklyAddLimit, setWeeklyAddLimit] = useState("0");
+  const [seasonAddLimit, setSeasonAddLimit] = useState("0");
+
   // ---- Roster Slot Configuration ----
   const [rosterSlots, setRosterSlots] = useState<Record<string, number>>(() => {
     const defaults: Record<string, number> = {};
@@ -324,6 +328,10 @@ const CreateLeague = () => {
 
         // FAAB budget (persisted so SQL RPCs can read it)
         faabBudget: waiverSettings.faab_budget,
+
+        // Transaction limits (industry standard: ESPN/Yahoo/Sleeper)
+        weeklyAddLimit: parseInt(weeklyAddLimit) || 0,
+        seasonAddLimit: parseInt(seasonAddLimit) || 0,
       };
 
       // Build scoring_settings JSONB (for points-based formats)
@@ -1327,6 +1335,45 @@ const CreateLeague = () => {
                             />
                             <span className="text-sm text-muted-foreground">Players can be traded even if game-locked</span>
                           </div>
+                        </div>
+
+                        {/* Transaction Limits - ESPN/Yahoo/Sleeper industry standard */}
+                        <div className="space-y-2">
+                          <Label>Max Adds Per Week</Label>
+                          <Select value={weeklyAddLimit} onValueChange={setWeeklyAddLimit}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="0">Unlimited (Default)</SelectItem>
+                              <SelectItem value="2">2 per week</SelectItem>
+                              <SelectItem value="3">3 per week</SelectItem>
+                              <SelectItem value="4">4 per week</SelectItem>
+                              <SelectItem value="5">5 per week</SelectItem>
+                              <SelectItem value="6">6 per week</SelectItem>
+                              <SelectItem value="7">7 per week</SelectItem>
+                              <SelectItem value="10">10 per week</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            Limit how many free agent pickups a team can make each week. Resets every Monday.
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Max Adds Per Season</Label>
+                          <Select value={seasonAddLimit} onValueChange={setSeasonAddLimit}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="0">Unlimited (Default)</SelectItem>
+                              <SelectItem value="25">25 per season</SelectItem>
+                              <SelectItem value="50">50 per season</SelectItem>
+                              <SelectItem value="75">75 per season</SelectItem>
+                              <SelectItem value="100">100 per season</SelectItem>
+                              <SelectItem value="150">150 per season</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            Limit total free agent pickups for the entire season.
+                          </p>
                         </div>
                       </div>
                     </div>
