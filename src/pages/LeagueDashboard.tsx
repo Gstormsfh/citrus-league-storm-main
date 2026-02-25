@@ -45,6 +45,8 @@ const LeagueDashboard = () => {
     waiver_game_lock: true,
     waiver_type: 'rolling' as 'rolling' | 'faab' | 'reverse_standings',
     allow_trades_during_games: true,
+    weeklyAddLimit: 0,
+    seasonAddLimit: 0,
   });
   
   // Scoring settings state
@@ -165,7 +167,7 @@ const LeagueDashboard = () => {
         allow_trades_during_games: leagueData.allow_trades_during_games ?? true,
         weeklyAddLimit: (leagueSettings.weeklyAddLimit as number) ?? 0,
         seasonAddLimit: (leagueSettings.seasonAddLimit as number) ?? 0,
-      } as any);
+      });
       
       // Update scoring settings from league data
       if (leagueData.scoring_settings) {
@@ -371,9 +373,7 @@ const LeagueDashboard = () => {
 
         // Also persist transaction limits into JSONB settings column
         if (saved) {
-          const ws = waiverSettings as any;
-          const weeklyAddLimit = ws.weeklyAddLimit ?? 0;
-          const seasonAddLimit = ws.seasonAddLimit ?? 0;
+          const { weeklyAddLimit = 0, seasonAddLimit = 0 } = waiverSettings;
           const { data: currentLeague } = await supabase
             .from('leagues')
             .select('settings')
@@ -772,8 +772,8 @@ const LeagueDashboard = () => {
                             Max Adds Per Week
                           </Label>
                           <Select
-                            value={(waiverSettings as any).weeklyAddLimit?.toString() || '0'}
-                            onValueChange={(value) => setWaiverSettings(prev => ({ ...prev, weeklyAddLimit: parseInt(value) } as any))}
+                            value={waiverSettings.weeklyAddLimit?.toString() || '0'}
+                            onValueChange={(value) => setWaiverSettings(prev => ({ ...prev, weeklyAddLimit: parseInt(value) }))}
                           >
                             <SelectTrigger>
                               <SelectValue />
@@ -800,8 +800,8 @@ const LeagueDashboard = () => {
                             Max Adds Per Season
                           </Label>
                           <Select
-                            value={(waiverSettings as any).seasonAddLimit?.toString() || '0'}
-                            onValueChange={(value) => setWaiverSettings(prev => ({ ...prev, seasonAddLimit: parseInt(value) } as any))}
+                            value={waiverSettings.seasonAddLimit?.toString() || '0'}
+                            onValueChange={(value) => setWaiverSettings(prev => ({ ...prev, seasonAddLimit: parseInt(value) }))}
                           >
                             <SelectTrigger>
                               <SelectValue />

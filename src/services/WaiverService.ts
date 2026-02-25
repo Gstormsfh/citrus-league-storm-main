@@ -281,7 +281,9 @@ export class WaiverService {
     teamId: string,
     playerId: number,
     dropPlayerId: number | null = null,
-    userId?: string
+    userId?: string,
+    /** Skip limit check when called from waiver/FAAB processing (limits were checked at claim time) */
+    skipLimitCheck = false
   ): Promise<{ success: boolean; error?: string }> {
     try {
       // Get userId from team if not provided
@@ -292,7 +294,7 @@ export class WaiverService {
           .select('owner_id')
           .eq('id', teamId)
           .single();
-        
+
         if (!team || !team.owner_id) {
           return {
             success: false,
@@ -306,9 +308,14 @@ export class WaiverService {
       // No need to check again here — avoids redundant API calls.
 
       // Enforce weekly/season add limits (ESPN/Yahoo/Sleeper industry standard)
-      const limitCheck = await this.checkTransactionLimits(leagueId, teamId);
-      if (!limitCheck.allowed) {
-        return { success: false, error: limitCheck.reason };
+      // Skipped during waiver/FAAB processing — limits were validated at submission time.
+      // Double-checking here would unfairly block winning bids if the team added players
+      // between bid submission and processing.
+      if (!skipLimitCheck) {
+        const limitCheck = await this.checkTransactionLimits(leagueId, teamId);
+        if (!limitCheck.allowed) {
+          return { success: false, error: limitCheck.reason };
+        }
       }
 
       // Use process_roster_move RPC (atomic transaction engine)
@@ -1078,12 +1085,14 @@ export class WaiverService {
 
               if (winner.is_conditional_drop && winner.drop_player_id) {
                 // Try add-only first (no drop)
+                // skipLimitCheck=true: limits were checked at bid submission time
                 moveResult = await this.addFreeAgent(
                   leagueId,
                   winner.team_id,
                   playerId,
                   null,
-                  teamData.owner_id
+                  teamData.owner_id,
+                  true // skipLimitCheck — waiver processing
                 );
 
                 // If add-only failed (likely roster full), retry with the drop
@@ -1093,7 +1102,8 @@ export class WaiverService {
                     winner.team_id,
                     playerId,
                     winner.drop_player_id,
-                    teamData.owner_id
+                    teamData.owner_id,
+                    true // skipLimitCheck — waiver processing
                   );
                 }
               } else {
@@ -1103,7 +1113,8 @@ export class WaiverService {
                   winner.team_id,
                   playerId,
                   winner.drop_player_id,
-                  teamData.owner_id
+                  teamData.owner_id,
+                  true // skipLimitCheck — waiver processing
                 );
               }
 
