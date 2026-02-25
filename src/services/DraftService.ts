@@ -201,10 +201,11 @@ export const DraftService = {
   async initializeDraftOrder(
     leagueId: string,
     userId: string,
-    teams: Team[], 
+    teams: Team[],
     totalRounds: number,
     resetExisting: boolean = false,
-    customTeamOrder?: string[]
+    customTeamOrder?: string[],
+    draftType?: string
   ): Promise<{ error: unknown; sessionId?: string }> {
     try {
       // Use custom order if provided, otherwise use teams array order
@@ -262,12 +263,14 @@ export const DraftService = {
         sessionId = customTeamOrder ? crypto.randomUUID() : activeSessionId;
       }
       
-      // Create draft order for each round (snake draft)
+      // Create draft order for each round
+      // Linear: same order every round. Snake (default): reverses on even rounds.
+      const isLinear = draftType === 'linear';
       const orders = [];
       for (let round = 1; round <= totalRounds; round++) {
         const isEvenRound = round % 2 === 0;
-        const teamOrder = isEvenRound ? [...teamIds].reverse() : [...teamIds];
-        
+        const teamOrder = (isLinear || !isEvenRound) ? [...teamIds] : [...teamIds].reverse();
+
         orders.push({
           league_id: leagueId,
           round_number: round,

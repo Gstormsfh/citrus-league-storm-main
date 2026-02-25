@@ -2010,15 +2010,17 @@ const DraftRoom = () => {
           || randomizedTeamOrder
           || undefined;
         
+        const leagueDraftType = (league?.settings as any)?.draftType || 'snake';
         const { error: initError } = await DraftService.initializeDraftOrder(
           leagueId,
           user.id,
-          teams, 
+          teams,
           draftRounds,
           false,
-          orderToUse
+          orderToUse,
+          leagueDraftType
         );
-      
+
       if (initError) {
         logger.error('handlePrepareDraft: Error initializing draft order', initError);
         // Try cleanup and retry
@@ -2026,14 +2028,15 @@ const DraftRoom = () => {
         if (cleanupError) {
           logger.error('handlePrepareDraft: Cleanup failed:', cleanupError);
         }
-        
+
         const { error: retryError } = await DraftService.initializeDraftOrder(
           leagueId,
           user.id,
-          teams, 
+          teams,
           draftRounds,
           true,
-          orderToUse
+          orderToUse,
+          leagueDraftType
         );
         
         if (retryError) {
@@ -2178,13 +2181,15 @@ const DraftRoom = () => {
         draftRounds
       });
 
+      const startDraftType = (league?.settings as any)?.draftType || 'snake';
       const { error: initError } = await DraftService.initializeDraftOrder(
         leagueId,
         user.id,
         teams,
         draftRounds,
         true, // resetExisting=true to always delete old orders and create fresh ones
-        orderToUse
+        orderToUse,
+        startDraftType
       );
 
       if (initError) {

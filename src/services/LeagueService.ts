@@ -1497,18 +1497,27 @@ async joinLeagueByCode(
     // If leagueId is provided, use real database data
     if (leagueId && userId) {
       try {
-        // Get all active draft picks for this league (only non-deleted)
-        const { picks: draftPicks } = await DraftService.getDraftPicks(leagueId, userId);
-        
-        // Get player IDs that are currently owned (active picks only)
-        const ownedPlayerIds = new Set(draftPicks.map(pick => pick.player_id));
-        
-        // Filter out owned players - only return players NOT in the owned set
-        // This includes:
-        // 1. Players never drafted
-        // 2. Players that were dropped (deleted_at is not null, so not in draftPicks)
-        const freeAgents = allPlayers.filter(player => !ownedPlayerIds.has(player.id));
-        
+        // CRITICAL FIX: Use roster_assignments (single source of truth) instead of draft_picks.
+        // draft_picks only tracks drafted players — players added via waivers/FA are NOT in draft_picks,
+        // causing them to incorrectly appear as free agents while already on a roster.
+        const { data: rosterAssignments, error: rosterError } = await supabase
+          .from('roster_assignments')
+          .select('player_id')
+          .eq('league_id', leagueId);
+
+        if (rosterError) {
+          console.error('Error fetching roster_assignments for free agents:', rosterError);
+          throw rosterError;
+        }
+
+        // Get player IDs that are currently on any roster in this league
+        const ownedPlayerIds = new Set(
+          (rosterAssignments || []).map((r: { player_id: string }) => String(r.player_id))
+        );
+
+        // Filter out owned players - only return players NOT on any roster
+        const freeAgents = allPlayers.filter(player => !ownedPlayerIds.has(String(player.id)));
+
         return freeAgents;
       } catch (error) {
         console.error('Error getting free agents from database:', error);
@@ -1517,7 +1526,7 @@ async joinLeagueByCode(
         return cachedFreeAgents || [];
       }
     }
-    
+
     // No leagueId provided - use demo data
     await this.initializeLeague(allPlayers);
     return cachedFreeAgents || [];
