@@ -155,14 +155,17 @@ const LeagueDashboard = () => {
 
       setLeague(leagueData);
 
-      // Update waiver settings from league data
+      // Update waiver settings from league data (including transaction limits from JSONB)
+      const leagueSettings = (leagueData.settings as LeagueSettings) || {};
       setWaiverSettings({
         waiver_process_time: leagueData.waiver_process_time || '02:00:00',
         waiver_period_hours: leagueData.waiver_period_hours || 48,
         waiver_game_lock: leagueData.waiver_game_lock ?? true,
         waiver_type: leagueData.waiver_type || 'rolling',
         allow_trades_during_games: leagueData.allow_trades_during_games ?? true,
-      });
+        weeklyAddLimit: (leagueSettings.weeklyAddLimit as number) ?? 0,
+        seasonAddLimit: (leagueSettings.seasonAddLimit as number) ?? 0,
+      } as any);
       
       // Update scoring settings from league data
       if (leagueData.scoring_settings) {
@@ -356,13 +359,36 @@ const LeagueDashboard = () => {
       
       // Save based on active tab
       if (activeSettingsTab === 'waivers') {
+        // Save column-level waiver settings
+        const { waiver_process_time, waiver_period_hours, waiver_game_lock, waiver_type, allow_trades_during_games } = waiverSettings;
         const { success, error: saveError } = await LeagueService.updateWaiverSettings(
           leagueId,
           user.id,
-          waiverSettings
+          { waiver_process_time, waiver_period_hours, waiver_game_lock, waiver_type, allow_trades_during_games }
         );
         saved = success;
         errorMessage = saveError?.message || 'Failed to save waiver settings';
+
+        // Also persist transaction limits into JSONB settings column
+        if (saved) {
+          const ws = waiverSettings as any;
+          const weeklyAddLimit = ws.weeklyAddLimit ?? 0;
+          const seasonAddLimit = ws.seasonAddLimit ?? 0;
+          const { data: currentLeague } = await supabase
+            .from('leagues')
+            .select('settings')
+            .eq('id', leagueId)
+            .single();
+          if (currentLeague) {
+            const currentSettings = (currentLeague.settings as LeagueSettings) || {};
+            await supabase
+              .from('leagues')
+              .update({
+                settings: { ...currentSettings, weeklyAddLimit, seasonAddLimit },
+              })
+              .eq('id', leagueId);
+          }
+        }
       } else if (activeSettingsTab === 'scoring') {
         const { success, error: saveError } = await LeagueService.updateScoringSettings(
           leagueId,
@@ -737,6 +763,61 @@ const LeagueDashboard = () => {
                             checked={waiverSettings.allow_trades_during_games}
                             onCheckedChange={(checked) => setWaiverSettings(prev => ({ ...prev, allow_trades_during_games: checked }))}
                           />
+                        </div>
+
+                        {/* Transaction Limits - ESPN/Yahoo/Sleeper industry standard */}
+                        <div className="space-y-2">
+                          <Label className="flex items-center gap-2">
+                            <Layers className="h-4 w-4" />
+                            Max Adds Per Week
+                          </Label>
+                          <Select
+                            value={(waiverSettings as any).weeklyAddLimit?.toString() || '0'}
+                            onValueChange={(value) => setWaiverSettings(prev => ({ ...prev, weeklyAddLimit: parseInt(value) } as any))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="0">Unlimited (Default)</SelectItem>
+                              <SelectItem value="2">2 per week</SelectItem>
+                              <SelectItem value="3">3 per week</SelectItem>
+                              <SelectItem value="4">4 per week</SelectItem>
+                              <SelectItem value="5">5 per week</SelectItem>
+                              <SelectItem value="6">6 per week</SelectItem>
+                              <SelectItem value="7">7 per week</SelectItem>
+                              <SelectItem value="10">10 per week</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            Limit how many free agent pickups a team can make each week. Resets every Monday.
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="flex items-center gap-2">
+                            <Layers className="h-4 w-4" />
+                            Max Adds Per Season
+                          </Label>
+                          <Select
+                            value={(waiverSettings as any).seasonAddLimit?.toString() || '0'}
+                            onValueChange={(value) => setWaiverSettings(prev => ({ ...prev, seasonAddLimit: parseInt(value) } as any))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="0">Unlimited (Default)</SelectItem>
+                              <SelectItem value="25">25 per season</SelectItem>
+                              <SelectItem value="50">50 per season</SelectItem>
+                              <SelectItem value="75">75 per season</SelectItem>
+                              <SelectItem value="100">100 per season</SelectItem>
+                              <SelectItem value="150">150 per season</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            Limit total free agent pickups for the entire season.
+                          </p>
                         </div>
 
                         {/* Manual Waiver Processing */}

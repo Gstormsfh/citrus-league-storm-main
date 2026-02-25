@@ -225,6 +225,10 @@ export interface LeagueFormatSettings {
   // === Roster Slot Configuration (Commissioner-configurable) ===
   rosterSlots?: Record<string, number>;  // e.g., { C: 2, LW: 2, RW: 2, D: 4, G: 2, UTIL: 2 }
 
+  // === Transaction Limits (Commissioner-configurable) ===
+  weeklyAddLimit?: number;           // Max adds per team per week (0 = unlimited, ESPN/Yahoo/Sleeper standard)
+  seasonAddLimit?: number;           // Max adds per team per season (0 = unlimited)
+
   // === FAAB Budget ===
   faabBudget?: number;             // FAAB budget per team (default: 100)
 
@@ -424,6 +428,10 @@ export function extractFormatSettings(settings: Record<string, unknown>): Partia
 
     // Roster slots (commissioner-configurable)
     rosterSlots: (settings.rosterSlots as Record<string, number>) || undefined,
+
+    // Transaction limits
+    weeklyAddLimit: (settings.weeklyAddLimit as number) ?? 0,
+    seasonAddLimit: (settings.seasonAddLimit as number) ?? 0,
 
     // FAAB
     faabBudget: (settings.faabBudget as number) || 100,
