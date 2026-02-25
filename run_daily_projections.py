@@ -2,7 +2,7 @@
 """
 run_daily_projections.py
 
-Citrus Projections 2.0 - Batch Daily Projections with Parallel Processing
+Citrus Projections 3.0 - Batch Daily Projections with Parallel Processing
 Calculates daily fantasy point projections for all rostered players across all leagues.
 Uses multiprocessing for sub-60-second execution on 600+ players.
 
@@ -738,7 +738,7 @@ def main():
         max_workers = max(4, min(cpu_count * 2, 16))
     
     print("=" * 80)
-    print("CITRUS PROJECTIONS 2.0 - BATCH DAILY PROJECTIONS")
+    print("CITRUS PROJECTIONS 3.0 - BATCH DAILY PROJECTIONS")
     print("=" * 80)
     print(f"Target Date: {target_date}")
     print(f"Season: {args.season}")
