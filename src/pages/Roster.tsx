@@ -45,6 +45,7 @@ import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { MatchupScheduleSelector } from "@/components/matchup/MatchupScheduleSelector";
 import { WeeklySchedule } from "@/components/matchup/WeeklySchedule";
 import { getTodayMST, getTodayMSTDate } from '@/utils/timezoneUtils';
+import { CURRENT_SEASON } from '@/utils/seasonConstants';
 import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
 import { Matchup as MatchupType } from '@/services/MatchupService';
 
@@ -1708,10 +1709,11 @@ const Roster = () => {
 
     const loadAnalytics = async () => {
         try {
-            // Load 2024 and 2025 data
-            const [data2024, data2025] = await Promise.all([
-                CitrusPuckService.getAllAnalytics(2024),
-                CitrusPuckService.getAllAnalytics(2025)
+            // Load previous season and current season data
+            const prevSeason = CURRENT_SEASON - 1;
+            const [dataPrev, dataCurr] = await Promise.all([
+                CitrusPuckService.getAllAnalytics(prevSeason),
+                CitrusPuckService.getAllAnalytics(CURRENT_SEASON)
             ]);
 
             const enrichPlayer = (p: HockeyPlayer) => {
@@ -1731,19 +1733,19 @@ const Roster = () => {
                         return undefined;
                     };
 
-                    let d2024 = findByName(data2024);
-                    let d2025 = findByName(data2025);
-                    
+                    let dPrev = findByName(dataPrev);
+                    let dCurr = findByName(dataCurr);
+
                     // If name match fails, try ID if numeric
-                    if (!d2024 && !d2025) {
+                    if (!dPrev && !dCurr) {
                         const pId = typeof p.id === 'string' ? parseInt(p.id) : p.id;
                         if (!isNaN(pId)) {
-                            d2024 = data2024.get(pId);
-                            d2025 = data2025.get(pId);
+                            dPrev = dataPrev.get(pId);
+                            dCurr = dataCurr.get(pId);
                         }
                     }
 
-                    if (!d2025 && !d2024) return p;
+                    if (!dCurr && !dPrev) return p;
 
                     // Rest of season projections will be loaded from player_projected_stats
                     // to match the matchup projection system exactly
@@ -1754,7 +1756,7 @@ const Roster = () => {
                     return {
                         ...p,
                         citrusPuckData: {
-                            currentSeason: d2025,
+                            currentSeason: dCurr,
                             projections
                         }
                     };

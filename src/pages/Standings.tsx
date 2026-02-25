@@ -533,9 +533,9 @@ const Standings = () => {
                     <SelectValue placeholder="Select Season" />
                   </SelectTrigger>
                   <SelectContent className="z-[9999]">
-                    <SelectItem value="2023">2023 Season</SelectItem>
-                    <SelectItem value="2024">2024 Season</SelectItem>
-                    <SelectItem value="2025">2025 Season</SelectItem>
+                    {Array.from({ length: 3 }, (_, i) => CURRENT_SEASON - 2 + i).map(year => (
+                      <SelectItem key={year} value={String(year)}>{year} Season</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
