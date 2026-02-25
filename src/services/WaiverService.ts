@@ -311,13 +311,17 @@ export class WaiverService {
   ): Promise<{ success: boolean; error?: string; claimId?: string }> {
     try {
       // Best Ball leagues prohibit waivers (industry standard: zero management)
-      const { data: leagueCheck } = await supabase
+      const { data: leagueCheck, error: leagueCheckErr } = await supabase
         .from('leagues')
         .select('settings')
         .eq('id', leagueId)
         .single();
 
-      if ((leagueCheck?.settings as any)?.bestBallEnabled) {
+      if (leagueCheckErr || !leagueCheck) {
+        return { success: false, error: 'League not found.' };
+      }
+
+      if ((leagueCheck.settings as any)?.bestBallEnabled) {
         return { success: false, error: 'Waivers are not allowed in Best Ball leagues.' };
       }
 
@@ -707,13 +711,17 @@ export class WaiverService {
   ): Promise<{ success: boolean; error?: string; claimId?: string }> {
     try {
       // Best Ball leagues prohibit FAAB bidding (industry standard: zero management)
-      const { data: bbCheck } = await supabase
+      const { data: bbCheck, error: bbCheckErr } = await supabase
         .from('leagues')
         .select('settings')
         .eq('id', leagueId)
         .single();
 
-      if ((bbCheck?.settings as any)?.bestBallEnabled) {
+      if (bbCheckErr || !bbCheck) {
+        return { success: false, error: 'League not found.' };
+      }
+
+      if ((bbCheck.settings as any)?.bestBallEnabled) {
         return { success: false, error: 'FAAB bidding is not allowed in Best Ball leagues.' };
       }
 

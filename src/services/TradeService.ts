@@ -54,18 +54,22 @@ export class TradeService {
     try {
       // Best Ball leagues prohibit trades (industry standard: zero management after draft)
       // Also fetch settings for dynamic trade expiration (commissioner-configurable)
-      const { data: league } = await supabase
+      const { data: league, error: leagueErr } = await supabase
         .from('leagues')
         .select('settings')
         .eq('id', leagueId)
         .single();
 
-      if ((league?.settings as any)?.bestBallEnabled) {
+      if (leagueErr || !league) {
+        return { success: false, error: 'League not found.' };
+      }
+
+      if ((league.settings as any)?.bestBallEnabled) {
         return { success: false, error: 'Trades are not allowed in Best Ball leagues.' };
       }
 
       // Check trade deadline (also enforced by DB trigger, but give a friendly message)
-      const tradeDeadlineWeek = (league?.settings as any)?.tradeDeadlineWeek ?? 0;
+      const tradeDeadlineWeek = (league.settings as any)?.tradeDeadlineWeek ?? 0;
       if (tradeDeadlineWeek > 0) {
         const { data: latestMatchup } = await supabase
           .from('matchups')

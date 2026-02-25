@@ -162,6 +162,14 @@ $join$;
 GRANT EXECUTE ON FUNCTION public.join_league_with_code(TEXT, UUID, TEXT) TO authenticated;
 
 -- ============================================================================
+-- 1b. NOTE: waiver_claims intentionally has NO DELETE RLS policy.
+-- ============================================================================
+-- Claims use soft-delete via status='cancelled' (see cancelWaiverClaim).
+-- Hard deletes are blocked by RLS to preserve the audit trail.
+-- This is intentional — do NOT add a DELETE policy.
+-- ============================================================================
+
+-- ============================================================================
 -- 2. Partial unique index: prevent duplicate pending waiver claims
 -- ============================================================================
 -- A team should not be able to have two pending claims for the same player
