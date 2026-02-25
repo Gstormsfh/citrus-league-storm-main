@@ -1127,19 +1127,20 @@ export const MatchupService = {
    */
   async getRosterPlayerIds(teamId: string, leagueId: string): Promise<string[]> {
     try {
-      const { data: teamDraftPicks, error: picksError } = await supabase
-        .from('draft_picks')
+      // CRITICAL FIX: Use roster_assignments (source of truth) instead of draft_picks.
+      // draft_picks misses players acquired via trades (TradeService only updates roster_assignments).
+      const { data: assignments, error: assignError } = await supabase
+        .from('roster_assignments')
         .select('player_id')
         .eq('league_id', leagueId)
-        .eq('team_id', teamId)
-        .is('deleted_at', null);
-      
-      if (picksError) {
-        console.error('Error fetching roster player IDs:', picksError);
+        .eq('team_id', teamId);
+
+      if (assignError) {
+        console.error('Error fetching roster player IDs:', assignError);
         return [];
       }
-      
-      return (teamDraftPicks || []).map(p => p.player_id);
+
+      return (assignments || []).map((a: { player_id: string }) => String(a.player_id));
     } catch (error: unknown) {
       console.error('Error getting roster player IDs:', error);
       return [];
@@ -1161,15 +1162,13 @@ export const MatchupService = {
         return cached.roster;
       }
 
-      // Optimized: Query draft picks directly for this team (not all league picks)
-      // This matches the efficient pattern used in Roster.tsx
+      // CRITICAL FIX: Use roster_assignments (source of truth) instead of draft_picks.
+      // draft_picks misses players acquired via trades (TradeService only updates roster_assignments).
       const { data: teamDraftPicks, error: picksError } = await supabase
-        .from('draft_picks')
-        .select(COLUMNS.DRAFT_PICK)
+        .from('roster_assignments')
+        .select('player_id, team_id, league_id')
         .eq('league_id', leagueId)
-        .eq('team_id', teamId)
-        .is('deleted_at', null)
-        .order('pick_number', { ascending: true });
+        .eq('team_id', teamId);
       
       if (picksError) {
         console.error('Error fetching draft picks for team:', picksError);
@@ -1292,7 +1291,9 @@ export const MatchupService = {
       status: p.status === 'injured' ? 'IR' : (p.status === 'active' ? null : 'WVR'),
       image: p.headshot_url || undefined,
       nextGame: { opponent: 'vs OPP', isToday: false },
-      projectedPoints: (p.points || 0) / 20
+      projectedPoints: p.games_played > 0
+        ? ((p.goals || 0) * 3 + (p.assists || 0) * 2 + (p.shots || 0) * 0.4 + (p.blocks || 0) * 0.5 + (p.hits || 0) * 0.2 + (p.pim || 0) * 0.5) / p.games_played
+        : 0
     };
   },
 

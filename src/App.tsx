@@ -111,7 +111,7 @@ const queryClient = new QueryClient({
       // Cache data for 5 minutes (reduces repeated fetches)
       staleTime: 5 * 60 * 1000,
       // Keep unused data in cache for 10 minutes
-      cacheTime: 10 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
       // Don't refetch on window focus (reduces unnecessary calls)
       refetchOnWindowFocus: false,
       // Don't refetch on component mount if data is fresh

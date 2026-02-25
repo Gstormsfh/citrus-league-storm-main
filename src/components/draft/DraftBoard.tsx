@@ -30,6 +30,7 @@ interface DraftBoardProps {
   currentRound: number;
   totalRounds?: number; // Optional prop for total rounds (defaults to 16 if not provided)
   onPlayerClick?: (playerId: string) => void; // Callback when player name is clicked
+  draftType?: 'snake' | 'linear'; // Draft type — linear keeps same order every round
 }
 
 // Position colors for entire card
@@ -53,18 +54,20 @@ const normalizePosition = (pos: string): string => {
   return upper;
 };
 
-export const DraftBoard = ({ teams, draftHistory, currentPick, currentRound, totalRounds = 16, onPlayerClick }: DraftBoardProps) => {
+export const DraftBoard = ({ teams, draftHistory, currentPick, currentRound, totalRounds = 16, onPlayerClick, draftType = 'snake' }: DraftBoardProps) => {
   const totalPicks = teams.length * totalRounds;
+  const isLinear = draftType === 'linear';
 
   // PERF: Memoize picks into a Map for O(1) lookups instead of O(n) Array.find per cell
   const picksMap = useMemo(() => {
     return new Map(draftHistory.map(p => [p.pick, p]));
   }, [draftHistory]);
 
-  // Calculate pick number based on round and team index (serpentine draft)
+  // Calculate pick number based on round and team index
+  // Snake: reverse order on even rounds. Linear: same order every round.
   const getPickNumber = (round: number, teamIndex: number): number => {
     const isOddRound = round % 2 === 1;
-    const actualTeamIndex = isOddRound ? teamIndex : (teams.length - 1 - teamIndex);
+    const actualTeamIndex = (isLinear || isOddRound) ? teamIndex : (teams.length - 1 - teamIndex);
     return (round - 1) * teams.length + actualTeamIndex + 1;
   };
 

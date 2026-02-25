@@ -359,7 +359,9 @@ const TradeAnalyzer = () => {
     teamAbbreviation: p.team,
     status: p.status === 'injured' ? 'IR' : null,
     image: p.headshot_url || undefined,
-    projectedPoints: (p.points || 0) / 20
+    projectedPoints: p.games_played > 0
+      ? ((p.goals || 0) * 3 + (p.assists || 0) * 2 + (p.shots || 0) * 0.4 + (p.blocks || 0) * 0.5 + (p.hits || 0) * 0.2 + (p.pim || 0) * 0.5) / p.games_played
+      : 0
   });
 
   const handlePlayerClick = (e: React.MouseEvent, player: Player) => {

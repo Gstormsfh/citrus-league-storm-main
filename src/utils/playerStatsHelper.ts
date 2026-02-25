@@ -88,7 +88,9 @@ export async function getPlayerWithSeasonStats(
       roster_status: player.roster_status,
       is_ir_eligible: player.is_ir_eligible,
       image: player.headshot_url || undefined,
-      projectedPoints: (player.points || 0) / 20
+      projectedPoints: player.games_played > 0
+        ? ((player.goals || 0) * 3 + (player.assists || 0) * 2 + (player.shots || 0) * 0.4 + (player.blocks || 0) * 0.5 + (player.hits || 0) * 0.2 + (player.pim || 0) * 0.5) / player.games_played
+        : 0
     };
 
     return hockeyPlayer;

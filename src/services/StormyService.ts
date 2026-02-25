@@ -450,6 +450,9 @@ class StormyServiceImpl {
                 const ppg = (ss.nhl_points / ss.games_played).toFixed(1);
                 line += ` ${ppg}PPG`;
                 if (ss.nhl_ppp > 0) line += ` ${ss.nhl_ppp}PPP`;
+                if (ss.nhl_shp > 0) line += ` ${ss.nhl_shp}SHP`;
+                // Include peripheral stats used in fantasy scoring
+                line += ` ${ss.nhl_shots_on_goal}SOG ${ss.nhl_hits}HIT ${ss.nhl_blocks}BLK ${ss.nhl_pim}PIM`;
               }
             }
 

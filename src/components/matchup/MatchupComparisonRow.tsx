@@ -21,9 +21,14 @@ export const MatchupComparisonRow = ({
   selectedDate,
   dailyStatsMap
 }: MatchupComparisonRowProps) => {
-  // Calculate projected points for tonight (points / 20 is the standard projection calculation)
-  const userProjectedPoints = userPlayer ? (userPlayer.points || 0) / 20 : 0;
-  const opponentProjectedPoints = opponentPlayer ? (opponentPlayer.points || 0) / 20 : 0;
+  // Calculate projected points using actual fantasy PPG from season stats
+  const calcPPG = (p: HockeyPlayer | null) => {
+    if (!p || !p.stats?.gamesPlayed) return 0;
+    const s = p.stats;
+    return ((s.goals || 0) * 3 + (s.assists || 0) * 2 + (s.shots || 0) * 0.4 + (s.blocks || 0) * 0.5 + (s.hits || 0) * 0.2 + (s.pim || 0) * 0.5) / s.gamesPlayed;
+  };
+  const userProjectedPoints = calcPPG(userPlayer);
+  const opponentProjectedPoints = calcPPG(opponentPlayer);
   
   // Add projectedPoints to players if not already present
   const userPlayerWithProjection = userPlayer ? { ...userPlayer, projectedPoints: userProjectedPoints } : null;
