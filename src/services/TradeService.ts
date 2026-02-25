@@ -319,7 +319,9 @@ export class TradeService {
       ];
 
       // Best-effort logging — don't fail the trade if ledger insert fails
-      await supabase.from('transaction_ledger').insert(txnEntries).catch(() => {});
+      await supabase.from('transaction_ledger').insert(txnEntries).catch((err) => {
+        console.error('[TradeService] Transaction ledger insert failed:', err);
+      });
 
       // 4. Record in trade history
       await supabase

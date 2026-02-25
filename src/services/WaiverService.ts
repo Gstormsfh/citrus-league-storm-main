@@ -961,24 +961,42 @@ export class WaiverService {
 
             if (teamData?.owner_id) {
               // Conditional drop logic (ESPN/Yahoo standard):
-              // When is_conditional_drop is true, the drop_player_id is only
-              // dropped if the add succeeds. First try adding without drop,
-              // then with drop if roster is full.
-              const dropId = winner.is_conditional_drop
-                ? winner.drop_player_id  // conditional: include drop to make space
-                : winner.drop_player_id; // non-conditional: always include drop
+              // - Non-conditional: always include the drop player
+              // - Conditional: try add-only first; if roster is full, retry with drop
+              let moveResult: { success: boolean; error?: string };
 
-              const moveResult = await this.addFreeAgent(
-                leagueId,
-                winner.team_id,
-                playerId,
-                dropId,
-                teamData.owner_id
-              );
+              if (winner.is_conditional_drop && winner.drop_player_id) {
+                // Try add-only first (no drop)
+                moveResult = await this.addFreeAgent(
+                  leagueId,
+                  winner.team_id,
+                  playerId,
+                  null,
+                  teamData.owner_id
+                );
+
+                // If add-only failed (likely roster full), retry with the drop
+                if (!moveResult.success) {
+                  moveResult = await this.addFreeAgent(
+                    leagueId,
+                    winner.team_id,
+                    playerId,
+                    winner.drop_player_id,
+                    teamData.owner_id
+                  );
+                }
+              } else {
+                // Non-conditional: always include the drop
+                moveResult = await this.addFreeAgent(
+                  leagueId,
+                  winner.team_id,
+                  playerId,
+                  winner.drop_player_id,
+                  teamData.owner_id
+                );
+              }
 
               if (!moveResult.success) {
-                // If conditional and drop was included but still failed,
-                // mark as failed with specific reason
                 const reason = winner.is_conditional_drop
                   ? `Conditional claim failed: ${moveResult.error}`
                   : `Roster move failed: ${moveResult.error}`;

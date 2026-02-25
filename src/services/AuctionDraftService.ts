@@ -238,12 +238,13 @@ export class AuctionDraftService {
       if (error) return { success: false, error: error.message };
 
       // Record the opening bid
-      await supabase.from('auction_bids').insert({
+      const { error: bidError } = await supabase.from('auction_bids').insert({
         league_id: leagueId,
         nomination_id: nom.id,
         team_id: teamId,
         bid_amount: openingBid,
       });
+      if (bidError) console.error('[AuctionDraft] Failed to record opening bid:', bidError);
 
       // Update nomination count
       const sessionSettings = (await supabase
@@ -429,7 +430,7 @@ export class AuctionDraftService {
 
       const totalNoms = (session?.settings as any)?.total_nominations ?? 1;
 
-      await supabase.from('draft_picks').insert({
+      const { error: pickError } = await supabase.from('draft_picks').insert({
         league_id: leagueId,
         team_id: winnerTeamId,
         player_id: nom.player_id,
@@ -437,6 +438,7 @@ export class AuctionDraftService {
         pick_number: totalNoms,
         draft_session_id: sessionId,
       });
+      if (pickError) console.error('[AuctionDraft] Failed to record draft pick:', pickError);
 
       // Advance nomination order
       const settings = session?.settings as any;

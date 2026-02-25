@@ -333,7 +333,7 @@ export const LeagueService = {
       // Initialize FAAB budget if league uses FAAB waivers
       if (waiverSettings?.waiver_type === 'faab') {
         const faabBudget = (settings?.faabBudget as number) || 100;
-        await supabase
+        const { error: faabError } = await supabase
           .from('faab_budgets')
           .insert({
             league_id: league.id,
@@ -341,6 +341,7 @@ export const LeagueService = {
             initial_budget: faabBudget,
             remaining_budget: faabBudget,
           });
+        if (faabError) console.error('Failed to initialize FAAB budget:', faabError);
       }
 
       return { league, team, error: null };
