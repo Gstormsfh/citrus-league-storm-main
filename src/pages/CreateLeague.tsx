@@ -368,7 +368,16 @@ const CreateLeague = () => {
         description: `${league.name} has been created successfully.`,
       });
 
-      navigate(`/league/${league.id}?league=${league.id}`);
+      // Route to the appropriate page based on league type
+      if (leagueType === 'pickem') {
+        navigate(`/pool/pickem?league=${league.id}`);
+      } else if (leagueType === 'survivor') {
+        navigate(`/pool/survivor?league=${league.id}`);
+      } else if (leagueType === 'confidence-pool') {
+        navigate(`/pool/confidence?league=${league.id}`);
+      } else {
+        navigate(`/league/${league.id}?league=${league.id}`);
+      }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Failed to create league";
       setError(errorMessage);
@@ -420,7 +429,17 @@ const CreateLeague = () => {
         description: `Welcome to ${league.name}! Your team "${team.team_name}" has been created.`,
       });
 
-      navigate(`/league/${league.id}?league=${league.id}`);
+      // Route to the appropriate page based on the joined league's type
+      const joinedLeagueType = (league.settings as Record<string, unknown>)?.leagueType;
+      if (joinedLeagueType === 'pickem') {
+        navigate(`/pool/pickem?league=${league.id}`);
+      } else if (joinedLeagueType === 'survivor') {
+        navigate(`/pool/survivor?league=${league.id}`);
+      } else if (joinedLeagueType === 'confidence-pool') {
+        navigate(`/pool/confidence?league=${league.id}`);
+      } else {
+        navigate(`/league/${league.id}?league=${league.id}`);
+      }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Failed to join league";
       setError(errorMessage);

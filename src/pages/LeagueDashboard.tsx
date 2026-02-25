@@ -137,8 +137,24 @@ const LeagueDashboard = () => {
         throw leagueError;
       }
       if (!leagueData) throw new Error('League not found');
+
+      // Guard: redirect pool leagues to their proper pages
+      const leagueTypeFromSettings = (leagueData.settings as Record<string, unknown>)?.leagueType;
+      if (leagueTypeFromSettings && leagueTypeFromSettings !== 'fantasy') {
+        const poolRoutes: Record<string, string> = {
+          'pickem': '/pool/pickem',
+          'survivor': '/pool/survivor',
+          'confidence-pool': '/pool/confidence',
+        };
+        const poolRoute = poolRoutes[leagueTypeFromSettings as string];
+        if (poolRoute) {
+          navigate(`${poolRoute}?league=${leagueId}`);
+          return;
+        }
+      }
+
       setLeague(leagueData);
-      
+
       // Update waiver settings from league data
       setWaiverSettings({
         waiver_process_time: leagueData.waiver_process_time || '03:00:00',

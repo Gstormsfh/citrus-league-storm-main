@@ -389,6 +389,14 @@ const DraftRoom = () => {
         logger.error('DraftRoom: League not found');
         throw new Error('League not found');
       }
+
+      // Guard: only fantasy leagues have drafts
+      const leagueTypeFromSettings = (leagueData.settings as Record<string, unknown>)?.leagueType;
+      if (leagueTypeFromSettings && leagueTypeFromSettings !== 'fantasy') {
+        navigate('/gm-office');
+        return;
+      }
+
       logger.debug('DraftRoom: League loaded:', leagueData);
       setLeague(leagueData);
       setIsCommissioner(leagueData.commissioner_id === user.id);
