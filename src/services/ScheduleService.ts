@@ -3,12 +3,13 @@ import { withTimeout } from '@/utils/promiseUtils';
 import { getTodayMST, getTodayMSTDate } from '@/utils/timezoneUtils';
 import { COLUMNS } from '@/utils/queryColumns';
 import type { PostgrestError } from '@supabase/supabase-js';
+import { DEFAULT_TEST_DATE } from '@/utils/seasonConstants';
 
 // Test mode: Controlled via VITE_TEST_MODE environment variable
 // Set VITE_TEST_MODE=true in .env to use test date for development
 // Defaults to false (uses actual current date) for production
 const TEST_MODE = import.meta.env.VITE_TEST_MODE === 'true';
-const TEST_DATE = import.meta.env.VITE_TEST_DATE || '2025-12-08';
+const TEST_DATE = import.meta.env.VITE_TEST_DATE || DEFAULT_TEST_DATE;
 
 // Helper to get "today" in Mountain Time - uses test date if in test mode
 function getTodayString(): string {

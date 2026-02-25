@@ -13,6 +13,7 @@ import { ScoreCard } from "@/components/matchup/ScoreCard";
 import { WeeklySchedule } from "@/components/matchup/WeeklySchedule";
 import { DailyRosters } from "@/components/matchup/DailyRosters";
 import { getTodayMST, getTodayMSTDate } from '@/utils/timezoneUtils';
+import { CURRENT_SEASON } from '@/utils/seasonConstants';
 import LeagueNotifications from "@/components/matchup/LeagueNotifications";
 import { MatchupSidebar } from "@/components/matchup/MatchupSidebar";
 import { Button } from "@/components/ui/button";
@@ -2363,7 +2364,7 @@ const Matchup = () => {
         setSelectedPlayer(toHockeyPlayer(player, seasonStats));
       } else {
         // Fallback: try to fetch directly from player_season_stats
-        const DEFAULT_SEASON = 2025;
+        const DEFAULT_SEASON = CURRENT_SEASON;
         const { data: seasonStatsData, error } = await supabase
           .from('player_season_stats')
           .select(COLUMNS.PLAYER_STATS)

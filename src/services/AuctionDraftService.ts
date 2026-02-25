@@ -16,6 +16,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { CURRENT_SEASON } from '@/utils/seasonConstants';
 
 // ============================================================================
 // Types
@@ -529,7 +530,7 @@ export class AuctionDraftService {
       const { data: topPlayers } = await supabase
         .from('player_directory')
         .select('player_id, full_name, points')
-        .eq('season', 2025)
+        .eq('season', CURRENT_SEASON)
         .order('points', { ascending: false })
         .limit(50);
 

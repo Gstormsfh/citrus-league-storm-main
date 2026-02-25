@@ -8,6 +8,7 @@ import { LeagueMembershipService } from "./LeagueMembershipService";
 import { DEMO_LEAGUE_ID_FOR_GUESTS } from "./DemoLeagueService";
 import { logger } from "@/utils/logger";
 import { getTodayMST } from "@/utils/timezoneUtils";
+import { CURRENT_SEASON } from "@/utils/seasonConstants";
 import type { LeagueType, ScoringFormat, DraftType as LeagueDraftType } from "@/types/leagueTypes";
 import { extractFormatSettings } from "@/types/leagueTypes";
 
@@ -3160,7 +3161,7 @@ async joinLeagueByCode(
             .from('player_directory')
             .select('player_id, goals, assists, points, plus_minus, shots_on_goal, hits, blocks, pim, power_play_points, short_handed_points, position_code, wins, saves, shutouts, goals_against, save_pct')
             .in('player_id', playerIds)
-            .eq('season', 2025)
+            .eq('season', CURRENT_SEASON)
         : { data: [] };
 
       // Map player stats by ID
@@ -3375,7 +3376,7 @@ async joinLeagueByCode(
             .from('player_directory')
             .select('player_id, goals, assists, points, plus_minus, shots_on_goal, hits, blocks, pim, power_play_points, short_handed_points, position_code, wins, saves, shutouts, goals_against, save_pct')
             .in('player_id', rotoPlayerIds)
-            .eq('season', 2025)
+            .eq('season', CURRENT_SEASON)
         : { data: [] };
 
       const rotoPlayerMap = new Map<string, any>();

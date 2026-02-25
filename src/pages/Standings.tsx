@@ -13,6 +13,7 @@ import { LeagueService, League, Team, getLeagueFormat } from '@/services/LeagueS
 import { DraftService } from '@/services/DraftService';
 import { PlayerService } from '@/services/PlayerService';
 import { MatchupService } from '@/services/MatchupService';
+import { CURRENT_SEASON } from '@/utils/seasonConstants';
 import { Loader2, RefreshCw } from 'lucide-react';
 import {
   type ScoringFormat,
@@ -54,7 +55,7 @@ const Standings = () => {
   const { user } = useAuth();
   const { userLeagueState, activeLeagueId, isChangingLeague } = useLeague();
   const { toast } = useToast();
-  const [season, setSeason] = useState("2025");
+  const [season, setSeason] = useState(String(CURRENT_SEASON));
   const [loading, setLoading] = useState(true);
   const [leagues, setLeagues] = useState<League[]>([]);
   const [teams, setTeams] = useState<StandingsTeam[]>([]);

@@ -5,6 +5,7 @@ import {
   PlayerContract, TeamCapData, NHL_TEAMS,
   formatCap, formatCapFull, SALARY_CAP_2025_26,
 } from '@/types/captracker';
+import { CURRENT_SEASON } from '@/utils/seasonConstants';
 import { getTeamCapData } from '@/services/NHLCapService';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -35,7 +36,7 @@ function calculateBuyout(player: PlayerContract): { years: BuyoutYear[]; totalDe
   const annualBuyoutCap = totalBuyoutCost / buyoutPeriod;
 
   const years: BuyoutYear[] = [];
-  const currentYear = 2025;
+  const currentYear = CURRENT_SEASON;
   let totalDeadCap = 0;
   let totalSavings = 0;
 

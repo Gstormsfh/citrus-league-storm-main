@@ -11,6 +11,7 @@ import { withTimeout } from '@/utils/promiseUtils';
 import { getTodayMST, getTodayMSTDate, formatDateToString, isDateInRange } from '@/utils/timezoneUtils';
 import { COLUMNS } from '@/utils/queryColumns';
 import { ScoringCalculator, extractScoringSettings } from '@/utils/scoringUtils';
+import { DEFAULT_TEST_DATE } from '@/utils/seasonConstants';
 
 // Shared stat shape used by calculateMatchupWeekPoints and matchup stats
 interface MatchupWeekStats {
@@ -1379,7 +1380,7 @@ export const MatchupService = {
       // Calculate games remaining (scheduled or live games from today onwards)
       // Test mode controlled via VITE_TEST_MODE environment variable (defaults to false)
       const TEST_MODE = import.meta.env.VITE_TEST_MODE === 'true';
-      const TEST_DATE = import.meta.env.VITE_TEST_DATE || '2025-12-08';
+      const TEST_DATE = import.meta.env.VITE_TEST_DATE || DEFAULT_TEST_DATE;
       const getTodayString = () => TEST_MODE ? TEST_DATE : getTodayMST(); // Use MST instead of UTC
       const getTodayDate = () => {
         if (TEST_MODE) {

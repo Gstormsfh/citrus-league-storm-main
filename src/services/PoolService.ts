@@ -13,6 +13,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { ScheduleService, NHLGame } from '@/services/ScheduleService';
+import { SEASON_START_YEAR } from '@/utils/seasonConstants';
 
 // ============================================================================
 // Week / Deadline Helpers
@@ -20,36 +21,37 @@ import { ScheduleService, NHLGame } from '@/services/ScheduleService';
 
 /**
  * Calculate NHL week start/end dates for a given week number.
- * NHL regular season starts in early October; weeks are Monday-Sunday.
- * Week 1 starts on the first Monday of October.
+ * NHL regular season starts in early October; weeks are Sunday-Saturday
+ * (matching the app-wide standard set by the shift_weeks migration).
+ * Week 1 starts on the first Sunday on or after October 1.
  */
-function getWeekDateRange(weekNumber: number, seasonStartYear: number = 2025): { start: Date; end: Date } {
-  // Find the first Monday on or after October 1
+function getWeekDateRange(weekNumber: number, seasonStartYear: number = SEASON_START_YEAR): { start: Date; end: Date } {
+  // Find the first Sunday on or after October 1
   const oct1 = new Date(seasonStartYear, 9, 1); // October 1
-  const dayOfWeek = oct1.getDay();
-  const daysUntilMonday = dayOfWeek === 0 ? 1 : dayOfWeek === 1 ? 0 : 8 - dayOfWeek;
-  const firstMonday = new Date(oct1);
-  firstMonday.setDate(oct1.getDate() + daysUntilMonday);
+  const dayOfWeek = oct1.getDay(); // 0 = Sunday
+  const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+  const firstSunday = new Date(oct1);
+  firstSunday.setDate(oct1.getDate() + daysUntilSunday);
 
-  const start = new Date(firstMonday);
-  start.setDate(firstMonday.getDate() + (weekNumber - 1) * 7);
+  const start = new Date(firstSunday);
+  start.setDate(firstSunday.getDate() + (weekNumber - 1) * 7);
   const end = new Date(start);
-  end.setDate(start.getDate() + 6); // Sunday
+  end.setDate(start.getDate() + 6); // Saturday
   return { start, end };
 }
 
 /**
  * Calculate the current NHL week number based on today's date.
  */
-function getCurrentWeekNumber(seasonStartYear: number = 2025): number {
+function getCurrentWeekNumber(seasonStartYear: number = SEASON_START_YEAR): number {
   const oct1 = new Date(seasonStartYear, 9, 1);
-  const dayOfWeek = oct1.getDay();
-  const daysUntilMonday = dayOfWeek === 0 ? 1 : dayOfWeek === 1 ? 0 : 8 - dayOfWeek;
-  const firstMonday = new Date(oct1);
-  firstMonday.setDate(oct1.getDate() + daysUntilMonday);
+  const dayOfWeek = oct1.getDay(); // 0 = Sunday
+  const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+  const firstSunday = new Date(oct1);
+  firstSunday.setDate(oct1.getDate() + daysUntilSunday);
 
   const today = new Date();
-  const diffMs = today.getTime() - firstMonday.getTime();
+  const diffMs = today.getTime() - firstSunday.getTime();
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
   return Math.max(1, Math.floor(diffDays / 7) + 1);
 }

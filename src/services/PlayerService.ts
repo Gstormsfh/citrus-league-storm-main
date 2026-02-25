@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { CURRENT_SEASON, getHeadshotUrl } from "@/utils/seasonConstants";
 
 /**
  * PlayerService - SINGLE SOURCE OF TRUTH
@@ -160,7 +161,7 @@ export const PlayerService = {
     }
 
     try {
-      const DEFAULT_SEASON = 2025;
+      const DEFAULT_SEASON = CURRENT_SEASON;
       // CRITICAL: Supabase defaults to returning max 1000 rows per query.
       // NHL has ~900+ players per season. Without .range(), some players silently drop off,
       // causing drafted players to be missing from rosters.
@@ -287,7 +288,7 @@ export const PlayerService = {
         const pos = d.position_code || s?.position_code || (d.is_goalie ? "G" : "");
         const headshot =
           d.headshot_url ||
-          (team && pid ? `https://assets.nhle.com/mugs/nhl/20242025/${team}/${pid}.png` : null);
+          getHeadshotUrl(team, pid);
 
         // ALWAYS use NHL.com official stats (no fallback to PBP)
         const calculatedGoals = Number(s?.nhl_goals ?? 0);
@@ -404,7 +405,7 @@ export const PlayerService = {
     }
     
     try {
-      const DEFAULT_SEASON = 2025;
+      const DEFAULT_SEASON = CURRENT_SEASON;
       // EGRESS OPTIMIZATION: Only fetch uncached player IDs
       const intIds = uncachedIds.map((id) => Number(id)).filter((n) => !Number.isNaN(n));
 
@@ -525,7 +526,7 @@ export const PlayerService = {
         const pos = d.position_code || s?.position_code || (d.is_goalie ? "G" : "");
         const headshot =
           d.headshot_url ||
-          (team && pid ? `https://assets.nhle.com/mugs/nhl/20242025/${team}/${pid}.png` : null);
+          getHeadshotUrl(team, pid);
 
         // ALWAYS use NHL.com official stats (no fallback to PBP)
         const calculatedGoals = Number(s?.nhl_goals ?? 0);
