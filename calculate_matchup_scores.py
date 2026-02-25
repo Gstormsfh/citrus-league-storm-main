@@ -234,34 +234,33 @@ def fetch_player_matchup_stats(
                 }
     except Exception as e:
         print(f"[WARNING] RPC failed, aggregating manually: {e}")
-        # Fallback: aggregate manually from player_game_stats
-        # This is slower but more reliable
+        # Fallback: aggregate manually from player_game_stats using official nhl_* columns
         for pid in player_ids:
             stats = db.select(
                 "player_game_stats",
-                select="goals,primary_assists,secondary_assists,points,shots_on_goal,hits,blocks,pim,ppp,shp,wins,saves,goals_against,shutouts,goalie_gp",
+                select="nhl_goals,nhl_assists,nhl_points,nhl_shots_on_goal,nhl_hits,nhl_blocks,nhl_pim,nhl_ppp,nhl_shp,nhl_wins,nhl_saves,nhl_goals_against,nhl_shutouts,goalie_gp",
                 filters=[
                     ("player_id", "eq", pid),
                     ("game_date", "gte", start_date),
                     ("game_date", "lte", end_date)
                 ]
             )
-            
+
             if stats:
                 aggregated = {
-                    "goals": sum(_safe_int(s.get("goals", 0)) for s in stats),
-                    "assists": sum(_safe_int(s.get("primary_assists", 0)) + _safe_int(s.get("secondary_assists", 0)) for s in stats),
-                    "points": sum(_safe_int(s.get("points", 0)) for s in stats),
-                    "shots_on_goal": sum(_safe_int(s.get("shots_on_goal", 0)) for s in stats),
-                    "hits": sum(_safe_int(s.get("hits", 0)) for s in stats),
-                    "blocks": sum(_safe_int(s.get("blocks", 0)) for s in stats),
-                    "pim": sum(_safe_int(s.get("pim", 0)) for s in stats),
-                    "ppp": sum(_safe_int(s.get("ppp", 0)) for s in stats),
-                    "shp": sum(_safe_int(s.get("shp", 0)) for s in stats),
-                    "wins": sum(_safe_int(s.get("wins", 0)) for s in stats),
-                    "saves": sum(_safe_int(s.get("saves", 0)) for s in stats),
-                    "goals_against": sum(_safe_int(s.get("goals_against", 0)) for s in stats),
-                    "shutouts": sum(_safe_int(s.get("shutouts", 0)) for s in stats),
+                    "goals": sum(_safe_int(s.get("nhl_goals", 0)) for s in stats),
+                    "assists": sum(_safe_int(s.get("nhl_assists", 0)) for s in stats),
+                    "points": sum(_safe_int(s.get("nhl_points", 0)) for s in stats),
+                    "shots_on_goal": sum(_safe_int(s.get("nhl_shots_on_goal", 0)) for s in stats),
+                    "hits": sum(_safe_int(s.get("nhl_hits", 0)) for s in stats),
+                    "blocks": sum(_safe_int(s.get("nhl_blocks", 0)) for s in stats),
+                    "pim": sum(_safe_int(s.get("nhl_pim", 0)) for s in stats),
+                    "ppp": sum(_safe_int(s.get("nhl_ppp", 0)) for s in stats),
+                    "shp": sum(_safe_int(s.get("nhl_shp", 0)) for s in stats),
+                    "wins": sum(_safe_int(s.get("nhl_wins", 0)) for s in stats),
+                    "saves": sum(_safe_int(s.get("nhl_saves", 0)) for s in stats),
+                    "goals_against": sum(_safe_int(s.get("nhl_goals_against", 0)) for s in stats),
+                    "shutouts": sum(_safe_int(s.get("nhl_shutouts", 0)) for s in stats),
                     "games_played": len([s for s in stats if _safe_int(s.get("goalie_gp", 0)) > 0])  # Goalie games
                 }
                 stats_map[pid] = aggregated

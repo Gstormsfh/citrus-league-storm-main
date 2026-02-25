@@ -62,20 +62,19 @@ def calculate_league_wide_baselines(db: SupabaseRest, season: int) -> Dict[str, 
     # Diagnostic showed: PBP SV% = 0.929 (inflated), NHL SV% = 0.900 (correct)
     goalie_stats = db.select(
         "player_season_stats",
-        select="nhl_saves,nhl_shots_faced,saves,shots_faced",
+        select="nhl_saves,nhl_shots_faced",
         filters=[
             ("season", "eq", season),
             ("is_goalie", "eq", True)
         ]
     )
-    
+
     total_saves = 0
     total_shots_faced = 0
-    
+
     for g in goalie_stats:
-        # Prefer NHL official stats, fallback to PBP if NHL not available
-        saves = int(g.get("nhl_saves") or g.get("saves", 0))
-        shots_faced = int(g.get("nhl_shots_faced") or g.get("shots_faced", 0))
+        saves = int(g.get("nhl_saves", 0) or 0)
+        shots_faced = int(g.get("nhl_shots_faced", 0) or 0)
         if shots_faced > 0:  # Only include goalies who have faced shots
             total_saves += saves
             total_shots_faced += shots_faced
