@@ -8,8 +8,19 @@
 -- Service-role policy already covers backend writes; public SELECT covers reads.
 -- ============================================================================
 
-DROP POLICY IF EXISTS "Authenticated users can manage matchup difficulty"
-  ON public.team_matchup_difficulty;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'team_matchup_difficulty'
+  ) THEN
+    DROP POLICY IF EXISTS "Authenticated users can manage matchup difficulty"
+      ON public.team_matchup_difficulty;
+    RAISE NOTICE 'Dropped overly permissive matchup_difficulty RLS policy';
+  ELSE
+    RAISE NOTICE 'team_matchup_difficulty table does not exist, skipping policy drop';
+  END IF;
+END $$;
 
 -- ============================================================================
 -- 2. FIX: trade_offers.counter_offer_id FK missing ON DELETE SET NULL
