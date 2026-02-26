@@ -564,9 +564,10 @@ const WaiverWire = () => {
                           type="number"
                           min={0}
                           max={faabBudget ?? 100}
+                          step="0.01"
                           value={faabBidAmount}
                           onChange={(e) => {
-                            const val = Math.max(0, parseInt(e.target.value) || 0);
+                            const val = Math.max(0, parseFloat(e.target.value) || 0);
                             setFaabBidAmount(Math.min(val, faabBudget ?? 100));
                           }}
                           className="w-28"
@@ -653,10 +654,13 @@ const WaiverWire = () => {
                               {dropPlayer && (
                                 <div className="text-citrus-orange/80">
                                   Dropping: {dropPlayer.full_name} ({dropPlayer.position} • {dropPlayer.team})
+                                  {isFAAB && claim.is_conditional_drop && (
+                                    <span className="ml-1 text-xs opacity-70">(conditional)</span>
+                                  )}
                                 </div>
                               )}
                               <div>
-                                {isFAAB ? `Bid: $${claim.priority}` : `Priority #${claim.priority}`}
+                                {isFAAB ? `Bid: $${claim.bid_amount ?? claim.priority}` : `Priority #${claim.priority}`}
                               </div>
                             </div>
                           </div>
