@@ -456,17 +456,6 @@ export const CitrusPuckService = {
   },
 
   /**
-   * Helper to get table name (DEPRECATED - kept for backward compatibility)
-   * Now uses player_season_stats instead of staging tables
-   */
-  getTableName(season: number, type: 'skater' | 'goalie'): string {
-    // DEPRECATED: This method is no longer used
-    // All data now comes from player_season_stats + player_directory
-    console.warn('getTableName() is deprecated - using player_season_stats instead');
-    return `player_season_stats`;
-  },
-
-  /**
    * Project current week stats
    */
   projectCurrentWeek(data: AggregatedPlayerData): CitrusPuckPlayerData {

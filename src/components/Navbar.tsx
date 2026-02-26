@@ -79,7 +79,7 @@ const Navbar = () => {
   ];
 
   return (
-    <header className="fixed top-0 left-0 right-0 w-full z-50 lg:block max-lg:py-2 max-lg:pt-[calc(0.5rem+env(safe-area-inset-top))] max-lg:bg-[#D4E8B8]/95 max-lg:backdrop-blur-lg max-lg:border-b max-lg:border-citrus-sage/20">
+    <header className="fixed top-0 left-0 right-0 w-full z-50 lg:block max-lg:py-2 max-lg:pt-[calc(0.5rem+env(safe-area-inset-top))] max-lg:bg-[#D4E8B8]/95 max-lg:dark:bg-citrus-forest/95 max-lg:backdrop-blur-lg max-lg:border-b max-lg:border-citrus-sage/20">
       {/* ===== ROW 1: Brand bar ===== */}
       <div className="hidden lg:block bg-citrus-forest">
         <div className="w-full px-6 h-12 flex items-center justify-between">
@@ -149,6 +149,7 @@ const Navbar = () => {
                 <button
                   onClick={() => activeLeagueId && navigate(`/matchup/${activeLeagueId}`)}
                   className="relative p-2.5 rounded-lg hover:bg-white/10 transition-colors"
+                  aria-label="Notifications"
                 >
                   <Bell className="h-5 w-5 text-citrus-cream/80" />
                   {unreadCount > 0 && (
@@ -195,7 +196,7 @@ const Navbar = () => {
       </div>
 
       {/* ===== ROW 2: Tab bar ===== */}
-      <div className="hidden lg:block bg-[#D4E8B8] border-b border-citrus-sage/30">
+      <div className="hidden lg:block bg-[#D4E8B8] dark:bg-citrus-forest/90 border-b border-citrus-sage/30">
         <div className="w-full px-6">
           <nav className="flex items-center gap-0 h-11 -mb-px">
             {navTabs.map((tab) => {
@@ -262,6 +263,7 @@ const Navbar = () => {
               <button
                 className="p-2.5 rounded-xl text-citrus-forest relative"
                 onClick={() => activeLeagueId && navigate(`/matchup/${activeLeagueId}`)}
+                aria-label="Notifications"
               >
                 <Bell className="h-5 w-5" />
                 {unreadCount > 0 && (

@@ -128,6 +128,21 @@ serve(async (req) => {
   }
 
   try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+
+    // Authenticate the caller
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: { Authorization: req.headers.get("Authorization") ?? "" },
+      },
+    });
+    const { data: { user } } = await authClient.auth.getUser();
+    if (!user) {
+      return makeJsonResponse({ error: "Unauthorized — sign in required" }, 401);
+    }
+
     const API_KEY = Deno.env.get("THE_ODDS_API_KEY");
     if (!API_KEY) {
       console.error("THE_ODDS_API_KEY not set");
@@ -137,8 +152,6 @@ serve(async (req) => {
       }, 503);
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const svc = createClient(supabaseUrl, supabaseServiceKey);
 
     // Parse optional date parameter

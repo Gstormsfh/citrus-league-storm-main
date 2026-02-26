@@ -52,7 +52,8 @@ def _safe_int(v, default=0) -> int:
     """Safely convert value to int."""
     try:
         return int(v) if v is not None else default
-    except Exception:
+    except Exception as e:
+        print(f"Warning: _safe_int failed to convert {v!r} to int: {e}")
         return default
 
 
@@ -60,7 +61,8 @@ def _safe_float(v, default=0.0) -> float:
     """Safely convert value to float."""
     try:
         return float(v) if v is not None else default
-    except Exception:
+    except Exception as e:
+        print(f"Warning: _safe_float failed to convert {v!r} to float: {e}")
         return default
 
 
@@ -89,7 +91,8 @@ def parse_time_to_seconds(time_str: str) -> int:
             return int(parts[0]) * 60 + int(parts[1])
         else:
             return int(time_str) if time_str.isdigit() else 0
-    except Exception:
+    except Exception as e:
+        print(f"Warning: parse_time_to_seconds failed to parse {time_str!r}: {e}")
         return 0
 
 
