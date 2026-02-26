@@ -460,12 +460,19 @@ export class TradeService {
 
   /**
    * Get trade offers for a team (both sent and received)
+   * REQUIRES: Caller must be a member of the league
    */
   static async getTeamTradeOffers(
     leagueId: string,
-    teamId: string
+    teamId: string,
+    userId?: string
   ): Promise<TradeOfferWithPlayers[]> {
     try {
+      // Validate league membership if userId is provided (defense-in-depth)
+      if (userId) {
+        await LeagueMembershipService.requireMembership(leagueId, userId);
+      }
+
       const { data: trades, error } = await supabase
         .from('trade_offers')
         .select(`
@@ -523,9 +530,15 @@ export class TradeService {
 
   /**
    * Get league trade history
+   * REQUIRES: Caller must be a member of the league
    */
-  static async getLeagueTradeHistory(leagueId: string): Promise<any[]> {
+  static async getLeagueTradeHistory(leagueId: string, userId?: string): Promise<any[]> {
     try {
+      // Validate league membership if userId is provided (defense-in-depth)
+      if (userId) {
+        await LeagueMembershipService.requireMembership(leagueId, userId);
+      }
+
       const { data, error } = await supabase
         .from('trade_history')
         .select(`
@@ -672,6 +685,9 @@ export class TradeService {
 
   /**
    * Get all votes for a specific trade.
+   * NOTE: RLS on trade_votes table ensures users can only see votes for
+   * trades in leagues they belong to. No additional membership check needed
+   * since Supabase client carries the authenticated user's JWT.
    */
   static async getTradeVotes(
     tradeOfferId: string
@@ -712,14 +728,17 @@ export class TradeService {
     commissionerId: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
+      // CRITICAL: Use centralized commissioner check (not manual comparison)
+      await LeagueMembershipService.requireCommissioner(leagueId, commissionerId);
+
       const { data: league } = await supabase
         .from('leagues')
-        .select('commissioner_id, trade_review_type')
+        .select('trade_review_type')
         .eq('id', leagueId)
         .single();
 
-      if (!league || league.commissioner_id !== commissionerId) {
-        return { success: false, error: 'Only the commissioner can make this decision' };
+      if (!league) {
+        return { success: false, error: 'League not found' };
       }
 
       if (league.trade_review_type !== 'commissioner') {
@@ -816,15 +835,8 @@ export class TradeService {
     }
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      const { data: league } = await supabase
-        .from('leagues')
-        .select('commissioner_id')
-        .eq('id', leagueId)
-        .single();
-
-      if (!league || league.commissioner_id !== commissionerId) {
-        return { success: false, error: 'Only the commissioner can update trade settings' };
-      }
+      // CRITICAL: Use centralized commissioner check (not manual comparison)
+      await LeagueMembershipService.requireCommissioner(leagueId, commissionerId);
 
       const { error } = await supabase
         .from('leagues')

@@ -289,6 +289,8 @@ export function getDefaultSettings(leagueType: LeagueType): LeagueFormatSettings
         dynastyMode: false,
         bestBallEnabled: false,
         categories: [...DEFAULT_ROTO_CATEGORIES],
+        weeklyAddLimit: 0,   // 0 = unlimited (industry standard default)
+        seasonAddLimit: 0,   // 0 = unlimited (industry standard default)
         stats: [...BASE_STATS],
       };
     case 'pickem':
