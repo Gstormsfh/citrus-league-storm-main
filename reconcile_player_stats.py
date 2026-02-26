@@ -220,7 +220,7 @@ def get_games_to_validate(db: SupabaseRest, args: argparse.Namespace, season: in
                     mid.append(game)
                 else:
                     old.append(game)
-            except:
+            except (ValueError, TypeError, KeyError):
                 continue
         
         # Sample

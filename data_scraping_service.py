@@ -22,7 +22,6 @@ import signal
 import datetime as dt
 from typing import Optional, Dict, Any, List, Tuple
 from dotenv import load_dotenv
-import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from src.utils.citrus_request import citrus_request
 
@@ -89,7 +88,7 @@ def signal_handler(signum, frame):
 try:
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
-except Exception:
+except OSError:
     pass  # Windows may not support all signals
 
 # --- PARALLEL API CALLER (OPTIMIZED FOR IP REUSE) ---
@@ -231,7 +230,7 @@ def process_single_game(game_id: str, game_date: str) -> Dict[str, Any]:
                 details["boxscore"] = True
                 try:
                     from scrape_live_nhl_stats import process_game_data_citrus
-                    process_game_data_citrus(game_id, box, pbp)
+                    process_game_data_citrus(game_id, box, pbp, game_date=game_date)
                     details["stats"] = True
                     return {"game_id": game_id, "state": state, "success": True, "details": details}
                 except Exception as e:
@@ -536,15 +535,13 @@ def run_unified_loop() -> Tuple[str, int]:
     return (game_state, live_count)
 
 if __name__ == "__main__":
-    # BOOT MESSAGE - Verify this in your terminal
-    print("\n" + "█" * 70)
-    print("█" + " " * 68 + "█")
-    print("█   🍋 CITRUS MASTER - PARALLEL MODE (30s BULLETPROOF)           █")
-    print("█   Architecture: 100-IP Auto-Rotation + Parallel Processing      █")
-    print("█   Features: ALL games hit simultaneously, ZERO rate limits      █")
-    print("█   Performance: McDavid scores → 30-35s to your app (3x faster) █")
-    print("█" + " " * 68 + "█")
-    print("█" * 70 + "\n")
+    # BOOT MESSAGE
+    logger.info("=" * 70)
+    logger.info("CITRUS MASTER - PARALLEL MODE (30s BULLETPROOF)")
+    logger.info("Architecture: 100-IP Auto-Rotation + Parallel Processing")
+    logger.info("Features: ALL games hit simultaneously, ZERO rate limits")
+    logger.info("Performance: McDavid scores -> 30-35s to your app (3x faster)")
+    logger.info("=" * 70)
     
     consecutive_failures = 0
     max_consecutive_failures = 5
