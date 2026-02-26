@@ -19,11 +19,24 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
  *   - SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (auto-provided by Supabase)
  */
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+// Allowed origins — restrict CORS to known deployment URLs only
+const ALLOWED_ORIGINS = [
+  "https://citrus-fantasy-sports.web.app",
+  "https://citrus-fantasy-sports.firebaseapp.com",
+  "http://localhost:5173",
+  "http://localhost:3000",
+];
+
+function getCorsHeaders(origin: string): Record<string, string> {
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type",
+  };
+}
+
+let corsHeaders: Record<string, string> = {};
 
 // The Odds API configuration
 const ODDS_API_BASE = "https://api.the-odds-api.com/v4/sports";
@@ -109,6 +122,7 @@ interface OddsEvent {
 }
 
 serve(async (req) => {
+  corsHeaders = getCorsHeaders(req.headers.get("origin") ?? "");
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
