@@ -571,12 +571,14 @@ export const DraftService = {
           // Save draft snapshot for historical viewing
           try {
             logger.log('Saving draft snapshot...');
-            const { data: snapshotTeams } = await supabase
+            const { data: snapshotTeams, error: teamsErr } = await supabase
               .from('teams').select('id, team_name, owner_id').eq('league_id', leagueId);
-            const { data: snapshotPicks } = await supabase
+            if (teamsErr) throw teamsErr;
+            const { data: snapshotPicks, error: picksErr } = await supabase
               .from('draft_picks').select('*')
               .eq('league_id', leagueId).eq('draft_session_id', targetSessionId).is('deleted_at', null)
               .order('pick_number', { ascending: true });
+            if (picksErr) throw picksErr;
             if (snapshotTeams && snapshotPicks) {
               await this.saveDraftSnapshot(
                 leagueId,

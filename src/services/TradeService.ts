@@ -219,11 +219,15 @@ export class TradeService {
 
       if (tradeRpcError) {
         console.error('[TradeService] execute_trade RPC error:', tradeRpcError);
+        // Rollback trade status since roster changes didn't happen
+        await supabase.from('trade_offers').update({ status: 'pending', processed_at: null }).eq('id', trade.id);
         return { success: false, error: `Trade execution failed: ${tradeRpcError.message}` };
       }
 
       const rpcResult = tradeResult as { success: boolean; error?: string } | null;
       if (rpcResult && !rpcResult.success) {
+        // Rollback trade status since roster changes didn't happen
+        await supabase.from('trade_offers').update({ status: 'pending', processed_at: null }).eq('id', trade.id);
         return { success: false, error: rpcResult.error || 'Trade execution failed' };
       }
 

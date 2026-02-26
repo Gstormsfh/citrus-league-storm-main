@@ -337,11 +337,11 @@ export class WaiverService {
         };
       }
 
-      const rpcResult = result as { status: string; message: string };
-      if (rpcResult.status === 'error') {
+      const rpcResult = result as { success: boolean; error?: string; status?: string; message?: string };
+      if (rpcResult.success === false || rpcResult.status === 'error') {
         return {
           success: false,
-          error: rpcResult.message || 'Failed to add player'
+          error: rpcResult.error || rpcResult.message || 'Failed to add player'
         };
       }
 
