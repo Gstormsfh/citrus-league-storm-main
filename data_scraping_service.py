@@ -72,6 +72,10 @@ tracker = PerformanceTracker()
 # Game state cache - track which games are finished to avoid re-processing
 game_state_cache = {}  # {game_id: {"state": "FINAL", "last_check": timestamp}}
 
+# PPP/SHP sync tracking - runs every 30 minutes during game hours
+last_ppp_sync_time = 0.0  # epoch timestamp of last sync
+PPP_SYNC_INTERVAL = 1800  # 30 minutes in seconds
+
 # Graceful shutdown flag
 shutdown_requested = False
 
@@ -382,7 +386,44 @@ def run_unified_loop() -> Tuple[str, int]:
     except Exception as e:
         logger.error(f"[WARN] Matchup update failed (non-critical): {e}")
     
-    # 4. Determine game state from results
+    # 4. PERIODIC PPP/SHP SYNC (Every 30 minutes during game hours)
+    # Boxscore API doesn't provide PP/SH assists — only goals.
+    # Game-Log API has the correct per-game PPP/SHP values.
+    # Running every 30 minutes keeps live scoring accurate without hammering the API.
+    global last_ppp_sync_time
+    has_active_or_final_games = any(
+        r.get("state") in ("LIVE", "CRIT", "FINAL", "OFF", "INTERMISSION")
+        for r in results
+    )
+    time_since_last_sync = time.time() - last_ppp_sync_time
+
+    if has_active_or_final_games and time_since_last_sync >= PPP_SYNC_INTERVAL:
+        logger.info("[PPP-SYNC] 30-min interval reached — syncing per-game PPP/SHP from Game-Log API...")
+        try:
+            import subprocess
+            ppp_result = subprocess.run(
+                [sys.executable, "sync_ppp_from_gamelog.py", "--days", "1"],
+                capture_output=True,
+                text=True,
+                timeout=600  # 10 min timeout
+            )
+            if ppp_result.returncode == 0:
+                last_ppp_sync_time = time.time()
+                logger.info("[PPP-SYNC] Per-game PPP/SHP updated successfully.")
+                if ppp_result.stdout:
+                    for line in ppp_result.stdout.strip().split('\n')[-3:]:
+                        if line.strip():
+                            logger.info(f"  {line}")
+            else:
+                logger.error(f"[PPP-SYNC] FAILED with code {ppp_result.returncode}")
+                if ppp_result.stderr:
+                    logger.error(f"  Error: {ppp_result.stderr[:500]}")
+        except subprocess.TimeoutExpired:
+            logger.error("[PPP-SYNC] TIMEOUT after 10 minutes")
+        except Exception as e:
+            logger.error(f"[PPP-SYNC] Error: {e}")
+
+    # 5. Determine game state from results
     game_states = [r.get("state", "SCHEDULED") for r in results]
     all_cached = all(r.get("cached", False) for r in results)
     
@@ -401,7 +442,7 @@ def run_unified_loop() -> Tuple[str, int]:
     else:
         game_state = "SCHEDULED"
     
-    # 5. NIGHTLY PBP AUDIT - FIXED: Must run BEFORE return statement!
+    # 6. NIGHTLY PBP AUDIT - FIXED: Must run BEFORE return statement!
     now = dt.datetime.now()
     if now.hour == 23 and now.minute >= 50:
         logger.info("[NIGHTLY] END OF NIGHT DETECTED. Starting Deep PBP Audit...")
@@ -423,7 +464,7 @@ def run_unified_loop() -> Tuple[str, int]:
     #              Wins, Losses, OTL, Saves, GA, GAA, SV%, Shutouts
     # =========================================================================
     
-    # 6. DATA RECONCILIATION (00:00-00:03)
+    # 7. DATA RECONCILIATION (00:00-00:03)
     # Validate recent games against NHL API, auto-fix discrepancies
     if now.hour == 0 and 0 <= now.minute < 3:
         logger.info("[RECONCILE] Starting Data Reconciliation (Last 7 Days)...")
@@ -451,7 +492,7 @@ def run_unified_loop() -> Tuple[str, int]:
         except Exception as e:
             logger.error(f"[RECONCILE] Error: {e}")
 
-    # 7. RE-AGGREGATE SEASON STATS (00:03-00:06)
+    # 8. RE-AGGREGATE SEASON STATS (00:03-00:06)
     # Rebuild player_season_stats from corrected per-game data
     if now.hour == 0 and 3 <= now.minute < 6:
         logger.info("[AGGREGATE] Re-building player_season_stats from per-game data...")
@@ -465,7 +506,7 @@ def run_unified_loop() -> Tuple[str, int]:
         except Exception as e:
             logger.error(f"[AGGREGATE] Error: {e}")
 
-    # 8. PER-GAME PPP/SHP SYNC FROM GAME-LOG (00:06-00:08)
+    # 9. PER-GAME PPP/SHP SYNC FROM GAME-LOG (00:06-00:08) — nightly deep sync
     # Populate per-game nhl_ppp and nhl_shp from NHL Game-Log API
     # (Boxscore API only has PP goals, not PP assists — game-log has full PPP/SHP)
     if now.hour == 0 and 6 <= now.minute < 8:
@@ -493,7 +534,7 @@ def run_unified_loop() -> Tuple[str, int]:
         except Exception as e:
             logger.error(f"[PPP-SYNC] Error: {e}")
 
-    # 9. LANDING STATS TRUE-UP - ALL STATS (00:08-00:12)
+    # 10. LANDING STATS TRUE-UP - ALL STATS (00:08-00:12)
     # Fetch ALL authoritative stats from NHL Landing Endpoint (source of truth)
     # Overwrites aggregated values with official NHL.com data for every player
     if now.hour == 0 and 8 <= now.minute < 12:
