@@ -125,60 +125,34 @@ def safe_api_call_batch(urls: List[str], max_retries: int = 3) -> List[Optional[
     """
     Make multiple API calls reusing the same IP (when possible).
     Reduces IP usage from N calls = N IPs to N calls = 1 IP.
-    
+    Uses citrus_request for proper exponential backoff, circuit breaker,
+    and proxy rotation on failures.
+
     Args:
         urls: List of URLs to fetch
         max_retries: Number of retry attempts
-        
+
     Returns:
         List of responses (None for failed calls)
     """
     results = []
-    
-    # Import here to avoid circular dependency
-    from src.utils.citrus_request import get_proxy_manager
-    proxy_manager = get_proxy_manager()
-    
-    # Get ONE proxy for all calls in this batch
-    proxy_url = proxy_manager.get_next_proxy()
-    
-    if not proxy_url:
-        # Fallback: No proxy available, use individual calls
-        logger.warning("[WARN] No proxy available, falling back to individual calls")
-        return [safe_api_call(url, max_retries) for url in urls]
-    
-    # Use same proxy for all URLs in batch
-    proxies = {"http": proxy_url, "https": proxy_url}
-    proxy_ip = proxy_url.split('@')[1].split(':')[0] if '@' in proxy_url else proxy_url.split(':')[0]
-    
+
     for url in urls:
         response_data = None
-        for attempt in range(max_retries):
-            try:
-                url_display = url if len(url) <= 60 else f"...{url[-57:]}"
-                logger.info(f"[Batch-Call] Requesting {url_display} via {proxy_ip}...")
-                
-                r = requests.get(url, proxies=proxies, timeout=15)
-                
-                if r.status_code == 429:
-                    wait = (attempt + 1) * 10
-                    logger.warning(f"[429-LIMIT] Resting {wait}s...")
-                    time.sleep(wait)
-                    continue
-                    
-                r.raise_for_status()
-                response_data = r.json()
-                logger.info(f"[Batch-Call] OK (200)")
-                break
-                
-            except Exception as e:
-                if attempt < max_retries - 1:
-                    time.sleep(2)
-                else:
-                    logger.error(f"[ERROR] Batch call error: {e}")
-        
+        try:
+            url_display = url if len(url) <= 60 else f"...{url[-57:]}"
+            logger.info(f"[Batch-Call] Requesting {url_display}...")
+
+            r = citrus_request(url, timeout=15)
+            r.raise_for_status()
+            response_data = r.json()
+            logger.info(f"[Batch-Call] OK (200)")
+
+        except Exception as e:
+            logger.error(f"[ERROR] Batch call error: {e}")
+
         results.append(response_data)
-    
+
     return results
 
 # --- PROCESS SINGLE GAME (FOR PARALLEL EXECUTION) ---
