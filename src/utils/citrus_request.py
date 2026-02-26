@@ -387,11 +387,52 @@ def citrus_request(
                 raise
             continue
     
-    # All retries exhausted
+    # All proxy retries exhausted — try ONE direct (no-proxy) request as last resort.
+    # The NHL API is public. Getting rate-limited (429) is recoverable; getting 0/12 games is not.
+    all_proxy_errors = isinstance(last_exception, (requests.exceptions.ProxyError, requests.exceptions.ConnectionError))
+
+    if all_proxy_errors and proxy_manager.is_enabled():
+        logger.warning(
+            f"[Citrus-IP-Rotator] All {retries} proxy retries failed. "
+            f"Attempting DIRECT (no-proxy) request as last resort..."
+        )
+        try:
+            request_start = time.time()
+            response = session.request(
+                method=method.upper(),
+                url=url,
+                headers=merged_headers,
+                proxies=None,
+                **kwargs
+            )
+            request_duration = time.time() - request_start
+
+            health_monitor.record_request(
+                proxy_ip="direct-fallback",
+                success=(200 <= response.status_code < 300),
+                response_time=request_duration,
+                status_code=response.status_code
+            )
+
+            response.raise_for_status()
+            _reset_circuit_breaker()
+
+            logger.info(
+                f"[Citrus-IP-Rotator] DIRECT fallback OK ({response.status_code}, {request_duration:.2f}s)"
+            )
+            return response
+
+        except Exception as direct_err:
+            logger.error(
+                f"[Citrus-IP-Rotator] DIRECT fallback also failed: {direct_err}"
+            )
+            # Fall through to raise the original proxy error below
+
+    # All retries exhausted (including direct fallback if attempted)
     logger.error(
         f"[Citrus-IP-Rotator] All {retries} retries exhausted for {url}"
     )
-    
+
     if last_exception:
         raise last_exception
     else:

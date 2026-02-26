@@ -138,17 +138,24 @@ def safe_api_call_batch(urls: List[str], max_retries: int = 3) -> List[Optional[
 
     for url in urls:
         response_data = None
-        try:
-            url_display = url if len(url) <= 60 else f"...{url[-57:]}"
-            logger.info(f"[Batch-Call] Requesting {url_display}...")
+        url_display = url if len(url) <= 60 else f"...{url[-57:]}"
 
-            r = citrus_request(url, timeout=15)
-            r.raise_for_status()
-            response_data = r.json()
-            logger.info(f"[Batch-Call] OK (200)")
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"[Batch-Call] Requesting {url_display} (attempt {attempt + 1}/{max_retries})...")
 
-        except Exception as e:
-            logger.error(f"[ERROR] Batch call error: {e}")
+                r = citrus_request(url, timeout=15)
+                r.raise_for_status()
+                response_data = r.json()
+                logger.info(f"[Batch-Call] OK (200)")
+                break  # Success — move to next URL
+
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    logger.warning(f"[Batch-Call] Attempt {attempt + 1} failed for {url_display}: {e}")
+                    time.sleep(2)  # Brief pause before retry with new proxy
+                else:
+                    logger.error(f"[ERROR] Batch call error after {max_retries} attempts: {e}")
 
         results.append(response_data)
 
@@ -205,25 +212,35 @@ def process_single_game(game_id: str, game_date: str) -> Dict[str, Any]:
         pbp = batch_results[0] if batch_results else None
         box = batch_results[1] if len(batch_results) > 1 else None
         
-        if not pbp:
-            logger.warning(f"   [Game {game_id}] Failed to fetch PBP data")
+        if not pbp and not box:
+            logger.warning(f"   [Game {game_id}] Failed to fetch both PBP and boxscore")
             return {"game_id": game_id, "state": "ERROR", "success": False, "details": details}
-        
-        details["pbp"] = True
-        state = pbp.get("gameState", "").upper()
-        
+
+        if pbp:
+            details["pbp"] = True
+
+        # Determine game state: prefer PBP (has period/clock), fall back to boxscore
+        state = ""
+        if pbp:
+            state = pbp.get("gameState", "").upper()
+        elif box:
+            state = box.get("gameState", "").upper()
+            logger.warning(f"   [Game {game_id}] PBP unavailable — using boxscore for game state ({state})")
+
         # Update cache with current state
-        game_state_cache[game_id] = {"state": state, "last_check": time.time()}
-        
+        if state:
+            game_state_cache[game_id] = {"state": state, "last_check": time.time()}
+
         # 2. Ingest Raw PBP (for xG processing later)
-        try:
-            from ingest_live_raw_nhl import upsert_raw_game, supabase_client
-            upsert_raw_game(supabase_client(), game_id, game_date, pbp)
-            details["raw_ingest"] = True
-        except Exception as e:
-            logger.warning(f"   [Game {game_id}] Raw ingest error (non-critical): {e}")
-            # Non-critical - continue processing
-        
+        if pbp:
+            try:
+                from ingest_live_raw_nhl import upsert_raw_game, supabase_client
+                upsert_raw_game(supabase_client(), game_id, game_date, pbp)
+                details["raw_ingest"] = True
+            except Exception as e:
+                logger.warning(f"   [Game {game_id}] Raw ingest error (non-critical): {e}")
+                # Non-critical - continue processing
+
         # 3. Process Stats (if game is active/final and we got boxscore)
         if state in ("LIVE", "CRIT", "OFF", "FINAL", "INTERMISSION"):
             if box:
@@ -239,7 +256,7 @@ def process_single_game(game_id: str, game_date: str) -> Dict[str, Any]:
             else:
                 logger.warning(f"   [Game {game_id}] Failed to fetch boxscore")
                 return {"game_id": game_id, "state": state, "success": False, "details": details}
-        
+
         # Scheduled game - no stats to process yet
         return {"game_id": game_id, "state": state, "success": True, "details": details}
         
