@@ -72,7 +72,20 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+
+    // Authenticate the caller
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: { Authorization: req.headers.get("Authorization") ?? "" },
+      },
+    });
+    const { data: { user } } = await authClient.auth.getUser();
+    if (!user) {
+      return makeJsonResponse({ error: "Unauthorized — sign in required" }, 401);
+    }
+
     const svc = createClient(supabaseUrl, supabaseServiceKey);
 
     // Parse parameters

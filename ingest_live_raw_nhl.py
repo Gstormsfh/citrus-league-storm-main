@@ -87,8 +87,8 @@ def detect_active_games() -> bool:
             now = dt.datetime.now(dt.timezone.utc)
             if (now - game_date).total_seconds() < 7200:  # 2 hours
               return True
-          except (ValueError, TypeError, KeyError):
-            pass
+          except (ValueError, TypeError, KeyError) as e:
+            print(f"[ingest_live_raw_nhl] Warning: failed to parse game start time for active game check: {e}")
 
     return False
   except Exception as e:

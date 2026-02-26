@@ -225,8 +225,8 @@ def extract_game_date_from_json(json_data, game_id):
                 from zoneinfo import ZoneInfo
                 mt_dt = utc_dt.astimezone(ZoneInfo("America/Denver"))
                 return mt_dt.strftime('%Y-%m-%d')
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Warning: failed to extract game date from JSON for game {game_id}: {e}")
 
     return None
 

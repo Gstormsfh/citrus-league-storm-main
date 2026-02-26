@@ -534,9 +534,9 @@ def get_player_team_abbrev(
             team = player[0].get("team_abbrev")
             if team:
                 return str(team)
-    except:
-        pass
-    
+    except Exception as e:
+        print(f"Warning: failed to look up team abbrev from player_directory for player {player_id}: {e}")
+
     # Fallback: get most recent team from player_game_stats
     try:
         recent = db.select(
@@ -551,9 +551,9 @@ def get_player_team_abbrev(
             team = recent[0].get("team_abbrev")
             if team:
                 return str(team)
-    except:
-        pass
-    
+    except Exception as e:
+        print(f"Warning: failed to look up team abbrev from player_game_stats for player {player_id}: {e}")
+
     return None
 
 
