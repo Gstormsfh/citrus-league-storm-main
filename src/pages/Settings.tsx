@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Loader2, User, Mail, Lock, Trash2, ExternalLink, Shield, FileText, Download } from 'lucide-react';
+import { Loader2, User, Mail, Lock, Trash2, ExternalLink, Shield, FileText, Download, Sun, Moon, Monitor } from 'lucide-react';
 import { logger } from '@/utils/logger';
 
 const Settings = () => {
@@ -26,6 +26,24 @@ const Settings = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
+
+  // Theme preference: 'light' | 'dark' | 'system'
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(() => {
+    return (localStorage.getItem('citrus-theme') as 'light' | 'dark' | 'system') || 'light';
+  });
+
+  useEffect(() => {
+    const root = document.documentElement;
+    localStorage.setItem('citrus-theme', theme);
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else if (theme === 'system') {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      root.classList.toggle('dark', prefersDark);
+    } else {
+      root.classList.remove('dark');
+    }
+  }, [theme]);
 
   if (!user) {
     navigate('/auth');
@@ -182,6 +200,36 @@ const Settings = () => {
                 <Shield className="h-4 w-4 text-gray-400" />
                 <span className="text-base font-mono text-xs text-gray-500">{user.id}</span>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Appearance */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Sun className="h-5 w-5" />
+              Appearance
+            </CardTitle>
+            <CardDescription>Choose your preferred theme</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-3">
+              {([
+                { value: 'light' as const, label: 'Light', icon: Sun },
+                { value: 'dark' as const, label: 'Dark', icon: Moon },
+                { value: 'system' as const, label: 'System', icon: Monitor },
+              ]).map(({ value, label, icon: Icon }) => (
+                <Button
+                  key={value}
+                  variant={theme === value ? 'default' : 'outline'}
+                  onClick={() => setTheme(value)}
+                  className="flex-1"
+                >
+                  <Icon className="mr-2 h-4 w-4" />
+                  {label}
+                </Button>
+              ))}
             </div>
           </CardContent>
         </Card>

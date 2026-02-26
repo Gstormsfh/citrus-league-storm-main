@@ -221,8 +221,9 @@ def extract_game_date_from_json(json_data, game_id):
             if 'startTimeUTC' in game_info:
                 start_time = game_info['startTimeUTC']
                 utc_dt = datetime.datetime.fromisoformat(start_time.replace('Z', '+00:00'))
-                # Approximate Mountain Time to get correct local date
-                mt_dt = utc_dt + datetime.timedelta(hours=-7)
+                # Convert to US Mountain Time (handles DST: UTC-7 winter, UTC-6 summer)
+                from zoneinfo import ZoneInfo
+                mt_dt = utc_dt.astimezone(ZoneInfo("America/Denver"))
                 return mt_dt.strftime('%Y-%m-%d')
     except Exception:
         pass

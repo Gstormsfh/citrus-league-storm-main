@@ -203,142 +203,81 @@ export class TradeService {
         };
       }
 
-      // ===== EXECUTE THE TRADE =====
-      // 1. Update roster_assignments (source of truth for player ownership)
-      const now = new Date().toISOString();
-
-      // Transfer offered players: from_team -> to_team (single batch query)
-      if (trade.offered_player_ids.length > 0) {
-        await supabase
-          .from('roster_assignments')
-          .update({ team_id: trade.to_team_id, updated_at: now })
-          .eq('league_id', trade.league_id)
-          .eq('team_id', trade.from_team_id)
-          .in('player_id', trade.offered_player_ids.map(String));
-      }
-
-      // Transfer requested players: to_team -> from_team (single batch query)
-      if (trade.requested_player_ids.length > 0) {
-        await supabase
-          .from('roster_assignments')
-          .update({ team_id: trade.from_team_id, updated_at: now })
-          .eq('league_id', trade.league_id)
-          .eq('team_id', trade.to_team_id)
-          .in('player_id', trade.requested_player_ids.map(String));
-      }
-
-      // 2. Update team_lineups (display layer - starters/bench/IR)
-      const { data: fromTeamLineup } = await supabase
-        .from('team_lineups')
-        .select('starters, bench, ir, slot_assignments')
-        .eq('league_id', trade.league_id)
-        .eq('team_id', trade.from_team_id)
-        .single();
-
-      const { data: toTeamLineup } = await supabase
-        .from('team_lineups')
-        .select('starters, bench, ir, slot_assignments')
-        .eq('league_id', trade.league_id)
-        .eq('team_id', trade.to_team_id)
-        .single();
-
-      if (fromTeamLineup && toTeamLineup) {
-        const removePlayers = (lineup: TeamLineup, playerIds: number[]): TeamLineup => {
-          const playerIdStrs = playerIds.map(id => id.toString());
-          return {
-            starters: (lineup.starters || []).filter((id: string) => !playerIdStrs.includes(id)),
-            bench: (lineup.bench || []).filter((id: string) => !playerIdStrs.includes(id)),
-            ir: (lineup.ir || []).filter((id: string) => !playerIdStrs.includes(id)),
-            slot_assignments: Object.fromEntries(
-              Object.entries(lineup.slot_assignments || {}).filter(([key]) => !playerIdStrs.includes(key))
-            )
-          };
-        };
-
-        const addPlayersToBench = (lineup: TeamLineup, playerIds: number[]): TeamLineup => {
-          const newBench = [...(lineup.bench || []), ...playerIds.map(id => id.toString())];
-          return { ...lineup, bench: newBench };
-        };
-
-        let newFromTeamLineup = removePlayers(fromTeamLineup, trade.offered_player_ids);
-        newFromTeamLineup = addPlayersToBench(newFromTeamLineup, trade.requested_player_ids);
-
-        let newToTeamLineup = removePlayers(toTeamLineup, trade.requested_player_ids);
-        newToTeamLineup = addPlayersToBench(newToTeamLineup, trade.offered_player_ids);
-
-        await supabase
-          .from('team_lineups')
-          .update({
-            starters: newFromTeamLineup.starters,
-            bench: newFromTeamLineup.bench,
-            ir: newFromTeamLineup.ir,
-            slot_assignments: newFromTeamLineup.slot_assignments,
-            updated_at: new Date().toISOString()
-          })
-          .eq('league_id', trade.league_id)
-          .eq('team_id', trade.from_team_id);
-
-        await supabase
-          .from('team_lineups')
-          .update({
-            starters: newToTeamLineup.starters,
-            bench: newToTeamLineup.bench,
-            ir: newToTeamLineup.ir,
-            slot_assignments: newToTeamLineup.slot_assignments,
-            updated_at: new Date().toISOString()
-          })
-          .eq('league_id', trade.league_id)
-          .eq('team_id', trade.to_team_id);
-      }
-
-      // 3. Log transactions in transaction_ledger
-      const txnEntries = [
-        ...trade.offered_player_ids.map((pid: number) => ({
-          league_id: trade.league_id,
-          team_id: trade.from_team_id,
-          player_id: String(pid),
-          type: 'TRADE',
-          created_at: now
-        })),
-        ...trade.offered_player_ids.map((pid: number) => ({
-          league_id: trade.league_id,
-          team_id: trade.to_team_id,
-          player_id: String(pid),
-          type: 'TRADE',
-          created_at: now
-        })),
-        ...trade.requested_player_ids.map((pid: number) => ({
-          league_id: trade.league_id,
-          team_id: trade.to_team_id,
-          player_id: String(pid),
-          type: 'TRADE',
-          created_at: now
-        })),
-        ...trade.requested_player_ids.map((pid: number) => ({
-          league_id: trade.league_id,
-          team_id: trade.from_team_id,
-          player_id: String(pid),
-          type: 'TRADE',
-          created_at: now
-        }))
-      ];
-
-      // Best-effort logging — don't fail the trade if ledger insert fails
-      await supabase.from('transaction_ledger').insert(txnEntries).catch((err) => {
-        console.error('[TradeService] Transaction ledger insert failed:', err);
+      // ===== EXECUTE THE TRADE (Atomic RPC) =====
+      // Uses execute_trade RPC for full transactional safety:
+      // - Validates player ownership before moving
+      // - Rolls back ALL changes if any step fails
+      // - Logs to transaction_ledger and trade_history inside the transaction
+      const { data: tradeResult, error: tradeRpcError } = await supabase.rpc('execute_trade', {
+        p_trade_id: trade.id,
+        p_league_id: trade.league_id,
+        p_from_team_id: trade.from_team_id,
+        p_to_team_id: trade.to_team_id,
+        p_offered_player_ids: trade.offered_player_ids.map(String),
+        p_requested_player_ids: trade.requested_player_ids.map(String),
       });
 
-      // 4. Record in trade history
-      await supabase
-        .from('trade_history')
-        .insert({
-          league_id: trade.league_id,
-          trade_offer_id: trade.id,
-          team1_id: trade.from_team_id,
-          team2_id: trade.to_team_id,
-          team1_players: trade.offered_player_ids,
-          team2_players: trade.requested_player_ids
-        });
+      if (tradeRpcError) {
+        console.error('[TradeService] execute_trade RPC error:', tradeRpcError);
+        return { success: false, error: `Trade execution failed: ${tradeRpcError.message}` };
+      }
+
+      const rpcResult = tradeResult as { success: boolean; error?: string } | null;
+      if (rpcResult && !rpcResult.success) {
+        return { success: false, error: rpcResult.error || 'Trade execution failed' };
+      }
+
+      // Update team_lineups display layer (bench new acquisitions)
+      // This is best-effort — roster_assignments is already correct from the RPC
+      try {
+        const [{ data: fromTeamLineup }, { data: toTeamLineup }] = await Promise.all([
+          supabase.from('team_lineups').select('starters, bench, ir, slot_assignments')
+            .eq('league_id', trade.league_id).eq('team_id', trade.from_team_id).single(),
+          supabase.from('team_lineups').select('starters, bench, ir, slot_assignments')
+            .eq('league_id', trade.league_id).eq('team_id', trade.to_team_id).single(),
+        ]);
+
+        if (fromTeamLineup && toTeamLineup) {
+          const removePlayers = (lineup: TeamLineup, playerIds: number[]): TeamLineup => {
+            const playerIdStrs = playerIds.map(id => id.toString());
+            return {
+              starters: (lineup.starters || []).filter((id: string) => !playerIdStrs.includes(id)),
+              bench: (lineup.bench || []).filter((id: string) => !playerIdStrs.includes(id)),
+              ir: (lineup.ir || []).filter((id: string) => !playerIdStrs.includes(id)),
+              slot_assignments: Object.fromEntries(
+                Object.entries(lineup.slot_assignments || {}).filter(([key]) => !playerIdStrs.includes(key))
+              )
+            };
+          };
+
+          const addPlayersToBench = (lineup: TeamLineup, playerIds: number[]): TeamLineup => {
+            const newBench = [...(lineup.bench || []), ...playerIds.map(id => id.toString())];
+            return { ...lineup, bench: newBench };
+          };
+
+          let newFromTeamLineup = removePlayers(fromTeamLineup, trade.offered_player_ids);
+          newFromTeamLineup = addPlayersToBench(newFromTeamLineup, trade.requested_player_ids);
+
+          let newToTeamLineup = removePlayers(toTeamLineup, trade.requested_player_ids);
+          newToTeamLineup = addPlayersToBench(newToTeamLineup, trade.offered_player_ids);
+
+          await Promise.all([
+            supabase.from('team_lineups').update({
+              starters: newFromTeamLineup.starters, bench: newFromTeamLineup.bench,
+              ir: newFromTeamLineup.ir, slot_assignments: newFromTeamLineup.slot_assignments,
+              updated_at: new Date().toISOString()
+            }).eq('league_id', trade.league_id).eq('team_id', trade.from_team_id),
+            supabase.from('team_lineups').update({
+              starters: newToTeamLineup.starters, bench: newToTeamLineup.bench,
+              ir: newToTeamLineup.ir, slot_assignments: newToTeamLineup.slot_assignments,
+              updated_at: new Date().toISOString()
+            }).eq('league_id', trade.league_id).eq('team_id', trade.to_team_id),
+          ]);
+        }
+      } catch (lineupErr) {
+        // Best-effort — roster_assignments (source of truth) is already correct
+        console.error('[TradeService] team_lineups update failed (non-critical):', lineupErr);
+      }
 
       return { success: true };
     } catch (error: unknown) {

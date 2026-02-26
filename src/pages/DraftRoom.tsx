@@ -1712,13 +1712,19 @@ const DraftRoom = () => {
           positionCounts[pos] = (positionCounts[pos] || 0) + 1;
         });
 
-        // Ideal roster composition: 6C, 6LW, 6RW, 6D, 3G = needs spread across positions
-        // Simplified: prioritize positions with fewest picks relative to need
-        const positionNeeds: Record<string, number> = {
-          'C': 4, 'LW': 3, 'RW': 3, 'D': 6, 'G': 2,
-          // Fallback for combined forward positions
-          'F': 3, 'W': 3
-        };
+        // Read roster composition from league settings if available, otherwise use defaults
+        const leagueRosterSlots = (league?.settings as LeagueSettings)?.rosterSlots;
+        const positionNeeds: Record<string, number> = leagueRosterSlots
+          ? {
+              'C': (leagueRosterSlots['C'] || 0) + Math.floor((leagueRosterSlots['BN'] || 0) / 5),
+              'LW': (leagueRosterSlots['LW'] || 0) + Math.floor((leagueRosterSlots['BN'] || 0) / 5),
+              'RW': (leagueRosterSlots['RW'] || 0) + Math.floor((leagueRosterSlots['BN'] || 0) / 5),
+              'D': (leagueRosterSlots['D'] || 0) + Math.floor((leagueRosterSlots['BN'] || 0) * 2 / 5),
+              'G': leagueRosterSlots['G'] || 2,
+              'F': Math.floor((leagueRosterSlots['UTIL'] || 0) / 2) + 1,
+              'W': Math.floor((leagueRosterSlots['UTIL'] || 0) / 2) + 1,
+            }
+          : { 'C': 4, 'LW': 3, 'RW': 3, 'D': 6, 'G': 2, 'F': 3, 'W': 3 };
 
         // Find position with biggest need gap
         let bestNeedPosition: string | null = null;

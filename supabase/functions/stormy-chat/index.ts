@@ -1,11 +1,23 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+// Allowed origins — restrict CORS to known deployment URLs only
+const ALLOWED_ORIGINS = [
+  "https://citrus-fantasy-sports.web.app",
+  "https://citrus-fantasy-sports.firebaseapp.com",
+  "http://localhost:5173",  // Vite dev server
+  "http://localhost:3000",
+];
+
+function getCorsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get("origin") ?? "";
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type",
+  };
+}
 
 // ── Cost Controls ────────────────────────────────────────────────
 // HARD CAPS. Stormy stops responding once ANY limit is hit.
@@ -93,10 +105,13 @@ When context is provided, you may see:
 6. **STAY CONCISE.** Max 2-3 short paragraphs. Use bullets for player comparisons.`;
 
 // ── Helpers ──────────────────────────────────────────────────────
+// requestCorsHeaders is set per-request in the serve handler
+let requestCorsHeaders: Record<string, string> = {};
+
 function makeJsonResponse(body: Record<string, unknown>, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...requestCorsHeaders, "Content-Type": "application/json" },
   });
 }
 
@@ -170,8 +185,11 @@ async function logUsage(
 
 // ── Main Handler ─────────────────────────────────────────────────
 serve(async (req) => {
+  // Set per-request CORS headers from origin
+  requestCorsHeaders = getCorsHeaders(req);
+
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: requestCorsHeaders });
   }
 
   try {
