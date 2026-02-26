@@ -216,10 +216,12 @@ export default function CapProjection() {
                         backgroundColor: '#4A5F4D',
                         border: 'none',
                         borderRadius: '12px',
-                        color: '#E8EED9',
+                        color: '#FFFFFF',
                         fontSize: '12px',
                         fontFamily: 'Montserrat',
                       }}
+                      itemStyle={{ color: '#FFFFFF' }}
+                      labelStyle={{ color: '#FFFFFF' }}
                       formatter={(value: number, name: string) => [
                         `$${value.toFixed(1)}M`,
                         name === 'committed' ? 'Committed' : 'Projected Space',
