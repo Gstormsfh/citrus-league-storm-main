@@ -61,8 +61,9 @@ def process_game_data_citrus(game_id: int, boxscore: dict, pbp_data: Optional[di
         start_time_utc = game_info.get("startTimeUTC", "")
         try:
             utc_dt = dt.datetime.fromisoformat(start_time_utc.replace('Z', '+00:00'))
-            # Approximate Mountain Time (UTC-7) to get correct local date
-            mt_dt = utc_dt + dt.timedelta(hours=-7)
+            # Convert to US Mountain Time (handles DST automatically: UTC-7 in winter, UTC-6 in summer)
+            from zoneinfo import ZoneInfo
+            mt_dt = utc_dt.astimezone(ZoneInfo("America/Denver"))
             game_date = mt_dt.date()
         except Exception:
             game_date = dt.date.today()

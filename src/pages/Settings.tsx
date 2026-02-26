@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Loader2, User, Mail, Lock, Trash2, ExternalLink, Shield, FileText, Download } from 'lucide-react';
+import { Loader2, User, Mail, Lock, Trash2, ExternalLink, Shield, FileText, Download, Sun, Moon, Monitor } from 'lucide-react';
 import { logger } from '@/utils/logger';
 
 const Settings = () => {
@@ -26,6 +26,37 @@ const Settings = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
+
+  // Theme preference: 'light' | 'dark' | 'system'
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(() => {
+    return (localStorage.getItem('citrus-theme') as 'light' | 'dark' | 'system') || 'light';
+  });
+
+  useEffect(() => {
+    const root = document.documentElement;
+    localStorage.setItem('citrus-theme', theme);
+
+    const applyTheme = (prefersDark?: boolean) => {
+      if (theme === 'dark') {
+        root.classList.add('dark');
+      } else if (theme === 'system') {
+        const dark = prefersDark ?? window.matchMedia('(prefers-color-scheme: dark)').matches;
+        root.classList.toggle('dark', dark);
+      } else {
+        root.classList.remove('dark');
+      }
+    };
+
+    applyTheme();
+
+    // Listen for OS theme changes when in 'system' mode
+    if (theme === 'system') {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      const handler = (e: MediaQueryListEvent) => applyTheme(e.matches);
+      mq.addEventListener('change', handler);
+      return () => mq.removeEventListener('change', handler);
+    }
+  }, [theme]);
 
   if (!user) {
     navigate('/auth');
@@ -136,24 +167,24 @@ const Settings = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-50 via-green-50 to-emerald-50">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-50 via-green-50 to-emerald-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 dark:bg-gray-900/98 backdrop-blur-xl border-b border-citrus-sage/20 dark:border-gray-700/40 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-center h-12 px-4">
-          <h1 className="text-lg font-varsity font-bold text-citrus-forest">Settings</h1>
+          <h1 className="text-lg font-varsity font-bold text-citrus-forest dark:text-green-300">Settings</h1>
         </div>
       </div>
       <main className="w-full lg:pt-20 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
         <div className="w-full m-0 p-0">
           <div className="max-w-4xl mx-auto px-2 lg:px-6">
             <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Account Settings</h1>
-          <p className="text-gray-600">Manage your account, security, and preferences</p>
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100 mb-2">Account Settings</h1>
+          <p className="text-gray-600 dark:text-gray-400">Manage your account, security, and preferences</p>
         </div>
 
         {message && (
-          <Alert className={`mb-6 ${message.type === 'success' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-            <AlertDescription className={message.type === 'success' ? 'text-green-800' : 'text-red-800'}>
+          <Alert className={`mb-6 ${message.type === 'success' ? 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800'}`}>
+            <AlertDescription className={message.type === 'success' ? 'text-green-800 dark:text-green-300' : 'text-red-800 dark:text-red-300'}>
               {message.text}
             </AlertDescription>
           </Alert>
@@ -170,18 +201,48 @@ const Settings = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label className="text-sm text-gray-600">Email Address</Label>
+              <Label className="text-sm text-gray-600 dark:text-gray-400">Email Address</Label>
               <div className="flex items-center gap-2 mt-1">
-                <Mail className="h-4 w-4 text-gray-400" />
+                <Mail className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                 <span className="text-base font-medium">{user.email}</span>
               </div>
             </div>
             <div>
-              <Label className="text-sm text-gray-600">User ID</Label>
+              <Label className="text-sm text-gray-600 dark:text-gray-400">User ID</Label>
               <div className="flex items-center gap-2 mt-1">
-                <Shield className="h-4 w-4 text-gray-400" />
-                <span className="text-base font-mono text-xs text-gray-500">{user.id}</span>
+                <Shield className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                <span className="text-base font-mono text-xs text-gray-500 dark:text-gray-400">{user.id}</span>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Appearance */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Sun className="h-5 w-5" />
+              Appearance
+            </CardTitle>
+            <CardDescription>Choose your preferred theme</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-3">
+              {([
+                { value: 'light' as const, label: 'Light', icon: Sun },
+                { value: 'dark' as const, label: 'Dark', icon: Moon },
+                { value: 'system' as const, label: 'System', icon: Monitor },
+              ]).map(({ value, label, icon: Icon }) => (
+                <Button
+                  key={value}
+                  variant={theme === value ? 'default' : 'outline'}
+                  onClick={() => setTheme(value)}
+                  className="flex-1"
+                >
+                  <Icon className="mr-2 h-4 w-4" />
+                  {label}
+                </Button>
+              ))}
             </div>
           </CardContent>
         </Card>
@@ -253,20 +314,20 @@ const Settings = () => {
               href="/privacy-policy.html" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors group"
+              className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group"
             >
-              <span className="font-medium text-gray-900 group-hover:text-green-700">Privacy Policy</span>
-              <ExternalLink className="h-4 w-4 text-gray-400 group-hover:text-green-700" />
+              <span className="font-medium text-gray-900 dark:text-gray-100 group-hover:text-green-700 dark:group-hover:text-green-400">Privacy Policy</span>
+              <ExternalLink className="h-4 w-4 text-gray-400 dark:text-gray-500 group-hover:text-green-700 dark:group-hover:text-green-400" />
             </a>
             <Separator />
             <a 
               href="/terms-of-service.html" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors group"
+              className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group"
             >
-              <span className="font-medium text-gray-900 group-hover:text-green-700">Terms of Service</span>
-              <ExternalLink className="h-4 w-4 text-gray-400 group-hover:text-green-700" />
+              <span className="font-medium text-gray-900 dark:text-gray-100 group-hover:text-green-700 dark:group-hover:text-green-400">Terms of Service</span>
+              <ExternalLink className="h-4 w-4 text-gray-400 dark:text-gray-500 group-hover:text-green-700 dark:group-hover:text-green-400" />
             </a>
           </CardContent>
         </Card>
@@ -281,7 +342,7 @@ const Settings = () => {
             <CardDescription>Export a copy of all your data</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
               Download a JSON file containing all your account data, including your profile, teams, leagues, transactions, and draft history.
             </p>
             <Button
@@ -306,20 +367,20 @@ const Settings = () => {
         </Card>
 
         {/* Delete Account */}
-        <Card className="border-red-200 bg-red-50/50">
+        <Card className="border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/30">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-red-700">
+            <CardTitle className="flex items-center gap-2 text-red-700 dark:text-red-400">
               <Trash2 className="h-5 w-5" />
               Delete Account
             </CardTitle>
-            <CardDescription className="text-red-600">
+            <CardDescription className="text-red-600 dark:text-red-400/80">
               Permanently delete your account and all associated data
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="bg-white p-4 rounded-lg border border-red-200">
-              <h4 className="font-semibold text-red-900 mb-2">This action cannot be undone</h4>
-              <ul className="text-sm text-red-700 space-y-1 ml-4 list-disc">
+            <div className="bg-white dark:bg-gray-900 p-4 rounded-lg border border-red-200 dark:border-red-800">
+              <h4 className="font-semibold text-red-900 dark:text-red-300 mb-2">This action cannot be undone</h4>
+              <ul className="text-sm text-red-700 dark:text-red-400 space-y-1 ml-4 list-disc">
                 <li>Your account and authentication credentials will be permanently deleted</li>
                 <li>All your fantasy teams and league data will be removed</li>
                 <li>If you're a league commissioner, your leagues may be orphaned</li>
@@ -381,8 +442,8 @@ const Settings = () => {
           </CardContent>
         </Card>
 
-        <div className="mt-8 text-center text-sm text-gray-600">
-          <p>Need help? Contact us at <a href="mailto:CitrusFantasySports@Gmail.com" className="text-green-700 hover:underline">CitrusFantasySports@Gmail.com</a></p>
+        <div className="mt-8 text-center text-sm text-gray-600 dark:text-gray-400">
+          <p>Need help? Contact us at <a href="mailto:CitrusFantasySports@Gmail.com" className="text-green-700 dark:text-green-400 hover:underline">CitrusFantasySports@Gmail.com</a></p>
         </div>
           </div>
         </div>

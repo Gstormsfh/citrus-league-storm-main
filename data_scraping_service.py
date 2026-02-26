@@ -433,7 +433,9 @@ def run_unified_loop() -> Tuple[str, int]:
         game_state = "SCHEDULED"
     
     # 6. NIGHTLY PBP AUDIT - FIXED: Must run BEFORE return statement!
-    now = dt.datetime.now()
+    # Use Mountain Time explicitly for all scheduling decisions (not server local time)
+    from zoneinfo import ZoneInfo
+    now = dt.datetime.now(ZoneInfo("America/Denver"))
     if now.hour == 23 and now.minute >= 50:
         logger.info("[NIGHTLY] END OF NIGHT DETECTED. Starting Deep PBP Audit...")
         try:
@@ -445,99 +447,122 @@ def run_unified_loop() -> Tuple[str, int]:
 
     # =========================================================================
     # BULLETPROOF DATA INTEGRITY PIPELINE (Midnight MT)
-    # Sequential execution ensures data accuracy:
-    #   1. Reconcile recent games (catch NHL stat corrections)
-    #   2. Re-aggregate season stats from per-game data
-    #   3. Sync per-game PPP/SHP from Game-Log API (last 3 days)
-    #   4. True-up ALL stats from Landing Endpoint (authoritative source)
-    #      Writes: Goals, Assists, Points, SOG, PIM, PPP, SHP, TOI, +/-,
-    #              Wins, Losses, OTL, Saves, GA, GAA, SV%, Shutouts
+    # Uses flag-based job tracking via nightly_job_runs table to ensure
+    # each job runs exactly once per day, even if a scheduling window is
+    # missed. Jobs are sequenced: reconcile → aggregate → ppp-sync → landing.
     # =========================================================================
-    
-    # 7. DATA RECONCILIATION (00:00-00:03)
-    # Validate recent games against NHL API, auto-fix discrepancies
-    if now.hour == 0 and 0 <= now.minute < 3:
-        logger.info("[RECONCILE] Starting Data Reconciliation (Last 7 Days)...")
+
+    def _has_run_today(db_client, job_name: str, today_str: str) -> bool:
+        """Check if a nightly job already ran today."""
         try:
-            import subprocess
-            result = subprocess.run(
-                [sys.executable, "reconcile_player_stats.py", "--recent", "--auto-fix"],
-                capture_output=True,
-                text=True,
-                timeout=1800  # 30 min timeout
+            rows = db_client.select(
+                "nightly_job_runs",
+                select="id",
+                filters=[("job_name", "eq", job_name), ("run_date", "eq", today_str), ("status", "eq", "completed")],
+                limit=1,
             )
-            if result.returncode == 0:
-                logger.info("[RECONCILE] Complete.")
-                # Log summary
-                if result.stdout:
-                    for line in result.stdout.strip().split('\n')[-5:]:
-                        if line.strip():
-                            logger.info(f"  {line}")
-            else:
-                logger.error(f"[RECONCILE] FAILED with code {result.returncode}")
-                if result.stderr:
-                    logger.error(f"  Error: {result.stderr[:500]}")
-        except subprocess.TimeoutExpired:
-            logger.error("[RECONCILE] TIMEOUT after 30 minutes")
-        except Exception as e:
-            logger.error(f"[RECONCILE] Error: {e}")
+            return bool(rows)
+        except Exception:
+            return False
 
-    # 8. RE-AGGREGATE SEASON STATS (00:03-00:06)
-    # Rebuild player_season_stats from corrected per-game data
-    if now.hour == 0 and 3 <= now.minute < 6:
-        logger.info("[AGGREGATE] Re-building player_season_stats from per-game data...")
+    def _mark_job(db_client, job_name: str, today_str: str, status: str = "completed"):
+        """Mark a nightly job as completed (or failed) for today."""
         try:
-            from build_player_season_stats import main as build_season_stats
-            result = build_season_stats()
-            if result == 0:
-                logger.info("[AGGREGATE] Season stats rebuilt successfully.")
-            else:
-                logger.error(f"[AGGREGATE] FAILED with code {result}")
-        except Exception as e:
-            logger.error(f"[AGGREGATE] Error: {e}")
-
-    # 9. PER-GAME PPP/SHP SYNC FROM GAME-LOG (00:06-00:08) — nightly deep sync
-    # Populate per-game nhl_ppp and nhl_shp from NHL Game-Log API
-    # (Boxscore API only has PP goals, not PP assists — game-log has full PPP/SHP)
-    if now.hour == 0 and 6 <= now.minute < 8:
-        logger.info("[PPP-SYNC] Syncing per-game PPP/SHP from NHL Game-Log API (last 3 days)...")
-        try:
-            import subprocess
-            result = subprocess.run(
-                [sys.executable, "sync_ppp_from_gamelog.py", "--days", "3"],
-                capture_output=True,
-                text=True,
-                timeout=600  # 10 min timeout
+            db_client.upsert(
+                "nightly_job_runs",
+                {"job_name": job_name, "run_date": today_str, "status": status, "completed_at": dt.datetime.now(ZoneInfo("America/Denver")).isoformat()},
+                on_conflict="job_name,run_date",
             )
-            if result.returncode == 0:
-                logger.info("[PPP-SYNC] Per-game PPP/SHP sync complete.")
-                if result.stdout:
-                    for line in result.stdout.strip().split('\n')[-3:]:
-                        if line.strip():
-                            logger.info(f"  {line}")
-            else:
-                logger.error(f"[PPP-SYNC] FAILED with code {result.returncode}")
-                if result.stderr:
-                    logger.error(f"  Error: {result.stderr[:500]}")
-        except subprocess.TimeoutExpired:
-            logger.error("[PPP-SYNC] TIMEOUT after 10 minutes")
         except Exception as e:
-            logger.error(f"[PPP-SYNC] Error: {e}")
+            logger.warning(f"[JOB-TRACK] Could not mark {job_name}: {e}")
 
-    # 10. LANDING STATS TRUE-UP - ALL STATS (00:08-00:12)
-    # Fetch ALL authoritative stats from NHL Landing Endpoint (source of truth)
-    # Overwrites aggregated values with official NHL.com data for every player
-    if now.hour == 0 and 8 <= now.minute < 12:
-        logger.info("[LANDING] True-up ALL stats from NHL Landing Endpoint (Goals, Assists, PPP, SHP, SOG, PIM, TOI, Goalie stats)...")
-        try:
-            from fetch_nhl_stats_from_landing import main as fetch_landing_stats
-            result = fetch_landing_stats()
-            if result == 0:
-                logger.info("[LANDING] ALL stats true-up complete (official NHL.com source of truth).")
-            else:
-                logger.error(f"[LANDING] FAILED with code {result}")
-        except Exception as e:
-            logger.error(f"[LANDING] Error: {e}")
+    # Only attempt nightly jobs during the midnight window (00:00-00:30 MT)
+    if now.hour == 0 and now.minute < 30:
+        today_str = now.strftime("%Y-%m-%d")
+
+        # 7. DATA RECONCILIATION — once per day
+        if not _has_run_today(db, "reconcile", today_str):
+            logger.info("[RECONCILE] Starting Data Reconciliation (Last 7 Days)...")
+            try:
+                import subprocess
+                result = subprocess.run(
+                    [sys.executable, "reconcile_player_stats.py", "--recent", "--auto-fix"],
+                    capture_output=True, text=True, timeout=1800
+                )
+                if result.returncode == 0:
+                    _mark_job(db, "reconcile", today_str)
+                    logger.info("[RECONCILE] Complete.")
+                    if result.stdout:
+                        for line in result.stdout.strip().split('\n')[-5:]:
+                            if line.strip():
+                                logger.info(f"  {line}")
+                else:
+                    _mark_job(db, "reconcile", today_str, "failed")
+                    logger.error(f"[RECONCILE] FAILED with code {result.returncode}")
+                    if result.stderr:
+                        logger.error(f"  Error: {result.stderr[:500]}")
+            except subprocess.TimeoutExpired:
+                _mark_job(db, "reconcile", today_str, "failed")
+                logger.error("[RECONCILE] TIMEOUT after 30 minutes")
+            except Exception as e:
+                logger.error(f"[RECONCILE] Error: {e}")
+
+        # 8. RE-AGGREGATE SEASON STATS — once per day (after reconcile)
+        if _has_run_today(db, "reconcile", today_str) and not _has_run_today(db, "aggregate", today_str):
+            logger.info("[AGGREGATE] Re-building player_season_stats from per-game data...")
+            try:
+                from build_player_season_stats import main as build_season_stats
+                agg_result = build_season_stats()
+                if agg_result == 0:
+                    _mark_job(db, "aggregate", today_str)
+                    logger.info("[AGGREGATE] Season stats rebuilt successfully.")
+                else:
+                    _mark_job(db, "aggregate", today_str, "failed")
+                    logger.error(f"[AGGREGATE] FAILED with code {agg_result}")
+            except Exception as e:
+                logger.error(f"[AGGREGATE] Error: {e}")
+
+        # 9. PER-GAME PPP/SHP SYNC — once per day (after aggregate)
+        if _has_run_today(db, "aggregate", today_str) and not _has_run_today(db, "ppp_sync", today_str):
+            logger.info("[PPP-SYNC] Syncing per-game PPP/SHP from NHL Game-Log API (last 3 days)...")
+            try:
+                import subprocess
+                result = subprocess.run(
+                    [sys.executable, "sync_ppp_from_gamelog.py", "--days", "3"],
+                    capture_output=True, text=True, timeout=600
+                )
+                if result.returncode == 0:
+                    _mark_job(db, "ppp_sync", today_str)
+                    logger.info("[PPP-SYNC] Per-game PPP/SHP sync complete.")
+                    if result.stdout:
+                        for line in result.stdout.strip().split('\n')[-3:]:
+                            if line.strip():
+                                logger.info(f"  {line}")
+                else:
+                    _mark_job(db, "ppp_sync", today_str, "failed")
+                    logger.error(f"[PPP-SYNC] FAILED with code {result.returncode}")
+                    if result.stderr:
+                        logger.error(f"  Error: {result.stderr[:500]}")
+            except subprocess.TimeoutExpired:
+                _mark_job(db, "ppp_sync", today_str, "failed")
+                logger.error("[PPP-SYNC] TIMEOUT after 10 minutes")
+            except Exception as e:
+                logger.error(f"[PPP-SYNC] Error: {e}")
+
+        # 10. LANDING STATS TRUE-UP — once per day (after ppp_sync)
+        if _has_run_today(db, "ppp_sync", today_str) and not _has_run_today(db, "landing_trueup", today_str):
+            logger.info("[LANDING] True-up ALL stats from NHL Landing Endpoint (Goals, Assists, PPP, SHP, SOG, PIM, TOI, Goalie stats)...")
+            try:
+                from fetch_nhl_stats_from_landing import main as fetch_landing_stats
+                landing_result = fetch_landing_stats()
+                if landing_result == 0:
+                    _mark_job(db, "landing_trueup", today_str)
+                    logger.info("[LANDING] ALL stats true-up complete (official NHL.com source of truth).")
+                else:
+                    _mark_job(db, "landing_trueup", today_str, "failed")
+                    logger.error(f"[LANDING] FAILED with code {landing_result}")
+            except Exception as e:
+                logger.error(f"[LANDING] Error: {e}")
 
     # Track performance metrics
     tracker.total_syncs += 1
@@ -574,7 +599,8 @@ if __name__ == "__main__":
             
             # ADAPTIVE SCHEDULING: Use game state to determine refresh rate
             # With 100 IPs, we can be MUCH more aggressive during live action
-            now = dt.datetime.now()
+            from zoneinfo import ZoneInfo
+            now = dt.datetime.now(ZoneInfo("America/Denver"))
             is_game_hours = 17 <= now.hour <= 23  # 5pm-11pm MT
             
             # LIVE GAME MODE - Ultra-safe aggressive refresh (30 seconds)

@@ -141,10 +141,10 @@ def fetch_game_boxscore(game_id: int, db: Optional[SupabaseRest] = None, force_a
         print(f"  [WARNING] Could not read stored boxscore for game {game_id}: {e}")
         print(f"  [INFO] Falling back to API fetch...")
     
-    # Fallback: Fetch from API if not in database
+    # Fallback: Fetch from API if not in database (uses proxy rotation)
     url = f"{NHL_API_BASE}/gamecenter/{game_id}/boxscore"
     try:
-        response = requests.get(url, timeout=10)
+        response = citrus_request(url, timeout=10)
         response.raise_for_status()
         return response.json()
     except Exception as e:

@@ -19,11 +19,24 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
  * The actual scoring logic lives in Postgres for atomicity and performance.
  */
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+// Allowed origins — restrict CORS to known deployment URLs only
+const ALLOWED_ORIGINS = [
+  "https://citrus-fantasy-sports.web.app",
+  "https://citrus-fantasy-sports.firebaseapp.com",
+  "http://localhost:5173",
+  "http://localhost:3000",
+];
+
+function getCorsHeaders(origin: string): Record<string, string> {
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type",
+  };
+}
+
+let corsHeaders: Record<string, string> = {};
 
 function makeJsonResponse(body: Record<string, unknown>, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -52,6 +65,7 @@ function getCurrentWeekNumber(): number {
 }
 
 serve(async (req) => {
+  corsHeaders = getCorsHeaders(req.headers.get("origin") ?? "");
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }

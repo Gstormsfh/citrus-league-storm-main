@@ -3696,9 +3696,9 @@ async joinLeagueByCode(
         return { success: false, error };
       }
 
-      const result = data as { status: string; message: string };
-      if (result.status === 'error') {
-        return { success: false, error: new Error(result.message) };
+      const result = data as { success?: boolean; error?: string; status?: string; message?: string };
+      if (result.success === false || result.status === 'error') {
+        return { success: false, error: new Error(result.error || result.message || 'Roster move failed') };
       }
 
       // Clear roster cache for the user's team when player is dropped
@@ -3818,9 +3818,9 @@ async joinLeagueByCode(
         return { success: false, error };
       }
 
-      const result = data as { status: string; message: string };
-      if (result.status === 'error') {
-        return { success: false, error: new Error(result.message) };
+      const result = data as { success?: boolean; error?: string; status?: string; message?: string };
+      if (result.success === false || result.status === 'error') {
+        return { success: false, error: new Error(result.error || result.message || 'Roster move failed') };
       }
 
       // Clear roster cache for this team when player is added

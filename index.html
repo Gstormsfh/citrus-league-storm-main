@@ -3,6 +3,10 @@
 <html lang="en" style="background: #D4E8B8;">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // Apply saved theme before first paint (prevents flash)
+      (function(){var t=localStorage.getItem('citrus-theme');if(t==='dark'||(t==='system'&&matchMedia('(prefers-color-scheme:dark)').matches)){document.documentElement.classList.add('dark')}})();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>CitrusSports - A Fresh Take on Fantasy Sports</title>
 

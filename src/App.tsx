@@ -156,28 +156,28 @@ const App = () => {
                 <Route path="/profile-setup" element={<ProfileSetup />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/verify-email" element={<VerifyEmail />} />
-                <Route path="/roster" element={<Roster />} />
-                <Route path="/standings" element={<Standings />} />
+                <Route path="/roster" element={<ErrorBoundary><Roster /></ErrorBoundary>} />
+                <Route path="/standings" element={<ErrorBoundary><Standings /></ErrorBoundary>} />
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/blog" element={<Blog />} />
                 <Route path="/podcasts" element={<Podcasts />} />
                 <Route path="/guides" element={<Guides />} />
-                    <Route path="/matchup/:leagueId/:weekId?" element={<Matchup />} />
-                    <Route path="/matchup" element={<Matchup />} /> {/* Fallback for /matchup without params */}
-                    <Route path="/league/:leagueId/playoffs" element={<ProtectedRoute><PlayoffBracket /></ProtectedRoute>} />
-                <Route path="/free-agents" element={<FreeAgents />} />
-                <Route path="/gm-office" element={<GMOffice />} />
+                    <Route path="/matchup/:leagueId/:weekId?" element={<ErrorBoundary><Matchup /></ErrorBoundary>} />
+                    <Route path="/matchup" element={<ErrorBoundary><Matchup /></ErrorBoundary>} /> {/* Fallback for /matchup without params */}
+                    <Route path="/league/:leagueId/playoffs" element={<ProtectedRoute><ErrorBoundary><PlayoffBracket /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/free-agents" element={<ErrorBoundary><FreeAgents /></ErrorBoundary>} />
+                <Route path="/gm-office" element={<ErrorBoundary><GMOffice /></ErrorBoundary>} />
                 <Route path="/gm-office/stormy" element={<StormyAssistant />} />
                 <Route path="/news" element={<News />} />
                 <Route path="/draft-room" element={<ErrorBoundary><DraftRoom /></ErrorBoundary>} />
                 <Route path="/draft" element={<ErrorBoundary><DraftRoom /></ErrorBoundary>} /> {/* Fallback route */}
                 <Route path="/create-league" element={<ProtectedRoute requireProfile><CreateLeague /></ProtectedRoute>} />
-                <Route path="/league/:leagueId" element={<ProtectedRoute><LeagueDashboard /></ProtectedRoute>} />
+                <Route path="/league/:leagueId" element={<ProtectedRoute><ErrorBoundary><LeagueDashboard /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/profile" element={<Profile />} />
-                <Route path="/team-analytics" element={<TeamAnalytics />} />
-                <Route path="/waiver-wire" element={<WaiverWire />} />
-                <Route path="/schedule-manager" element={<ScheduleManager />} />
-                <Route path="/trade-analyzer" element={<TradeAnalyzer />} />
+                <Route path="/team-analytics" element={<ErrorBoundary><TeamAnalytics /></ErrorBoundary>} />
+                <Route path="/waiver-wire" element={<ErrorBoundary><WaiverWire /></ErrorBoundary>} />
+                <Route path="/schedule-manager" element={<ErrorBoundary><ScheduleManager /></ErrorBoundary>} />
+                <Route path="/trade-analyzer" element={<ErrorBoundary><TradeAnalyzer /></ErrorBoundary>} />
                 <Route path="/armchair-gm" element={<ArmchairGM />} />
                 <Route path="/team/:teamId" element={<OtherTeam />} />
                 <Route path="/features" element={<Features />} />

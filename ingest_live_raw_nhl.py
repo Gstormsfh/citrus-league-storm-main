@@ -127,7 +127,9 @@ def extract_game_state_and_last_updated(pbp_json: dict) -> Tuple[Optional[str], 
   if isinstance(st, str) and "T" in st:
     try:
       utc_dt = dt.datetime.fromisoformat(st.replace('Z', '+00:00'))
-      mt_dt = utc_dt + dt.timedelta(hours=-7)
+      # Convert to US Mountain Time (handles DST: UTC-7 winter, UTC-6 summer)
+      from zoneinfo import ZoneInfo
+      mt_dt = utc_dt.astimezone(ZoneInfo("America/Denver"))
       game_date = mt_dt.strftime('%Y-%m-%d')
     except Exception:
       game_date = st.split("T")[0]

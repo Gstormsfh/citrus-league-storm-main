@@ -567,7 +567,36 @@ export const DraftService = {
           } catch (syncError: unknown) {
             logger.error('Error syncing roster_assignments:', syncError);
           }
-          
+
+          // Save draft snapshot for historical viewing
+          try {
+            logger.log('Saving draft snapshot...');
+            const { data: snapshotTeams, error: teamsErr } = await supabase
+              .from('teams').select('id, team_name, owner_id').eq('league_id', leagueId);
+            if (teamsErr) throw teamsErr;
+            const { data: snapshotPicks, error: picksErr } = await supabase
+              .from('draft_picks').select('*')
+              .eq('league_id', leagueId).eq('draft_session_id', targetSessionId).is('deleted_at', null)
+              .order('pick_number', { ascending: true });
+            if (picksErr) throw picksErr;
+            if (snapshotTeams && snapshotPicks) {
+              await this.saveDraftSnapshot(
+                leagueId,
+                targetSessionId,
+                snapshotTeams.map(t => ({ id: t.id, name: t.team_name, owner: t.owner_id || 'AI', color: '' })),
+                snapshotPicks.map(p => ({
+                  id: p.id, teamId: p.team_id, teamName: snapshotTeams.find(t => t.id === p.team_id)?.team_name || '',
+                  playerId: p.player_id, playerName: '', position: '', round: p.round_number,
+                  pick: p.pick_number, timestamp: new Date(p.picked_at).getTime(),
+                })),
+                { rounds: league?.draft_rounds || 0, draftOrder: 'snake', completedAt: new Date().toISOString() }
+              );
+              logger.log('Draft snapshot saved successfully');
+            }
+          } catch (snapshotError: unknown) {
+            logger.error('Error saving draft snapshot (non-critical):', snapshotError);
+          }
+
           // Generate matchups for the entire season immediately after draft completion
           try {
             logger.log('Generating matchups for the entire season...');

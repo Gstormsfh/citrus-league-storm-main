@@ -24,43 +24,43 @@ export class ErrorBoundary extends Component<Props, State> {
     console.error("Uncaught error:", error, errorInfo);
   }
 
+  private handleRetry = () => {
+    this.setState({ hasError: false, error: undefined });
+  };
+
   public render() {
     if (this.state.hasError) {
       return this.props.fallback || (
-        <div style={{
-          padding: '20px',
-          fontFamily: 'sans-serif',
-          backgroundColor: '#fef2f2',
-          border: '2px solid #ef4444',
-          borderRadius: '8px',
-          color: '#dc2626',
-          minHeight: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
+        <div
+          role="alert"
+          aria-live="assertive"
+          style={{
+            padding: '20px',
+            fontFamily: 'sans-serif',
+            backgroundColor: '#fef2f2',
+            border: '2px solid #ef4444',
+            borderRadius: '8px',
+            color: '#dc2626',
+            minHeight: '200px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px', fontSize: '18px', fontWeight: 'bold' }}>
-            <span style={{ marginRight: '8px' }}>⚠️</span>
-            <span>Render Error</span>
+            <AlertCircle style={{ marginRight: '8px', width: 20, height: 20 }} aria-hidden="true" />
+            <span>Something went wrong</span>
           </div>
-          <pre style={{
-            fontSize: '12px',
-            backgroundColor: 'white',
-            padding: '16px',
-            borderRadius: '4px',
-            border: '1px solid #fca5a5',
-            overflow: 'auto',
-            maxWidth: '90%',
-            maxHeight: '400px'
-          }}>
-            <strong>Error Message:</strong>
-            {this.state.error?.message || 'Unknown error'}
-            
-            {'\n\n'}
-            <strong>Stack Trace:</strong>
-            {this.state.error?.stack || 'No stack trace available'}
-          </pre>
+          <p style={{ color: '#666', marginBottom: '16px', fontSize: '14px' }}>
+            {this.state.error?.message || 'An unexpected error occurred.'}
+          </p>
+          <button
+            onClick={this.handleRetry}
+            style={{ padding: '8px 24px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}
+          >
+            Try Again
+          </button>
         </div>
       );
     }
