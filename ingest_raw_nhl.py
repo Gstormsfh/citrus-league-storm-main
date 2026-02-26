@@ -209,31 +209,24 @@ def save_raw_json_to_db(game_id, json_data, game_date, db_client, boxscore_json=
 
 
 def extract_game_date_from_json(json_data, game_id):
-    """Extract game date from JSON structure."""
+    """Extract game date from JSON structure.
+
+    Converts UTC start time to approximate Mountain Time (UTC-7) to get
+    the correct local game date. Without this, evening games (7pm+ ET)
+    would be recorded as the next day since their UTC time crosses midnight.
+    """
     try:
-        # Try to get date from game info
         if 'gameInfo' in json_data:
             game_info = json_data['gameInfo']
             if 'startTimeUTC' in game_info:
                 start_time = game_info['startTimeUTC']
-                # Parse ISO format date
-                date_part = start_time.split('T')[0]
-                return date_part
-    except:
+                utc_dt = datetime.datetime.fromisoformat(start_time.replace('Z', '+00:00'))
+                # Approximate Mountain Time to get correct local date
+                mt_dt = utc_dt + datetime.timedelta(hours=-7)
+                return mt_dt.strftime('%Y-%m-%d')
+    except Exception:
         pass
-    
-    # Fallback: try to infer from game_id
-    # Game IDs are like 2025020001 where 2025 is year, 02 is month, etc.
-    try:
-        game_id_str = str(game_id)
-        if len(game_id_str) >= 8:
-            year = game_id_str[:4]
-            # Game ID format varies, try to extract date
-            # For now, return None and let caller use today's date
-            pass
-    except:
-        pass
-    
+
     return None
 
 
@@ -270,8 +263,9 @@ def ingest_single_game(game_id, rate_limit_flag=None):
         # Extract game date
         game_date = extract_game_date_from_json(json_data, game_id)
         if not game_date:
-            # Fallback to today if we can't extract date
+            # Fallback to today — only safe for same-day scrapes
             game_date = datetime.date.today().strftime('%Y-%m-%d')
+            print(f"  Game {game_id}: WARNING - Could not extract date from JSON, using today's date")
         
         # Save to database (UPSERT) - boxscore is optional, PBP is required
         saved = save_raw_json_to_db(game_id, json_data, game_date, db_client, boxscore_json=boxscore_json)

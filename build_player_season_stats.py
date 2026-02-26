@@ -96,12 +96,12 @@ def try_fetch_xg_totals(db: SupabaseRest, season: int) -> Dict[int, Dict[str, fl
           select_cols = "player_id,xg_value,xa_value"
       else:
         select_cols = "player_id,xg_value,xa_value"
-    except:
+    except Exception:
       # Fallback to basic columns
       try:
         test_batch = db.select("raw_shots", select="player_id,xg_value,xa_value", limit=1, offset=0)
         select_cols = "player_id,xg_value,xa_value"
-      except:
+      except Exception:
         # Last resort: try old column names
         select_cols = "player_id,xg,xa"
     

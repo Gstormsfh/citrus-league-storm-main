@@ -87,9 +87,9 @@ def detect_active_games() -> bool:
             now = dt.datetime.now(dt.timezone.utc)
             if (now - game_date).total_seconds() < 7200:  # 2 hours
               return True
-          except:
+          except (ValueError, TypeError, KeyError):
             pass
-    
+
     return False
   except Exception as e:
     print(f"[ingest_live_raw_nhl] Warning: Error detecting active games: {e}")
@@ -119,12 +119,18 @@ def extract_game_state_and_last_updated(pbp_json: dict) -> Tuple[Optional[str], 
   game_state = pbp_json.get("gameState")
   last_updated = pbp_json.get("lastUpdated")
 
-  # Try to get a stable game date from gameInfo.startTimeUTC
+  # Get game date from startTimeUTC, converting to Mountain Time (UTC-7)
+  # to avoid evening games being recorded as the next day
   game_date = None
   gi = pbp_json.get("gameInfo") or {}
   st = gi.get("startTimeUTC")
   if isinstance(st, str) and "T" in st:
-    game_date = st.split("T")[0]
+    try:
+      utc_dt = dt.datetime.fromisoformat(st.replace('Z', '+00:00'))
+      mt_dt = utc_dt + dt.timedelta(hours=-7)
+      game_date = mt_dt.strftime('%Y-%m-%d')
+    except Exception:
+      game_date = st.split("T")[0]
 
   return game_state, last_updated, game_date
 

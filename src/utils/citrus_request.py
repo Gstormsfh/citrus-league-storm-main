@@ -148,7 +148,7 @@ def _extract_ip_from_proxy(proxy_url: Optional[str]) -> str:
             if len(octets) == 4:
                 return f"{octets[0]}.{octets[1]}.{octets[2]}.xxx"
         return "unknown"
-    except:
+    except Exception:
         return "unknown"
 
 

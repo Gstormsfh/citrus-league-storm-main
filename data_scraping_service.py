@@ -22,7 +22,6 @@ import signal
 import datetime as dt
 from typing import Optional, Dict, Any, List, Tuple
 from dotenv import load_dotenv
-import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from src.utils.citrus_request import citrus_request
 
@@ -72,6 +71,10 @@ tracker = PerformanceTracker()
 # Game state cache - track which games are finished to avoid re-processing
 game_state_cache = {}  # {game_id: {"state": "FINAL", "last_check": timestamp}}
 
+# PPP/SHP sync tracking - runs every 30 minutes during game hours
+last_ppp_sync_time = 0.0  # epoch timestamp of last sync
+PPP_SYNC_INTERVAL = 1800  # 30 minutes in seconds
+
 # Graceful shutdown flag
 shutdown_requested = False
 
@@ -85,7 +88,7 @@ def signal_handler(signum, frame):
 try:
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
-except Exception:
+except OSError:
     pass  # Windows may not support all signals
 
 # --- PARALLEL API CALLER (OPTIMIZED FOR IP REUSE) ---
@@ -121,60 +124,34 @@ def safe_api_call_batch(urls: List[str], max_retries: int = 3) -> List[Optional[
     """
     Make multiple API calls reusing the same IP (when possible).
     Reduces IP usage from N calls = N IPs to N calls = 1 IP.
-    
+    Uses citrus_request for proper exponential backoff, circuit breaker,
+    and proxy rotation on failures.
+
     Args:
         urls: List of URLs to fetch
         max_retries: Number of retry attempts
-        
+
     Returns:
         List of responses (None for failed calls)
     """
     results = []
-    
-    # Import here to avoid circular dependency
-    from src.utils.citrus_request import get_proxy_manager
-    proxy_manager = get_proxy_manager()
-    
-    # Get ONE proxy for all calls in this batch
-    proxy_url = proxy_manager.get_next_proxy()
-    
-    if not proxy_url:
-        # Fallback: No proxy available, use individual calls
-        logger.warning("[WARN] No proxy available, falling back to individual calls")
-        return [safe_api_call(url, max_retries) for url in urls]
-    
-    # Use same proxy for all URLs in batch
-    proxies = {"http": proxy_url, "https": proxy_url}
-    proxy_ip = proxy_url.split('@')[1].split(':')[0] if '@' in proxy_url else proxy_url.split(':')[0]
-    
+
     for url in urls:
         response_data = None
-        for attempt in range(max_retries):
-            try:
-                url_display = url if len(url) <= 60 else f"...{url[-57:]}"
-                logger.info(f"[Batch-Call] Requesting {url_display} via {proxy_ip}...")
-                
-                r = requests.get(url, proxies=proxies, timeout=15)
-                
-                if r.status_code == 429:
-                    wait = (attempt + 1) * 10
-                    logger.warning(f"[429-LIMIT] Resting {wait}s...")
-                    time.sleep(wait)
-                    continue
-                    
-                r.raise_for_status()
-                response_data = r.json()
-                logger.info(f"[Batch-Call] OK (200)")
-                break
-                
-            except Exception as e:
-                if attempt < max_retries - 1:
-                    time.sleep(2)
-                else:
-                    logger.error(f"[ERROR] Batch call error: {e}")
-        
+        try:
+            url_display = url if len(url) <= 60 else f"...{url[-57:]}"
+            logger.info(f"[Batch-Call] Requesting {url_display}...")
+
+            r = citrus_request(url, timeout=15)
+            r.raise_for_status()
+            response_data = r.json()
+            logger.info(f"[Batch-Call] OK (200)")
+
+        except Exception as e:
+            logger.error(f"[ERROR] Batch call error: {e}")
+
         results.append(response_data)
-    
+
     return results
 
 # --- PROCESS SINGLE GAME (FOR PARALLEL EXECUTION) ---
@@ -253,7 +230,7 @@ def process_single_game(game_id: str, game_date: str) -> Dict[str, Any]:
                 details["boxscore"] = True
                 try:
                     from scrape_live_nhl_stats import process_game_data_citrus
-                    process_game_data_citrus(game_id, box, pbp)
+                    process_game_data_citrus(game_id, box, pbp, game_date=game_date)
                     details["stats"] = True
                     return {"game_id": game_id, "state": state, "success": True, "details": details}
                 except Exception as e:
@@ -382,7 +359,44 @@ def run_unified_loop() -> Tuple[str, int]:
     except Exception as e:
         logger.error(f"[WARN] Matchup update failed (non-critical): {e}")
     
-    # 4. Determine game state from results
+    # 4. PERIODIC PPP/SHP SYNC (Every 30 minutes during game hours)
+    # Boxscore API doesn't provide PP/SH assists — only goals.
+    # Game-Log API has the correct per-game PPP/SHP values.
+    # Running every 30 minutes keeps live scoring accurate without hammering the API.
+    global last_ppp_sync_time
+    has_active_or_final_games = any(
+        r.get("state") in ("LIVE", "CRIT", "FINAL", "OFF", "INTERMISSION")
+        for r in results
+    )
+    time_since_last_sync = time.time() - last_ppp_sync_time
+
+    if has_active_or_final_games and time_since_last_sync >= PPP_SYNC_INTERVAL:
+        logger.info("[PPP-SYNC] 30-min interval reached — syncing per-game PPP/SHP from Game-Log API...")
+        try:
+            import subprocess
+            ppp_result = subprocess.run(
+                [sys.executable, "sync_ppp_from_gamelog.py", "--days", "1"],
+                capture_output=True,
+                text=True,
+                timeout=600  # 10 min timeout
+            )
+            if ppp_result.returncode == 0:
+                last_ppp_sync_time = time.time()
+                logger.info("[PPP-SYNC] Per-game PPP/SHP updated successfully.")
+                if ppp_result.stdout:
+                    for line in ppp_result.stdout.strip().split('\n')[-3:]:
+                        if line.strip():
+                            logger.info(f"  {line}")
+            else:
+                logger.error(f"[PPP-SYNC] FAILED with code {ppp_result.returncode}")
+                if ppp_result.stderr:
+                    logger.error(f"  Error: {ppp_result.stderr[:500]}")
+        except subprocess.TimeoutExpired:
+            logger.error("[PPP-SYNC] TIMEOUT after 10 minutes")
+        except Exception as e:
+            logger.error(f"[PPP-SYNC] Error: {e}")
+
+    # 5. Determine game state from results
     game_states = [r.get("state", "SCHEDULED") for r in results]
     all_cached = all(r.get("cached", False) for r in results)
     
@@ -401,7 +415,7 @@ def run_unified_loop() -> Tuple[str, int]:
     else:
         game_state = "SCHEDULED"
     
-    # 5. NIGHTLY PBP AUDIT - FIXED: Must run BEFORE return statement!
+    # 6. NIGHTLY PBP AUDIT - FIXED: Must run BEFORE return statement!
     now = dt.datetime.now()
     if now.hour == 23 and now.minute >= 50:
         logger.info("[NIGHTLY] END OF NIGHT DETECTED. Starting Deep PBP Audit...")
@@ -423,7 +437,7 @@ def run_unified_loop() -> Tuple[str, int]:
     #              Wins, Losses, OTL, Saves, GA, GAA, SV%, Shutouts
     # =========================================================================
     
-    # 6. DATA RECONCILIATION (00:00-00:03)
+    # 7. DATA RECONCILIATION (00:00-00:03)
     # Validate recent games against NHL API, auto-fix discrepancies
     if now.hour == 0 and 0 <= now.minute < 3:
         logger.info("[RECONCILE] Starting Data Reconciliation (Last 7 Days)...")
@@ -451,7 +465,7 @@ def run_unified_loop() -> Tuple[str, int]:
         except Exception as e:
             logger.error(f"[RECONCILE] Error: {e}")
 
-    # 7. RE-AGGREGATE SEASON STATS (00:03-00:06)
+    # 8. RE-AGGREGATE SEASON STATS (00:03-00:06)
     # Rebuild player_season_stats from corrected per-game data
     if now.hour == 0 and 3 <= now.minute < 6:
         logger.info("[AGGREGATE] Re-building player_season_stats from per-game data...")
@@ -465,7 +479,7 @@ def run_unified_loop() -> Tuple[str, int]:
         except Exception as e:
             logger.error(f"[AGGREGATE] Error: {e}")
 
-    # 8. PER-GAME PPP/SHP SYNC FROM GAME-LOG (00:06-00:08)
+    # 9. PER-GAME PPP/SHP SYNC FROM GAME-LOG (00:06-00:08) — nightly deep sync
     # Populate per-game nhl_ppp and nhl_shp from NHL Game-Log API
     # (Boxscore API only has PP goals, not PP assists — game-log has full PPP/SHP)
     if now.hour == 0 and 6 <= now.minute < 8:
@@ -493,7 +507,7 @@ def run_unified_loop() -> Tuple[str, int]:
         except Exception as e:
             logger.error(f"[PPP-SYNC] Error: {e}")
 
-    # 9. LANDING STATS TRUE-UP - ALL STATS (00:08-00:12)
+    # 10. LANDING STATS TRUE-UP - ALL STATS (00:08-00:12)
     # Fetch ALL authoritative stats from NHL Landing Endpoint (source of truth)
     # Overwrites aggregated values with official NHL.com data for every player
     if now.hour == 0 and 8 <= now.minute < 12:
@@ -521,15 +535,13 @@ def run_unified_loop() -> Tuple[str, int]:
     return (game_state, live_count)
 
 if __name__ == "__main__":
-    # BOOT MESSAGE - Verify this in your terminal
-    print("\n" + "█" * 70)
-    print("█" + " " * 68 + "█")
-    print("█   🍋 CITRUS MASTER - PARALLEL MODE (30s BULLETPROOF)           █")
-    print("█   Architecture: 100-IP Auto-Rotation + Parallel Processing      █")
-    print("█   Features: ALL games hit simultaneously, ZERO rate limits      █")
-    print("█   Performance: McDavid scores → 30-35s to your app (3x faster) █")
-    print("█" + " " * 68 + "█")
-    print("█" * 70 + "\n")
+    # BOOT MESSAGE
+    logger.info("=" * 70)
+    logger.info("CITRUS MASTER - PARALLEL MODE (30s BULLETPROOF)")
+    logger.info("Architecture: 100-IP Auto-Rotation + Parallel Processing")
+    logger.info("Features: ALL games hit simultaneously, ZERO rate limits")
+    logger.info("Performance: McDavid scores -> 30-35s to your app (3x faster)")
+    logger.info("=" * 70)
     
     consecutive_failures = 0
     max_consecutive_failures = 5

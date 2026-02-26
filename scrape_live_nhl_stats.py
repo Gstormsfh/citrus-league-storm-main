@@ -11,7 +11,6 @@ import datetime as dt
 from typing import Dict, List, Optional
 from dotenv import load_dotenv
 from supabase_rest import SupabaseRest
-import requests
 
 load_dotenv()
 
@@ -27,18 +26,22 @@ def supabase_client() -> SupabaseRest:
     return SupabaseRest(SUPABASE_URL, SUPABASE_KEY)
 
 # --- THE UNIFIED PROCESSOR (INJECTED DATA) ---
-def process_game_data_citrus(game_id: int, boxscore: dict, pbp_data: Optional[dict] = None):
+def process_game_data_citrus(game_id: int, boxscore: dict, pbp_data: Optional[dict] = None, game_date=None):
     """
     Accepts raw JSON and reconciles it into the 8-stat model.
     No internal API calls to prevent 429s.
+
+    Args:
+        game_date: Authoritative game date from nhl_games schedule (YYYY-MM-DD string or date).
+                   If None, falls back to extracting from boxscore UTC timestamp.
     """
     db = supabase_client()
-    
+
     # 1. Update scoreboard in nhl_games
     if pbp_data:
         boxscore["periodDescriptor"] = pbp_data.get("periodDescriptor", {})
         boxscore["clock"] = pbp_data.get("clock", {})
-    
+
     update_game_scores_in_nhl_games(db, game_id, boxscore)
 
     # 2. Extract 8-Stats
@@ -46,18 +49,28 @@ def process_game_data_citrus(game_id: int, boxscore: dict, pbp_data: Optional[di
         extract_player_stats_from_boxscore,
         update_player_game_stats_nhl_columns
     )
-    
+
     player_stats = extract_player_stats_from_boxscore(boxscore)
     if not player_stats:
         return False
 
-    # 3. Write to player_game_stats
-    game_info = boxscore.get("gameInfo", {})
-    start_time_utc = game_info.get("startTimeUTC", "")
-    try:
-        game_date = dt.datetime.fromisoformat(start_time_utc.replace('Z', '+00:00')).date()
-    except:
-        game_date = dt.date.today()
+    # 3. Resolve game date: prefer authoritative schedule date over UTC extraction
+    if game_date is None:
+        # Fallback: extract from boxscore UTC (may be wrong for evening games)
+        game_info = boxscore.get("gameInfo", {})
+        start_time_utc = game_info.get("startTimeUTC", "")
+        try:
+            utc_dt = dt.datetime.fromisoformat(start_time_utc.replace('Z', '+00:00'))
+            # Approximate Mountain Time (UTC-7) to get correct local date
+            mt_dt = utc_dt + dt.timedelta(hours=-7)
+            game_date = mt_dt.date()
+        except Exception:
+            game_date = dt.date.today()
+    elif isinstance(game_date, str):
+        try:
+            game_date = dt.date.fromisoformat(game_date)
+        except ValueError:
+            game_date = dt.date.today()
 
     update_player_game_stats_nhl_columns(
         db=db,
