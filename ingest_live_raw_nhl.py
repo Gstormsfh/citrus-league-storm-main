@@ -131,7 +131,8 @@ def extract_game_state_and_last_updated(pbp_json: dict) -> Tuple[Optional[str], 
       from zoneinfo import ZoneInfo
       mt_dt = utc_dt.astimezone(ZoneInfo("America/Denver"))
       game_date = mt_dt.strftime('%Y-%m-%d')
-    except Exception:
+    except Exception as e:
+      print(f"[ingest_live_raw_nhl] Warning: failed to parse startTimeUTC '{st}' for timezone conversion: {e}")
       game_date = st.split("T")[0]
 
   return game_state, last_updated, game_date
@@ -203,7 +204,8 @@ def main() -> int:
       for g in games:
         try:
           game_id = int(g.get("id"))
-        except Exception:
+        except Exception as e:
+          print(f"[ingest_live_raw_nhl] Warning: failed to parse game ID from schedule entry: {e}")
           continue
 
         game_state = g.get("gameState")
