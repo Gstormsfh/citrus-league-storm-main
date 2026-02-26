@@ -163,12 +163,36 @@ export class TradeService {
         }
       }
 
-      // Check if league requires trade review before execution
+      // Validate roster size: ensure neither team exceeds the limit after trade
       const { data: league } = await supabase
         .from('leagues')
-        .select('trade_review_type, trade_review_period_hours')
+        .select('trade_review_type, trade_review_period_hours, roster_size')
         .eq('id', trade.league_id)
         .single();
+
+      if (league?.roster_size) {
+        const maxRoster = league.roster_size;
+        const offeredCount = (trade.offered_player_ids || []).length;
+        const requestedCount = (trade.requested_player_ids || []).length;
+
+        // Check both teams' current roster sizes
+        const [{ count: fromCount }, { count: toCount }] = await Promise.all([
+          supabase.from('roster_assignments').select('*', { count: 'exact', head: true })
+            .eq('league_id', trade.league_id).eq('team_id', trade.from_team_id),
+          supabase.from('roster_assignments').select('*', { count: 'exact', head: true })
+            .eq('league_id', trade.league_id).eq('team_id', trade.to_team_id),
+        ]);
+
+        const fromAfter = (fromCount || 0) - offeredCount + requestedCount;
+        const toAfter = (toCount || 0) - requestedCount + offeredCount;
+
+        if (fromAfter > maxRoster) {
+          return { success: false, error: `Trade would put the proposing team over the ${maxRoster}-player roster limit.` };
+        }
+        if (toAfter > maxRoster) {
+          return { success: false, error: `Trade would put your team over the ${maxRoster}-player roster limit.` };
+        }
+      }
 
       const reviewType = league?.trade_review_type || 'none';
 

@@ -2123,6 +2123,10 @@ def load_physical_projection(
                 "shots": float(cache_entry.get("projected_shots", 0.0)),
                 "blocks": float(cache_entry.get("projected_blocks", 0.0)),
                 "saves": float(cache_entry.get("projected_saves", 0.0)),
+                "ppp": float(cache_entry.get("projected_ppp", 0.0)),
+                "shp": float(cache_entry.get("projected_shp", 0.0)),
+                "hits": float(cache_entry.get("projected_hits", 0.0)),
+                "pim": float(cache_entry.get("projected_pim", 0.0)),
                 "toi_seconds": int(cache_entry.get("projected_toi_seconds", 0)),
                 "base_goals": float(cache_entry.get("base_goals", 0.0)),
                 "base_assists": float(cache_entry.get("base_assists", 0.0)),
@@ -2146,10 +2150,9 @@ def save_physical_projection(
 ) -> bool:
     """
     Save physical projection to projection_cache table.
-    
-    Note: For future dates, caching may be skipped due to database constraints.
-    This is non-blocking - the projection calculation will continue regardless.
-    
+
+    Caches both current and future date projections for reuse.
+
     Args:
         db: Supabase client
         player_id: Player ID
@@ -2157,21 +2160,16 @@ def save_physical_projection(
         projection_date: Projection date
         season: Season year
         physical_projection: Physical projection dict from calculate_physical_projection()
-    
+
     Returns:
-        True if saved successfully, False otherwise (including skipped future dates)
+        True if saved successfully, False otherwise
     """
     try:
         import hashlib
         
-        # For future dates, skip caching (database has constraint blocking future projections)
-        # The projection itself will still be calculated and saved to player_projected_stats
-        today = date.today()
-        if projection_date > today:
-            # Silently skip caching for future dates - this is expected behavior
-            # The projection will still be saved to player_projected_stats (no constraint there)
-            return True
-        
+        # Future dates are now cacheable (projection_date_not_future constraint was
+        # dropped in migration 20260109100000_allow_future_projection_dates.sql)
+
         # Generate versioned data source hash — includes CACHE_VERSION so that
         # bumping the version auto-invalidates all prior cached entries on load
         hash_input = f"v{CACHE_VERSION}_{player_id}_{game_id}_{projection_date}_{season}"
@@ -2188,6 +2186,10 @@ def save_physical_projection(
             "projected_shots": round(physical_projection.get("shots", 0.0), 3),
             "projected_blocks": round(physical_projection.get("blocks", 0.0), 3),
             "projected_saves": round(physical_projection.get("saves", 0.0), 3),
+            "projected_ppp": round(physical_projection.get("ppp", 0.0), 3),
+            "projected_shp": round(physical_projection.get("shp", 0.0), 3),
+            "projected_hits": round(physical_projection.get("hits", 0.0), 3),
+            "projected_pim": round(physical_projection.get("pim", 0.0), 3),
             "projected_toi_seconds": physical_projection.get("toi_seconds", 0),
             "base_goals": round(physical_projection.get("base_goals", 0.0), 3),
             "base_assists": round(physical_projection.get("base_assists", 0.0), 3),

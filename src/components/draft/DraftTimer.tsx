@@ -30,23 +30,30 @@ export const DraftTimer = memo(({ timeRemaining, isActive, totalTime = 90 }: Dra
   };
 
   return (
-    <Card className="p-4 min-w-[140px]">
+    <Card className="p-4 min-w-[140px]" role="timer" aria-label={`Draft timer: ${minutes} minutes ${seconds} seconds remaining`}>
       <div className="flex items-center gap-2 mb-3">
         {isActive ? (
-          <Clock className="h-4 w-4 text-primary" />
+          <Clock className="h-4 w-4 text-primary" aria-hidden="true" />
         ) : (
-          <Pause className="h-4 w-4 text-muted-foreground" />
+          <Pause className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
         )}
         <span className="text-sm font-medium">
           {isActive ? 'Time Left' : 'Paused'}
         </span>
       </div>
-      
+
+      {/* Screen reader announcement at key thresholds */}
+      {timeRemaining <= 10 && isActive && (
+        <span className="sr-only" aria-live="assertive">
+          {timeRemaining} seconds remaining
+        </span>
+      )}
+
       <div className="text-center mb-3">
         <div className={cn(
           'text-2xl font-bold tabular-nums',
           isActive ? getTimerColor() : 'text-muted-foreground'
-        )}>
+        )} aria-hidden="true">
           {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
         </div>
       </div>

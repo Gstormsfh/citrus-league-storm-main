@@ -55,11 +55,15 @@ AUTO_FIX_THRESHOLDS = {
     "goals": 2,
     "assists": 2,
     "points": 3,
-    "shots": 5
+    "shots": 5,
+    "hits": 5,
+    "blocks": 5,
+    "pim": 10,
+    "plus_minus": 5
 }
 
-# Stats we track and reconcile
-STAT_FIELDS = ["goals", "assists", "points", "shots"]
+# Stats we track and reconcile — all 8 fantasy-relevant stats
+STAT_FIELDS = ["goals", "assists", "points", "shots", "hits", "blocks", "pim", "plus_minus"]
 
 def supabase_client() -> SupabaseRest:
     return SupabaseRest(SUPABASE_URL, SUPABASE_KEY)
@@ -74,28 +78,28 @@ def _safe_int(v, default=0) -> int:
 def fetch_boxscore(game_id: int) -> Optional[Dict[int, Dict[str, int]]]:
     """
     Fetch ALL player stats from a game boxscore in ONE API call.
-    Returns: {player_id: {goals, assists, points, shots}} or None on error.
-    
+    Returns: {player_id: {goals, assists, points, shots, hits, blocks, pim, plus_minus}} or None on error.
+
     Uses citrus_request for 100-IP rotation - no rate limiting needed.
     """
     url = f"{NHL_API_BASE}/gamecenter/{game_id}/boxscore"
-    
+
     try:
         response = citrus_request(url, timeout=15)
         if response.status_code != 200:
             logger.warning(f"[BOXSCORE] Game {game_id}: HTTP {response.status_code}")
             return None
-        
+
         boxscore = response.json()
         player_stats_by_game = boxscore.get("playerByGameStats", {})
-        
+
         result = {}
-        
+
         for team_key in ["homeTeam", "awayTeam"]:
             if team_key not in player_stats_by_game:
                 continue
             team_data = player_stats_by_game[team_key]
-            
+
             # Process skaters (forwards + defense)
             for position_group in ["forwards", "defense"]:
                 if position_group not in team_data:
@@ -107,9 +111,13 @@ def fetch_boxscore(game_id: int) -> Optional[Dict[int, Dict[str, int]]]:
                             "goals": _safe_int(player_stat.get("goals", 0)),
                             "assists": _safe_int(player_stat.get("assists", 0)),
                             "points": _safe_int(player_stat.get("points", 0)),
-                            "shots": _safe_int(player_stat.get("sog", 0))
+                            "shots": _safe_int(player_stat.get("sog", 0)),
+                            "hits": _safe_int(player_stat.get("hits", 0)),
+                            "blocks": _safe_int(player_stat.get("blockedShots", 0) or player_stat.get("blocked", 0)),
+                            "pim": _safe_int(player_stat.get("pim", 0) or player_stat.get("penaltyMinutes", 0)),
+                            "plus_minus": _safe_int(player_stat.get("plusMinus", 0))
                         }
-        
+
         return result
         
     except Exception as e:
@@ -275,7 +283,7 @@ def validate_game(db: SupabaseRest, game_id: int, game_date: str,
     
     our_records = db.select(
         "player_game_stats",
-        select="player_id,nhl_goals,nhl_assists,nhl_points,nhl_shots_on_goal",
+        select="player_id,nhl_goals,nhl_assists,nhl_points,nhl_shots_on_goal,nhl_hits,nhl_blocks,nhl_pim,nhl_plus_minus",
         filters=filters,
         limit=100
     )
@@ -300,7 +308,11 @@ def validate_game(db: SupabaseRest, game_id: int, game_date: str,
             "goals": _safe_int(record.get("nhl_goals")),
             "assists": _safe_int(record.get("nhl_assists")),
             "points": _safe_int(record.get("nhl_points")),
-            "shots": _safe_int(record.get("nhl_shots_on_goal"))
+            "shots": _safe_int(record.get("nhl_shots_on_goal")),
+            "hits": _safe_int(record.get("nhl_hits")),
+            "blocks": _safe_int(record.get("nhl_blocks")),
+            "pim": _safe_int(record.get("nhl_pim")),
+            "plus_minus": _safe_int(record.get("nhl_plus_minus"))
         }
         
         differences = compare_stats(our_stats, api_stats)
@@ -331,6 +343,10 @@ def validate_game(db: SupabaseRest, game_id: int, game_date: str,
                             "nhl_assists": api_stats.get("assists", 0),
                             "nhl_points": points,
                             "nhl_shots_on_goal": api_stats.get("shots", 0),
+                            "nhl_hits": api_stats.get("hits", 0),
+                            "nhl_blocks": api_stats.get("blocks", 0),
+                            "nhl_pim": api_stats.get("pim", 0),
+                            "nhl_plus_minus": api_stats.get("plus_minus", 0),
                             "updated_at": datetime.now().isoformat()
                         },
                         filters=[

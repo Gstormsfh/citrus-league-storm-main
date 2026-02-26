@@ -1819,7 +1819,7 @@ const DraftRoom = () => {
       setDraftHistory(activePicks);
       setDraftedPlayerIds(new Set(activePicks.map(p => p.player_id)));
 
-      // Reset timer for the restored pick
+      // Reset timer for the restored pick — update DB so ALL clients resync
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
         timerIntervalRef.current = null;
@@ -1831,6 +1831,17 @@ const DraftRoom = () => {
       timerRunningRef.current = false;
       lastPickNumberRef.current = 0;
       setTimeRemaining(draftSettings.pickTimeLimit);
+
+      // Publish a fresh timerStartedAt to DB so all clients restart their countdown
+      const newTimerStartedAt = new Date().toISOString();
+      await supabase
+        .from('leagues')
+        .update({ settings: { ...(league?.settings || {}), timerStartedAt: newTimerStartedAt } })
+        .eq('id', leagueId);
+      setLeague(prev => prev ? {
+        ...prev,
+        settings: { ...prev.settings, timerStartedAt: newTimerStartedAt }
+      } : prev);
 
       await loadDraftState();
     } catch (error) {

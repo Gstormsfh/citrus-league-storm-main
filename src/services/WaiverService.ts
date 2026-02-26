@@ -1262,16 +1262,8 @@ export class WaiverService {
     settings: Partial<LeagueWaiverSettings>
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      // Verify commissioner
-      const { data: league } = await supabase
-        .from('leagues')
-        .select('commissioner_id')
-        .eq('id', leagueId)
-        .single();
-
-      if (!league || league.commissioner_id !== commissionerId) {
-        return { success: false, error: 'Only the commissioner can update waiver settings' };
-      }
+      // CRITICAL: Use centralized commissioner check (not manual comparison)
+      await LeagueMembershipService.requireCommissioner(leagueId, commissionerId);
 
       const { error } = await supabase
         .from('leagues')
