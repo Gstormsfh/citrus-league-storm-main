@@ -1185,14 +1185,30 @@ export const MatchupService = {
         return roster;
       }
       
-      // Map draft picks to players
-      // CRITICAL: draft_picks.player_id might be UUID (from old migrations) or numeric NHL ID (from new migrations)
-      const playerIds = (teamDraftPicks || []).map(p => p.player_id);
-      
+      // Map roster assignments to players
+      // player_id might be UUID (from old migrations) or numeric NHL ID (from new migrations)
+      let playerIds = (teamDraftPicks || []).map(p => p.player_id);
+
+      // FALLBACK: If roster_assignments is empty, try draft_picks (original source of truth).
+      // This handles demo leagues and cases where roster_assignments wasn't seeded properly.
+      if (playerIds.length === 0) {
+        console.warn(`[MatchupService.getTeamRoster] roster_assignments empty for team ${teamId} in league ${leagueId}, falling back to draft_picks`);
+        const { data: draftPicksData, error: draftError } = await supabase
+          .from('draft_picks')
+          .select('player_id, team_id, league_id')
+          .eq('league_id', leagueId)
+          .eq('team_id', teamId)
+          .is('deleted_at', null);
+
+        if (!draftError && draftPicksData && draftPicksData.length > 0) {
+          playerIds = draftPicksData.map(p => p.player_id);
+        }
+      }
+
       // First, try direct numeric ID matching (for new migrations using NHL IDs)
       const numericIds: number[] = [];
       const uuidIds: string[] = [];
-      
+
       playerIds.forEach((id: string | number) => {
         if (typeof id === 'string') {
           // Check if it's a numeric string (NHL ID) or UUID
@@ -1208,17 +1224,17 @@ export const MatchupService = {
           numericIds.push(id);
         }
       });
-      
+
       // Match numeric IDs directly
       const teamPlayers = allPlayers.filter(p => numericIds.includes(Number(p.id)));
-      
+
       // If we have UUIDs, look them up in players table and match by name/team
       if (uuidIds.length > 0) {
         const { data: uuidPlayers, error: uuidError } = await supabase
           .from('players')
           .select('id, full_name, team')
           .in('id', uuidIds);
-        
+
         if (!uuidError && uuidPlayers) {
           // Match UUID players to allPlayers by name and team
           uuidPlayers.forEach((uuidPlayer: { id: string; full_name: string; team: string }) => {
@@ -1235,10 +1251,10 @@ export const MatchupService = {
 
       // Transform to HockeyPlayer format
       const roster = teamPlayers.map((p) => this.transformToHockeyPlayer(p));
-      
+
       // Cache the result
       rosterCache.set(cacheKey, { roster, timestamp: now });
-      
+
       return roster;
     } catch (error: unknown) {
       console.error('Error getting team roster:', error);
@@ -1936,21 +1952,23 @@ export const MatchupService = {
         return { starters, bench, ir, slotAssignments };
       };
 
-      // Auto-initialize missing lineups for opponent teams
-      // This ensures all teams have lineups for future week matchups
-      // SKIP for demo league - guests can't write, and lineups should already exist from migration
-      if (!isDemoLeague && !team1Lineup && team1Roster.length > 0) {
+      // Auto-initialize missing lineups for teams
+      // For non-demo leagues, save to database. For demo leagues, generate in-memory only
+      // (guests can't write to team_lineups)
+      if (!team1Lineup && team1Roster.length > 0) {
         const defaultLineup = organizeRosterIntoLineup(team1Roster);
         team1Lineup = defaultLineup;
-        // Save the default lineup to database
-        await LeagueService.saveLineup(matchup.team1_id, matchup.league_id, defaultLineup);
+        if (!isDemoLeague) {
+          await LeagueService.saveLineup(matchup.team1_id, matchup.league_id, defaultLineup);
+        }
       }
 
-      if (!isDemoLeague && matchup.team2_id && !team2Lineup && team2Roster.length > 0) {
+      if (matchup.team2_id && !team2Lineup && team2Roster.length > 0) {
         const defaultLineup = organizeRosterIntoLineup(team2Roster);
         team2Lineup = defaultLineup;
-        // Save the default lineup to database
-        await LeagueService.saveLineup(matchup.team2_id, matchup.league_id, defaultLineup);
+        if (!isDemoLeague) {
+          await LeagueService.saveLineup(matchup.team2_id, matchup.league_id, defaultLineup);
+        }
       }
 
       // Debug logging to help diagnose lineup sync issues

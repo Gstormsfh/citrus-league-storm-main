@@ -30,6 +30,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekLabel, getWeekDateLabel, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
 import LoadingScreen from '@/components/LoadingScreen';
 import { DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeagueService';
+import { DemoMatchupCacheService, type DemoMatchupPayload } from '@/services/DemoMatchupCacheService';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { MatchupScoreJobService } from '@/services/MatchupScoreJobService';
 import { DataCacheService, TTL } from '@/services/DataCacheService';
@@ -453,34 +454,142 @@ const Matchup = () => {
       try {
         setLoading(true);
         setError(null);
-        
+
         log(' ========== Loading REAL league data for guest ==========');
         log(' Using demo league ID:', DEMO_LEAGUE_ID_FOR_GUESTS);
-        
+
+        // ===================================================================
+        // FAST PATH: Try Edge Function cache first (1 request instead of ~16)
+        // Falls back to direct queries if the edge function is unavailable.
+        // ===================================================================
+        let cachedPayload: DemoMatchupPayload | null = null;
+        try {
+          const requestedWeek = urlWeekId ? parseInt(urlWeekId) : undefined;
+          cachedPayload = await DemoMatchupCacheService.getPayload(
+            requestedWeek && !isNaN(requestedWeek) ? requestedWeek : undefined
+          );
+          log(' Edge function cache HIT — skipping ~16 direct queries');
+        } catch (cacheError) {
+          log(' Edge function cache unavailable, falling back to direct queries:', cacheError);
+        }
+
+        // If we got a cached payload, hydrate state from it
+        if (cachedPayload) {
+          const demoLeague = cachedPayload.league as any;
+          setLeague(demoLeague as League);
+
+          const { getDraftCompletionDate: gDCD, getFirstWeekStartDate: gFWSD, getAvailableWeeks: gAW, getWeekStartDate: gWSD, getWeekEndDate: gWED } = await import('@/utils/weekCalculator');
+          const draftDate = gDCD(demoLeague as any);
+          const firstWeek = draftDate ? gFWSD(draftDate) : new Date();
+          setFirstWeekStart(firstWeek);
+
+          const weeks = cachedPayload.availableWeeks.length > 0 ? cachedPayload.availableWeeks : gAW(firstWeek);
+          setAvailableWeeks(weeks);
+          setSelectedWeek(cachedPayload.week);
+
+          const guestMatchup = cachedPayload.matchup;
+          const matchupWeekStart = gWSD(guestMatchup.week_number, firstWeek);
+          const matchupWeekEnd = gWED(guestMatchup.week_number, firstWeek);
+          const matchupWithDates: MatchupType = {
+            ...guestMatchup,
+            week_start_date: matchupWeekStart.toISOString().split('T')[0],
+            week_end_date: matchupWeekEnd.toISOString().split('T')[0],
+          };
+          setCurrentMatchup(matchupWithDates);
+          setSelectedMatchupId(guestMatchup.id);
+
+          const scoringSettingsData = demoLeague.scoring_settings as any;
+          setScoringSettings(scoringSettingsData || {
+            goalie: { wins: 4, saves: 0.2, shutouts: 3, goals_against: -1 },
+            skater: { goals: 3, assists: 2, power_play_points: 1, short_handed_points: 2, shots_on_goal: 0.4, blocks: 0.5, hits: 0.2, penalty_minutes: 0.5 }
+          });
+
+          setUserTeam(cachedPayload.team1 as unknown as Team);
+          setOpponentTeam(cachedPayload.team2 as unknown as Team | null);
+
+          // Build MatchupPlayer rosters from cached lineup + player data
+          const { PlayerService: PS } = await import('@/services/PlayerService');
+          const allPlayers = await PS.getAllPlayers();
+          const { team1Roster, team2Roster, team1SlotAssignments, team2SlotAssignments, error: rosterError } =
+            await MatchupService.getMatchupRosters(guestMatchup as MatchupType, allPlayers, 'America/Denver', undefined);
+          if (rosterError) throw rosterError;
+
+          setDemoMyTeam(team1Roster);
+          setDemoOpponentTeam(team2Roster || []);
+          setDemoMyTeamSlotAssignments(team1SlotAssignments);
+          setDemoOpponentTeamSlotAssignments(team2SlotAssignments || {});
+          setMyTeam(team1Roster);
+          setOpponentTeamPlayers(team2Roster || []);
+          setMyTeamSlotAssignments(team1SlotAssignments);
+          setOpponentTeamSlotAssignments(team2SlotAssignments || {});
+
+          // Daily scores from cached payload (already pre-computed by edge fn)
+          const sortScores = (arr: any[]) =>
+            [...arr].sort((a, b) => new Date(a.roster_date).getTime() - new Date(b.roster_date).getTime()).map(d => parseFloat(d.daily_score) || 0);
+          const team1DailyPoints = cachedPayload.team1DailyScores.length > 0 ? sortScores(cachedPayload.team1DailyScores) : Array(7).fill(0);
+          const team2DailyPoints = cachedPayload.team2DailyScores.length > 0 ? sortScores(cachedPayload.team2DailyScores) : Array(7).fill(0);
+
+          setMyDailyPoints(team1DailyPoints);
+          setOpponentDailyPoints(team2DailyPoints);
+
+          // Build daily score maps (same logic as direct path below)
+          const cachedScores = new Map<string, { myScore: number; oppScore: number; isLocked: boolean }>();
+          const calculatedTotals = new Map<string, { myTotal: number; oppTotal: number }>();
+          const [startYear, startMonth, startDay] = matchupWithDates.week_start_date.split('-').map(Number);
+          const todayStr = getTodayMST();
+          const totalDailyPoints = team1DailyPoints.reduce((s, p) => s + p, 0) + team2DailyPoints.reduce((s, p) => s + p, 0);
+
+          for (let i = 0; i < 7 && i < team1DailyPoints.length; i++) {
+            const dayDate = new Date(startYear, startMonth - 1, startDay + i);
+            const dateStr = `${dayDate.getFullYear()}-${String(dayDate.getMonth() + 1).padStart(2, '0')}-${String(dayDate.getDate()).padStart(2, '0')}`;
+            cachedScores.set(dateStr, { myScore: team1DailyPoints[i] || 0, oppScore: team2DailyPoints[i] || 0, isLocked: dateStr < todayStr });
+            calculatedTotals.set(dateStr, totalDailyPoints < 0.1
+              ? { myTotal: 0, oppTotal: 0 }
+              : { myTotal: team1DailyPoints[i] || 0, oppTotal: team2DailyPoints[i] || 0 });
+          }
+          setCachedDailyScores(cachedScores);
+          setCalculatedDailyTotals(calculatedTotals);
+
+          if (cachedPayload.allWeekMatchups.length > 0) {
+            setAllWeekMatchups(cachedPayload.allWeekMatchups as any);
+          }
+
+          log(' Guest matchup loaded from edge cache (cachedAt:', cachedPayload.cachedAt, ')');
+          setLoading(false);
+          hasInitializedRef.current = true;
+          loadingRef.current = false;
+          return; // Done — skip direct query path
+        }
+
+        // ===================================================================
+        // SLOW PATH: Direct Supabase queries (~16 round-trips)
+        // Only reached when the edge function is unavailable.
+        // ===================================================================
+
         // Get the league data directly (using maybeSingle to avoid single() coercion error)
         const { data: demoLeagueData, error: leagueError } = await supabase
           .from('leagues')
           .select(COLUMNS.LEAGUE)
           .eq('id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
           .maybeSingle();
-        
+
         if (leagueError) {
           throw new Error(`Failed to load demo league: ${leagueError.message || 'Unknown error'}`);
         }
-        
+
         if (!demoLeagueData) {
           throw new Error('Demo league not found');
         }
-        
+
         const demoLeague = demoLeagueData as any;
         log(' Demo league loaded:', demoLeague.id, 'draft_status:', demoLeague.draft_status);
         setLeague(demoLeague as League);
-        
+
         // Check if draft is completed
         if (demoLeague.draft_status !== 'completed') {
           throw new Error('Demo league draft not completed');
         }
-        
+
         // Get first week start date from league (uses updated_at when draft_status is 'completed')
         // Use same logic as logged-in users
         const { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekStartDate, getWeekEndDate } = await import('@/utils/weekCalculator');
@@ -488,16 +597,16 @@ const Matchup = () => {
         if (!draftCompletionDate) {
           throw new Error('Demo league has no draft completion date (updated_at is missing)');
         }
-        
+
         // Calculate first week start (same as logged-in users)
         const firstWeek = getFirstWeekStartDate(draftCompletionDate);
         setFirstWeekStart(firstWeek);
-        
+
         // Get available weeks (same as logged-in users)
         const weeks = getAvailableWeeks(firstWeek);
         log(` Calculated ${weeks.length} available weeks:`, weeks);
         setAvailableWeeks(weeks);
-        
+
         // Determine which week to show (from URL or current week) - same logic as logged-in users
         let weekToShow: number;
         if (urlWeekId) {
@@ -512,9 +621,9 @@ const Matchup = () => {
           const currentWeek = getCurrentWeekNumber(firstWeek);
           weekToShow = weeks.includes(currentWeek) ? currentWeek : weeks[0] || 1;
         }
-        
+
         setSelectedWeek(weekToShow);
-        
+
         log(' Week calculation details:', {
           urlWeekId,
           weekToShow,
@@ -522,7 +631,7 @@ const Matchup = () => {
           firstWeekStart: firstWeek.toISOString(),
           availableWeeks: weeks
         });
-        
+
         // Get all matchups for this week (same as logged-in users)
         const { data: weekMatchupsData, error: matchupsError } = await supabase
           .from('matchups')
@@ -530,15 +639,15 @@ const Matchup = () => {
           .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
           .eq('week_number' as any, weekToShow as any)
           .order('created_at', { ascending: true });
-        
+
         if (matchupsError) throw matchupsError;
-        
+
         let weekMatchups = weekMatchupsData as any[];
-        
+
         // If no matchups found for calculated week, try to find ANY matchup
         if (!weekMatchups || weekMatchups.length === 0) {
           log(' No matchups found for week', weekToShow, '- trying to find any matchup in demo league');
-          
+
           // Get ANY matchup from the demo league (fallback)
           const { data: anyMatchupsData, error: anyMatchupsError } = await supabase
             .from('matchups')
@@ -546,12 +655,12 @@ const Matchup = () => {
             .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
             .order('week_number', { ascending: true })
             .limit(1);
-          
+
           if (anyMatchupsError) {
             log(' Error fetching any matchups:', anyMatchupsError);
             throw new Error(`Failed to load matchups: ${anyMatchupsError.message}`);
           }
-          
+
           if (anyMatchupsData && anyMatchupsData.length > 0) {
             // Use the first available matchup and update weekToShow
             weekMatchups = anyMatchupsData;
@@ -562,14 +671,14 @@ const Matchup = () => {
             throw new Error(`No matchups found in demo league. Please verify the migration ran successfully.`);
           }
         }
-        
+
         // Use the first matchup (guests see the first matchup in the league)
         const guestMatchup = weekMatchups[0] as any;
-        
+
         // CRITICAL: Use the matchup's week_number to calculate dates (not weekToShow)
         // This ensures dates match exactly how the matchup was created in the database
         const matchupWeekNumber = guestMatchup.week_number;
-        
+
         log(' Guest matchup selected:', {
           id: guestMatchup.id,
           team1_id: guestMatchup.team1_id,
@@ -579,12 +688,12 @@ const Matchup = () => {
           dbWeekStart: guestMatchup.week_start_date,
           dbWeekEnd: guestMatchup.week_end_date
         });
-        
+
         // Always use calculated dates based on the matchup's week_number and firstWeekStart
         // This matches EXACTLY how matchups are created in generateMatchupsForLeague
         const matchupWeekStart = getWeekStartDate(matchupWeekNumber, firstWeek);
         const matchupWeekEnd = getWeekEndDate(matchupWeekNumber, firstWeek);
-        
+
         log(' Setting matchup week dates (same logic as database):', {
           matchupWeekNumber,
           firstWeekStart: firstWeek.toISOString().split('T')[0],
@@ -597,7 +706,7 @@ const Matchup = () => {
             matchupWeekEnd.toISOString().split('T')[0] === guestMatchup.week_end_date
           )
         });
-        
+
         // Create matchup object with proper calculated dates (same format as logged-in users)
         // Always use calculated dates to ensure they're correct, even if DB dates are wrong
         const matchupWithDates: MatchupType = {
@@ -605,10 +714,10 @@ const Matchup = () => {
           week_start_date: matchupWeekStart.toISOString().split('T')[0],
           week_end_date: matchupWeekEnd.toISOString().split('T')[0]
         };
-        
+
         setCurrentMatchup(matchupWithDates);
         setSelectedMatchupId(guestMatchup.id);
-        
+
         // Get league scoring settings
         const scoringSettingsData = demoLeague.scoring_settings as any;
         if (scoringSettingsData) {
@@ -629,33 +738,35 @@ const Matchup = () => {
             }
           });
         }
-        
-        // Get teams
-        const team1 = await supabase.from('teams').select(COLUMNS.TEAM).eq('id' as any, guestMatchup.team1_id as any).maybeSingle();
-        const team2 = guestMatchup.team2_id ? await supabase.from('teams').select(COLUMNS.TEAM).eq('id' as any, guestMatchup.team2_id as any).maybeSingle() : { data: null, error: null };
-        
+
+        // Get teams (parallel)
+        const [team1, team2] = await Promise.all([
+          supabase.from('teams').select(COLUMNS.TEAM).eq('id' as any, guestMatchup.team1_id as any).maybeSingle(),
+          guestMatchup.team2_id ? supabase.from('teams').select(COLUMNS.TEAM).eq('id' as any, guestMatchup.team2_id as any).maybeSingle() : Promise.resolve({ data: null, error: null })
+        ]);
+
         if (team1.error) throw team1.error;
         if (team2.error) throw team2.error;
-        
+
         setUserTeam(team1.data as unknown as Team);
         setOpponentTeam(team2.data as unknown as Team | null);
-        
+
         // Get matchup rosters using the same service as logged-in users
         const { PlayerService } = await import('@/services/PlayerService');
         const allPlayers = await PlayerService.getAllPlayers();
-        
-        const { team1Roster, team2Roster, team1SlotAssignments, team2SlotAssignments, error: rosterError } = 
+
+        const { team1Roster, team2Roster, team1SlotAssignments, team2SlotAssignments, error: rosterError } =
           await MatchupService.getMatchupRosters(guestMatchup as MatchupType, allPlayers, 'America/Denver', undefined);
-        
+
         if (rosterError) throw rosterError;
-        
+
         // Debug: Verify isStarter flags and slot assignments before setting state
         const team1StartersCount = team1Roster.filter(p => p.isStarter).length;
         const team2StartersCount = (team2Roster || []).filter(p => p.isStarter).length;
         const team1SlotKeys = Object.keys(team1SlotAssignments);
         const team1RosterIds = team1Roster.map(p => String(p.id));
         const slotMatches = team1SlotKeys.filter(key => team1RosterIds.includes(key));
-        
+
         log(' Setting demo teams with isStarter flags:', {
           team1Total: team1Roster.length,
           team1Starters: team1StartersCount,
@@ -667,37 +778,37 @@ const Matchup = () => {
           slotMatchesCount: slotMatches.length,
           sampleSlotKeys: team1SlotKeys.slice(0, 5),
           sampleRosterIds: team1RosterIds.slice(0, 5),
-          sampleTeam1Starters: team1Roster.filter(p => p.isStarter).slice(0, 3).map(p => ({ 
-            name: p.name, 
-            id: p.id, 
+          sampleTeam1Starters: team1Roster.filter(p => p.isStarter).slice(0, 3).map(p => ({
+            name: p.name,
+            id: p.id,
             idString: String(p.id),
             isStarter: p.isStarter,
             hasSlot: team1SlotKeys.includes(String(p.id))
           })),
-          sampleTeam1Bench: team1Roster.filter(p => !p.isStarter).slice(0, 3).map(p => ({ 
-            name: p.name, 
-            id: p.id, 
-            isStarter: p.isStarter 
+          sampleTeam1Bench: team1Roster.filter(p => !p.isStarter).slice(0, 3).map(p => ({
+            name: p.name,
+            id: p.id,
+            isStarter: p.isStarter
           }))
         });
-        
+
         // Set demo state (but using real data)
         setDemoMyTeam(team1Roster);
         setDemoOpponentTeam(team2Roster || []);
         setDemoMyTeamSlotAssignments(team1SlotAssignments);
         setDemoOpponentTeamSlotAssignments(team2SlotAssignments || {});
-        
+
         // Also set regular state for compatibility
         setMyTeam(team1Roster);
         setOpponentTeamPlayers(team2Roster || []);
         setMyTeamSlotAssignments(team1SlotAssignments);
         setOpponentTeamSlotAssignments(team2SlotAssignments || {});
-        
+
         // Calculate daily points using the same RPC as logged-in users
         log(' Calculating daily points for guest matchup...');
         const weekStartStr = matchupWithDates.week_start_date;
         const weekEndStr = matchupWithDates.week_end_date;
-        
+
         // Calculate daily scores for team1 (same logic as logged-in users)
         let team1DailyPoints: number[] = [];
         try {
@@ -710,10 +821,10 @@ const Matchup = () => {
               p_week_end: weekEndStr
             }
           );
-          
+
           if (!team1Error && team1DailyScores) {
             // Sort by date and extract scores (same logic as logged-in users)
-            const sorted = (team1DailyScores as any[]).sort((a, b) => 
+            const sorted = (team1DailyScores as any[]).sort((a, b) =>
               new Date(a.roster_date).getTime() - new Date(b.roster_date).getTime()
             );
             team1DailyPoints = sorted.map(d => parseFloat(d.daily_score) || 0);
@@ -726,7 +837,7 @@ const Matchup = () => {
           console.error('[Matchup] Exception calculating team1 daily scores:', error);
           team1DailyPoints = Array(7).fill(0);
         }
-        
+
         // Calculate daily scores for team2 (if exists)
         let team2DailyPoints: number[] = [];
         if (team2.data) {
@@ -740,10 +851,10 @@ const Matchup = () => {
                 p_week_end: weekEndStr
               }
             );
-            
+
             if (!team2Error && team2DailyScores) {
               // Sort by date and extract scores (same logic as logged-in users)
-              const sorted = (team2DailyScores as any[]).sort((a, b) => 
+              const sorted = (team2DailyScores as any[]).sort((a, b) =>
                 new Date(a.roster_date).getTime() - new Date(b.roster_date).getTime()
               );
               team2DailyPoints = sorted.map(d => parseFloat(d.daily_score) || 0);
@@ -759,7 +870,7 @@ const Matchup = () => {
         } else {
           team2DailyPoints = Array(7).fill(0);
         }
-        
+
         // Set daily points state (same as logged-in users)
         setMyDailyPoints(team1DailyPoints);
         setOpponentDailyPoints(team2DailyPoints);
@@ -821,16 +932,9 @@ const Matchup = () => {
         setCalculatedDailyTotals(calculatedTotals);
         log(' Calculated daily totals populated for demo league:', Array.from(calculatedTotals.entries()));
         
-        // Get all week matchups for dropdown (same week as selected)
-        const { data: allMatchups } = await supabase
-          .from('matchups')
-          .select(COLUMNS.MATCHUP)
-          .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
-          .eq('week_number' as any, weekToShow as any)
-          .order('created_at', { ascending: true });
-        
-        if (allMatchups) {
-          setAllWeekMatchups(allMatchups as any);
+        // Reuse already-fetched week matchups for the dropdown (avoids duplicate query)
+        if (weekMatchups && weekMatchups.length > 0) {
+          setAllWeekMatchups(weekMatchups as any);
         }
         
         log(' ✅ Guest matchup loaded successfully');
