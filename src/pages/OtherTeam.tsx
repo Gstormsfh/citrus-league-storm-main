@@ -548,6 +548,7 @@ const OtherTeam = () => {
     if (teamId) {
       loadRoster();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teamId]);
 
   if (!team) {

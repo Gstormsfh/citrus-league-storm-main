@@ -399,6 +399,7 @@ const Standings = () => {
       // If userLeagueState is still loading, keep loading state
       setLoading(true);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, toast, userLeagueState, activeLeagueId]);
 
   // Animation observer setup

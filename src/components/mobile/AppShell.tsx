@@ -40,6 +40,7 @@ export default AppShell;
 /**
  * Hook to detect if user is on a mobile device
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState(false);
 
@@ -61,6 +62,7 @@ export const useIsMobile = () => {
 /**
  * Hook to detect if app is running in standalone mode (added to home screen)
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export const useIsStandalone = () => {
   const [isStandalone, setIsStandalone] = useState(false);
 

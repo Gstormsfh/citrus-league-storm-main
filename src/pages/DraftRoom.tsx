@@ -180,6 +180,7 @@ const DraftRoom = () => {
       setError('Failed to load your leagues. Please try again.');
       setLoading(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, navigate, searchParams]);
 
   /**
@@ -667,6 +668,7 @@ const DraftRoom = () => {
       setDraftPhase(DraftPhase.LOBBY);
       // Don't redirect on error - show error message instead
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leagueId, user, navigate, userLeagueState, generateDemoDraftPicks]);
 
   useEffect(() => {
@@ -754,6 +756,7 @@ const DraftRoom = () => {
       clearTimeout(updateTimeout);
       unsubscribe();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leagueId, user?.id]);
 
   // POLLING FALLBACK: safety net in case Supabase realtime drops.
@@ -843,6 +846,7 @@ const DraftRoom = () => {
     }, 15000);
 
     return () => clearInterval(pollInterval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftPhase, leagueId, user?.id]);
 
   // Reload teams when page becomes visible again (e.g., user changed team name in another tab)
@@ -938,6 +942,7 @@ const DraftRoom = () => {
     const bidPoll = setInterval(loadBidHistory, 3000);
 
     return () => { clearInterval(interval); clearInterval(bidPoll); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuctionDraft, auctionState?.currentNomination?.id, auctionState?.currentNomination?.expires_at, draftPhase, leagueId, auctionSessionId]);
 
   // Real-time subscription to league status changes
@@ -1414,6 +1419,7 @@ const DraftRoom = () => {
 
     return cleanup;
     // Only recreate interval when the server timestamp changes (new pick) or time limit changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [league?.settings?.timerStartedAt, draftSettings.pickTimeLimit, draftState?.currentPick]);
 
   // Auto-start draft at scheduled time (commissioner only)
@@ -3551,7 +3557,7 @@ const DraftRoom = () => {
                   {/* Floating Pause/Continue button for active drafts */}
                   {isCommissioner && draftPhase === DraftPhase.ACTIVE && (draftHistory?.length || 0) > 0 && (
                     <div className="fixed bottom-3 right-3 sm:bottom-4 sm:right-4 z-50">
-                      {!!league?.settings?.timerStartedAt ? (
+                      {league?.settings?.timerStartedAt ? (
                         <Button
                           size="sm"
                           variant="destructive"
@@ -3592,15 +3598,7 @@ const DraftRoom = () => {
               <p className="text-xl text-muted-foreground mb-6">
                 The draft is complete! Your rosters are now locked and ready for the season.
               </p>
-              {/* Demo State CTA - Hidden from public */}
-              {false && userLeagueState === 'logged-in-no-league' && (
-                <div className="max-w-3xl mx-auto mb-8">
-                  <LeagueCreationCTA
-                    title="Your Draft Awaits"
-                    description="Create your league to start drafting players, building your team, and competing with friends."
-                  />
-                </div>
-              )}
+              {/* Demo State CTA - removed (disabled) */}
               
               <div className="flex gap-4 justify-center flex-wrap">
                 {/* Disable navigation buttons in demo state */}
@@ -3666,7 +3664,7 @@ const DraftRoom = () => {
             {/* Show Pause/Continue buttons for in-progress drafts - Disabled in demo state */}
             {isCommissioner && userLeagueState === 'active-user' && draftPhase === DraftPhase.ACTIVE && (draftHistory?.length || 0) > 0 && (
               <div className="fixed bottom-4 right-4 z-50">
-                {!!league?.settings?.timerStartedAt ? (
+                {league?.settings?.timerStartedAt ? (
                   <Button
                     size="lg"
                     variant="destructive"

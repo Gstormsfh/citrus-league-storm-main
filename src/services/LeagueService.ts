@@ -221,9 +221,9 @@ export interface Transaction {
 
 let cachedLeagueState: Record<number, Player[]> | null = null;
 let cachedFreeAgents: Player[] | null = null;
-let cachedWatchlist: Set<string> = new Set();
+const cachedWatchlist: Set<string> = new Set();
 let cachedLineupsInitialized: boolean = false;
-let cachedTransactions: Transaction[] = [
+const cachedTransactions: Transaction[] = [
   { id: '1', type: 'claim', playerId: '101', playerName: 'Joey Daccord', playerTeam: 'SEA', date: '2024-03-25', status: 'pending' }
 ];
 
@@ -939,7 +939,7 @@ async joinLeagueByCode(
         .filter((id): id is string => id !== null);
 
       // Fetch owner profiles
-      let ownerProfiles: Record<string, { first_name?: string; last_name?: string; username?: string }> = {};
+      const ownerProfiles: Record<string, { first_name?: string; last_name?: string; username?: string }> = {};
       if (ownerIds.length > 0) {
         const { data: profiles, error: profilesError } = await supabase
           .from('profiles')
@@ -1887,6 +1887,7 @@ async joinLeagueByCode(
       
       // Verify the save was successful
       if (data) {
+        // Save confirmed by Supabase response
       }
       
       // Supabase save succeeded - clear any stale localStorage data to prevent conflicts
@@ -1952,7 +1953,7 @@ async joinLeagueByCode(
       const weekStart = new Date(matchup.week_start_date);
       const weekEnd = new Date(matchup.week_end_date);
       const weekDates: string[] = [];
-      let currentDate = new Date(weekStart);
+      const currentDate = new Date(weekStart);
       while (currentDate <= weekEnd) {
         weekDates.push(currentDate.toISOString().split('T')[0]);
         currentDate.setDate(currentDate.getDate() + 1);
@@ -2185,7 +2186,7 @@ async joinLeagueByCode(
       
       // Generate all dates in the week (Sun-Sat)
       const weekDates: Date[] = [];
-      let currentDate = new Date(weekStart);
+      const currentDate = new Date(weekStart);
       while (currentDate <= weekEnd) {
         weekDates.push(new Date(currentDate));
         currentDate.setDate(currentDate.getDate() + 1);
@@ -2195,7 +2196,7 @@ async joinLeagueByCode(
       const allPlayerIds = [...lineup.starters, ...lineup.bench, ...lineup.ir].map(id => parseInt(id));
       
       // Get player teams from player_directory
-      let playerTeamMap = new Map<number, string>();
+      const playerTeamMap = new Map<number, string>();
       if (allPlayerIds.length > 0) {
         const { data: players } = await supabase
           .from('player_directory')

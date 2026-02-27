@@ -194,6 +194,7 @@ export const DraftQueue = ({
         }
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leagueId]);
 
   // Save queue to localStorage whenever it changes

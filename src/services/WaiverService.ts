@@ -360,7 +360,7 @@ export class WaiverService {
         let newStarters = (lineup.starters as any[]) || [];
         let newBench = (lineup.bench as any[]) || [];
         let newIr = (lineup.ir as any[]) || [];
-        let newSlotAssignments = (lineup.slot_assignments as any) || {};
+        const newSlotAssignments = (lineup.slot_assignments as any) || {};
 
         // Drop player if specified
         if (dropPlayerId) {

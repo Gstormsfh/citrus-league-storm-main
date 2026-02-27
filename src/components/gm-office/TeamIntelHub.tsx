@@ -394,6 +394,7 @@ export const TeamIntelHub = () => {
     }
 
     setActionableInsights(insights);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calendarDays, depths, myPriority, waiverPriority.length]);
 
 

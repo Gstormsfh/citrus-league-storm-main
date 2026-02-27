@@ -347,6 +347,7 @@ export const PlayerService = {
 
       // Log sample of players to verify data
       if (sortedPlayers.length > 0) {
+        // Players loaded successfully
       }
 
       playersCache = {

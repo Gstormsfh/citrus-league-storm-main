@@ -111,6 +111,7 @@ export default MobilePageHeader;
 /**
  * Hook to detect if current viewport is mobile
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export const useIsMobileView = () => {
   const [isMobile, setIsMobile] = useState(false);
   
@@ -127,6 +128,7 @@ export const useIsMobileView = () => {
 /**
  * Hook to detect if current device is mobile for conditional rendering
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export const useShowMobileHeader = () => {
   // Only show on screens smaller than lg breakpoint
   if (typeof window === 'undefined') return false;

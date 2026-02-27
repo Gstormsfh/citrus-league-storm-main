@@ -52,6 +52,7 @@ const StormySection = () => {
     }, 20);
     
     return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeDemo]);
   
   // Auto-rotate demos

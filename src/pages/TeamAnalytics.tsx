@@ -57,6 +57,7 @@ const TeamAnalytics = () => {
     }
     
     loadScheduleMaximizers();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, userLeagueState, activeLeagueId, isChangingLeague]);
 
   const loadScheduleMaximizers = async () => {

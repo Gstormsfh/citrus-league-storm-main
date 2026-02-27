@@ -485,7 +485,7 @@ class StormyServiceImpl {
           const userScore = isTeam1 ? currentMatchup.team1_score : currentMatchup.team2_score;
           const oppScore = isTeam1 ? currentMatchup.team2_score : currentMatchup.team1_score;
 
-          let matchupLines = [
+          const matchupLines = [
             `Week ${currentMatchup.week_number} (${currentMatchup.status})`,
             `${team.team_name}: ${userScore} pts`,
             `${opponentName}: ${oppScore} pts`,
