@@ -37,6 +37,7 @@ dist-ssr
 # Miscellaneous
 *.class
 *.pyc
+__pycache__/
 
 # Large training data files (too big for Git, train locally)
 data/*.csv.gz
@@ -49,9 +50,6 @@ data/shots_2018-2024.zip
 temp_*.json
 test-*.html
 fix_*.sql
-# PowerShell scripts are part of ops automation and should be tracked
-# (We still ignore user-specific PS temp files below if needed)
-#!*.ps1
 
 # Ignore stray PowerShell scratch scripts, but allow our ops scripts
 *.ps1
@@ -60,36 +58,10 @@ git-*.txt
 git-*.log
 git-diagnostic-output/
 
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-.packages
-.pub-cache/
-.pub/
-/build/
-
 # Environment variables - NEVER commit .env files with secrets!
 .env
 .env.local
 .env.*.local
 
-# Firebase – this is necessary if you use Firebase since it could otherwise 
-# lead to leaking of private certificates to your repository, which is no bueno.
+# Firebase
 .firebase/
-
-# Web related
-lib/generated_plugin_registrant.dart
-
-# Symbolication related
-app.*.symbols
-
-# Obfuscation related
-app.*.map.json
-
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
