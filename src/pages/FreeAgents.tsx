@@ -108,6 +108,8 @@ const FreeAgents = () => {
     observerRef.current.observe(node);
   }, []);
 
+  const displayLoading = useMinimumLoadingTime(loading, 800);
+
   useEffect(() => {
     // Skip if league is changing
     if (isChangingLeague) {
@@ -120,6 +122,7 @@ const FreeAgents = () => {
     }
     fetchPlayers();
     setWatchlist(new Set(LeagueService.getWatchlist()));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, activeLeagueId, isChangingLeague]);
 
   // Load schedule maximizers when players are loaded (needed for Top Projected combined view)
@@ -1219,7 +1222,6 @@ const FreeAgents = () => {
             </div>
 
             {(() => {
-              const displayLoading = useMinimumLoadingTime(loading, 800);
               if (displayLoading) {
                 return (
                   <LoadingScreen

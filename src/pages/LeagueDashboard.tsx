@@ -102,6 +102,7 @@ const LeagueDashboard = () => {
     }
 
     loadLeagueData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leagueId, user, navigate]);
 
   // Reload data when page becomes visible again (user navigates back)
@@ -114,6 +115,7 @@ const LeagueDashboard = () => {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leagueId, user]);
 
   const loadLeagueData = async () => {

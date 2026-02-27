@@ -254,6 +254,7 @@ const Matchup = () => {
     
     // Fire-and-forget
     runBackfillAndCalculate();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentMatchup?.id]);
 
   // Fetch and cache daily scores for past days (Yahoo/Sleeper frozen scoring)
@@ -387,6 +388,7 @@ const Matchup = () => {
     };
     
     fetchCachedScores();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentMatchup?.id, dailyStatsByDate, currentMatchup?.team1_id, currentMatchup?.team2_id, userTeam?.id]);
 
   const [myDailyPoints, setMyDailyPoints] = useState<number[]>([]);
@@ -969,6 +971,7 @@ const Matchup = () => {
     };
 
     fetchAllWeekMatchups();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [league?.id, selectedWeek, userLeagueState, currentMatchup?.id]);
 
   // Update player ID refs when teams change (stable references to break death loop)
@@ -1300,6 +1303,7 @@ const Matchup = () => {
       } finally {
         statsLoadingRef.current = false;
       }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentMatchup, userLeagueState, scoringSettings, playerIdsVersion, demoMyTeam, demoOpponentTeam]);
 
   // Initial fetch on mount and when dependencies change
@@ -1684,6 +1688,7 @@ const Matchup = () => {
     };
 
     fetchData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate, currentMatchup, userLeagueState, scoringSettings, playerIdsVersion, demoMyTeam, demoOpponentTeam]); // Use playerIdsVersion instead of team arrays to prevent Death Loop, but include demo teams for guests
 
   // Auto-select today's date on initial load (so user sees something immediately)
@@ -2311,6 +2316,7 @@ const Matchup = () => {
     }
     
     // Note: This effect can re-run when frozen rosters are loaded to ensure dropped players are included
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     currentMatchup,
     myTeam,
@@ -2411,6 +2417,7 @@ const Matchup = () => {
     }
     
     setIsPlayerDialogOpen(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // State setters are stable - no dependencies needed
 
   // Use real data if active user, otherwise demo data
@@ -2727,6 +2734,7 @@ const Matchup = () => {
       }
       return transformedPlayer;
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userLeagueState, playerIdsVersion, demoMyTeam.length, dailyStatsMap, dailyStatsByDate, selectedDate, projectionsByDate, isSwitchingDate, myTeam]);
 
   const displayOpponentTeam = useMemo(() => {
@@ -2938,6 +2946,7 @@ const Matchup = () => {
         wasDropped: player.wasDropped
       };
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userLeagueState, playerIdsVersion, demoOpponentTeam.length, dailyStatsMap, dailyStatsByDate, selectedDate, projectionsByDate, isSwitchingDate, opponentTeamPlayers]);
   const displayMyTeamSlotAssignments = useMemo(() =>
     userLeagueState === 'active-user' ? myTeamSlotAssignments : demoMyTeamSlotAssignments,
@@ -4047,7 +4056,7 @@ const Matchup = () => {
           }, 20000);
         });
         
-        let { data: matchupData, error: matchupError } = await Promise.race([
+        const { data: matchupData, error: matchupError } = await Promise.race([
           matchupDataPromise,
           timeoutPromise
         ]);
@@ -4437,10 +4446,11 @@ const Matchup = () => {
     };
 
     loadMatchupData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     // CRITICAL: selectedDate is NOT in this dependency array
     // Date changes are handled by a separate useEffect that uses frozenRostersByDate
     // This prevents full reload on every date click
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, userLeagueState, urlLeagueId, urlWeekId, selectedMatchupId, activeLeagueId]);
 
   // ============================================================
@@ -4518,7 +4528,7 @@ const Matchup = () => {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [user?.id, league?.id, userTeam?.id, urlLeagueId, urlWeekId]);
 
   // =============================================================================
@@ -4567,7 +4577,7 @@ const Matchup = () => {
       try {
         // Get teams from current state using functional pattern
         // This avoids stale closure issues with myStarters/opponentStarters
-        let allTeamsArray: string[] = [];
+        const allTeamsArray: string[] = [];
         setMyTeam(prev => {
           prev.forEach(p => {
             const team = ((p as any).teamAbbreviation || p.team || '').toUpperCase();
@@ -4714,6 +4724,7 @@ const Matchup = () => {
     };
     // CRITICAL: Do NOT include myStarters/opponentStarters in deps - it creates infinite loop
     // The refreshGameStatuses function uses functional state updates to get current state
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [league?.id, currentMatchup?.id, currentMatchup?.week_start_date, currentMatchup?.week_end_date, currentMatchup?.status, userLeagueState, fetchAllDailyStats]);
 
 

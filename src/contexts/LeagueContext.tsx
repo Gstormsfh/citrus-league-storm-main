@@ -15,6 +15,7 @@ export type UserLeagueState = 'guest' | 'logged-in-no-league' | 'active-user';
 /**
  * Check if a league ID is the demo league (read-only, isolated)
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export const isDemoLeague = (leagueId: string | null | undefined): boolean => {
   return leagueId === DEMO_LEAGUE_ID;
 };
@@ -65,6 +66,7 @@ const defaultContextValue: LeagueContextType = {
 
 const LeagueContext = createContext<LeagueContextType>(defaultContextValue);
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useLeague = () => {
   const context = useContext(LeagueContext);
   // Context should always be defined now (has default value)
@@ -319,6 +321,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
 
       verifyAndSetLeague();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlLeagueId, userLeagues, user, activeLeagueId, loading, navigate, toast]);
 
   // Derive league format from active league (memoized to avoid unnecessary re-renders)

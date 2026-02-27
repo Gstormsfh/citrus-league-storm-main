@@ -69,6 +69,7 @@ const FeaturesSection = () => {
     });
 
     return () => {
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       elementRefs.current.forEach(el => {
         if (el) observer.unobserve(el);
       });

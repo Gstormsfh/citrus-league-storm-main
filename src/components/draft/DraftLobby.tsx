@@ -152,6 +152,7 @@ export const DraftLobby = ({
         setDraftOrderCustomOrder(defaultOrder);
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teams, customOrder.length, randomizedOrder, customDraftOrder]);
 
   // Helper functions for custom order

@@ -116,6 +116,7 @@ export default MobileQuickActions;
 /**
  * Pre-configured action sets for common use cases
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export const PlayerCardActions = {
   roster: (onDrop: () => void, onTrade: () => void, onInfo: () => void): QuickAction[] => [
     {

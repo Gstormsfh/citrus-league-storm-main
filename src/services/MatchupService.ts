@@ -1210,7 +1210,7 @@ export const MatchupService = {
       });
       
       // Match numeric IDs directly
-      let teamPlayers = allPlayers.filter(p => numericIds.includes(Number(p.id)));
+      const teamPlayers = allPlayers.filter(p => numericIds.includes(Number(p.id)));
       
       // If we have UUIDs, look them up in players table and match by name/team
       if (uuidIds.length > 0) {

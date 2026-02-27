@@ -58,6 +58,7 @@ const WaiverWire = () => {
     } else {
       setLoading(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, activeLeagueId]);
 
   const loadWaiverData = async () => {

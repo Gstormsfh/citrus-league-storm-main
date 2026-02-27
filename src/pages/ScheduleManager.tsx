@@ -25,6 +25,7 @@ const ScheduleManager = () => {
 
   useEffect(() => {
     loadScheduleData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, activeLeagueId]);
 
   const loadScheduleData = async () => {

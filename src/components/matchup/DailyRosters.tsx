@@ -138,6 +138,7 @@ export const DailyRosters = ({
     };
 
     fetchDailyLineups();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matchupId, teamId, opponentTeamId, weekStart, weekEnd, allDates.join(',')]);
 
   const formatDate = (dateStr: string): string => {

@@ -84,7 +84,7 @@ export function calculateEligibleGamesRemaining(starters: MatchupPlayer[]): numb
     
     // Count eligible players per position (up to slot limits)
     let eligibleOnThisDate = 0;
-    let overflow: MatchupPlayer[] = [];
+    const overflow: MatchupPlayer[] = [];
     
     // Count each position up to its limit
     (['C', 'LW', 'RW', 'D', 'G'] as const).forEach(pos => {

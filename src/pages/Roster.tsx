@@ -308,6 +308,8 @@ const Roster = () => {
     };
   }, []);
 
+  const rosterDisplayLoading = useMinimumLoadingTime(loading || leagueLoading, 800);
+
   // Calculate positional stats
   const posStats = useMemo(() => calculateTeamCategoryStats(roster.starters), [roster.starters]);
 
@@ -702,8 +704,10 @@ const Roster = () => {
             setLoading(false);
             return; // Exit early - we've loaded from daily roster
           } else {
+            // No daily roster found for this date
           }
         } else if (selectedDate) {
+          // Selected date without daily roster
         }
         
         // Regular lineup loading (from team_lineups or default)
@@ -741,6 +745,7 @@ const Roster = () => {
           const stalePlayerIds = Array.from(allSavedIds).filter(id => !currentPlayerIds.has(id));
           
           if (stalePlayerIds.length > 0) {
+            // Stale player IDs detected - they'll be filtered out below
           }
           
           // Filter saved lineup to only include current roster players
@@ -1113,6 +1118,7 @@ const Roster = () => {
         // Always set loading to false at the end
         setLoading(false);
       }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, profile, toast, userLeagueState, leagueLoading, activeLeagueId, selectedDate, currentMatchup]);
 
   // Initial load on mount and when userLeagueState changes
@@ -1171,6 +1177,7 @@ const Roster = () => {
     if (userTeam?.league_id && (userLeagueState === 'active-user' || userLeagueState === 'guest')) {
       calculateWeeks();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userTeam?.league_id, userLeagueState]);
 
   // Handle week change
@@ -1358,6 +1365,7 @@ const Roster = () => {
     if (roster.starters.length > 0 || roster.bench.length > 0 || roster.ir.length > 0) {
       fetchLockedPlayerIds();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchLockedPlayerIds, selectedDate]);
 
   // Reload roster when selected date changes to a PAST date (to load frozen roster)
@@ -1374,6 +1382,7 @@ const Roster = () => {
       // For today/future dates: projections are automatically fetched by the fetchDailyProjections useEffect
       // which triggers on selectedDate changes
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate, currentMatchup?.id, userTeamId, loadRoster]);
 
   // EGRESS OPTIMIZATION: Refresh lock status every 60 seconds (was 30s)
@@ -1388,6 +1397,7 @@ const Roster = () => {
     }, 60000); // 60 seconds (was 30s - enterprise egress optimization)
 
     return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchLockedPlayerIds]);
 
   // Auto-save lineup when leaving page (backup)
@@ -1533,6 +1543,7 @@ const Roster = () => {
     };
 
     calculateStats();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userTeam?.id, user?.id, transactions.length]); // Only recalc when team/user/transactions change, not roster slots
 
   // Fetch daily projections for selected date (WORLD-CLASS PATTERN - matches Matchup tab)
@@ -1596,6 +1607,7 @@ const Roster = () => {
     // Fetch projections for this date
     fetchProjectionsForDate(targetDate, allPlayerIds);
     
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate, roster.starters.length, roster.bench.length, roster.ir.length, fetchProjectionsForDate]);
 
   // =============================================================================
@@ -1635,7 +1647,7 @@ const Roster = () => {
       
       // Projection exists = player has game on this date
       // Build nextGame info from projection context
-      let enrichedPlayer = { 
+      const enrichedPlayer = { 
         ...player,
         nextGame: {
           opponent: 'Game', // Could be enhanced with opponent info if available in projection
@@ -1944,6 +1956,7 @@ const Roster = () => {
     };
     
     loadAnalytics();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, analyticsLoaded, roster.starters.length, toast]); // Removed 'roster' full dependency to avoid loops
 
   // Update statView on players when it changes
@@ -2834,10 +2847,7 @@ const Roster = () => {
 
                 {(() => {
                   // Apply minimum display time to prevent flash
-                  const actualLoading = loading || leagueLoading;
-                  const displayLoading = useMinimumLoadingTime(actualLoading, 800);
-                  
-                  if (displayLoading) {
+                  if (rosterDisplayLoading) {
                     return (
                       <LoadingScreen
                         character="lemon"

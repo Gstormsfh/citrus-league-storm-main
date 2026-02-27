@@ -256,6 +256,7 @@ const Profile = () => {
     };
 
     loadLeagueSettings();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSettingsLeagueId, user]);
 
   // Load roster counts when rosters tab is selected
@@ -292,6 +293,7 @@ const Profile = () => {
     if (commissionerLeagues.length > 0 && !selectedSettingsLeagueId) {
       setSelectedSettingsLeagueId(commissionerLeagues[0].id);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [commissionerLeagues]);
 
   // Save commissioner league settings
@@ -521,7 +523,7 @@ const Profile = () => {
       if (formData.bio.trim()) updateData.bio = formData.bio.trim();
 
       // Try to update - if bio column doesn't exist, try without it
-      let { error } = await supabase
+      const { error } = await supabase
         .from('profiles')
         .update(updateData)
         .eq('id', user.id);

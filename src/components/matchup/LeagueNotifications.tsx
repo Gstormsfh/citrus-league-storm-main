@@ -40,6 +40,7 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
     clearError,
   } = useNotificationStore();
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const leagueNotifications = notifications.get(leagueId) || [];
   const isLoading = loading.get(leagueId) || false;
   const error = errors.get(leagueId);
@@ -121,6 +122,7 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
     return () => {
       unsubscribe(leagueId);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leagueId, user?.id]);
 
   const handleMarkAllAsRead = async () => {
