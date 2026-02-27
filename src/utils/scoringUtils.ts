@@ -65,9 +65,9 @@ export const DEFAULT_SCORING: ScoringSettings = {
 export class ScoringCalculator {
   private settings: ScoringSettings;
 
-  constructor(settings?: ScoringSettings | any) {
+  constructor(settings?: ScoringSettings | Partial<ScoringSettings> | null) {
     // Handle both ScoringSettings interface and raw league.scoring_settings objects
-    this.settings = settings || DEFAULT_SCORING;
+    this.settings = (settings as ScoringSettings) || DEFAULT_SCORING;
   }
 
   /**
@@ -78,7 +78,7 @@ export class ScoringCalculator {
    * @param isGoalie - True for goalie stats, false for skater stats
    * @returns Total fantasy points calculated
    */
-  calculatePoints(stats: any, isGoalie: boolean): number {
+  calculatePoints(stats: Record<string, number> | null | undefined, isGoalie: boolean): number {
     if (!stats) return 0;
 
     if (isGoalie) {
@@ -110,11 +110,11 @@ export class ScoringCalculator {
    * @param isGoalie - True for goalie, false for skater
    * @returns Object mapping stat names to count/points/logic
    */
-  getStatBreakdown(stats: any, isGoalie: boolean): Record<string, { count: number; points: number; logic: string }> {
+  getStatBreakdown(stats: Record<string, number> | null | undefined, isGoalie: boolean): Record<string, { count: number; points: number; logic: string }> {
     if (!stats) return {};
 
     if (isGoalie) {
-      const breakdown: Record<string, any> = {};
+      const breakdown: Record<string, { count: number; points: number; logic: string }> = {};
       
       if ((stats.wins || 0) > 0) {
         const weight = this.settings.goalie.wins;
@@ -154,7 +154,7 @@ export class ScoringCalculator {
       
       return breakdown;
     } else {
-      const breakdown: Record<string, any> = {};
+      const breakdown: Record<string, { count: number; points: number; logic: string }> = {};
       const statMappings = [
         { key: 'Goals', stat: 'goals', weight: this.settings.skater.goals },
         { key: 'Assists', stat: 'assists', weight: this.settings.skater.assists },
@@ -225,7 +225,7 @@ export class ScoringCalculator {
  * @param league - League object with optional scoring_settings
  * @returns ScoringSettings object (defaults if not found)
  */
-export function extractScoringSettings(league: any): ScoringSettings {
+export function extractScoringSettings(league: { scoring_settings?: ScoringSettings } | null | undefined): ScoringSettings {
   return league?.scoring_settings || DEFAULT_SCORING;
 }
 
@@ -236,7 +236,7 @@ export function extractScoringSettings(league: any): ScoringSettings {
  * @param league - League object with optional scoring_settings
  * @returns New ScoringCalculator instance
  */
-export function createScorerFromLeague(league: any): ScoringCalculator {
+export function createScorerFromLeague(league: { scoring_settings?: ScoringSettings } | null | undefined): ScoringCalculator {
   return new ScoringCalculator(extractScoringSettings(league));
 }
 
@@ -294,8 +294,8 @@ export function compareCategoryMatchup(
   const details: Record<string, 'team1' | 'team2' | 'tie'> = {};
 
   for (const cat of categories) {
-    const v1 = (team1Stats as any)[cat] ?? 0;
-    const v2 = (team2Stats as any)[cat] ?? 0;
+    const v1 = (team1Stats as Record<string, number>)[cat] ?? 0;
+    const v2 = (team2Stats as Record<string, number>)[cat] ?? 0;
     const higher = categoryMeta[cat]?.higherIsBetter ?? true;
 
     if (v1 === v2) {
@@ -379,8 +379,8 @@ export function calculateRotoStandings(
 
     // Sort teams by their stat value
     const sorted = [...teamIds].sort((a, b) => {
-      const va = (teamStats[a] as any)?.[cat] ?? 0;
-      const vb = (teamStats[b] as any)?.[cat] ?? 0;
+      const va = (teamStats[a] as Record<string, number>)?.[cat] ?? 0;
+      const vb = (teamStats[b] as Record<string, number>)?.[cat] ?? 0;
       return higher ? vb - va : va - vb; // Descending for "higher is better", ascending otherwise
     });
 
@@ -390,8 +390,8 @@ export function calculateRotoStandings(
     while (i < sorted.length) {
       // Find tied group
       let j = i;
-      const val = (teamStats[sorted[i]] as any)?.[cat] ?? 0;
-      while (j < sorted.length && ((teamStats[sorted[j]] as any)?.[cat] ?? 0) === val) {
+      const val = (teamStats[sorted[i]] as Record<string, number>)?.[cat] ?? 0;
+      while (j < sorted.length && ((teamStats[sorted[j]] as Record<string, number>)?.[cat] ?? 0) === val) {
         j++;
       }
 

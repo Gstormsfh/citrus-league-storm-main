@@ -6,10 +6,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-
-const SUPABASE_URL = "https://iezwazccqqrhrjupxzvf.supabase.co";
-// Using the anon key - in production, you'd want to use a service role key for migrations
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImllendhemNjcXFyaHJqdXB4enZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY3NjM2MDYsImV4cCI6MjA3MjMzOTYwNn0.349EuoSQ3c1eUiMkc1fvzPfTqPKvCyWw2fLczU-ucOU";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './env';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 

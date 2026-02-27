@@ -503,7 +503,7 @@ def bulk_upsert_projections(db: SupabaseRest, projections: List[Dict]) -> int:
                 try:
                     db.upsert("player_projected_stats", proj, on_conflict="player_id,game_id,projection_date")
                     total_upserted += 1
-                except:
+                except Exception:
                     pass
     
     return total_upserted

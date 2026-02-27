@@ -8,11 +8,9 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './env';
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://your-project.supabase.co';
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || 'your-anon-key';
-
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 interface TeamLineup {
   team_id: string;

@@ -1,13 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-
-// Repo convention: many scripts hardcode these for convenience.
-// You can override by setting env vars.
-const SUPABASE_URL =
-  process.env.VITE_SUPABASE_URL ||
-  "https://iezwazccqqrhrjupxzvf.supabase.co";
-const SUPABASE_ANON_KEY =
-  process.env.VITE_SUPABASE_ANON_KEY ||
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImllendhemNjcXFyaHJqdXB4enZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY3NjM2MDYsImV4cCI6MjA3MjMzOTYwNn0.349EuoSQ3c1eUiMkc1fvzPfTqPKvCyWw2fLczU-ucOU";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./env";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 

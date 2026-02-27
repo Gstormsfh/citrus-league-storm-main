@@ -1172,7 +1172,7 @@ def _extract_shots_from_game(raw_data, game_id, db_client):
                             pass_zone_encoded = PASS_ZONE_ENCODER.transform(['no_pass'])[0]
                         else:
                             pass_zone_encoded = 0
-                except:
+                except Exception:
                     pass_zone_encoded = 0
             else:
                 pass_zone_encoded = 0
@@ -1201,7 +1201,7 @@ def _extract_shots_from_game(raw_data, game_id, db_client):
                             shot_type_encoded = SHOT_TYPE_ENCODER.transform(['wrist'])[0]
                         else:
                             shot_type_encoded = 0
-                except:
+                except Exception:
                     shot_type_encoded = 0
             else:
                 shot_type_encoded = 0
@@ -1349,7 +1349,7 @@ def _extract_shots_from_game(raw_data, game_id, db_client):
                     name_response = db_client.select('player_names', select='full_name', filters=[('player_id', 'eq', goalie_id)], limit=1)
                     if name_response:
                         goalie_name = name_response[0].get('full_name')
-                except:
+                except Exception:
                     pass  # Skip API lookup in parallel processing
             
             # Period/time context
@@ -2115,7 +2115,7 @@ def process_single_game(game_id, rate_limit_flag=None):
                 team_code_col='team_code', period_col='period',
                 time_in_period_col='time_in_period', time_since_last_event_col='time_since_last_event'
             )
-        except:
+        except Exception:
             df_shots['flurry_adjusted_xg'] = df_shots['xG_Value']
         
         # 6. Save to database using db_client
@@ -2891,7 +2891,7 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                         name_response = supabase.table('player_names').select('full_name').eq('player_id', goalie_id).limit(1).execute()
                         if name_response.data:
                             goalie_name = name_response.data[0]['full_name']
-                    except:
+                    except Exception:
                         # If table lookup fails, try API fetch (slower)
                         try:
                             goalie_api_url = f"https://api-web.nhle.com/v1/player/{goalie_id}/landing"
@@ -2915,9 +2915,9 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                                             'is_active': goalie_data.get('isActive', True),
                                             'headshot_url': goalie_data.get('headshot', '')
                                         }, on_conflict='player_id').execute()
-                                    except:
+                                    except Exception:
                                         pass  # Don't fail if upsert fails
-                        except:
+                        except Exception:
                             pass  # Don't fail if API fetch fails
                 
                 # PERIOD/TIME CONTEXT

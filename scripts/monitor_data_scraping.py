@@ -107,7 +107,7 @@ def check_database_updates(db: SupabaseRest, max_age_hours: int = 2) -> Dict[str
                         "latest_update": latest_time.isoformat(),
                         "age_hours": age_hours
                     }
-                except:
+                except Exception:
                     pass
         
         return {

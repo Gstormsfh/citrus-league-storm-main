@@ -223,7 +223,7 @@ def extract_rich_metadata(details: dict) -> Dict[str, Optional]:
     try:
       # NHL API format is typically "YYYY-MM-DD"
       metadata["birthdate"] = birth_date_str
-    except:
+    except Exception:
       metadata["birthdate"] = None
   else:
     metadata["birthdate"] = None

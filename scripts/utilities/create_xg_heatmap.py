@@ -84,7 +84,7 @@ def create_default_features(x, y, distance, angle):
     if SHOT_TYPE_ENCODER:
         try:
             features['shot_type_encoded'] = SHOT_TYPE_ENCODER.transform(['Wrist Shot'])[0]
-        except:
+        except Exception:
             features['shot_type_encoded'] = 0
     else:
         features['shot_type_encoded'] = 0
@@ -103,7 +103,7 @@ def create_default_features(x, y, distance, angle):
     if PASS_ZONE_ENCODER:
         try:
             features['pass_zone_encoded'] = PASS_ZONE_ENCODER.transform(['None'])[0] if 'None' in PASS_ZONE_ENCODER.classes_ else 0
-        except:
+        except Exception:
             features['pass_zone_encoded'] = 0
     else:
         features['pass_zone_encoded'] = 0
@@ -117,7 +117,7 @@ def create_default_features(x, y, distance, angle):
     if LAST_EVENT_CATEGORY_ENCODER:
         try:
             features['last_event_category_encoded'] = LAST_EVENT_CATEGORY_ENCODER.transform(['None'])[0] if 'None' in LAST_EVENT_CATEGORY_ENCODER.classes_ else 0
-        except:
+        except Exception:
             features['last_event_category_encoded'] = 0
     else:
         features['last_event_category_encoded'] = 0
@@ -165,7 +165,7 @@ def predict_xg(x, y):
     # Predict
     try:
         xg = XG_MODEL.predict_proba(X_predict)[0][1]  # Probability of goal
-    except:
+    except Exception:
         xg = XG_MODEL.predict(X_predict)[0]  # Direct prediction
     
     # Clip to reasonable range

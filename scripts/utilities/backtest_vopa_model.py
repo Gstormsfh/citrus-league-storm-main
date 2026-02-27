@@ -107,7 +107,7 @@ def get_completed_games(
                     # Include games from yesterday or earlier (assumed completed)
                     if game_date < today:
                         completed.append(game)
-                except:
+                except Exception:
                     pass
         
         return completed
@@ -225,7 +225,7 @@ def backtest_vopa_model(
         
         try:
             game_date = datetime.fromisoformat(game_date_str.replace("Z", "+00:00")).date()
-        except:
+        except Exception:
             continue
         
         # Show progress for EVERY game (or every 5 games to reduce spam)
@@ -587,7 +587,7 @@ def main():
     if len(sys.argv) > 1:
         try:
             start_date = datetime.fromisoformat(sys.argv[1]).date()
-        except:
+        except Exception:
             start_date = date.today() - timedelta(days=30)
     else:
         start_date = date.today() - timedelta(days=30)
@@ -595,7 +595,7 @@ def main():
     if len(sys.argv) > 2:
         try:
             end_date = datetime.fromisoformat(sys.argv[2]).date()
-        except:
+        except Exception:
             end_date = date.today()
     else:
         end_date = date.today()
@@ -603,7 +603,7 @@ def main():
     if len(sys.argv) > 3:
         try:
             season = int(sys.argv[3])
-        except:
+        except Exception:
             season = 2025
     else:
         season = 2025

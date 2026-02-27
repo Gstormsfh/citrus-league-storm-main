@@ -10,7 +10,7 @@ const Footer = () => {
   const league = useLeague();
   const activeLeagueId = league?.activeLeagueId ?? null;
   return (
-    <footer className="bg-[#D4E8B8] pt-20 pb-10 border-t-2 border-citrus-sage/40 relative overflow-hidden">
+    <footer className="bg-[#D4E8B8] dark:bg-gray-900 pt-20 pb-10 border-t-2 border-citrus-sage/40 dark:border-gray-700 relative overflow-hidden">
       {/* Rich green texture overlay */}
       <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(circle_at_1px_1px,_rgba(92,124,71,0.5)_1px,_transparent_1px)] bg-[length:40px_40px]"></div>
       
@@ -37,48 +37,48 @@ const Footer = () => {
             
             {/* Social Links with Varsity Style */}
             <div className="flex gap-3">
-              <a href="#" className="w-11 h-11 bg-citrus-sage/20 border-2 border-citrus-sage rounded-varsity flex items-center justify-center hover:bg-citrus-sage hover:shadow-patch hover:-translate-y-0.5 transition-all group">
-                <Facebook size={18} className="text-citrus-forest group-hover:text-[#E8EED9] transition-colors" />
+              <a href="#" aria-label="Facebook" className="w-11 h-11 bg-citrus-sage/20 dark:bg-gray-800 border-2 border-citrus-sage dark:border-gray-600 rounded-varsity flex items-center justify-center hover:bg-citrus-sage hover:shadow-patch hover:-translate-y-0.5 transition-all group">
+                <Facebook size={18} className="text-citrus-forest dark:text-gray-300 group-hover:text-[#E8EED9] transition-colors" />
               </a>
-              <a href="#" className="w-11 h-11 bg-citrus-sage/20 border-2 border-citrus-sage rounded-varsity flex items-center justify-center hover:bg-citrus-sage hover:shadow-patch hover:-translate-y-0.5 transition-all group">
-                <Twitter size={18} className="text-citrus-forest group-hover:text-[#E8EED9] transition-colors" />
+              <a href="#" aria-label="Twitter" className="w-11 h-11 bg-citrus-sage/20 dark:bg-gray-800 border-2 border-citrus-sage dark:border-gray-600 rounded-varsity flex items-center justify-center hover:bg-citrus-sage hover:shadow-patch hover:-translate-y-0.5 transition-all group">
+                <Twitter size={18} className="text-citrus-forest dark:text-gray-300 group-hover:text-[#E8EED9] transition-colors" />
               </a>
-              <a href="#" className="w-11 h-11 bg-citrus-sage/20 border-2 border-citrus-sage rounded-varsity flex items-center justify-center hover:bg-citrus-sage hover:shadow-patch hover:-translate-y-0.5 transition-all group">
-                <Instagram size={18} className="text-citrus-forest group-hover:text-[#E8EED9] transition-colors" />
+              <a href="#" aria-label="Instagram" className="w-11 h-11 bg-citrus-sage/20 dark:bg-gray-800 border-2 border-citrus-sage dark:border-gray-600 rounded-varsity flex items-center justify-center hover:bg-citrus-sage hover:shadow-patch hover:-translate-y-0.5 transition-all group">
+                <Instagram size={18} className="text-citrus-forest dark:text-gray-300 group-hover:text-[#E8EED9] transition-colors" />
               </a>
-              <a href="#" className="w-11 h-11 bg-citrus-sage/20 border-2 border-citrus-sage rounded-varsity flex items-center justify-center hover:bg-citrus-sage hover:shadow-patch hover:-translate-y-0.5 transition-all group">
-                <Youtube size={18} className="text-citrus-forest group-hover:text-[#E8EED9] transition-colors" />
+              <a href="#" aria-label="YouTube" className="w-11 h-11 bg-citrus-sage/20 dark:bg-gray-800 border-2 border-citrus-sage dark:border-gray-600 rounded-varsity flex items-center justify-center hover:bg-citrus-sage hover:shadow-patch hover:-translate-y-0.5 transition-all group">
+                <Youtube size={18} className="text-citrus-forest dark:text-gray-300 group-hover:text-[#E8EED9] transition-colors" />
               </a>
             </div>
           </div>
           
           <div>
-            <h4 className="font-display font-bold text-base uppercase text-citrus-forest mb-5 tracking-wide">Product</h4>
+            <h4 className="font-display font-bold text-base uppercase text-citrus-forest dark:text-gray-200 mb-5 tracking-wide">Product</h4>
             <ul className="space-y-3">
-              <li><Link to="/features" className="text-citrus-forest hover:text-citrus-sage transition-colors font-sans">Features</Link></li>
-              <li><Link to="/draft-room" className="text-citrus-forest hover:text-citrus-sage transition-colors font-sans">Draft Room</Link></li>
-              <li><Link to={activeLeagueId ? `/matchup/${activeLeagueId}` : '/matchup'} className="text-citrus-forest hover:text-citrus-sage transition-colors font-sans">Matchups</Link></li>
-              <li><Link to="/roster" className="text-citrus-forest hover:text-citrus-sage transition-colors font-sans">Roster</Link></li>
-              <li><Link to="/free-agents" className="text-citrus-forest hover:text-citrus-sage transition-colors font-sans">Free Agents</Link></li>
+              <li><Link to="/features" className="text-citrus-forest dark:text-gray-400 hover:text-citrus-sage dark:hover:text-gray-200 transition-colors font-sans">Features</Link></li>
+              <li><Link to="/draft-room" className="text-citrus-forest dark:text-gray-400 hover:text-citrus-sage dark:hover:text-gray-200 transition-colors font-sans">Draft Room</Link></li>
+              <li><Link to={activeLeagueId ? `/matchup/${activeLeagueId}` : '/matchup'} className="text-citrus-forest dark:text-gray-400 hover:text-citrus-sage dark:hover:text-gray-200 transition-colors font-sans">Matchups</Link></li>
+              <li><Link to="/roster" className="text-citrus-forest dark:text-gray-400 hover:text-citrus-sage dark:hover:text-gray-200 transition-colors font-sans">Roster</Link></li>
+              <li><Link to="/free-agents" className="text-citrus-forest dark:text-gray-400 hover:text-citrus-sage dark:hover:text-gray-200 transition-colors font-sans">Free Agents</Link></li>
             </ul>
           </div>
           
           <div>
-            <h4 className="font-display font-bold text-base uppercase text-citrus-forest mb-5 tracking-wide">Resources</h4>
+            <h4 className="font-display font-bold text-base uppercase text-citrus-forest dark:text-gray-200 mb-5 tracking-wide">Resources</h4>
             <ul className="space-y-3">
-              <li><Link to="/news" className="text-citrus-forest hover:text-citrus-sage transition-colors font-sans">Player News</Link></li>
-              <li><Link to="/standings" className="text-citrus-forest hover:text-citrus-sage transition-colors font-sans">Standings</Link></li>
-              <li><Link to="/gm-office/stormy" className="text-citrus-forest hover:text-citrus-sage transition-colors font-sans">Stormy AI</Link></li>
-              <li><a href="mailto:CitrusFantasySports@Gmail.com" className="text-citrus-forest hover:text-citrus-sage transition-colors font-sans">Contact Support</a></li>
+              <li><Link to="/news" className="text-citrus-forest dark:text-gray-400 hover:text-citrus-sage dark:hover:text-gray-200 transition-colors font-sans">Player News</Link></li>
+              <li><Link to="/standings" className="text-citrus-forest dark:text-gray-400 hover:text-citrus-sage dark:hover:text-gray-200 transition-colors font-sans">Standings</Link></li>
+              <li><Link to="/gm-office/stormy" className="text-citrus-forest dark:text-gray-400 hover:text-citrus-sage dark:hover:text-gray-200 transition-colors font-sans">Stormy AI</Link></li>
+              <li><a href="mailto:CitrusFantasySports@Gmail.com" className="text-citrus-forest dark:text-gray-400 hover:text-citrus-sage dark:hover:text-gray-200 transition-colors font-sans">Contact Support</a></li>
             </ul>
           </div>
           
           <div>
-            <h4 className="font-display font-bold text-base uppercase text-citrus-forest mb-5 tracking-wide">Legal</h4>
+            <h4 className="font-display font-bold text-base uppercase text-citrus-forest dark:text-gray-200 mb-5 tracking-wide">Legal</h4>
             <ul className="space-y-3">
-              <li><Link to="/settings" className="text-citrus-forest hover:text-citrus-sage transition-colors font-sans">Account Settings</Link></li>
-              <li><Link to="/privacy" className="text-citrus-forest hover:text-citrus-sage transition-colors font-sans">Privacy Policy</Link></li>
-              <li><Link to="/terms" className="text-citrus-forest hover:text-citrus-sage transition-colors font-sans">Terms of Service</Link></li>
+              <li><Link to="/settings" className="text-citrus-forest dark:text-gray-400 hover:text-citrus-sage dark:hover:text-gray-200 transition-colors font-sans">Account Settings</Link></li>
+              <li><Link to="/privacy" className="text-citrus-forest dark:text-gray-400 hover:text-citrus-sage dark:hover:text-gray-200 transition-colors font-sans">Privacy Policy</Link></li>
+              <li><Link to="/terms" className="text-citrus-forest dark:text-gray-400 hover:text-citrus-sage dark:hover:text-gray-200 transition-colors font-sans">Terms of Service</Link></li>
             </ul>
           </div>
         </div>
