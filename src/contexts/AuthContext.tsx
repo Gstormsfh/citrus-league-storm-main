@@ -189,10 +189,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signInWithOAuth = async (provider: 'google' | 'apple') => {
     const redirectUrl = `${window.location.origin}/auth/callback`;
+
+    // Provider-specific scopes and query params for a complete profile
+    const providerOptions: Record<string, { scopes?: string; queryParams?: Record<string, string> }> = {
+      google: {
+        scopes: 'email profile',
+        queryParams: { access_type: 'offline', prompt: 'consent' },
+      },
+      apple: {
+        scopes: 'email name',
+      },
+    };
+
+    const opts = providerOptions[provider] || {};
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
         redirectTo: redirectUrl,
+        scopes: opts.scopes,
+        queryParams: opts.queryParams,
       },
     });
     return { error };

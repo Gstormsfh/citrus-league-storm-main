@@ -36,7 +36,7 @@ const Auth = () => {
 
   const getBetterErrorMessage = (errorMessage: string): string => {
     const lower = errorMessage.toLowerCase();
-    
+
     if (lower.includes('invalid login') || lower.includes('invalid credentials')) {
       return 'Invalid email or password. Please check and try again.';
     }
@@ -46,13 +46,19 @@ const Auth = () => {
     if (lower.includes('too many requests')) {
       return 'Too many attempts. Please wait a few minutes before trying again.';
     }
+    if (lower.includes('provider is not enabled') || lower.includes('unsupported provider')) {
+      return 'This sign-in method is not available yet. Please use email and password to sign in.';
+    }
+    if (lower.includes('validation_failed') || lower.includes('validation failed')) {
+      return 'Sign-in could not be completed. Please try again or use email and password.';
+    }
     if (lower.includes('password')) {
       return errorMessage;
     }
     if (lower.includes('email')) {
       return 'Invalid email address. Please check and try again.';
     }
-    
+
     return errorMessage;
   };
 
