@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, Session, AuthError, AuthResponse } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { analyticsService } from '@/services/AnalyticsService';
+import { setSentryUser } from '@/integrations/sentry/config';
 
 interface Profile {
   id: string;
@@ -116,10 +117,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
         if (session?.user) {
           analyticsService.setUserId(session.user.id);
+          setSentryUser({ id: session.user.id, email: session.user.email });
           fetchProfile(session.user.id);
         }
       } else if (event === 'SIGNED_OUT') {
         analyticsService.setUserId(null);
+        setSentryUser(null);
         setProfile(null);
       }
     });

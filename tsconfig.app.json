@@ -14,12 +14,20 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
-    /* Linting */
+    /* Linting — Incremental strict mode rollout */
+    /* Phase 1 (now): Enable safe strict checks that catch real bugs */
     "strict": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noImplicitAny": false,
-    "noFallthroughCasesInSwitch": false,
+    "noFallthroughCasesInSwitch": true,
+    "strictNullChecks": false,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "noImplicitThis": true,
+    "useUnknownInCatchVariables": true,
+    /* Phase 2 (next sprint): Enable strictNullChecks */
+    /* Phase 3 (after): Enable strict: true + noImplicitAny */
 
     "baseUrl": ".",
     "paths": {
