@@ -49,11 +49,43 @@ def supabase_client() -> SupabaseRest:
 
 
 def _safe_int(v, default=0) -> int:
-    """Safely convert value to int."""
+    """Safely convert value to int.
+
+    Handles NHL API fraction strings like '2/5' (faceoff wins/total)
+    by parsing the numerator. Use _safe_int_denom() to get the denominator.
+    """
+    if v is None:
+        return default
     try:
-        return int(v) if v is not None else default
-    except Exception as e:
-        print(f"Warning: _safe_int failed to convert {v!r} to int: {e}")
+        return int(v)
+    except (ValueError, TypeError):
+        # Handle fraction format "X/Y" from NHL API (e.g., faceoffs "2/5")
+        s = str(v)
+        if '/' in s:
+            try:
+                return int(s.split('/')[0])
+            except (ValueError, IndexError):
+                pass
+        return default
+
+
+def _safe_int_denom(v, default=0) -> int:
+    """Parse denominator from NHL API fraction strings like '2/5'.
+
+    Returns the second number (total) for fields like faceoffsTaken.
+    Falls back to plain int() for normal values.
+    """
+    if v is None:
+        return default
+    try:
+        return int(v)
+    except (ValueError, TypeError):
+        s = str(v)
+        if '/' in s:
+            try:
+                return int(s.split('/')[1])
+            except (ValueError, IndexError):
+                pass
         return default
 
 
@@ -61,8 +93,7 @@ def _safe_float(v, default=0.0) -> float:
     """Safely convert value to float."""
     try:
         return float(v) if v is not None else default
-    except Exception as e:
-        print(f"Warning: _safe_float failed to convert {v!r} to float: {e}")
+    except Exception:
         return default
 
 
@@ -91,8 +122,7 @@ def parse_time_to_seconds(time_str: str) -> int:
             return int(parts[0]) * 60 + int(parts[1])
         else:
             return int(time_str) if time_str.isdigit() else 0
-    except Exception as e:
-        print(f"Warning: parse_time_to_seconds failed to parse {time_str!r}: {e}")
+    except Exception:
         return 0
 
 
@@ -263,7 +293,7 @@ def extract_player_stats_from_boxscore(boxscore: Dict) -> Dict[int, Dict[str, An
                     "nhl_faceoff_wins": _safe_int(
                         player_stat.get("faceoffWins") or player_stat.get("faceOffWins", 0)
                     ),
-                    "nhl_faceoff_taken": _safe_int(
+                    "nhl_faceoff_taken": _safe_int_denom(
                         player_stat.get("faceoffsTaken") or player_stat.get("faceOffs", 0)
                     ),
                     
