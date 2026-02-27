@@ -630,9 +630,11 @@ const Matchup = () => {
           });
         }
         
-        // Get teams
-        const team1 = await supabase.from('teams').select(COLUMNS.TEAM).eq('id' as any, guestMatchup.team1_id as any).maybeSingle();
-        const team2 = guestMatchup.team2_id ? await supabase.from('teams').select(COLUMNS.TEAM).eq('id' as any, guestMatchup.team2_id as any).maybeSingle() : { data: null, error: null };
+        // Get teams (parallel)
+        const [team1, team2] = await Promise.all([
+          supabase.from('teams').select(COLUMNS.TEAM).eq('id' as any, guestMatchup.team1_id as any).maybeSingle(),
+          guestMatchup.team2_id ? supabase.from('teams').select(COLUMNS.TEAM).eq('id' as any, guestMatchup.team2_id as any).maybeSingle() : Promise.resolve({ data: null, error: null })
+        ]);
         
         if (team1.error) throw team1.error;
         if (team2.error) throw team2.error;
@@ -821,16 +823,9 @@ const Matchup = () => {
         setCalculatedDailyTotals(calculatedTotals);
         log(' Calculated daily totals populated for demo league:', Array.from(calculatedTotals.entries()));
         
-        // Get all week matchups for dropdown (same week as selected)
-        const { data: allMatchups } = await supabase
-          .from('matchups')
-          .select(COLUMNS.MATCHUP)
-          .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
-          .eq('week_number' as any, weekToShow as any)
-          .order('created_at', { ascending: true });
-        
-        if (allMatchups) {
-          setAllWeekMatchups(allMatchups as any);
+        // Reuse already-fetched week matchups for the dropdown (avoids duplicate query)
+        if (weekMatchups && weekMatchups.length > 0) {
+          setAllWeekMatchups(weekMatchups as any);
         }
         
         log(' ✅ Guest matchup loaded successfully');
