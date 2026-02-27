@@ -6,6 +6,9 @@ import './index.css'
 import { ErrorBoundary } from './components/ErrorBoundary'
 // Import logger early to silence all console output (Sleeper-style)
 import './utils/logger'
+// Initialize Sentry error monitoring (no-ops if not installed or configured)
+import { initSentry } from './integrations/sentry/config'
+initSentry();
 
 // Ensure root element exists
 const rootElement = document.getElementById("root");

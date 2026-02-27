@@ -156,41 +156,41 @@ const App = () => {
                 <Route path="/profile-setup" element={<ProfileSetup />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/verify-email" element={<VerifyEmail />} />
-                <Route path="/roster" element={<ErrorBoundary><Roster /></ErrorBoundary>} />
-                <Route path="/standings" element={<ErrorBoundary><Standings /></ErrorBoundary>} />
+                <Route path="/roster" element={<ProtectedRoute><ErrorBoundary><Roster /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/standings" element={<ProtectedRoute><ErrorBoundary><Standings /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/blog" element={<Blog />} />
                 <Route path="/podcasts" element={<Podcasts />} />
                 <Route path="/guides" element={<Guides />} />
-                    <Route path="/matchup/:leagueId/:weekId?" element={<ErrorBoundary><Matchup /></ErrorBoundary>} />
-                    <Route path="/matchup" element={<ErrorBoundary><Matchup /></ErrorBoundary>} /> {/* Fallback for /matchup without params */}
+                    <Route path="/matchup/:leagueId/:weekId?" element={<ProtectedRoute><ErrorBoundary><Matchup /></ErrorBoundary></ProtectedRoute>} />
+                    <Route path="/matchup" element={<ProtectedRoute><ErrorBoundary><Matchup /></ErrorBoundary></ProtectedRoute>} /> {/* Fallback for /matchup without params */}
                     <Route path="/league/:leagueId/playoffs" element={<ProtectedRoute><ErrorBoundary><PlayoffBracket /></ErrorBoundary></ProtectedRoute>} />
-                <Route path="/free-agents" element={<ErrorBoundary><FreeAgents /></ErrorBoundary>} />
-                <Route path="/gm-office" element={<ErrorBoundary><GMOffice /></ErrorBoundary>} />
-                <Route path="/gm-office/stormy" element={<StormyAssistant />} />
+                <Route path="/free-agents" element={<ProtectedRoute><ErrorBoundary><FreeAgents /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/gm-office" element={<ProtectedRoute><ErrorBoundary><GMOffice /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/gm-office/stormy" element={<ProtectedRoute><ErrorBoundary><StormyAssistant /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/news" element={<News />} />
-                <Route path="/draft-room" element={<ErrorBoundary><DraftRoom /></ErrorBoundary>} />
-                <Route path="/draft" element={<ErrorBoundary><DraftRoom /></ErrorBoundary>} /> {/* Fallback route */}
+                <Route path="/draft-room" element={<ProtectedRoute><ErrorBoundary><DraftRoom /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/draft" element={<ProtectedRoute><ErrorBoundary><DraftRoom /></ErrorBoundary></ProtectedRoute>} /> {/* Fallback route */}
                 <Route path="/create-league" element={<ProtectedRoute requireProfile><CreateLeague /></ProtectedRoute>} />
                 <Route path="/league/:leagueId" element={<ProtectedRoute><ErrorBoundary><LeagueDashboard /></ErrorBoundary></ProtectedRoute>} />
-                <Route path="/profile" element={<Profile />} />
-                <Route path="/team-analytics" element={<ErrorBoundary><TeamAnalytics /></ErrorBoundary>} />
-                <Route path="/waiver-wire" element={<ErrorBoundary><WaiverWire /></ErrorBoundary>} />
-                <Route path="/schedule-manager" element={<ErrorBoundary><ScheduleManager /></ErrorBoundary>} />
-                <Route path="/trade-analyzer" element={<ErrorBoundary><TradeAnalyzer /></ErrorBoundary>} />
-                <Route path="/armchair-gm" element={<ArmchairGM />} />
-                <Route path="/team/:teamId" element={<OtherTeam />} />
+                <Route path="/profile" element={<ProtectedRoute><ErrorBoundary><Profile /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/team-analytics" element={<ProtectedRoute><ErrorBoundary><TeamAnalytics /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/waiver-wire" element={<ProtectedRoute><ErrorBoundary><WaiverWire /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/schedule-manager" element={<ProtectedRoute><ErrorBoundary><ScheduleManager /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/trade-analyzer" element={<ProtectedRoute><ErrorBoundary><TradeAnalyzer /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/armchair-gm" element={<ProtectedRoute><ErrorBoundary><ArmchairGM /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/team/:teamId" element={<ProtectedRoute><ErrorBoundary><OtherTeam /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/features" element={<Features />} />
                 <Route path="/pricing" element={<Pricing />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/careers" element={<Careers />} />
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/terms" element={<Terms />} />
-                <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                <Route path="/settings" element={<ProtectedRoute><ErrorBoundary><Settings /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/waitlist" element={<Waitlist />} />
-                <Route path="/pool/pickem" element={<PoolPickem />} />
-                <Route path="/pool/survivor" element={<PoolSurvivor />} />
-                <Route path="/pool/confidence" element={<PoolConfidence />} />
+                <Route path="/pool/pickem" element={<ProtectedRoute><ErrorBoundary><PoolPickem /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/pool/survivor" element={<ProtectedRoute><ErrorBoundary><PoolSurvivor /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/pool/confidence" element={<ProtectedRoute><ErrorBoundary><PoolConfidence /></ErrorBoundary></ProtectedRoute>} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

@@ -1,0 +1,103 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run ESLint (fail on warnings)
+        run: npx eslint src/ --max-warnings 0
+
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: TypeScript compile check
+        run: npx tsc --noEmit
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Production build
+        run: npm run build
+
+      - name: Bundle size check (600KB per chunk)
+        run: |
+          echo "=== Bundle Size Report ==="
+          oversized=0
+          for file in dist/assets/*.js; do
+            [ -f "$file" ] || continue
+            size=$(stat --format=%s "$file")
+            size_kb=$((size / 1024))
+            name=$(basename "$file")
+            if [ "$size_kb" -gt 600 ]; then
+              echo "::warning file=$file::Chunk $name is ${size_kb}KB (exceeds 600KB limit)"
+              oversized=$((oversized + 1))
+            else
+              echo "  OK  $name — ${size_kb}KB"
+            fi
+          done
+          echo ""
+          if [ "$oversized" -gt 0 ]; then
+            echo "::warning::$oversized chunk(s) exceed the 600KB threshold"
+          else
+            echo "All chunks are within the 600KB budget."
+          fi
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run tests
+        run: npx vitest run
