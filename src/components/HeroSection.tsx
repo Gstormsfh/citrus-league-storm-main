@@ -8,7 +8,7 @@ import WaitlistSignup from '@/components/WaitlistSignup';
 
 const HeroSection = () => {
   return (
-    <div className="relative bg-[#D4E8B8] overflow-x-hidden">
+    <div className="relative bg-[#D4E8B8] dark:bg-gray-900 overflow-x-hidden">
       {/* Solid creamy green background */}
 
       <div className="container mx-auto px-4 flex flex-col lg:flex-row items-center justify-between py-12 lg:py-16">

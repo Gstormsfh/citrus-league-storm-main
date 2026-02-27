@@ -348,7 +348,7 @@ def process_single_game_json(raw_json, game_id):
                 team_code_col='team_code', period_col='period',
                 time_in_period_col='time_in_period', time_since_last_event_col='time_since_last_event'
             )
-        except:
+        except Exception:
             df_shots['flurry_adjusted_xg'] = df_shots['xG_Value']
         
         # 9. Save to database

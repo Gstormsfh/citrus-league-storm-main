@@ -1042,7 +1042,7 @@ def get_vegas_win_probability(
         # Sort by date (most recent first) - handle date strings
         try:
             team_games.sort(key=lambda g: g.get("game_date", ""), reverse=True)
-        except:
+        except Exception:
             pass  # If sorting fails, use all games
         
         # Use last 10 games if available, otherwise use all games
@@ -1282,7 +1282,7 @@ def calculate_goalie_days_rest(
                         prev_date = datetime.fromisoformat(prev_date_str.replace("Z", "+00:00")).date()
                         days_diff = (game_date - prev_date).days
                         return days_diff
-                    except:
+                    except Exception:
                         continue
         
         # No previous game found, default to well-rested
@@ -1403,7 +1403,7 @@ def check_back_to_back(db: SupabaseRest, team: str, game_date: date) -> float:
                         days_diff = (game_date - prev_date).days
                         if days_diff == 1:
                             return 0.95  # B2B penalty
-                    except:
+                    except Exception:
                         pass
                 break
         

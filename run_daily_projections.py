@@ -426,7 +426,7 @@ def generate_traceability_log_for_rejection(
     
     try:
         game_date = datetime.strptime(game_date_str, "%Y-%m-%d").date()
-    except:
+    except Exception:
         game_date = date.today()
     
     # Get player info
