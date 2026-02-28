@@ -3115,13 +3115,12 @@ const DraftRoom = () => {
                 <div className="lg:col-span-3">
                   <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-3 sm:space-y-6">
                     {/* Mobile: 4 tabs (includes Roster). Desktop: 3 tabs (Roster in sidebar) */}
-                    <TabsList className="grid w-full grid-cols-4 lg:grid-cols-3 h-9 sm:h-10">
-                      <TabsTrigger value="players" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
+                    <TabsList className="grid w-full grid-cols-4 lg:grid-cols-3 h-11 sm:h-10">
+                      <TabsTrigger value="players" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
                         <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                        <span className="hidden sm:inline">Players</span>
-                        <span className="sm:hidden">Players</span>
+                        <span>Players</span>
                       </TabsTrigger>
-                      <TabsTrigger value="board" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
+                      <TabsTrigger value="board" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
                         <Trophy className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                         Board
                       </TabsTrigger>

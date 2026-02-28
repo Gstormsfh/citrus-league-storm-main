@@ -8,8 +8,8 @@
 /** The numeric season identifier used in DB queries (e.g. `.eq('season', CURRENT_SEASON)`) */
 export const CURRENT_SEASON = 2025;
 
-/** The NHL headshot asset season path segment (e.g. "20242025" for the 2024-25 season) */
-export const HEADSHOT_SEASON = '20242025';
+/** The NHL headshot asset season path segment (e.g. "20252026" for the 2025-26 season) */
+export const HEADSHOT_SEASON = '20252026';
 
 /** The calendar year the regular season starts (October) */
 export const SEASON_START_YEAR = 2025;

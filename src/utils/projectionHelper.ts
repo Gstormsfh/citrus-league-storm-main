@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { CURRENT_SEASON } from '@/utils/seasonConstants';
 
 /**
  * Get weekly projected fantasy points for players
@@ -29,7 +30,7 @@ export async function getWeeklyProjections(
       .select('player_id, total_projected_points, projection_date')
       .in('player_id', playerIds)
       .in('projection_date', dates)
-      .eq('season', 2025);
+      .eq('season', CURRENT_SEASON);
 
     if (error) {
       console.error('Error fetching weekly projections:', error);
@@ -108,7 +109,7 @@ export async function getLeagueAverageProjections(
     const { data: players, error: playersError } = await supabase
       .from('player_directory')
       .select('player_id, position_code')
-      .eq('season', 2025)
+      .eq('season', CURRENT_SEASON)
       .in('player_id', Array.from(allPlayerIds));
 
     if (playersError || !players) {
