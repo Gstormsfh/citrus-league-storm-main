@@ -2653,6 +2653,7 @@ const DraftRoom = () => {
         id: player.id,
         name: player.full_name,
         position: player.position,
+        eligible_positions: player.eligible_positions || [player.position],
         number: parseInt(player.jersey_number || '0'),
         starter: false,
         stats: {
@@ -2711,7 +2712,7 @@ const DraftRoom = () => {
       }
       
       // If still no session ID, try to get active session
-      if (!sessionId) {
+      if (!sessionId && user?.id) {
         const { sessionId: activeSessionId } = await DraftService.getActiveDraftSession(leagueId, user.id);
         sessionId = activeSessionId;
       }
@@ -2970,40 +2971,40 @@ const DraftRoom = () => {
                   </div>
                 </div>
 
-                {/* Row 2: Selected player / recent pick (collapsible on mobile) */}
+                {/* Row 2: Player spotlight — selected player, queued player, or last pick */}
                 {selectedPlayer ? (
-                  <div className="mt-2 flex items-center gap-2 bg-primary/5 border border-primary/20 rounded-lg px-3 py-2">
+                  <div className="mt-2 flex items-center gap-2 bg-primary/10 border-2 border-primary/30 rounded-lg px-3 py-2.5 shadow-sm">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-[10px] flex-shrink-0">{selectedPlayer.position}</Badge>
-                        <span className="font-bold text-sm truncate">{selectedPlayer.full_name}</span>
+                        <Badge className="text-[10px] flex-shrink-0 bg-primary text-primary-foreground">{selectedPlayer.position}</Badge>
+                        <span className="font-bold text-sm md:text-base truncate">{selectedPlayer.full_name}</span>
                         <span className="text-xs text-muted-foreground flex-shrink-0">{selectedPlayer.team}</span>
                       </div>
-                      {/* Compact stat pills - scrollable on mobile to see ALL stats */}
-                      <div className="flex items-center gap-1.5 mt-1 overflow-x-auto text-[10px] md:text-xs pb-0.5 scrollbar-styled">
+                      {/* Full stat line — scrollable on mobile */}
+                      <div className="flex items-center gap-2 mt-1.5 overflow-x-auto text-[11px] md:text-xs pb-0.5 scrollbar-styled">
                         {selectedPlayer.position === 'G' ? (
                           <>
-                            <span className="flex-shrink-0 font-bold text-sm">{selectedPlayer.wins || 0}W</span>
-                            <span className="text-muted-foreground">|</span>
+                            <span className="flex-shrink-0 font-bold text-primary">{selectedPlayer.wins || 0}W</span>
+                            <span className="text-muted-foreground/40">|</span>
                             <span className="flex-shrink-0">{selectedPlayer.losses || 0}L</span>
                             <span className="flex-shrink-0">{selectedPlayer.goals_against_average ? selectedPlayer.goals_against_average.toFixed(2) : '0.00'} GAA</span>
                             <span className="flex-shrink-0">{selectedPlayer.save_percentage ? (selectedPlayer.save_percentage * 100).toFixed(1) : '0.0'}%</span>
-                            <span className="flex-shrink-0">{selectedPlayer.saves || 0}SV</span>
-                            <span className="flex-shrink-0">{selectedPlayer.shutouts || 0}SO</span>
+                            <span className="flex-shrink-0">{selectedPlayer.saves || 0} SV</span>
+                            <span className="flex-shrink-0">{selectedPlayer.shutouts || 0} SO</span>
                           </>
                         ) : (
                           <>
-                            <span className="flex-shrink-0 font-bold text-sm">{selectedPlayer.points} PTS</span>
-                            <span className="text-muted-foreground">|</span>
+                            <span className="flex-shrink-0 font-bold text-primary">{selectedPlayer.points} PTS</span>
+                            <span className="text-muted-foreground/40">|</span>
                             <span className="flex-shrink-0">{selectedPlayer.goals}G</span>
                             <span className="flex-shrink-0">{selectedPlayer.assists}A</span>
                             <span className="flex-shrink-0">{selectedPlayer.plus_minus > 0 ? '+' : ''}{selectedPlayer.plus_minus}</span>
-                            <span className="flex-shrink-0">{selectedPlayer.ppp || 0}PPP</span>
-                            <span className="flex-shrink-0">{selectedPlayer.shp || 0}SHP</span>
-                            <span className="flex-shrink-0">{selectedPlayer.shots}SOG</span>
-                            <span className="flex-shrink-0">{selectedPlayer.hits}HIT</span>
-                            <span className="flex-shrink-0">{selectedPlayer.blocks}BLK</span>
-                            <span className="flex-shrink-0">{selectedPlayer.pim || 0}PIM</span>
+                            <span className="flex-shrink-0">{selectedPlayer.ppp || 0} PPP</span>
+                            <span className="flex-shrink-0">{selectedPlayer.shp || 0} SHP</span>
+                            <span className="flex-shrink-0">{selectedPlayer.shots} SOG</span>
+                            <span className="flex-shrink-0">{selectedPlayer.hits} HIT</span>
+                            <span className="flex-shrink-0">{selectedPlayer.blocks} BLK</span>
+                            <span className="flex-shrink-0">{selectedPlayer.pim || 0} PIM</span>
                           </>
                         )}
                       </div>
@@ -3012,29 +3013,70 @@ const DraftRoom = () => {
                       <Button
                         onClick={(e) => { e.stopPropagation(); handlePlayerDraft(selectedPlayer); }}
                         size="sm"
-                        className="flex-shrink-0 relative z-20 text-xs"
+                        className="flex-shrink-0 relative z-20 bg-primary hover:bg-primary/90 font-bold px-4"
                         disabled={draftedPlayerIds.has(selectedPlayer.id)}
                       >
                         {draftedPlayerIds.has(selectedPlayer.id) ? 'Taken' : 'Draft'}
                       </Button>
                     )}
                   </div>
-                ) : draftHistory.length > 0 ? (
-                  (() => {
-                    const mostRecent = draftHistory[draftHistory.length - 1];
-                    const player = availablePlayers.find(p => p.id === mostRecent.player_id);
-                    const team = teams.find(t => t.id === mostRecent.team_id);
-                    if (!player || !team) return null;
-                    return (
-                      <div className="mt-2 flex items-center gap-2 bg-muted/30 rounded-lg px-3 py-1.5 text-xs md:text-sm">
-                        <span className="text-muted-foreground">Last:</span>
-                        <span className="font-semibold truncate">{player.full_name}</span>
-                        <span className="text-muted-foreground hidden sm:inline">to {team.team_name}</span>
-                        <span className="text-muted-foreground">R{mostRecent.round_number}</span>
-                      </div>
-                    );
-                  })()
-                ) : null}
+                ) : (() => {
+                  // Show next queued player if available (gives the nav bar purpose)
+                  const nextQueuedPlayer = draftQueue
+                    .filter(id => !draftedPlayerIds.has(id))
+                    .map(id => playersById.get(id))
+                    .find(p => p !== undefined);
+                  const mostRecent = draftHistory.length > 0 ? draftHistory[draftHistory.length - 1] : null;
+                  const lastPlayer = mostRecent ? playersById.get(mostRecent.player_id) : null;
+                  const lastTeam = mostRecent ? teamsById.get(mostRecent.team_id) : null;
+
+                  return (
+                    <div className="mt-2 flex items-center gap-3 bg-muted/20 border border-border/40 rounded-lg px-3 py-2.5">
+                      {nextQueuedPlayer ? (
+                        <>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <Star className="h-3.5 w-3.5 fill-fantasy-tertiary text-fantasy-tertiary flex-shrink-0" />
+                              <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide flex-shrink-0">Up Next</span>
+                              <Badge variant="outline" className="text-[10px] flex-shrink-0">{nextQueuedPlayer.position}</Badge>
+                              <span className="font-bold text-sm truncate">{nextQueuedPlayer.full_name}</span>
+                              <span className="text-xs text-muted-foreground flex-shrink-0">{nextQueuedPlayer.team}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-1 text-[10px] md:text-xs text-muted-foreground">
+                              {nextQueuedPlayer.position === 'G' ? (
+                                <span>{nextQueuedPlayer.wins || 0}W • {nextQueuedPlayer.goals_against_average?.toFixed(2) || '0.00'} GAA • {nextQueuedPlayer.save_percentage ? (nextQueuedPlayer.save_percentage * 100).toFixed(1) : '0.0'}%</span>
+                              ) : (
+                                <span>{nextQueuedPlayer.points} PTS • {nextQueuedPlayer.goals}G • {nextQueuedPlayer.assists}A</span>
+                              )}
+                            </div>
+                          </div>
+                          {currentTeam?.owner_id === user?.id && userLeagueState === 'active-user' && (
+                            <Button
+                              onClick={() => { setSelectedPlayer(nextQueuedPlayer); }}
+                              variant="outline"
+                              size="sm"
+                              className="flex-shrink-0 text-xs"
+                            >
+                              Select
+                            </Button>
+                          )}
+                        </>
+                      ) : lastPlayer && lastTeam ? (
+                        <div className="flex items-center gap-2 text-xs md:text-sm w-full">
+                          <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Last Pick</span>
+                          <Badge variant="outline" className="text-[10px]">{lastPlayer.position}</Badge>
+                          <span className="font-semibold truncate">{lastPlayer.full_name}</span>
+                          <span className="text-muted-foreground hidden sm:inline">to {lastTeam.team_name}</span>
+                          <span className="text-muted-foreground ml-auto flex-shrink-0">R{mostRecent!.round_number}</span>
+                        </div>
+                      ) : (
+                        <div className="text-center w-full py-1">
+                          <p className="text-xs text-muted-foreground">Click a player below to select them for drafting</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Queue badges - only show on desktop or if queue has items */}
                 {draftQueue.length > 0 && (

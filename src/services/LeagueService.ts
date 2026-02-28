@@ -1898,10 +1898,15 @@ async joinLeagueByCode(
       MatchupService.clearRosterCache(String(teamId), leagueId);
       // Clear roster page cache to force fresh load when user navigates back
       RosterCacheService.clearCache(String(teamId), leagueId);
-      
-      // NEW: Create daily roster snapshots for current matchup week
-      // If targetDate is set, only save to that specific date (Yahoo-style per-day rosters)
-      await this.createDailyRosterSnapshots(teamId, leagueId, lineupToSave, targetDate);
+
+      // Create daily roster snapshots for current matchup week
+      // ONLY when a specific targetDate is set (Yahoo-style per-day rosters)
+      // When no targetDate is set, the user is editing their "default" lineup in team_lineups,
+      // which the Matchup page reads directly for today/future dates.
+      // This prevents one generic edit from overwriting all per-day customizations.
+      if (targetDate) {
+        await this.createDailyRosterSnapshots(teamId, leagueId, lineupToSave, targetDate);
+      }
     } catch (error) {
       // Fallback to localStorage if Supabase fails (offline mode, errors, etc.)
       try {
@@ -1911,9 +1916,11 @@ async joinLeagueByCode(
         // Still clear cache even if using localStorage fallback
         MatchupService.clearRosterCache(String(teamId), leagueId);
         RosterCacheService.clearCache(String(teamId), leagueId);
-        
-        // Try to create daily snapshots even with localStorage fallback
-        await this.createDailyRosterSnapshots(teamId, leagueId, lineupToSave, targetDate);
+
+        // Only create daily snapshots for specific dates (same guard as primary path)
+        if (targetDate) {
+          await this.createDailyRosterSnapshots(teamId, leagueId, lineupToSave, targetDate);
+        }
       } catch (localError) {
         console.error('Failed to save lineup to both Supabase and localStorage:', localError);
       }

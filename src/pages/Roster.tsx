@@ -575,6 +575,7 @@ const Roster = () => {
           id: p.id,
           name: p.full_name,
           position: p.position,
+          eligible_positions: p.eligible_positions || [p.position],
           number: parseInt(p.jersey_number || '0'),
           starter: false, // Will determine below
           stats: {
