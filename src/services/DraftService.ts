@@ -254,7 +254,7 @@ export const DraftService = {
           .eq('league_id', leagueId);
         
         if (deleteError) {
-          console.warn('Error deleting old draft orders:', deleteError);
+          logger.warn('Error deleting old draft orders:', deleteError);
           // Continue anyway - might be no existing orders
         }
         

@@ -586,29 +586,29 @@ const Standings = () => {
               <Table style={{ visibility: 'visible', opacity: 1 }}>
                 <thead className="bg-muted/30 border-b border-border/50">
                   <tr className="text-left">
-                    <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Rank</th>
-                    <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Team</th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Rank</th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Team</th>
                     {hasMatchups && (
                       <>
-                        <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">
+                        <th className="px-3 sm:px-6 py-3 sm:py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">
                           {isCategories ? 'Cat W-L-T' : 'Record'}
                         </th>
-                        <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Win %</th>
+                        <th className="px-3 sm:px-6 py-3 sm:py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Win %</th>
                       </>
                     )}
-                    <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-right">
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-right">
                       {isRoto ? 'Roto Pts' : isCategories ? 'Total PF' : 'PF'}
                     </th>
                     {hasMatchups && (
-                      <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-right">PA</th>
+                      <th className="px-3 sm:px-6 py-3 sm:py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-right">PA</th>
                     )}
                     {isSeasonPoints && (
-                      <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-right">PPG</th>
+                      <th className="px-3 sm:px-6 py-3 sm:py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-right">PPG</th>
                     )}
                     {hasMatchups && (
                       <>
-                        <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Streak</th>
-                        <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Last 5</th>
+                        <th className="px-3 sm:px-6 py-3 sm:py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Streak</th>
+                        <th className="px-3 sm:px-6 py-3 sm:py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Last 5</th>
                       </>
                     )}
                   </tr>
@@ -616,7 +616,7 @@ const Standings = () => {
                 <tbody className="divide-y divide-border/40" style={{ visibility: 'visible', opacity: 1 }}>
                   {sortedTeams.length === 0 ? (
                     <tr style={{ visibility: 'visible', opacity: 1 }}>
-                      <td colSpan={hasMatchups ? 8 : (isSeasonPoints ? 4 : 3)} className="px-6 py-12 text-center text-muted-foreground" style={{ visibility: 'visible', opacity: 1 }}>
+                      <td colSpan={hasMatchups ? 8 : (isSeasonPoints ? 4 : 3)} className="px-3 sm:px-6 py-12 text-center text-muted-foreground" style={{ visibility: 'visible', opacity: 1 }}>
                         No teams found in this league.
                       </td>
                     </tr>
@@ -632,7 +632,7 @@ const Standings = () => {
                         style={{ visibility: 'visible', opacity: 1 }}
                         onClick={() => navigate(`/team/${team.id}`)}
                       >
-                        <td className="px-6 py-4 font-medium">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 font-medium">
                           <div className="flex items-center gap-2">
                             <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${(hasMatchups && index < leagueFormat.playoffTeams) ? 'bg-primary text-white' : 'text-muted-foreground bg-muted'}`}>
                               {index + 1}
@@ -660,7 +660,7 @@ const Standings = () => {
                             )}
                           </div>
                         </td>
-                        <td className="px-6 py-4" style={{ visibility: 'visible', opacity: 1 }}>
+                        <td className="px-3 sm:px-6 py-3 sm:py-4" style={{ visibility: 'visible', opacity: 1 }}>
                           <div className="flex items-center gap-3" style={{ visibility: 'visible', opacity: 1 }}>
                             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center text-xs font-bold text-muted-foreground border border-white/20 shadow-sm" style={{ visibility: 'visible', opacity: 1 }}>
                               {team.logo}
@@ -676,24 +676,24 @@ const Standings = () => {
                         </td>
                         {hasMatchups && (
                           <>
-                            <td className="px-6 py-4 text-center font-medium" style={{ visibility: 'visible', opacity: 1 }}>
+                            <td className="px-3 sm:px-6 py-3 sm:py-4 text-center font-medium" style={{ visibility: 'visible', opacity: 1 }}>
                               {team.record.wins}-{team.record.losses}{team.record.ties > 0 ? `-${team.record.ties}` : ''}
                             </td>
-                            <td className="px-6 py-4 text-center text-muted-foreground" style={{ visibility: 'visible', opacity: 1 }}>
+                            <td className="px-3 sm:px-6 py-3 sm:py-4 text-center text-muted-foreground" style={{ visibility: 'visible', opacity: 1 }}>
                               {(team.winPercentage ?? 0).toFixed(1)}%
                             </td>
                           </>
                         )}
-                        <td className="px-6 py-4 text-right font-bold tabular-nums" style={{ visibility: 'visible', opacity: 1 }}>
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 text-right font-bold tabular-nums" style={{ visibility: 'visible', opacity: 1 }}>
                           {team.pointsFor.toFixed(1)}
                         </td>
                         {hasMatchups && (
-                          <td className="px-6 py-4 text-right font-medium tabular-nums text-muted-foreground" style={{ visibility: 'visible', opacity: 1 }}>
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-right font-medium tabular-nums text-muted-foreground" style={{ visibility: 'visible', opacity: 1 }}>
                             {team.pointsAgainst.toFixed(1)}
                           </td>
                         )}
                         {isSeasonPoints && (
-                          <td className="px-6 py-4 text-right font-medium tabular-nums text-muted-foreground" style={{ visibility: 'visible', opacity: 1 }}>
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-right font-medium tabular-nums text-muted-foreground" style={{ visibility: 'visible', opacity: 1 }}>
                             {team.pointsFor > 0
                               ? (team.pointsFor / Math.max(1, team.gamesPlayed || (team.record.wins + team.record.losses + team.record.ties) || 1)).toFixed(1)
                               : '0.0'}
@@ -701,7 +701,7 @@ const Standings = () => {
                         )}
                         {hasMatchups && (
                           <>
-                            <td className="px-6 py-4 text-center" style={{ visibility: 'visible', opacity: 1 }}>
+                            <td className="px-3 sm:px-6 py-3 sm:py-4 text-center" style={{ visibility: 'visible', opacity: 1 }}>
                               <span className={`inline-flex px-2.5 py-1 text-[10px] font-bold rounded-full border ${
                                 team.streak.startsWith('W')
                                   ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800'
@@ -712,7 +712,7 @@ const Standings = () => {
                                 {team.streak}
                               </span>
                             </td>
-                            <td className="px-6 py-4 text-center text-muted-foreground font-medium" style={{ visibility: 'visible', opacity: 1 }}>
+                            <td className="px-3 sm:px-6 py-3 sm:py-4 text-center text-muted-foreground font-medium" style={{ visibility: 'visible', opacity: 1 }}>
                               {team.last5.wins}-{team.last5.losses}{team.last5.ties > 0 ? `-${team.last5.ties}` : ''}
                             </td>
                           </>

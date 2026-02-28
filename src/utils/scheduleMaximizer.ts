@@ -2,6 +2,7 @@ import { ScheduleService, NHLGame } from '@/services/ScheduleService';
 import { LeagueService } from '@/services/LeagueService';
 import { Player } from '@/services/PlayerService';
 import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getWeekStartDate, getWeekEndDate } from './weekCalculator';
+import { DEFAULT_TEST_DATE } from '@/utils/seasonConstants';
 
 export interface PlayerWithSchedule extends Player {
   gamesThisWeek: number;
@@ -23,7 +24,7 @@ export async function calculateWeekDates(
 ): Promise<WeekDates> {
   // Test mode controlled via VITE_TEST_MODE environment variable (defaults to false)
   const TEST_MODE = import.meta.env.VITE_TEST_MODE === 'true';
-  const TEST_DATE = import.meta.env.VITE_TEST_DATE || '2025-12-07';
+  const TEST_DATE = import.meta.env.VITE_TEST_DATE || DEFAULT_TEST_DATE;
   
   const getTodayDate = () => {
     if (TEST_MODE) {

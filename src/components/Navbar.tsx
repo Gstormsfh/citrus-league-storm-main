@@ -261,7 +261,7 @@ const Navbar = () => {
           <div className="flex items-center gap-1">
             {user && (
               <button
-                className="p-2.5 rounded-xl text-citrus-forest relative"
+                className="p-3 rounded-xl text-citrus-forest relative"
                 onClick={() => activeLeagueId && navigate(`/matchup/${activeLeagueId}`)}
                 aria-label="Notifications"
               >
@@ -274,7 +274,7 @@ const Navbar = () => {
               </button>
             )}
             <button
-              className="p-2.5 rounded-xl text-citrus-forest"
+              className="p-3 rounded-xl text-citrus-forest"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
               aria-expanded={mobileMenuOpen}
