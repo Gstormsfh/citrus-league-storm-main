@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { TeamCapData, formatCap, formatCapFull, SALARY_CAP_2025_26, MAX_CONTRACTS, MAX_ACTIVE_ROSTER } from '@/types/captracker';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { TrendingUp, TrendingDown, Users, FileText, AlertTriangle, Shield } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { TrendingUp, TrendingDown, Users, FileText, AlertTriangle, Shield, X } from 'lucide-react';
+import { useIsMobile } from '@/components/mobile/AppShell';
 
 interface CapSummaryBarProps {
   data: TeamCapData;
@@ -11,6 +14,8 @@ export default function CapSummaryBar({ data }: CapSummaryBarProps) {
   const capUsedPercent = Math.min((data.projectedCapHit / data.salaryCap) * 100, 100);
   const isOverCap = data.capSpace < 0;
   const isNearCap = data.capSpace >= 0 && data.capSpace < 3_000_000;
+  const isMobile = useIsMobile();
+  const [capPopoverOpen, setCapPopoverOpen] = useState(false);
 
   return (
     <div className="bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden">
@@ -67,10 +72,9 @@ export default function CapSummaryBar({ data }: CapSummaryBarProps) {
         </div>
 
         {/* Visual Cap Bar */}
-        <Tooltip>
-          <TooltipTrigger asChild>
+        {(() => {
+          const barContent = (
             <div className="relative h-6 md:h-8 bg-citrus-cream rounded-full overflow-hidden border-2 border-dashed border-citrus-sage/40 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)] cursor-help">
-              {/* Cap used fill */}
               <div
                 className={cn(
                   "absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out",
@@ -82,11 +86,8 @@ export default function CapSummaryBar({ data }: CapSummaryBarProps) {
                 )}
                 style={{ width: `${capUsedPercent}%` }}
               >
-                {/* Shimmer effect */}
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" />
               </div>
-
-              {/* Dead cap indicator (stacked within the bar) */}
               {data.deadCap > 0 && (
                 <div
                   className="absolute inset-y-0 bg-gray-400/50 border-r-2 border-gray-500/50"
@@ -96,8 +97,6 @@ export default function CapSummaryBar({ data }: CapSummaryBarProps) {
                   }}
                 />
               )}
-
-              {/* Percentage label inside bar */}
               <div className="absolute inset-0 flex items-center justify-center">
                 <span className={cn(
                   "font-varsity text-[10px] md:text-xs font-bold tracking-wider drop-shadow-sm",
@@ -107,37 +106,31 @@ export default function CapSummaryBar({ data }: CapSummaryBarProps) {
                 </span>
               </div>
             </div>
-          </TooltipTrigger>
-          <TooltipContent className="bg-citrus-forest text-citrus-cream p-3 max-w-xs">
+          );
+          const detailContent = (
             <div className="space-y-1 text-xs">
-              <div className="flex justify-between gap-4">
-                <span>Cap Ceiling:</span>
-                <span className="font-varsity">{formatCapFull(data.salaryCap)}</span>
-              </div>
-              <div className="flex justify-between gap-4">
-                <span>Projected Hit:</span>
-                <span className="font-varsity">{formatCapFull(data.projectedCapHit)}</span>
-              </div>
-              {data.deadCap > 0 && (
-                <div className="flex justify-between gap-4">
-                  <span>Dead Cap:</span>
-                  <span className="font-varsity">{formatCapFull(data.deadCap)}</span>
-                </div>
-              )}
-              {data.ltirUsed > 0 && (
-                <div className="flex justify-between gap-4">
-                  <span>LTIR Relief:</span>
-                  <span className="font-varsity">{formatCapFull(data.ltirUsed)}</span>
-                </div>
-              )}
+              {isMobile && <div className="flex justify-end"><button onClick={() => setCapPopoverOpen(false)} className="p-0.5 rounded-full hover:bg-citrus-cream/20"><X className="h-3.5 w-3.5" /></button></div>}
+              <div className="flex justify-between gap-4"><span>Cap Ceiling:</span><span className="font-varsity">{formatCapFull(data.salaryCap)}</span></div>
+              <div className="flex justify-between gap-4"><span>Projected Hit:</span><span className="font-varsity">{formatCapFull(data.projectedCapHit)}</span></div>
+              {data.deadCap > 0 && <div className="flex justify-between gap-4"><span>Dead Cap:</span><span className="font-varsity">{formatCapFull(data.deadCap)}</span></div>}
+              {data.ltirUsed > 0 && <div className="flex justify-between gap-4"><span>LTIR Relief:</span><span className="font-varsity">{formatCapFull(data.ltirUsed)}</span></div>}
               <hr className="border-citrus-cream/20" />
-              <div className="flex justify-between gap-4 font-bold">
-                <span>Remaining Space:</span>
-                <span className="font-varsity">{formatCapFull(data.capSpace)}</span>
-              </div>
+              <div className="flex justify-between gap-4 font-bold"><span>Remaining Space:</span><span className="font-varsity">{formatCapFull(data.capSpace)}</span></div>
             </div>
-          </TooltipContent>
-        </Tooltip>
+          );
+          const contentClass = "bg-citrus-forest text-citrus-cream p-3 max-w-xs !z-[9999]";
+          return isMobile ? (
+            <Popover open={capPopoverOpen} onOpenChange={setCapPopoverOpen}>
+              <PopoverTrigger asChild><button className="touch-manipulation w-full">{barContent}</button></PopoverTrigger>
+              <PopoverContent side="top" align="center" sideOffset={4} className={contentClass} onOpenAutoFocus={(e) => e.preventDefault()}>{detailContent}</PopoverContent>
+            </Popover>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>{barContent}</TooltipTrigger>
+              <TooltipContent className={contentClass}>{detailContent}</TooltipContent>
+            </Tooltip>
+          );
+        })()}
 
         {/* Quick Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 sm:gap-2 md:gap-3 mt-3 sm:mt-4">
