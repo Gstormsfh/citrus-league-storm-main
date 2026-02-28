@@ -4995,8 +4995,8 @@ const Matchup = () => {
                   )}
                   {/* Matchup Viewer Dropdown - Show all matchups for current week */}
                   {userLeagueState === 'active-user' && allWeekMatchups.length > 0 && (
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm font-medium text-muted-foreground">View Matchup:</label>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:gap-2">
+                      <label className="text-xs sm:text-sm font-medium text-muted-foreground">View Matchup:</label>
                       <Select
                         value={selectedMatchupId || currentMatchup?.id || ''}
                         onValueChange={async (value) => {
@@ -5015,7 +5015,7 @@ const Matchup = () => {
                           // The useEffect will pick up the selectedMatchupId change and reload
                         }}
                       >
-                        <SelectTrigger className="w-[280px]">
+                        <SelectTrigger className="w-full sm:w-[280px]">
                           <SelectValue placeholder="Select a matchup" />
                         </SelectTrigger>
                         <SelectContent>

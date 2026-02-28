@@ -276,6 +276,15 @@ const CreateLeague = () => {
       return;
     }
 
+    // Validate roster has at least 1 slot for fantasy leagues
+    if (leagueType === 'fantasy') {
+      const totalSlots = Object.values(rosterSlots).reduce((sum, count) => sum + (count || 0), 0);
+      if (totalSlots < 1) {
+        setError("Roster must have at least 1 position slot");
+        return;
+      }
+    }
+
     if (loading) return;
 
     setLoading(true);
@@ -961,6 +970,8 @@ const CreateLeague = () => {
                                       onChange={(e) => handleStatPointsChange(stat.id, e.target.value)}
                                       disabled={!stat.enabled}
                                       step="0.1"
+                                      min={-10}
+                                      max={20}
                                     />
                                   </div>
                                 </div>

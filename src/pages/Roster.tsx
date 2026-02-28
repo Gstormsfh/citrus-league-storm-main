@@ -2384,7 +2384,11 @@ const Roster = () => {
         if (occupantId && occupantSourceInfo) {
             // Find the original object reference from closure or re-find in 'allPlayers' isn't quite right because we need the object.
             // But we removed it from newStarters/Bench/IR. We can find it in 'allPlayers' which is unchanged.
-            const occupant = allPlayers.find(x => String(x.id) === String(occupantId))!;
+            const occupant = allPlayers.find(x => String(x.id) === String(occupantId));
+            if (!occupant) {
+              console.error('[Roster] Swap failed: occupant not found in allPlayers', occupantId);
+              return prev;
+            }
             const p2 = { ...occupant };
             
             // Determine where to put the swapped player
@@ -2534,6 +2538,14 @@ const Roster = () => {
     if (lockedPlayerIds.has(String(player.id))) {
       toast({ title: "Player Locked", description: `${player.name}'s game has started. Players cannot be moved once their game begins.`, variant: "destructive" });
       return;
+    }
+    // Block edits on past dates
+    if (selectedDate) {
+      const todayStr = getTodayMST();
+      if (selectedDate < todayStr) {
+        toast({ title: "Cannot Edit Past Dates", description: "Rosters for past dates are frozen and cannot be changed.", variant: "destructive" });
+        return;
+      }
     }
 
     // If no player selected, select this one

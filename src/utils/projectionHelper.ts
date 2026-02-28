@@ -1,4 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
+import { CURRENT_SEASON } from '@/utils/seasonConstants';
+import { logger } from '@/utils/logger';
 
 /**
  * Get weekly projected fantasy points for players
@@ -29,10 +31,10 @@ export async function getWeeklyProjections(
       .select('player_id, total_projected_points, projection_date')
       .in('player_id', playerIds)
       .in('projection_date', dates)
-      .eq('season', 2025);
+      .eq('season', CURRENT_SEASON);
 
     if (error) {
-      console.error('Error fetching weekly projections:', error);
+      logger.error('Error fetching weekly projections:', error);
       return new Map();
     }
 
@@ -48,7 +50,7 @@ export async function getWeeklyProjections(
 
     return weeklyTotals;
   } catch (error) {
-    console.error('Error in getWeeklyProjections:', error);
+    logger.error('Error in getWeeklyProjections:', error);
     return new Map();
   }
 }
@@ -108,7 +110,7 @@ export async function getLeagueAverageProjections(
     const { data: players, error: playersError } = await supabase
       .from('player_directory')
       .select('player_id, position_code')
-      .eq('season', 2025)
+      .eq('season', CURRENT_SEASON)
       .in('player_id', Array.from(allPlayerIds));
 
     if (playersError || !players) {
@@ -142,7 +144,7 @@ export async function getLeagueAverageProjections(
 
     return averages;
   } catch (error) {
-    console.error('Error in getLeagueAverageProjections:', error);
+    logger.error('Error in getLeagueAverageProjections:', error);
     return new Map();
   }
 }

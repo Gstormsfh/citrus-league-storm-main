@@ -2,6 +2,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { CitrusPuckPlayerData, AggregatedPlayerData, Situation } from "@/types/citruspuck";
+import { CURRENT_SEASON } from "@/utils/seasonConstants";
 
 type PlayerSeasonStatsRow = {
   season: number;
@@ -427,30 +428,28 @@ export const CitrusPuckService = {
     currentWeek: CitrusPuckPlayerData;
     restOfSeason: CitrusPuckPlayerData;
   }> {
-    const [data2024, data2025] = await Promise.all([
-      this.getAggregatedPlayerData(playerId, 2024, position),
-      this.getAggregatedPlayerData(playerId, 2025, position)
+    const [dataPrior, dataCurrent] = await Promise.all([
+      this.getAggregatedPlayerData(playerId, CURRENT_SEASON - 1, position),
+      this.getAggregatedPlayerData(playerId, CURRENT_SEASON, position)
     ]);
     
-    // Fallback logic: if no 2025 data, use 2024 data as baseline (maybe injured/not played yet)
-    // Or return empty/zeros.
-    if (!data2025) {
-      if (data2024) {
-           // Fallback to 2024 data if 2025 is missing (e.g. start of season or injured)
-           // Project based on 2024 pace
-           const currentWeek = this.projectCurrentWeek(data2024);
-           const restOfSeason = this.projectRestOfSeason(null, data2024); // Treat 2024 as current for fallback
+    // Fallback logic: if no current season data, use prior season as baseline
+    if (!dataCurrent) {
+      if (dataPrior) {
+           // Fallback to prior season data if current is missing (e.g. start of season or injured)
+           const currentWeek = this.projectCurrentWeek(dataPrior);
+           const restOfSeason = this.projectRestOfSeason(null, dataPrior);
            return { currentWeek, restOfSeason };
       }
       // Return zero stats
-      return { 
-          currentWeek: {} as CitrusPuckPlayerData, 
-          restOfSeason: {} as CitrusPuckPlayerData 
+      return {
+          currentWeek: {} as CitrusPuckPlayerData,
+          restOfSeason: {} as CitrusPuckPlayerData
       };
     }
-    
-    const currentWeek = this.projectCurrentWeek(data2025);
-    const restOfSeason = this.projectRestOfSeason(data2024, data2025);
+
+    const currentWeek = this.projectCurrentWeek(dataCurrent);
+    const restOfSeason = this.projectRestOfSeason(dataPrior, dataCurrent);
     
     return { currentWeek, restOfSeason };
   },
@@ -473,32 +472,30 @@ export const CitrusPuckService = {
   },
 
   /**
-   * Project rest of season based on 2024 vs 2025 comparison
+   * Project rest of season based on prior vs current season comparison
    */
   projectRestOfSeason(
-    data2024: AggregatedPlayerData | null,
-    data2025: AggregatedPlayerData
+    dataPrior: AggregatedPlayerData | null,
+    dataCurrent: AggregatedPlayerData
   ): CitrusPuckPlayerData {
-    if (!data2025 || !data2025.allSituation) {
+    if (!dataCurrent || !dataCurrent.allSituation) {
       return {} as CitrusPuckPlayerData;
     }
-    const all2025 = data2025.allSituation;
-    const gamesPlayed = all2025.games_played || 0;
+    const allCurrent = dataCurrent.allSituation;
+    const gamesPlayed = allCurrent.games_played || 0;
     const gamesInSeason = 82;
     const gamesRemaining = Math.max(0, gamesInSeason - gamesPlayed);
-    
-    // If no 2024 data, or if 2025 games played is 0 (injured/not started),
-    // we need a baseline. 
-    if (gamesPlayed === 0 && data2024 && data2024.allSituation) {
-        // Player hasn't played this year, project based on last year's pace for remaining games
-        const all2024 = data2024.allSituation;
-        const gp2024 = all2024.games_played || 1;
-        const scaleFactor = gamesRemaining / gp2024;
-        return this.scaleStats(all2024, scaleFactor);
+
+    // If current season games played is 0 (injured/not started), use prior season as baseline
+    if (gamesPlayed === 0 && dataPrior && dataPrior.allSituation) {
+        const allPrior = dataPrior.allSituation;
+        const gpPrior = allPrior.games_played || 1;
+        const scaleFactor = gamesRemaining / gpPrior;
+        return this.scaleStats(allPrior, scaleFactor);
     }
 
     const scaleFactor = gamesPlayed > 0 ? (gamesRemaining / gamesPlayed) : 0;
-    return this.scaleStats(all2025, scaleFactor);
+    return this.scaleStats(allCurrent, scaleFactor);
   },
 
   scaleStats(data: CitrusPuckPlayerData, factor: number): CitrusPuckPlayerData {

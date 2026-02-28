@@ -102,7 +102,7 @@ export const DraftBoard = ({ teams, draftHistory, currentPick, currentRound, tot
         </div>
       </div>
 
-      <div className="overflow-x-auto max-h-[calc(100vh-250px)] overflow-y-auto scrollbar-styled">
+      <div className="overflow-x-auto max-h-[calc(100vh-250px)] overflow-y-auto scrollbar-styled -webkit-overflow-scrolling-touch">
         <div className="inline-block min-w-full">
           {/* Header - All teams in one row */}
           <div 
