@@ -97,6 +97,12 @@ def fetch_player_gamelog(player_id: int, season: str = SEASON_STRING) -> Optiona
         else:
             print(f"  [WARN] Game-log HTTP {resp.status_code} for player {player_id}")
             return None
+    except requests.exceptions.HTTPError as e:
+        # citrus_request raises HTTPError for non-retryable status codes (including 404)
+        if e.response is not None and e.response.status_code == 404:
+            return _SENTINEL_NOT_FOUND
+        print(f"  [ERROR] Game-log HTTP error for player {player_id}: {e}")
+        return None
     except Exception as e:
         print(f"  [ERROR] Game-log request failed for player {player_id}: {e}")
         return None
