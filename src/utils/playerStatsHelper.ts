@@ -96,7 +96,7 @@ export async function getPlayerWithSeasonStats(
 
     return hockeyPlayer;
   } catch (error) {
-    console.error(`[playerStatsHelper] Error fetching season stats for player ${playerId}:`, error);
+    logger.error(`[playerStatsHelper] Error fetching season stats for player ${playerId}:`, error);
     return null;
   }
 }
