@@ -60,7 +60,7 @@ def get_players_who_played(db: SupabaseRest, game_date: str) -> List[Dict]:
         batch = db.select(
             "player_game_stats",
             select="player_id,game_id,nhl_ppp,nhl_shp",
-            filters=[("game_date", "eq", game_date)],
+            filters=[("game_date", "eq", game_date), ("is_goalie", "eq", False)],
             limit=limit,
             offset=offset
         )
