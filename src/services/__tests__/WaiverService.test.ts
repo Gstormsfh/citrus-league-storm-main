@@ -272,7 +272,7 @@ describe('WaiverService.checkTransactionLimits', () => {
     // Weekly: under limit — need gte to return count < limit
     // Season: at limit — need eq chain to resolve with count = 50
     // Because the same table is queried twice, we track call order.
-    let callNum = 0;
+    const callNum = 0;
     const txChain = createChainMock();
     // First await (weekly): ends at .gte() → resolves with low count
     txChain.gte.mockResolvedValue({ data: null, error: null, count: 2 });
@@ -284,7 +284,7 @@ describe('WaiverService.checkTransactionLimits', () => {
       return txChain;
     });
     // For the season path, the chain ends at the 3rd eq without gte
-    let seasonEqCount = 0;
+    const seasonEqCount = 0;
     const origEq = txChain.eq;
     txChain.eq.mockImplementation(() => {
       // After the weekly path is done (gte was called), reset for season path

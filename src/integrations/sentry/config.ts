@@ -13,7 +13,6 @@
  * Sentry Dashboard: https://sentry.io (create project for "citrus-fantasy-sports")
  */
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _sentry: any = null;
 let sentryInitialized = false;
 
@@ -56,7 +55,6 @@ export async function initSentry(): Promise<void> {
       replaysSessionSampleRate: 0.01,
       replaysOnErrorSampleRate: 1.0,
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       beforeSend(event: any) {
         const message = event.exception?.values?.[0]?.value || '';
         if (
@@ -70,7 +68,6 @@ export async function initSentry(): Promise<void> {
         return event;
       },
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       beforeBreadcrumb(breadcrumb: any) {
         if (breadcrumb.category === 'fetch' || breadcrumb.category === 'xhr') {
           const url = breadcrumb.data?.url || '';

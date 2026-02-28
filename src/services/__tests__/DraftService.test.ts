@@ -859,7 +859,7 @@ describe('DraftService.resetDraft', () => {
       if (table === 'teams') {
         // The chain is awaited directly (no terminal), so make it thenable
         chain.eq.mockImplementation(() => {
-          const thenableChain = { ...chain, then: (resolve: Function) => resolve({ data: [{ id: 'team-1' }], error: null }) };
+          const thenableChain = { ...chain, then: (resolve: (value: unknown) => void) => resolve({ data: [{ id: 'team-1' }], error: null }) };
           return thenableChain;
         });
       }
@@ -912,7 +912,7 @@ describe('DraftService.undoLastPick', () => {
           // Second call: soft-delete via .update({ deleted_at: ... }).eq('id', ...)
           // .update() returns chain, .eq() is awaited directly
           chain.update.mockReturnValue(chain);
-          chain.eq.mockReturnValue({ then: (resolve: Function) => resolve({ data: null, error: null }) });
+          chain.eq.mockReturnValue({ then: (resolve: (value: unknown) => void) => resolve({ data: null, error: null }) });
         }
       }
       return chain;
@@ -982,7 +982,7 @@ describe('DraftService.getDraftPicks', () => {
       chain.order.mockReturnValue(chain);
       // When the chain is awaited after the extra .eq(), resolve with data
       chain.eq.mockImplementation(() => {
-        return { ...chain, then: (resolve: Function) => resolve({ data: mockPicks, error: null }) };
+        return { ...chain, then: (resolve: (value: unknown) => void) => resolve({ data: mockPicks, error: null }) };
       });
       return chain;
     });
