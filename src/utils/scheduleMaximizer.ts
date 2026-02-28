@@ -3,6 +3,7 @@ import { LeagueService } from '@/services/LeagueService';
 import { Player } from '@/services/PlayerService';
 import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getWeekStartDate, getWeekEndDate } from './weekCalculator';
 import { DEFAULT_TEST_DATE } from '@/utils/seasonConstants';
+import { logger } from '@/utils/logger';
 
 export interface PlayerWithSchedule extends Player {
   gamesThisWeek: number;
@@ -64,7 +65,7 @@ export async function calculateWeekDates(
       }
     } catch (error) {
       // Silently fall back to calendar week if league fetch fails
-      console.warn('Could not fetch league data for matchup week calculation, using calendar week:', error);
+      logger.warn('Could not fetch league data for matchup week calculation, using calendar week:', error);
     }
   }
 
@@ -87,13 +88,13 @@ export async function fetchGamesForTeams(
     ScheduleService.getGamesForTeamInWeek(team, weekStart, weekEnd)
       .then(({ games, error }) => {
         if (error) {
-          console.warn(`Error fetching games for ${team}:`, error);
+          logger.warn(`Error fetching games for ${team}:`, error);
           return { team, games: [] };
         }
         return { team, games: games || [] };
       })
       .catch((error) => {
-        console.warn(`Exception fetching games for ${team}:`, error);
+        logger.warn(`Exception fetching games for ${team}:`, error);
         return { team, games: [] };
       })
   );
@@ -174,7 +175,7 @@ export async function calculateScheduleMaximizers(
 
     return maximizers;
   } catch (error) {
-    console.error('Error calculating schedule maximizers:', error);
+    logger.error('Error calculating schedule maximizers:', error);
     return [];
   }
 }
@@ -200,7 +201,7 @@ export async function getGamesPerDay(
 
     return gamesPerDay;
   } catch (error) {
-    console.error('Error getting games per day:', error);
+    logger.error('Error getting games per day:', error);
     return new Map();
   }
 }
@@ -231,7 +232,7 @@ export async function getRosterGamesPerDay(
 
     return rosterGamesPerDay;
   } catch (error) {
-    console.error('Error getting roster games per day:', error);
+    logger.error('Error getting roster games per day:', error);
     return new Map();
   }
 }

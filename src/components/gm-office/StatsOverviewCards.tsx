@@ -9,6 +9,7 @@ import { MatchupService } from '@/services/MatchupService';
 import { supabase } from '@/integrations/supabase/client';
 import { Trophy, TrendingUp, Shield } from 'lucide-react';
 import { CitrusSparkle, CitrusBurst, CitrusLeaf } from '@/components/icons/CitrusIcons';
+import { logger } from '@/utils/logger';
 
 export const StatsOverviewCards = () => {
   const { user } = useAuth();
@@ -65,7 +66,7 @@ export const StatsOverviewCards = () => {
           setStats(prev => ({ ...prev, loading: false }));
         }
       } catch (error) {
-        console.error('Error fetching stats:', error);
+        logger.error('Error fetching stats:', error);
         setStats(prev => ({ ...prev, loading: false }));
       }
     };

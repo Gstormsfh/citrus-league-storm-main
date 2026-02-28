@@ -20,6 +20,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
+import { logger } from '@/utils/logger';
 
 const WaiverWire = () => {
   const { user } = useAuth();
@@ -182,19 +183,19 @@ const WaiverWire = () => {
               if (newMyPrio && newMyPrio.priority > 0 && newMyPrio.priority <= actualTeamCount) {
                 setMyPriority(newMyPrio.priority);
               } else {
-                console.warn('Created priority but validation failed:', newMyPrio, 'actualTeamCount:', actualTeamCount);
+                logger.warn('Created priority but validation failed:', newMyPrio, 'actualTeamCount:', actualTeamCount);
                 setMyPriority(result.priority); // Use the priority from RPC result
               }
             } else {
-              console.error('RPC returned error:', result.error_message);
+              logger.error('RPC returned error:', result.error_message);
               setMyPriority(null);
             }
           } else {
-            console.error('Error calling create_waiver_priority_for_team:', rpcError);
+            logger.error('Error calling create_waiver_priority_for_team:', rpcError);
             setMyPriority(null);
           }
         } catch (error) {
-          console.error('Error creating waiver priority:', error);
+          logger.error('Error creating waiver priority:', error);
           setMyPriority(null);
         }
       } else {
@@ -219,7 +220,7 @@ const WaiverWire = () => {
       }
 
     } catch (error) {
-      console.error('Error loading waiver data:', error);
+      logger.error('Error loading waiver data:', error);
     } finally {
       setLoading(false);
     }
@@ -237,7 +238,7 @@ const WaiverWire = () => {
       );
       setAvailablePlayers(players);
     } catch (error) {
-      console.error('Error searching players:', error);
+      logger.error('Error searching players:', error);
     } finally {
       setSearchLoading(false);
     }
@@ -263,7 +264,7 @@ const WaiverWire = () => {
         return;
       }
     } catch (error) {
-      console.error("[WaiverWire] Error checking draft status:", error);
+      logger.error("[WaiverWire] Error checking draft status:", error);
       toast({
         title: "Error",
         description: "Could not verify draft status.",

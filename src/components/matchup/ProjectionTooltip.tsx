@@ -60,9 +60,9 @@ export const ProjectionTooltip = ({ projection }: ProjectionTooltipProps) => {
               e.stopPropagation();
               setOpen(false);
             }}
-            className="text-white hover:text-citrus-cream transition-colors"
+            className="min-w-[44px] min-h-[44px] -m-2 p-2.5 rounded-full flex items-center justify-center text-white hover:text-citrus-cream hover:bg-white/10 transition-colors touch-manipulation"
           >
-            <X className="h-4 w-4" />
+            <X className="h-5 w-5" />
           </button>
         )}
       </div>
@@ -92,14 +92,14 @@ export const ProjectionTooltip = ({ projection }: ProjectionTooltipProps) => {
     return (
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <button 
-            className="w-5 h-5 rounded-lg bg-citrus-sage border-2 border-citrus-forest shadow-patch flex items-center justify-center hover:scale-110 transition-all touch-manipulation"
+          <button
+            className="w-11 h-11 rounded-lg bg-citrus-sage border-2 border-citrus-forest shadow-patch flex items-center justify-center hover:scale-110 transition-all touch-manipulation"
             onClick={(e) => {
               e.stopPropagation();
               // Don't prevent default - let Popover handle the click
             }}
           >
-            <span className="text-[10px] font-varsity font-black text-citrus-forest">i</span>
+            <span className="text-xs font-varsity font-black text-citrus-forest">i</span>
           </button>
         </PopoverTrigger>
         <PopoverContent 
@@ -119,15 +119,15 @@ export const ProjectionTooltip = ({ projection }: ProjectionTooltipProps) => {
   return (
     <Tooltip open={open} onOpenChange={setOpen}>
       <TooltipTrigger asChild>
-        <button 
-          className="w-5 h-5 rounded-lg bg-citrus-sage border-2 border-citrus-forest shadow-patch flex items-center justify-center hover:scale-110 transition-all"
+        <button
+          className="w-11 h-11 rounded-lg bg-citrus-sage border-2 border-citrus-forest shadow-patch flex items-center justify-center hover:scale-110 transition-all"
           onClick={(e) => {
             e.stopPropagation();
             e.preventDefault();
             setOpen(!open);
           }}
         >
-          <span className="text-[10px] font-varsity font-black text-citrus-forest">i</span>
+          <span className="text-xs font-varsity font-black text-citrus-forest">i</span>
         </button>
       </TooltipTrigger>
       <TooltipContent 

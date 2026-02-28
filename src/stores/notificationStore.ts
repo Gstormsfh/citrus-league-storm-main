@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { NotificationService, Notification } from '@/services/NotificationService';
+import { logger } from '@/utils/logger';
 
 interface NotificationState {
   // State maps: leagueId -> data
@@ -80,11 +81,11 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
       // Update unread count
       await get().updateUnreadCount(leagueId, userId);
-    } catch (error: any) {
-      console.error('[NotificationStore] Error loading notifications:', error);
+    } catch (error: unknown) {
+      logger.error('[NotificationStore] Error loading notifications:', error);
       set((state) => {
         const newErrors = new Map(state.errors);
-        newErrors.set(leagueId, error?.message || 'Failed to load notifications');
+        newErrors.set(leagueId, error instanceof Error ? error.message : 'Failed to load notifications');
         const newLoading = new Map(state.loading);
         newLoading.set(leagueId, false);
         return { errors: newErrors, loading: newLoading };
@@ -98,7 +99,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       const { error } = await NotificationService.markAsRead(notificationId, userId);
       
       if (error) {
-        console.error('[NotificationStore] Error marking notification as read:', error);
+        logger.error('[NotificationStore] Error marking notification as read:', error);
         return;
       }
 
@@ -132,7 +133,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         return { notifications: newNotifications };
       });
     } catch (error) {
-      console.error('[NotificationStore] Unexpected error in markAsRead:', error);
+      logger.error('[NotificationStore] Unexpected error in markAsRead:', error);
     }
   },
 
@@ -142,7 +143,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       const { data: count, error } = await NotificationService.markAllAsRead(leagueId, userId);
       
       if (error) {
-        console.error('[NotificationStore] Error marking all as read:', error);
+        logger.error('[NotificationStore] Error marking all as read:', error);
         return;
       }
 
@@ -163,7 +164,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         return { notifications: newNotifications, unreadCounts: newUnreadCounts };
       });
     } catch (error) {
-      console.error('[NotificationStore] Unexpected error in markAllAsRead:', error);
+      logger.error('[NotificationStore] Unexpected error in markAllAsRead:', error);
     }
   },
 
@@ -173,7 +174,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       const { data: count, error } = await NotificationService.getUnreadCount(leagueId, userId);
       
       if (error) {
-        console.error('[NotificationStore] Error updating unread count:', error);
+        logger.error('[NotificationStore] Error updating unread count:', error);
         return;
       }
 
@@ -183,7 +184,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         return { unreadCounts: newUnreadCounts };
       });
     } catch (error) {
-      console.error('[NotificationStore] Unexpected error in updateUnreadCount:', error);
+      logger.error('[NotificationStore] Unexpected error in updateUnreadCount:', error);
     }
   },
 

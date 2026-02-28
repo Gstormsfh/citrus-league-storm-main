@@ -13,6 +13,7 @@ import { useState, useEffect, useRef } from 'react';
 import { CitrusSparkle } from '@/components/icons/CitrusIcons';
 import { getTodayMST } from '@/utils/timezoneUtils';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/utils/logger';
 
 // ─── Types for week projections ─────────────────────────────────────
 interface GameProjection {
@@ -22,7 +23,7 @@ interface GameProjection {
   opponent: string; // e.g. "vs BOS" or "@ NYR"
   gameTime?: string;
   projectedPoints: number;
-  projection: any; // Full projection object (skater or goalie)
+  projection: Record<string, unknown>; // Full projection object (skater or goalie)
   isGoalie: boolean;
   isPast: boolean;
   isToday: boolean;
@@ -30,7 +31,7 @@ interface GameProjection {
 }
 
 /** Compute a meaningful confidence score from projection data + temporal distance */
-function computeConfidence(projection: any, gameDate: string, todayStr: string): number {
+function computeConfidence(projection: Record<string, unknown>, gameDate: string, todayStr: string): number {
   if (!projection) return 0;
 
   // Base confidence from sample size (games played proxy: shrinkage_weight)
@@ -225,7 +226,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
         setWeekProjections(projections);
         setWeekTotalProjected(total);
       } catch (error) {
-        console.error('[PlayerStatsModal] Error fetching projections:', error);
+        logger.error('[PlayerStatsModal] Error fetching projections:', error);
       } finally {
         setWeekProjectionsLoading(false);
       }
@@ -273,8 +274,9 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
       } else {
         toast({ title: "Error", description: error?.message || "Failed to drop player.", variant: "destructive" });
       }
-    } catch (error: any) {
-      toast({ title: "Error", description: error?.message || "Failed to drop player.", variant: "destructive" });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to drop player.";
+      toast({ title: "Error", description: message, variant: "destructive" });
     } finally {
       setIsDropping(false);
     }

@@ -14,6 +14,7 @@ import { NHLGame } from '@/services/ScheduleService';
 import { Loader2, CheckCircle, XCircle, Target, ChevronLeft, ChevronRight, Lock } from 'lucide-react';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import LoadingScreen from '@/components/LoadingScreen';
+import { logger } from '@/utils/logger';
 
 const PoolPickem = () => {
   const { user } = useAuth();
@@ -55,7 +56,7 @@ const PoolPickem = () => {
         const standingsData = await PoolService.getPickemStandings(activeLeagueId);
         setStandings(standingsData);
       } catch (err) {
-        console.error('[PoolPickem] Error loading data:', err);
+        logger.error('[PoolPickem] Error loading data:', err);
       } finally {
         setLoading(false);
       }

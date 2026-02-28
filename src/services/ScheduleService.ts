@@ -4,6 +4,7 @@ import { getTodayMST, getTodayMSTDate } from '@/utils/timezoneUtils';
 import { COLUMNS } from '@/utils/queryColumns';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { DEFAULT_TEST_DATE } from '@/utils/seasonConstants';
+import { logger } from '@/utils/logger';
 
 // Test mode: Controlled via VITE_TEST_MODE environment variable
 // Set VITE_TEST_MODE=true in .env to use test date for development
@@ -84,14 +85,14 @@ export const ScheduleService = {
       if (error) {
         // If table doesn't exist, return empty array (schedule not loaded yet)
         if (error.message?.includes('does not exist') || error.message?.includes('relation')) {
-          console.warn('nhl_games table does not exist yet. Run the migration and fetch script.');
+          logger.warn('nhl_games table does not exist yet. Run the migration and fetch script.');
           return { games: [], error: null };
         }
         throw error;
       }
       return { games: data || [], error: null };
     } catch (error) {
-      console.error('Error fetching games for date range:', error);
+      logger.error('Error fetching games for date range:', error);
       return { games: [], error: error as PostgrestError };
     }
   },
@@ -149,17 +150,17 @@ export const ScheduleService = {
         data = result.data;
         error = result.error;
       } catch (timeoutError: unknown) {
-        console.error('[ScheduleService.getGamesForTeams] Query timeout:', timeoutError);
+        logger.error('[ScheduleService.getGamesForTeams] Query timeout:', timeoutError);
         error = timeoutError as PostgrestError;
       }
       
       if (error) {
         if (error.message?.includes('does not exist') || error.message?.includes('relation')) {
-          console.warn('nhl_games table does not exist yet. Run the migration and fetch script.');
+          logger.warn('nhl_games table does not exist yet. Run the migration and fetch script.');
           return { gamesByTeam: new Map(), error: null };
         }
         if (error.message?.includes('timeout')) {
-          console.error('[ScheduleService.getGamesForTeams] Query timed out after 10s');
+          logger.error('[ScheduleService.getGamesForTeams] Query timed out after 10s');
           return { gamesByTeam: new Map(), error };
         }
         throw error;
@@ -186,7 +187,7 @@ export const ScheduleService = {
 
       return { gamesByTeam, error: null };
     } catch (error) {
-      console.error('Error fetching games for teams:', error);
+      logger.error('Error fetching games for teams:', error);
       return { gamesByTeam: new Map(), error: error as PostgrestError };
     }
   },
@@ -226,14 +227,14 @@ export const ScheduleService = {
       if (error) {
         // If table doesn't exist, return empty array
         if (error.message?.includes('does not exist') || error.message?.includes('relation')) {
-          console.warn('nhl_games table does not exist yet. Run the migration and fetch script.');
+          logger.warn('nhl_games table does not exist yet. Run the migration and fetch script.');
           return { games: [], error: null };
         }
         throw error;
       }
       return { games: data || [], error: null };
     } catch (error) {
-      console.error('Error fetching games for team:', error);
+      logger.error('Error fetching games for team:', error);
       return { games: [], error: error as PostgrestError };
     }
   },
@@ -265,7 +266,7 @@ export const ScheduleService = {
       }
       return { game: data || null, error: null };
     } catch (error) {
-      console.error('Error fetching next game:', error);
+      logger.error('Error fetching next game:', error);
       return { game: null, error: error as PostgrestError };
     }
   },
@@ -332,7 +333,7 @@ export const ScheduleService = {
           });
         }
       } catch (e) {
-        console.warn('Error parsing game time:', e);
+        logger.warn('Error parsing game time:', e);
       }
     }
 
@@ -428,7 +429,7 @@ export const ScheduleService = {
         if (error.message?.includes('does not exist') || error.message?.includes('relation')) {
           return new Map(teamAbbrevs.map(team => [team, false]));
         }
-        console.error('Error checking games on date batch:', error);
+        logger.error('Error checking games on date batch:', error);
         return new Map(teamAbbrevs.map(team => [team, false]));
       }
 
@@ -442,7 +443,7 @@ export const ScheduleService = {
       // Return map
       return new Map(teamAbbrevs.map(team => [team, teamsWithGames.has(team)]));
     } catch (error) {
-      console.error('Error checking games on date batch:', error);
+      logger.error('Error checking games on date batch:', error);
       return new Map(teamAbbrevs.map(team => [team, false]));
     }
   },
@@ -473,7 +474,7 @@ export const ScheduleService = {
         if (error.message?.includes('does not exist') || error.message?.includes('relation')) {
           return new Map(teamAbbrevs.map(team => [team, null]));
         }
-        console.error('Error fetching games for date batch:', error);
+        logger.error('Error fetching games for date batch:', error);
         return new Map(teamAbbrevs.map(team => [team, null]));
       }
 
@@ -488,7 +489,7 @@ export const ScheduleService = {
 
       return gamesMap;
     } catch (error) {
-      console.error('Error fetching games for date batch:', error);
+      logger.error('Error fetching games for date batch:', error);
       return new Map(teamAbbrevs.map(team => [team, null]));
     }
   },
@@ -521,7 +522,7 @@ export const ScheduleService = {
         if (error.message?.includes('does not exist') || error.message?.includes('relation')) {
           return new Map(teamAbbrevs.map(team => [team, null]));
         }
-        console.error('Error fetching next games batch:', error);
+        logger.error('Error fetching next games batch:', error);
         return new Map(teamAbbrevs.map(team => [team, null]));
       }
 
@@ -536,7 +537,7 @@ export const ScheduleService = {
 
       return nextGames;
     } catch (error) {
-      console.error('Error fetching next games batch:', error);
+      logger.error('Error fetching next games batch:', error);
       return new Map(teamAbbrevs.map(team => [team, null]));
     }
   },
@@ -560,16 +561,16 @@ export const ScheduleService = {
       if (error) {
         // If table doesn't exist, return false
         if (error.message?.includes('does not exist') || error.message?.includes('relation')) {
-          console.warn('nhl_games table does not exist yet. Run the migration and fetch script.');
+          logger.warn('nhl_games table does not exist yet. Run the migration and fetch script.');
           return false;
         }
-        console.error('Error checking if team has game today:', error);
+        logger.error('Error checking if team has game today:', error);
         return false;
       }
 
       return (games || []).length > 0;
     } catch (error) {
-      console.error('Error checking if team has game today:', error);
+      logger.error('Error checking if team has game today:', error);
       return false;
     }
   },
@@ -653,7 +654,7 @@ export const ScheduleService = {
       if (game.status === 'final') return 'Final';
       return 'Yet to Play';
     } catch (error) {
-      console.error('Error getting player game status:', error);
+      logger.error('Error getting player game status:', error);
       return 'Yet to Play';
     }
   }

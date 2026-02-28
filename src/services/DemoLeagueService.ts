@@ -53,7 +53,7 @@ export const DemoLeagueService = {
    */
   async forceReinitialize(): Promise<{ success: boolean; error: PostgrestError | Error | null }> {
     try {
-      console.log('[DemoLeagueService] FORCE REINITIALIZING demo league...');
+      logger.log('[DemoLeagueService] FORCE REINITIALIZING demo league...');
       
       // Delete existing draft picks
       const { error: deletePicksError } = await supabase
@@ -62,7 +62,7 @@ export const DemoLeagueService = {
         .eq('league_id', DEMO_LEAGUE_ID);
       
       if (deletePicksError) {
-        console.warn('[DemoLeagueService] Error deleting draft picks:', deletePicksError);
+        logger.warn('[DemoLeagueService] Error deleting draft picks:', deletePicksError);
       }
       
       // Delete existing lineups
@@ -72,7 +72,7 @@ export const DemoLeagueService = {
         .eq('league_id', DEMO_LEAGUE_ID);
       
       if (deleteLineupsError) {
-        console.warn('[DemoLeagueService] Error deleting lineups:', deleteLineupsError);
+        logger.warn('[DemoLeagueService] Error deleting lineups:', deleteLineupsError);
       }
       
       // Delete existing teams
@@ -82,7 +82,7 @@ export const DemoLeagueService = {
         .eq('league_id', DEMO_LEAGUE_ID);
       
       if (deleteTeamsError) {
-        console.warn('[DemoLeagueService] Error deleting teams:', deleteTeamsError);
+        logger.warn('[DemoLeagueService] Error deleting teams:', deleteTeamsError);
       }
       
       // Delete league
@@ -92,15 +92,15 @@ export const DemoLeagueService = {
         .eq('id', DEMO_LEAGUE_ID);
       
       if (deleteLeagueError) {
-        console.warn('[DemoLeagueService] Error deleting league:', deleteLeagueError);
+        logger.warn('[DemoLeagueService] Error deleting league:', deleteLeagueError);
       }
       
-      console.log('[DemoLeagueService] Deleted existing demo league, now reinitializing...');
+      logger.log('[DemoLeagueService] Deleted existing demo league, now reinitializing...');
       
       // Reinitialize
       return await this.initializeDemoLeague();
     } catch (error) {
-      console.error('[DemoLeagueService] Error in forceReinitialize:', error);
+      logger.error('[DemoLeagueService] Error in forceReinitialize:', error);
       return { success: false, error: error as PostgrestError | Error };
     }
   },
@@ -117,13 +117,13 @@ export const DemoLeagueService = {
         .maybeSingle();
       
       if (error && error.code !== 'PGRST116') { // PGRST116 = not found
-        console.error('[DemoLeagueService] Error checking demo league:', error);
+        logger.error('[DemoLeagueService] Error checking demo league:', error);
         return false;
       }
       
       return !!data;
     } catch (error) {
-      console.error('[DemoLeagueService] Error checking demo league:', error);
+      logger.error('[DemoLeagueService] Error checking demo league:', error);
       return false;
     }
   },
@@ -142,12 +142,12 @@ export const DemoLeagueService = {
       try {
         const { data: { user }, error: authError } = await supabase.auth.getUser();
         if (authError || !user) {
-          console.log('[DemoLeagueService] Guest user detected - cannot initialize demo league (requires authentication)');
+          logger.log('[DemoLeagueService] Guest user detected - cannot initialize demo league (requires authentication)');
           return { success: false, error: new Error('Guest users cannot initialize demo league - use static fallback instead') };
         }
-        console.log('[DemoLeagueService] User authenticated, proceeding with initialization');
+        logger.log('[DemoLeagueService] User authenticated, proceeding with initialization');
       } catch (authCheckError) {
-        console.log('[DemoLeagueService] Auth check failed - assuming guest, skipping initialization');
+        logger.log('[DemoLeagueService] Auth check failed - assuming guest, skipping initialization');
         return { success: false, error: new Error('Authentication check failed - use static fallback instead') };
       }
       
@@ -167,13 +167,13 @@ export const DemoLeagueService = {
       }
       
       if (exists && rostersPopulated) {
-        console.log('[DemoLeagueService] Demo league already exists with rosters, skipping initialization');
+        logger.log('[DemoLeagueService] Demo league already exists with rosters, skipping initialization');
         return { success: true, error: null };
       }
 
       // Check timeout before proceeding
       if (Date.now() - startTime > timeoutMs) {
-        console.warn('[DemoLeagueService] Initialization timeout before starting');
+        logger.warn('[DemoLeagueService] Initialization timeout before starting');
         return { success: false, error: new Error('Initialization timeout') };
       }
 
@@ -183,11 +183,11 @@ export const DemoLeagueService = {
         // Double-check authentication before attempting to create league
         const { data: { user: verifyUser }, error: verifyError } = await supabase.auth.getUser();
         if (verifyError || !verifyUser) {
-          console.log('[DemoLeagueService] Authentication verification failed - cannot create league');
+          logger.log('[DemoLeagueService] Authentication verification failed - cannot create league');
           return { success: false, error: new Error('Authentication required to create demo league') };
         }
         
-        console.log('[DemoLeagueService] Creating demo league...');
+        logger.log('[DemoLeagueService] Creating demo league...');
 
         // 1. Create the league
         const { data: league, error: leagueError } = await supabase
@@ -205,7 +205,7 @@ export const DemoLeagueService = {
           .single();
 
         if (leagueError) {
-          console.error('[DemoLeagueService] Error creating league:', leagueError);
+          logger.error('[DemoLeagueService] Error creating league:', leagueError);
           // If it's a 401 or RLS error, return a specific error
           if (leagueError.code === '42501' || leagueError.code === 'PGRST301' || leagueError.message?.includes('row-level security')) {
             return { success: false, error: new Error('Guest users cannot create demo league - use static fallback instead') };
@@ -213,7 +213,7 @@ export const DemoLeagueService = {
           return { success: false, error: leagueError };
         }
 
-        console.log('[DemoLeagueService] League created:', league.id);
+        logger.log('[DemoLeagueService] League created:', league.id);
 
         // 2. Create 10 teams (no owner_id - completely isolated)
         for (const teamData of LEAGUE_TEAMS_DATA) {
@@ -229,27 +229,27 @@ export const DemoLeagueService = {
             .single();
 
           if (teamError) {
-            console.error(`[DemoLeagueService] Error creating team ${teamData.name}:`, teamError);
+            logger.error(`[DemoLeagueService] Error creating team ${teamData.name}:`, teamError);
             continue;
           }
 
           teams.push(team);
         }
 
-        console.log(`[DemoLeagueService] Created ${teams.length} teams`);
+        logger.log(`[DemoLeagueService] Created ${teams.length} teams`);
       } else {
         // League exists but rosters not populated - get existing teams
-        console.log('[DemoLeagueService] Demo league exists but rosters not populated, getting existing teams...');
+        logger.log('[DemoLeagueService] Demo league exists but rosters not populated, getting existing teams...');
         const { data: existingTeams } = await supabase
           .from('teams')
           .select(COLUMNS.TEAM)
           .eq('league_id', DEMO_LEAGUE_ID);
         teams = existingTeams || [];
-        console.log(`[DemoLeagueService] Found ${teams.length} existing teams`);
+        logger.log(`[DemoLeagueService] Found ${teams.length} existing teams`);
       }
       
       if (teams.length === 0) {
-        console.error('[DemoLeagueService] No teams available for roster population');
+        logger.error('[DemoLeagueService] No teams available for roster population');
         return { success: false, error: new Error('No teams available') };
       }
 
@@ -258,7 +258,7 @@ export const DemoLeagueService = {
       
       // Check timeout
       if (Date.now() - startTime > timeoutMs) {
-        console.warn('[DemoLeagueService] Timeout before populating rosters');
+        logger.warn('[DemoLeagueService] Timeout before populating rosters');
         return { success: false, error: new Error('Initialization timeout') };
       }
       
@@ -268,14 +268,14 @@ export const DemoLeagueService = {
       try {
         await this.initializeDemoLineups(DEMO_LEAGUE_ID, teams, allPlayers);
       } catch (lineupError) {
-        console.warn('[DemoLeagueService] Error initializing lineups (non-critical):', lineupError);
+        logger.warn('[DemoLeagueService] Error initializing lineups (non-critical):', lineupError);
       }
 
       // 5. Create static matchups (non-blocking - can fail silently)
       try {
         await this.createDemoMatchups(DEMO_LEAGUE_ID, teams);
       } catch (matchupError) {
-        console.warn('[DemoLeagueService] Error creating matchups (non-critical):', matchupError);
+        logger.warn('[DemoLeagueService] Error creating matchups (non-critical):', matchupError);
       }
 
       // Verify that picks were actually inserted
@@ -286,14 +286,14 @@ export const DemoLeagueService = {
         .is('deleted_at', null);
 
       if ((finalPicksCount || 0) === 0) {
-        console.error('[DemoLeagueService] Initialization completed but no picks found');
+        logger.error('[DemoLeagueService] Initialization completed but no picks found');
         return { success: false, error: new Error('No draft picks were created') };
       }
 
-      console.log('[DemoLeagueService] Demo league initialization complete');
+      logger.log('[DemoLeagueService] Demo league initialization complete');
       return { success: true, error: null };
     } catch (error) {
-      console.error('[DemoLeagueService] Error initializing demo league:', error);
+      logger.error('[DemoLeagueService] Error initializing demo league:', error);
       return { success: false, error: error as PostgrestError | Error };
     }
   },
@@ -307,7 +307,7 @@ export const DemoLeagueService = {
     allPlayers: Player[]
   ): Promise<void> {
     try {
-      console.log('[DemoLeagueService] Populating rosters via draft simulation...');
+      logger.log('[DemoLeagueService] Populating rosters via draft simulation...');
 
       // Sort players by points (best first)
       const sortedPlayers = [...allPlayers].sort((a, b) => (b.points || 0) - (a.points || 0));
@@ -336,7 +336,7 @@ export const DemoLeagueService = {
         .insert(draftOrderEntries);
 
       if (orderError) {
-        console.warn('[DemoLeagueService] Error creating draft order:', orderError);
+        logger.warn('[DemoLeagueService] Error creating draft order:', orderError);
       }
 
       // Directly insert draft picks (bypass DraftService to avoid guards)
@@ -379,14 +379,14 @@ export const DemoLeagueService = {
         }
       }
       
-      console.log(`[DemoLeagueService] Generated ${draftPicks.length} draft picks for ${teams.length} teams`);
+      logger.log(`[DemoLeagueService] Generated ${draftPicks.length} draft picks for ${teams.length} teams`);
       
       if (draftPicks.length === 0) {
         throw new Error('No draft picks generated! Check that teams and players are available.');
       }
 
       // Batch insert all draft picks (in chunks to avoid size limits)
-      console.log(`[DemoLeagueService] Inserting ${draftPicks.length} draft picks in chunks...`);
+      logger.log(`[DemoLeagueService] Inserting ${draftPicks.length} draft picks in chunks...`);
       
       // Insert in chunks of 50 to avoid potential size limits
       const chunkSize = 50;
@@ -399,15 +399,15 @@ export const DemoLeagueService = {
           .select('id');
 
         if (picksError) {
-          console.error(`[DemoLeagueService] Error inserting draft picks chunk ${i + 1}-${i + chunk.length}:`, picksError);
-          console.error('[DemoLeagueService] Sample chunk data:', chunk.slice(0, 2));
+          logger.error(`[DemoLeagueService] Error inserting draft picks chunk ${i + 1}-${i + chunk.length}:`, picksError);
+          logger.error('[DemoLeagueService] Sample chunk data:', chunk.slice(0, 2));
           throw picksError;
         }
         totalInserted += insertedData?.length || 0;
-        console.log(`[DemoLeagueService] Inserted chunk ${Math.floor(i / chunkSize) + 1}: ${insertedData?.length || 0} picks (${totalInserted}/${draftPicks.length} total)`);
+        logger.log(`[DemoLeagueService] Inserted chunk ${Math.floor(i / chunkSize) + 1}: ${insertedData?.length || 0} picks (${totalInserted}/${draftPicks.length} total)`);
       }
 
-      console.log(`[DemoLeagueService] Successfully inserted ${totalInserted} draft picks`);
+      logger.log(`[DemoLeagueService] Successfully inserted ${totalInserted} draft picks`);
       
       // Verify insertion
       const { count: verifyCount, error: verifyError } = await supabase
@@ -417,9 +417,9 @@ export const DemoLeagueService = {
         .is('deleted_at', null);
       
       if (verifyError) {
-        console.error('[DemoLeagueService] Error verifying picks:', verifyError);
+        logger.error('[DemoLeagueService] Error verifying picks:', verifyError);
       } else {
-        console.log(`[DemoLeagueService] Verified: ${verifyCount} total draft picks in database`);
+        logger.log(`[DemoLeagueService] Verified: ${verifyCount} total draft picks in database`);
         
         // Check picks for first team
         if (teams.length > 0) {
@@ -429,11 +429,11 @@ export const DemoLeagueService = {
             .eq('league_id', leagueId)
             .eq('team_id', teams[0].id)
             .is('deleted_at', null);
-          console.log(`[DemoLeagueService] Team ${teams[0].team_name} has ${teamPicksCount} picks`);
+          logger.log(`[DemoLeagueService] Team ${teams[0].team_name} has ${teamPicksCount} picks`);
         }
       }
     } catch (error) {
-      console.error('[DemoLeagueService] Error populating rosters:', error);
+      logger.error('[DemoLeagueService] Error populating rosters:', error);
       throw error;
     }
   },
@@ -447,7 +447,7 @@ export const DemoLeagueService = {
     allPlayers: Player[]
   ): Promise<void> {
     try {
-      console.log('[DemoLeagueService] Initializing default lineups...');
+      logger.log('[DemoLeagueService] Initializing default lineups...');
 
       for (const team of teams) {
         // Get team roster using MatchupService (uses draft picks from database)
@@ -620,15 +620,15 @@ export const DemoLeagueService = {
             ir,
             slotAssignments
           });
-          console.log(`[DemoLeagueService] Saved lineup for team ${team.team_name}: ${starters.length} starters, ${bench.length} bench, ${ir.length} IR`);
+          logger.log(`[DemoLeagueService] Saved lineup for team ${team.team_name}: ${starters.length} starters, ${bench.length} bench, ${ir.length} IR`);
         } else {
-          console.warn(`[DemoLeagueService] Lineup for team ${team.team_name} incomplete: ${starters.length} starters (need 13), ${bench.length} bench`);
+          logger.warn(`[DemoLeagueService] Lineup for team ${team.team_name} incomplete: ${starters.length} starters (need 13), ${bench.length} bench`);
         }
       }
 
-      console.log('[DemoLeagueService] Lineups initialized');
+      logger.log('[DemoLeagueService] Lineups initialized');
     } catch (error) {
-      console.error('[DemoLeagueService] Error initializing lineups:', error);
+      logger.error('[DemoLeagueService] Error initializing lineups:', error);
       throw error;
     }
   },
@@ -638,7 +638,7 @@ export const DemoLeagueService = {
    */
   async createDemoMatchups(leagueId: string, teams: TeamRow[]): Promise<void> {
     try {
-      console.log('[DemoLeagueService] Creating static matchups...');
+      logger.log('[DemoLeagueService] Creating static matchups...');
 
       // Generate matchups for weeks 1-20
       // Start from Dec 31, 2023 (Sunday) so weeks align to Sunday-Saturday
@@ -669,15 +669,15 @@ export const DemoLeagueService = {
               });
 
             if (matchupError) {
-              console.warn(`[DemoLeagueService] Error creating matchup week ${week}:`, matchupError);
+              logger.warn(`[DemoLeagueService] Error creating matchup week ${week}:`, matchupError);
             }
           }
         }
       }
 
-      console.log('[DemoLeagueService] Matchups created');
+      logger.log('[DemoLeagueService] Matchups created');
     } catch (error) {
-      console.error('[DemoLeagueService] Error creating matchups:', error);
+      logger.error('[DemoLeagueService] Error creating matchups:', error);
       throw error;
     }
   },

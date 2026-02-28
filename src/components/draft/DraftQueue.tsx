@@ -24,6 +24,7 @@ import { GripVertical, X, Play, Trash2, AlertCircle, Info, Zap } from 'lucide-re
 import { cn } from '@/lib/utils';
 import { Player } from '@/services/PlayerService';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/utils/logger';
 
 interface DraftQueueProps {
   queue: string[]; // Array of player IDs
@@ -190,7 +191,7 @@ export const DraftQueue = ({
             });
           }
         } catch (e) {
-          console.error('Error loading queue from localStorage:', e);
+          logger.error('Error loading queue from localStorage:', e);
         }
       }
     }

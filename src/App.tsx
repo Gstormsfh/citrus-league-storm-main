@@ -1,5 +1,6 @@
 import React, { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
+import { logger } from '@/utils/logger';
 import '@/utils/testDemoLeague'; // Load test utility
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -129,7 +130,7 @@ const App = () => {
       const timeout = setTimeout(() => {
         const root = document.getElementById('root');
         if (root && root.textContent?.includes('Loading application...')) {
-          console.error("App appears to be stuck on loading screen");
+          logger.error("App appears to be stuck on loading screen");
         }
       }, 10000);
       return () => clearTimeout(timeout);

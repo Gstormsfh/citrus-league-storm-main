@@ -1,5 +1,6 @@
 import { PlayerService, Player } from '@/services/PlayerService';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
+import { logger } from '@/utils/logger';
 
 /**
  * Helper to format TOI from seconds
@@ -36,7 +37,7 @@ export async function getPlayerWithSeasonStats(
     const player = players.find(p => Number(p.id) === Number(playerId));
     
     if (!player) {
-      console.warn(`[playerStatsHelper] Player ${playerId} not found`);
+      logger.warn(`[playerStatsHelper] Player ${playerId} not found`);
       return null;
     }
 

@@ -1,6 +1,7 @@
 // Analytics Service - Centralized Firebase Analytics tracking
 import { getAnalyticsInstance } from '@/integrations/firebase/config';
 import { logEvent, setUserId, setUserProperties } from 'firebase/analytics';
+import { logger } from '@/utils/logger';
 
 interface AnalyticsEvent {
   name: string;
@@ -28,7 +29,7 @@ class AnalyticsService {
       logEvent(analytics, eventName, parameters);
     } catch (error) {
       // Silently fail - analytics should never break the app
-      console.error('Analytics error:', error);
+      logger.error('Analytics error:', error);
     }
   }
 
@@ -42,7 +43,7 @@ class AnalyticsService {
     try {
       setUserId(analytics, userId);
     } catch (error) {
-      console.error('Analytics setUserId error:', error);
+      logger.error('Analytics setUserId error:', error);
     }
   }
 
@@ -56,7 +57,7 @@ class AnalyticsService {
     try {
       setUserProperties(analytics, properties);
     } catch (error) {
-      console.error('Analytics setUserProperties error:', error);
+      logger.error('Analytics setUserProperties error:', error);
     }
   }
 

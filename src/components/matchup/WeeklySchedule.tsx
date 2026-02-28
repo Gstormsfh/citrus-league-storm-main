@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { getTodayMST } from '@/utils/timezoneUtils';
 import { CitrusSparkle } from '@/components/icons/CitrusIcons';
+import { logger } from '@/utils/logger';
 
 interface WeeklyScheduleProps {
   weekStart: string; // Sunday date (YYYY-MM-DD)
@@ -43,13 +44,13 @@ export const WeeklySchedule = ({
   // Verify that startDate is actually a Sunday (getDay() returns 0 for Sunday)
   const startDayOfWeek = startDate.getDay();
   if (startDayOfWeek !== 0) {
-    console.warn(`[WeeklySchedule] weekStart (${weekStart}) is not a Sunday! Day of week: ${startDayOfWeek} (0=Sun, 1=Mon, etc.)`);
+    logger.warn(`[WeeklySchedule] weekStart (${weekStart}) is not a Sunday! Day of week: ${startDayOfWeek} (0=Sun, 1=Mon, etc.)`);
   }
   
   // Verify that endDate is actually a Saturday (getDay() returns 6 for Saturday)
   const endDayOfWeek = endDate.getDay();
   if (endDayOfWeek !== 6) {
-    console.warn(`[WeeklySchedule] weekEnd (${weekEnd}) is not a Saturday! Day of week: ${endDayOfWeek} (0=Sun, 1=Mon, etc.)`);
+    logger.warn(`[WeeklySchedule] weekEnd (${weekEnd}) is not a Saturday! Day of week: ${endDayOfWeek} (0=Sun, 1=Mon, etc.)`);
   }
   
   const current = new Date(startDate);
@@ -67,7 +68,7 @@ export const WeeklySchedule = ({
   
   // Ensure we have exactly 7 days (Sun-Sat)
   if (dates.length !== 7) {
-    console.warn(`[WeeklySchedule] Expected 7 days but got ${dates.length}. Week: ${weekStart} to ${weekEnd}`);
+    logger.warn(`[WeeklySchedule] Expected 7 days but got ${dates.length}. Week: ${weekStart} to ${weekEnd}`);
   }
 
   const formatDayLabel = (dateStr: string): string => {

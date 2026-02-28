@@ -36,7 +36,20 @@ jobs:
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
         run: npm run build
 
+      - name: Check Firebase credentials
+        id: check-creds
+        run: |
+          if [ -n "$FIREBASE_SA" ]; then
+            echo "has_creds=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_creds=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping Firebase preview deploy — FIREBASE_SERVICE_ACCOUNT secret not configured"
+          fi
+        env:
+          FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
       - name: Deploy to Firebase preview channel
+        if: steps.check-creds.outputs.has_creds == 'true'
         id: firebase-deploy
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
@@ -46,6 +59,7 @@ jobs:
           expires: 7d
 
       - name: Post preview URL comment
+        if: steps.check-creds.outputs.has_creds == 'true'
         uses: actions/github-script@v7
         with:
           script: |

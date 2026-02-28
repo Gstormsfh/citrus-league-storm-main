@@ -454,7 +454,7 @@ const HockeyPlayerCardContent = ({
               <div className="p-3 max-w-xs">
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="font-varsity text-sm text-citrus-forest border-b-2 border-citrus-sage/30 pb-1">Projected Stats</h4>
-                  {isMobile && <button onClick={() => setStatsPopoverOpen(false)} className="p-1 rounded-full hover:bg-citrus-sage/20"><X className="h-3.5 w-3.5 text-citrus-forest" /></button>}
+                  {isMobile && <button onClick={() => setStatsPopoverOpen(false)} className="min-w-[44px] min-h-[44px] p-2.5 -m-1.5 rounded-full hover:bg-citrus-sage/20 flex items-center justify-center touch-manipulation"><X className="h-4 w-4 text-citrus-forest" /></button>}
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                   <div className="flex justify-between"><span className="text-citrus-charcoal font-display">Wins:</span><span className="font-varsity text-citrus-forest">{player.goalieProjection.projected_wins?.toFixed(2)}</span></div>
@@ -525,7 +525,7 @@ const HockeyPlayerCardContent = ({
               <div className="p-3 max-w-xs">
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="font-varsity text-sm text-citrus-forest border-b-2 border-citrus-sage/30 pb-1">Projected Stats</h4>
-                  {isMobile && <button onClick={() => setStatsPopoverOpen(false)} className="p-1 rounded-full hover:bg-citrus-sage/20"><X className="h-3.5 w-3.5 text-citrus-forest" /></button>}
+                  {isMobile && <button onClick={() => setStatsPopoverOpen(false)} className="min-w-[44px] min-h-[44px] p-2.5 -m-1.5 rounded-full hover:bg-citrus-sage/20 flex items-center justify-center touch-manipulation"><X className="h-4 w-4 text-citrus-forest" /></button>}
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                   <div className="flex justify-between"><span className="text-citrus-charcoal font-display">Goals:</span><span className="font-varsity text-citrus-forest">{player.daily_projection.projected_goals?.toFixed(2)}</span></div>

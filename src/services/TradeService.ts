@@ -3,6 +3,7 @@ import { PlayerService } from './PlayerService';
 import { LeagueMembershipService } from './LeagueMembershipService';
 import { COLUMNS } from '@/utils/queryColumns';
 import type { LeagueSettings } from '@/types/leagueTypes';
+import { logger } from '@/utils/logger';
 
 export interface TradeOffer {
   id: string;
@@ -118,7 +119,7 @@ export class TradeService {
         tradeId: data.id
       };
     } catch (error: unknown) {
-      console.error('Error creating trade offer:', error);
+      logger.error('Error creating trade offer:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error)
@@ -242,7 +243,7 @@ export class TradeService {
       });
 
       if (tradeRpcError) {
-        console.error('[TradeService] execute_trade RPC error:', tradeRpcError);
+        logger.error('[TradeService] execute_trade RPC error:', tradeRpcError);
         // Rollback trade status since roster changes didn't happen
         await supabase.from('trade_offers').update({ status: 'pending', processed_at: null }).eq('id', trade.id);
         return { success: false, error: `Trade execution failed: ${tradeRpcError.message}` };
@@ -304,12 +305,12 @@ export class TradeService {
         }
       } catch (lineupErr) {
         // Best-effort — roster_assignments (source of truth) is already correct
-        console.error('[TradeService] team_lineups update failed (non-critical):', lineupErr);
+        logger.error('[TradeService] team_lineups update failed (non-critical):', lineupErr);
       }
 
       return { success: true };
     } catch (error: unknown) {
-      console.error('Error accepting trade:', error);
+      logger.error('Error accepting trade:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error)
@@ -363,7 +364,7 @@ export class TradeService {
 
       return { success: true };
     } catch (error: unknown) {
-      console.error('Error rejecting trade:', error);
+      logger.error('Error rejecting trade:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error)
@@ -417,7 +418,7 @@ export class TradeService {
 
       return { success: true };
     } catch (error: unknown) {
-      console.error('Error cancelling trade:', error);
+      logger.error('Error cancelling trade:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error)
@@ -480,8 +481,8 @@ export class TradeService {
 
           return {
             ...trade,
-            from_team_name: (trade.from_team as any).team_name,
-            to_team_name: (trade.to_team as any).team_name,
+            from_team_name: (trade.from_team as { team_name: string }).team_name,
+            to_team_name: (trade.to_team as { team_name: string }).team_name,
             offered_players: offeredPlayers,
             requested_players: requestedPlayers
           };
@@ -490,7 +491,7 @@ export class TradeService {
 
       return tradesWithPlayers;
     } catch (error) {
-      console.error('Error fetching trade offers:', error);
+      logger.error('Error fetching trade offers:', error);
       return [];
     }
   }
@@ -499,7 +500,7 @@ export class TradeService {
    * Get league trade history
    * REQUIRES: Caller must be a member of the league
    */
-  static async getLeagueTradeHistory(leagueId: string, userId?: string): Promise<any[]> {
+  static async getLeagueTradeHistory(leagueId: string, userId?: string): Promise<Record<string, unknown>[]> {
     try {
       // Validate league membership if userId is provided (defense-in-depth)
       if (userId) {
@@ -523,7 +524,7 @@ export class TradeService {
 
       return data || [];
     } catch (error) {
-      console.error('Error fetching trade history:', error);
+      logger.error('Error fetching trade history:', error);
       return [];
     }
   }
@@ -591,7 +592,7 @@ export class TradeService {
 
       return { success: true, reviewType };
     } catch (error: unknown) {
-      console.error('Error submitting trade for review:', error);
+      logger.error('Error submitting trade for review:', error);
       return {
         success: false,
         reviewType: 'unknown',
@@ -638,7 +639,7 @@ export class TradeService {
         error: result?.success ? undefined : (result?.message || 'Unknown error'),
       };
     } catch (error: unknown) {
-      console.error('Error submitting trade vote:', error);
+      logger.error('Error submitting trade vote:', error);
       return {
         success: false,
         vetoCount: 0,
@@ -672,14 +673,14 @@ export class TradeService {
       if (error) throw error;
 
       return {
-        votes: (data || []).map((v: any) => ({
+        votes: (data || []).map((v: { voter_team_id: string; vote: 'approve' | 'veto'; created_at: string }) => ({
           voterTeamId: v.voter_team_id,
           vote: v.vote,
           createdAt: v.created_at,
         })),
       };
     } catch (error: unknown) {
-      console.error('Error fetching trade votes:', error);
+      logger.error('Error fetching trade votes:', error);
       return { votes: [], error: error instanceof Error ? error.message : String(error) };
     }
   }
@@ -748,7 +749,7 @@ export class TradeService {
         return { success: true };
       }
     } catch (error: unknown) {
-      console.error('Error on commissioner decision:', error);
+      logger.error('Error on commissioner decision:', error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   }
@@ -836,7 +837,7 @@ export class TradeService {
 
       return { success: true };
     } catch (error: unknown) {
-      console.error('Error updating trade review settings:', error);
+      logger.error('Error updating trade review settings:', error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   }

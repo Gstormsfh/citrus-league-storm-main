@@ -9,6 +9,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/utils/logger';
 
 export interface GameSpread {
   id: string;
@@ -42,7 +43,7 @@ export class OddsService {
       if (error) throw error;
       return (data ?? []) as GameSpread[];
     } catch (err) {
-      console.error('[OddsService] getSpreadsForDate error:', err);
+      logger.error('[OddsService] getSpreadsForDate error:', err);
       return [];
     }
   }
@@ -67,7 +68,7 @@ export class OddsService {
       }
       return map;
     } catch (err) {
-      console.error('[OddsService] getSpreadsForGames error:', err);
+      logger.error('[OddsService] getSpreadsForGames error:', err);
       return new Map();
     }
   }
@@ -86,7 +87,7 @@ export class OddsService {
       if (error) throw error;
       return data as GameSpread | null;
     } catch (err) {
-      console.error('[OddsService] getSpreadForGame error:', err);
+      logger.error('[OddsService] getSpreadForGame error:', err);
       return null;
     }
   }
@@ -107,7 +108,7 @@ export class OddsService {
       if (error) throw error;
       return (data ?? []) as GameSpread[];
     } catch (err) {
-      console.error('[OddsService] getSpreadsForDateRange error:', err);
+      logger.error('[OddsService] getSpreadsForDateRange error:', err);
       return [];
     }
   }
@@ -152,7 +153,7 @@ export class OddsService {
       };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error('[OddsService] triggerSpreadFetch error:', msg);
+      logger.error('[OddsService] triggerSpreadFetch error:', msg);
       return { success: false, error: msg };
     }
   }

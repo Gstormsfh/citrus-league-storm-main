@@ -5,6 +5,7 @@ import { Lock, Unlock } from 'lucide-react';
 import { MatchupPlayer } from './types';
 import { MatchupService, DailyLineupPlayer } from '@/services/MatchupService';
 import { getTodayMST } from '@/utils/timezoneUtils';
+import { logger } from '@/utils/logger';
 
 interface DailyRostersProps {
   matchupId: string;
@@ -107,7 +108,7 @@ export const DailyRosters = ({
               isLoading: false
             });
           } catch (error) {
-            console.error(`[DailyRosters] Error fetching lineup for ${date}:`, error);
+            logger.error(`[DailyRosters] Error fetching lineup for ${date}:`, error);
             // Fallback to current roster if fetch fails
             newDayRosters.set(date, {
               date,

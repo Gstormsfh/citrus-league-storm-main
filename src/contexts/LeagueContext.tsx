@@ -9,6 +9,7 @@ import { PlayerService } from '@/services/PlayerService';
 import { LeagueMembershipService } from '@/services/LeagueMembershipService';
 import { useToast } from '@/hooks/use-toast';
 import type { LeagueType, ScoringFormat, DraftType } from '@/types/leagueTypes';
+import { logger } from '@/utils/logger';
 
 export type UserLeagueState = 'guest' | 'logged-in-no-league' | 'active-user';
 
@@ -153,7 +154,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
 
       setLoading(false);
     } catch (err: unknown) {
-      console.error('Error loading leagues:', err);
+      logger.error('Error loading leagues:', err);
       setError('Failed to load leagues');
       setLoading(false);
     }
@@ -271,7 +272,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
             }
             
             // Not a member or refresh didn't find it - block access
-            console.warn('[LeagueContext] User attempted to access league not in their list:', urlLeagueId);
+            logger.warn('[LeagueContext] User attempted to access league not in their list:', urlLeagueId);
             navigate('/gm-office');
             toast({
               title: "Access Denied",
@@ -280,7 +281,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
             });
             return;
           } catch (error) {
-            console.error('[LeagueContext] Error verifying membership:', error);
+            logger.error('[LeagueContext] Error verifying membership:', error);
             navigate('/gm-office');
             toast({
               title: "Error",
@@ -300,7 +301,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
             setActiveLeague(league);
           } else {
             // Membership check failed - block access
-            console.error('[LeagueContext] Membership verification failed for league:', urlLeagueId);
+            logger.error('[LeagueContext] Membership verification failed for league:', urlLeagueId);
             navigate('/gm-office');
             toast({
               title: "Access Denied",
@@ -309,7 +310,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
             });
           }
         } catch (error) {
-          console.error('[LeagueContext] Error verifying membership:', error);
+          logger.error('[LeagueContext] Error verifying membership:', error);
           navigate('/gm-office');
           toast({
             title: "Error",

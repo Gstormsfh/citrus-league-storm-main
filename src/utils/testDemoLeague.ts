@@ -58,6 +58,6 @@ export const testDemoLeague = async () => {
 // Expose globally (only in dev mode)
 if (typeof window !== 'undefined' && import.meta.env.DEV) {
   (window as any).testDemoLeague = testDemoLeague;
-  console.debug('Test function available: window.testDemoLeague()');
+  logger.debug('Test function available: window.testDemoLeague()');
 }
 

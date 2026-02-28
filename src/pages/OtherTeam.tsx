@@ -18,6 +18,7 @@ import { useLeague } from '@/contexts/LeagueContext';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { logger } from '@/utils/logger';
 
 // Helper for fantasy position (reused)
 const getFantasyPosition = (position: string): 'C' | 'LW' | 'RW' | 'D' | 'G' | 'UTIL' => {
@@ -85,7 +86,7 @@ const OtherTeam = () => {
             .maybeSingle();
           
           if (leagueError || !demoLeagueData) {
-            console.error('[OtherTeam] Error loading demo league:', leagueError);
+            logger.error('[OtherTeam] Error loading demo league:', leagueError);
             setLoading(false);
             return;
           }
@@ -98,7 +99,7 @@ const OtherTeam = () => {
             .order('created_at', { ascending: true });
           
           if (teamsError || !demoTeamsData || demoTeamsData.length === 0) {
-            console.error('[OtherTeam] Error loading demo teams:', teamsError);
+            logger.error('[OtherTeam] Error loading demo teams:', teamsError);
             setLoading(false);
             return;
           }
@@ -106,7 +107,7 @@ const OtherTeam = () => {
           // Find the specific team by index (teamIdNum is 1-10, array is 0-indexed)
           const demoTeamFromDb = (demoTeamsData as any[])[teamIdNum - 1];
           if (!demoTeamFromDb) {
-            console.error(`[OtherTeam] Demo team ${teamIdNum} not found in database`);
+            logger.error(`[OtherTeam] Demo team ${teamIdNum} not found in database`);
             setLoading(false);
             return;
           }
@@ -126,7 +127,7 @@ const OtherTeam = () => {
             .is('deleted_at', null);
           
           if (picksError) {
-            console.error('[OtherTeam] Error loading draft picks:', picksError);
+            logger.error('[OtherTeam] Error loading draft picks:', picksError);
             setLoading(false);
             return;
           }
@@ -134,7 +135,7 @@ const OtherTeam = () => {
           const playerIds = (draftPicksData || []).map((p: any) => p.player_id);
 
           if (playerIds.length === 0) {
-            console.error(`[OtherTeam] Demo team ${teamIdNum} has no players in roster`);
+            logger.error(`[OtherTeam] Demo team ${teamIdNum} has no players in roster`);
             setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
             setLoading(false);
             return;
@@ -293,7 +294,7 @@ const OtherTeam = () => {
           .maybeSingle();
 
         if (teamError || !teamData) {
-          console.error(`Team ${teamId} not found:`, teamError);
+          logger.error(`Team ${teamId} not found:`, teamError);
           setLoading(false);
           return;
         }
@@ -345,7 +346,7 @@ const OtherTeam = () => {
 
         // CRITICAL: If no players loaded, something is wrong - log and return
         if (teamPlayers.length === 0) {
-          console.error(`OtherTeam: Team ${teamId} - ❌ NO PLAYERS LOADED! This team has no players assigned.`);
+          logger.error(`OtherTeam: Team ${teamId} - ❌ NO PLAYERS LOADED! This team has no players assigned.`);
           setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
           setLoading(false);
           return;
@@ -426,7 +427,7 @@ const OtherTeam = () => {
 
         // If lineup exists but is invalid (especially if starters is empty), force re-assignment
         if (savedLineup && !isValidLineup) {
-          console.error(`OtherTeam: Team ${teamId} - ❌ INVALID LINEUP DETECTED! (${starterCount} starters, ${benchCount} bench). All players on bench! Auto-fixing NOW...`);
+          logger.error(`OtherTeam: Team ${teamId} - ❌ INVALID LINEUP DETECTED! (${starterCount} starters, ${benchCount} bench). All players on bench! Auto-fixing NOW...`);
           // Fall through to auto-assignment below - don't use the invalid lineup
           // The auto-assignment will create a proper lineup and save it (same logic as team 2)
         } else if (isValidLineup) {
@@ -532,14 +533,14 @@ const OtherTeam = () => {
                 slotAssignments: assignments
               });
             } catch (err) {
-              console.error(`OtherTeam: Team ${teamId} - ❌ FAILED to save lineup:`, err);
+              logger.error(`OtherTeam: Team ${teamId} - ❌ FAILED to save lineup:`, err);
             }
           } else {
-            console.error(`OtherTeam: Team ${teamId} - ❌ CRITICAL: Generated lineup is still invalid (${starters.length} starters, ${bench.length} bench). This should not happen!`);
+            logger.error(`OtherTeam: Team ${teamId} - ❌ CRITICAL: Generated lineup is still invalid (${starters.length} starters, ${bench.length} bench). This should not happen!`);
           }
         }
       } catch (e) {
-        console.error(e);
+        logger.error(e);
       } finally {
         setLoading(false);
       }

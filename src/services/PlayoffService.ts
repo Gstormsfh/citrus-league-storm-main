@@ -11,6 +11,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { CURRENT_SEASON } from '@/utils/seasonConstants';
+import { logger } from '@/utils/logger';
 
 // ============================================================================
 // TYPES
@@ -166,7 +167,7 @@ export const PlayoffService = {
         error: null,
       };
     } catch (error) {
-      console.error('[PlayoffService] Error getting bracket:', error);
+      logger.error('[PlayoffService] Error getting bracket:', error);
       return {
         bracket: null,
         seeds: [],
@@ -201,7 +202,7 @@ export const PlayoffService = {
 
       return { result, error: null };
     } catch (error) {
-      console.error('[PlayoffService] Error generating bracket:', error);
+      logger.error('[PlayoffService] Error generating bracket:', error);
       return {
         result: null,
         error: error instanceof Error ? error : new Error(String(error)),
@@ -227,7 +228,7 @@ export const PlayoffService = {
 
       return { result, error: null };
     } catch (error) {
-      console.error('[PlayoffService] Error advancing round:', error);
+      logger.error('[PlayoffService] Error advancing round:', error);
       return {
         result: null,
         error: error instanceof Error ? error : new Error(String(error)),
@@ -253,7 +254,7 @@ export const PlayoffService = {
 
       return { error: null };
     } catch (error) {
-      console.error('[PlayoffService] Error resetting bracket:', error);
+      logger.error('[PlayoffService] Error resetting bracket:', error);
       return {
         error: error instanceof Error ? error : new Error(String(error)),
       };
@@ -281,7 +282,7 @@ export const PlayoffService = {
 
       return { picture: result as PlayoffPicture, error: null };
     } catch (error) {
-      console.error('[PlayoffService] Error getting playoff picture:', error);
+      logger.error('[PlayoffService] Error getting playoff picture:', error);
       return {
         picture: null,
         error: error instanceof Error ? error : new Error(String(error)),

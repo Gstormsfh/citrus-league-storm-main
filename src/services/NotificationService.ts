@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/utils/logger';
 
 export interface Notification {
   id: string;
@@ -110,13 +111,13 @@ export const NotificationService = {
         .limit(50); // ← OPTIMIZATION: Reduced from 100 to 50 (pagination can load more)
 
       if (error) {
-        console.error('[NotificationService] Error fetching notifications:', error);
+        logger.error('[NotificationService] Error fetching notifications:', error);
         return { data: null, error };
       }
 
       return { data: (data || []) as Notification[], error: null };
     } catch (error) {
-      console.error('[NotificationService] Unexpected error in getNotifications:', error);
+      logger.error('[NotificationService] Unexpected error in getNotifications:', error);
       return { data: null, error };
     }
   },
@@ -158,13 +159,13 @@ export const NotificationService = {
         .eq('read_status', false);
 
       if (error) {
-        console.error('[NotificationService] Error counting unread notifications:', error);
+        logger.error('[NotificationService] Error counting unread notifications:', error);
         return { data: null, error };
       }
 
       return { data: count || 0, error: null };
     } catch (error) {
-      console.error('[NotificationService] Unexpected error in getUnreadCount:', error);
+      logger.error('[NotificationService] Unexpected error in getUnreadCount:', error);
       return { data: null, error };
     }
   },
@@ -211,13 +212,13 @@ export const NotificationService = {
         .eq('user_id', userId);
 
       if (updateError) {
-        console.error('[NotificationService] Error marking notification as read:', updateError);
+        logger.error('[NotificationService] Error marking notification as read:', updateError);
         return { data: null, error: updateError };
       }
 
       return { data: true, error: null };
     } catch (error) {
-      console.error('[NotificationService] Unexpected error in markAsRead:', error);
+      logger.error('[NotificationService] Unexpected error in markAsRead:', error);
       return { data: null, error };
     }
   },
@@ -270,13 +271,13 @@ export const NotificationService = {
         .eq('read_status', false);
 
       if (updateError) {
-        console.error('[NotificationService] Error marking all as read:', updateError);
+        logger.error('[NotificationService] Error marking all as read:', updateError);
         return { data: null, error: updateError };
       }
 
       return { data: beforeCount || 0, error: null };
     } catch (error) {
-      console.error('[NotificationService] Unexpected error in markAllAsRead:', error);
+      logger.error('[NotificationService] Unexpected error in markAllAsRead:', error);
       return { data: null, error };
     }
   },

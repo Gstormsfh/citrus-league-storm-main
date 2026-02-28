@@ -3,6 +3,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { CitrusPuckPlayerData, AggregatedPlayerData, Situation } from "@/types/citruspuck";
 import { CURRENT_SEASON } from "@/utils/seasonConstants";
+import { logger } from '@/utils/logger';
 
 type PlayerSeasonStatsRow = {
   season: number;
@@ -299,22 +300,22 @@ export const CitrusPuckService = {
       // Fetch stats and directory data
       // Select all columns including NHL stats for proper mapping
       const [statsResponse, directoryResponse] = await Promise.all([
-          (supabase as any)
+          (supabase as unknown as { from: (table: string) => { select: (columns: string) => { eq: (col: string, val: number) => Promise<{ data: unknown[]; error: { message: string } | null }> } } })
             .from("player_season_stats")
             .select("season, player_id, team_abbrev, position_code, is_goalie, games_played, nhl_toi_seconds, goals, primary_assists, secondary_assists, points, nhl_goals, nhl_assists, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_saves, x_goals, pim, hits, blocks, saves, wins, nhl_wins, nhl_losses, nhl_ot_losses, goals_against, shutouts, save_pct, nhl_gaa, nhl_save_pct, nhl_shutouts, shots_faced, nhl_shots_faced, nhl_goals_against, goalie_gp")
             .eq("season", season),
-          (supabase as any)
+          (supabase as unknown as { from: (table: string) => { select: (columns: string) => { eq: (col: string, val: number) => Promise<{ data: unknown[]; error: { message: string } | null }> } } })
             .from("player_directory")
             .select("season, player_id, full_name, team_abbrev, position_code, is_goalie")
             .eq("season", season)
       ]);
 
       if (statsResponse.error) {
-        console.error(`Error fetching player_season_stats for ${season}:`, statsResponse.error);
+        logger.error(`Error fetching player_season_stats for ${season}:`, statsResponse.error);
         return new Map();
       }
       if (directoryResponse.error) {
-        console.error(`Error fetching player_directory for ${season}:`, directoryResponse.error);
+        logger.error(`Error fetching player_directory for ${season}:`, directoryResponse.error);
         return new Map();
       }
 
@@ -361,13 +362,13 @@ export const CitrusPuckService = {
     // Fetch stats and directory
     // Select all columns including NHL stats for proper mapping
     const [statsResponse, directoryResponse] = await Promise.all([
-      (supabase as any)
+      (supabase as unknown as { from: (table: string) => { select: (columns: string) => { eq: (col: string, val: number) => { eq: (col: string, val: number) => { single: () => Promise<{ data: unknown; error: { message: string } | null }> } } } } })
         .from("player_season_stats")
         .select("season, player_id, team_abbrev, position_code, is_goalie, games_played, icetime_seconds, nhl_toi_seconds, goals, primary_assists, secondary_assists, points, shots_on_goal, hits, blocks, pim, ppp, shp, plus_minus, nhl_plus_minus, nhl_goals, nhl_assists, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_ppp, nhl_shp, x_goals, x_assists, goalie_gp, wins, saves, shots_faced, goals_against, shutouts, save_pct, nhl_wins, nhl_losses, nhl_ot_losses, nhl_saves, nhl_shots_faced, nhl_goals_against, nhl_shutouts, nhl_save_pct, nhl_gaa")
         .eq("season", season)
         .eq("player_id", playerId)
         .single(),
-      (supabase as any)
+      (supabase as unknown as { from: (table: string) => { select: (columns: string) => { eq: (col: string, val: number) => { eq: (col: string, val: number) => { single: () => Promise<{ data: unknown; error: { message: string } | null }> } } } } })
         .from("player_directory")
         .select("season, player_id, full_name, team_abbrev, position_code, is_goalie")
         .eq("season", season)
@@ -376,7 +377,7 @@ export const CitrusPuckService = {
     ]);
     
     if (statsResponse.error) {
-      console.error(`Error fetching player_season_stats for player ${playerId}:`, statsResponse.error);
+      logger.error(`Error fetching player_season_stats for player ${playerId}:`, statsResponse.error);
       return [];
     }
     

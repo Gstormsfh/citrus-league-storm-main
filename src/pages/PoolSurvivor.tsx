@@ -13,6 +13,7 @@ import { PoolService, SurvivorStanding } from '@/services/PoolService';
 import { Loader2, Shield, Heart, Skull, CheckCircle, XCircle, ChevronLeft, ChevronRight, Lock } from 'lucide-react';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import LoadingScreen from '@/components/LoadingScreen';
+import { logger } from '@/utils/logger';
 
 // NHL team data for selection grid
 const NHL_TEAMS = [
@@ -77,7 +78,7 @@ const PoolSurvivor = () => {
           setLockedTeams(locked);
         } catch { /* non-critical */ }
       } catch (err) {
-        console.error('[PoolSurvivor] Error:', err);
+        logger.error('[PoolSurvivor] Error:', err);
       } finally {
         setLoading(false);
       }

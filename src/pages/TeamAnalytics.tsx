@@ -20,6 +20,7 @@ import { CitrusSparkle, CitrusBurst } from '@/components/icons/CitrusIcons';
 import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import LoadingScreen from '@/components/LoadingScreen';
+import { logger } from '@/utils/logger';
 
 interface PositionStats {
   position: string;
@@ -89,7 +90,7 @@ const TeamAnalytics = () => {
               });
             } catch (error) {
               // Skip players with schedule errors
-              console.warn(`Error getting games for ${player.team}:`, error);
+              logger.warn(`Error getting games for ${player.team}:`, error);
             }
           }
           
@@ -104,7 +105,7 @@ const TeamAnalytics = () => {
           setLoading(false);
           return;
         } catch (error) {
-          console.error('Error loading demo analytics:', error);
+          logger.error('Error loading demo analytics:', error);
           setFreeAgentTargets([]);
           setLoading(false);
           return;
@@ -127,7 +128,7 @@ const TeamAnalytics = () => {
             currentLeagueId = userTeamData.league_id;
           }
         } catch (error) {
-          console.error('Error fetching user team:', error);
+          logger.error('Error fetching user team:', error);
           // Continue without league ID
         }
       }
@@ -163,7 +164,7 @@ const TeamAnalytics = () => {
       
       setFreeAgentTargets(maximizers);
     } catch (error) {
-      console.error('Error loading schedule maximizers:', error);
+      logger.error('Error loading schedule maximizers:', error);
       setFreeAgentTargets([]);
     } finally {
       setLoading(false);

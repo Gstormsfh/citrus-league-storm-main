@@ -5,6 +5,7 @@ import { GameLockService } from './GameLockService';
 import { LeagueMembershipService } from './LeagueMembershipService';
 import { CURRENT_SEASON } from '@/utils/seasonConstants';
 import type { LeagueSettings } from '@/types/leagueTypes';
+import { logger } from '@/utils/logger';
 
 export interface WaiverClaim {
   id: string;
@@ -128,7 +129,7 @@ export class WaiverService {
 
       return { allowed: true };
     } catch (err) {
-      console.error('[WaiverService] checkTransactionLimits error:', err);
+      logger.error('[WaiverService] checkTransactionLimits error:', err);
       // Fail open — don't block adds if the check itself fails
       return { allowed: true };
     }
@@ -269,7 +270,7 @@ export class WaiverService {
         lock_reason: lockReason
       };
     } catch (error: unknown) {
-      console.error('Error checking player availability:', error);
+      logger.error('Error checking player availability:', error);
       throw error;
     }
   }
@@ -357,10 +358,10 @@ export class WaiverService {
         .maybeSingle();
 
       if (lineup) {
-        let newStarters = (lineup.starters as any[]) || [];
-        let newBench = (lineup.bench as any[]) || [];
-        let newIr = (lineup.ir as any[]) || [];
-        const newSlotAssignments = (lineup.slot_assignments as any) || {};
+        let newStarters = (lineup.starters as string[]) || [];
+        let newBench = (lineup.bench as string[]) || [];
+        let newIr = (lineup.ir as string[]) || [];
+        const newSlotAssignments = (lineup.slot_assignments as Record<string, string>) || {};
 
         // Drop player if specified
         if (dropPlayerId) {
@@ -393,7 +394,7 @@ export class WaiverService {
 
       return { success: true };
     } catch (error: unknown) {
-      console.error('Error adding free agent:', error);
+      logger.error('Error adding free agent:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error)
@@ -474,7 +475,7 @@ export class WaiverService {
         claimId: data.id
       };
     } catch (error: unknown) {
-      console.error('Error submitting waiver claim:', error);
+      logger.error('Error submitting waiver claim:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error)
@@ -531,7 +532,7 @@ export class WaiverService {
         };
       }
     } catch (error: unknown) {
-      console.error('Error adding player:', error);
+      logger.error('Error adding player:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error)
@@ -559,7 +560,7 @@ export class WaiverService {
 
       return { success: true };
     } catch (error: unknown) {
-      console.error('Error cancelling waiver claim:', error);
+      logger.error('Error cancelling waiver claim:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error)
@@ -593,12 +594,12 @@ export class WaiverService {
         id: wp.id,
         league_id: wp.league_id,
         team_id: wp.team_id,
-        team_name: (wp.teams as any).team_name,
+        team_name: (wp.teams as { team_name: string }).team_name,
         priority: wp.priority,
         updated_at: wp.updated_at
       }));
     } catch (error: unknown) {
-      console.error('Error fetching waiver priority:', error);
+      logger.error('Error fetching waiver priority:', error);
       return [];
     }
   }
@@ -625,7 +626,7 @@ export class WaiverService {
 
       return data || [];
     } catch (error: unknown) {
-      console.error('Error fetching team waiver claims:', error);
+      logger.error('Error fetching team waiver claims:', error);
       return [];
     }
   }
@@ -651,7 +652,7 @@ export class WaiverService {
 
       return data as LeagueWaiverSettings;
     } catch (error: unknown) {
-      console.error('Error fetching league waiver settings:', error);
+      logger.error('Error fetching league waiver settings:', error);
       return null;
     }
   }
@@ -708,7 +709,7 @@ export class WaiverService {
         is_goalie: p.position === 'G'
       }));
     } catch (error: unknown) {
-      console.error('Error fetching available players:', error);
+      logger.error('Error fetching available players:', error);
       return [];
     }
   }
@@ -737,7 +738,7 @@ export class WaiverService {
       const { data, error } = await supabase.rpc('process_all_pending_waivers');
       
       if (error) {
-        console.error('[WaiverService] Error processing waivers:', error);
+        logger.error('[WaiverService] Error processing waivers:', error);
         return {
           success: false,
           results: [],
@@ -763,7 +764,7 @@ export class WaiverService {
         results
       };
     } catch (error: unknown) {
-      console.error('[WaiverService] Error processing waivers:', error);
+      logger.error('[WaiverService] Error processing waivers:', error);
       return {
         success: false,
         results: [],
@@ -790,13 +791,13 @@ export class WaiverService {
       const { data, error } = await supabase.rpc('get_waiver_processing_status');
       
       if (error) {
-        console.error('[WaiverService] Error getting waiver status:', error);
+        logger.error('[WaiverService] Error getting waiver status:', error);
         return { leagues: [], error: error.message };
       }
       
       return { leagues: data || [] };
     } catch (error: unknown) {
-      console.error('[WaiverService] Error getting waiver status:', error);
+      logger.error('[WaiverService] Error getting waiver status:', error);
       return { leagues: [], error: error instanceof Error ? error.message : String(error) };
     }
   }
@@ -900,7 +901,7 @@ export class WaiverService {
       return { success: true, claimId: data.id };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error('[WaiverService] submitFAABBid error:', msg);
+      logger.error('[WaiverService] submitFAABBid error:', msg);
       return { success: false, error: msg };
     }
   }
@@ -945,7 +946,7 @@ export class WaiverService {
 
       return Math.max(0, initialBudget - totalSpent);
     } catch (err) {
-      console.error('[WaiverService] getFAABBudget error:', err);
+      logger.error('[WaiverService] getFAABBudget error:', err);
       return null;
     }
   }
@@ -999,7 +1000,7 @@ export class WaiverService {
         };
       }).sort((a, b) => b.remaining_budget - a.remaining_budget);
     } catch (err) {
-      console.error('[WaiverService] getAllFAABBudgets error:', err);
+      logger.error('[WaiverService] getAllFAABBudgets error:', err);
       return [];
     }
   }
@@ -1157,7 +1158,7 @@ export class WaiverService {
               }
             }
           } catch (moveErr) {
-            console.error('[WaiverService] FAAB roster move error:', moveErr);
+            logger.error('[WaiverService] FAAB roster move error:', moveErr);
           }
 
           // 2. Deduct FAAB budget from winner
@@ -1220,7 +1221,7 @@ export class WaiverService {
       return { processed: results.length, results };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error('[WaiverService] processFAABWaivers error:', msg);
+      logger.error('[WaiverService] processFAABWaivers error:', msg);
       return { processed: 0, results: [], error: msg };
     }
   }
@@ -1247,7 +1248,7 @@ export class WaiverService {
       if (error) throw error;
       return { success: true };
     } catch (error: unknown) {
-      console.error('[WaiverService] recalculateReverseStandingsPriority error:', error);
+      logger.error('[WaiverService] recalculateReverseStandingsPriority error:', error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   }
@@ -1316,7 +1317,7 @@ export class WaiverService {
 
       return { success: true };
     } catch (error: unknown) {
-      console.error('[WaiverService] updateWaiverSettings error:', error);
+      logger.error('[WaiverService] updateWaiverSettings error:', error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   }

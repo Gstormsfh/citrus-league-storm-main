@@ -38,6 +38,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
+import { logger } from '@/utils/logger';
 
 const TradeAnalyzer = () => {
   const [searchParams] = useSearchParams();
@@ -68,7 +69,7 @@ const TradeAnalyzer = () => {
       const offers = await TradeService.getTeamTradeOffers(activeLeagueId, teamId);
       setTradeOffers(offers);
     } catch (error) {
-      console.error("Failed to load trade offers", error);
+      logger.error("Failed to load trade offers", error);
       setTradeOffers([]);
     }
   }, [activeLeagueId]);
@@ -182,7 +183,7 @@ const TradeAnalyzer = () => {
           setOpponentTeams(teams.filter(t => t.id !== 3));
         }
       } catch (error) {
-        console.error("[TradeAnalyzer] Error:", error);
+        logger.error("[TradeAnalyzer] Error:", error);
         if (isMounted) {
           toast({
             title: "Error",

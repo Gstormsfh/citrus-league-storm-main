@@ -40,10 +40,124 @@ import { CitrusSectionDivider } from '@/components/CitrusSectionDivider';
 import { calculateEligibleGamesRemaining } from '@/utils/rosterUtils';
 import { COLUMNS } from '@/utils/queryColumns';
 import { ScoringCalculator } from '@/utils/scoringUtils';
+import { logger } from '@/utils/logger';
+
+// ============================================================
+// Local type definitions for data used throughout this file
+// ============================================================
+
+/** Stats for a single player on a single day (from get_daily_game_stats RPC or computed) */
+interface DailyPlayerStats {
+  goals: number;
+  assists: number;
+  points: number;
+  shots_on_goal: number;
+  blocks: number;
+  ppp: number;
+  shp: number;
+  hits: number;
+  pim: number;
+  wins: number;
+  saves: number;
+  shutouts: number;
+  goals_against: number;
+  daily_total_points?: number;
+  daily_stats_breakdown?: Record<string, { count: number; points: number }> | null;
+  // Additional fields from get_daily_game_stats RPC
+  sog?: number;
+  plus_minus?: number;
+  toi_seconds?: number;
+  faceoff_wins?: number;
+  faceoff_losses?: number;
+  faceoff_taken?: number;
+  takeaways?: number;
+  giveaways?: number;
+  ppg?: number;
+  ppa?: number;
+  shg?: number;
+  sha?: number;
+  shots_missed?: number;
+  shots_blocked?: number;
+  shot_attempts?: number;
+  gwg?: number;
+  otg?: number;
+  shifts?: number;
+  losses?: number;
+  ot_losses?: number;
+  shots_faced?: number;
+  save_pct?: number;
+  is_goalie?: boolean;
+  xGoals?: number;
+  // RPC row raw fields
+  player_id?: number;
+  game_id?: number;
+  game_date?: string;
+}
+
+/** A single row from the fantasy_daily_rosters table */
+interface FrozenRosterEntry {
+  player_id: string | number;
+  team_id: string;
+  roster_date: string;
+  slot_type?: string;
+  slot_id?: string;
+}
+
+/** Projection data from getDailyProjectionsForMatchup */
+interface DailyProjection {
+  total_projected_points?: number;
+  projected_goals?: number;
+  projected_assists?: number;
+  projected_sog?: number;
+  projected_blocks?: number;
+  projected_ppp?: number;
+  projected_shp?: number;
+  projected_hits?: number;
+  projected_pim?: number;
+  projected_xg?: number;
+  base_ppg?: number;
+  shrinkage_weight?: number;
+  finishing_multiplier?: number;
+  opponent_adjustment?: number;
+  b2b_penalty?: number;
+  home_away_adjustment?: number;
+  confidence_score?: number;
+  calculation_method?: string;
+  is_goalie?: boolean;
+  // Goalie projections
+  projected_wins?: number;
+  projected_saves?: number;
+  projected_shutouts?: number;
+  projected_goals_against?: number;
+  projected_gaa?: number;
+  projected_save_pct?: number;
+  projected_gp?: number;
+  starter_confirmed?: boolean;
+}
+
+/** A matchup row from a Supabase query with joined team names */
+interface MatchupWithTeamNames extends MatchupType {
+  team1_name?: string;
+  team2_name?: string;
+  team1?: { team_name: string } | null;
+  team2?: { team_name: string } | null;
+}
+
+/** Daily score entry from calculate_daily_matchup_scores RPC */
+interface DailyScoreRow {
+  roster_date: string;
+  daily_score: string | number;
+}
+
+/** Profile type with optional timezone */
+interface UserProfile {
+  timezone?: string;
+  [key: string]: unknown;
+}
 
 // Debug flag - set to true only when debugging performance issues
 const DEBUG_MATCHUP = false;
-const log = DEBUG_MATCHUP ? console.log.bind(console, '[Matchup]') : () => {};
+const log = DEBUG_MATCHUP ? logger.log.bind(logger, '[Matchup]') : () => {};
 
 const Matchup = () => {
   const { user, profile, loading: authLoading } = useAuth();
@@ -51,9 +165,9 @@ const Matchup = () => {
   const { leagueId: urlLeagueId, weekId: urlWeekId } = useParams<{ leagueId?: string; weekId?: string }>();
   const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [dailyStatsMap, setDailyStatsMap] = useState<Map<number, any>>(new Map()); // For selected date (or today)
-  const [dailyStatsByDate, setDailyStatsByDate] = useState<Map<string, Map<number, any>>>(new Map()); // For all 7 days
-  const [projectionsByDate, setProjectionsByDate] = useState<Map<string, Map<number, any>>>(new Map()); // Cache projections per date
+  const [dailyStatsMap, setDailyStatsMap] = useState<Map<number, DailyPlayerStats>>(new Map()); // For selected date (or today)
+  const [dailyStatsByDate, setDailyStatsByDate] = useState<Map<string, Map<number, DailyPlayerStats>>>(new Map()); // For all 7 days
+  const [projectionsByDate, setProjectionsByDate] = useState<Map<string, Map<number, DailyProjection>>>(new Map()); // Cache projections per date
   // Cached daily scores for past days (frozen, won't change when roster changes)
   const [cachedDailyScores, setCachedDailyScores] = useState<Map<string, { 
     myScore: number; 
@@ -190,12 +304,12 @@ const Matchup = () => {
           if (result.backfilledCount > 0) {
             log(' Backfilled', result.backfilledCount, 'records for team1');
           } else if (result.error) {
-            console.error('[Matchup] Backfill error for team1:', result.error);
+            logger.error('[Matchup] Backfill error for team1:', result.error);
           } else {
             log(' No records to backfill for team1 (all exist)');
           }
         } catch (err) {
-          console.error('[Matchup] Team1 backfill exception:', err);
+          logger.error('[Matchup] Team1 backfill exception:', err);
         }
       }
       
@@ -211,12 +325,12 @@ const Matchup = () => {
           if (result.backfilledCount > 0) {
             log(' Backfilled', result.backfilledCount, 'records for team2');
           } else if (result.error) {
-            console.error('[Matchup] Backfill error for team2:', result.error);
+            logger.error('[Matchup] Backfill error for team2:', result.error);
           } else {
             log(' No records to backfill for team2 (all exist)');
           }
         } catch (err) {
-          console.error('[Matchup] Team2 backfill exception:', err);
+          logger.error('[Matchup] Team2 backfill exception:', err);
         }
       }
       
@@ -233,11 +347,12 @@ const Matchup = () => {
             const { data: refreshedMatchup } = await supabase
               .from('matchups')
               .select('team1_score, team2_score')
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               .eq('id' as any, currentMatchup.id as any)
               .single();
-            
+
             if (refreshedMatchup) {
-              const scores = refreshedMatchup as any;
+              const scores = refreshedMatchup as { team1_score: number; team2_score: number };
               // Update currentMatchup with new scores (this triggers re-render)
               setCurrentMatchup(prev => prev ? {
                 ...prev,
@@ -248,7 +363,7 @@ const Matchup = () => {
             }
           }
         } catch (err) {
-          console.error('[Matchup] Background job failed (non-blocking):', err);
+          logger.error('[Matchup] Background job failed (non-blocking):', err);
         }
       }
     };
@@ -315,19 +430,23 @@ const Matchup = () => {
       const { data: allRosters, error } = await supabase
         .from('fantasy_daily_rosters')
         .select('player_id, roster_date, team_id')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .eq('matchup_id' as any, currentMatchup.id as any)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .in('team_id' as any, teamIds as any)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .in('roster_date' as any, pastDates as any)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .eq('slot_type' as any, 'active' as any);
       
       if (error) {
-        console.error('[Matchup] Error fetching cached rosters:', error);
+        logger.error('[Matchup] Error fetching cached rosters:', error);
         return;
       }
       
       // Group rosters by date and team
       const rostersByDateTeam = new Map<string, Map<string, number[]>>();
-      (allRosters as any)?.forEach((r: any) => {
+      ((allRosters ?? []) as FrozenRosterEntry[]).forEach((r: FrozenRosterEntry) => {
         if (!rostersByDateTeam.has(r.roster_date)) {
           rostersByDateTeam.set(r.roster_date, new Map());
         }
@@ -345,7 +464,7 @@ const Matchup = () => {
       // Use actual viewing team (handles both user and guest viewing)
       // For guest: currentMatchup contains viewing_team_id that UI sets
       // For user: userTeam.id should match one of the matchup teams
-      const viewingTeamId = (currentMatchup as any).viewing_team_id || userTeam?.id || team1Id;
+      const viewingTeamId = (currentMatchup as unknown as Record<string, unknown>).viewing_team_id as string | undefined || userTeam?.id || team1Id;
       
       // Determine if viewing team is team1 or team2
       const isViewingTeam1 = viewingTeamId === team1Id;
@@ -834,7 +953,7 @@ const Matchup = () => {
             team1DailyPoints = Array(7).fill(0);
           }
         } catch (error) {
-          console.error('[Matchup] Exception calculating team1 daily scores:', error);
+          logger.error('[Matchup] Exception calculating team1 daily scores:', error);
           team1DailyPoints = Array(7).fill(0);
         }
 
@@ -864,7 +983,7 @@ const Matchup = () => {
               team2DailyPoints = Array(7).fill(0);
             }
           } catch (error) {
-            console.error('[Matchup] Exception calculating team2 daily scores:', error);
+            logger.error('[Matchup] Exception calculating team2 daily scores:', error);
             team2DailyPoints = Array(7).fill(0);
           }
         } else {
@@ -942,7 +1061,7 @@ const Matchup = () => {
         hasInitializedRef.current = true;
         loadingRef.current = false;
       } catch (error) {
-        console.error('[Matchup] ❌ ERROR loading guest matchup:', error);
+        logger.error('[Matchup] ❌ ERROR loading guest matchup:', error);
         // CRITICAL: During initial load, NEVER set error or mark as initialized
         // This keeps the loading screen showing and prevents error flash
         // Only show errors after we've successfully initialized at least once
@@ -1070,7 +1189,7 @@ const Matchup = () => {
           }
         }
       } catch (error) {
-        console.error('[Matchup] Exception fetching all week matchups:', error);
+        logger.error('[Matchup] Exception fetching all week matchups:', error);
       }
     };
 
@@ -1402,7 +1521,7 @@ const Matchup = () => {
         setDailyStatsByDate(statsByDate);
         // Calculation will be triggered by useEffect when dailyStatsByDate updates
       } catch (error) {
-        console.error('[Matchup] Error fetching all daily stats:', error);
+        logger.error('[Matchup] Error fetching all daily stats:', error);
         setDailyStatsByDate(new Map());
       } finally {
         statsLoadingRef.current = false;
@@ -1615,7 +1734,7 @@ const Matchup = () => {
         });
 
         if (error) {
-          console.error('[Matchup] Error calling get_daily_game_stats:', error);
+          logger.error('[Matchup] Error calling get_daily_game_stats:', error);
           throw error;
         }
         
@@ -1762,7 +1881,7 @@ const Matchup = () => {
 
         setDailyStatsMap(statsMap);
       } catch (error) {
-        console.error('[Matchup] Error fetching daily stats:', error);
+        logger.error('[Matchup] Error fetching daily stats:', error);
         setDailyStatsMap(new Map());
       } finally {
         loadingRef.current = false;
@@ -3621,7 +3740,7 @@ const Matchup = () => {
       // Set up timeout to ensure loading completes within 15 seconds (more aggressive)
       let timeoutId: NodeJS.Timeout | null = null;
       timeoutId = setTimeout(() => {
-        console.error('[MATCHUP] Load timeout after 15s - FORCING STOP');
+        logger.error('[MATCHUP] Load timeout after 15s - FORCING STOP');
         setError('Loading took too long. Please refresh the page or try again later.');
         setLoading(false);
         loadingRef.current = false; // Force release lock
@@ -3657,7 +3776,7 @@ const Matchup = () => {
           cachedUserLeagues = userLeagues || [];
           
           if (leaguesError) {
-            console.error('[MATCHUP] Error fetching leagues for validation:', leaguesError);
+            logger.error('[MATCHUP] Error fetching leagues for validation:', leaguesError);
             log(' Cannot validate activeLeagueId, will fall back to URL league');
           } else {
             const isValidLeague = userLeagues?.some(l => l.id === activeLeagueId);
@@ -3695,13 +3814,13 @@ const Matchup = () => {
             cachedUserLeagues = userLeagues || [];
             
             if (leaguesError) {
-              console.error('[MATCHUP] Error fetching user leagues:', leaguesError);
+              logger.error('[MATCHUP] Error fetching user leagues:', leaguesError);
               throw leaguesError;
             }
           }
           
           if (cachedUserLeagues.length === 0) {
-            console.error('[MATCHUP] User has no leagues');
+            logger.error('[MATCHUP] User has no leagues');
             setError('You are not in any leagues');
             setLoading(false);
             loadingRef.current = false;
@@ -3736,13 +3855,13 @@ const Matchup = () => {
         }
         
         if (leagueError) {
-          console.error('[MATCHUP] Error fetching leagues for validation:', leagueError);
+          logger.error('[MATCHUP] Error fetching leagues for validation:', leagueError);
           throw leagueError;
         }
         
         const currentLeague = userLeagues.find((l: League) => l.id === targetLeagueId);
         if (!currentLeague) {
-          console.error('[MATCHUP] League not found in user leagues:', targetLeagueId);
+          logger.error('[MATCHUP] League not found in user leagues:', targetLeagueId);
           
           // If activeLeagueId is set and different, try using it
           if (activeLeagueId && activeLeagueId !== targetLeagueId) {
@@ -3792,7 +3911,7 @@ const Matchup = () => {
         // Get user's team
         const { team: userTeamData } = await LeagueService.getUserTeam(currentLeague.id, user.id);
         if (!userTeamData) {
-          console.error('[MATCHUP] User team not found');
+          logger.error('[MATCHUP] User team not found');
           setError('You do not have a team in this league');
           setLoading(false);
           loadingRef.current = false;
@@ -3958,7 +4077,7 @@ const Matchup = () => {
           );
           
           if (genError) {
-            console.error('[Matchup] Error generating matchups:', genError);
+            logger.error('[Matchup] Error generating matchups:', genError);
             setError(`Failed to generate matchups: ${genError.message || 'Unknown error'}`);
             setLoading(false);
             return;
@@ -4021,7 +4140,7 @@ const Matchup = () => {
           );
           
           if (!verifyMatchup) {
-            console.error('[Matchup] Matchup still not found after generation for week', weekToShow);
+            logger.error('[Matchup] Matchup still not found after generation for week', weekToShow);
             
             // If matchups exist but user's team isn't in them, this is a serious issue - FORCE REGENERATE
             if (allMatchups && allMatchups.length > 0 && userTeamData) {
@@ -4032,8 +4151,8 @@ const Matchup = () => {
               );
               
               if (!userTeamInMatchups) {
-                console.error('[Matchup] CRITICAL: Week', weekToShow, 'has matchups but user team', teamData.id, 'is not in any of them!');
-                console.error('[Matchup] FORCING FULL REGENERATION of all matchups...');
+                logger.error('[Matchup] CRITICAL: Week', weekToShow, 'has matchups but user team', teamData.id, 'is not in any of them!');
+                logger.error('[Matchup] FORCING FULL REGENERATION of all matchups...');
                 
                 // Force delete ALL matchups and regenerate
                 await MatchupService.deleteAllMatchupsForLeague(currentLeague.id);
@@ -4044,7 +4163,7 @@ const Matchup = () => {
                 // Verify user's team is in the list
                 const userTeamInList = allLeagueTeams.some(t => t.id === teamData.id);
                 if (!userTeamInList) {
-                  console.error('[Matchup] CRITICAL: User team is not in the league teams list!');
+                  logger.error('[Matchup] CRITICAL: User team is not in the league teams list!');
                   setError(`Your team (${teamData.id}) is not found in the league teams. This is a data integrity issue.`);
                   setLoading(false);
                   return;
@@ -4059,7 +4178,7 @@ const Matchup = () => {
                 );
                 
                 if (regenError) {
-                  console.error('[Matchup] Error during forced regeneration:', regenError);
+                  logger.error('[Matchup] Error during forced regeneration:', regenError);
                   setError(`Failed to regenerate matchups: ${regenError.message || 'Unknown error'}`);
                   setLoading(false);
                   return;
@@ -4076,7 +4195,7 @@ const Matchup = () => {
                 );
                 
                 if (!finalMatchup) {
-                  console.error('[Matchup] Still no matchup after forced regeneration!');
+                  logger.error('[Matchup] Still no matchup after forced regeneration!');
                   setError(`Failed to generate matchup for week ${weekToShow} after forced regeneration. Please refresh and try again.`);
                   setLoading(false);
                   return;
@@ -4104,7 +4223,7 @@ const Matchup = () => {
             );
             
             if (!regeneratedMatchup) {
-              console.error('[Matchup] Matchup still not found after forced regeneration!');
+              logger.error('[Matchup] Matchup still not found after forced regeneration!');
               setError(`Failed to generate matchup for week ${weekToShow} after forced regeneration. Please refresh and try again.`);
               setLoading(false);
               return;
@@ -4166,11 +4285,11 @@ const Matchup = () => {
         ]);
 
         if (matchupError) {
-          console.error('[MATCHUP] Error getting matchup data:', matchupError);
+          logger.error('[MATCHUP] Error getting matchup data:', matchupError);
           
           // Enhanced error handling for dropdown selections
           if (selectedMatchupId) {
-            console.error('[MATCHUP] Failed to load selected matchup from dropdown:', {
+            logger.error('[MATCHUP] Failed to load selected matchup from dropdown:', {
               matchupId: selectedMatchupId,
               error: matchupError,
               errorMessage: matchupError?.message || String(matchupError),
@@ -4208,7 +4327,7 @@ const Matchup = () => {
         }
         
         if (!matchupData) {
-          console.error('[MATCHUP] No matchup data returned', {
+          logger.error('[MATCHUP] No matchup data returned', {
             selectedMatchupId,
             weekToShow,
             targetLeagueId,
@@ -4501,7 +4620,7 @@ const Matchup = () => {
                 data: { myRoster, oppRoster, mySlots, oppSlots }
               };
             } catch (error) {
-              console.error(`[MATCHUP] Error loading frozen roster for ${date}:`, error);
+              logger.error(`[MATCHUP] Error loading frozen roster for ${date}:`, error);
               return null;
             }
           });
@@ -4522,8 +4641,8 @@ const Matchup = () => {
         }
 
       } catch (err: any) {
-        console.error('[MATCHUP] CRITICAL ERROR loading matchup data:', err);
-        console.error('[MATCHUP] Error details:', {
+        logger.error('[MATCHUP] CRITICAL ERROR loading matchup data:', err);
+        logger.error('[MATCHUP] Error details:', {
           message: err.message,
           stack: err.stack,
           name: err.name
@@ -4535,7 +4654,7 @@ const Matchup = () => {
         
         // Log if it's a timeout for debugging
         if (errorMessage.includes('timeout')) {
-          console.error('[MATCHUP] TIMEOUT ERROR - Query took too long');
+          logger.error('[MATCHUP] TIMEOUT ERROR - Query took too long');
         }
       } finally {
         // CRITICAL: Always clear timeout and reset state, even if error occurred
@@ -4798,7 +4917,7 @@ const Matchup = () => {
         
         log(' ✅ Game statuses refreshed successfully');
       } catch (err) {
-        console.error('[Matchup] ❌ Error refreshing game statuses:', err);
+        logger.error('[Matchup] ❌ Error refreshing game statuses:', err);
       }
     };
     

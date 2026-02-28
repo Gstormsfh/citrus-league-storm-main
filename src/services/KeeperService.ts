@@ -16,6 +16,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/utils/logger';
 
 export interface KeeperDesignation {
   id: string;
@@ -89,7 +90,7 @@ export class KeeperService {
 
       return { success: true, designation: data as KeeperDesignation };
     } catch (error: unknown) {
-      console.error('Error designating keeper:', error);
+      logger.error('Error designating keeper:', error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   }
@@ -112,7 +113,7 @@ export class KeeperService {
       if (error) throw error;
       return { success: true };
     } catch (error: unknown) {
-      console.error('Error releasing keeper:', error);
+      logger.error('Error releasing keeper:', error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   }
@@ -138,7 +139,7 @@ export class KeeperService {
       if (error) throw error;
       return { keepers: (data || []) as KeeperDesignation[] };
     } catch (error: unknown) {
-      console.error('Error fetching team keepers:', error);
+      logger.error('Error fetching team keepers:', error);
       return { keepers: [], error: error instanceof Error ? error.message : String(error) };
     }
   }
@@ -162,7 +163,7 @@ export class KeeperService {
       if (error) throw error;
       return { keepers: (data || []) as KeeperDesignation[] };
     } catch (error: unknown) {
-      console.error('Error fetching league keepers:', error);
+      logger.error('Error fetching league keepers:', error);
       return { keepers: [], error: error instanceof Error ? error.message : String(error) };
     }
   }
@@ -193,7 +194,7 @@ export class KeeperService {
         max_keepers: result?.max_keepers ?? 0,
       };
     } catch (error: unknown) {
-      console.error('Error validating keepers:', error);
+      logger.error('Error validating keepers:', error);
       return {
         is_valid: false,
         error_message: 'Validation failed',
@@ -223,7 +224,7 @@ export class KeeperService {
       if (error) throw error;
       return { costs: (data || []) as KeeperDraftCost[] };
     } catch (error: unknown) {
-      console.error('Error fetching keeper draft costs:', error);
+      logger.error('Error fetching keeper draft costs:', error);
       return { costs: [], error: error instanceof Error ? error.message : String(error) };
     }
   }
@@ -269,7 +270,7 @@ export class KeeperService {
 
       return { results };
     } catch (error: unknown) {
-      console.error('Error locking keepers:', error);
+      logger.error('Error locking keepers:', error);
       return { results: [], error: error instanceof Error ? error.message : String(error) };
     }
   }
@@ -338,7 +339,7 @@ export class KeeperService {
 
       return { success: true };
     } catch (error: unknown) {
-      console.error('Error updating keeper settings:', error);
+      logger.error('Error updating keeper settings:', error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   }

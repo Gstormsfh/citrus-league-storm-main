@@ -17,6 +17,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { MatchupService } from './MatchupService';
 import type { PostgrestError } from '@supabase/supabase-js';
+import { logger } from '@/utils/logger';
 
 export const MatchupScoreJobService = {
   /**
@@ -33,7 +34,7 @@ export const MatchupScoreJobService = {
         .eq('status', 'final');
       
       if (gamesError) {
-        console.error('[MatchupScoreJobService] Error querying final games:', gamesError);
+        logger.error('[MatchupScoreJobService] Error querying final games:', gamesError);
         return { lockedCount: 0, error: gamesError };
       }
       
@@ -56,7 +57,7 @@ export const MatchupScoreJobService = {
         .select('player_id');
       
       if (updateError) {
-        console.error('[MatchupScoreJobService] Error batch locking rosters:', updateError);
+        logger.error('[MatchupScoreJobService] Error batch locking rosters:', updateError);
         return { lockedCount: 0, error: updateError };
       }
       
@@ -64,7 +65,7 @@ export const MatchupScoreJobService = {
       return { lockedCount: totalLocked, error: null };
       
     } catch (error) {
-      console.error('[MatchupScoreJobService] Exception in lockCompletedDays:', error);
+      logger.error('[MatchupScoreJobService] Exception in lockCompletedDays:', error);
       return { lockedCount: 0, error: error as PostgrestError };
     }
   },
@@ -82,14 +83,14 @@ export const MatchupScoreJobService = {
       const { error, updatedCount, results } = await MatchupService.updateMatchupScores(leagueId);
       
       if (error) {
-        console.error('[MatchupScoreJobService] Error updating matchup scores:', error);
+        logger.error('[MatchupScoreJobService] Error updating matchup scores:', error);
         return { updatedCount: 0, error };
       }
       
       return { updatedCount: updatedCount || 0, error: null };
       
     } catch (error) {
-      console.error('[MatchupScoreJobService] Exception in calculateAndStoreScores:', error);
+      logger.error('[MatchupScoreJobService] Exception in calculateAndStoreScores:', error);
       return { updatedCount: 0, error: error as PostgrestError };
     }
   },
@@ -120,7 +121,7 @@ export const MatchupScoreJobService = {
     }
     
     if (errors.length > 0) {
-      console.error('[MatchupScoreJobService] Errors:', errors);
+      logger.error('[MatchupScoreJobService] Errors:', errors);
     }
     
     return {
@@ -166,7 +167,7 @@ export const MatchupScoreJobService = {
         lockedDays: lockedCount || 0
       };
     } catch (error) {
-      console.error('[MatchupScoreJobService] Error getting job status:', error);
+      logger.error('[MatchupScoreJobService] Error getting job status:', error);
       return {
         lastRun: null,
         totalMatchups: 0,

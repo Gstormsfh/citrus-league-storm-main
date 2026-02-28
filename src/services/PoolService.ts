@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ScheduleService, NHLGame } from '@/services/ScheduleService';
 import { SEASON_START_YEAR } from '@/utils/seasonConstants';
 import type { LeagueSettings } from '@/types/leagueTypes';
+import { logger } from '@/utils/logger';
 
 // ============================================================================
 // Week / Deadline Helpers
@@ -234,7 +235,7 @@ export class PoolService {
       return { success: true };
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error('[PoolService] submitPickemPicks error:', message);
+      logger.error('[PoolService] submitPickemPicks error:', message);
       return { success: false, error: message };
     }
   }
@@ -257,7 +258,7 @@ export class PoolService {
       if (error) throw error;
       return (data ?? []) as PickemPick[];
     } catch (err) {
-      console.error('[PoolService] getPickemPicks error:', err);
+      logger.error('[PoolService] getPickemPicks error:', err);
       return [];
     }
   }
@@ -308,7 +309,7 @@ export class PoolService {
       return { scored };
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error('[PoolService] scorePickemWeek error:', message);
+      logger.error('[PoolService] scorePickemWeek error:', message);
       return { scored: 0, error: message };
     }
   }
@@ -386,7 +387,7 @@ export class PoolService {
       return { scored };
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error('[PoolService] scorePickemWeekATS error:', message);
+      logger.error('[PoolService] scorePickemWeekATS error:', message);
       return { scored: 0, error: message };
     }
   }
@@ -456,7 +457,7 @@ export class PoolService {
           return b.accuracy - a.accuracy;
         });
     } catch (err) {
-      console.error('[PoolService] getPickemStandings error:', err);
+      logger.error('[PoolService] getPickemStandings error:', err);
       return [];
     }
   }
@@ -520,7 +521,7 @@ export class PoolService {
       return { success: true };
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error('[PoolService] submitSurvivorPick error:', message);
+      logger.error('[PoolService] submitSurvivorPick error:', message);
       return { success: false, error: message };
     }
   }
@@ -548,7 +549,7 @@ export class PoolService {
       if (error) throw error;
       return (count ?? 0) >= maxLives;
     } catch (err) {
-      console.error('[PoolService] isSurvivorEliminated error:', err);
+      logger.error('[PoolService] isSurvivorEliminated error:', err);
       return false;
     }
   }
@@ -658,7 +659,7 @@ export class PoolService {
           return b.teams_used.length - a.teams_used.length;
         });
     } catch (err) {
-      console.error('[PoolService] getSurvivorStandings error:', err);
+      logger.error('[PoolService] getSurvivorStandings error:', err);
       return [];
     }
   }
@@ -683,7 +684,7 @@ export class PoolService {
         is_correct: d.is_correct,
       }));
     } catch (err) {
-      console.error('[PoolService] getSurvivorPickHistory error:', err);
+      logger.error('[PoolService] getSurvivorPickHistory error:', err);
       return [];
     }
   }
@@ -700,7 +701,7 @@ export class PoolService {
       if (error) throw error;
       return (data ?? []).map(d => d.picked_team);
     } catch (err) {
-      console.error('[PoolService] getSurvivorUsedTeams error:', err);
+      logger.error('[PoolService] getSurvivorUsedTeams error:', err);
       return [];
     }
   }
@@ -763,7 +764,7 @@ export class PoolService {
       return { success: true };
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error('[PoolService] submitConfidencePicks error:', message);
+      logger.error('[PoolService] submitConfidencePicks error:', message);
       return { success: false, error: message };
     }
   }
@@ -786,7 +787,7 @@ export class PoolService {
       if (error) throw error;
       return (data ?? []) as ConfidencePick[];
     } catch (err) {
-      console.error('[PoolService] getConfidencePicks error:', err);
+      logger.error('[PoolService] getConfidencePicks error:', err);
       return [];
     }
   }
@@ -882,7 +883,7 @@ export class PoolService {
           return effB - effA;
         });
     } catch (err) {
-      console.error('[PoolService] getConfidenceStandings error:', err);
+      logger.error('[PoolService] getConfidenceStandings error:', err);
       return [];
     }
   }

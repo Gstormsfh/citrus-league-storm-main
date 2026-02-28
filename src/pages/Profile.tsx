@@ -48,6 +48,7 @@ import {
   Play,
   Loader2
 } from 'lucide-react';
+import { logger } from '@/utils/logger';
 
 const Profile = () => {
   const { user, profile, refreshProfile } = useAuth();
@@ -123,7 +124,7 @@ const Profile = () => {
         setLoadingLeagues(true);
         const { leagues, error } = await LeagueService.getUserLeagues(user.id);
         if (error) {
-          console.error('Error loading leagues:', error);
+          logger.error('Error loading leagues:', error);
           return;
         }
         // Filter to only leagues where user is commissioner
@@ -134,7 +135,7 @@ const Profile = () => {
           draft_status: l.draft_status
         })));
       } catch (error) {
-        console.error('Error loading commissioner leagues:', error);
+        logger.error('Error loading commissioner leagues:', error);
       } finally {
         setLoadingLeagues(false);
       }
@@ -244,7 +245,7 @@ const Profile = () => {
           pickTimeLimit: leagueData?.settings?.pickTimeLimit || 90,
         });
       } catch (error) {
-        console.error('Error loading league settings:', error);
+        logger.error('Error loading league settings:', error);
         toast({
           title: 'Error',
           description: 'Failed to load league settings',
@@ -426,7 +427,7 @@ const Profile = () => {
           description: `Synced ${playersSynced} players and rebuilt all team lineups.`,
         });
       } catch (lineupErr) {
-        console.error('Failed to rebuild team_lineups after sync:', lineupErr);
+        logger.error('Failed to rebuild team_lineups after sync:', lineupErr);
         toast({
           title: 'Partial Sync',
           description: `Synced ${playersSynced} players to roster_assignments, but team lineups may need a page refresh.`,
@@ -590,14 +591,14 @@ const Profile = () => {
         );
         
         if (teamUpdateError) {
-          console.error('Error updating existing team names:', teamUpdateError);
+          logger.error('Error updating existing team names:', teamUpdateError);
           toast({
             title: "Partial update",
             description: "Profile updated, but some teams may not have been updated. Please refresh the draft room.",
             variant: "default"
           });
         } else if (updatedCount && updatedCount > 0) {
-          console.log(`Successfully updated ${updatedCount} team(s) with new name`);
+          logger.log(`Successfully updated ${updatedCount} team(s) with new name`);
         }
       }
 

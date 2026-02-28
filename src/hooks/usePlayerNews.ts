@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { PlayerService, Player } from '@/services/PlayerService';
 import { CURRENT_SEASON } from '@/utils/seasonConstants';
+import { logger } from '@/utils/logger';
 
 export interface PlayerNewsItem {
   player_id: number;
@@ -56,7 +57,7 @@ export function usePlayerNews(
         .in('player_id', playerIds);
 
       if (error) {
-        console.error('Error fetching player news:', error);
+        logger.error('Error fetching player news:', error);
         setLoading(false);
         return;
       }
@@ -114,7 +115,7 @@ export function usePlayerNews(
       setNewsItems(items);
       setLastRefresh(new Date());
     } catch (error) {
-      console.error('Error in fetchPlayerNews:', error);
+      logger.error('Error in fetchPlayerNews:', error);
     } finally {
       setLoading(false);
     }

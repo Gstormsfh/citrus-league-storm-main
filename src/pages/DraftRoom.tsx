@@ -1912,14 +1912,14 @@ const DraftRoom = () => {
 
   const handleDeleteTeam = async (teamId: string) => {
     if (!leagueId || !isCommissioner || !user?.id) {
-      console.error('[DraftRoom] Cannot delete team - missing requirements:', { leagueId, isCommissioner, userId: user?.id });
+      logger.error('[DraftRoom] Cannot delete team - missing requirements:', { leagueId, isCommissioner, userId: user?.id });
       throw new Error('Cannot delete team: Missing league ID, commissioner status, or user ID');
     }
 
     try {
       const { success, error } = await LeagueService.deleteTeam(teamId, leagueId, user.id);
       if (error) {
-        console.error('[DraftRoom] Error from deleteTeam service:', error);
+        logger.error('[DraftRoom] Error from deleteTeam service:', error);
         logger.error('Error deleting team:', error);
         throw error;
       }
@@ -1932,7 +1932,7 @@ const DraftRoom = () => {
         throw new Error('Delete operation returned success=false but no error');
       }
     } catch (err) {
-      console.error('[DraftRoom] Exception deleting team:', err);
+      logger.error('[DraftRoom] Exception deleting team:', err);
       logger.error('Exception deleting team:', err);
       throw err;
     }
