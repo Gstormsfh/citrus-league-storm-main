@@ -109,28 +109,6 @@ const MockDraftSimulator = () => {
     }
   }, [numTeams, numRounds, userTeamIndex, getCurrentPickInfo]);
 
-  // AI makes a pick (takes best available player)
-  const makeAIPick = useCallback(() => {
-    if (availablePlayers.length === 0 || currentOverall > totalPicks) return;
-
-    const info = getCurrentPickInfo(currentOverall);
-    const player = availablePlayers[0];
-    const teamNames = MOCK_TEAM_NAMES.slice(0, numTeams);
-
-    const pick: MockDraftPick = {
-      round: info.round,
-      pick: info.pick,
-      overall: currentOverall,
-      teamName: teamNames[info.teamIndex] || `Team ${info.teamIndex + 1}`,
-      teamIndex: info.teamIndex,
-      player,
-    };
-
-    setPicks(prev => [...prev, pick]);
-    setAvailablePlayers(prev => prev.filter(p => p.id !== player.id));
-    setCurrentOverall(prev => prev + 1);
-  }, [availablePlayers, currentOverall, totalPicks, getCurrentPickInfo, numTeams]);
-
   // User drafts a specific player, then auto-simulates AI picks until next user turn
   const draftPlayer = useCallback((player: Player) => {
     if (currentOverall > totalPicks || !isUserPick) return;
