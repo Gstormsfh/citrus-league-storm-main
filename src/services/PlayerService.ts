@@ -301,9 +301,9 @@ export const PlayerService = {
         .map((d) => {
         const pid = Number(d.player_id);
         const sRaw = statsByPlayerId.get(pid) || null;
-        
-        // Validate season matches
-        if (sRaw.season !== DEFAULT_SEASON) {
+
+        // Validate season matches (only if stats record exists)
+        if (sRaw && sRaw.season !== DEFAULT_SEASON) {
           console.warn(`[PlayerService] WARNING: Stats for player ${d.full_name} (ID: ${pid}) has season ${sRaw.season}, expected ${DEFAULT_SEASON}`);
         }
         
@@ -539,6 +539,15 @@ export const PlayerService = {
         }
       });
 
+      // Build talent metrics lookup for getPlayersByIds (same as getAllPlayers)
+      const talentRows2 = (talentRowsRaw || []) as Array<{ player_id: number; season: number; roster_status: string | null; is_ir_eligible: boolean | null }>;
+      const talentByPlayerId2 = new Map<number, { roster_status: string | null; is_ir_eligible: boolean | null }>();
+      talentRows2.forEach(t => {
+        if (t?.player_id != null) {
+          talentByPlayerId2.set(Number(t.player_id), { roster_status: t.roster_status, is_ir_eligible: t.is_ir_eligible });
+        }
+      });
+
       // Include all players from directory (matching getAllPlayers behavior).
       // Players without stats get zero stats but remain visible on rosters.
       const players: Player[] = dirRows
@@ -546,9 +555,9 @@ export const PlayerService = {
         .map((d) => {
         const pid = Number(d.player_id);
         const sRaw = statsByPlayerId.get(pid) || null;
-        
-        // Validate season matches
-        if (sRaw.season !== DEFAULT_SEASON) {
+
+        // Validate season matches (only if stats record exists)
+        if (sRaw && sRaw.season !== DEFAULT_SEASON) {
           console.warn(`[PlayerService] WARNING: Stats for player ${d.full_name} (ID: ${pid}) has season ${sRaw.season}, expected ${DEFAULT_SEASON}`);
         }
         
@@ -576,6 +585,14 @@ export const PlayerService = {
 
         const eligiblePositions = deriveEligiblePositions(pos, sRaw?.position_code || null);
 
+        // Use real roster_status from player_talent_metrics (same as getAllPlayers)
+        const talent2 = talentByPlayerId2.get(pid);
+        const rosterStatus2 = talent2?.roster_status || null;
+        const irEligible2 = talent2?.is_ir_eligible || false;
+        const derivedStatus2 = rosterStatus2 === 'IR' || rosterStatus2 === 'LTIR'
+          ? 'injured'
+          : 'active';
+
         return {
           id: String(pid),
           full_name: d.full_name,
@@ -583,7 +600,9 @@ export const PlayerService = {
           eligible_positions: eligiblePositions,
           team: team || "",
           jersey_number: d.jersey_number ?? null,
-          status: "active",
+          status: derivedStatus2,
+          roster_status: rosterStatus2 || undefined,
+          is_ir_eligible: irEligible2,
           headshot_url: headshot,
           last_updated: new Date().toISOString(),
           games_played: gamesPlayed,

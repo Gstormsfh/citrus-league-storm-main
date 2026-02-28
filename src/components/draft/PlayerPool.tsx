@@ -316,7 +316,7 @@ export const PlayerPool = ({
             <td className="px-2 py-1.5 text-xs text-center">{player.hits}</td>
             <td className="px-2 py-1.5 text-xs text-center">{player.blocks}</td>
             <td className="px-2 py-1.5 text-xs text-center">{player.pim || 0}</td>
-            <td className="px-2 py-1.5 text-xs text-center text-muted-foreground">{player.icetime_seconds && player.games_played ? (() => { const avgSec = player.icetime_seconds / player.games_played; const m = Math.floor(avgSec / 60); const s = Math.round(avgSec % 60); return `${m}:${s < 10 ? '0' : ''}${s}`; })() : '-'}</td>
+            <td className="px-2 py-1.5 text-xs text-center text-muted-foreground">{player.icetime_seconds && player.games_played ? (() => { const totalSec = Math.round(player.icetime_seconds / player.games_played); const m = Math.floor(totalSec / 60); const s = totalSec % 60; return `${m}:${s < 10 ? '0' : ''}${s}`; })() : '-'}</td>
             <td className="px-2 py-1.5 text-xs text-center text-muted-foreground">{player.xGoals.toFixed(2)}</td>
           </>
         )}

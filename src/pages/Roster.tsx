@@ -606,6 +606,8 @@ const Roster = () => {
           team: p.team,
           teamAbbreviation: p.team, // DB has 'EDM' etc
           status: p.status === 'injured' ? 'IR' : (p.status === 'active' ? null : 'WVR'),
+          roster_status: p.roster_status,
+          is_ir_eligible: p.is_ir_eligible,
           image: p.headshot_url || undefined,
           nextGame: undefined, // Will be populated below with real schedule data
           projectedPoints: 0 // Will be set by daily projections system (getDailyProjectionsForMatchup)

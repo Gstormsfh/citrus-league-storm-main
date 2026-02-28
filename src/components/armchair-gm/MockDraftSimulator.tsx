@@ -66,23 +66,48 @@ const MockDraftSimulator = () => {
   const isUserPick = currentPickInfo.teamIndex === userTeamIndex;
   const isDraftComplete = currentOverall > totalPicks;
 
-  // Start draft - load all players
+  // Start draft - load all players, then auto-sim AI picks until user's first turn
   const startDraft = useCallback(async () => {
     setLoading(true);
     try {
       const players = await PlayerService.getAllPlayers();
       // Sort by points descending (best available)
       const sorted = [...players].sort((a, b) => (b.points || 0) - (a.points || 0));
-      setAvailablePlayers(sorted);
-      setPicks([]);
-      setCurrentOverall(1);
+
+      // Auto-sim AI picks before user's first turn
+      const teamNames = MOCK_TEAM_NAMES.slice(0, numTeams);
+      const aiPicks: MockDraftPick[] = [];
+      let remaining = [...sorted];
+      let ov = 1;
+
+      while (ov <= numTeams * numRounds) {
+        const info = getCurrentPickInfo(ov);
+        if (info.teamIndex === userTeamIndex) break; // User's turn
+        if (remaining.length === 0) break;
+
+        const aiPlayer = remaining[0];
+        aiPicks.push({
+          round: info.round,
+          pick: info.pick,
+          overall: ov,
+          teamName: teamNames[info.teamIndex] || `Team ${info.teamIndex + 1}`,
+          teamIndex: info.teamIndex,
+          player: aiPlayer,
+        });
+        remaining = remaining.filter(p => p.id !== aiPlayer.id);
+        ov++;
+      }
+
+      setPicks(aiPicks);
+      setAvailablePlayers(remaining);
+      setCurrentOverall(ov);
       setDraftStarted(true);
     } catch {
       // Failed to load players
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [numTeams, numRounds, userTeamIndex, getCurrentPickInfo]);
 
   // AI makes a pick (takes best available player)
   const makeAIPick = useCallback(() => {
@@ -106,14 +131,15 @@ const MockDraftSimulator = () => {
     setCurrentOverall(prev => prev + 1);
   }, [availablePlayers, currentOverall, totalPicks, getCurrentPickInfo, numTeams]);
 
-  // User drafts a specific player
+  // User drafts a specific player, then auto-simulates AI picks until next user turn
   const draftPlayer = useCallback((player: Player) => {
     if (currentOverall > totalPicks || !isUserPick) return;
 
     const info = getCurrentPickInfo(currentOverall);
     const teamNames = MOCK_TEAM_NAMES.slice(0, numTeams);
 
-    const pick: MockDraftPick = {
+    // User's pick
+    const userPick: MockDraftPick = {
       round: info.round,
       pick: info.pick,
       overall: currentOverall,
@@ -122,10 +148,33 @@ const MockDraftSimulator = () => {
       player,
     };
 
-    setPicks(prev => [...prev, pick]);
-    setAvailablePlayers(prev => prev.filter(p => p.id !== player.id));
-    setCurrentOverall(prev => prev + 1);
-  }, [currentOverall, totalPicks, isUserPick, getCurrentPickInfo, numTeams]);
+    // Auto-simulate AI picks until next user turn
+    const allNewPicks: MockDraftPick[] = [userPick];
+    let remaining = availablePlayers.filter(p => p.id !== player.id);
+    let ov = currentOverall + 1;
+
+    while (ov <= totalPicks) {
+      const nextInfo = getCurrentPickInfo(ov);
+      if (nextInfo.teamIndex === userTeamIndex) break; // Stop at user's next pick
+      if (remaining.length === 0) break;
+
+      const aiPlayer = remaining[0];
+      allNewPicks.push({
+        round: nextInfo.round,
+        pick: nextInfo.pick,
+        overall: ov,
+        teamName: teamNames[nextInfo.teamIndex] || `Team ${nextInfo.teamIndex + 1}`,
+        teamIndex: nextInfo.teamIndex,
+        player: aiPlayer,
+      });
+      remaining = remaining.filter(p => p.id !== aiPlayer.id);
+      ov++;
+    }
+
+    setPicks(prev => [...prev, ...allNewPicks]);
+    setAvailablePlayers(remaining);
+    setCurrentOverall(ov);
+  }, [currentOverall, totalPicks, isUserPick, getCurrentPickInfo, numTeams, availablePlayers, userTeamIndex]);
 
   // Simulate until next user pick
   const simToMyPick = useCallback(() => {
