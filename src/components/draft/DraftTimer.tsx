@@ -11,9 +11,10 @@ interface DraftTimerProps {
 }
 
 export const DraftTimer = memo(({ timeRemaining, isActive, totalTime = 90 }: DraftTimerProps) => {
-  const progress = ((totalTime - timeRemaining) / totalTime) * 100;
-  const minutes = Math.floor(timeRemaining / 60);
-  const seconds = timeRemaining % 60;
+  const clamped = Math.max(0, timeRemaining);
+  const progress = Math.min(100, ((totalTime - clamped) / totalTime) * 100);
+  const minutes = Math.floor(clamped / 60);
+  const seconds = clamped % 60;
   const totalMinutes = Math.floor(totalTime / 60);
   const totalSeconds = totalTime % 60;
   

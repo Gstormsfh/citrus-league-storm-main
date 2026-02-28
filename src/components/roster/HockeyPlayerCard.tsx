@@ -178,7 +178,7 @@ const HockeyPlayerCardContent = ({
 
   const getTeamAbbreviation = (): string => {
     if (player.teamAbbreviation) return player.teamAbbreviation;
-    const words = player.team.split(' ');
+    const words = (player.team || '').split(' ');
     return words[words.length - 1].substring(0, 3).toUpperCase();
   };
 

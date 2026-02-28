@@ -1577,7 +1577,7 @@ const DraftRoom = () => {
       setSelectedPlayer(null);
 
       // Reload all picks to ensure sync
-      const { picks } = await DraftService.getDraftPicks(leagueId, user.id);
+      const { picks } = await DraftService.getDraftPicks(leagueId, user?.id || '');
       const activePicks = picks.filter(p => !p.deleted_at);
       setDraftHistory(activePicks);
       setDraftedPlayerIds(new Set(activePicks.map(p => p.player_id)));
@@ -1740,7 +1740,12 @@ const DraftRoom = () => {
           const gap = need - have;
           if (gap > 0 && gap > biggestGap) {
             // Check if there are available players at this position
-            const availableAtPos = undraftedPlayers.filter(p => p.position === pos);
+            // Expand generic positions: F = any forward (C/LW/RW), W = any wing (LW/RW)
+            const availableAtPos = undraftedPlayers.filter(p => {
+              if (pos === 'F') return ['C', 'LW', 'RW'].includes(p.position);
+              if (pos === 'W') return ['LW', 'RW'].includes(p.position);
+              return p.position === pos;
+            });
             if (availableAtPos.length > 0) {
               biggestGap = gap;
               bestNeedPosition = pos;
@@ -1751,7 +1756,11 @@ const DraftRoom = () => {
         if (bestNeedPosition) {
           // Pick the best available player at the needed position
           const posPlayers = undraftedPlayers
-            .filter(p => p.position === bestNeedPosition)
+            .filter(p => {
+              if (bestNeedPosition === 'F') return ['C', 'LW', 'RW'].includes(p.position);
+              if (bestNeedPosition === 'W') return ['LW', 'RW'].includes(p.position);
+              return p.position === bestNeedPosition;
+            })
             .sort((a, b) => (b.points || 0) - (a.points || 0));
           if (posPlayers.length > 0) {
             selectedPlayer = posPlayers[0];
