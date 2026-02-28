@@ -10,10 +10,45 @@ import { CURRENT_SEASON, getHeadshotUrl } from "@/utils/seasonConstants";
  *
  * No reliance on staging tables.
  */
+
+/**
+ * Derive eligible positions for a player (max 2).
+ * Industry standard: primary position + secondary if the player commonly plays both.
+ * Currently derived from player_season_stats.position_code vs player_directory.position_code differences,
+ * and common NHL position adjacencies (e.g., many Cs also play LW/RW).
+ * In future, this will use game-level position data (10+ GP at secondary position = eligibility).
+ */
+function deriveEligiblePositions(primaryPos: string, statsPos: string | null): string[] {
+  const normalize = (p: string): string => {
+    const u = (p || '').toUpperCase();
+    if (u === 'L' || u === 'LEFT' || u === 'LEFTWING') return 'LW';
+    if (u === 'R' || u === 'RIGHT' || u === 'RIGHTWING') return 'RW';
+    if (u === 'CENTRE' || u === 'CENTER') return 'C';
+    if (u === 'DEFENCE' || u === 'DEFENSE') return 'D';
+    if (u === 'GOALIE' || u === 'GOALTENDER') return 'G';
+    return u;
+  };
+
+  const primary = normalize(primaryPos);
+  if (!primary) return [];
+
+  const positions = [primary];
+
+  // If stats table has a different position than directory, the player is dual-eligible
+  if (statsPos) {
+    const secondary = normalize(statsPos);
+    if (secondary && secondary !== primary && positions.length < 2) {
+      positions.push(secondary);
+    }
+  }
+
+  return positions;
+}
 export interface Player {
   id: string; // Using string ID to be consistent with app usage, but will store NHL ID
   full_name: string;
-  position: string;
+  position: string; // Primary position (C, LW, RW, D, G)
+  eligible_positions: string[]; // All positions this player qualifies for (max 2). Industry standard dual-eligibility.
   team: string;
   jersey_number: string | null;
   status: string | null;
@@ -249,28 +284,26 @@ export const PlayerService = {
         }
       }
 
-      // CRITICAL: Only include players that have matching stats records
-      // This ensures we only show players with actual season data, matching what getPlayersByIds() would return
-      // This prevents showing players from wrong seasons or players without stats
+      // Build talent metrics lookup for roster_status and IR eligibility
+      const talentRows = (talentRowsRaw || []) as Array<{ player_id: number; season: number; roster_status: string | null; is_ir_eligible: boolean | null }>;
+      const talentByPlayerId = new Map<number, { roster_status: string | null; is_ir_eligible: boolean | null }>();
+      talentRows.forEach(t => {
+        if (t?.player_id != null) {
+          talentByPlayerId.set(Number(t.player_id), { roster_status: t.roster_status, is_ir_eligible: t.is_ir_eligible });
+        }
+      });
+
+      // Include ALL players from directory, even those without stats records.
+      // Players without stats get zero stats but still appear on rosters (critical for newly
+      // traded/injured players like McDavid who may have no season stats yet).
       const players: Player[] = dirRows
-        .filter((d) => {
-          const pid = Number(d.player_id);
-          const hasStats = statsByPlayerId.has(pid);
-          if (!hasStats) {
-            // Skip player without stats
-          }
-          return hasStats; // Only include players with matching stats
-        })
+        .filter((d) => d.player_id != null)
         .map((d) => {
         const pid = Number(d.player_id);
-        const sRaw = statsByPlayerId.get(pid);
-        if (!sRaw) {
-          // This shouldn't happen due to filter above, but defensive check
-          throw new Error(`No stats found for player ${pid} despite filter`);
-        }
-        
-        // Validate season matches
-        if (sRaw.season !== DEFAULT_SEASON) {
+        const sRaw = statsByPlayerId.get(pid) || null;
+
+        // Validate season matches (only if stats record exists)
+        if (sRaw && sRaw.season !== DEFAULT_SEASON) {
           console.warn(`[PlayerService] WARNING: Stats for player ${d.full_name} (ID: ${pid}) has season ${sRaw.season}, expected ${DEFAULT_SEASON}`);
         }
         
@@ -293,17 +326,33 @@ export const PlayerService = {
         // ALWAYS use NHL.com official stats (no fallback to PBP)
         const calculatedGoals = Number(s?.nhl_goals ?? 0);
         const calculatedAssists = Number(s?.nhl_assists ?? 0);
-        
+
         // ALWAYS calculate points from goals + assists to ensure consistency
         const calculatedPoints = calculatedGoals + calculatedAssists;
+
+        // Use real roster_status from player_talent_metrics (IR, LTIR, etc.)
+        const talent = talentByPlayerId.get(pid);
+        const rosterStatus = talent?.roster_status || null;
+        const irEligible = talent?.is_ir_eligible || false;
+        // Map NHL roster_status to fantasy-relevant status
+        // IR/LTIR -> 'injured', active/null -> 'active'
+        const derivedStatus = rosterStatus === 'IR' || rosterStatus === 'LTIR'
+          ? 'injured'
+          : 'active';
+
+        // Derive dual-position eligibility from directory vs stats position differences
+        const eligiblePositions = deriveEligiblePositions(pos, sRaw?.position_code || null);
 
         return {
           id: String(pid),
           full_name: d.full_name,
           position: pos || "",
+          eligible_positions: eligiblePositions,
           team: team || "",
           jersey_number: d.jersey_number ?? null,
-          status: "active",
+          status: derivedStatus,
+          roster_status: rosterStatus || undefined,
+          is_ir_eligible: irEligible,
           headshot_url: headshot,
           last_updated: new Date().toISOString(),
           games_played: gamesPlayed,
@@ -333,7 +382,7 @@ export const PlayerService = {
           shutouts: d.is_goalie ? Number(s?.nhl_shutouts ?? 0) : null,
           shots_faced: d.is_goalie ? Number(s?.nhl_shots_faced ?? 0) : null,
           goals_against: d.is_goalie ? Number(s?.nhl_goals_against ?? 0) : null,
-          goals_against_average: d.is_goalie 
+          goals_against_average: d.is_goalie
             ? (s?.nhl_gaa ?? null)
             : null,
           save_percentage: d.is_goalie ? (s?.nhl_save_pct ?? null) : null,
@@ -490,27 +539,25 @@ export const PlayerService = {
         }
       });
 
-      // CRITICAL: Only include players that have matching stats records
-      // This ensures consistency with getAllPlayers() - both methods now filter to players with stats
+      // Build talent metrics lookup for getPlayersByIds (same as getAllPlayers)
+      const talentRows2 = (talentRowsRaw || []) as Array<{ player_id: number; season: number; roster_status: string | null; is_ir_eligible: boolean | null }>;
+      const talentByPlayerId2 = new Map<number, { roster_status: string | null; is_ir_eligible: boolean | null }>();
+      talentRows2.forEach(t => {
+        if (t?.player_id != null) {
+          talentByPlayerId2.set(Number(t.player_id), { roster_status: t.roster_status, is_ir_eligible: t.is_ir_eligible });
+        }
+      });
+
+      // Include all players from directory (matching getAllPlayers behavior).
+      // Players without stats get zero stats but remain visible on rosters.
       const players: Player[] = dirRows
-        .filter((d) => {
-          const pid = Number(d.player_id);
-          const hasStats = statsByPlayerId.has(pid);
-          if (!hasStats) {
-            // Skip player without stats
-          }
-          return hasStats; // Only include players with matching stats
-        })
+        .filter((d) => d.player_id != null)
         .map((d) => {
         const pid = Number(d.player_id);
-        const sRaw = statsByPlayerId.get(pid);
-        if (!sRaw) {
-          // This shouldn't happen due to filter above, but defensive check
-          throw new Error(`No stats found for player ${pid} despite filter`);
-        }
-        
-        // Validate season matches
-        if (sRaw.season !== DEFAULT_SEASON) {
+        const sRaw = statsByPlayerId.get(pid) || null;
+
+        // Validate season matches (only if stats record exists)
+        if (sRaw && sRaw.season !== DEFAULT_SEASON) {
           console.warn(`[PlayerService] WARNING: Stats for player ${d.full_name} (ID: ${pid}) has season ${sRaw.season}, expected ${DEFAULT_SEASON}`);
         }
         
@@ -532,17 +579,30 @@ export const PlayerService = {
         // ALWAYS use NHL.com official stats (no fallback to PBP)
         const calculatedGoals = Number(s?.nhl_goals ?? 0);
         const calculatedAssists = Number(s?.nhl_assists ?? 0);
-        
+
         // ALWAYS calculate points from goals + assists to ensure consistency
         const calculatedPoints = calculatedGoals + calculatedAssists;
+
+        const eligiblePositions = deriveEligiblePositions(pos, sRaw?.position_code || null);
+
+        // Use real roster_status from player_talent_metrics (same as getAllPlayers)
+        const talent2 = talentByPlayerId2.get(pid);
+        const rosterStatus2 = talent2?.roster_status || null;
+        const irEligible2 = talent2?.is_ir_eligible || false;
+        const derivedStatus2 = rosterStatus2 === 'IR' || rosterStatus2 === 'LTIR'
+          ? 'injured'
+          : 'active';
 
         return {
           id: String(pid),
           full_name: d.full_name,
           position: pos || "",
+          eligible_positions: eligiblePositions,
           team: team || "",
           jersey_number: d.jersey_number ?? null,
-          status: "active",
+          status: derivedStatus2,
+          roster_status: rosterStatus2 || undefined,
+          is_ir_eligible: irEligible2,
           headshot_url: headshot,
           last_updated: new Date().toISOString(),
           games_played: gamesPlayed,
@@ -572,7 +632,7 @@ export const PlayerService = {
           shutouts: d.is_goalie ? Number(s?.nhl_shutouts ?? 0) : null,
           shots_faced: d.is_goalie ? Number(s?.nhl_shots_faced ?? 0) : null,
           goals_against: d.is_goalie ? Number(s?.nhl_goals_against ?? 0) : null,
-          goals_against_average: d.is_goalie 
+          goals_against_average: d.is_goalie
             ? (s?.nhl_gaa ?? null)
             : null,
           save_percentage: d.is_goalie ? (s?.nhl_save_pct ?? null) : null,

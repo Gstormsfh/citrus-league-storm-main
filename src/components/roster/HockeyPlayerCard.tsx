@@ -12,6 +12,7 @@ export interface HockeyPlayer {
   id: number | string;
   name: string;
   position: string; // 'Centre', 'Right Wing', 'Left Wing', 'Defence', 'Goalie', 'C', 'RW', 'LW', 'D', 'G'
+  eligible_positions?: string[]; // Dual-position eligibility (max 2), e.g., ['C', 'LW']
   number: number;
   starter: boolean;
   stats: {
@@ -167,6 +168,14 @@ const HockeyPlayerCardContent = ({
     return pos.substring(0, 2);
   };
 
+  // Display dual-position eligibility (e.g., "C/LW") or single position
+  const getPositionDisplay = (): string => {
+    if (player.eligible_positions && player.eligible_positions.length > 1) {
+      return player.eligible_positions.slice(0, 2).join('/');
+    }
+    return getPositionAbbreviation(player.position);
+  };
+
   const getTeamAbbreviation = (): string => {
     if (player.teamAbbreviation) return player.teamAbbreviation;
     const words = player.team.split(' ');
@@ -298,7 +307,7 @@ const HockeyPlayerCardContent = ({
 
   const displayStats = getDisplayStats();
   const isGoalie = player.position === 'Goalie' || player.position === 'G';
-  const positionAbbr = getPositionAbbreviation(player.position);
+  const positionAbbr = getPositionDisplay();
   const teamAbbr = getTeamAbbreviation();
   const teamLogoUrl = `https://assets.nhle.com/logos/nhl/svg/${player.teamAbbreviation || 'NHL'}_light.svg`;
 

@@ -234,7 +234,7 @@ const PositionSlot = ({
       className={cn(
         "p-2 transition-all rounded-lg w-full",
         "border-2",
-        "min-h-[154px]",
+        "min-h-[140px]",
         isOver && "border-citrus-sage bg-citrus-sage/10 shadow-lg",
         isEmpty && !isEligibleTarget && "border-dashed border-citrus-charcoal/20 bg-[#E8EED9]/50 backdrop-blur-sm/50",
         isFull && !isOver && !isSlotSelected && !isEligibleTarget && "border-citrus-sage/30 bg-[#E8EED9]/50 backdrop-blur-sm shadow-sm",

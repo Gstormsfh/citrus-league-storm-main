@@ -45,7 +45,7 @@ const IndividualIRSlot = ({
     <Card
       ref={setNodeRef}
       className={cn(
-        "p-2 transition-all rounded-lg min-h-[110px] w-full",
+        "p-2 transition-all rounded-lg min-h-[140px] w-full",
         "border-2",
         isOver && "border-red-500 bg-red-500/10 shadow-lg",
         isEmpty && !isOver && "border-dashed border-red-400/30 bg-[#E8EED9]/50 backdrop-blur-sm/50",
@@ -78,7 +78,7 @@ const IndividualIRSlot = ({
         </SortableContext>
       ) : (
         <div className={cn(
-          "flex items-center justify-center h-[80px] rounded border border-dashed transition-all",
+          "flex items-center justify-center h-[110px] rounded border border-dashed transition-all",
           isOver ? "border-red-500 bg-red-500/10 border-2" : "border-red-300/30 bg-red-50/20 dark:bg-red-950/5"
         )}>
           <div className="text-center">

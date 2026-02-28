@@ -102,7 +102,7 @@ const BenchGrid = ({ players, onPlayerClick, className, lockedPlayerIds = new Se
           </SortableContext>
         ) : (
           <div className={cn(
-            "flex items-center justify-center h-64 rounded-lg border-2 border-dashed relative overflow-hidden",
+            "flex items-center justify-center h-[140px] rounded-lg border-2 border-dashed relative overflow-hidden",
             isOver ? "border-citrus-sage bg-citrus-sage/10" : "border-citrus-sage/30 bg-[#E8EED9]/50 backdrop-blur-sm/50"
           )}>
             {/* Decorative citrus slices in background */}

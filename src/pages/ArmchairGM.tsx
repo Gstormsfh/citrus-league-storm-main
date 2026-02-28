@@ -13,12 +13,13 @@ import { getTeamCapData } from '@/services/NHLCapService';
 import { TeamCapData, formatCap, SALARY_CAP_2025_26 } from '@/types/captracker';
 import { cn } from '@/lib/utils';
 import { SEASON_LABEL } from '@/utils/seasonConstants';
+import MockDraftSimulator from '@/components/armchair-gm/MockDraftSimulator';
 import {
   DollarSign, TrendingUp, ChevronLeft, Loader2, AlertCircle,
-  ArrowLeftRight, Calculator, CalendarRange, BarChart3, PenLine,
+  ArrowLeftRight, Calculator, CalendarRange, BarChart3, PenLine, Trophy,
 } from 'lucide-react';
 
-type GMTab = 'tracker' | 'trade' | 'signing' | 'buyout' | 'projection';
+type GMTab = 'tracker' | 'trade' | 'signing' | 'buyout' | 'projection' | 'mockdraft';
 
 const TABS: { id: GMTab; label: string; shortLabel: string; icon: React.ReactNode; description: string }[] = [
   { id: 'tracker', label: 'Cap Tracker', shortLabel: 'Cap', icon: <BarChart3 className="w-4 h-4" />, description: 'View team rosters & cap details' },
@@ -26,6 +27,7 @@ const TABS: { id: GMTab; label: string; shortLabel: string; icon: React.ReactNod
   { id: 'signing', label: 'Signing Sim', shortLabel: 'Sign', icon: <PenLine className="w-4 h-4" />, description: 'Simulate free agent signings' },
   { id: 'buyout', label: 'Buyout Calculator', shortLabel: 'Buy', icon: <Calculator className="w-4 h-4" />, description: 'Calculate buyout costs & savings' },
   { id: 'projection', label: 'Cap Projection', shortLabel: 'Proj', icon: <CalendarRange className="w-4 h-4" />, description: 'Multi-year cap commitments' },
+  { id: 'mockdraft', label: 'Mock Draft', shortLabel: 'Draft', icon: <Trophy className="w-4 h-4" />, description: 'Practice your draft strategy' },
 ];
 
 const ArmchairGM = () => {
@@ -201,6 +203,9 @@ const ArmchairGM = () => {
 
           {/* Cap Projection Tab */}
           {activeTab === 'projection' && <CapProjection />}
+
+          {/* Mock Draft Tab */}
+          {activeTab === 'mockdraft' && <MockDraftSimulator />}
         </div>
       </main>
 
