@@ -12,6 +12,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { DataCacheService, TTL } from '@/services/DataCacheService';
+import { logger } from '@/utils/logger';
 
 interface DailyScore {
   myScore: number;
@@ -102,7 +103,7 @@ export function useMatchupScoring({
         .eq('slot_type', 'active');
       
       if (error) {
-        console.error('[useMatchupScoring] Error fetching rosters:', error);
+        logger.error('[useMatchupScoring] Error fetching rosters:', error);
         setIsLoading(false);
         return;
       }

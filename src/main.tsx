@@ -2,6 +2,7 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
+import { logger } from '@/utils/logger'
 import './index.css'
 import { ErrorBoundary } from './components/ErrorBoundary'
 // Import logger early to silence all console output (Sleeper-style)
@@ -35,7 +36,7 @@ try {
   );
 
 } catch (error) {
-  console.error('Critical render error:', error);
+  logger.error('Critical render error:', error);
   if (rootElement) {
     rootElement.innerHTML = `
       <div style="padding: 20px; font-family: sans-serif; background: white; min-height: 100vh; display: flex; align-items: center; justify-content: center;">

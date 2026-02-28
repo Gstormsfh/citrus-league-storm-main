@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { getTodayMST, getTodayMSTDate } from '@/utils/timezoneUtils';
 import { DEFAULT_TEST_DATE } from '@/utils/seasonConstants';
+import { logger } from '@/utils/logger';
 
 // Test mode: Controlled via VITE_TEST_MODE environment variable
 const TEST_MODE = import.meta.env.VITE_TEST_MODE === 'true';
@@ -68,7 +69,7 @@ export const GameLockService = {
         .maybeSingle();
 
       if (error) {
-        console.error('[GameLockService] Error checking game status:', error);
+        logger.error('[GameLockService] Error checking game status:', error);
         // Fail open - allow moves if we can't determine status
         return { isLocked: false, gameStatus: 'not_started' };
       }
@@ -123,7 +124,7 @@ export const GameLockService = {
         gameDate: game.game_date
       };
     } catch (error) {
-      console.error('[GameLockService] Exception checking player lock:', error);
+      logger.error('[GameLockService] Exception checking player lock:', error);
       // Fail open - allow moves on error
       return { isLocked: false, gameStatus: 'not_started' };
     }
@@ -186,7 +187,7 @@ export const GameLockService = {
       .in('status', ['scheduled', 'live', 'final']);
 
     if (error) {
-      console.error('[GameLockService] Error batch checking games:', error);
+      logger.error('[GameLockService] Error batch checking games:', error);
       return lockedIds;
     }
 

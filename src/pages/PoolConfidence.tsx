@@ -15,6 +15,7 @@ import { NHLGame } from '@/services/ScheduleService';
 import { Loader2, BarChart3, ArrowUpDown, CheckCircle, XCircle, ChevronLeft, ChevronRight, Lock } from 'lucide-react';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import LoadingScreen from '@/components/LoadingScreen';
+import { logger } from '@/utils/logger';
 
 interface PickWithConfidence {
   game_id: string;
@@ -63,7 +64,7 @@ const PoolConfidence = () => {
         const standingsData = await PoolService.getConfidenceStandings(activeLeagueId);
         setStandings(standingsData);
       } catch (err) {
-        console.error('[PoolConfidence] Error:', err);
+        logger.error('[PoolConfidence] Error:', err);
       } finally {
         setLoading(false);
       }

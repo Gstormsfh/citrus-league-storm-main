@@ -17,6 +17,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { CURRENT_SEASON } from '@/utils/seasonConstants';
+import { logger } from '@/utils/logger';
 
 // ============================================================================
 // Types
@@ -120,7 +121,7 @@ export class AuctionDraftService {
       return { success: true };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error('[AuctionDraftService] initializeAuction error:', msg);
+      logger.error('[AuctionDraftService] initializeAuction error:', msg);
       return { success: false, error: msg };
     }
   }
@@ -142,7 +143,7 @@ export class AuctionDraftService {
 
       if (!session) return null;
 
-      const settings = session.settings as any;
+      const settings = session.settings as Record<string, unknown>;
 
       // Get all budgets
       const { data: budgets } = await supabase
@@ -171,7 +172,7 @@ export class AuctionDraftService {
         total_nominations: settings?.total_nominations ?? 0,
       };
     } catch (err) {
-      console.error('[AuctionDraftService] getAuctionState error:', err);
+      logger.error('[AuctionDraftService] getAuctionState error:', err);
       return null;
     }
   }
@@ -244,7 +245,7 @@ export class AuctionDraftService {
         team_id: teamId,
         bid_amount: openingBid,
       });
-      if (bidError) console.error('[AuctionDraft] Failed to record opening bid:', bidError);
+      if (bidError) logger.error('[AuctionDraft] Failed to record opening bid:', bidError);
 
       // Update nomination count
       const sessionSettings = (await supabase
@@ -266,7 +267,7 @@ export class AuctionDraftService {
       return { success: true, nomination: nom as AuctionNomination };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error('[AuctionDraftService] nominatePlayer error:', msg);
+      logger.error('[AuctionDraftService] nominatePlayer error:', msg);
       return { success: false, error: msg };
     }
   }
@@ -363,7 +364,7 @@ export class AuctionDraftService {
       return { success: true };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error('[AuctionDraftService] placeBid error:', msg);
+      logger.error('[AuctionDraftService] placeBid error:', msg);
       return { success: false, error: msg };
     }
   }
@@ -428,7 +429,7 @@ export class AuctionDraftService {
         .eq('id', sessionId)
         .single();
 
-      const totalNoms = (session?.settings as any)?.total_nominations ?? 1;
+      const totalNoms = (session?.settings as Record<string, unknown>)?.total_nominations as number ?? 1;
 
       const { error: pickError } = await supabase.from('draft_picks').insert({
         league_id: leagueId,
@@ -438,12 +439,12 @@ export class AuctionDraftService {
         pick_number: totalNoms,
         draft_session_id: sessionId,
       });
-      if (pickError) console.error('[AuctionDraft] Failed to record draft pick:', pickError);
+      if (pickError) logger.error('[AuctionDraft] Failed to record draft pick:', pickError);
 
       // Advance nomination order
-      const settings = session?.settings as any;
-      const order = settings?.nomination_order ?? [];
-      const nextIndex = ((settings?.current_nominator_index ?? 0) + 1) % order.length;
+      const settings = session?.settings as Record<string, unknown>;
+      const order = (settings?.nomination_order ?? []) as string[];
+      const nextIndex = (((settings?.current_nominator_index as number) ?? 0) + 1) % order.length;
 
       await supabase
         .from('draft_sessions')
@@ -483,7 +484,7 @@ export class AuctionDraftService {
       return { success: true, winner_team_id: winnerTeamId, amount: winAmount };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error('[AuctionDraftService] closeNomination error:', msg);
+      logger.error('[AuctionDraftService] closeNomination error:', msg);
       return { success: false, error: msg };
     }
   }
@@ -502,7 +503,7 @@ export class AuctionDraftService {
       if (error) throw error;
       return (data ?? []) as AuctionBid[];
     } catch (err) {
-      console.error('[AuctionDraftService] getBidHistory error:', err);
+      logger.error('[AuctionDraftService] getBidHistory error:', err);
       return [];
     }
   }
@@ -554,7 +555,7 @@ export class AuctionDraftService {
       );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error('[AuctionDraftService] autoNominate error:', msg);
+      logger.error('[AuctionDraftService] autoNominate error:', msg);
       return { success: false, error: msg };
     }
   }
@@ -573,7 +574,7 @@ export class AuctionDraftService {
       if (error) throw error;
       return (data ?? []) as AuctionBudget[];
     } catch (err) {
-      console.error('[AuctionDraftService] getAuctionBudgets error:', err);
+      logger.error('[AuctionDraftService] getAuctionBudgets error:', err);
       return [];
     }
   }

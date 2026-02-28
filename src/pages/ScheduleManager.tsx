@@ -14,6 +14,7 @@ import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { format } from 'date-fns';
 import { COLUMNS } from '@/utils/queryColumns';
+import { logger } from '@/utils/logger';
 
 const ScheduleManager = () => {
   const { user } = useAuth();
@@ -66,7 +67,7 @@ const ScheduleManager = () => {
         }
       }
     } catch (error) {
-      console.error('Error loading schedule data:', error);
+      logger.error('Error loading schedule data:', error);
     } finally {
       setLoading(false);
     }

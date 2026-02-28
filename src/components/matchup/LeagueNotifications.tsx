@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { CitrusSparkle, CitrusLeaf } from '@/components/icons/CitrusIcons';
 import { toast } from '@/hooks/use-toast';
+import { logger } from '@/utils/logger';
 
 interface LeagueNotificationsProps {
   leagueId: string;
@@ -82,7 +83,7 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
           .in('owner_id', Array.from(senderIds));
 
         if (error) {
-          console.error('Error fetching team info:', error);
+          logger.error('Error fetching team info:', error);
           return;
         }
 
@@ -99,7 +100,7 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
 
         setTeamInfoMap(newMap);
       } catch (error) {
-        console.error('Error fetching team info:', error);
+        logger.error('Error fetching team info:', error);
       }
     };
 
@@ -146,7 +147,7 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
       });
 
       if (error) {
-        console.error('Error sending chat message:', error);
+        logger.error('Error sending chat message:', error);
         throw new Error(error.message || 'Failed to send message');
       }
 
@@ -165,7 +166,7 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
         }
       }, 300);
     } catch (error: unknown) {
-      console.error('Error sending chat message:', error);
+      logger.error('Error sending chat message:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to send message. Please try again.';
       toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
     } finally {

@@ -12,9 +12,10 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
-import { ScoringCalculator, extractScoringSettings } from '@/utils/scoringUtils';
+import { ScoringCalculator, extractScoringSettings, type ScoringSettings } from '@/utils/scoringUtils';
 import { DEFAULT_ROSTER_SLOTS, type RosterSlotConfig } from '@/types/leagueTypes';
 import { CURRENT_SEASON } from '@/utils/seasonConstants';
+import { logger } from '@/utils/logger';
 
 // Mapping of roster slot codes to eligible player positions
 const SLOT_ELIGIBLE_POSITIONS: Record<string, string[]> = {
@@ -110,7 +111,7 @@ export class BestBallService {
     leagueId: string,
     teamId: string,
     weekNumber: number,
-    scoringSettings?: any
+    scoringSettings?: ScoringSettings | Partial<ScoringSettings> | null
   ): Promise<BestBallResult> {
     const scorer = new ScoringCalculator(scoringSettings);
     const emptyResult: BestBallResult = {
@@ -161,7 +162,7 @@ export class BestBallService {
         .in('player_id', playerIds.map(Number));
 
       const posMap = new Map<string, string>();
-      (players ?? []).forEach((p: any) => posMap.set(String(p.player_id), p.position_code || 'UTIL'));
+      (players ?? []).forEach((p: { player_id: number; position_code: string | null }) => posMap.set(String(p.player_id), p.position_code || 'UTIL'));
 
       // Get weekly stats for these players
       const { data: weeklyStats } = await supabase
@@ -174,7 +175,7 @@ export class BestBallService {
 
       // Calculate fantasy points for each player
       // IR players score 0 — they're tracked but never optimized into the lineup
-      const playerScores: PlayerScore[] = weeklyStats.map((s: any) => {
+      const playerScores: PlayerScore[] = weeklyStats.map((s: Record<string, number>) => {
         const pos = posMap.get(String(s.player_id)) || 'UTIL';
         const isGoalie = pos === 'G' || pos === 'Goalie';
         const isOnIR = irPlayerIds.has(String(s.player_id));
@@ -201,7 +202,7 @@ export class BestBallService {
         player_scores: allScores,
       };
     } catch (err) {
-      console.error('[BestBallService] calculateWeeklyBestBall error:', err);
+      logger.error('[BestBallService] calculateWeeklyBestBall error:', err);
       return emptyResult;
     }
   }
@@ -212,7 +213,7 @@ export class BestBallService {
   static async calculateLeagueWeekBestBall(
     leagueId: string,
     weekNumber: number,
-    scoringSettings?: any
+    scoringSettings?: ScoringSettings | Partial<ScoringSettings> | null
   ): Promise<BestBallResult[]> {
     try {
       // Get all teams in the league
@@ -229,7 +230,7 @@ export class BestBallService {
 
       return results;
     } catch (err) {
-      console.error('[BestBallService] calculateLeagueWeekBestBall error:', err);
+      logger.error('[BestBallService] calculateLeagueWeekBestBall error:', err);
       return [];
     }
   }
@@ -241,7 +242,7 @@ export class BestBallService {
   static async calculateSeasonBestBall(
     leagueId: string,
     totalWeeks: number,
-    scoringSettings?: any
+    scoringSettings?: ScoringSettings | Partial<ScoringSettings> | null
   ): Promise<Record<string, { totalOptimizedPoints: number; weeklyBreakdown: Record<number, number> }>> {
     const result: Record<string, { totalOptimizedPoints: number; weeklyBreakdown: Record<number, number> }> = {};
 
@@ -257,7 +258,7 @@ export class BestBallService {
         }
       }
     } catch (err) {
-      console.error('[BestBallService] calculateSeasonBestBall error:', err);
+      logger.error('[BestBallService] calculateSeasonBestBall error:', err);
     }
 
     return result;
@@ -296,7 +297,7 @@ export class BestBallService {
 
       if (error) throw error;
 
-      const results = (data || []).map((row: any) => ({
+      const results = (data || []).map((row: { team_id: string; players_optimized: number; total_points: number }) => ({
         teamId: row.team_id,
         playersOptimized: row.players_optimized,
         totalPoints: row.total_points,
@@ -304,7 +305,7 @@ export class BestBallService {
 
       return { results };
     } catch (error: unknown) {
-      console.error('[BestBallService] triggerServerOptimization error:', error);
+      logger.error('[BestBallService] triggerServerOptimization error:', error);
       return { results: [], error: error instanceof Error ? error.message : String(error) };
     }
   }
@@ -331,7 +332,7 @@ export class BestBallService {
 
       return { daysOptimized };
     } catch (error: unknown) {
-      console.error('[BestBallService] triggerWeekOptimization error:', error);
+      logger.error('[BestBallService] triggerWeekOptimization error:', error);
       return { daysOptimized: 0, error: error instanceof Error ? error.message : String(error) };
     }
   }

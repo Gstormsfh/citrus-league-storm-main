@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { AlertCircle, Clock, TrendingUp, TrendingDown } from 'lucide-react';
 import { CitrusSparkle, CitrusWedge } from '@/components/icons/CitrusIcons';
 import { COLUMNS } from '@/utils/queryColumns';
+import { logger } from '@/utils/logger';
 
 interface HeadlineItem {
   type: 'waiver' | 'matchup' | 'streak';
@@ -98,7 +99,7 @@ export const HeadlinesBanner = () => {
             }
           }
         } catch (error) {
-          console.error('Error fetching matchup headline:', error);
+          logger.error('Error fetching matchup headline:', error);
         }
 
         // 2. Calculate team streak
@@ -163,7 +164,7 @@ export const HeadlinesBanner = () => {
             }
           }
         } catch (error) {
-          console.error('Error calculating streak:', error);
+          logger.error('Error calculating streak:', error);
         }
 
         // 3. Check for waiver wire deadline (default to Saturday 11 PM EST)
@@ -197,7 +198,7 @@ export const HeadlinesBanner = () => {
 
         setHeadline(headlines[0] || null);
       } catch (error) {
-        console.error('Error fetching headlines:', error);
+        logger.error('Error fetching headlines:', error);
       } finally {
         setLoading(false);
       }

@@ -22,6 +22,7 @@ import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { TradeService } from '@/services/TradeService';
 import { extractFormatSettings, AVAILABLE_CATEGORIES, DEFAULT_ROSTER_SLOTS, type LeagueSettings } from '@/types/leagueTypes';
+import { logger } from '@/utils/logger';
 
 const LeagueDashboard = () => {
   const { leagueId } = useParams<{ leagueId: string }>();
@@ -216,7 +217,7 @@ const LeagueDashboard = () => {
       // Load teams
       const { teams: teamsData, error: teamsError } = await LeagueService.getLeagueTeams(leagueId);
       if (teamsError) {
-        console.error('Error loading teams:', teamsError);
+        logger.error('Error loading teams:', teamsError);
         throw teamsError;
       }
       setTeams(teamsData || []);
@@ -233,7 +234,7 @@ const LeagueDashboard = () => {
 
   const handleSimulateFill = async () => {
     if (!leagueId) {
-      console.error('handleSimulateFill: No leagueId');
+      logger.error('handleSimulateFill: No leagueId');
       return;
     }
 
@@ -248,7 +249,7 @@ const LeagueDashboard = () => {
       const { error: simError } = await LeagueService.simulateLeagueFill(leagueId, 12);
       
       if (simError) {
-        console.error('handleSimulateFill: Error from simulateLeagueFill:', simError);
+        logger.error('handleSimulateFill: Error from simulateLeagueFill:', simError);
         const errorMessage = simError.message || JSON.stringify(simError) || 'Failed to simulate teams';
         toast({
           title: 'Error Creating Teams',
@@ -287,7 +288,7 @@ const LeagueDashboard = () => {
       }
       
       if (reloadError) {
-        console.error('handleSimulateFill: Error reloading teams:', reloadError);
+        logger.error('handleSimulateFill: Error reloading teams:', reloadError);
         toast({
           title: 'Warning',
           description: 'Teams were created but could not be reloaded. Please refresh the page.',
@@ -304,7 +305,7 @@ const LeagueDashboard = () => {
         }
       }
     } catch (err: any) {
-      console.error('handleSimulateFill: Exception:', err);
+      logger.error('handleSimulateFill: Exception:', err);
       toast({
         title: 'Error',
         description: err.message || 'Failed to simulate teams',
@@ -545,7 +546,7 @@ const LeagueDashboard = () => {
           description: `Synced ${playersSynced} players and rebuilt all team lineups.`,
         });
       } catch (lineupErr) {
-        console.error('Failed to rebuild team_lineups:', lineupErr);
+        logger.error('Failed to rebuild team_lineups:', lineupErr);
         toast({
           title: 'Partial Sync',
           description: `Synced ${playersSynced} players. Team lineups may need a page refresh.`,

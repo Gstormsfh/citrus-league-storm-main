@@ -3,6 +3,7 @@ import { User, Session, AuthError, AuthResponse } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { analyticsService } from '@/services/AnalyticsService';
 import { setSentryUser } from '@/integrations/sentry/config';
+import { logger } from '@/utils/logger';
 
 interface Profile {
   id: string;
@@ -54,7 +55,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // PGRST116 = no rows found (which is fine)
         // Check if it's a table doesn't exist error
         if (error.message?.includes('relation') || error.message?.includes('does not exist')) {
-          console.warn('Profiles table does not exist. Please run Supabase migrations.');
+          logger.warn('Profiles table does not exist. Please run Supabase migrations.');
           setProfile(null);
           return;
         }
@@ -64,7 +65,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // If profile exists but has auto-generated username, still set it (user can update it)
       setProfile(data || null);
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      logger.error('Error fetching profile:', error);
       setProfile(null);
     }
   };
@@ -79,7 +80,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     let mounted = true;
     const timeout = setTimeout(() => {
       if (mounted) {
-        console.warn("⚠️ Auth initialization taking longer than expected, setting loading to false");
+        logger.warn("⚠️ Auth initialization taking longer than expected, setting loading to false");
         setLoading(false);
       }
     }, 5000); // 5 second timeout
@@ -103,7 +104,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }).catch((error) => {
       if (!mounted) return;
       clearTimeout(timeout);
-      console.error("Error getting session:", error);
+      logger.error("Error getting session:", error);
       setLoading(false);
     });
 

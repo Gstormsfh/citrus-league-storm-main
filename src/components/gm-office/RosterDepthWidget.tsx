@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { PlayerService, Player } from '@/services/PlayerService';
 import { LeagueService } from '@/services/LeagueService';
 import { Loader2 } from 'lucide-react';
+import { logger } from '@/utils/logger';
 
 interface PositionDepth {
   position: string;
@@ -123,7 +124,7 @@ export const RosterDepthWidget = () => {
         let rosterPlayers: Player[] = [];
 
         if (picksError) {
-          console.error('Error fetching roster assignments:', picksError);
+          logger.error('Error fetching roster assignments:', picksError);
           setLoading(false);
           return;
         } else {
@@ -173,7 +174,7 @@ export const RosterDepthWidget = () => {
 
         setDepths(positionDepths);
       } catch (error) {
-        console.error('Error calculating roster depth:', error);
+        logger.error('Error calculating roster depth:', error);
       } finally {
         setLoading(false);
       }

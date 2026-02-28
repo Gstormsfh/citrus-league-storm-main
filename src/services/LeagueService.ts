@@ -341,12 +341,12 @@ export const LeagueService = {
             initial_budget: faabBudget,
             remaining_budget: faabBudget,
           });
-        if (faabError) console.error('Failed to initialize FAAB budget:', faabError);
+        if (faabError) logger.error('Failed to initialize FAAB budget:', faabError);
       }
 
       return { league, team, error: null };
     } catch (error) {
-      console.error('Error creating league:', error);
+      logger.error('Error creating league:', error);
       return { league: null, team: null, error };
     }
   },
@@ -413,7 +413,7 @@ async joinLeagueByCode(
     });
 
     if (error) {
-      console.error('Error calling join_league_with_code RPC:', error);
+      logger.error('Error calling join_league_with_code RPC:', error);
       throw error;
     }
 
@@ -439,7 +439,7 @@ async joinLeagueByCode(
       error: null 
     };
   } catch (error) {
-    console.error('Exception in joinLeagueByCode:', error);
+    logger.error('Exception in joinLeagueByCode:', error);
     return { league: null, team: null, error };
   }
 },
@@ -475,7 +475,7 @@ async joinLeagueByCode(
 
       return { success: true, error: null };
     } catch (error) {
-      console.error('Error updating waiver settings:', error);
+      logger.error('Error updating waiver settings:', error);
       return { success: false, error };
     }
   },
@@ -531,7 +531,7 @@ async joinLeagueByCode(
 
       return { success: true, error: null };
     } catch (error) {
-      console.error('Error updating scoring settings:', error);
+      logger.error('Error updating scoring settings:', error);
       return { success: false, error };
     }
   },
@@ -584,7 +584,7 @@ async joinLeagueByCode(
       
       return { success: true, error: null };
     } catch (error) {
-      console.error('Error updating draft settings:', error);
+      logger.error('Error updating draft settings:', error);
       return { success: false, error };
     }
   },
@@ -637,7 +637,7 @@ async joinLeagueByCode(
       await this.notifyLeagueMembers(leagueId, 'Commissioner updated keeper/dynasty settings', 'Keeper Settings Updated');
       return { success: true, error: null };
     } catch (error) {
-      console.error('Error updating keeper settings:', error);
+      logger.error('Error updating keeper settings:', error);
       return { success: false, error };
     }
   },
@@ -686,7 +686,7 @@ async joinLeagueByCode(
       await this.notifyLeagueMembers(leagueId, `Commissioner updated stat categories (${categories.length} categories)`, 'Category Settings Updated');
       return { success: true, error: null };
     } catch (error) {
-      console.error('Error updating category settings:', error);
+      logger.error('Error updating category settings:', error);
       return { success: false, error };
     }
   },
@@ -734,7 +734,7 @@ async joinLeagueByCode(
       await this.notifyLeagueMembers(leagueId, `Commissioner updated roster slot configuration (${totalSlots} total slots)`, 'Roster Slots Updated');
       return { success: true, error: null };
     } catch (error) {
-      console.error('Error updating roster slot settings:', error);
+      logger.error('Error updating roster slot settings:', error);
       return { success: false, error };
     }
   },
@@ -760,7 +760,7 @@ async joinLeagueByCode(
       });
 
       if (rpcError) {
-        console.error('Error calling notify_league_members RPC:', rpcError);
+        logger.error('Error calling notify_league_members RPC:', rpcError);
         // Fallback: try direct insert (will work if the INSERT policy migration is applied)
         const { data: teams } = await supabase
           .from('teams')
@@ -780,17 +780,17 @@ async joinLeagueByCode(
 
           const { error: insertError } = await supabase.from('notifications').insert(notifications);
           if (insertError) {
-            console.error('Fallback direct insert also failed:', insertError);
+            logger.error('Fallback direct insert also failed:', insertError);
           }
         }
         return;
       }
 
       if (result && !result.success) {
-        console.error('notify_league_members RPC returned error:', result.error);
+        logger.error('notify_league_members RPC returned error:', result.error);
       }
     } catch (error) {
-      console.error('Error creating notifications:', error);
+      logger.error('Error creating notifications:', error);
       // Don't throw - notification failure shouldn't block settings update
     }
   },
@@ -819,7 +819,7 @@ async joinLeagueByCode(
         .neq('league_id', DEMO_LEAGUE_ID_FOR_GUESTS); // Exclude demo league - guests only
 
       if (teamsError) {
-        console.error('[LeagueService] Error fetching user teams:', teamsError);
+        logger.error('[LeagueService] Error fetching user teams:', teamsError);
         throw teamsError;
       }
 
@@ -827,7 +827,7 @@ async joinLeagueByCode(
       // (Defense in depth - should never fail if RLS is working)
       const validTeams = (userTeams || []).filter(t => t.owner_id === userId);
       if (validTeams.length !== (userTeams || []).length) {
-        console.error('[LeagueService] SECURITY WARNING: RLS returned teams not owned by user!', {
+        logger.error('[LeagueService] SECURITY WARNING: RLS returned teams not owned by user!', {
           userId,
           allTeams: userTeams?.length,
           validTeams: validTeams.length
@@ -856,7 +856,7 @@ async joinLeagueByCode(
       );
       return { leagues: uniqueLeagues, error: null };
     } catch (error) {
-      console.error('[LeagueService] Error in getUserLeagues:', error);
+      logger.error('[LeagueService] Error in getUserLeagues:', error);
       return { leagues: [], error };
     }
   },
@@ -874,12 +874,12 @@ async joinLeagueByCode(
         .rpc('get_league_teams', { p_league_id: leagueId });
 
       if (error) {
-        console.error('Error fetching teams:', error);
+        logger.error('Error fetching teams:', error);
         throw error;
       }
       return { teams: data || [], error: null };
     } catch (error) {
-      console.error('Exception in getLeagueTeams:', error);
+      logger.error('Exception in getLeagueTeams:', error);
       return { teams: [], error };
     }
   },
@@ -907,7 +907,7 @@ async joinLeagueByCode(
       logger.debug(`[LeagueService] Successfully deleted team ${teamId}`);
       return { success: true, error: null };
     } catch (error) {
-      console.error('[LeagueService] Error deleting team:', error);
+      logger.error('[LeagueService] Error deleting team:', error);
       return { success: false, error };
     }
   },
@@ -925,7 +925,7 @@ async joinLeagueByCode(
         .rpc('get_league_teams', { p_league_id: leagueId });
 
       if (teamsError) {
-        console.error('Error fetching teams:', teamsError);
+        logger.error('Error fetching teams:', teamsError);
         throw teamsError;
       }
 
@@ -973,7 +973,7 @@ async joinLeagueByCode(
       logger.debug('Fetched teams with owners:', teamsWithOwners);
       return { teams: teamsWithOwners, error: null };
     } catch (error) {
-      console.error('Exception in getLeagueTeamsWithOwners:', error);
+      logger.error('Exception in getLeagueTeamsWithOwners:', error);
       return { teams: [], error };
     }
   },
@@ -996,7 +996,7 @@ async joinLeagueByCode(
         .order('created_at', { ascending: true });
 
       if (countError) {
-        console.error('simulateLeagueFill: Error counting existing teams:', countError);
+        logger.error('simulateLeagueFill: Error counting existing teams:', countError);
         throw countError;
       }
 
@@ -1042,7 +1042,7 @@ async joinLeagueByCode(
       }
 
       if (teamsToInsert.length < teamsToCreate) {
-        console.warn('simulateLeagueFill: Could only create', teamsToInsert.length, 'out of', teamsToCreate, 'requested teams');
+        logger.warn('simulateLeagueFill: Could only create', teamsToInsert.length, 'out of', teamsToCreate, 'requested teams');
       }
 
       // Insert teams one at a time to avoid any potential race conditions
@@ -1053,14 +1053,14 @@ async joinLeagueByCode(
         .select();
 
       if (error) {
-        console.error('simulateLeagueFill: Insert error:', error);
+        logger.error('simulateLeagueFill: Insert error:', error);
         throw error;
       }
 
       
       return { error: null };
     } catch (error) {
-      console.error('simulateLeagueFill: Exception:', error);
+      logger.error('simulateLeagueFill: Exception:', error);
       return { error };
     }
   },
@@ -1101,7 +1101,7 @@ async joinLeagueByCode(
         this.initializeDefaultLineups().then(() => {
           logger.debug('initializeLeague: All 10 demo team lineups initialized successfully');
         }).catch(err => {
-          console.error('initializeLeague: Error initializing lineups (non-critical):', err);
+          logger.error('initializeLeague: Error initializing lineups (non-critical):', err);
         });
       } else {
         // Even if initialized before, verify and fix any invalid lineups
@@ -1111,7 +1111,7 @@ async joinLeagueByCode(
         this.initializeDefaultLineups().then(() => {
           logger.debug('initializeLeague: All 10 demo team lineups verified');
         }).catch(err => {
-          console.error('initializeLeague: Error verifying lineups (non-critical):', err);
+          logger.error('initializeLeague: Error verifying lineups (non-critical):', err);
         });
       }
       return;
@@ -1327,7 +1327,7 @@ async joinLeagueByCode(
       this.initializeDefaultLineups().then(() => {
         logger.debug('initializeLeague: All 10 demo team lineups initialized successfully');
       }).catch((error) => {
-        console.error('initializeLeague: Error initializing lineups (non-critical):', error);
+        logger.error('initializeLeague: Error initializing lineups (non-critical):', error);
         // This is non-critical - rosters are already available in cachedLeagueState
       });
     }
@@ -1375,7 +1375,7 @@ async joinLeagueByCode(
       const players = cachedLeagueState[teamIdNum] || [];
       
       if (players.length === 0) {
-        console.warn(`Team ${teamIdNum}: No players assigned, skipping lineup initialization`);
+        logger.warn(`Team ${teamIdNum}: No players assigned, skipping lineup initialization`);
         continue; // Skip teams with no players
       }
       
@@ -1404,7 +1404,7 @@ async joinLeagueByCode(
       // Log what we found - especially important for teams with all players on bench
       if (existingLineup) {
         if (starterCount === 0 && benchCount > 0) {
-          console.error(`Team ${teamIdNum}: ❌ CRITICAL - All ${benchCount} players are on bench, NO STARTERS! This is invalid. Re-initializing...`);
+          logger.error(`Team ${teamIdNum}: ❌ CRITICAL - All ${benchCount} players are on bench, NO STARTERS! This is invalid. Re-initializing...`);
         }
       }
       
@@ -1477,10 +1477,10 @@ async joinLeagueByCode(
           });
           logger.debug(`Team ${teamIdNum}: Lineup saved successfully (${starters.length} starters, ${bench.length} bench, ${ir.length} IR)`);
         } catch (error) {
-          console.error(`Team ${teamIdNum}: ❌ FAILED to save lineup:`, error);
+          logger.error(`Team ${teamIdNum}: ❌ FAILED to save lineup:`, error);
         }
       } else {
-        console.error(`Team ${teamIdNum}: ❌ CRITICAL - Has insufficient players for a valid lineup (${starters.length} starters, ${bench.length} bench, ${players.length} total players). This should not happen in demo league!`);
+        logger.error(`Team ${teamIdNum}: ❌ CRITICAL - Has insufficient players for a valid lineup (${starters.length} starters, ${bench.length} bench, ${players.length} total players). This should not happen in demo league!`);
         // Even if we can't fill all slots, save what we have to prevent empty lineups
         if (starters.length > 0 && demoLeagueId) {
           try {
@@ -1491,7 +1491,7 @@ async joinLeagueByCode(
               slotAssignments
             });
           } catch (error) {
-            console.error(`Team ${teamIdNum}: ❌ FAILED to save even partial lineup:`, error);
+            logger.error(`Team ${teamIdNum}: ❌ FAILED to save even partial lineup:`, error);
           }
         }
       }
@@ -1522,7 +1522,7 @@ async joinLeagueByCode(
           .eq('league_id', leagueId);
 
         if (rosterError) {
-          console.error('Error fetching roster_assignments for free agents:', rosterError);
+          logger.error('Error fetching roster_assignments for free agents:', rosterError);
           throw rosterError;
         }
 
@@ -1536,7 +1536,7 @@ async joinLeagueByCode(
 
         return freeAgents;
       } catch (error) {
-        console.error('Error getting free agents from database:', error);
+        logger.error('Error getting free agents from database:', error);
         // Fallback to demo data if database query fails
         await this.initializeLeague(allPlayers);
         return cachedFreeAgents || [];
@@ -1592,7 +1592,7 @@ async joinLeagueByCode(
         .limit(100);
 
       if (error) {
-        console.error('Error fetching transactions:', error);
+        logger.error('Error fetching transactions:', error);
         return { transactions: [], error };
       }
 
@@ -1621,7 +1621,7 @@ async joinLeagueByCode(
 
       return { transactions, error: null };
     } catch (error) {
-      console.error('Error in fetchTransactions:', error);
+      logger.error('Error in fetchTransactions:', error);
       return { transactions: [], error };
     }
   },
@@ -1687,7 +1687,7 @@ async joinLeagueByCode(
 
       return transactions;
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      logger.error('Error fetching notifications:', error);
       return [];
     }
   },
@@ -1742,7 +1742,7 @@ async joinLeagueByCode(
       
       if (existingLineup) {
         // Lineup exists - user trying to modify, block it
-        console.warn('[saveLineup] Demo league is read-only. Sign up to create your own league!');
+        logger.warn('[saveLineup] Demo league is read-only. Sign up to create your own league!');
         return; // Silently fail - demo league is read-only
       }
       // No lineup exists - this is initialization, allow it
@@ -1780,12 +1780,12 @@ async joinLeagueByCode(
           const invalidPlayerIds = allLineupPlayerIds.filter(id => !validPlayerIds.has(id));
           
           if (invalidPlayerIds.length > 0) {
-            console.error('[LINEUP VALIDATION] ========================================');
-            console.error('[LINEUP VALIDATION] CRITICAL: Lineup contains player IDs not in roster_assignments!');
-            console.error('[LINEUP VALIDATION] Invalid IDs:', invalidPlayerIds);
-            console.error('[LINEUP VALIDATION] These players are not in roster_assignments (source of truth)');
-            console.error('[LINEUP VALIDATION] Filtering them out before save...');
-            console.error('[LINEUP VALIDATION] ========================================');
+            logger.error('[LINEUP VALIDATION] ========================================');
+            logger.error('[LINEUP VALIDATION] CRITICAL: Lineup contains player IDs not in roster_assignments!');
+            logger.error('[LINEUP VALIDATION] Invalid IDs:', invalidPlayerIds);
+            logger.error('[LINEUP VALIDATION] These players are not in roster_assignments (source of truth)');
+            logger.error('[LINEUP VALIDATION] Filtering them out before save...');
+            logger.error('[LINEUP VALIDATION] ========================================');
             
             // Filter out invalid IDs
             lineupToSave.starters = lineupToSave.starters.filter(id => validPlayerIds.has(id));
@@ -1801,11 +1801,11 @@ async joinLeagueByCode(
             
           }
         } else if (rosterError) {
-          console.warn('[LINEUP VALIDATION] Could not read roster_assignments, skipping validation:', rosterError);
+          logger.warn('[LINEUP VALIDATION] Could not read roster_assignments, skipping validation:', rosterError);
         }
       }
     } catch (validationError) {
-      console.error('[LINEUP VALIDATION] Validation failed:', validationError);
+      logger.error('[LINEUP VALIDATION] Validation failed:', validationError);
       // Continue with save - don't block due to validation errors
     }
 
@@ -1831,33 +1831,33 @@ async joinLeagueByCode(
         const removedPlayers = Array.from(currentPlayerIds).filter(id => !newPlayerIds.has(id));
         
         if (removedPlayers.length > 0) {
-          console.error('[ROSTER PROTECTION] ========================================');
-          console.error('[ROSTER PROTECTION] CRITICAL: Players would be REMOVED!');
-          console.error('[ROSTER PROTECTION] Removed players:', removedPlayers);
-          console.error('[ROSTER PROTECTION] Team:', teamId, 'League:', leagueId);
-          console.error('[ROSTER PROTECTION] Current roster size:', currentPlayerIds.size);
-          console.error('[ROSTER PROTECTION] New roster size:', newPlayerIds.size);
-          console.error('[ROSTER PROTECTION] allowPlayerRemoval:', allowPlayerRemoval);
+          logger.error('[ROSTER PROTECTION] ========================================');
+          logger.error('[ROSTER PROTECTION] CRITICAL: Players would be REMOVED!');
+          logger.error('[ROSTER PROTECTION] Removed players:', removedPlayers);
+          logger.error('[ROSTER PROTECTION] Team:', teamId, 'League:', leagueId);
+          logger.error('[ROSTER PROTECTION] Current roster size:', currentPlayerIds.size);
+          logger.error('[ROSTER PROTECTION] New roster size:', newPlayerIds.size);
+          logger.error('[ROSTER PROTECTION] allowPlayerRemoval:', allowPlayerRemoval);
           
           // Log each removed player for audit trail
           removedPlayers.forEach(playerId => {
-            console.error(`[ROSTER PROTECTION] WOULD REMOVE: Player ID ${playerId}`);
+            logger.error(`[ROSTER PROTECTION] WOULD REMOVE: Player ID ${playerId}`);
           });
-          console.error('[ROSTER PROTECTION] ========================================');
+          logger.error('[ROSTER PROTECTION] ========================================');
           
           // CRITICAL: Block the save if removal wasn't explicitly allowed
           if (!allowPlayerRemoval) {
-            console.error('[ROSTER PROTECTION] BLOCKED: Save rejected to prevent data loss!');
-            console.error('[ROSTER PROTECTION] To allow player removal, pass { allowPlayerRemoval: true }');
+            logger.error('[ROSTER PROTECTION] BLOCKED: Save rejected to prevent data loss!');
+            logger.error('[ROSTER PROTECTION] To allow player removal, pass { allowPlayerRemoval: true }');
             // Return early - DO NOT SAVE
             return;
           } else {
-            console.warn('[ROSTER PROTECTION] ALLOWED: Player removal explicitly permitted');
+            logger.warn('[ROSTER PROTECTION] ALLOWED: Player removal explicitly permitted');
           }
         }
       }
     } catch (validationError) {
-      console.error('[ROSTER PROTECTION] Validation check failed:', validationError);
+      logger.error('[ROSTER PROTECTION] Validation check failed:', validationError);
       // If we can't validate, be conservative and allow the save
       // This prevents blocking legitimate saves due to network issues
     }
@@ -1881,7 +1881,7 @@ async joinLeagueByCode(
         .single();
       
       if (error) {
-        console.warn('[saveLineup] Supabase save failed, using localStorage fallback:', error);
+        logger.warn('[saveLineup] Supabase save failed, using localStorage fallback:', error);
         throw error; // Fall through to localStorage
       }
       
@@ -1922,7 +1922,7 @@ async joinLeagueByCode(
           await this.createDailyRosterSnapshots(teamId, leagueId, lineupToSave, targetDate);
         }
       } catch (localError) {
-        console.error('Failed to save lineup to both Supabase and localStorage:', localError);
+        logger.error('Failed to save lineup to both Supabase and localStorage:', localError);
       }
     }
   },
@@ -1946,7 +1946,7 @@ async joinLeagueByCode(
         .single();
       
       if (matchupError || !matchup) {
-        console.error('[backfillMissingDailyRosters] Matchup not found:', matchupError);
+        logger.error('[backfillMissingDailyRosters] Matchup not found:', matchupError);
         return { backfilledCount: 0, error: matchupError };
       }
       
@@ -2056,7 +2056,7 @@ async joinLeagueByCode(
           });
         
         if (insertError) {
-          console.error('[backfillMissingDailyRosters] Error inserting records:', insertError);
+          logger.error('[backfillMissingDailyRosters] Error inserting records:', insertError);
           return { backfilledCount: 0, error: insertError };
         }
         
@@ -2065,7 +2065,7 @@ async joinLeagueByCode(
       return { backfilledCount: recordsToInsert.length, error: null };
       
     } catch (error) {
-      console.error('[backfillMissingDailyRosters] Exception:', error);
+      logger.error('[backfillMissingDailyRosters] Exception:', error);
       return { backfilledCount: 0, error };
     }
   },
@@ -2089,7 +2089,7 @@ async joinLeagueByCode(
         .eq('league_id', leagueId);
       
       if (matchupsError) {
-        console.error('[LeagueService] Error fetching matchups:', matchupsError);
+        logger.error('[LeagueService] Error fetching matchups:', matchupsError);
         return { totalBackfilled: 0, matchupsProcessed: 0, errors: [{ error: matchupsError }] };
       }
       
@@ -2143,12 +2143,12 @@ async joinLeagueByCode(
       
       logger.debug(`[LeagueService] Backfill complete: ${totalBackfilled} records for ${matchups.length} matchups`);
       if (errors.length > 0) {
-        console.error('[LeagueService] Errors during backfill:', errors);
+        logger.error('[LeagueService] Errors during backfill:', errors);
       }
       
       return { totalBackfilled, matchupsProcessed: matchups.length, errors };
     } catch (error) {
-      console.error('[LeagueService] Exception in backfillAllMatchupsForLeague:', error);
+      logger.error('[LeagueService] Exception in backfillAllMatchupsForLeague:', error);
       return { totalBackfilled: 0, matchupsProcessed: 0, errors: [{ error }] };
     }
   },
@@ -2385,7 +2385,7 @@ async joinLeagueByCode(
           .eq('is_locked', true);
         
         if (queryError) {
-          console.error('[createDailyRosterSnapshots] Error querying locked records:', queryError);
+          logger.error('[createDailyRosterSnapshots] Error querying locked records:', queryError);
         }
         
         // Create a Set of locked keys for fast lookup
@@ -2421,12 +2421,12 @@ async joinLeagueByCode(
             });
           
           if (error) {
-            console.error('[createDailyRosterSnapshots] Error upserting daily rosters:', error);
+            logger.error('[createDailyRosterSnapshots] Error upserting daily rosters:', error);
           }
         }
       }
     } catch (error) {
-      console.error('[createDailyRosterSnapshots] Error:', error);
+      logger.error('[createDailyRosterSnapshots] Error:', error);
     }
   },
 
@@ -2496,7 +2496,7 @@ async joinLeagueByCode(
       
       return true; // All games are in the future, can update
     } catch (error) {
-      console.error('[canUpdateRosterForDate] Error:', error);
+      logger.error('[canUpdateRosterForDate] Error:', error);
       return true; // On error, allow update (fail open)
     }
   },
@@ -2546,7 +2546,7 @@ async joinLeagueByCode(
           return null;
         }
         // Actual error (network, permission, etc.) - fall back to localStorage
-        console.warn('[getLineup] Supabase query error, trying localStorage fallback:', error);
+        logger.warn('[getLineup] Supabase query error, trying localStorage fallback:', error);
         const key = `lineup_team_${teamId}`;
         const saved = localStorage.getItem(key);
         if (saved) {
@@ -2589,7 +2589,7 @@ async joinLeagueByCode(
           return JSON.parse(saved);
         }
       } catch (localError) {
-        console.error('[getLineup] Failed to load lineup from both Supabase and localStorage:', localError);
+        logger.error('[getLineup] Failed to load lineup from both Supabase and localStorage:', localError);
       }
       return null;
     }
@@ -2626,7 +2626,7 @@ async joinLeagueByCode(
         .eq('roster_date', rosterDate);
 
       if (rosterError) {
-        console.error('[LeagueService.loadDailyRoster] Error:', rosterError);
+        logger.error('[LeagueService.loadDailyRoster] Error:', rosterError);
         return null;
       }
 
@@ -2716,7 +2716,7 @@ async joinLeagueByCode(
 
       return { starters, bench, ir, slotAssignments, missingPlayerIds };
     } catch (error) {
-      console.error('[LeagueService.loadDailyRoster] Exception:', error);
+      logger.error('[LeagueService.loadDailyRoster] Exception:', error);
       return null;
     }
   },
@@ -2806,10 +2806,10 @@ async joinLeagueByCode(
       ]);
       
       if (completedResult.error) {
-        console.error('[LeagueService] Error fetching completed matchups:', completedResult.error);
+        logger.error('[LeagueService] Error fetching completed matchups:', completedResult.error);
       }
       if (pastResult.error) {
-        console.error('[LeagueService] Error fetching past matchups:', pastResult.error);
+        logger.error('[LeagueService] Error fetching past matchups:', pastResult.error);
       }
       
       // Combine results and deduplicate by matchup ID
@@ -2834,7 +2834,7 @@ async joinLeagueByCode(
       const error = completedResult.error || pastResult.error;
 
       if (error) {
-        console.error('[LeagueService] Error fetching completed matchups:', error);
+        logger.error('[LeagueService] Error fetching completed matchups:', error);
         return teamStats; // Return empty stats if query fails
       }
 
@@ -2969,7 +2969,7 @@ async joinLeagueByCode(
         delete (stats as Partial<TeamStatsWithHistory>).matchupHistory;
       });
     } catch (error) {
-      console.error('[LeagueService] Exception calculating team standings:', error);
+      logger.error('[LeagueService] Exception calculating team standings:', error);
       // Return empty stats on error
     }
 
@@ -3094,7 +3094,7 @@ async joinLeagueByCode(
         }
       }
     } catch (error) {
-      console.error('[LeagueService] Exception calculating season points standings:', error);
+      logger.error('[LeagueService] Exception calculating season points standings:', error);
     }
 
     return result;
@@ -3309,7 +3309,7 @@ async joinLeagueByCode(
         delete (stats as any).matchupHistory;
       });
     } catch (err) {
-      console.error('[LeagueService] calculateCategoryStandings error:', err);
+      logger.error('[LeagueService] calculateCategoryStandings error:', err);
     }
 
     // Clean up matchupHistory before returning
@@ -3451,7 +3451,7 @@ async joinLeagueByCode(
         }
       });
     } catch (err) {
-      console.error('[LeagueService] calculateRotoStandingsFromDB error:', err);
+      logger.error('[LeagueService] calculateRotoStandingsFromDB error:', err);
     }
 
     return result;
@@ -3476,7 +3476,7 @@ async joinLeagueByCode(
         .eq('owner_id', userId);
 
       if (countError) {
-        console.error('Error checking existing teams:', countError);
+        logger.error('Error checking existing teams:', countError);
         throw countError;
       }
 
@@ -3494,7 +3494,7 @@ async joinLeagueByCode(
         .select();
 
       if (error) {
-        console.error('Error updating user team names:', error);
+        logger.error('Error updating user team names:', error);
         throw error;
       }
 
@@ -3502,7 +3502,7 @@ async joinLeagueByCode(
 
       return { error: null, updatedCount };
     } catch (error) {
-      console.error('Exception in updateUserTeamNames:', error);
+      logger.error('Exception in updateUserTeamNames:', error);
       return { error, updatedCount: 0 };
     }
   },
@@ -3530,7 +3530,7 @@ async joinLeagueByCode(
         .eq('team_id', teamId);
       
       if (rosterError) {
-        console.error(`Error fetching roster_assignments for team ${teamId}:`, rosterError);
+        logger.error(`Error fetching roster_assignments for team ${teamId}:`, rosterError);
         return { lineup: null, error: rosterError };
       }
       
@@ -3545,7 +3545,7 @@ async joinLeagueByCode(
       if (teamPlayers.length < rosterAssignments.length) {
         const matchedIds = new Set(teamPlayers.map(p => String(p.id)));
         const unmatchedIds = playerIds.filter((id: string) => !matchedIds.has(String(id)));
-        console.error(`[initializeTeamLineup] Team ${teamId}: ⚠️ MISSING ${unmatchedIds.length} players! Unmatched IDs:`, unmatchedIds);
+        logger.error(`[initializeTeamLineup] Team ${teamId}: ⚠️ MISSING ${unmatchedIds.length} players! Unmatched IDs:`, unmatchedIds);
       }
 
       if (teamPlayers.length === 0) {
@@ -3669,7 +3669,7 @@ async joinLeagueByCode(
 
       return { lineup, error: null };
     } catch (error) {
-      console.error(`Error initializing lineup for team ${teamId}:`, error);
+      logger.error(`Error initializing lineup for team ${teamId}:`, error);
       return { lineup: null, error };
     }
   },
@@ -3776,7 +3776,7 @@ async joinLeagueByCode(
       if (lineupError && lineupError.code !== 'PGRST116') {
         // PGRST116 = no rows found (expected when no lineup exists yet)
         // Any other error is a real database error
-        console.error('Error fetching lineup data:', lineupError);
+        logger.error('Error fetching lineup data:', lineupError);
         return { success: false, error: new Error('Could not load lineup information') };
       }
 
@@ -3798,7 +3798,7 @@ async joinLeagueByCode(
           .eq('league_id', leagueId);
         
         if (rosterError) {
-          console.error('Error counting roster_assignments:', rosterError);
+          logger.error('Error counting roster_assignments:', rosterError);
           return { success: false, error: new Error('Could not load roster for size check') };
         } else {
           currentRosterSize = rosterCount || 0;

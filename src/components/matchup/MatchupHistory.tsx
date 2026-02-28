@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MatchupService } from "@/services/MatchupService";
 import { getWeekLabel } from "@/utils/weekCalculator";
+import { logger } from '@/utils/logger';
 
 interface MatchupHistoryProps {
   leagueId?: string;
@@ -50,7 +51,7 @@ export const MatchupHistory = ({
         );
 
         if (error) {
-          console.error('Error loading matchup history:', error);
+          logger.error('Error loading matchup history:', error);
           setHistory([]);
           setLoading(false);
           return;
@@ -80,7 +81,7 @@ export const MatchupHistory = ({
         setWins(winCount);
         setLosses(lossCount);
       } catch (error) {
-        console.error('Error in loadHistory:', error);
+        logger.error('Error in loadHistory:', error);
         setHistory([]);
       } finally {
         setLoading(false);

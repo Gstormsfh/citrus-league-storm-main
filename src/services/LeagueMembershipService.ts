@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/utils/logger';
 
 /**
  * ============================================================================
@@ -95,7 +96,7 @@ export const LeagueMembershipService = {
     // Fail-fast: throw error immediately if userId is missing to catch bugs during development
     if (!userId || userId === 'undefined') {
       const error = new Error(`SECURITY ERROR: checkMembership called with invalid userId: "${userId}". This indicates a bug in the calling code - userId parameter is required for membership validation.`);
-      console.error('[LeagueMembershipService] SECURITY VIOLATION:', error);
+      logger.error('[LeagueMembershipService] SECURITY VIOLATION:', error);
       throw error;
     }
 
@@ -114,7 +115,7 @@ export const LeagueMembershipService = {
         .single();
 
       if (leagueError && leagueError.code !== 'PGRST116') {
-        console.error('[LeagueMembershipService] Error checking commissioner status:', leagueError);
+        logger.error('[LeagueMembershipService] Error checking commissioner status:', leagueError);
       }
 
       const isCommissioner = leagueData?.commissioner_id === userId;
@@ -129,7 +130,7 @@ export const LeagueMembershipService = {
         .maybeSingle();
 
       if (teamError && teamError.code !== 'PGRST116') {
-        console.error('[LeagueMembershipService] Error checking team ownership:', teamError);
+        logger.error('[LeagueMembershipService] Error checking team ownership:', teamError);
       }
 
       const isMember = isCommissioner || !!teamData;
@@ -144,7 +145,7 @@ export const LeagueMembershipService = {
 
       return result;
     } catch (error) {
-      console.error('[LeagueMembershipService] Unexpected error in checkMembership:', error);
+      logger.error('[LeagueMembershipService] Unexpected error in checkMembership:', error);
       // Fail closed - deny access on error
       return {
         isMember: false,

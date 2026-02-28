@@ -32,6 +32,7 @@ import { COLUMNS } from '@/utils/queryColumns';
 import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { GameLogosBar } from '@/components/matchup/GameLogosBar';
+import { logger } from '@/utils/logger';
 
 // Helper function to format position for display (L -> LW, R -> RW)
 const formatPositionForDisplay = (position: string): string => {
@@ -210,7 +211,7 @@ const FreeAgents = () => {
           setLoading(false);
           return;
         } catch (error) {
-          console.error('Error fetching demo players:', error);
+          logger.error('Error fetching demo players:', error);
           toast({
             title: "Error",
             description: "Failed to load players. Please try again later.",
@@ -238,7 +239,7 @@ const FreeAgents = () => {
             currentLeagueId = userTeamData.league_id;
           }
         } catch (error) {
-          console.error('Error fetching user team:', error);
+          logger.error('Error fetching user team:', error);
           // Continue without league ID - will show all players
         }
       }
@@ -262,7 +263,7 @@ const FreeAgents = () => {
       
       // Don't calculate schedule maximizers here - will be lazy loaded when tab is active
     } catch (error) {
-      console.error('Error fetching players:', error);
+      logger.error('Error fetching players:', error);
       toast({
         title: "Error",
         description: `Failed to load players: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -445,7 +446,7 @@ const FreeAgents = () => {
       setWeeklyProjections(weeklyProjectionMap);
       setWeeklyGameCounts(gameCountMap);
     } catch (error) {
-      console.error('Error fetching weekly projections:', error);
+      logger.error('Error fetching weekly projections:', error);
       // On error, set empty map (will fall back to mock projection)
     } finally {
       setLoadingProjections(false);
@@ -628,7 +629,7 @@ const FreeAgents = () => {
       
       setScheduleMaximizers(maximizers); // Show ALL players (scrollable list)
     } catch (error) {
-      console.error('Error calculating schedule maximizers:', error);
+      logger.error('Error calculating schedule maximizers:', error);
       setScheduleMaximizers([]);
     } finally {
       setLoadingMaximizers(false);
@@ -674,7 +675,7 @@ const FreeAgents = () => {
         return;
       }
     } catch (error) {
-      console.error("[FreeAgents] Error checking draft status:", error);
+      logger.error("[FreeAgents] Error checking draft status:", error);
       toast({
         title: "Error",
         description: "Could not verify draft status.",
@@ -725,7 +726,7 @@ const FreeAgents = () => {
       if (lineupError && lineupError.code !== 'PGRST116') {
         // PGRST116 = no rows found (expected when no lineup exists yet)
         // Any other error is a real database error
-        console.error('Error fetching lineup data:', lineupError);
+        logger.error('Error fetching lineup data:', lineupError);
         toast({
           title: "Error",
           description: "Could not load lineup information.",
@@ -753,7 +754,7 @@ const FreeAgents = () => {
           .eq('league_id' as any, leagueId as any);
         
         if (rosterError) {
-          console.error('Error counting roster_assignments:', rosterError);
+          logger.error('Error counting roster_assignments:', rosterError);
           toast({
             title: "Error",
             description: "Could not load roster for size check.",

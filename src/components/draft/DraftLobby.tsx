@@ -33,6 +33,7 @@ import {
   X
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/utils/logger';
 
 interface Team {
   id: string;
@@ -240,7 +241,7 @@ export const DraftLobby = ({
       setTeamToDelete(null);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : (typeof error === 'string' ? error : JSON.stringify(error)) || 'Unknown error';
-      console.error('[DraftLobby] Error deleting team:', error);
+      logger.error('[DraftLobby] Error deleting team:', error);
       toast({
         title: "Error",
         description: `Failed to remove team: ${errorMessage}`,

@@ -1,6 +1,7 @@
 import { NHLGame } from "@/services/ScheduleService";
 import { getTeamColor } from "@/utils/teamColors";
 import { getTodayMST, getTodayMSTDate, isTodayMST, formatTimeMST } from "@/utils/timezoneUtils";
+import { logger } from '@/utils/logger';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
@@ -382,7 +383,7 @@ export const GameLogosBar = ({ games, playerTeam, selectedDate }: GameLogosBarPr
             </GameLogoWithTooltip>
           );
         } catch (error) {
-          console.warn('Error rendering game logo:', error, game);
+          logger.warn('Error rendering game logo:', error, game);
           return null;
         }
       })}

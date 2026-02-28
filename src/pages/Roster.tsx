@@ -49,6 +49,7 @@ import { getTodayMST, getTodayMSTDate } from '@/utils/timezoneUtils';
 import { CURRENT_SEASON } from '@/utils/seasonConstants';
 import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
 import { Matchup as MatchupType } from '@/services/MatchupService';
+import { logger } from '@/utils/logger';
 
 // Helper function to transform position to fantasy slot
 const getFantasyPosition = (position: string): 'C' | 'LW' | 'RW' | 'D' | 'G' | 'UTIL' => {
@@ -137,7 +138,7 @@ const getTeamAbbreviation = (team: string): string => {
         stats.G.losses += p.stats?.losses || 0;
         stats.G.count++;
       } else if (stats[realPos as keyof typeof stats]) {
-        const target = stats[realPos as keyof typeof stats] as any;
+        const target = stats[realPos as keyof typeof stats] as { goals: number; assists: number; shots: number; hits: number; blocks: number; ppp: number; shp: number };
         if (p.stats) {
             target.goals += p.stats.goals || 0;
             target.assists += p.stats.assists || 0;
@@ -161,7 +162,7 @@ const safeValue = (val: number) => {
 
 // ... inside Roster component ...
 
-  const calculateRadarData = (stats: any, position: string) => {
+  const calculateRadarData = (stats: { goals: number; assists: number; shots: number; hits: number; blocks: number; ppp: number; shp?: number } | null, position: string) => {
     // Baselines customized by position group (Per Player Season Avg * Num Slots)
     // Approx baselines for a "Good" starter
     const singlePlayerBaseline = {
@@ -418,7 +419,7 @@ const Roster = () => {
             .maybeSingle();
           
           if (leagueError || !demoLeagueData) {
-            console.error('[Roster] Error loading demo league:', leagueError);
+            logger.error('[Roster] Error loading demo league:', leagueError);
             setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
             setLoading(false);
             return;
@@ -435,7 +436,7 @@ const Roster = () => {
             .limit(1);
           
           if (teamsError || !demoTeamsData || demoTeamsData.length === 0) {
-            console.error('[Roster] Error loading demo team:', teamsError);
+            logger.error('[Roster] Error loading demo team:', teamsError);
             setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
             setLoading(false);
             return;
@@ -461,7 +462,7 @@ const Roster = () => {
             .order('pick_number', { ascending: true });
           
           if (picksError) {
-            console.error('[Roster] Error loading demo roster:', picksError);
+            logger.error('[Roster] Error loading demo roster:', picksError);
             setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
             setLoading(false);
             return;
@@ -475,7 +476,7 @@ const Roster = () => {
           const teamPlayers = allPlayers.filter(p => playerIdsAsNumbers.includes(p.id));
           
           if (teamPlayers.length === 0) {
-            console.error('[Roster] Demo team has no players in roster');
+            logger.error('[Roster] Demo team has no players in roster');
             setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
             setLoading(false);
             return;
@@ -536,7 +537,7 @@ const Roster = () => {
             .eq('team_id' as any, userTeamData.id as any);
           
           if (rosterError) {
-            console.error('[Roster] Error fetching roster_assignments:', rosterError);
+            logger.error('[Roster] Error fetching roster_assignments:', rosterError);
             // Last resort: empty roster
             dbPlayers = [];
           } else {
@@ -989,7 +990,7 @@ const Roster = () => {
       } catch (e: any) {
         // For demo state, try to set roster even if there was an error
         if ((userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league')) {
-          console.error('[Roster] Error in loadRoster for demo state, attempting fallback:', e);
+          logger.error('[Roster] Error in loadRoster for demo state, attempting fallback:', e);
           try {
             // Last resort: get static players and set roster directly (inline, no service dependency)
             const allPlayers = await PlayerService.getAllPlayers();
@@ -1093,7 +1094,7 @@ const Roster = () => {
             setUserTeamId(`${DEMO_LEAGUE_ID}-team-3`);
             setUserTeam({ id: `${DEMO_LEAGUE_ID}-team-3`, league_id: DEMO_LEAGUE_ID, team_name: 'Citrus Crushers' });
           } catch (fallbackError) {
-            console.error('[Roster] Even emergency fallback failed:', fallbackError);
+            logger.error('[Roster] Even emergency fallback failed:', fallbackError);
           }
         }
         // Filter out demo league errors - they're expected and harmless
@@ -1103,8 +1104,8 @@ const Roster = () => {
                                   (errorMessage.toLowerCase().includes('id') || errorMessage.toLowerCase().includes('uuid'));
         
         if (!isDemoLeagueError) {
-          console.error("Failed to load roster", e);
-          console.error("Error details:", {
+          logger.error("Failed to load roster", e);
+          logger.error("Error details:", {
             message: e?.message,
             stack: e?.stack,
             name: e?.name
@@ -1136,7 +1137,7 @@ const Roster = () => {
       try {
         loadRoster();
       } catch (error) {
-        console.error('[Roster] Error in initial load:', error);
+        logger.error('[Roster] Error in initial load:', error);
         setLoading(false);
         toast({
           title: 'Error',
@@ -1156,7 +1157,7 @@ const Roster = () => {
         // Get league to determine first week start
         const { league, error: leagueError } = await LeagueService.getLeague(userTeam.league_id, user.id);
         if (leagueError || !league) {
-          console.error('[Roster] Error loading league for week calculation:', leagueError);
+          logger.error('[Roster] Error loading league for week calculation:', leagueError);
           return;
         }
 
@@ -1173,7 +1174,7 @@ const Roster = () => {
         setAvailableWeeks(weeks);
         setSelectedWeek(currentWeek); // Default to current week
       } catch (error) {
-        console.error('[Roster] Error calculating weeks:', error);
+        logger.error('[Roster] Error calculating weeks:', error);
       }
     };
 
@@ -1204,7 +1205,7 @@ const Roster = () => {
           .limit(1);
 
         if (error) {
-          console.error('[Roster] Error fetching matchup for week:', error);
+          logger.error('[Roster] Error fetching matchup for week:', error);
           setCurrentMatchup(null);
           setMatchupWeekDates([]);
           return;
@@ -1244,7 +1245,7 @@ const Roster = () => {
           setSelectedDate(dates[0]);
         }
       } catch (error) {
-        console.error('[Roster] Error in fetchMatchupForWeek:', error);
+        logger.error('[Roster] Error in fetchMatchupForWeek:', error);
         setCurrentMatchup(null);
         setMatchupWeekDates([]);
       }
@@ -1357,7 +1358,7 @@ const Roster = () => {
       
       setLockedPlayerIds(lockedIds);
     } catch (error) {
-      console.error('[Roster] Error fetching locked player IDs:', error);
+      logger.error('[Roster] Error fetching locked player IDs:', error);
       // Fail open - don't lock players on error
       setLockedPlayerIds(new Set());
     }
@@ -1532,7 +1533,7 @@ const Roster = () => {
           waiverMoves,
         });
       } catch (error) {
-        console.error('Error calculating team stats:', error);
+        logger.error('Error calculating team stats:', error);
         // On error, show defaults
         setTeamStats({
           record: "0-0-0",
@@ -1581,7 +1582,7 @@ const Roster = () => {
         return newMap;
       });
     } catch (error) {
-      console.error(`[Roster.fetchProjections] Error fetching projections for ${date}:`, error);
+      logger.error(`[Roster.fetchProjections] Error fetching projections for ${date}:`, error);
       // Don't cache errors - allow retry
     } finally {
       projectionsLoadingRef.current = false;
@@ -1776,7 +1777,7 @@ const Roster = () => {
                         }
                     };
                 } catch (err) {
-                    console.error(`Error enriching player ${p.name}:`, err);
+                    logger.error(`Error enriching player ${p.name}:`, err);
                     return p;
                 }
             };
@@ -1954,7 +1955,7 @@ const Roster = () => {
             setAnalyticsLoaded(true);
             toast({ title: "CitrusPuck Loaded", description: "Advanced stats and projections ready." });
         } catch (e) {
-            console.error("Failed to load analytics", e);
+            logger.error("Failed to load analytics", e);
         }
     };
     
@@ -2077,7 +2078,7 @@ const Roster = () => {
           bench: newBench.map(p => p.id),
           ir: prev.ir.map(p => p.id),
           slotAssignments: newAssignments
-        }, selectedDate || undefined).catch(err => console.error('Failed to save lineup:', err));
+        }, selectedDate || undefined).catch(err => logger.error('Failed to save lineup:', err));
       }
       
       return updatedRoster;
@@ -2287,7 +2288,7 @@ const Roster = () => {
               bench: newBench.map(p => p.id),
               ir: prev.ir.map(p => p.id),
               slotAssignments: prev.slotAssignments
-            }, selectedDate || undefined).catch(err => console.error('Failed to save lineup:', err));
+            }, selectedDate || undefined).catch(err => logger.error('Failed to save lineup:', err));
           }
           
           return updatedRoster;
@@ -2386,7 +2387,7 @@ const Roster = () => {
             // But we removed it from newStarters/Bench/IR. We can find it in 'allPlayers' which is unchanged.
             const occupant = allPlayers.find(x => String(x.id) === String(occupantId));
             if (!occupant) {
-              console.error('[Roster] Swap failed: occupant not found in allPlayers', occupantId);
+              logger.error('[Roster] Swap failed: occupant not found in allPlayers', occupantId);
               return prev;
             }
             const p2 = { ...occupant };
@@ -2483,7 +2484,7 @@ const Roster = () => {
               loadRoster(true);
             })
             .catch(err => {
-              console.error('[Roster] Failed to save lineup:', err);
+              logger.error('[Roster] Failed to save lineup:', err);
             });
         }
         
@@ -3385,7 +3386,7 @@ const Roster = () => {
                         return;
                       }
                     } catch (error) {
-                      console.error("[Roster] Error checking draft status:", error);
+                      logger.error("[Roster] Error checking draft status:", error);
                       toast({
                         title: "Error",
                         description: "Could not verify draft status.",

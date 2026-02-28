@@ -26,6 +26,7 @@ import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { logger } from '@/utils/logger';
 
 // ============================================================================
 // BRACKET MATCHUP CARD - Individual series matchup in the bracket
@@ -512,7 +513,7 @@ const PlayoffBracket = () => {
       });
       setTeamNames(names);
     } catch (err: any) {
-      console.error('[PlayoffBracket] Error loading:', err);
+      logger.error('[PlayoffBracket] Error loading:', err);
       setError(err.message || 'Failed to load playoff bracket');
     } finally {
       setLoading(false);

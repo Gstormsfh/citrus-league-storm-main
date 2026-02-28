@@ -32,6 +32,7 @@ import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { supabase } from '@/integrations/supabase/client';
 import { AdSpace } from '@/components/AdSpace';
 import { PlayoffService, type PlayoffPictureTeam, type PlayoffBracket as BracketType } from '@/services/PlayoffService';
+import { logger } from '@/utils/logger';
 // Citrus decorative imports removed — cleaner layout
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 
@@ -104,7 +105,7 @@ const Standings = () => {
             .maybeSingle();
           
           if (leagueError || !demoLeagueData) {
-            console.error('[Standings] Error loading demo league:', leagueError);
+            logger.error('[Standings] Error loading demo league:', leagueError);
             // Fallback to empty teams
             setTeams([]);
             setLoading(false);
@@ -121,7 +122,7 @@ const Standings = () => {
             .order('created_at', { ascending: true });
           
           if (teamsError || !demoTeamsData || demoTeamsData.length === 0) {
-            console.error('[Standings] Error loading demo teams:', teamsError);
+            logger.error('[Standings] Error loading demo teams:', teamsError);
             setTeams([]);
             setLoading(false);
             return;
@@ -226,11 +227,11 @@ const Standings = () => {
             // We MUST wait for this to complete before calculating standings
             const { error: updateScoresError, updatedCount } = await MatchupService.updateMatchupScores(leagueToUse);
             if (updateScoresError) {
-              console.error('[Standings] Failed to update matchup scores:', updateScoresError);
+              logger.error('[Standings] Failed to update matchup scores:', updateScoresError);
               // Still show standings, but they may be outdated
             }
           } catch (error) {
-            console.error('[Standings] Exception updating scores:', error);
+            logger.error('[Standings] Exception updating scores:', error);
             // Still show standings, but they may be outdated
           }
 
@@ -376,7 +377,7 @@ const Standings = () => {
           setLeagues([]);
         }
       } catch (err: any) {
-        console.error('[Standings] Error loading standings:', err);
+        logger.error('[Standings] Error loading standings:', err);
         toast({
           title: 'Error',
           description: err.message || 'Failed to load standings',
@@ -557,7 +558,7 @@ const Standings = () => {
                       // Reload standings
                       window.location.reload();
                     } catch (error) {
-                      console.error('[Standings] Error refreshing:', error);
+                      logger.error('[Standings] Error refreshing:', error);
                       toast({
                         title: 'Error',
                         description: 'Failed to refresh standings',

@@ -109,7 +109,7 @@ export default function CapSummaryBar({ data }: CapSummaryBarProps) {
           );
           const detailContent = (
             <div className="space-y-1 text-xs">
-              {isMobile && <div className="flex justify-end"><button onClick={() => setCapPopoverOpen(false)} className="p-0.5 rounded-full hover:bg-citrus-cream/20"><X className="h-3.5 w-3.5" /></button></div>}
+              {isMobile && <div className="flex justify-end -mr-1.5 -mt-1.5"><button onClick={() => setCapPopoverOpen(false)} className="min-w-[44px] min-h-[44px] p-2.5 rounded-full hover:bg-citrus-cream/20 flex items-center justify-center touch-manipulation"><X className="h-4 w-4" /></button></div>}
               <div className="flex justify-between gap-4"><span>Cap Ceiling:</span><span className="font-varsity">{formatCapFull(data.salaryCap)}</span></div>
               <div className="flex justify-between gap-4"><span>Projected Hit:</span><span className="font-varsity">{formatCapFull(data.projectedCapHit)}</span></div>
               {data.deadCap > 0 && <div className="flex justify-between gap-4"><span>Dead Cap:</span><span className="font-varsity">{formatCapFull(data.deadCap)}</span></div>}

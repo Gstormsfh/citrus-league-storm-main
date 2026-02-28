@@ -41,7 +41,7 @@ export async function getWeeklyProjections(
     // Sum projections per player across all days
     const weeklyTotals = new Map<number, number>();
     
-    (data || []).forEach((projection: any) => {
+    (data || []).forEach((projection: Record<string, unknown>) => {
       const playerId = Number(projection.player_id);
       const points = Number(projection.total_projected_points) || 0;
       const current = weeklyTotals.get(playerId) || 0;
@@ -88,8 +88,8 @@ export async function getLeagueAverageProjections(
     // Collect all player IDs
     const allPlayerIds = new Set<number>();
     lineups.forEach(lineup => {
-      const starters = (lineup.starters as any[]) || [];
-      const bench = (lineup.bench as any[]) || [];
+      const starters = (lineup.starters as unknown[]) || [];
+      const bench = (lineup.bench as unknown[]) || [];
       [...starters, ...bench].forEach(id => {
         if (id) allPlayerIds.add(Number(id));
       });
@@ -120,7 +120,7 @@ export async function getLeagueAverageProjections(
     // Group projections by position and calculate average
     const positionTotals = new Map<string, { total: number; count: number }>();
     
-    players.forEach((player: any) => {
+    players.forEach((player: Record<string, unknown>) => {
       const playerId = Number(player.player_id);
       const position = player.position_code || '';
       const normalizedPos = normalizePosition(position);

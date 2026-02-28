@@ -17,6 +17,7 @@ import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { getPlayerWithSeasonStats } from '@/utils/playerStatsHelper';
 import { getWeeklyProjections, getLeagueAverageProjections } from '@/utils/projectionHelper';
+import { logger } from '@/utils/logger';
 
 interface PositionDepth {
   position: string;
@@ -183,7 +184,7 @@ export const TeamIntelHub = () => {
         let players: Player[] = [];
 
         if (rosterError) {
-          console.error('Error fetching roster assignments:', rosterError);
+          logger.error('Error fetching roster assignments:', rosterError);
         } else if (rosterAssignments && rosterAssignments.length > 0) {
           const playerIds = rosterAssignments.map((r: { player_id: string }) => String(r.player_id));
           players = allPlayers.filter(p => playerIds.includes(String(p.id)));
@@ -258,7 +259,7 @@ export const TeamIntelHub = () => {
         if (myPrio && myPrio.priority > 0 && myPrio.priority <= priority.length) {
           setMyPriority(myPrio.priority);
         } else {
-          console.warn('Invalid waiver priority:', myPrio?.priority, 'of', priority.length);
+          logger.warn('Invalid waiver priority:', myPrio?.priority, 'of', priority.length);
           setMyPriority(null);
         }
 
@@ -280,7 +281,7 @@ export const TeamIntelHub = () => {
         // Note: Next Man Up suggestions will be loaded when news items are available
 
       } catch (error) {
-        console.error('Error loading roster data:', error);
+        logger.error('Error loading roster data:', error);
       } finally {
         setLoading(false);
       }
@@ -434,7 +435,7 @@ export const TeamIntelHub = () => {
       setStreamerSuggestions(suggestions);
       setShowStreamers(true);
     } catch (error) {
-      console.error('Error loading streamer suggestions:', error);
+      logger.error('Error loading streamer suggestions:', error);
     } finally {
       setLoadingStreamers(false);
     }
@@ -449,7 +450,7 @@ export const TeamIntelHub = () => {
         setIsPlayerModalOpen(true);
       }
     } catch (error) {
-      console.error('Error loading player stats:', error);
+      logger.error('Error loading player stats:', error);
     }
   };
 
@@ -512,7 +513,7 @@ export const TeamIntelHub = () => {
 
         setNextManUpMap(nextManUp);
       } catch (error) {
-        console.error('Error loading Next Man Up suggestions:', error);
+        logger.error('Error loading Next Man Up suggestions:', error);
       }
     };
 

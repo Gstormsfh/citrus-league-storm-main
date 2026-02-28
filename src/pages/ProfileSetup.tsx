@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, User, Mail, Phone, MapPin } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/utils/logger';
 
 const ProfileSetup = () => {
   const navigate = useNavigate();
@@ -111,7 +112,7 @@ const ProfileSetup = () => {
 
         // Don't throw on optional field errors - they can be added later
         if (optionalError) {
-          console.warn('Some optional fields could not be saved:', optionalError.message);
+          logger.warn('Some optional fields could not be saved:', optionalError.message);
         }
       }
 

@@ -10,6 +10,7 @@ import Footer from '../components/Footer';
 import { AdSpace } from '@/components/AdSpace';
 import { CitrusBackground } from '@/components/CitrusBackground';
 import { CitrusSectionDivider } from '@/components/CitrusSectionDivider';
+import { logger } from '@/utils/logger';
 
 const Index = () => {
   // Animation observer setup
@@ -72,7 +73,7 @@ const Index = () => {
       </div>
     );
   } catch (error) {
-    console.error("❌ Error in Index component:", error);
+    logger.error("❌ Error in Index component:", error);
     return (
       <div style={{ padding: "40px", textAlign: "center" }}>
         <h1>Error loading page</h1>

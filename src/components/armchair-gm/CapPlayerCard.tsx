@@ -188,9 +188,9 @@ export default function CapPlayerCard({ player, maxCapHit }: CapPlayerCardProps)
         {isMobile && (
           <button
             onClick={(e) => { e.stopPropagation(); setOpen(false); }}
-            className="text-citrus-sage/60 hover:text-citrus-cream transition-colors"
+            className="min-w-[44px] min-h-[44px] -m-2 p-2.5 rounded-full flex items-center justify-center text-citrus-sage/60 hover:text-citrus-cream hover:bg-citrus-sage/10 transition-colors touch-manipulation"
           >
-            <X className="h-4 w-4" />
+            <X className="h-5 w-5" />
           </button>
         )}
       </div>
