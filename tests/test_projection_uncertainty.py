@@ -673,5 +673,141 @@ class TestStatDistributions:
         assert 0.10 < goals_mean < 1.0
 
 
+# ============================================================================
+# TEST: PRESENTATION FIELDS (likely_low, likely_high, confidence_label)
+# ============================================================================
+
+class TestPresentationFields:
+    """Test user-facing presentation fields for UX clarity."""
+
+    def test_likely_range_present_in_result(self):
+        """propagate_uncertainty should return likely_low, likely_high, confidence_label."""
+        engine = UncertaintyEngine(n_samples=1000, seed=42)
+        proj = make_projection()
+        ctx = make_context()
+        result = engine.propagate_uncertainty(proj, ctx)
+
+        assert "likely_low" in result
+        assert "likely_high" in result
+        assert "confidence_label" in result
+
+    def test_likely_range_matches_50_ci(self):
+        """likely_low/likely_high should equal rounded 50% CI bounds."""
+        engine = UncertaintyEngine(n_samples=5000, seed=42)
+        proj = make_projection()
+        ctx = make_context()
+        result = engine.propagate_uncertainty(proj, ctx)
+
+        assert result["likely_low"] == round(result["ci_lower_50"], 1)
+        assert result["likely_high"] == round(result["ci_upper_50"], 1)
+
+    def test_likely_low_less_than_likely_high(self):
+        """likely_low must be <= likely_high."""
+        engine = UncertaintyEngine(n_samples=5000, seed=42)
+        proj = make_projection()
+        ctx = make_context()
+        result = engine.propagate_uncertainty(proj, ctx)
+        assert result["likely_low"] <= result["likely_high"]
+
+    def test_likely_range_narrower_than_90_ci(self):
+        """50% CI (likely range) must be narrower than 90% CI."""
+        engine = UncertaintyEngine(n_samples=5000, seed=42)
+        proj = make_projection()
+        ctx = make_context()
+        result = engine.propagate_uncertainty(proj, ctx)
+
+        likely_width = result["likely_high"] - result["likely_low"]
+        full_width = result["ci_upper_90"] - result["ci_lower_90"]
+        assert likely_width < full_width
+
+    def test_likely_range_rounded_to_one_decimal(self):
+        """likely_low and likely_high should be rounded to 1 decimal place."""
+        engine = UncertaintyEngine(n_samples=5000, seed=42)
+        proj = make_projection()
+        ctx = make_context()
+        result = engine.propagate_uncertainty(proj, ctx)
+
+        # A value rounded to 1 decimal, when multiplied by 10, should be an integer
+        assert result["likely_low"] * 10 == int(result["likely_low"] * 10)
+        assert result["likely_high"] * 10 == int(result["likely_high"] * 10)
+
+    def test_confidence_label_high(self):
+        """High-confidence projection should get 'High' label."""
+        engine = UncertaintyEngine(n_samples=5000, seed=42)
+        proj = make_projection(total_pts=5.0, confidence=0.95)
+        ctx = make_context(games_played=70, shot_count=300, actual_goals=30, total_xg=28.0)
+        result = engine.propagate_uncertainty(proj, ctx)
+
+        # With many games and high confidence, dynamic_confidence should be >= 0.60
+        if result["dynamic_confidence"] >= 0.60:
+            assert result["confidence_label"] == "High"
+
+    def test_confidence_label_low_for_rookies(self):
+        """Rookie with few games should get 'Medium' or 'Low' label."""
+        engine = UncertaintyEngine(n_samples=5000, seed=42)
+        proj = make_projection(total_pts=4.0, confidence=0.30)
+        ctx = make_context(games_played=3, shot_count=5, actual_goals=0, total_xg=0.3)
+        result = engine.propagate_uncertainty(proj, ctx)
+
+        # With very few games, confidence should be lower
+        assert result["confidence_label"] in ("Medium", "Low")
+
+    def test_confidence_label_valid_values(self):
+        """confidence_label must be one of 'High', 'Medium', 'Low'."""
+        engine = UncertaintyEngine(n_samples=1000, seed=42)
+        proj = make_projection()
+        ctx = make_context()
+        result = engine.propagate_uncertainty(proj, ctx)
+        assert result["confidence_label"] in ("High", "Medium", "Low")
+
+    def test_enrichment_adds_presentation_fields(self):
+        """enrich_projection_with_uncertainty should add likely_low, likely_high, confidence_label."""
+        engine = UncertaintyEngine(n_samples=1000, seed=42)
+        proj = make_projection()
+        ctx = make_context()
+
+        enriched = enrich_projection_with_uncertainty(proj, ctx, engine=engine)
+
+        assert "likely_low" in enriched
+        assert "likely_high" in enriched
+        assert "confidence_label" in enriched
+        assert isinstance(enriched["likely_low"], float)
+        assert isinstance(enriched["likely_high"], float)
+        assert enriched["confidence_label"] in ("High", "Medium", "Low")
+
+    def test_fallback_includes_presentation_fields(self):
+        """Fallback result should also include presentation fields."""
+        engine = UncertaintyEngine(n_samples=500, seed=42)
+        fallback = engine._fallback_result(make_projection(total_pts=4.0))
+
+        assert "likely_low" in fallback
+        assert "likely_high" in fallback
+        assert "confidence_label" in fallback
+        assert fallback["likely_low"] <= fallback["likely_high"]
+        assert fallback["confidence_label"] in ("High", "Medium", "Low")
+
+    def test_fallback_likely_range_based_on_point_estimate(self):
+        """Fallback likely range should be derived from the point estimate."""
+        engine = UncertaintyEngine(n_samples=500, seed=42)
+        pts = 5.0
+        fallback = engine._fallback_result(make_projection(total_pts=pts))
+
+        # Fallback uses pts * 0.7 and pts * 1.3
+        assert fallback["likely_low"] == round(pts * 0.7, 1)
+        assert fallback["likely_high"] == round(pts * 1.3, 1)
+
+    def test_batch_includes_presentation_fields(self):
+        """Batch results should include presentation fields."""
+        engine = UncertaintyEngine(n_samples=500, seed=42)
+        projections = [make_projection(), make_projection(total_pts=6.0)]
+        contexts = [make_context(), make_context()]
+        results = engine.propagate_batch(projections, contexts)
+
+        for r in results:
+            assert "likely_low" in r
+            assert "likely_high" in r
+            assert "confidence_label" in r
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])

@@ -502,6 +502,20 @@ class UncertaintyEngine:
                 "median": round(float(np.median(s)), 4),
             }
 
+        # ── Presentation-ready fields ──
+        # The 50% CI is the "likely range" — tight enough to feel accurate,
+        # wide enough to be honest. This is what users see.
+        likely_low = round(float(ci_25), 1)
+        likely_high = round(float(ci_75), 1)
+
+        # Confidence label — plain English for the UI
+        if dynamic_confidence >= 0.60:
+            confidence_label = "High"
+        elif dynamic_confidence >= 0.35:
+            confidence_label = "Medium"
+        else:
+            confidence_label = "Low"
+
         return {
             # Core distribution metrics
             "point_estimate": round(point_estimate, 3),
@@ -520,6 +534,13 @@ class UncertaintyEngine:
 
             # Dynamic confidence (replaces static confidence_score)
             "dynamic_confidence": round(dynamic_confidence, 3),
+
+            # ── User-facing presentation fields ──
+            # Primary display: "3.2 – 5.8 likely" (50% CI, rounded to 1 decimal)
+            "likely_low": likely_low,
+            "likely_high": likely_high,
+            # Confidence badge: "High", "Medium", or "Low"
+            "confidence_label": confidence_label,
 
             # Per-stat breakdowns
             "stat_distributions": stat_distributions,
@@ -561,6 +582,13 @@ class UncertaintyEngine:
     def _fallback_result(self, projection: Dict[str, Any]) -> Dict[str, Any]:
         """Fallback result when MC propagation fails."""
         pts = float(projection.get("total_projected_points", 0.0))
+        dyn_conf = float(projection.get("confidence_score", 0.5))
+        if dyn_conf >= 0.60:
+            conf_label = "High"
+        elif dyn_conf >= 0.35:
+            conf_label = "Medium"
+        else:
+            conf_label = "Low"
         return {
             "point_estimate": round(pts, 3),
             "mean": round(pts, 3),
@@ -573,7 +601,10 @@ class UncertaintyEngine:
             "skewness": 0.5,
             "upside_probability": 0.15,
             "floor_probability": 0.20,
-            "dynamic_confidence": float(projection.get("confidence_score", 0.5)),
+            "dynamic_confidence": dyn_conf,
+            "likely_low": round(pts * 0.7, 1),
+            "likely_high": round(pts * 1.3, 1),
+            "confidence_label": conf_label,
             "stat_distributions": {},
         }
 
@@ -621,7 +652,7 @@ def enrich_projection_with_uncertainty(
 
     result = engine.propagate_uncertainty(projection, player_context, scoring_weights)
 
-    # Add uncertainty fields to the projection (prefix with 'unc_' for clarity)
+    # Add uncertainty fields to the projection
     projection["projection_mean"] = result["mean"]
     projection["projection_std_dev"] = result["std_dev"]
     projection["projection_ci_lower"] = result["ci_lower_90"]
@@ -634,8 +665,14 @@ def enrich_projection_with_uncertainty(
     projection["floor_probability"] = result["floor_probability"]
     projection["dynamic_confidence"] = result["dynamic_confidence"]
 
+    # User-facing presentation fields
+    # "likely_low" / "likely_high" = 50% CI, the primary range shown to users
+    # "confidence_label" = "High" / "Medium" / "Low" plain-English badge
+    projection["likely_low"] = result["likely_low"]
+    projection["likely_high"] = result["likely_high"]
+    projection["confidence_label"] = result["confidence_label"]
+
     # Override static confidence with dynamic MC-derived confidence
-    # This is more informative than the static formula
     projection["confidence_score"] = result["dynamic_confidence"]
 
     return projection
