@@ -49,7 +49,7 @@ const ODDS_FORMAT = "american";
 // The Odds API uses full team names; we need abbreviations for our DB
 const TEAM_NAME_TO_ABBREV: Record<string, string> = {
   "Anaheim Ducks": "ANA",
-  "Arizona Coyotes": "ARI",
+  "Utah Hockey Club": "UTA",
   "Boston Bruins": "BOS",
   "Buffalo Sabres": "BUF",
   "Calgary Flames": "CGY",

@@ -17,7 +17,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // Team abbreviation mapping (common variations)
 const TEAM_ABBREV_MAP: Record<string, string> = {
   'Anaheim Ducks': 'ANA',
-  'Arizona Coyotes': 'ARI',
+  'Utah Hockey Club': 'UTA',
   'Boston Bruins': 'BOS',
   'Buffalo Sabres': 'BUF',
   'Calgary Flames': 'CGY',
@@ -51,7 +51,7 @@ const TEAM_ABBREV_MAP: Record<string, string> = {
   'Winnipeg Jets': 'WPG',
   // Common abbreviations
   'ANA': 'ANA',
-  'ARI': 'ARI',
+  'UTA': 'UTA',
   'BOS': 'BOS',
   'BUF': 'BUF',
   'CGY': 'CGY',

@@ -14,7 +14,7 @@ const demoMessages = [
   },
   {
     question: "Should I drop my backup goalie for a streaming spot?",
-    answer: "Check your matchup first. If you're up 4-2 going into Saturday, you're probably safe. But if it's tight, keep the goalie. Your backup (Ullmark) has a .925 save% and faces ARI on Saturday—that's a 65% win probability based on our model. Saturday finishes mean every game matters. Don't get cute."
+    answer: "Check your matchup first. If you're up 4-2 going into Saturday, you're probably safe. But if it's tight, keep the goalie. Your backup (Ullmark) has a .925 save% and faces UTA on Saturday—that's a 65% win probability based on our model. Saturday finishes mean every game matters. Don't get cute."
   },
   {
     question: "Is this trade fair? I give Matthews, get MacKinnon + a 3rd round pick.",

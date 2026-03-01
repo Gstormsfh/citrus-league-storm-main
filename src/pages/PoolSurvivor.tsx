@@ -17,7 +17,7 @@ import { logger } from '@/utils/logger';
 
 // NHL team data for selection grid
 const NHL_TEAMS = [
-  'ANA', 'ARI', 'BOS', 'BUF', 'CGY', 'CAR', 'CHI', 'COL',
+  'ANA', 'BOS', 'BUF', 'CGY', 'CAR', 'CHI', 'COL',
   'CBJ', 'DAL', 'DET', 'EDM', 'FLA', 'LAK', 'MIN', 'MTL',
   'NSH', 'NJD', 'NYI', 'NYR', 'OTT', 'PHI', 'PIT', 'SJS',
   'SEA', 'STL', 'TBL', 'TOR', 'UTA', 'VAN', 'VGK', 'WPG', 'WSH',
