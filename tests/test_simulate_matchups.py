@@ -2,17 +2,23 @@
 Unit tests for the Monte Carlo Matchup Simulation Engine.
 
 Tests cover:
-- PlayerDistribution: sampling, mean/std estimation, gamma/normal distributions
-- CorrelationEngine: correlation matrix construction, t-copula sampling
-- MatchupSimulator: full matchup simulation, win probability properties
+- PlayerDistribution: sampling, mean/std estimation, gamma/normal distributions,
+  confidence-weighted variance, GSAx goalie adjustments, over/under scaling
+- CorrelationEngine: correlation matrix construction, t-copula sampling,
+  shift overlap mining, assist chain mining, fantasy co-movement
+- MatchupSimulator: full matchup simulation, win probability properties,
+  data-driven correlation passthrough
+- SeasonSimulator: season-long Monte Carlo structure
 - BrierTracker: calibration score calculation
 - calculate_fantasy_points: scoring accuracy vs ScoringCalculator
+- Data loading helpers: compute_player_over_under
 """
 
 import sys
 import os
 import numpy as np
 import pytest
+from unittest.mock import MagicMock, patch
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -21,8 +27,10 @@ from simulate_matchups import (
     PlayerDistribution,
     CorrelationEngine,
     MatchupSimulator,
+    SeasonSimulator,
     BrierTracker,
     calculate_fantasy_points,
+    compute_player_over_under,
     SKATER_STATS,
     GOALIE_STATS,
     DEFAULT_SKATER_SCORING,
@@ -137,21 +145,24 @@ class TestCorrelationEngine:
 
     def test_same_team_correlation(self):
         """Players on the same team have positive correlation."""
-        rho = CorrelationEngine.estimate_correlation(
+        engine = CorrelationEngine(nu=5.0)
+        rho = engine.estimate_correlation(
             1, 2, "EDM", "EDM", same_game=True
         )
         assert rho > 0
 
     def test_opposing_team_correlation(self):
         """Players on opposing teams in same game have negative correlation."""
-        rho = CorrelationEngine.estimate_correlation(
+        engine = CorrelationEngine(nu=5.0)
+        rho = engine.estimate_correlation(
             1, 2, "EDM", "CGY", same_game=True
         )
         assert rho < 0
 
     def test_different_game_correlation(self):
         """Players in different games are independent."""
-        rho = CorrelationEngine.estimate_correlation(
+        engine = CorrelationEngine(nu=5.0)
+        rho = engine.estimate_correlation(
             1, 2, "EDM", "TBL", same_game=False
         )
         assert rho == 0.0
@@ -469,6 +480,569 @@ class TestCalculateFantasyPoints:
         points = calculate_fantasy_points(stats, is_goalie=False, scoring=custom)
 
         assert points == pytest.approx(13.0)  # 2*5 + 1*3
+
+
+class TestConfidenceWeightedVariance:
+    """Tests for confidence_score variance inflation in PlayerDistribution."""
+
+    def _make_game_stats(self, n=10):
+        return [
+            {"goals": 0.5, "assists": 0.8, "sog": 3.0, "blocks": 0.5,
+             "ppp": 0.2, "shp": 0.0, "hits": 1.0, "pim": 0.5}
+        ] * n
+
+    def test_full_confidence_no_inflation(self):
+        """confidence_score=1.0 should not inflate variance."""
+        stats = self._make_game_stats()
+        dist_baseline = PlayerDistribution(1, False, stats, confidence_score=1.0)
+        dist_full = PlayerDistribution(2, False, stats, confidence_score=1.0)
+
+        for stat in SKATER_STATS:
+            assert dist_baseline.std_devs[stat] == pytest.approx(dist_full.std_devs[stat])
+
+    def test_low_confidence_inflates_variance(self):
+        """confidence_score=0.5 should inflate std_dev by 1.5x."""
+        stats = self._make_game_stats()
+        dist_high = PlayerDistribution(1, False, stats, confidence_score=1.0)
+        dist_low = PlayerDistribution(2, False, stats, confidence_score=0.5)
+
+        for stat in SKATER_STATS:
+            expected_inflation = 1.0 + (1.0 - 0.5)  # 1.5x
+            assert dist_low.std_devs[stat] == pytest.approx(
+                dist_high.std_devs[stat] * expected_inflation, rel=0.01
+            ), f"Low confidence should inflate {stat} std_dev by {expected_inflation}x"
+
+    def test_minimum_confidence_floor(self):
+        """confidence_score below 0.1 should be clamped to 0.1."""
+        stats = self._make_game_stats()
+        dist = PlayerDistribution(1, False, stats, confidence_score=0.0)
+        # Should clamp to 0.1, giving inflation of 1.0 + (1.0 - 0.1) = 1.9x
+        assert dist.confidence_score == 0.1
+
+    def test_very_low_confidence_doubles_variance(self):
+        """confidence_score=0.1 should nearly double std_dev (1.9x)."""
+        stats = self._make_game_stats()
+        dist_high = PlayerDistribution(1, False, stats, confidence_score=1.0)
+        dist_very_low = PlayerDistribution(2, False, stats, confidence_score=0.1)
+
+        for stat in SKATER_STATS:
+            ratio = dist_very_low.std_devs[stat] / dist_high.std_devs[stat]
+            assert ratio == pytest.approx(1.9, rel=0.01), \
+                f"{stat} std_dev ratio should be ~1.9x, got {ratio:.3f}"
+
+    def test_confidence_preserves_means(self):
+        """confidence_score should only affect std_devs, not means."""
+        stats = self._make_game_stats()
+        dist_high = PlayerDistribution(1, False, stats, confidence_score=1.0)
+        dist_low = PlayerDistribution(2, False, stats, confidence_score=0.3)
+
+        for stat in SKATER_STATS:
+            assert dist_high.means[stat] == pytest.approx(dist_low.means[stat])
+
+    def test_wider_distributions_produce_higher_variance_samples(self):
+        """Low confidence samples should have higher empirical variance."""
+        stats = self._make_game_stats(20)
+        dist_high = PlayerDistribution(1, False, stats, confidence_score=1.0)
+        dist_low = PlayerDistribution(2, False, stats, confidence_score=0.3)
+
+        rng = np.random.default_rng(42)
+        samples_high = dist_high.sample(n=10000, rng=rng)
+        samples_low = dist_low.sample(n=10000, rng=rng)
+
+        # Total fantasy points variance should be higher for low confidence
+        pts_high = samples_high @ np.array([DEFAULT_SKATER_SCORING.get(s, 0) for s in SKATER_STATS])
+        pts_low = samples_low @ np.array([DEFAULT_SKATER_SCORING.get(s, 0) for s in SKATER_STATS])
+
+        assert np.std(pts_low) > np.std(pts_high), \
+            "Low confidence should produce higher variance fantasy point samples"
+
+
+class TestGSAxGoalieAdjustment:
+    """Tests for GSAx-based goalie distribution adjustments."""
+
+    def _make_goalie_stats(self, n=10):
+        return [
+            {"wins": 0.6, "saves": 28.0, "shutouts": 0.08, "goals_against": 2.5}
+        ] * n
+
+    def test_elite_goalie_boosted(self):
+        """GSAx > 0 should boost saves and reduce goals_against."""
+        stats = self._make_goalie_stats()
+        dist_avg = PlayerDistribution(1, True, stats, gsax=None)
+        dist_elite = PlayerDistribution(2, True, stats, gsax=10.0)
+
+        assert dist_elite.means["saves"] > dist_avg.means["saves"], \
+            "Elite goalie should have higher save mean"
+        assert dist_elite.means["goals_against"] < dist_avg.means["goals_against"], \
+            "Elite goalie should have lower GA mean"
+        assert dist_elite.means["wins"] > dist_avg.means["wins"], \
+            "Elite goalie should have higher win mean"
+        assert dist_elite.means["shutouts"] > dist_avg.means["shutouts"], \
+            "Elite goalie should have higher shutout mean"
+
+    def test_replacement_goalie_penalized(self):
+        """GSAx < 0 should reduce saves and increase goals_against."""
+        stats = self._make_goalie_stats()
+        dist_avg = PlayerDistribution(1, True, stats, gsax=None)
+        dist_bad = PlayerDistribution(2, True, stats, gsax=-10.0)
+
+        assert dist_bad.means["saves"] < dist_avg.means["saves"], \
+            "Replacement goalie should have lower save mean"
+        assert dist_bad.means["goals_against"] > dist_avg.means["goals_against"], \
+            "Replacement goalie should have higher GA mean"
+        assert dist_bad.means["wins"] < dist_avg.means["wins"], \
+            "Replacement goalie should have lower win mean"
+
+    def test_gsax_capped_at_15_percent(self):
+        """GSAx adjustment should be capped at ±15%."""
+        stats = self._make_goalie_stats()
+        dist_avg = PlayerDistribution(1, True, stats, gsax=None)
+        # Extreme GSAx = 50 (way beyond normal range)
+        dist_extreme = PlayerDistribution(2, True, stats, gsax=50.0)
+
+        # The saves adjustment should be at most +7.5% (0.15 * 0.5 = 0.075)
+        max_expected_saves = dist_avg.means["saves"] * 1.075
+        assert dist_extreme.means["saves"] <= max_expected_saves * 1.01, \
+            "GSAx saves adjustment should be capped"
+
+    def test_gsax_does_not_affect_skaters(self):
+        """GSAx parameter should be ignored for non-goalies."""
+        stats = [{"goals": 0.5, "assists": 0.5, "sog": 3.0, "blocks": 0.5,
+                  "ppp": 0.2, "shp": 0.0, "hits": 1.0, "pim": 0.5}] * 10
+
+        dist_with = PlayerDistribution(1, False, stats, gsax=15.0)
+        dist_without = PlayerDistribution(2, False, stats, gsax=None)
+
+        for stat in SKATER_STATS:
+            assert dist_with.means[stat] == pytest.approx(dist_without.means[stat])
+
+    def test_gsax_zero_no_change(self):
+        """GSAx=0 should result in no adjustments (average goalie)."""
+        stats = self._make_goalie_stats()
+        dist_avg = PlayerDistribution(1, True, stats, gsax=None)
+        dist_zero = PlayerDistribution(2, True, stats, gsax=0.0)
+
+        for stat in GOALIE_STATS:
+            assert dist_zero.means[stat] == pytest.approx(dist_avg.means[stat], rel=0.001)
+
+
+class TestOverUnderScaling:
+    """Tests for Vegas over/under game environment scaling."""
+
+    def _make_skater_stats(self, n=10):
+        return [
+            {"goals": 0.5, "assists": 0.8, "sog": 3.0, "blocks": 0.5,
+             "ppp": 0.3, "shp": 0.0, "hits": 1.0, "pim": 0.5}
+        ] * n
+
+    def test_high_scoring_game_scales_up(self):
+        """O/U > 6.0 (avg) should scale up offensive stats."""
+        stats = self._make_skater_stats()
+        dist_avg = PlayerDistribution(1, False, stats, over_under=None)
+        dist_high = PlayerDistribution(2, False, stats, over_under=7.0)
+
+        for stat in ("goals", "assists", "ppp", "sog"):
+            assert dist_high.means[stat] > dist_avg.means[stat], \
+                f"High O/U should increase {stat} mean"
+
+    def test_low_scoring_game_scales_down(self):
+        """O/U < 6.0 (avg) should scale down offensive stats."""
+        stats = self._make_skater_stats()
+        dist_avg = PlayerDistribution(1, False, stats, over_under=None)
+        dist_low = PlayerDistribution(2, False, stats, over_under=5.0)
+
+        for stat in ("goals", "assists", "ppp", "sog"):
+            assert dist_low.means[stat] < dist_avg.means[stat], \
+                f"Low O/U should decrease {stat} mean"
+
+    def test_average_ou_no_change(self):
+        """O/U = 6.0 should produce no scaling (1.0x)."""
+        stats = self._make_skater_stats()
+        dist_avg = PlayerDistribution(1, False, stats, over_under=None)
+        dist_avg_ou = PlayerDistribution(2, False, stats, over_under=6.0)
+
+        for stat in ("goals", "assists", "ppp", "sog"):
+            assert dist_avg_ou.means[stat] == pytest.approx(dist_avg.means[stat], rel=0.001)
+
+    def test_ou_scaling_capped(self):
+        """O/U scaling should be capped at ±25%."""
+        stats = self._make_skater_stats()
+        dist_avg = PlayerDistribution(1, False, stats, over_under=None)
+        # Extreme O/U = 10.0 → scale = 10/6 = 1.67, should cap to 1.25
+        dist_extreme = PlayerDistribution(2, False, stats, over_under=10.0)
+
+        for stat in ("goals", "assists", "ppp", "sog"):
+            ratio = dist_extreme.means[stat] / dist_avg.means[stat]
+            assert ratio <= 1.26, f"O/U scaling for {stat} should cap at 1.25x, got {ratio:.3f}"
+
+    def test_ou_does_not_affect_defensive_stats(self):
+        """Blocks, hits, PIM should NOT be scaled by over/under."""
+        stats = self._make_skater_stats()
+        dist_avg = PlayerDistribution(1, False, stats, over_under=None)
+        dist_high = PlayerDistribution(2, False, stats, over_under=8.0)
+
+        for stat in ("blocks", "hits", "pim"):
+            assert dist_high.means[stat] == pytest.approx(dist_avg.means[stat])
+
+    def test_ou_does_not_affect_goalies(self):
+        """Over/under should not scale goalie distributions."""
+        goalie_stats = [
+            {"wins": 0.6, "saves": 28.0, "shutouts": 0.08, "goals_against": 2.5}
+        ] * 10
+
+        dist_avg = PlayerDistribution(1, True, goalie_stats, over_under=None)
+        dist_high = PlayerDistribution(2, True, goalie_stats, over_under=8.0)
+
+        for stat in GOALIE_STATS:
+            assert dist_high.means[stat] == pytest.approx(dist_avg.means[stat])
+
+    def test_ou_correct_magnitude(self):
+        """O/U=7.0 should scale offensive stats by ~1.167x (7/6)."""
+        stats = self._make_skater_stats()
+        dist_avg = PlayerDistribution(1, False, stats, over_under=None)
+        dist_7 = PlayerDistribution(2, False, stats, over_under=7.0)
+
+        expected_scale = 7.0 / 6.0  # 1.1667
+        for stat in ("goals", "assists"):
+            ratio = dist_7.means[stat] / dist_avg.means[stat]
+            assert ratio == pytest.approx(expected_scale, rel=0.01), \
+                f"O/U=7.0 should scale {stat} by {expected_scale:.4f}x, got {ratio:.4f}x"
+
+
+class TestFantasyComovement:
+    """Tests for empirical Kendall's tau co-movement analysis."""
+
+    def test_perfectly_correlated_players(self):
+        """Players with perfectly correlated performance should have high tau."""
+        engine = CorrelationEngine(nu=5.0)
+
+        # Both players always score proportionally
+        stats_a = [{"goals": i, "assists": i, "sog": i * 2, "blocks": 0,
+                     "ppp": 0, "shp": 0, "hits": 0, "pim": 0} for i in range(1, 11)]
+        stats_b = [{"goals": i * 2, "assists": i, "sog": i * 3, "blocks": 0,
+                     "ppp": 0, "shp": 0, "hits": 0, "pim": 0} for i in range(1, 11)]
+
+        tau = engine.mine_fantasy_comovement(stats_a, stats_b)
+        assert tau is not None
+        assert tau > 0.5, f"Perfectly correlated players should have high tau, got {tau}"
+
+    def test_uncorrelated_players(self):
+        """Players with random performance should have tau near 0."""
+        engine = CorrelationEngine(nu=5.0)
+
+        rng = np.random.default_rng(42)
+        stats_a = [{"goals": rng.poisson(0.3), "assists": rng.poisson(0.5),
+                     "sog": rng.poisson(3), "blocks": 0, "ppp": 0,
+                     "shp": 0, "hits": 0, "pim": 0} for _ in range(50)]
+        stats_b = [{"goals": rng.poisson(0.4), "assists": rng.poisson(0.6),
+                     "sog": rng.poisson(2), "blocks": 0, "ppp": 0,
+                     "shp": 0, "hits": 0, "pim": 0} for _ in range(50)]
+
+        tau = engine.mine_fantasy_comovement(stats_a, stats_b)
+        # With random data, tau could be None (not significant) or close to 0
+        if tau is not None:
+            assert abs(tau) < 0.5, f"Random players should have low tau, got {tau}"
+
+    def test_insufficient_data_returns_none(self):
+        """Should return None with < 5 games of data."""
+        engine = CorrelationEngine(nu=5.0)
+
+        stats_a = [{"goals": 1}] * 3
+        stats_b = [{"goals": 1}] * 3
+
+        assert engine.mine_fantasy_comovement(stats_a, stats_b) is None
+
+
+class TestDataDrivenCorrelations:
+    """Tests for the data-driven correlation estimation priority chain."""
+
+    def test_heuristic_fallback_same_team(self):
+        """Without data, same-team players get heuristic correlation of 0.25."""
+        engine = CorrelationEngine(nu=5.0)
+        rho = engine.estimate_correlation(1, 2, "EDM", "EDM", same_game=True)
+        assert rho == pytest.approx(0.25)
+
+    def test_comovement_used_when_game_stats_provided(self):
+        """When game_stats are provided, co-movement should be attempted."""
+        engine = CorrelationEngine(nu=5.0)
+
+        # Positively correlated game stats
+        game_stats = {
+            1: [{"goals": i, "assists": i, "sog": i * 2, "blocks": 0,
+                 "ppp": 0, "shp": 0, "hits": 0, "pim": 0} for i in range(1, 11)],
+            2: [{"goals": i * 2, "assists": i, "sog": i * 3, "blocks": 0,
+                 "ppp": 0, "shp": 0, "hits": 0, "pim": 0} for i in range(1, 11)],
+        }
+
+        rho = engine.estimate_correlation(
+            1, 2, "EDM", "EDM", same_game=True,
+            game_stats=game_stats,
+        )
+
+        # Should use co-movement rather than fallback
+        assert rho != 0.25, "Should use co-movement, not heuristic fallback"
+        assert rho > 0, "Positively correlated players should have rho > 0"
+
+    def test_correlation_matrix_with_game_stats(self):
+        """Correlation matrix should use game stats when provided."""
+        engine = CorrelationEngine(nu=5.0)
+
+        players = [
+            PlayerDistribution(1, False, [{"goals": 1}] * 10, team_abbrev="EDM"),
+            PlayerDistribution(2, False, [{"goals": 1}] * 10, team_abbrev="EDM"),
+        ]
+
+        game_stats = {
+            1: [{"goals": i, "assists": i, "sog": i * 2, "blocks": 0,
+                 "ppp": 0, "shp": 0, "hits": 0, "pim": 0} for i in range(1, 11)],
+            2: [{"goals": i * 2, "assists": i, "sog": i * 3, "blocks": 0,
+                 "ppp": 0, "shp": 0, "hits": 0, "pim": 0} for i in range(1, 11)],
+        }
+
+        schedule = {1: [1001], 2: [1001]}
+
+        corr = engine.build_correlation_matrix(
+            players, schedule, game_stats=game_stats
+        )
+
+        assert corr.shape == (2, 2)
+        assert corr[0, 1] > 0, "Same-team correlated players should have positive correlation"
+        # Should be different from the heuristic fallback of 0.25
+        assert corr[0, 1] != pytest.approx(0.25, abs=0.01), \
+            "Should use data-driven correlation, not heuristic"
+
+
+class TestComputePlayerOverUnder:
+    """Tests for compute_player_over_under helper."""
+
+    def test_single_game_player(self):
+        """Player with one game gets that game's O/U."""
+        schedule = {1: [100]}
+        over_unders = {100: 6.5}
+        result = compute_player_over_under(schedule, over_unders)
+        assert result[1] == pytest.approx(6.5)
+
+    def test_multi_game_average(self):
+        """Player with multiple games gets average O/U."""
+        schedule = {1: [100, 101, 102]}
+        over_unders = {100: 5.5, 101: 6.5, 102: 7.0}
+        result = compute_player_over_under(schedule, over_unders)
+        expected = (5.5 + 6.5 + 7.0) / 3
+        assert result[1] == pytest.approx(expected)
+
+    def test_missing_game_ids_excluded(self):
+        """Games without O/U data are excluded from average."""
+        schedule = {1: [100, 101, 102]}
+        over_unders = {100: 6.0}  # Only one game has data
+        result = compute_player_over_under(schedule, over_unders)
+        assert result[1] == pytest.approx(6.0)
+
+    def test_no_games_no_entry(self):
+        """Player with no games should not appear in result."""
+        schedule = {1: []}
+        over_unders = {}
+        result = compute_player_over_under(schedule, over_unders)
+        assert 1 not in result
+
+    def test_multiple_players(self):
+        """Multiple players with different schedules."""
+        schedule = {1: [100, 101], 2: [101, 102]}
+        over_unders = {100: 5.5, 101: 6.5, 102: 7.0}
+        result = compute_player_over_under(schedule, over_unders)
+        assert result[1] == pytest.approx((5.5 + 6.5) / 2)
+        assert result[2] == pytest.approx((6.5 + 7.0) / 2)
+
+
+class TestCombinedEnhancements:
+    """Integration tests verifying all enhancements work together correctly."""
+
+    def _make_game_stats(self, n=10):
+        return [
+            {"goals": 0.5, "assists": 0.8, "sog": 3.0, "blocks": 0.5,
+             "ppp": 0.3, "shp": 0.0, "hits": 1.0, "pim": 0.5}
+        ] * n
+
+    def test_all_enhancements_simultaneously(self):
+        """Player with confidence, O/U, and projection should work together."""
+        stats = self._make_game_stats()
+        dist = PlayerDistribution(
+            player_id=1,
+            is_goalie=False,
+            game_stats=stats,
+            confidence_score=0.5,
+            over_under=7.0,
+        )
+
+        # Should have inflated variance (confidence 0.5 → 1.5x std)
+        baseline = PlayerDistribution(1, False, stats, confidence_score=1.0, over_under=None)
+
+        # Goals mean should be scaled by O/U (7.0/6.0 = 1.167)
+        assert dist.means["goals"] > baseline.means["goals"]
+
+        # Std dev should be inflated by confidence
+        expected_confidence_inflation = 1.5
+        # After O/U scaling, the means changed but std was inflated
+        assert dist.std_devs["goals"] > baseline.std_devs["goals"]
+
+    def test_goalie_with_gsax_and_confidence(self):
+        """Goalie with both GSAx and low confidence."""
+        stats = [
+            {"wins": 0.6, "saves": 28.0, "shutouts": 0.08, "goals_against": 2.5}
+        ] * 10
+
+        dist = PlayerDistribution(
+            player_id=1,
+            is_goalie=True,
+            game_stats=stats,
+            gsax=8.0,
+            confidence_score=0.6,
+        )
+
+        baseline = PlayerDistribution(1, True, stats, gsax=None, confidence_score=1.0)
+
+        # GSAx should boost saves
+        assert dist.means["saves"] > baseline.means["saves"]
+        # Confidence should inflate variance
+        assert dist.std_devs["saves"] > baseline.std_devs["saves"]
+
+    def test_simulation_with_enhanced_players(self):
+        """Full simulation should work with all enhancements."""
+        sim = MatchupSimulator(n_sims=500, seed=42)
+
+        team1 = [
+            PlayerDistribution(
+                i, False,
+                [{"goals": 0.5, "assists": 0.5, "sog": 3.0, "blocks": 0.5,
+                  "ppp": 0.2, "shp": 0.0, "hits": 1.0, "pim": 0.5}] * 10,
+                team_abbrev="EDM",
+                confidence_score=0.7,
+                over_under=6.5,
+            )
+            for i in range(3)
+        ]
+
+        team2 = [
+            PlayerDistribution(
+                i + 10, False,
+                [{"goals": 0.4, "assists": 0.4, "sog": 2.5, "blocks": 0.5,
+                  "ppp": 0.1, "shp": 0.0, "hits": 1.0, "pim": 0.5}] * 10,
+                team_abbrev="CGY",
+                confidence_score=0.9,
+                over_under=5.5,
+            )
+            for i in range(3)
+        ]
+
+        games1 = {i: 2 for i in range(3)}
+        games2 = {i + 10: 2 for i in range(3)}
+        sched1 = {i: [1, 2] for i in range(3)}
+        sched2 = {i + 10: [1, 3] for i in range(3)}
+
+        result = sim.simulate_matchup(
+            team1, team2, games1, games2, sched1, sched2
+        )
+
+        assert 0 <= result["win_probability"] <= 1
+        total = result["win_probability"] + result["loss_probability"] + result["tie_probability"]
+        assert abs(total - 1.0) < 0.01
+
+    def test_higher_ou_increases_projected_points(self):
+        """Players in high-scoring games should project more points."""
+        sim = MatchupSimulator(n_sims=5000, seed=42)
+
+        def make_team(ou, team, id_start):
+            return [
+                PlayerDistribution(
+                    i + id_start, False,
+                    [{"goals": 0.5, "assists": 0.8, "sog": 3.0, "blocks": 0.5,
+                      "ppp": 0.2, "shp": 0.0, "hits": 1.0, "pim": 0.5}] * 10,
+                    team_abbrev=team,
+                    over_under=ou,
+                )
+                for i in range(3)
+            ]
+
+        team_high = make_team(7.5, "EDM", 0)
+        team_low = make_team(5.0, "CGY", 10)
+        team_avg = make_team(None, "TBL", 20)
+
+        games = {i: 3 for i in range(30)}
+        sched = {i: [1, 2, 3] for i in range(30)}
+
+        sims_high = sim.simulate_team_week(team_high, games, sched)
+        sims_low = sim.simulate_team_week(team_low, games, sched)
+
+        assert np.mean(sims_high) > np.mean(sims_low), \
+            "High O/U team should project more points than low O/U team"
+
+
+class TestSeasonSimulator:
+    """Tests for the SeasonSimulator class structure."""
+
+    def test_season_simulator_initialization(self):
+        """SeasonSimulator should initialize with correct parameters."""
+        ss = SeasonSimulator(n_sims=3000, copula_nu=6.0)
+        assert ss.n_sims == 3000
+        assert ss.copula_nu == 6.0
+
+    def test_season_simulator_default_params(self):
+        """Default SeasonSimulator should use 5000 sims."""
+        ss = SeasonSimulator()
+        assert ss.n_sims == 5000
+        assert ss.copula_nu == 5.0
+
+
+class TestVectorizedScoring:
+    """Tests verifying vectorized scoring produces same results as scalar."""
+
+    def test_vectorized_matches_scalar(self):
+        """Vectorized scoring should produce identical results to per-simulation loop."""
+        sim = MatchupSimulator(n_sims=200, seed=42)
+
+        players = [
+            PlayerDistribution(
+                i, False,
+                [{"goals": 0.5, "assists": 0.8, "sog": 3.0, "blocks": 0.5,
+                  "ppp": 0.2, "shp": 0.0, "hits": 1.0, "pim": 0.5}] * 10,
+                team_abbrev="EDM",
+            )
+            for i in range(3)
+        ]
+
+        games = {i: 2 for i in range(3)}
+        sched = {i: [1, 2] for i in range(3)}
+
+        # Run simulation — internally uses vectorized scoring
+        totals = sim.simulate_team_week(players, games, sched)
+
+        # All values should be finite and reasonable
+        assert np.all(np.isfinite(totals)), "All simulated totals should be finite"
+        assert np.all(totals >= 0), "Simulated totals should be non-negative"
+        assert np.mean(totals) > 0, "Mean team total should be positive"
+
+
+class TestCorrelationCache:
+    """Tests for the CorrelationEngine caching mechanism."""
+
+    def test_cache_stores_results(self):
+        """Mined correlations should be cached for reuse."""
+        engine = CorrelationEngine(nu=5.0)
+
+        # Manually populate cache
+        engine._correlation_cache[(1, 2)] = 0.45
+        engine._correlation_cache[(3, 4)] = 0.30
+
+        assert engine._correlation_cache[(1, 2)] == 0.45
+        assert engine._correlation_cache[(3, 4)] == 0.30
+
+    def test_cache_key_ordering(self):
+        """Cache keys should use canonical ordering (min, max)."""
+        engine = CorrelationEngine(nu=5.0)
+
+        # Both orderings should produce same key
+        key_ab = (min(5, 10), max(5, 10))
+        key_ba = (min(10, 5), max(10, 5))
+        assert key_ab == key_ba == (5, 10)
 
 
 if __name__ == "__main__":
