@@ -17,6 +17,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
+import { COLUMNS } from '@/utils/queryColumns';
 
 export interface KeeperDesignation {
   id: string;
@@ -129,7 +130,7 @@ export class KeeperService {
     try {
       const { data, error } = await supabase
         .from('keeper_designations')
-        .select('*')
+        .select(COLUMNS.KEEPER_DESIGNATION)
         .eq('league_id', leagueId)
         .eq('team_id', teamId)
         .eq('season_year', seasonYear)
@@ -154,7 +155,7 @@ export class KeeperService {
     try {
       const { data, error } = await supabase
         .from('keeper_designations')
-        .select('*')
+        .select(COLUMNS.KEEPER_DESIGNATION)
         .eq('league_id', leagueId)
         .eq('season_year', seasonYear)
         .in('status', ['designated', 'approved', 'locked'])

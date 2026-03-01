@@ -6,6 +6,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { DEMO_LEAGUE_ID } from '@/services/DemoLeagueService';
 import { logger } from '@/utils/logger';
+import { COLUMNS } from '@/utils/queryColumns';
 
 export const testDemoLeague = async () => {
   logger.debug('=== Testing Demo League ===');
@@ -13,7 +14,7 @@ export const testDemoLeague = async () => {
   // Check if league exists
   const { data: league, error: leagueError } = await supabase
     .from('leagues')
-    .select('*')
+    .select(COLUMNS.LEAGUE)
     .eq('id', DEMO_LEAGUE_ID)
     .single();
   
@@ -33,7 +34,7 @@ export const testDemoLeague = async () => {
   // Check draft picks
   const { data: picks, error: picksError } = await supabase
     .from('draft_picks')
-    .select('*')
+    .select(COLUMNS.DRAFT_PICK)
     .eq('league_id', DEMO_LEAGUE_ID)
     .is('deleted_at', null)
     .limit(10);

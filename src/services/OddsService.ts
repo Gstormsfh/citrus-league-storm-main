@@ -10,6 +10,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
+import { COLUMNS } from '@/utils/queryColumns';
 
 export interface GameSpread {
   id: string;
@@ -36,7 +37,7 @@ export class OddsService {
     try {
       const { data, error } = await supabase
         .from('game_spreads')
-        .select('*')
+        .select(COLUMNS.GAME_SPREAD)
         .eq('game_date', date)
         .order('game_id');
 
@@ -57,7 +58,7 @@ export class OddsService {
 
       const { data, error } = await supabase
         .from('game_spreads')
-        .select('*')
+        .select(COLUMNS.GAME_SPREAD)
         .in('game_id', gameIds);
 
       if (error) throw error;
@@ -80,7 +81,7 @@ export class OddsService {
     try {
       const { data, error } = await supabase
         .from('game_spreads')
-        .select('*')
+        .select(COLUMNS.GAME_SPREAD)
         .eq('game_id', gameId)
         .maybeSingle();
 
@@ -99,7 +100,7 @@ export class OddsService {
     try {
       const { data, error } = await supabase
         .from('game_spreads')
-        .select('*')
+        .select(COLUMNS.GAME_SPREAD)
         .gte('game_date', startDate)
         .lte('game_date', endDate)
         .order('game_date')

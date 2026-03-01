@@ -113,6 +113,54 @@ export const PROFILE_COLUMNS = 'id, username, first_name, last_name, phone, loca
 export const DRAFT_ORDER_COLUMNS = 'id, league_id, round_number, team_order, created_at';
 
 // ============================================================================
+// PLAYER PROJECTED STATS COLUMNS
+// ============================================================================
+export const PLAYER_PROJECTED_STATS_COLUMNS = 'id, player_id, projection_date, calculation_method, total_projected_points, projected_goals, projected_assists, projected_sog, projected_blocks, projected_ppp, projected_shp, projected_hits, projected_pim, projected_wins, projected_saves, projected_shutouts, projected_goals_against, projected_gaa, projected_save_pct, shrinkage_weight, opponent_adjustment, created_at, updated_at';
+
+// ============================================================================
+// KEEPER DESIGNATION COLUMNS
+// ============================================================================
+export const KEEPER_DESIGNATION_COLUMNS = 'id, league_id, team_id, player_id, season_year, keeper_round, keeper_penalty_type, original_draft_round, years_kept, designated_at, approved_by, status';
+
+// ============================================================================
+// AUCTION DRAFT COLUMNS
+// ============================================================================
+export const AUCTION_BUDGET_COLUMNS = 'id, league_id, team_id, initial_budget, remaining_budget, players_won, updated_at';
+
+export const AUCTION_NOMINATION_COLUMNS = 'id, league_id, draft_session_id, nominated_by_team_id, player_id, player_name, minimum_bid, current_high_bid, current_high_bidder_team_id, status, nomination_number, expires_at, created_at';
+
+export const AUCTION_BID_COLUMNS = 'id, league_id, nomination_id, team_id, bid_amount, created_at';
+
+// ============================================================================
+// DRAFT SNAPSHOT COLUMNS
+// ============================================================================
+export const DRAFT_SNAPSHOT_COLUMNS = 'id, league_id, draft_session_id, snapshot_data, created_at';
+
+// ============================================================================
+// POOL PICK COLUMNS (Pick'em)
+// ============================================================================
+export const POOL_PICK_COLUMNS = 'id, league_id, user_id, week_number, game_id, picked_team, is_correct, spread_value, created_at, updated_at';
+
+// ============================================================================
+// CONFIDENCE PICK COLUMNS
+// ============================================================================
+export const CONFIDENCE_PICK_COLUMNS = 'id, league_id, user_id, week_number, game_id, picked_team, confidence_points, is_correct, points_earned, created_at';
+
+// ============================================================================
+// GAME SPREAD / ODDS COLUMNS
+// ============================================================================
+export const GAME_SPREAD_COLUMNS = 'id, game_id, game_date, external_id, home_team, away_team, home_spread, away_spread, home_moneyline, away_moneyline, over_under, source, bookmaker, fetched_at';
+
+// ============================================================================
+// PLAYOFF COLUMNS
+// ============================================================================
+export const PLAYOFF_BRACKET_COLUMNS = 'id, league_id, season, bracket_size, status, current_round, total_rounds, seeding_method, reseed_each_round, consolation_enabled, two_week_matchups, champion_team_id, runner_up_team_id, third_place_team_id, generated_by, started_at, completed_at, created_at, updated_at';
+
+export const PLAYOFF_SEED_COLUMNS = 'id, bracket_id, team_id, seed_number, regular_season_wins, regular_season_losses, regular_season_ties, regular_season_points_for, source, created_at';
+
+export const PLAYOFF_SERIES_COLUMNS = 'id, bracket_id, round_number, match_number, bracket_position, home_seed, away_seed, home_team_id, away_team_id, home_score, away_score, winner_team_id, loser_team_id, status, matchup_week_1, matchup_week_2, winner_advances_to, winner_slot, loser_drops_to, loser_slot, created_at, updated_at';
+
+// ============================================================================
 // COUNT-ONLY QUERIES (use with { count: 'exact', head: true })
 // ============================================================================
 // For count queries, we still need a column selection even though data isn't returned
@@ -136,7 +184,19 @@ export const COLUMNS = {
   TRADE: TRADE_OFFER_COLUMNS,
   MATCHUP_LINES: MATCHUP_LINES_COLUMNS,
   PROFILE: PROFILE_COLUMNS,
-  
+  PLAYER_PROJECTED_STATS: PLAYER_PROJECTED_STATS_COLUMNS,
+  KEEPER_DESIGNATION: KEEPER_DESIGNATION_COLUMNS,
+  AUCTION_BUDGET: AUCTION_BUDGET_COLUMNS,
+  AUCTION_NOMINATION: AUCTION_NOMINATION_COLUMNS,
+  AUCTION_BID: AUCTION_BID_COLUMNS,
+  DRAFT_SNAPSHOT: DRAFT_SNAPSHOT_COLUMNS,
+  POOL_PICK: POOL_PICK_COLUMNS,
+  CONFIDENCE_PICK: CONFIDENCE_PICK_COLUMNS,
+  GAME_SPREAD: GAME_SPREAD_COLUMNS,
+  PLAYOFF_BRACKET: PLAYOFF_BRACKET_COLUMNS,
+  PLAYOFF_SEED: PLAYOFF_SEED_COLUMNS,
+  PLAYOFF_SERIES: PLAYOFF_SERIES_COLUMNS,
+
   // Slim versions
   MATCHUP_SLIM: MATCHUP_COLUMNS_SLIM,
   MATCHUP_LINES_SLIM: MATCHUP_LINES_COLUMNS_SLIM,
@@ -146,7 +206,7 @@ export const COLUMNS = {
   DRAFT_PICK_SLIM: DRAFT_PICK_COLUMNS_SLIM,
   NHL_GAME_SLIM: NHL_GAME_COLUMNS_SLIM,
   NHL_GAME_MINIMAL: NHL_GAME_COLUMNS_MINIMAL,
-  
+
   // For count queries
   COUNT: COUNT_ONLY,
 };

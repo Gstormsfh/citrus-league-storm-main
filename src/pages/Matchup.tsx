@@ -1221,7 +1221,7 @@ const Matchup = () => {
   // Extract to useCallback so it can be reused for live game refreshes
   const fetchAllDailyStats = React.useCallback(async () => {
       // DEBUG: Log entry into function
-      (window as any).__originalConsole?.log('[DEBUG fetchAllDailyStats] ENTERING function', {
+      logger.debug('[DEBUG fetchAllDailyStats] ENTERING function', {
         statsLoadingRefCurrent: statsLoadingRef.current,
         hasCurrentMatchup: !!currentMatchup,
         currentMatchupId: currentMatchup?.id,
@@ -1230,12 +1230,12 @@ const Matchup = () => {
       
       // Prevent concurrent fetches that cause score flashing
       if (statsLoadingRef.current) {
-        (window as any).__originalConsole?.log('[DEBUG fetchAllDailyStats] EARLY RETURN: statsLoadingRef is true');
+        logger.debug('[DEBUG fetchAllDailyStats] EARLY RETURN: statsLoadingRef is true');
         return;
       }
       
       if (!currentMatchup) {
-        (window as any).__originalConsole?.log('[DEBUG fetchAllDailyStats] EARLY RETURN: no currentMatchup');
+        logger.debug('[DEBUG fetchAllDailyStats] EARLY RETURN: no currentMatchup');
         setDailyStatsByDate(new Map());
         return;
       }
@@ -1259,7 +1259,7 @@ const Matchup = () => {
       const allPlayerIds = [...new Set([...currentRosterIds, ...starterIds])];
       
       // DEBUG: Log player IDs
-      (window as any).__originalConsole?.log('[DEBUG fetchAllDailyStats] Player IDs:', {
+      logger.debug('[DEBUG fetchAllDailyStats] Player IDs:', {
         userLeagueState,
         currentRosterIdsCount: currentRosterIds.length,
         starterIdsCount: starterIds.length,
@@ -1270,7 +1270,7 @@ const Matchup = () => {
       });
       
       if (allPlayerIds.length === 0) {
-        (window as any).__originalConsole?.log('[DEBUG fetchAllDailyStats] EARLY RETURN: no player IDs');
+        logger.debug('[DEBUG fetchAllDailyStats] EARLY RETURN: no player IDs');
         setDailyStatsByDate(new Map());
         statsLoadingRef.current = false;
         return;
@@ -1306,7 +1306,7 @@ const Matchup = () => {
 
           // DEBUG: Log raw RPC data for today (ALWAYS log for today, even if empty)
           if (date === todayStr) {
-            (window as any).__originalConsole?.log('[DEBUG fetchAllDailyStats] Raw RPC data for TODAY:', {
+            logger.debug('[DEBUG fetchAllDailyStats] Raw RPC data for TODAY:', {
               date,
               todayMST: todayStr,
               rowCount: data?.length || 0,
@@ -1489,7 +1489,7 @@ const Matchup = () => {
             
             // DEBUG: Log breakdown for today if player has stats
             if (date === todayStr && dailyTotalPoints > 0) {
-              (window as any).__originalConsole?.log('[DEBUG fetchAllDailyStats] Built breakdown for player:', {
+              logger.debug('[DEBUG fetchAllDailyStats] Built breakdown for player:', {
                 player_id: row.player_id,
                 date,
                 aggregated,
@@ -1503,7 +1503,7 @@ const Matchup = () => {
           // DEBUG: Log what's stored for today
           if (date === todayStr && dayStatsMap.size > 0) {
             const entries = Array.from(dayStatsMap.entries()).slice(0, 3);
-            (window as any).__originalConsole?.log('[DEBUG fetchAllDailyStats] Stored in dayStatsMap for TODAY:', {
+            logger.debug('[DEBUG fetchAllDailyStats] Stored in dayStatsMap for TODAY:', {
               date,
               mapSize: dayStatsMap.size,
               sampleEntries: entries.map(([id, stats]) => ({
@@ -1621,13 +1621,13 @@ const Matchup = () => {
         ];
 
     if (allPlayerIds.length === 0) {
-      (window as any).__originalConsole?.log('[DEBUG fetchProjectionsForDate] No player IDs, returning early');
+      logger.debug('[DEBUG fetchProjectionsForDate] No player IDs, returning early');
       return;
     }
 
     projectionsLoadingRef.current = true;
     
-    (window as any).__originalConsole?.log('[DEBUG fetchProjectionsForDate] Fetching projections:', {
+    logger.debug('[DEBUG fetchProjectionsForDate] Fetching projections:', {
       date,
       playerCount: allPlayerIds.length,
       userLeagueState,
@@ -1637,7 +1637,7 @@ const Matchup = () => {
     try {
       const projectionMap = await MatchupService.getDailyProjectionsForMatchup(allPlayerIds, date);
       
-      (window as any).__originalConsole?.log('[DEBUG fetchProjectionsForDate] Got projections:', {
+      logger.debug('[DEBUG fetchProjectionsForDate] Got projections:', {
         date,
         projectionMapSize: projectionMap.size
       });
@@ -1648,7 +1648,7 @@ const Matchup = () => {
         return newMap;
       });
     } catch (error) {
-      (window as any).__originalConsole?.log('[DEBUG fetchProjectionsForDate] Error:', error);
+      logger.debug('[DEBUG fetchProjectionsForDate] Error:', error);
       // Don't cache errors - allow retry
     } finally {
       projectionsLoadingRef.current = false;
@@ -2685,7 +2685,7 @@ const Matchup = () => {
     // DEBUG: Log stats map status for my team transform
     const todayDebug = getTodayMST();
     if (selectedDate === todayDebug) {
-      (window as any).__originalConsole?.log('[DEBUG displayMyTeam] Stats map status:', {
+      logger.debug('[DEBUG displayMyTeam] Stats map status:', {
         selectedDate,
         todayDebug,
         hasStatsMapForDate: !!statsMapForDate,
@@ -2706,7 +2706,7 @@ const Matchup = () => {
       
       // DEBUG: Log dailyStats lookup for ALL players with stats (for today only)
       if (selectedDate === todayDebug && dailyStats && (dailyStats.goals > 0 || dailyStats.assists > 0 || dailyStats.wins > 0 || dailyStats.saves > 0)) {
-        (window as any).__originalConsole?.log('[DEBUG displayMyTeam] Player with stats found:', {
+        logger.debug('[DEBUG displayMyTeam] Player with stats found:', {
           playerName: player.name,
           playerId,
           daily_total_points: dailyStats.daily_total_points,
@@ -2725,7 +2725,7 @@ const Matchup = () => {
       
       // DEBUG: Log first player stats lookup always
       if (player.id === baseTeam[0]?.id && selectedDate === todayDebug) {
-        (window as any).__originalConsole?.log('[DEBUG displayMyTeam] First player stats lookup:', {
+        logger.debug('[DEBUG displayMyTeam] First player stats lookup:', {
           playerName: player.name,
           playerId,
           foundDailyStats: !!dailyStats,

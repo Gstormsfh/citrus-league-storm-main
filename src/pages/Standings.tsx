@@ -135,7 +135,7 @@ const Standings = () => {
           // Get draft picks for calculating team stats
           const { data: draftPicksData } = await supabase
             .from('draft_picks')
-            .select('*')
+            .select(COLUMNS.DRAFT_PICK)
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
             .is('deleted_at', null);
