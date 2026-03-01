@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
@@ -21,16 +21,11 @@ const ScheduleManager = () => {
   const { user } = useAuth();
   const { activeLeagueId, userLeagueState } = useLeague();
   const [viewMode, setViewMode] = useState<'summary' | 'full'>('summary');
-  const [nhlGames, setNhlGames] = useState<any[]>([]);
+  const [nhlGames, setNhlGames] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
-  const [myRoster, setMyRoster] = useState<any[]>([]);
+  const [myRoster, setMyRoster] = useState<Record<string, unknown>[]>([]);
 
-  useEffect(() => {
-    loadScheduleData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, activeLeagueId]);
-
-  const loadScheduleData = async () => {
+  const loadScheduleData = useCallback(async () => {
     setLoading(true);
     try {
       // Load this week's NHL games
@@ -74,7 +69,11 @@ const ScheduleManager = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, activeLeagueId]);
+
+  useEffect(() => {
+    loadScheduleData();
+  }, [loadScheduleData]);
 
   // Matchup data is loaded dynamically from Matchup/Standings pages.
   // This page focuses on the NHL schedule for lineup planning.

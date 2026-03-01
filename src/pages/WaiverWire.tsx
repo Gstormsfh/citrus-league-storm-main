@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
@@ -52,17 +52,7 @@ const WaiverWire = () => {
   const [faabBudget, setFaabBudget] = useState<number | null>(null);
   const [faabBidAmount, setFaabBidAmount] = useState(0);
 
-  // Load data on mount
-  useEffect(() => {
-    if (user && activeLeagueId) {
-      loadWaiverData();
-    } else {
-      setLoading(false);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, activeLeagueId]);
-
-  const loadWaiverData = async () => {
+  const loadWaiverData = useCallback(async () => {
     if (!user || !activeLeagueId) return;
     
     setLoading(true);
@@ -224,7 +214,16 @@ const WaiverWire = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, activeLeagueId]);
+
+  // Load data on mount
+  useEffect(() => {
+    if (user && activeLeagueId) {
+      loadWaiverData();
+    } else {
+      setLoading(false);
+    }
+  }, [user, activeLeagueId, loadWaiverData]);
 
   const searchPlayers = async () => {
     if (!activeLeagueId) return;

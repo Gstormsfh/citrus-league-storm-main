@@ -153,7 +153,7 @@ export const DraftLobby = ({
         setDraftOrderCustomOrder(defaultOrder);
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- draftOrderCustomOrder.length is a guard condition, not a trigger; setters are stable
   }, [teams, customOrder.length, randomizedOrder, customDraftOrder]);
 
   // Helper functions for custom order

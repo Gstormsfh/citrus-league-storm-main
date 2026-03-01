@@ -139,7 +139,7 @@ export const DailyRosters = ({
     };
 
     fetchDailyLineups();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchDailyLineups is inline; allDates.join(',') is a stable derived value
   }, [matchupId, teamId, opponentTeamId, weekStart, weekEnd, allDates.join(',')]);
 
   const formatDate = (dateStr: string): string => {

@@ -22,13 +22,16 @@ import requests
 from dotenv import load_dotenv
 from supabase_rest import SupabaseRest
 from src.utils.citrus_request import citrus_request
+import logging
+
+logger = logging.getLogger(__name__)
 
 _shutdown_requested = False
 
 def _handle_shutdown(signum, frame):
     global _shutdown_requested
     _shutdown_requested = True
-    print(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
+    logger.info(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
 
 signal.signal(signal.SIGINT, _handle_shutdown)
 signal.signal(signal.SIGTERM, _handle_shutdown)
@@ -121,7 +124,7 @@ def main() -> int:
   db = supabase_client()
   game_ids = [args.game_id] if args.game_id else iter_game_ids_from_raw_nhl_data(db, args.season, args.limit)
 
-  print(f"[ingest_shiftcharts] ingesting games={len(game_ids)}")
+  logger.info(f"[ingest_shiftcharts] ingesting games={len(game_ids)}")
   success_count = 0
   skip_count = 0
   no_data_count = 0
@@ -129,8 +132,8 @@ def main() -> int:
   
   for idx, gid in enumerate(game_ids, start=1):
     if _shutdown_requested:
-      print(f"\n[SHUTDOWN] Graceful shutdown complete. Processed {idx - 1}/{len(game_ids)} games.")
-      print(f"  Success: {success_count} | Skipped: {skip_count} | No data: {no_data_count} | Errors: {error_count}")
+      logger.info(f"\n[SHUTDOWN] Graceful shutdown complete. Processed {idx - 1}/{len(game_ids)} games.")
+      logger.error(f"  Success: {success_count} | Skipped: {skip_count} | No data: {no_data_count} | Errors: {error_count}")
       sys.exit(0)
 
     try:
@@ -139,7 +142,7 @@ def main() -> int:
       if existing:
         skip_count += 1
         if idx % 50 == 0:  # Only print every 50th skip to avoid spam
-          print(f"[ingest_shiftcharts] ({idx}/{len(game_ids)}) game_id={gid} - already has shifts, skipping (skipped: {skip_count})")
+          logger.warning(f"[ingest_shiftcharts] ({idx}/{len(game_ids)}) game_id={gid} - already has shifts, skipping (skipped: {skip_count})")
         continue
       
       rows = fetch_shiftcharts(gid)
@@ -175,30 +178,31 @@ def main() -> int:
       if shift_rows:
         upsert_shifts(db, shift_rows)
         success_count += 1
-        print(f"[ingest_shiftcharts] ({idx}/{len(game_ids)}) game_id={gid} shifts={len(shift_rows)} - OK")
+        logger.info(f"[ingest_shiftcharts] ({idx}/{len(game_ids)}) game_id={gid} shifts={len(shift_rows)} - OK")
       else:
         no_data_count += 1
         if idx % 25 == 0:  # Only print every 25th no-data to avoid spam
-          print(f"[ingest_shiftcharts] ({idx}/{len(game_ids)}) game_id={gid} - no shifts in API (no data: {no_data_count})")
+          logger.info(f"[ingest_shiftcharts] ({idx}/{len(game_ids)}) game_id={gid} - no shifts in API (no data: {no_data_count})")
       
       # Progress update every 25 games
       if idx % 25 == 0:
-        print(f"[ingest_shiftcharts] Progress: {idx}/{len(game_ids)} | Success: {success_count} | Skipped: {skip_count} | No data: {no_data_count} | Errors: {error_count}")
+        logger.error(f"[ingest_shiftcharts] Progress: {idx}/{len(game_ids)} | Success: {success_count} | Skipped: {skip_count} | No data: {no_data_count} | Errors: {error_count}")
       
       time.sleep(max(0.0, args.sleep))
     except Exception as e:
       error_count += 1
-      print(f"[ingest_shiftcharts] ERROR game_id={gid} ({idx}/{len(game_ids)}): {e}")
+      logger.error(f"[ingest_shiftcharts] ERROR game_id={gid} ({idx}/{len(game_ids)}): {e}")
       import traceback
       traceback.print_exc()
   
-  print(f"\n[ingest_shiftcharts] COMPLETE: Processed {len(game_ids)} games")
-  print(f"  Success: {success_count} | Skipped: {skip_count} | No data: {no_data_count} | Errors: {error_count}")
+  logger.info(f"\n[ingest_shiftcharts] COMPLETE: Processed {len(game_ids)} games")
+  logger.error(f"  Success: {success_count} | Skipped: {skip_count} | No data: {no_data_count} | Errors: {error_count}")
 
   return 0
 
 
 if __name__ == "__main__":
+  logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
   raise SystemExit(main())
 
 

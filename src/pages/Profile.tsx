@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -258,7 +258,7 @@ const Profile = () => {
     };
 
     loadLeagueSettings();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- toast is a stable hook reference
   }, [selectedSettingsLeagueId, user]);
 
   // Load roster counts when rosters tab is selected
@@ -295,7 +295,7 @@ const Profile = () => {
     if (commissionerLeagues.length > 0 && !selectedSettingsLeagueId) {
       setSelectedSettingsLeagueId(commissionerLeagues[0].id);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- selectedSettingsLeagueId setter is stable; only trigger on league list changes
   }, [commissionerLeagues]);
 
   // Save commissioner league settings

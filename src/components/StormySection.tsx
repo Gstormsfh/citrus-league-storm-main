@@ -52,7 +52,7 @@ const StormySection = () => {
     }, 20);
     
     return () => clearInterval(interval);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- isAnimating is an early-return guard; demoMessages is a static constant. Adding either would break the typewriter.
   }, [activeDemo]);
   
   // Auto-rotate demos

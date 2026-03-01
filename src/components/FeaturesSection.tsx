@@ -64,13 +64,13 @@ const FeaturesSection = () => {
       { threshold: 0.2 }
     );
 
-    elementRefs.current.forEach(el => {
+    const elements = elementRefs.current;
+    elements.forEach(el => {
       if (el) observer.observe(el);
     });
 
     return () => {
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      elementRefs.current.forEach(el => {
+      elements.forEach(el => {
         if (el) observer.unobserve(el);
       });
     };

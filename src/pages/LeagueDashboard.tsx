@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { LeagueService, League, Team } from '@/services/LeagueService';
@@ -90,36 +90,7 @@ const LeagueDashboard = () => {
   // Active settings tab
   const [activeSettingsTab, setActiveSettingsTab] = useState('waivers');
 
-  useEffect(() => {
-    if (!user) {
-      navigate('/auth');
-      return;
-    }
-
-    if (!leagueId) {
-      setError('Invalid league ID');
-      setLoading(false);
-      return;
-    }
-
-    loadLeagueData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leagueId, user, navigate]);
-
-  // Reload data when page becomes visible again (user navigates back)
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && leagueId && user) {
-        loadLeagueData();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leagueId, user]);
-
-  const loadLeagueData = async () => {
+  const loadLeagueData = useCallback(async () => {
     if (!leagueId || !user) return;
 
     try {
@@ -230,7 +201,31 @@ const LeagueDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [leagueId, user, navigate]);
+
+  useEffect(() => {
+    if (!user) {
+      navigate('/auth');
+      return;
+    }
+    if (!leagueId) {
+      setError('Invalid league ID');
+      setLoading(false);
+      return;
+    }
+    loadLeagueData();
+  }, [leagueId, user, navigate, loadLeagueData]);
+
+  // Reload data when page becomes visible again (user navigates back)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && leagueId && user) {
+        loadLeagueData();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [leagueId, user, loadLeagueData]);
 
   const handleSimulateFill = async () => {
     if (!leagueId) {

@@ -10,9 +10,9 @@ import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { useState, useEffect } from 'react';
 import { PlayerService } from '@/services/PlayerService';
 import { LeagueService, Team, LEAGUE_TEAMS_DATA } from '@/services/LeagueService';
+import { DemoLeagueService } from '@/services/DemoLeagueService';
 import { DraftService } from '@/services/DraftService';
 import { ScheduleService } from '@/services/ScheduleService';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
@@ -74,17 +74,8 @@ const OtherTeam = () => {
           && teamIdNum >= 1 && teamIdNum <= 10;
         
         if (isDemoTeam) {
-          // Import DEMO_LEAGUE_ID_FOR_GUESTS
-          const { DEMO_LEAGUE_ID_FOR_GUESTS } = await import('@/services/DemoLeagueService');
-          const { COLUMNS } = await import('@/utils/queryColumns');
-          
-          // Get the demo league from database
-          const { data: demoLeagueData, error: leagueError } = await supabase
-            .from('leagues')
-            .select(COLUMNS.LEAGUE)
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .eq('id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
-            .maybeSingle();
+          // Load demo league data via service
+          const { data: demoLeagueData, error: leagueError } = await DemoLeagueService.getDemoLeague();
 
           if (leagueError || !demoLeagueData) {
             logger.error('[OtherTeam] Error loading demo league:', leagueError);
@@ -93,14 +84,9 @@ const OtherTeam = () => {
           }
 
           // Get all teams from the demo league
-          const { data: demoTeamsData, error: teamsError } = await supabase
-            .from('teams')
-            .select(COLUMNS.TEAM)
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
-            .order('created_at', { ascending: true });
-          
-          if (teamsError || !demoTeamsData || demoTeamsData.length === 0) {
+          const { data: demoTeamsData, error: teamsError } = await DemoLeagueService.getDemoTeams();
+
+          if (teamsError || demoTeamsData.length === 0) {
             logger.error('[OtherTeam] Error loading demo teams:', teamsError);
             setLoading(false);
             return;
@@ -121,14 +107,7 @@ const OtherTeam = () => {
           setOwnerName(demoTeamMetadata?.owner || 'Demo Owner');
 
           // Get draft picks for this team
-          const { data: draftPicksData, error: picksError } = await supabase
-            .from('draft_picks')
-            .select('player_id')
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .eq('team_id' as any, demoTeamFromDb.id as any)
-            .is('deleted_at', null);
+          const { data: draftPicksData, error: picksError } = await DemoLeagueService.getDemoDraftPicks(demoTeamFromDb.id);
           
           if (picksError) {
             logger.error('[OtherTeam] Error loading draft picks:', picksError);
@@ -553,7 +532,7 @@ const OtherTeam = () => {
     if (teamId) {
       loadRoster();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- loadRoster is defined inline; adding userLeagueState/activeLeagueId would re-fetch on every context change. teamId is the only meaningful trigger.
   }, [teamId]);
 
   if (!team) {

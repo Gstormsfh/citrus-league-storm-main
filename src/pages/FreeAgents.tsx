@@ -125,7 +125,7 @@ const FreeAgents = () => {
     }
     fetchPlayers();
     setWatchlist(new Set(LeagueService.getWatchlist()));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchPlayers/setWatchlist are stable; searchParams triggers re-fetch only when URL params change
   }, [searchParams, activeLeagueId, isChangingLeague]);
 
   // Load schedule maximizers when players are loaded (needed for Top Projected combined view)
@@ -133,7 +133,7 @@ const FreeAgents = () => {
     if (players.length > 0 && scheduleMaximizers.length === 0 && !loadingMaximizers) {
       calculateScheduleMaximizers(players);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time fetch when players first load; scheduleMaximizers.length/loadingMaximizers are guards, not triggers
   }, [players.length]);
 
   // Fetch weekly projections for top free agents (for Top Projected list)
@@ -142,7 +142,7 @@ const FreeAgents = () => {
     if (players.length > 0 && weeklyProjections.size === 0 && !loadingProjections) {
       fetchWeeklyProjections();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time fetch; weeklyProjections.size/loadingProjections are guards, not triggers
   }, [players.length, activeLeagueId]);
 
   // Reset visible count when search/position filter changes
@@ -155,35 +155,16 @@ const FreeAgents = () => {
     if (players.length > 0 && trendingData.size === 0 && !loadingTrending) {
       fetchTrendingData();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time fetch; trendingData.size/loadingTrending are guards, not triggers
   }, [players.length]);
 
   const fetchTrendingData = async () => {
     try {
       setLoadingTrending(true);
-      
-      // Call the RPC to get platform-wide trending data
-      const { data, error } = await supabase.rpc('get_trending_players', {
-        days_back: 7,
-        limit_count: 50
-      });
-      
-      if (error) {
-        return;
-      }
-      
-      if (data && Array.isArray(data)) {
-        const trendingMap = new Map<number, { addCount: number; netAdds: number }>();
-        data.forEach((item: { player_id: number; add_count: number; net_adds: number }) => {
-          trendingMap.set(item.player_id, {
-            addCount: item.add_count,
-            netAdds: item.net_adds
-          });
-        });
-        setTrendingData(trendingMap);
-      }
+      const trendingMap = await PlayerService.getTrendingPlayers(7, 50);
+      setTrendingData(trendingMap);
     } catch (error) {
-      // Non-critical error - fallback to mock data
+      // Non-critical error - trending data is optional
     } finally {
       setLoadingTrending(false);
     }
@@ -749,14 +730,8 @@ const FreeAgents = () => {
           (lineupData.ir?.length || 0);
       } else {
         // No lineup exists yet - count roster_assignments instead
-        const { count: rosterCount, error: rosterError } = await supabase
-          .from('roster_assignments')
-          .select(COLUMNS.COUNT, { count: 'exact', head: true })
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .eq('team_id' as any, teamData.id as any)
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .eq('league_id' as any, leagueId as any);
-        
+        const { count: rosterCount, error: rosterError } = await PlayerService.getRosterAssignmentCount(teamData.id, leagueId);
+
         if (rosterError) {
           logger.error('Error counting roster_assignments:', rosterError);
           toast({
@@ -794,21 +769,17 @@ const FreeAgents = () => {
       );
 
       if (result.success) {
-        // Record the transaction for platform-wide trending analytics
-        try {
-          await supabase.rpc('record_player_transaction', {
-            p_player_id: playerIdNum,
-            p_league_id: leagueId,
-            p_team_id: teamData.id,
-            p_transaction_type: 'add',
-            p_source: result.isFreeAgent ? 'free_agent' : 'waiver',
-            p_player_name: player.full_name,
-            p_player_team: player.team,
-            p_player_position: player.position
-          });
-        } catch (transactionError) {
-          // Non-critical - don't fail the add if transaction recording fails
-        }
+        // Record the transaction for platform-wide trending analytics (fire-and-forget)
+        PlayerService.recordPlayerTransaction({
+          playerId: playerIdNum,
+          leagueId,
+          teamId: teamData.id,
+          transactionType: 'add',
+          source: result.isFreeAgent ? 'free_agent' : 'waiver',
+          playerName: player.full_name,
+          playerTeam: player.team,
+          playerPosition: player.position,
+        });
 
         if (result.isFreeAgent) {
           toast({

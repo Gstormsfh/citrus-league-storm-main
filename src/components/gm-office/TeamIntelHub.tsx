@@ -395,7 +395,7 @@ export const TeamIntelHub = () => {
     }
 
     setActionableInsights(insights);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- insights are derived from these 4 values; setActionableInsights setter is stable
   }, [calendarDays, depths, myPriority, waiverPriority.length]);
 
 

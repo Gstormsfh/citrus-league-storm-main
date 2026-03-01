@@ -21,13 +21,16 @@ from typing import Dict, List, Optional
 from dotenv import load_dotenv
 from supabase_rest import SupabaseRest
 from src.utils.citrus_request import citrus_request
+import logging
+
+logger = logging.getLogger(__name__)
 
 _shutdown_requested = False
 
 def _handle_shutdown(signum, frame):
     global _shutdown_requested
     _shutdown_requested = True
-    print(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
+    logger.info(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
 
 signal.signal(signal.SIGINT, _handle_shutdown)
 signal.signal(signal.SIGTERM, _handle_shutdown)
@@ -72,7 +75,7 @@ def get_unprocessed_games(db: SupabaseRest, limit: Optional[int] = None) -> List
         
         return games or []
     except Exception as e:
-        print(f"[run_daily_pbp_processing] Error fetching unprocessed games: {e}")
+        logger.error(f"[run_daily_pbp_processing] Error fetching unprocessed games: {e}")
         return []
 
 
@@ -82,7 +85,7 @@ def count_unprocessed_games(db: SupabaseRest) -> int:
         games = get_unprocessed_games(db, limit=10000)  # Get a large sample to count
         return len(games)
     except Exception as e:
-        print(f"[run_daily_pbp_processing] Error counting unprocessed games: {e}")
+        logger.error(f"[run_daily_pbp_processing] Error counting unprocessed games: {e}")
         return 0
 
 
@@ -113,15 +116,15 @@ def process_single_game(game_id: int, raw_json: dict) -> bool:
         if result is not None:
             return True
         else:
-            print(f"[run_daily_pbp_processing] Game {game_id}: Processing returned None (may have no shots)")
+            logger.info(f"[run_daily_pbp_processing] Game {game_id}: Processing returned None (may have no shots)")
             return False
             
     except ImportError as e:
-        print(f"[run_daily_pbp_processing] Import error for process_xg_stats: {e}")
-        print("[run_daily_pbp_processing] Make sure scripts/utilities/process_xg_stats.py exists")
+        logger.error(f"[run_daily_pbp_processing] Import error for process_xg_stats: {e}")
+        logger.info("[run_daily_pbp_processing] Make sure scripts/utilities/process_xg_stats.py exists")
         return False
     except Exception as e:
-        print(f"[run_daily_pbp_processing] Error processing game {game_id}: {e}")
+        logger.error(f"[run_daily_pbp_processing] Error processing game {game_id}: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -138,9 +141,9 @@ def process_recently_finished_games(max_age_hours: int = 2) -> Dict[str, int]:
     Returns:
         Dictionary with processing statistics
     """
-    print("=" * 80)
-    print(f"[run_daily_pbp_processing] Processing recently finished games (max age: {max_age_hours} hours)")
-    print("=" * 80)
+    logger.info("=" * 80)
+    logger.info(f"[run_daily_pbp_processing] Processing recently finished games (max age: {max_age_hours} hours)")
+    logger.info("=" * 80)
     
     db = supabase_client()
     now = dt.datetime.now(dt.timezone.utc)
@@ -150,7 +153,7 @@ def process_recently_finished_games(max_age_hours: int = 2) -> Dict[str, int]:
     unprocessed_games = get_unprocessed_games(db, limit=1000)
     
     if not unprocessed_games:
-        print("[run_daily_pbp_processing] No unprocessed games found")
+        logger.info("[run_daily_pbp_processing] No unprocessed games found")
         return {"processed": 0, "failed": 0, "skipped": 0, "game_ids": []}
     
     # Filter to only recently finished games
@@ -190,17 +193,17 @@ def process_recently_finished_games(max_age_hours: int = 2) -> Dict[str, int]:
                     if pbp_state == "OFF":
                         # Game is now OFF, process it
                         recently_finished.append(game)
-                        print(f"[run_daily_pbp_processing] Game {game_id} is now OFF (was {game_state}), will process")
+                        logger.info(f"[run_daily_pbp_processing] Game {game_id} is now OFF (was {game_state}), will process")
             except Exception as e:
                 # If PBP check fails, skip this game
                 pass
     
     if not recently_finished:
-        print(f"[run_daily_pbp_processing] No recently finished games found (checked {len(unprocessed_games)} unprocessed games)")
+        logger.info(f"[run_daily_pbp_processing] No recently finished games found (checked {len(unprocessed_games)} unprocessed games)")
         return {"processed": 0, "failed": 0, "skipped": 0, "game_ids": []}
     
-    print(f"[run_daily_pbp_processing] Found {len(recently_finished)} recently finished game(s) to process")
-    print()
+    logger.info(f"[run_daily_pbp_processing] Found {len(recently_finished)} recently finished game(s) to process")
+    logger.info("")
     
     # Process the games
     processed_count = 0
@@ -210,7 +213,7 @@ def process_recently_finished_games(max_age_hours: int = 2) -> Dict[str, int]:
     
     for idx, game in enumerate(recently_finished, 1):
         if _shutdown_requested:
-            print(f"\n[SHUTDOWN] Graceful shutdown complete. Processed {processed_count}/{len(recently_finished)} games.")
+            logger.info(f"\n[SHUTDOWN] Graceful shutdown complete. Processed {processed_count}/{len(recently_finished)} games.")
             sys.exit(0)
 
         game_id = game.get("game_id")
@@ -218,11 +221,11 @@ def process_recently_finished_games(max_age_hours: int = 2) -> Dict[str, int]:
         game_date = game.get("game_date", "unknown")
 
         if not game_id or not raw_json:
-            print(f"[run_daily_pbp_processing] Skipping invalid game record: {game_id}")
+            logger.warning(f"[run_daily_pbp_processing] Skipping invalid game record: {game_id}")
             skipped_count += 1
             continue
         
-        print(f"[{idx}/{len(recently_finished)}] Processing recently finished game {game_id} ({game_date})...")
+        logger.info(f"[{idx}/{len(recently_finished)}] Processing recently finished game {game_id} ({game_date})...")
         
         game_start_time = time.time()
         success = process_single_game(game_id, raw_json)
@@ -231,7 +234,7 @@ def process_recently_finished_games(max_age_hours: int = 2) -> Dict[str, int]:
         if success:
             processed_count += 1
             processed_game_ids.append(game_id)
-            print(f"[run_daily_pbp_processing] ✓ Game {game_id} processed successfully ({game_time:.2f}s)")
+            logger.info(f"[run_daily_pbp_processing] ✓ Game {game_id} processed successfully ({game_time:.2f}s)")
             
             # Verify it was marked as processed
             try:
@@ -243,27 +246,27 @@ def process_recently_finished_games(max_age_hours: int = 2) -> Dict[str, int]:
                 )
                 if check and len(check) > 0:
                     if not check[0].get("processed", False):
-                        print(f"[run_daily_pbp_processing] Warning: Game {game_id} not marked as processed, marking now...")
+                        logger.warning(f"[run_daily_pbp_processing] Warning: Game {game_id} not marked as processed, marking now...")
                         db.update(
                             "raw_nhl_data",
                             {"processed": True},
                             filters=[("game_id", "eq", game_id)]
                         )
             except Exception as e:
-                print(f"[run_daily_pbp_processing] Warning: Could not verify processed flag for game {game_id}: {e}")
+                logger.warning(f"[run_daily_pbp_processing] Warning: Could not verify processed flag for game {game_id}: {e}")
         else:
             failed_count += 1
-            print(f"[run_daily_pbp_processing] ✗ Game {game_id} failed to process")
+            logger.error(f"[run_daily_pbp_processing] ✗ Game {game_id} failed to process")
         
         # Small delay between games
         time.sleep(0.5)
     
-    print("=" * 80)
-    print(f"[run_daily_pbp_processing] Recently finished games processing completed:")
-    print(f"  Processed: {processed_count}")
-    print(f"  Failed: {failed_count}")
-    print(f"  Skipped: {skipped_count}")
-    print("=" * 80)
+    logger.info("=" * 80)
+    logger.info(f"[run_daily_pbp_processing] Recently finished games processing completed:")
+    logger.info(f"  Processed: {processed_count}")
+    logger.error(f"  Failed: {failed_count}")
+    logger.info(f"  Skipped: {skipped_count}")
+    logger.info("=" * 80)
     
     return {
         "processed": processed_count,
@@ -280,24 +283,24 @@ def process_all_unprocessed_games() -> Dict[str, int]:
     Returns:
         Dictionary with processing statistics
     """
-    print("=" * 80)
-    print("[run_daily_pbp_processing] Starting daily PBP processing")
-    print("=" * 80)
-    print(f"Batch size: {BATCH_SIZE}")
-    print(f"Max retries per game: {MAX_RETRIES}")
-    print()
+    logger.info("=" * 80)
+    logger.info("[run_daily_pbp_processing] Starting daily PBP processing")
+    logger.info("=" * 80)
+    logger.info(f"Batch size: {BATCH_SIZE}")
+    logger.info(f"Max retries per game: {MAX_RETRIES}")
+    logger.info("")
     
     db = supabase_client()
     
     # Count unprocessed games
     total_unprocessed = count_unprocessed_games(db)
-    print(f"[run_daily_pbp_processing] Found {total_unprocessed} unprocessed game(s)")
+    logger.info(f"[run_daily_pbp_processing] Found {total_unprocessed} unprocessed game(s)")
     
     if total_unprocessed == 0:
-        print("[run_daily_pbp_processing] No games to process. Exiting.")
+        logger.info("[run_daily_pbp_processing] No games to process. Exiting.")
         return {"processed": 0, "failed": 0, "skipped": 0}
     
-    print()
+    logger.info("")
     
     # Process games in batches
     processed_count = 0
@@ -312,24 +315,24 @@ def process_all_unprocessed_games() -> Dict[str, int]:
     
     while batch_num <= max_batches:
         if _shutdown_requested:
-            print(f"\n[SHUTDOWN] Graceful shutdown complete. Processed: {processed_count}, Failed: {failed_count}")
+            logger.error(f"\n[SHUTDOWN] Graceful shutdown complete. Processed: {processed_count}, Failed: {failed_count}")
             sys.exit(0)
 
         # Fetch batch
         games = get_unprocessed_games(db, limit=BATCH_SIZE)
         
         if not games:
-            print("[run_daily_pbp_processing] No more unprocessed games found.")
+            logger.info("[run_daily_pbp_processing] No more unprocessed games found.")
             break
         
         # Filter out games we've already permanently failed (they should be marked but just in case)
         games = [g for g in games if g.get("game_id") not in permanently_failed_ids]
         
         if not games:
-            print("[run_daily_pbp_processing] All remaining games have permanently failed. Exiting.")
+            logger.error("[run_daily_pbp_processing] All remaining games have permanently failed. Exiting.")
             break
         
-        print(f"[run_daily_pbp_processing] Processing batch {batch_num} ({len(games)} games)...")
+        logger.info(f"[run_daily_pbp_processing] Processing batch {batch_num} ({len(games)} games)...")
         
         batch_processed = 0
         batch_any_progress = False  # Track if we made any progress this batch
@@ -340,7 +343,7 @@ def process_all_unprocessed_games() -> Dict[str, int]:
             game_date = game.get("game_date", "unknown")
             
             if not game_id or not raw_json:
-                print(f"[run_daily_pbp_processing] Skipping invalid game record: {game_id}")
+                logger.warning(f"[run_daily_pbp_processing] Skipping invalid game record: {game_id}")
                 skipped_count += 1
                 batch_any_progress = True
                 continue
@@ -348,7 +351,7 @@ def process_all_unprocessed_games() -> Dict[str, int]:
             # Check retry count
             retry_count = retry_map.get(game_id, 0)
             if retry_count >= MAX_RETRIES:
-                print(f"[run_daily_pbp_processing] Game {game_id} exceeded max retries, marking as processed to prevent re-fetching")
+                logger.info(f"[run_daily_pbp_processing] Game {game_id} exceeded max retries, marking as processed to prevent re-fetching")
                 failed_count += 1
                 permanently_failed_ids.add(game_id)
                 batch_any_progress = True
@@ -360,9 +363,9 @@ def process_all_unprocessed_games() -> Dict[str, int]:
                         {"processed": True},  # Mark as processed even though it failed
                         filters=[("game_id", "eq", game_id)]
                     )
-                    print(f"[run_daily_pbp_processing] ✗ Game {game_id} marked as processed (failed permanently)")
+                    logger.error(f"[run_daily_pbp_processing] ✗ Game {game_id} marked as processed (failed permanently)")
                 except Exception as e:
-                    print(f"[run_daily_pbp_processing] ERROR: Could not mark failed game {game_id} as processed: {e}")
+                    logger.error(f"[run_daily_pbp_processing] ERROR: Could not mark failed game {game_id} as processed: {e}")
                 continue
             
             # Progress tracking
@@ -372,9 +375,9 @@ def process_all_unprocessed_games() -> Dict[str, int]:
             avg_time = elapsed / total_processed_so_far if total_processed_so_far > 0 else 0
             remaining = avg_time * (total_unprocessed - total_processed_so_far)
             
-            print(f"[{total_processed_so_far + 1}/{total_unprocessed}] ({percent:.1f}%) Processing game {game_id} ({game_date})...")
+            logger.info(f"[{total_processed_so_far + 1}/{total_unprocessed}] ({percent:.1f}%) Processing game {game_id} ({game_date})...")
             if total_processed_so_far > 0:
-                print(f"  Elapsed: {elapsed:.1f}s | Est. remaining: {remaining:.1f}s | Batch: {idx}/{len(games)}")
+                logger.info(f"  Elapsed: {elapsed:.1f}s | Est. remaining: {remaining:.1f}s | Batch: {idx}/{len(games)}")
             
             game_start_time = time.time()
             
@@ -387,7 +390,7 @@ def process_all_unprocessed_games() -> Dict[str, int]:
                 processed_count += 1
                 batch_processed += 1
                 batch_any_progress = True
-                print(f"[run_daily_pbp_processing] ✓ Game {game_id} processed successfully ({game_time:.2f}s)")
+                logger.info(f"[run_daily_pbp_processing] ✓ Game {game_id} processed successfully ({game_time:.2f}s)")
                 
                 # Verify it was marked as processed
                 try:
@@ -399,20 +402,20 @@ def process_all_unprocessed_games() -> Dict[str, int]:
                     )
                     if check and len(check) > 0:
                         if not check[0].get("processed", False):
-                            print(f"[run_daily_pbp_processing] Warning: Game {game_id} not marked as processed, marking now...")
+                            logger.warning(f"[run_daily_pbp_processing] Warning: Game {game_id} not marked as processed, marking now...")
                             db.update(
                                 "raw_nhl_data",
                                 {"processed": True},
                                 filters=[("game_id", "eq", game_id)]
                             )
                 except Exception as e:
-                    print(f"[run_daily_pbp_processing] Warning: Could not verify processed flag for game {game_id}: {e}")
+                    logger.warning(f"[run_daily_pbp_processing] Warning: Could not verify processed flag for game {game_id}: {e}")
             else:
                 retry_map[game_id] = retry_count + 1
                 if retry_map[game_id] < MAX_RETRIES:
-                    print(f"[run_daily_pbp_processing] Game {game_id} failed, will retry (attempt {retry_map[game_id]}/{MAX_RETRIES})")
+                    logger.error(f"[run_daily_pbp_processing] Game {game_id} failed, will retry (attempt {retry_map[game_id]}/{MAX_RETRIES})")
                 else:
-                    print(f"[run_daily_pbp_processing] ✗ Game {game_id} failed after {MAX_RETRIES} attempts, marking as processed")
+                    logger.error(f"[run_daily_pbp_processing] ✗ Game {game_id} failed after {MAX_RETRIES} attempts, marking as processed")
                     failed_count += 1
                     permanently_failed_ids.add(game_id)
                     batch_any_progress = True
@@ -425,7 +428,7 @@ def process_all_unprocessed_games() -> Dict[str, int]:
                             filters=[("game_id", "eq", game_id)]
                         )
                     except Exception as e:
-                        print(f"[run_daily_pbp_processing] ERROR: Could not mark failed game {game_id} as processed: {e}")
+                        logger.error(f"[run_daily_pbp_processing] ERROR: Could not mark failed game {game_id} as processed: {e}")
             
             # Small delay between games
             time.sleep(0.5)
@@ -434,7 +437,7 @@ def process_all_unprocessed_games() -> Dict[str, int]:
         
         # SAFETY: If we made no progress this batch (all games already failed), exit
         if not batch_any_progress:
-            print("[run_daily_pbp_processing] No progress made in this batch - all games may have failed. Exiting.")
+            logger.error("[run_daily_pbp_processing] No progress made in this batch - all games may have failed. Exiting.")
             break
         
         # Check if we've processed all games (stop if batch was smaller than batch size)
@@ -442,19 +445,19 @@ def process_all_unprocessed_games() -> Dict[str, int]:
             break
         
         # Progress update
-        print(f"[run_daily_pbp_processing] Progress: {processed_count} processed, {failed_count} failed, {skipped_count} skipped")
-        print()
+        logger.error(f"[run_daily_pbp_processing] Progress: {processed_count} processed, {failed_count} failed, {skipped_count} skipped")
+        logger.info("")
     
     # Safety check: if we hit max batches, log it
     if batch_num > max_batches:
-        print(f"[run_daily_pbp_processing] WARNING: Hit max batch limit ({max_batches}). May indicate an issue.")
+        logger.warning(f"[run_daily_pbp_processing] WARNING: Hit max batch limit ({max_batches}). May indicate an issue.")
     
-    print("=" * 80)
-    print(f"[run_daily_pbp_processing] Processing completed:")
-    print(f"  Processed: {processed_count}")
-    print(f"  Failed: {failed_count}")
-    print(f"  Skipped: {skipped_count}")
-    print("=" * 80)
+    logger.info("=" * 80)
+    logger.info(f"[run_daily_pbp_processing] Processing completed:")
+    logger.info(f"  Processed: {processed_count}")
+    logger.error(f"  Failed: {failed_count}")
+    logger.info(f"  Skipped: {skipped_count}")
+    logger.info("=" * 80)
     
     return {
         "processed": processed_count,
@@ -467,18 +470,19 @@ def main() -> int:
     """Main entry point for manual execution."""
     try:
         result = process_all_unprocessed_games()
-        print(f"\nSummary: {result}")
+        logger.info(f"\nSummary: {result}")
         return 0
     except KeyboardInterrupt:
-        print("\n[run_daily_pbp_processing] Interrupted by user")
+        logger.info("\n[run_daily_pbp_processing] Interrupted by user")
         return 0
     except Exception as e:
-        print(f"[run_daily_pbp_processing] Fatal error: {e}")
+        logger.error(f"[run_daily_pbp_processing] Fatal error: {e}")
         import traceback
         traceback.print_exc()
         return 1
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     raise SystemExit(main())
 

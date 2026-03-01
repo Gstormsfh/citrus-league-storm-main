@@ -13,6 +13,7 @@ import { LeagueService, League, Team, getLeagueFormat } from '@/services/LeagueS
 import type { LeagueSettings } from '@/types/leagueTypes';
 import { DraftService } from '@/services/DraftService';
 import { PlayerService } from '@/services/PlayerService';
+import { DemoLeagueService, DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeagueService';
 import { MatchupService } from '@/services/MatchupService';
 import { CURRENT_SEASON } from '@/utils/seasonConstants';
 import { Loader2, RefreshCw } from 'lucide-react';
@@ -93,21 +94,11 @@ const Standings = () => {
         // State 1: Guest - show REAL demo league data from database
         // State 2: Logged in, no league - show REAL demo league data (will show CTAs in UI)
         if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
-          // Import DEMO_LEAGUE_ID_FOR_GUESTS
-          const { DEMO_LEAGUE_ID_FOR_GUESTS } = await import('@/services/DemoLeagueService');
-          const { COLUMNS } = await import('@/utils/queryColumns');
-          
-          // Get the demo league from database
-          const { data: demoLeagueData, error: leagueError } = await supabase
-            .from('leagues')
-            .select(COLUMNS.LEAGUE)
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .eq('id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
-            .maybeSingle();
+          // Load demo league data via service
+          const { data: demoLeagueData, error: leagueError } = await DemoLeagueService.getDemoLeague();
 
           if (leagueError || !demoLeagueData) {
             logger.error('[Standings] Error loading demo league:', leagueError);
-            // Fallback to empty teams
             setTeams([]);
             setLoading(false);
             return;
@@ -116,31 +107,21 @@ const Standings = () => {
           const demoLeague = demoLeagueData as League;
 
           // Get teams from the demo league
-          const { data: demoTeamsData, error: teamsError } = await supabase
-            .from('teams')
-            .select(COLUMNS.TEAM)
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
-            .order('created_at', { ascending: true });
-          
-          if (teamsError || !demoTeamsData || demoTeamsData.length === 0) {
+          const { data: demoTeamsData, error: teamsError } = await DemoLeagueService.getDemoTeams();
+
+          if (teamsError || demoTeamsData.length === 0) {
             logger.error('[Standings] Error loading demo teams:', teamsError);
             setTeams([]);
             setLoading(false);
             return;
           }
-          
+
           const demoTeamsFromDb = demoTeamsData as Team[];
 
           // Get draft picks for calculating team stats
-          const { data: draftPicksData } = await supabase
-            .from('draft_picks')
-            .select(COLUMNS.DRAFT_PICK)
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
-            .is('deleted_at', null);
+          const { data: draftPicksData } = await DemoLeagueService.getDemoDraftPicks();
 
-          const draftPicks = (draftPicksData || []) as Array<{ team_id: string; player_id: string }>;
+          const draftPicks = draftPicksData as Array<{ team_id: string; player_id: string }>;
           
           // Get all players
           const allPlayers = await PlayerService.getAllPlayers();
@@ -403,7 +384,7 @@ const Standings = () => {
       // If userLeagueState is still loading, keep loading state
       setLoading(true);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- loadStandings is inline; listed deps are the actual triggers for data refresh
   }, [user?.id, toast, userLeagueState, activeLeagueId]);
 
   // Animation observer setup

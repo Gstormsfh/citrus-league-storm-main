@@ -33,13 +33,16 @@ from typing import Optional, Dict, Tuple, Any
 from dotenv import load_dotenv
 from supabase_rest import SupabaseRest
 from src.utils.citrus_request import citrus_request
+import logging
+
+logger = logging.getLogger(__name__)
 
 _shutdown_requested = False
 
 def _handle_shutdown(signum, frame):
     global _shutdown_requested
     _shutdown_requested = True
-    print(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
+    logger.info(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
 
 signal.signal(signal.SIGINT, _handle_shutdown)
 signal.signal(signal.SIGTERM, _handle_shutdown)
@@ -139,10 +142,10 @@ def fetch_player_landing_data(player_id: int, retries: int = 5) -> Tuple[Optiona
                 return (None, "not_found")
             if e.response.status_code == 429:
                 return (None, "429")
-        print(f"  Error fetching landing data for player {player_id}: {e}")
+        logger.error(f"  Error fetching landing data for player {player_id}: {e}")
         return (None, "not_found")
     except Exception as e:
-        print(f"  Error fetching landing data for player {player_id}: {e}")
+        logger.error(f"  Error fetching landing data for player {player_id}: {e}")
         return (None, "not_found")
 
 
@@ -377,30 +380,30 @@ def extract_all_official_stats(landing_data: Dict, target_season: int, is_goalie
 
 
 def main() -> int:
-    print("=" * 80)
-    print("[fetch_nhl_stats_from_landing] STARTING")
-    print("=" * 80)
-    print(f"Season: {DEFAULT_SEASON}")
-    print("Fetching ALL official NHL.com statistics from landing endpoint...")
-    print(f"API: {NHL_API_BASE}/player/{{id}}/landing")
-    print()
-    print("Stats being fetched:")
-    print("  Skaters: Goals, Assists, Points, SOG, PIM, PPP, SHP, TOI, +/-")
-    print("  Goalies: Wins, Losses, OTL, Saves, Shots Faced, GA, GAA, SV%, Shutouts, TOI")
-    print("  Note: Hits and blocks require StatsAPI fallback (not in landing endpoint)")
-    print()
+    logger.info("=" * 80)
+    logger.info("[fetch_nhl_stats_from_landing] STARTING")
+    logger.info("=" * 80)
+    logger.info(f"Season: {DEFAULT_SEASON}")
+    logger.info("Fetching ALL official NHL.com statistics from landing endpoint...")
+    logger.info(f"API: {NHL_API_BASE}/player/{{id}}/landing")
+    logger.info("")
+    logger.info("Stats being fetched:")
+    logger.info("  Skaters: Goals, Assists, Points, SOG, PIM, PPP, SHP, TOI, +/-")
+    logger.info("  Goalies: Wins, Losses, OTL, Saves, Shots Faced, GA, GAA, SV%, Shutouts, TOI")
+    logger.info("  Note: Hits and blocks require StatsAPI fallback (not in landing endpoint)")
+    logger.info("")
     
     try:
         db = supabase_client()
-        print("[fetch_nhl_stats] Connected to Supabase")
+        logger.info("[fetch_nhl_stats] Connected to Supabase")
     except Exception as e:
-        print(f"[fetch_nhl_stats] ERROR: Failed to connect: {e}")
+        logger.error(f"[fetch_nhl_stats] ERROR: Failed to connect: {e}")
         return 1
     
     # Get all players from player_directory for current season only
     # CRITICAL: Must filter by season to avoid fetching players from all seasons,
     # which causes excessive API calls and 429 rate limiting that leaves players without stats rows
-    print(f"[fetch_nhl_stats] Fetching players from player_directory (season={DEFAULT_SEASON})...")
+    logger.info(f"[fetch_nhl_stats] Fetching players from player_directory (season={DEFAULT_SEASON})...")
     players = []
     offset = 0
     batch_size = 1000
@@ -414,8 +417,8 @@ def main() -> int:
             break
         offset += batch_size
     
-    print(f"[fetch_nhl_stats] Found {len(players):,} players")
-    print()
+    logger.info(f"[fetch_nhl_stats] Found {len(players):,} players")
+    logger.info("")
     
     # Fetch stats for each player
     updated_count = {
@@ -451,8 +454,8 @@ def main() -> int:
     
     for idx, player in enumerate(players, 1):
         if _shutdown_requested:
-            print(f"\n[SHUTDOWN] Graceful shutdown complete. Processed {idx - 1}/{len(players)} players.")
-            print(f"  Skaters updated: {updated_count['skaters']} | Goalies updated: {updated_count['goalies']}")
+            logger.info(f"\n[SHUTDOWN] Graceful shutdown complete. Processed {idx - 1}/{len(players)} players.")
+            logger.info(f"  Skaters updated: {updated_count['skaters']} | Goalies updated: {updated_count['goalies']}")
             sys.exit(0)
 
         player_id = _safe_int(player.get("player_id"), 0)
@@ -615,50 +618,50 @@ def main() -> int:
                     if updates.get("nhl_pim", 0) > 0:
                         updated_count["pim"] += 1
                 except Exception as e:
-                    print(f"  [ERROR] Failed to update player {player_id} ({player_name}): {e}")
+                    logger.error(f"  [ERROR] Failed to update player {player_id} ({player_name}): {e}")
                     error_count += 1
         
         # Progress every 15 seconds
         current_time = time.time()
         if current_time - last_progress_time >= 15:
-            print(f"  [PROGRESS] Processed {idx}/{len(players)} players ({updated_count['skaters']} skaters, {updated_count['goalies']} goalies updated, {not_found_count} not found, {error_count} errors)...")
+            logger.error(f"  [PROGRESS] Processed {idx}/{len(players)} players ({updated_count['skaters']} skaters, {updated_count['goalies']} goalies updated, {not_found_count} not found, {error_count} errors)...")
             last_progress_time = current_time
         
         # Minimal courtesy delay — citrus_request handles rate limiting via 100-IP rotation
         if idx < len(players):
             time.sleep(base_delay)
     
-    print()
-    print("=" * 80)
-    print("[fetch_nhl_stats_from_landing] COMPLETE")
-    print("=" * 80)
-    print(f"Players processed: {len(players):,}")
-    print(f"Skaters updated: {updated_count['skaters']:,}")
-    print(f"Goalies updated: {updated_count['goalies']:,}")
-    print()
-    print("Stats updated:")
-    print(f"  TOI: {updated_count['toi']:,}")
-    print(f"  Goals: {updated_count['goals']:,}")
-    print(f"  Assists: {updated_count['assists']:,}")
-    print(f"  Points: {updated_count['points']:,}")
-    print(f"  Plus/Minus: {updated_count['plus_minus']:,}")
-    print(f"  Shots on Goal: {updated_count['sog']:,}")
-    print(f"  PIM: {updated_count['pim']:,}")
-    print(f"  PPP: {updated_count['ppp']:,}")
-    print(f"  SHP: {updated_count['shp']:,}")
-    print(f"  Wins: {updated_count['wins']:,}")
-    print(f"  Saves: {updated_count['saves']:,}")
-    print(f"  Shutouts: {updated_count['shutouts']:,}")
-    print()
-    print(f"Not found: {not_found_count:,}")
-    print(f"Errors: {error_count:,}")
-    print()
+    logger.info("")
+    logger.info("=" * 80)
+    logger.info("[fetch_nhl_stats_from_landing] COMPLETE")
+    logger.info("=" * 80)
+    logger.info(f"Players processed: {len(players):,}")
+    logger.info(f"Skaters updated: {updated_count['skaters']:,}")
+    logger.info(f"Goalies updated: {updated_count['goalies']:,}")
+    logger.info("")
+    logger.info("Stats updated:")
+    logger.info(f"  TOI: {updated_count['toi']:,}")
+    logger.info(f"  Goals: {updated_count['goals']:,}")
+    logger.info(f"  Assists: {updated_count['assists']:,}")
+    logger.info(f"  Points: {updated_count['points']:,}")
+    logger.info(f"  Plus/Minus: {updated_count['plus_minus']:,}")
+    logger.info(f"  Shots on Goal: {updated_count['sog']:,}")
+    logger.info(f"  PIM: {updated_count['pim']:,}")
+    logger.info(f"  PPP: {updated_count['ppp']:,}")
+    logger.info(f"  SHP: {updated_count['shp']:,}")
+    logger.info(f"  Wins: {updated_count['wins']:,}")
+    logger.info(f"  Saves: {updated_count['saves']:,}")
+    logger.info(f"  Shutouts: {updated_count['shutouts']:,}")
+    logger.info("")
+    logger.info(f"Not found: {not_found_count:,}")
+    logger.error(f"Errors: {error_count:,}")
+    logger.info("")
     if updated_count.get("statsapi_hits_blocks", 0) > 0:
-        print(f"[OK] StatsAPI fallback: Successfully fetched hits/blocks for {updated_count['statsapi_hits_blocks']:,} players")
+        logger.info(f"[OK] StatsAPI fallback: Successfully fetched hits/blocks for {updated_count['statsapi_hits_blocks']:,} players")
     else:
-        print("[WARNING] StatsAPI fallback: Hits/blocks not available (StatsAPI may have DNS issues)")
-        print("      Players will have hits/blocks = 0 (can use PBP-calculated as fallback)")
-    print()
+        logger.warning("[WARNING] StatsAPI fallback: Hits/blocks not available (StatsAPI may have DNS issues)")
+        logger.info("      Players will have hits/blocks = 0 (can use PBP-calculated as fallback)")
+    logger.info("")
     
     # RETRY PHASE: Retry all failed players
     players_to_retry = failed_429_players + failed_not_found_players
@@ -684,14 +687,14 @@ def main() -> int:
     retry_error_count = 0
     
     if players_to_retry:
-        print("=" * 80)
-        print(f"[RETRY PHASE] Retrying {len(players_to_retry)} players that failed...")
-        print("=" * 80)
-        print()
+        logger.info("=" * 80)
+        logger.error(f"[RETRY PHASE] Retrying {len(players_to_retry)} players that failed...")
+        logger.info("=" * 80)
+        logger.info("")
         
         for idx, (player_id, player_name, is_goalie) in enumerate(players_to_retry, 1):
             if _shutdown_requested:
-                print(f"\n[SHUTDOWN] Graceful shutdown complete during retry phase.")
+                logger.info(f"\n[SHUTDOWN] Graceful shutdown complete during retry phase.")
                 sys.exit(0)
 
             # Fetch from NHL API (landing endpoint - primary)
@@ -818,7 +821,7 @@ def main() -> int:
                         if updates.get("nhl_pim", 0) > 0:
                             retry_updated_count["pim"] += 1
                     except Exception as e:
-                        print(f"  [ERROR] Failed to update player {player_id} ({player_name}) in retry: {e}")
+                        logger.error(f"  [ERROR] Failed to update player {player_id} ({player_name}) in retry: {e}")
                         retry_error_count += 1
             
             # Minimal courtesy delay — citrus_request handles rate limiting via 100-IP rotation
@@ -826,74 +829,75 @@ def main() -> int:
                 time.sleep(0.5)  # Slightly higher delay for retry phase
         
         # Print retry phase summary
-        print()
-        print("=" * 80)
-        print("[RETRY PHASE] COMPLETE")
-        print("=" * 80)
-        print(f"Players retried: {len(players_to_retry):,}")
-        print(f"Skaters updated: {retry_updated_count['skaters']:,}")
-        print(f"Goalies updated: {retry_updated_count['goalies']:,}")
-        print()
-        print("Stats updated in retry:")
-        print(f"  TOI: {retry_updated_count['toi']:,}")
-        print(f"  Goals: {retry_updated_count['goals']:,}")
-        print(f"  Assists: {retry_updated_count['assists']:,}")
-        print(f"  Points: {retry_updated_count['points']:,}")
-        print(f"  Plus/Minus: {retry_updated_count['plus_minus']:,}")
-        print(f"  Shots on Goal: {retry_updated_count['sog']:,}")
-        print(f"  PIM: {retry_updated_count['pim']:,}")
-        print(f"  PPP: {retry_updated_count['ppp']:,}")
-        print(f"  SHP: {retry_updated_count['shp']:,}")
-        print(f"  Wins: {retry_updated_count['wins']:,}")
-        print(f"  Saves: {retry_updated_count['saves']:,}")
-        print(f"  Shutouts: {retry_updated_count['shutouts']:,}")
-        print()
-        print(f"Rate limited (429): {retry_rate_limited_count:,}")
-        print(f"Not found: {retry_not_found_count:,}")
-        print(f"Errors: {retry_error_count:,}")
-        print()
+        logger.info("")
+        logger.info("=" * 80)
+        logger.info("[RETRY PHASE] COMPLETE")
+        logger.info("=" * 80)
+        logger.info(f"Players retried: {len(players_to_retry):,}")
+        logger.info(f"Skaters updated: {retry_updated_count['skaters']:,}")
+        logger.info(f"Goalies updated: {retry_updated_count['goalies']:,}")
+        logger.info("")
+        logger.info("Stats updated in retry:")
+        logger.info(f"  TOI: {retry_updated_count['toi']:,}")
+        logger.info(f"  Goals: {retry_updated_count['goals']:,}")
+        logger.info(f"  Assists: {retry_updated_count['assists']:,}")
+        logger.info(f"  Points: {retry_updated_count['points']:,}")
+        logger.info(f"  Plus/Minus: {retry_updated_count['plus_minus']:,}")
+        logger.info(f"  Shots on Goal: {retry_updated_count['sog']:,}")
+        logger.info(f"  PIM: {retry_updated_count['pim']:,}")
+        logger.info(f"  PPP: {retry_updated_count['ppp']:,}")
+        logger.info(f"  SHP: {retry_updated_count['shp']:,}")
+        logger.info(f"  Wins: {retry_updated_count['wins']:,}")
+        logger.info(f"  Saves: {retry_updated_count['saves']:,}")
+        logger.info(f"  Shutouts: {retry_updated_count['shutouts']:,}")
+        logger.info("")
+        logger.info(f"Rate limited (429): {retry_rate_limited_count:,}")
+        logger.info(f"Not found: {retry_not_found_count:,}")
+        logger.error(f"Errors: {retry_error_count:,}")
+        logger.info("")
     
     # Final summary
-    print("=" * 80)
-    print("[fetch_nhl_stats_from_landing] COMPLETE")
-    print("=" * 80)
+    logger.info("=" * 80)
+    logger.info("[fetch_nhl_stats_from_landing] COMPLETE")
+    logger.info("=" * 80)
     total_skaters = updated_count['skaters'] + retry_updated_count['skaters']
     total_goalies = updated_count['goalies'] + retry_updated_count['goalies']
-    print(f"Total players processed: {len(players):,}")
-    print(f"Total skaters updated: {total_skaters:,}")
-    print(f"Total goalies updated: {total_goalies:,}")
-    print()
-    print("Total stats updated:")
-    print(f"  TOI: {updated_count['toi'] + retry_updated_count['toi']:,}")
-    print(f"  Goals: {updated_count['goals'] + retry_updated_count['goals']:,}")
-    print(f"  Assists: {updated_count['assists'] + retry_updated_count['assists']:,}")
-    print(f"  Points: {updated_count['points'] + retry_updated_count['points']:,}")
-    print(f"  Plus/Minus: {updated_count['plus_minus'] + retry_updated_count['plus_minus']:,}")
-    print(f"  Shots on Goal: {updated_count['sog'] + retry_updated_count['sog']:,}")
-    print(f"  PIM: {updated_count['pim'] + retry_updated_count['pim']:,}")
-    print(f"  PPP: {updated_count['ppp'] + retry_updated_count['ppp']:,}")
-    print(f"  SHP: {updated_count['shp'] + retry_updated_count['shp']:,}")
-    print(f"  Wins: {updated_count['wins'] + retry_updated_count['wins']:,}")
-    print(f"  Saves: {updated_count['saves'] + retry_updated_count['saves']:,}")
-    print(f"  Shutouts: {updated_count['shutouts'] + retry_updated_count['shutouts']:,}")
-    print()
+    logger.info(f"Total players processed: {len(players):,}")
+    logger.info(f"Total skaters updated: {total_skaters:,}")
+    logger.info(f"Total goalies updated: {total_goalies:,}")
+    logger.info("")
+    logger.info("Total stats updated:")
+    logger.info(f"  TOI: {updated_count['toi'] + retry_updated_count['toi']:,}")
+    logger.info(f"  Goals: {updated_count['goals'] + retry_updated_count['goals']:,}")
+    logger.info(f"  Assists: {updated_count['assists'] + retry_updated_count['assists']:,}")
+    logger.info(f"  Points: {updated_count['points'] + retry_updated_count['points']:,}")
+    logger.info(f"  Plus/Minus: {updated_count['plus_minus'] + retry_updated_count['plus_minus']:,}")
+    logger.info(f"  Shots on Goal: {updated_count['sog'] + retry_updated_count['sog']:,}")
+    logger.info(f"  PIM: {updated_count['pim'] + retry_updated_count['pim']:,}")
+    logger.info(f"  PPP: {updated_count['ppp'] + retry_updated_count['ppp']:,}")
+    logger.info(f"  SHP: {updated_count['shp'] + retry_updated_count['shp']:,}")
+    logger.info(f"  Wins: {updated_count['wins'] + retry_updated_count['wins']:,}")
+    logger.info(f"  Saves: {updated_count['saves'] + retry_updated_count['saves']:,}")
+    logger.info(f"  Shutouts: {updated_count['shutouts'] + retry_updated_count['shutouts']:,}")
+    logger.info("")
     total_rate_limited = rate_limited_429_count + retry_rate_limited_count
     total_not_found = not_found_count + retry_not_found_count
     total_errors = error_count + retry_error_count
-    print(f"Total rate limited (429): {total_rate_limited:,}")
-    print(f"Total not found: {total_not_found:,}")
-    print(f"Total errors: {total_errors:,}")
-    print()
+    logger.info(f"Total rate limited (429): {total_rate_limited:,}")
+    logger.info(f"Total not found: {total_not_found:,}")
+    logger.error(f"Total errors: {total_errors:,}")
+    logger.info("")
     total_statsapi = updated_count.get("statsapi_hits_blocks", 0) + retry_updated_count.get("statsapi_hits_blocks", 0)
     if total_statsapi > 0:
-        print(f"[OK] StatsAPI fallback: Successfully fetched hits/blocks for {total_statsapi:,} players")
+        logger.info(f"[OK] StatsAPI fallback: Successfully fetched hits/blocks for {total_statsapi:,} players")
     else:
-        print("[WARNING] StatsAPI fallback: Hits/blocks not available (StatsAPI may have DNS issues)")
-        print("      Players will have hits/blocks = 0 (can use PBP-calculated as fallback)")
+        logger.warning("[WARNING] StatsAPI fallback: Hits/blocks not available (StatsAPI may have DNS issues)")
+        logger.info("      Players will have hits/blocks = 0 (can use PBP-calculated as fallback)")
     
     return 0
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     raise SystemExit(main())
 

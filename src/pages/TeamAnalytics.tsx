@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -51,17 +51,7 @@ const TeamAnalytics = () => {
   const [freeAgentTargets, setFreeAgentTargets] = useState<FreeAgentRec[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Skip if league is changing
-    if (isChangingLeague) {
-      return;
-    }
-    
-    loadScheduleMaximizers();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, userLeagueState, activeLeagueId, isChangingLeague]);
-
-  const loadScheduleMaximizers = async () => {
+  const loadScheduleMaximizers = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -169,7 +159,12 @@ const TeamAnalytics = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, userLeagueState, activeLeagueId]);
+
+  useEffect(() => {
+    if (isChangingLeague) return;
+    loadScheduleMaximizers();
+  }, [isChangingLeague, loadScheduleMaximizers]);
 
   // Mock Analysis Data
   const positionalAnalysis: PositionStats[] = [
