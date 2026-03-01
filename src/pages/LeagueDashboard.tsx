@@ -225,8 +225,8 @@ const LeagueDashboard = () => {
       // Load user's team
       const { team: userTeamData } = await LeagueService.getUserTeam(leagueId, user.id);
       setUserTeam(userTeamData);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load league data');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load league data');
     } finally {
       setLoading(false);
     }
@@ -304,11 +304,11 @@ const LeagueDashboard = () => {
           });
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error('handleSimulateFill: Exception:', err);
       toast({
         title: 'Error',
-        description: err.message || 'Failed to simulate teams',
+        description: err instanceof Error ? err.message : 'Failed to simulate teams',
         variant: 'destructive',
       });
     } finally {
@@ -459,10 +459,10 @@ const LeagueDashboard = () => {
       
       // Reload league data to reflect changes
       loadLeagueData();
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
         title: 'Error',
-        description: err.message || 'Failed to save settings',
+        description: err instanceof Error ? err.message : 'Failed to save settings',
         variant: 'destructive',
       });
     } finally {
@@ -504,10 +504,10 @@ const LeagueDashboard = () => {
           description: 'There are no pending waiver claims to process.',
         });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
         title: 'Error',
-        description: err.message || 'Failed to process waivers',
+        description: err instanceof Error ? err.message : 'Failed to process waivers',
         variant: 'destructive',
       });
     } finally {
@@ -555,10 +555,10 @@ const LeagueDashboard = () => {
       
       // Reload league data to reflect changes
       loadLeagueData();
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
         title: 'Error',
-        description: err.message || 'Failed to sync rosters',
+        description: err instanceof Error ? err.message : 'Failed to sync rosters',
         variant: 'destructive',
       });
     } finally {

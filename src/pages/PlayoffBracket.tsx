@@ -2,8 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
-import Navbar from '../components/Navbar';
-import Footer from '../components/Footer';
+import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
 import { LeagueService } from '@/services/LeagueService';
 import {
   PlayoffService,
@@ -512,9 +512,9 @@ const PlayoffBracket = () => {
         names[team.id] = team.team_name;
       });
       setTeamNames(names);
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error('[PlayoffBracket] Error loading:', err);
-      setError(err.message || 'Failed to load playoff bracket');
+      setError(err instanceof Error ? err.message : 'Failed to load playoff bracket');
     } finally {
       setLoading(false);
     }
@@ -541,10 +541,10 @@ const PlayoffBracket = () => {
       });
 
       await loadData();
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
         title: 'Error',
-        description: err.message || 'Failed to generate bracket',
+        description: err instanceof Error ? err.message : 'Failed to generate bracket',
         variant: 'destructive',
       });
     } finally {
@@ -565,10 +565,10 @@ const PlayoffBracket = () => {
       });
 
       await loadData();
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
         title: 'Error',
-        description: err.message || 'Failed to advance round',
+        description: err instanceof Error ? err.message : 'Failed to advance round',
         variant: 'destructive',
       });
     } finally {
@@ -587,10 +587,10 @@ const PlayoffBracket = () => {
       setBracket(null);
       setSeeds([]);
       setSeries([]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
         title: 'Error',
-        description: err.message || 'Failed to reset bracket',
+        description: err instanceof Error ? err.message : 'Failed to reset bracket',
         variant: 'destructive',
       });
     } finally {

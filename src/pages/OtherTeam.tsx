@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import Navbar from '../components/Navbar';
-import Footer from '../components/Footer';
+import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -82,19 +82,21 @@ const OtherTeam = () => {
           const { data: demoLeagueData, error: leagueError } = await supabase
             .from('leagues')
             .select(COLUMNS.LEAGUE)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .eq('id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
             .maybeSingle();
-          
+
           if (leagueError || !demoLeagueData) {
             logger.error('[OtherTeam] Error loading demo league:', leagueError);
             setLoading(false);
             return;
           }
-          
+
           // Get all teams from the demo league
           const { data: demoTeamsData, error: teamsError } = await supabase
             .from('teams')
             .select(COLUMNS.TEAM)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
             .order('created_at', { ascending: true });
           
@@ -105,7 +107,7 @@ const OtherTeam = () => {
           }
           
           // Find the specific team by index (teamIdNum is 1-10, array is 0-indexed)
-          const demoTeamFromDb = (demoTeamsData as any[])[teamIdNum - 1];
+          const demoTeamFromDb = (demoTeamsData as Team[])[teamIdNum - 1];
           if (!demoTeamFromDb) {
             logger.error(`[OtherTeam] Demo team ${teamIdNum} not found in database`);
             setLoading(false);
@@ -122,7 +124,9 @@ const OtherTeam = () => {
           const { data: draftPicksData, error: picksError } = await supabase
             .from('draft_picks')
             .select('player_id')
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .eq('team_id' as any, demoTeamFromDb.id as any)
             .is('deleted_at', null);
           
@@ -132,7 +136,7 @@ const OtherTeam = () => {
             return;
           }
           
-          const playerIds = (draftPicksData || []).map((p: any) => p.player_id);
+          const playerIds = (draftPicksData || []).map((p: { player_id: string }) => p.player_id);
 
           if (playerIds.length === 0) {
             logger.error(`[OtherTeam] Demo team ${teamIdNum} has no players in roster`);
