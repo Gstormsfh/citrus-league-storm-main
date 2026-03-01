@@ -2847,27 +2847,15 @@ def calculate_daily_projection(
         Projection dict with all stats and model components, or None if error
     """
     try:
-        # LAYER 1: Check cache first, then calculate if needed
-        physical_projection = load_physical_projection(
+        # LAYER 1: Calculate physical projection
+        # (Cache disabled — projection_cache table has schema mismatch.
+        #  With --force, we always recalculate anyway.)
+        physical_projection = calculate_physical_projection(
             db, player_id, game_id, game_date, season
         )
-        
+
         if not physical_projection:
-            # Not in cache - calculate it
-            physical_projection = calculate_physical_projection(
-                db, player_id, game_id, game_date, season
-            )
-            
-            if not physical_projection:
-                return None
-            
-            # Save physical projection to cache (optional, never fatal)
-            try:
-                save_physical_projection(
-                    db, player_id, game_id, game_date, season, physical_projection
-                )
-            except Exception:
-                pass  # Cache is optional — failures tracked inside the function
+            return None
         
         # LAYER 2: Transform physical to fantasy points
         # Get league_id if not provided (try to get from first league)

@@ -638,11 +638,12 @@ def batch_upsert_projections(db: SupabaseRest, projections: List[Dict[str, Any]]
     # Process in batches
     for i in range(0, len(projections), batch_size):
         batch = projections[i:i+batch_size]
-        
-        # Filter to only valid columns from each projection
+
+        # Filter to valid columns AND ensure every row has identical keys
+        # (PostgREST requires "All object keys must match" for batch upsert)
         filtered_batch = []
         for proj in batch:
-            filtered_proj = {k: v for k, v in proj.items() if k in valid_columns}
+            filtered_proj = {col: proj.get(col, None) for col in valid_columns}
             filtered_batch.append(filtered_proj)
         
         try:
@@ -838,22 +839,27 @@ def main():
     logger.info("[4/7] Preparing tasks...")
     worker_args = []
     skipped = 0
+
+    # Build a fallback: use the first league's scoring settings for unrostered players
+    # (free agents still exist in a league context — use league settings, not hardcoded defaults)
+    fallback_scoring = None
+    if league_scoring:
+        fallback_scoring = next(iter(league_scoring.values()))
+    if not fallback_scoring:
+        fallback_scoring = {
+            "skater": {"goals": 3, "assists": 2, "shots_on_goal": 0.4, "blocks": 0.5},
+            "goalie": {"wins": 4, "shutouts": 3, "saves": 0.2, "goals_against": -1}
+        }
+
     for player_id, game_id, league_id in rostered_players:
         # Skip if projection already exists (unless --force)
         if not args.force and (player_id, game_id) in existing_projections:
             skipped += 1
             continue
-        # Use league scoring if available, otherwise use defaults
-        # league_id can be None for unrostered players - use defaults
-        scoring_settings = league_scoring.get(league_id) if league_id else {
-            "skater": {"goals": 3, "assists": 2, "shots_on_goal": 0.4, "blocks": 0.5},
-            "goalie": {"wins": 4, "shutouts": 3, "saves": 0.2, "goals_against": -1}
-        }
+        # Use the player's league scoring, or fall back to first league's settings
+        scoring_settings = league_scoring.get(league_id) if league_id else fallback_scoring
         if not scoring_settings:
-            scoring_settings = {
-                "skater": {"goals": 3, "assists": 2, "shots_on_goal": 0.4, "blocks": 0.5},
-                "goalie": {"wins": 4, "shutouts": 3, "saves": 0.2, "goals_against": -1}
-            }
+            scoring_settings = fallback_scoring
         worker_args.append((player_id, game_id, target_date, args.season, scoring_settings))
     
     logger.info(f"       {len(worker_args)} to calculate, {skipped} skipped")
