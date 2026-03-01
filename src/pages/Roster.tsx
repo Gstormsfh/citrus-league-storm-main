@@ -1714,9 +1714,16 @@ const Roster = () => {
             opponent_adjustment: Number(projection.opponent_adjustment || 1),
             b2b_penalty: Number(projection.b2b_penalty || 1),
             home_away_adjustment: Number(projection.home_away_adjustment || 1),
-            confidence_score: Number(projection.confidence_score || 0),
+            confidence_score: Number(projection.dynamic_confidence || projection.confidence_score || 0),
             calculation_method: projection.calculation_method || 'hybrid_bayesian',
-            is_goalie: false
+            is_goalie: false,
+            // Monte Carlo uncertainty (Citrus 3.1)
+            likely_low: projection.likely_low != null ? Number(projection.likely_low) : undefined,
+            likely_high: projection.likely_high != null ? Number(projection.likely_high) : undefined,
+            confidence_label: projection.confidence_label || undefined,
+            dynamic_confidence: projection.dynamic_confidence != null ? Number(projection.dynamic_confidence) : undefined,
+            projection_mean: projection.projection_mean != null ? Number(projection.projection_mean) : undefined,
+            projection_std_dev: projection.projection_std_dev != null ? Number(projection.projection_std_dev) : undefined,
           }
         };
       }

@@ -77,6 +77,41 @@ export const ProjectionTooltip = ({ projection }: ProjectionTooltipProps) => {
         ))}
       </div>
 
+      {/* Likely Range + Confidence (Citrus 3.1) */}
+      {projection.likely_low != null && projection.likely_high != null && (
+        <div className="px-4 py-2 bg-white/30 border-t border-citrus-sage/20">
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-[10px] font-display font-semibold text-citrus-charcoal/50 uppercase">Likely Range</span>
+            <span className="text-xs font-varsity font-black text-citrus-forest">
+              {projection.likely_low.toFixed(1)} – {projection.likely_high.toFixed(1)} pts
+            </span>
+          </div>
+          {projection.dynamic_confidence != null && (
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] font-display text-citrus-charcoal/40">Confidence</span>
+              <div className="flex-1 h-1.5 bg-citrus-sage/10 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-citrus-sage to-citrus-orange rounded-full"
+                  style={{ width: `${Math.min(projection.dynamic_confidence * 100, 100)}%` }}
+                />
+              </div>
+              <span className="text-[9px] font-varsity font-black text-citrus-forest">
+                {Math.round(projection.dynamic_confidence * 100)}%
+              </span>
+              {projection.confidence_label && (
+                <span className={`text-[8px] px-1 py-0 rounded font-bold ${
+                  projection.confidence_label === 'High' ? 'bg-green-500/20 text-green-700' :
+                  projection.confidence_label === 'Medium' ? 'bg-blue-500/20 text-blue-700' :
+                  'bg-orange-500/20 text-orange-700'
+                }`}>
+                  {projection.confidence_label}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Footer */}
       <div className="bg-gradient-to-r from-citrus-peach via-citrus-orange/50 to-citrus-peach px-4 py-3 rounded-b-xl border-t-2 border-citrus-forest">
         <div className="flex justify-between items-center">

@@ -493,17 +493,29 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
         ) : (
           // CASE 3: Show projection bar (game not final yet) - VARSITY SCOREBOARD - COMPACT
           <div className="player-projection-bar-container relative bg-gradient-to-br from-citrus-peach/10 via-citrus-cream/30 to-citrus-sage/10 p-1 rounded border border-citrus-peach/40 shadow-sm">
-            {/* Label - Varsity Badge Style - HIDDEN ON MOBILE */}
-            <div className="hidden lg:flex text-[7px] font-varsity font-bold text-citrus-forest uppercase tracking-wider mb-0.5 items-center gap-0.5 bg-[#E8EED9]/50 backdrop-blur-sm/70 px-1 py-0 rounded border border-citrus-peach/40 w-fit">
-              <span className="w-1 h-1 rounded-full bg-citrus-orange animate-pulse" />
-              Projected
+            {/* Label + Confidence Badge - HIDDEN ON MOBILE */}
+            <div className="hidden lg:flex text-[7px] font-varsity font-bold text-citrus-forest uppercase tracking-wider mb-0.5 items-center gap-1 w-full">
+              <div className="flex items-center gap-0.5 bg-[#E8EED9]/50 backdrop-blur-sm/70 px-1 py-0 rounded border border-citrus-peach/40 w-fit">
+                <span className="w-1 h-1 rounded-full bg-citrus-orange animate-pulse" />
+                Projected
+              </div>
+              {/* Confidence label badge */}
+              {hasProjection && dailyProjection?.confidence_label && (
+                <span className={`text-[7px] px-1 py-0 rounded font-bold ${
+                  dailyProjection.confidence_label === 'High' ? 'bg-green-500/20 text-green-700 border border-green-500/30' :
+                  dailyProjection.confidence_label === 'Medium' ? 'bg-blue-500/20 text-blue-700 border border-blue-500/30' :
+                  'bg-orange-500/20 text-orange-700 border border-orange-500/30'
+                }`}>
+                  {dailyProjection.confidence_label}
+                </span>
+              )}
             </div>
             {/* Centered total above bar - Premium Badge - COMPACT */}
             <div className="flex justify-center items-center gap-1 mb-0.5">
               <span className="text-xs font-varsity font-black text-citrus-orange bg-citrus-peach/30 px-1.5 py-0.5 rounded border border-citrus-peach/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)]">
                 {hasProjection && isStarterConfirmed
                   ? `${projectedPoints.toFixed(1)} pts`
-                  : showTBD 
+                  : showTBD
                     ? (isGoalie && !isStarterConfirmed ? 'Probable' : 'TBD')
                     : '0.0 pts'
                 }
@@ -516,18 +528,38 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                 )
               )}
             </div>
-            {/* Collegiate Battery Bar with Stitched Style - COMPACT */}
-            {hasProjection && isStarterConfirmed ? (
+            {/* Likely Range - "3.2 – 5.8 likely" (50% CI) - HIDDEN ON MOBILE */}
+            {hasProjection && isStarterConfirmed && dailyProjection?.likely_low != null && dailyProjection?.likely_high != null && (
+              <div className="hidden lg:flex justify-center mb-0.5">
+                <span className="text-[8px] font-display text-citrus-charcoal/50">
+                  Likely: {dailyProjection.likely_low.toFixed(1)} – {dailyProjection.likely_high.toFixed(1)}
+                </span>
+              </div>
+            )}
+            {/* Confidence Bar - gradient fill matching PlayerStatsModal style */}
+            {hasProjection && isStarterConfirmed && dailyProjection?.dynamic_confidence != null ? (
+              <div className="flex items-center gap-1 w-full">
+                <div className="flex-1 h-1.5 bg-citrus-sage/10 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-citrus-sage to-citrus-orange rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(dailyProjection.dynamic_confidence * 100, 100)}%` }}
+                  />
+                </div>
+                <span className="text-[8px] font-varsity font-black text-citrus-forest min-w-[20px] text-right">
+                  {Math.round(dailyProjection.dynamic_confidence * 100)}%
+                </span>
+              </div>
+            ) : hasProjection && isStarterConfirmed ? (
               <div className="flex gap-0.5 w-full">
                 {Array.from({ length: maxBarPoints }, (_, i) => {
                   const isFilled = i < projectionFilledChunks;
                   const isPartial = i === projectionFilledChunks && projectionPartialChunk > 0;
                   return (
-                    <div 
+                    <div
                       key={i}
                       className={`flex-1 h-2 rounded overflow-hidden transition-all duration-300
-                        ${!isFilled && !isPartial 
-                          ? 'border-2 border-dashed border-citrus-peach/30 bg-[#E8EED9]/50 backdrop-blur-sm/50' 
+                        ${!isFilled && !isPartial
+                          ? 'border-2 border-dashed border-citrus-peach/30 bg-[#E8EED9]/50 backdrop-blur-sm/50'
                           : 'bg-[#E8EED9]/50 backdrop-blur-sm border-2 border-citrus-peach/40'
                         }`}
                     >
@@ -535,8 +567,8 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                         <div className="w-full h-full bg-gradient-to-br from-citrus-orange via-citrus-peach to-citrus-orange shadow-[inset_0_1px_2px_rgba(255,255,255,0.3)]" />
                       )}
                       {isPartial && (
-                        <div 
-                          className="h-full bg-gradient-to-br from-citrus-orange/70 via-citrus-peach/70 to-citrus-orange/70" 
+                        <div
+                          className="h-full bg-gradient-to-br from-citrus-orange/70 via-citrus-peach/70 to-citrus-orange/70"
                           style={{ width: `${projectionPartialChunk * 100}%` }}
                         />
                       )}
@@ -547,7 +579,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
             ) : showTBD ? (
               <div className="flex gap-0.5 w-full">
                 {Array.from({ length: maxBarPoints }, (_, i) => (
-                  <div 
+                  <div
                     key={i}
                     className="flex-1 h-2 rounded border border-dashed border-citrus-peach/30 bg-[#E8EED9]/50 backdrop-blur-sm/50 animate-pulse"
                   />
@@ -556,7 +588,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
             ) : (
               <div className="flex gap-0.5 w-full">
                 {Array.from({ length: maxBarPoints }, (_, i) => (
-                  <div 
+                  <div
                     key={i}
                     className="flex-1 h-2 rounded border border-dashed border-citrus-peach/30 bg-[#E8EED9]/50 backdrop-blur-sm/50"
                   />
