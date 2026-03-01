@@ -616,9 +616,17 @@ def batch_upsert_projections(db: SupabaseRest, projections: List[Dict[str, Any]]
         'projected_goals', 'projected_assists', 'projected_sog', 'projected_blocks', 'projected_xg',
         'projected_ppp', 'projected_shp', 'projected_hits', 'projected_pim',  # 8-stat columns
         'total_projected_points',
-        'base_ppg', 'shrinkage_weight', 'finishing_multiplier', 'opponent_adjustment', 
+        'base_ppg', 'shrinkage_weight', 'finishing_multiplier', 'opponent_adjustment',
         'b2b_penalty', 'home_away_adjustment',
-        'calculation_method', 'confidence_score'
+        'calculation_method', 'confidence_score',
+        # Monte Carlo uncertainty columns (Citrus 3.1)
+        'projection_mean', 'projection_std_dev',
+        'projection_ci_lower', 'projection_ci_upper',
+        'projection_ci_50_lower', 'projection_ci_50_upper',
+        'projection_median', 'projection_skewness',
+        'upside_probability', 'floor_probability', 'dynamic_confidence',
+        # User-facing presentation fields (Citrus 3.1 UX)
+        'likely_low', 'likely_high', 'confidence_label',
     }
     
     # Process in batches

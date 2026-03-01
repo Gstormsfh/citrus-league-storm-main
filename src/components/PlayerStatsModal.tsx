@@ -197,8 +197,10 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
           const projection = projectionMap.get(gameDate) || null;
           const projectedPoints = Number(projection?.total_projected_points || 0);
 
-          // Compute confidence fresh on the frontend (temporal + opponent factors)
-          const confidence = computeConfidence(projection, gameDate, todayStr);
+          // Use MC-derived dynamic_confidence from DB when available,
+          // otherwise compute from shrinkage + temporal + opponent factors
+          const mcConfidence = Number(projection?.dynamic_confidence || 0);
+          const confidence = mcConfidence > 0 ? mcConfidence : computeConfidence(projection, gameDate, todayStr);
 
           projections.push({
             date: gameDate,
@@ -627,9 +629,18 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                                 ))}
                               </div>
                             )}
-                            {/* Confidence bar (computed fresh from temporal + opponent factors) */}
+                            {/* Likely Range (50% CI from MC engine) */}
+                            {gp.projection?.likely_low != null && gp.projection?.likely_high != null && (
+                              <div className="flex items-center justify-between mt-1.5 px-1">
+                                <span className="text-[8px] font-display text-citrus-charcoal/40">Likely Range</span>
+                                <span className="text-[9px] font-varsity font-black text-citrus-forest">
+                                  {Number(gp.projection.likely_low).toFixed(1)} – {Number(gp.projection.likely_high).toFixed(1)} pts
+                                </span>
+                              </div>
+                            )}
+                            {/* Confidence bar (MC-derived or computed from temporal + opponent factors) */}
                             {gp.computedConfidence > 0 && (
-                              <div className="flex items-center gap-2 mt-1.5">
+                              <div className="flex items-center gap-2 mt-1">
                                 <span className="text-[8px] font-display text-citrus-charcoal/40">Confidence</span>
                                 <div className="flex-1 h-1.5 bg-citrus-sage/10 rounded-full overflow-hidden">
                                   <div
@@ -640,6 +651,15 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                                 <span className="text-[9px] font-varsity font-black text-citrus-forest">
                                   {Math.round(gp.computedConfidence * 100)}%
                                 </span>
+                                {gp.projection?.confidence_label && (
+                                  <span className={`text-[8px] px-1 py-0 rounded font-bold ${
+                                    gp.projection.confidence_label === 'High' ? 'bg-green-500/20 text-green-700' :
+                                    gp.projection.confidence_label === 'Medium' ? 'bg-blue-500/20 text-blue-700' :
+                                    'bg-orange-500/20 text-orange-700'
+                                  }`}>
+                                    {String(gp.projection.confidence_label)}
+                                  </span>
+                                )}
                               </div>
                             )}
                           </div>

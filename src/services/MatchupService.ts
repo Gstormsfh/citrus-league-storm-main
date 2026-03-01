@@ -63,6 +63,18 @@ interface DailyProjectionRow {
   projected_save_pct?: number;
   projected_gp?: number;
   starter_confirmed?: boolean;
+  // Monte Carlo uncertainty (Citrus 3.1)
+  projection_mean?: number;
+  projection_std_dev?: number;
+  projection_ci_lower?: number;
+  projection_ci_upper?: number;
+  projection_ci_50_lower?: number;
+  projection_ci_50_upper?: number;
+  projection_median?: number;
+  dynamic_confidence?: number;
+  likely_low?: number;
+  likely_high?: number;
+  confidence_label?: string;
 }
 
 // Shape for matchup line rows from fantasy_matchup_lines
@@ -1673,9 +1685,16 @@ export const MatchupService = {
             opponent_adjustment: Number(dailyProjection.opponent_adjustment || 1),
             b2b_penalty: Number(dailyProjection.b2b_penalty || 1),
             home_away_adjustment: Number(dailyProjection.home_away_adjustment || 1),
-            confidence_score: Number(dailyProjection.confidence_score || 0),
+            confidence_score: Number(dailyProjection.dynamic_confidence || dailyProjection.confidence_score || 0),
             calculation_method: dailyProjection.calculation_method || 'hybrid_bayesian',
-            is_goalie: false
+            is_goalie: false,
+            // Monte Carlo uncertainty (Citrus 3.1)
+            likely_low: dailyProjection.likely_low != null ? Number(dailyProjection.likely_low) : undefined,
+            likely_high: dailyProjection.likely_high != null ? Number(dailyProjection.likely_high) : undefined,
+            confidence_label: dailyProjection.confidence_label || undefined,
+            dynamic_confidence: dailyProjection.dynamic_confidence != null ? Number(dailyProjection.dynamic_confidence) : undefined,
+            projection_mean: dailyProjection.projection_mean != null ? Number(dailyProjection.projection_mean) : undefined,
+            projection_std_dev: dailyProjection.projection_std_dev != null ? Number(dailyProjection.projection_std_dev) : undefined,
           };
         }
       }

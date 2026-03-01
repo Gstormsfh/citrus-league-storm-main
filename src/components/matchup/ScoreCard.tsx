@@ -1,6 +1,7 @@
 import { Calendar } from "lucide-react";
 import { CitrusWedge, CitrusSparkle, CitrusSlice, CitrusBurst } from "@/components/icons/CitrusIcons";
 import { Badge } from "@/components/ui/badge";
+import { WinProbabilityBar } from "./WinProbabilityBar";
 
 interface ScoreCardProps {
   myTeamName: string;
@@ -13,6 +14,8 @@ interface ScoreCardProps {
   opponentTeamGamesRemaining?: number;
   myTeamProjection?: number;
   opponentTeamProjection?: number;
+  /** Matchup UUID for Monte Carlo simulation data */
+  matchupId?: string;
 }
 
 export const ScoreCard = ({
@@ -26,6 +29,7 @@ export const ScoreCard = ({
   opponentTeamGamesRemaining = 0,
   myTeamProjection = 0,
   opponentTeamProjection = 0,
+  matchupId,
 }: ScoreCardProps) => {
   // Calculate win probability based on scores and projections
   const myPointsNum = parseFloat(myTeamPoints) || 0;
@@ -84,19 +88,14 @@ export const ScoreCard = ({
           </div>
         </div>
         
-        {/* Win probability - Compact */}
-        <div className="mt-2">
-          <div className="flex justify-between items-center mb-1">
-            <span className="font-varsity text-[9px] text-citrus-forest uppercase">Win Prob</span>
-            <span className="font-display font-bold text-xs text-citrus-forest">{winProbability}%</span>
-          </div>
-          <div className="h-3 rounded-full overflow-hidden border border-citrus-forest bg-[#E8EED9]/50">
-            <div className="flex h-full">
-              <div className="bg-citrus-sage" style={{ width: `${winProbability}%` }} />
-              <div className="bg-citrus-peach flex-grow" />
-            </div>
-          </div>
-        </div>
+        {/* Win probability - Compact (Monte Carlo powered) */}
+        <WinProbabilityBar
+          matchupId={matchupId}
+          fallbackWinProbability={winProbability}
+          team1Projected={myTeamProjection}
+          team2Projected={opponentTeamProjection}
+          compact
+        />
       </div>
       
       {/* Desktop: Full layout */}
@@ -166,18 +165,14 @@ export const ScoreCard = ({
         </div>
       </div>
       
-      {/* Win probability - Desktop only */}
-      <div className="hidden md:block px-6 pb-6">
-        <div className="mb-2 flex justify-between items-center">
-          <span className="font-varsity text-xs text-citrus-forest uppercase">Win Probability</span>
-          <span className="font-display font-bold text-citrus-forest">{winProbability}%</span>
-        </div>
-        <div className="h-8 rounded-full overflow-hidden border-3 border-citrus-forest bg-[#E8EED9]/50 backdrop-blur-sm shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]">
-          <div className="flex h-full">
-            <div className="bg-citrus-sage" style={{ width: `${winProbability}%` }} />
-            <div className="bg-citrus-peach flex-grow" style={{ width: `${100-winProbability}%` }} />
-          </div>
-        </div>
+      {/* Win probability - Desktop (Monte Carlo powered) */}
+      <div className="hidden md:block">
+        <WinProbabilityBar
+          matchupId={matchupId}
+          fallbackWinProbability={winProbability}
+          team1Projected={myTeamProjection}
+          team2Projected={opponentTeamProjection}
+        />
       </div>
     </div>
   );

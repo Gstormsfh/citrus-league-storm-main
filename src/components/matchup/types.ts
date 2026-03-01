@@ -85,6 +85,13 @@ export type MatchupPlayer = {
     confidence_score: number;
     calculation_method: string;
     is_goalie?: boolean; // Flag to distinguish goalie vs skater
+    // Monte Carlo uncertainty (Citrus 3.1)
+    likely_low?: number;           // 50% CI lower (user-facing "likely range")
+    likely_high?: number;          // 50% CI upper (user-facing "likely range")
+    confidence_label?: string;     // "High" | "Medium" | "Low"
+    dynamic_confidence?: number;   // MC-derived confidence (0-1)
+    projection_mean?: number;      // MC mean of fantasy point distribution
+    projection_std_dev?: number;   // Standard deviation
   };
   // NEW: Goalie-specific fields
   isGoalie?: boolean;

@@ -87,8 +87,15 @@ export interface HockeyPlayer {
     confidence_score: number;
     calculation_method: string;
     is_goalie?: boolean; // Flag to distinguish goalie vs skater
+    // Monte Carlo uncertainty (Citrus 3.1)
+    likely_low?: number;
+    likely_high?: number;
+    confidence_label?: string;
+    dynamic_confidence?: number;
+    projection_mean?: number;
+    projection_std_dev?: number;
   };
-  
+
   // Goalie-specific projection object (matches Matchup tab structure)
   goalieProjection?: {
     total_projected_points: number;

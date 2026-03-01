@@ -25,7 +25,22 @@ from typing import Dict, List, Optional, Tuple, Any
 from decimal import Decimal, ROUND_HALF_UP
 import logging
 
+# Monte Carlo uncertainty propagation (Citrus Projections 3.1)
+try:
+    from projection_uncertainty import (
+        UncertaintyEngine,
+        enrich_projection_with_uncertainty,
+        build_player_context,
+    )
+    UNCERTAINTY_AVAILABLE = True
+except ImportError as _unc_import_err:
+    UNCERTAINTY_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
+
+if not UNCERTAINTY_AVAILABLE:
+    logger.warning(f"projection_uncertainty module not available: {_unc_import_err}. "
+                   "Uncertainty propagation will be disabled for this run.")
 
 _shutdown_requested = False
 
@@ -3094,8 +3109,8 @@ def calculate_daily_projection(
         opponent_factor = max(0.75, 1.0 - opp_deviation)
         
         confidence_score = round(base_confidence * temporal_factor * opponent_factor, 2)
-        
-        return {
+
+        result = {
             "player_id": player_id,
             "game_id": game_id,
             "projection_date": game_date.isoformat(),
@@ -3139,6 +3154,36 @@ def calculate_daily_projection(
             "is_goalie": False,
             "season": season,
         }
+
+        # LAYER 0: Monte Carlo Uncertainty Propagation (Citrus 3.1)
+        # Wraps point estimates in proper probability distributions
+        if UNCERTAINTY_AVAILABLE:
+            try:
+                player_ctx = build_player_context(
+                    db, player_id, season, games_played,
+                    opponent_team=opponent_team, position=position
+                )
+                # Reuse a per-process engine to avoid redundant Cholesky decompositions
+                if not hasattr(calculate_daily_projection, '_unc_engine'):
+                    calculate_daily_projection._unc_engine = UncertaintyEngine(n_samples=5000)
+                    calculate_daily_projection._unc_fail_count = 0
+                # Circuit breaker: if >20 consecutive failures, stop trying this run
+                if calculate_daily_projection._unc_fail_count < 20:
+                    result = enrich_projection_with_uncertainty(
+                        result, player_ctx, engine=calculate_daily_projection._unc_engine
+                    )
+                    calculate_daily_projection._unc_fail_count = 0  # Reset on success
+            except Exception as unc_err:
+                calculate_daily_projection._unc_fail_count = getattr(
+                    calculate_daily_projection, '_unc_fail_count', 0
+                ) + 1
+                if calculate_daily_projection._unc_fail_count <= 5:
+                    logger.warning(f"Uncertainty propagation skipped for player {player_id}: {unc_err}")
+                elif calculate_daily_projection._unc_fail_count == 20:
+                    logger.error(f"Uncertainty propagation failed 20 times consecutively — "
+                                 f"disabling for remainder of this run. Last error: {unc_err}")
+
+        return result
         
     except Exception as e:
         logger.error(f"❌ Error calculating projection for player {player_id}, game {game_id}: {e}")
