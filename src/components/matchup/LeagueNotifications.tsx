@@ -41,8 +41,7 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
     clearError,
   } = useNotificationStore();
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const leagueNotifications = notifications.get(leagueId) || [];
+  const leagueNotifications = useMemo(() => notifications.get(leagueId) || [], [notifications, leagueId]);
   const isLoading = loading.get(leagueId) || false;
   const error = errors.get(leagueId);
   const unreadCount = unreadCounts.get(leagueId) || 0;
@@ -123,7 +122,7 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
     return () => {
       unsubscribe(leagueId);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- loadNotifications, subscribe, unsubscribe are stable store functions that never change identity
   }, [leagueId, user?.id]);
 
   const handleMarkAllAsRead = async () => {

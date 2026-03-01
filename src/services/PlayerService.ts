@@ -8,8 +8,35 @@ import { logger } from '@/utils/logger';
  * Once types.ts is regenerated to include these tables, this cast can be removed and
  * `supabase` used directly.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const pipelineDb: Record<string, any> = supabase;
+interface PipelineQueryResult<T = unknown> {
+  data: T | null;
+  error: { message: string; code?: string } | null;
+  count?: number | null;
+}
+interface PipelineQueryBuilder<T = unknown> {
+  eq: (col: string, val: string | number) => PipelineQueryBuilder<T>;
+  neq: (col: string, val: string | number) => PipelineQueryBuilder<T>;
+  in: (col: string, vals: (string | number)[]) => PipelineQueryBuilder<T>;
+  is: (col: string, val: null) => PipelineQueryBuilder<T>;
+  gte: (col: string, val: string | number) => PipelineQueryBuilder<T>;
+  lte: (col: string, val: string | number) => PipelineQueryBuilder<T>;
+  gt: (col: string, val: string | number) => PipelineQueryBuilder<T>;
+  order: (col: string, opts?: { ascending?: boolean }) => PipelineQueryBuilder<T>;
+  limit: (count: number) => PipelineQueryBuilder<T>;
+  single: () => Promise<PipelineQueryResult<T>>;
+  maybeSingle: () => Promise<PipelineQueryResult<T>>;
+  then: Promise<PipelineQueryResult<T[]>>['then'];
+  [Symbol.toStringTag]: string;
+}
+interface PipelineDb {
+  from: (table: string) => {
+    select: (columns: string, opts?: { count?: string; head?: boolean }) => PipelineQueryBuilder;
+    insert: (data: Record<string, unknown> | Record<string, unknown>[]) => PipelineQueryBuilder;
+    upsert: (data: Record<string, unknown> | Record<string, unknown>[]) => PipelineQueryBuilder;
+  };
+  rpc: (fn: string, params?: Record<string, unknown>) => Promise<PipelineQueryResult>;
+}
+const pipelineDb = supabase as unknown as PipelineDb;
 
 /**
  * PlayerService - SINGLE SOURCE OF TRUTH
@@ -667,5 +694,75 @@ export const PlayerService = {
       // Return cached players if we have any, otherwise empty array
       return cachedPlayers.length > 0 ? cachedPlayers : [];
     }
-  }
+  },
+
+  /**
+   * Get platform-wide trending player data (adds/drops over recent days).
+   */
+  async getTrendingPlayers(daysBack = 7, limitCount = 50): Promise<Map<number, { addCount: number; netAdds: number }>> {
+    const trendingMap = new Map<number, { addCount: number; netAdds: number }>();
+    try {
+      const { data, error } = await supabase.rpc('get_trending_players', {
+        days_back: daysBack,
+        limit_count: limitCount,
+      });
+      if (error || !data || !Array.isArray(data)) return trendingMap;
+      for (const row of data) {
+        trendingMap.set(Number(row.player_id), {
+          addCount: Number(row.add_count ?? 0),
+          netAdds: Number(row.net_adds ?? 0),
+        });
+      }
+    } catch (err) {
+      logger.error('[PlayerService] getTrendingPlayers error:', err);
+    }
+    return trendingMap;
+  },
+
+  /**
+   * Record a player transaction (add/drop) for platform-wide trending analytics.
+   */
+  async recordPlayerTransaction(params: {
+    playerId: number;
+    leagueId: string;
+    teamId: string;
+    transactionType: 'add' | 'drop';
+    source: string;
+    playerName: string;
+    playerTeam: string;
+    playerPosition: string;
+  }): Promise<void> {
+    try {
+      await supabase.rpc('record_player_transaction', {
+        p_player_id: params.playerId,
+        p_league_id: params.leagueId,
+        p_team_id: params.teamId,
+        p_transaction_type: params.transactionType,
+        p_source: params.source,
+        p_player_name: params.playerName,
+        p_player_team: params.playerTeam,
+        p_player_position: params.playerPosition,
+      });
+    } catch (err) {
+      logger.error('[PlayerService] recordPlayerTransaction error:', err);
+    }
+  },
+
+  /**
+   * Count roster assignments for a given team+league.
+   * Used as fallback when no lineup data exists.
+   */
+  async getRosterAssignmentCount(teamId: string, leagueId: string): Promise<{ count: number | null; error: string | null }> {
+    try {
+      const { count, error } = await (supabase as unknown as PipelineDb)
+        .from('roster_assignments')
+        .select('id', { count: 'exact', head: true } as Record<string, unknown>)
+        .eq('team_id', teamId)
+        .eq('league_id', leagueId) as unknown as { count: number | null; error: { message: string } | null };
+      return { count, error: error?.message || null };
+    } catch (err) {
+      logger.error('[PlayerService] getRosterAssignmentCount error:', err);
+      return { count: null, error: String(err) };
+    }
+  },
 };

@@ -30,13 +30,16 @@ from typing import Dict, List, Optional, Any, Tuple
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from collections import defaultdict
 import statistics
+import logging
+
+logger = logging.getLogger(__name__)
 
 _shutdown_requested = False
 
 def _handle_shutdown(signum, frame):
     global _shutdown_requested
     _shutdown_requested = True
-    print(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
+    logger.info(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
 
 signal.signal(signal.SIGINT, _handle_shutdown)
 signal.signal(signal.SIGTERM, _handle_shutdown)
@@ -117,7 +120,7 @@ def fetch_remaining_schedule(db: SupabaseRest, season: int) -> List[Dict]:
     all_games = []
     offset = 0
     
-    print(f"  Fetching schedule from {today} onwards...")
+    logger.info(f"  Fetching schedule from {today} onwards...")
     
     while True:
         # Note: game_start_time may not exist in all schemas
@@ -142,7 +145,7 @@ def fetch_remaining_schedule(db: SupabaseRest, season: int) -> List[Dict]:
         if len(games) < FETCH_BATCH_SIZE:
             break
     
-    print(f"  Found {len(all_games)} remaining games")
+    logger.info(f"  Found {len(all_games)} remaining games")
     return all_games
 
 
@@ -155,7 +158,7 @@ def fetch_all_players(db: SupabaseRest, season: int) -> List[Dict]:
     all_players = []
     offset = 0
     
-    print(f"  Fetching all players for season {season}...")
+    logger.info(f"  Fetching all players for season {season}...")
     
     while True:
         players = db.select(
@@ -175,7 +178,7 @@ def fetch_all_players(db: SupabaseRest, season: int) -> List[Dict]:
         if len(players) < FETCH_BATCH_SIZE:
             break
     
-    print(f"  Found {len(all_players)} players")
+    logger.info(f"  Found {len(all_players)} players")
     return all_players
 
 
@@ -188,7 +191,7 @@ def fetch_player_stats(db: SupabaseRest, season: int) -> Dict[int, Dict]:
     all_stats = {}
     offset = 0
     
-    print(f"  Fetching player stats...")
+    logger.info(f"  Fetching player stats...")
     
     while True:
         # Use official NHL.com column names from player_season_stats table
@@ -211,7 +214,7 @@ def fetch_player_stats(db: SupabaseRest, season: int) -> Dict[int, Dict]:
         if len(stats) < FETCH_BATCH_SIZE:
             break
     
-    print(f"  Loaded stats for {len(all_stats)} players")
+    logger.info(f"  Loaded stats for {len(all_stats)} players")
     return all_stats
 
 
@@ -224,7 +227,7 @@ def fetch_team_defense_stats(db: SupabaseRest, season: int) -> Dict[str, Dict]:
     
     Returns: {team_abbrev: defense_stats}
     """
-    print(f"  Fetching team defense stats...")
+    logger.info(f"  Fetching team defense stats...")
     
     try:
         # First try team_stats table (columns are already averages)
@@ -245,14 +248,14 @@ def fetch_team_defense_stats(db: SupabaseRest, season: int) -> Dict[str, Dict]:
                     "xg_against_avg": 2.8,  # Not available in table, use default
                     "games_played": gp
                 }
-            print(f"  ✅ Loaded defense stats for {len(team_stats)} teams")
+            logger.info(f"  ✅ Loaded defense stats for {len(team_stats)} teams")
             return team_stats
     except Exception as e:
-        print(f"  Warning: team_stats table not available: {e}")
+        logger.warning(f"  Warning: team_stats table not available: {e}")
     
     # Fallback: Use default league-average values for all teams
     # This means matchup difficulty will be neutral (1.0) for all matchups
-    print("  Using default defense stats (neutral matchup difficulty)")
+    logger.info("  Using default defense stats (neutral matchup difficulty)")
     
     # Get list of teams from nhl_teams table
     try:
@@ -268,13 +271,13 @@ def fetch_team_defense_stats(db: SupabaseRest, season: int) -> Dict[str, Dict]:
                     "games_played": 41  # Half season
                 }
         if team_stats:
-            print(f"  Created default stats for {len(team_stats)} teams")
+            logger.info(f"  Created default stats for {len(team_stats)} teams")
             return team_stats
     except Exception:
         pass
     
     # Final fallback: hardcoded team list
-    print("  Using hardcoded team list with defaults")
+    logger.info("  Using hardcoded team list with defaults")
     team_abbrevs = list(TEAM_ABBREV_MAP.values())
     return {abbrev: {
         "goals_against_avg": 3.0,
@@ -290,7 +293,7 @@ def fetch_injury_report(db: SupabaseRest) -> Dict[int, str]:
     
     Returns: {player_id: injury_status}
     """
-    print(f"  Fetching injury report...")
+    logger.info(f"  Fetching injury report...")
     
     try:
         injuries = db.select(
@@ -304,11 +307,11 @@ def fetch_injury_report(db: SupabaseRest) -> Dict[int, str]:
             for inj in injuries:
                 injury_map[inj["player_id"]] = inj.get("status", "healthy")
         
-        print(f"  Found {len(injury_map)} injury records")
+        logger.info(f"  Found {len(injury_map)} injury records")
         return injury_map
     except Exception as e:
-        print(f"  Warning: Could not fetch injuries: {e}")
-        print(f"  Assuming all players healthy")
+        logger.warning(f"  Warning: Could not fetch injuries: {e}")
+        logger.info(f"  Assuming all players healthy")
         return {}
 
 
@@ -498,7 +501,7 @@ def bulk_upsert_projections(db: SupabaseRest, projections: List[Dict]) -> int:
         # Progress tracking every 10 batches
         if batch_num % 10 == 0 or batch_num == total_batches:
             progress_pct = (batch_num / total_batches) * 100
-            print(f"  [{progress_pct:.0f}%] Batch {batch_num}/{total_batches} | {total_upserted} upserted")
+            logger.info(f"  [{progress_pct:.0f}%] Batch {batch_num}/{total_batches} | {total_upserted} upserted")
         
         try:
             db.upsert(
@@ -508,7 +511,7 @@ def bulk_upsert_projections(db: SupabaseRest, projections: List[Dict]) -> int:
             )
             total_upserted += len(filtered_batch)
         except Exception as e:
-            print(f"  ❌ Batch {batch_num} failed: {e}")
+            logger.error(f"  ❌ Batch {batch_num} failed: {e}")
             # Try individual upserts for failed batch
             for proj in filtered_batch:
                 try:
@@ -624,7 +627,7 @@ def bulk_upsert_ros(db: SupabaseRest, ros_projections: List[Dict]) -> int:
         
         # Progress tracking
         progress_pct = (batch_num / total_batches) * 100
-        print(f"  [{progress_pct:.0f}%] ROS Batch {batch_num}/{total_batches} | {total} upserted")
+        logger.info(f"  [{progress_pct:.0f}%] ROS Batch {batch_num}/{total_batches} | {total} upserted")
         
         try:
             db.upsert(
@@ -634,7 +637,7 @@ def bulk_upsert_ros(db: SupabaseRest, ros_projections: List[Dict]) -> int:
             )
             total += len(normalized_batch)
         except Exception as e:
-            print(f"  ❌ ROS Batch {batch_num} failed: {e}")
+            logger.error(f"  ❌ ROS Batch {batch_num} failed: {e}")
     
     return total
 
@@ -709,7 +712,7 @@ def upsert_matchup_difficulty(db: SupabaseRest, team_defense: Dict[str, Dict], s
             )
             total += len(batch)
         except Exception as e:
-            print(f"  Warning: Error upserting matchup difficulty: {e}")
+            logger.error(f"  Warning: Error upserting matchup difficulty: {e}")
     
     return total
 
@@ -727,22 +730,22 @@ def main():
     
     start_time = time.time()
     
-    print("=" * 80)
-    print("CITRUS NIGHTLY PROJECTION BATCH")
-    print("Yahoo/Sleeper-Grade Projection System")
-    print("=" * 80)
-    print(f"Season: {args.season}")
-    print(f"Workers: {args.workers}")
-    print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print()
+    logger.info("=" * 80)
+    logger.info("CITRUS NIGHTLY PROJECTION BATCH")
+    logger.info("Yahoo/Sleeper-Grade Projection System")
+    logger.info("=" * 80)
+    logger.info(f"Season: {args.season}")
+    logger.info(f"Workers: {args.workers}")
+    logger.info(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info("")
     
     db = get_db()
     
     # ========================================================================
     # PHASE 1: DATA LOADING
     # ========================================================================
-    print("PHASE 1: Loading Data")
-    print("-" * 40)
+    logger.info("PHASE 1: Loading Data")
+    logger.info("-" * 40)
     
     phase1_start = time.time()
     
@@ -754,32 +757,32 @@ def main():
     scoring_settings = fetch_scoring_settings(db)
     
     phase1_elapsed = time.time() - phase1_start
-    print(f"  Phase 1 complete in {phase1_elapsed:.1f}s")
-    print()
+    logger.info(f"  Phase 1 complete in {phase1_elapsed:.1f}s")
+    logger.info("")
     
     if not schedule:
-        print("No remaining games found. Exiting.")
+        logger.info("No remaining games found. Exiting.")
         return
     
     # ========================================================================
     # PHASE 2: MATCHUP DIFFICULTY
     # ========================================================================
-    print("PHASE 2: Calculating Matchup Difficulty")
-    print("-" * 40)
+    logger.info("PHASE 2: Calculating Matchup Difficulty")
+    logger.info("-" * 40)
     
     phase2_start = time.time()
     matchup_ratings = calculate_matchup_difficulty(team_defense)
     phase2_elapsed = time.time() - phase2_start
     
-    print(f"  Calculated {len(matchup_ratings)} matchup ratings")
-    print(f"  Phase 2 complete in {phase2_elapsed:.1f}s")
-    print()
+    logger.info(f"  Calculated {len(matchup_ratings)} matchup ratings")
+    logger.info(f"  Phase 2 complete in {phase2_elapsed:.1f}s")
+    logger.info("")
     
     # ========================================================================
     # PHASE 3: PROJECTION CALCULATION
     # ========================================================================
-    print("PHASE 3: Calculating Projections")
-    print("-" * 40)
+    logger.info("PHASE 3: Calculating Projections")
+    logger.info("-" * 40)
     
     phase3_start = time.time()
     
@@ -851,10 +854,10 @@ def main():
                 player_id, game_id, game_date, args.season, scoring_settings, game_info
             ))
     
-    print(f"  Created {len(worker_tasks)} projection tasks")
+    logger.info(f"  Created {len(worker_tasks)} projection tasks")
     
     # Check for existing projections and skip them
-    print(f"  Checking for existing projections...")
+    logger.info(f"  Checking for existing projections...")
     existing_projections = set()
     offset = 0
     while True:
@@ -873,7 +876,7 @@ def main():
             break
         offset += 1000
     
-    print(f"  Found {len(existing_projections)} existing projections")
+    logger.info(f"  Found {len(existing_projections)} existing projections")
     
     # Filter out existing projections
     original_count = len(worker_tasks)
@@ -882,14 +885,14 @@ def main():
         if (task[0], task[1]) not in existing_projections
     ]
     skipped_count = original_count - len(worker_tasks)
-    print(f"  Filtered to {len(worker_tasks)} new projection tasks (skipped {skipped_count} existing)")
+    logger.info(f"  Filtered to {len(worker_tasks)} new projection tasks (skipped {skipped_count} existing)")
     
     if len(worker_tasks) == 0:
-        print(f"  ✅ All projections already exist! Nothing to calculate.")
-        print()
-        print("=" * 80)
-        print("BATCH COMPLETE - NO NEW PROJECTIONS NEEDED")
-        print("=" * 80)
+        logger.info(f"  ✅ All projections already exist! Nothing to calculate.")
+        logger.info("")
+        logger.info("=" * 80)
+        logger.info("BATCH COMPLETE - NO NEW PROJECTIONS NEEDED")
+        logger.info("=" * 80)
         return
     
     # Execute in parallel
@@ -899,8 +902,8 @@ def main():
     
     if len(worker_tasks) > 100:
         # Use multiprocessing for large batches
-        print(f"  Processing with {args.workers} workers...")
-        print(f"  Progress updates every 60 seconds...\n")
+        logger.info(f"  Processing with {args.workers} workers...")
+        logger.info(f"  Progress updates every 60 seconds...\n")
         
         with ProcessPoolExecutor(max_workers=args.workers) as executor:
             futures = {executor.submit(calculate_projection_worker, task): task for task in worker_tasks}
@@ -908,7 +911,7 @@ def main():
             for future in as_completed(futures):
                 if _shutdown_requested:
                     executor.shutdown(wait=False, cancel_futures=True)
-                    print(f"\n[SHUTDOWN] Graceful shutdown complete. Calculated {completed}/{len(worker_tasks)} projections.")
+                    logger.info(f"\n[SHUTDOWN] Graceful shutdown complete. Calculated {completed}/{len(worker_tasks)} projections.")
                     sys.exit(0)
 
                 try:
@@ -928,13 +931,13 @@ def main():
                     rate = completed / elapsed if elapsed > 0 else 0
                     eta_seconds = (len(worker_tasks) - completed) / rate if rate > 0 else 0
                     eta_minutes = eta_seconds / 60
-                    print(f"  ⏱️  [{int(elapsed)}s] {progress:.1f}% | {completed:,}/{len(worker_tasks):,} | Rate: {rate:.1f}/s | ETA: {eta_minutes:.1f} min")
+                    logger.info(f"  ⏱️  [{int(elapsed)}s] {progress:.1f}% | {completed:,}/{len(worker_tasks):,} | Rate: {rate:.1f}/s | ETA: {eta_minutes:.1f} min")
                     last_progress_time = current_time
     else:
         # Sequential for small batches
         for task in worker_tasks:
             if _shutdown_requested:
-                print(f"\n[SHUTDOWN] Graceful shutdown complete. Calculated {completed}/{len(worker_tasks)} projections.")
+                logger.info(f"\n[SHUTDOWN] Graceful shutdown complete. Calculated {completed}/{len(worker_tasks)} projections.")
                 sys.exit(0)
 
             result = calculate_projection_worker(task)
@@ -946,76 +949,77 @@ def main():
     
     # Final 100% progress update
     rate = len(worker_tasks) / phase3_elapsed if phase3_elapsed > 0 else 0
-    print(f"  ✅ [100.0%] {len(worker_tasks):,}/{len(worker_tasks):,} | Rate: {rate:.1f}/s | Complete!")
-    print(f"  Calculated {len(projections)} projections")
-    print(f"  Phase 3 complete in {phase3_elapsed:.1f}s")
-    print()
+    logger.info(f"  ✅ [100.0%] {len(worker_tasks):,}/{len(worker_tasks):,} | Rate: {rate:.1f}/s | Complete!")
+    logger.info(f"  Calculated {len(projections)} projections")
+    logger.info(f"  Phase 3 complete in {phase3_elapsed:.1f}s")
+    logger.info("")
     
     if args.dry_run:
-        print("DRY RUN - Skipping database writes")
-        print(f"Would have written {len(projections)} projections")
+        logger.warning("DRY RUN - Skipping database writes")
+        logger.info(f"Would have written {len(projections)} projections")
         return
     
     # ========================================================================
     # PHASE 4: BULK UPSERT
     # ========================================================================
-    print("PHASE 4: Upserting Projections")
-    print("-" * 40)
+    logger.info("PHASE 4: Upserting Projections")
+    logger.info("-" * 40)
     
     phase4_start = time.time()
     upserted = bulk_upsert_projections(db, projections)
     phase4_elapsed = time.time() - phase4_start
     
-    print(f"  Upserted {upserted} projections")
-    print(f"  Phase 4 complete in {phase4_elapsed:.1f}s")
-    print()
+    logger.info(f"  Upserted {upserted} projections")
+    logger.info(f"  Phase 4 complete in {phase4_elapsed:.1f}s")
+    logger.info("")
     
     # ========================================================================
     # PHASE 5: ROS AGGREGATES
     # ========================================================================
-    print("PHASE 5: Calculating ROS Aggregates")
-    print("-" * 40)
+    logger.info("PHASE 5: Calculating ROS Aggregates")
+    logger.info("-" * 40)
     
     phase5_start = time.time()
     ros_projections = calculate_ros_aggregates(projections, players)
     ros_upserted = bulk_upsert_ros(db, ros_projections)
     phase5_elapsed = time.time() - phase5_start
     
-    print(f"  Calculated {len(ros_projections)} ROS projections")
-    print(f"  Upserted {ros_upserted} ROS records")
-    print(f"  Phase 5 complete in {phase5_elapsed:.1f}s")
-    print()
+    logger.info(f"  Calculated {len(ros_projections)} ROS projections")
+    logger.info(f"  Upserted {ros_upserted} ROS records")
+    logger.info(f"  Phase 5 complete in {phase5_elapsed:.1f}s")
+    logger.info("")
     
     # ========================================================================
     # PHASE 6: MATCHUP DIFFICULTY TABLE
     # ========================================================================
-    print("PHASE 6: Updating Matchup Difficulty Table")
-    print("-" * 40)
+    logger.info("PHASE 6: Updating Matchup Difficulty Table")
+    logger.info("-" * 40)
     
     phase6_start = time.time()
     matchup_upserted = upsert_matchup_difficulty(db, team_defense, args.season)
     phase6_elapsed = time.time() - phase6_start
     
-    print(f"  Upserted {matchup_upserted} matchup difficulty records")
-    print(f"  Phase 6 complete in {phase6_elapsed:.1f}s")
-    print()
+    logger.info(f"  Upserted {matchup_upserted} matchup difficulty records")
+    logger.info(f"  Phase 6 complete in {phase6_elapsed:.1f}s")
+    logger.info("")
     
     # ========================================================================
     # SUMMARY
     # ========================================================================
     total_elapsed = time.time() - start_time
     
-    print("=" * 80)
-    print("BATCH COMPLETE")
-    print("=" * 80)
-    print(f"Total Time: {total_elapsed:.1f}s ({total_elapsed/60:.1f} minutes)")
-    print(f"Projections: {upserted}")
-    print(f"ROS Aggregates: {ros_upserted}")
-    print(f"Matchup Ratings: {matchup_upserted}")
-    print(f"Rate: {upserted / total_elapsed:.1f} projections/second")
-    print("=" * 80)
+    logger.info("=" * 80)
+    logger.info("BATCH COMPLETE")
+    logger.info("=" * 80)
+    logger.info(f"Total Time: {total_elapsed:.1f}s ({total_elapsed/60:.1f} minutes)")
+    logger.info(f"Projections: {upserted}")
+    logger.info(f"ROS Aggregates: {ros_upserted}")
+    logger.info(f"Matchup Ratings: {matchup_upserted}")
+    logger.info(f"Rate: {upserted / total_elapsed:.1f} projections/second")
+    logger.info("=" * 80)
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     main()
 

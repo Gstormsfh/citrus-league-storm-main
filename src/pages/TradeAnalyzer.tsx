@@ -204,7 +204,7 @@ const TradeAnalyzer = () => {
     return () => {
       isMounted = false;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchData is inline with isMounted guard; service calls are stable module imports
   }, [user?.id, activeLeagueId, loadTradeOffers, toast]);
 
   const handleProposeTrade = async () => {

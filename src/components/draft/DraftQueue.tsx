@@ -195,7 +195,7 @@ export const DraftQueue = ({
         }
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time restore from localStorage on mount; toast is stable
   }, [leagueId]);
 
   // Save queue to localStorage whenever it changes

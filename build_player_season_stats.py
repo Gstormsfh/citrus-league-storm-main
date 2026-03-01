@@ -33,13 +33,16 @@ import datetime as dt
 from typing import Dict, List
 
 from supabase_rest import SupabaseRest
+import logging
+
+logger = logging.getLogger(__name__)
 
 _shutdown_requested = False
 
 def _handle_shutdown(signum, frame):
     global _shutdown_requested
     _shutdown_requested = True
-    print(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
+    logger.info(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
 
 signal.signal(signal.SIGINT, _handle_shutdown)
 signal.signal(signal.SIGTERM, _handle_shutdown)
@@ -75,7 +78,7 @@ def fetch_all_player_game_stats(db: SupabaseRest, season: int) -> List[dict]:
       break
     offset += page_size
     if offset % 5000 == 0:
-      print(f"[build_player_season_stats] Fetched {len(all_rows)} rows so far...")
+      logger.info(f"[build_player_season_stats] Fetched {len(all_rows)} rows so far...")
   return all_rows
 
 
@@ -94,7 +97,7 @@ def try_fetch_xg_totals(db: SupabaseRest, season: int) -> Dict[int, Dict[str, fl
     last_progress_time = time.time()
     use_talent_adjusted = False
     
-    print("[build_player_season_stats] Fetching xG/xA from raw_shots (with pagination)...")
+    logger.info("[build_player_season_stats] Fetching xG/xA from raw_shots (with pagination)...")
     
     # Try to determine which columns are available by testing first batch
     try:
@@ -121,7 +124,7 @@ def try_fetch_xg_totals(db: SupabaseRest, season: int) -> Dict[int, Dict[str, fl
       try:
         rows = db.select("raw_shots", select=select_cols, limit=batch_size, offset=offset)
       except Exception as e:
-        print(f"[build_player_season_stats] Warning: Could not fetch xG/xA batch at offset {offset}: {e}")
+        logger.warning(f"[build_player_season_stats] Warning: Could not fetch xG/xA batch at offset {offset}: {e}")
         break
       
       if not rows:
@@ -158,7 +161,7 @@ def try_fetch_xg_totals(db: SupabaseRest, season: int) -> Dict[int, Dict[str, fl
       # Progress every 15 seconds
       current_time = time.time()
       if current_time - last_progress_time >= 15:
-        print(f"  [PROGRESS] Scanned {shot_count:,} shots, enriched {len(out)} players...")
+        logger.info(f"  [PROGRESS] Scanned {shot_count:,} shots, enriched {len(out)} players...")
         last_progress_time = current_time
       
       # Check if we got fewer rows than batch_size (last page)
@@ -167,10 +170,10 @@ def try_fetch_xg_totals(db: SupabaseRest, season: int) -> Dict[int, Dict[str, fl
       
       offset += batch_size
     
-    print(f"[build_player_season_stats] Enriched xG/xA for {len(out)} players from {shot_count:,} shots")
+    logger.info(f"[build_player_season_stats] Enriched xG/xA for {len(out)} players from {shot_count:,} shots")
     return out
   except Exception as e:
-    print(f"[build_player_season_stats] Warning: Error enriching xG/xA: {e}")
+    logger.error(f"[build_player_season_stats] Warning: Error enriching xG/xA: {e}")
     import traceback
     traceback.print_exc()
     return {}
@@ -186,30 +189,30 @@ def upsert_player_season_stats(db: SupabaseRest, season_rows: List[dict]) -> Non
 
 def main() -> int:
   import time
-  print("=" * 80)
-  print("[build_player_season_stats] STARTING")
-  print("=" * 80)
-  print(f"Season: {DEFAULT_SEASON}")
-  print(f"Timestamp: {_now_iso()}")
-  print()
+  logger.info("=" * 80)
+  logger.info("[build_player_season_stats] STARTING")
+  logger.info("=" * 80)
+  logger.info(f"Season: {DEFAULT_SEASON}")
+  logger.info(f"Timestamp: {_now_iso()}")
+  logger.info("")
   
   try:
     db = supabase_client()
-    print("[build_player_season_stats] Connected to Supabase")
+    logger.info("[build_player_season_stats] Connected to Supabase")
   except Exception as e:
-    print(f"[build_player_season_stats] ERROR: Failed to connect to Supabase: {e}")
+    logger.error(f"[build_player_season_stats] ERROR: Failed to connect to Supabase: {e}")
     return 1
   
   season = DEFAULT_SEASON
 
-  print("[build_player_season_stats] Fetching player_game_stats...")
+  logger.info("[build_player_season_stats] Fetching player_game_stats...")
   rows = fetch_all_player_game_stats(db, season)
   if not rows:
-    print("[build_player_season_stats] No player_game_stats rows found.")
+    logger.info("[build_player_season_stats] No player_game_stats rows found.")
     return 0
   
-  print(f"[build_player_season_stats] Fetched {len(rows):,} player_game_stats rows")
-  print("[build_player_season_stats] Aggregating season stats...")
+  logger.info(f"[build_player_season_stats] Fetched {len(rows):,} player_game_stats rows")
+  logger.info("[build_player_season_stats] Aggregating season stats...")
 
   # Pure-Python rollup (no pandas) for Windows friendliness
   acc: Dict[tuple, dict] = {}
@@ -338,10 +341,10 @@ def main() -> int:
     # Progress every 15 seconds
     current_time = time.time()
     if current_time - last_progress_time >= 15:
-      print(f"  [PROGRESS] Processed {idx:,}/{len(rows):,} game stats rows ({len(acc)} unique players)...")
+      logger.info(f"  [PROGRESS] Processed {idx:,}/{len(rows):,} game stats rows ({len(acc)} unique players)...")
       last_progress_time = current_time
 
-  print(f"[build_player_season_stats] Aggregated stats for {len(acc)} unique players")
+  logger.info(f"[build_player_season_stats] Aggregated stats for {len(acc)} unique players")
   
   # Save pct (both PBP and NHL)
   for out in acc.values():
@@ -360,8 +363,8 @@ def main() -> int:
     out["nhl_gaa"] = (nhl_ga * 60.0 / nhl_toi_minutes) if nhl_toi_minutes > 0 else None
 
   # xG enrich (optional)
-  print()
-  print("[build_player_season_stats] Enriching with xG/xA from raw_shots...")
+  logger.info("")
+  logger.info("[build_player_season_stats] Enriching with xG/xA from raw_shots...")
   xg = try_fetch_xg_totals(db, season)
   if xg:
     enriched_count = 0
@@ -371,13 +374,13 @@ def main() -> int:
         out["x_goals"] = float(xg[pid].get("x_goals", 0.0))
         out["x_assists"] = float(xg[pid].get("x_assists", 0.0))
         enriched_count += 1
-    print(f"[build_player_season_stats] Enriched xG/xA for {enriched_count} players")
+    logger.info(f"[build_player_season_stats] Enriched xG/xA for {enriched_count} players")
   else:
-    print("[build_player_season_stats] No xG/xA data available (will use 0.0)")
+    logger.info("[build_player_season_stats] No xG/xA data available (will use 0.0)")
 
   # Plus/minus computation (integrated)
-  print()
-  print("[build_player_season_stats] Computing plus/minus from shifts and goals...")
+  logger.info("")
+  logger.info("[build_player_season_stats] Computing plus/minus from shifts and goals...")
   try:
     from compute_player_season_plus_minus import compute_plus_minus
     pm = compute_plus_minus(season, db)
@@ -388,23 +391,23 @@ def main() -> int:
         if pid in pm:
           out["plus_minus"] = int(pm[pid])
           pm_count += 1
-      print(f"[build_player_season_stats] Computed plus/minus for {pm_count} players")
+      logger.info(f"[build_player_season_stats] Computed plus/minus for {pm_count} players")
     else:
-      print("[build_player_season_stats] No plus/minus computed (will use 0)")
+      logger.info("[build_player_season_stats] No plus/minus computed (will use 0)")
   except ImportError:
-    print("[build_player_season_stats] Warning: Could not import compute_plus_minus (plus/minus will remain 0)")
+    logger.warning("[build_player_season_stats] Warning: Could not import compute_plus_minus (plus/minus will remain 0)")
   except Exception as e:
-    print(f"[build_player_season_stats] Warning: Plus/minus computation failed: {e}")
+    logger.error(f"[build_player_season_stats] Warning: Plus/minus computation failed: {e}")
     import traceback
     traceback.print_exc()
 
   if _shutdown_requested:
-    print("[SHUTDOWN] Graceful shutdown complete.")
+    logger.info("[SHUTDOWN] Graceful shutdown complete.")
     sys.exit(0)
 
-  print()
-  print("[build_player_season_stats] Upserting to player_season_stats...")
-  print("[build_player_season_stats] Aggregating all nhl_* stats from per-game boxscore data")
+  logger.info("")
+  logger.info("[build_player_season_stats] Upserting to player_season_stats...")
+  logger.info("[build_player_season_stats] Aggregating all nhl_* stats from per-game boxscore data")
   season_rows = list(acc.values())
   
   # NOTE: nhl_hits, nhl_blocks are AGGREGATED from player_game_stats boxscore data
@@ -422,14 +425,15 @@ def main() -> int:
   
   upsert_player_season_stats(db, season_rows)
 
-  print()
-  print("=" * 80)
-  print(f"[build_player_season_stats] [OK] COMPLETE: upserted {len(season_rows)} player_season_stats rows for season {season}")
-  print("=" * 80)
+  logger.info("")
+  logger.info("=" * 80)
+  logger.info(f"[build_player_season_stats] [OK] COMPLETE: upserted {len(season_rows)} player_season_stats rows for season {season}")
+  logger.info("=" * 80)
   return 0
 
 
 if __name__ == "__main__":
+  logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
   raise SystemExit(main())
 
 

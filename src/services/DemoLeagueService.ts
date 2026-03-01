@@ -34,7 +34,57 @@ export const DEMO_LEAGUE_ID = '00000000-0000-0000-0000-000000000001';
 // This is the actual league that guests will see (read-only)
 export const DEMO_LEAGUE_ID_FOR_GUESTS = '750f4e1a-92ae-44cf-a798-2f3e06d0d5c9';
 
+/**
+ * Typed Supabase query helper for guest view queries.
+ * Eliminates `as any` casts when querying with string column names / values
+ * that are valid at runtime but not in the generated Supabase types.
+ */
+function typedFrom(table: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (supabase as any).from(table);
+}
+
 export const DemoLeagueService = {
+  /**
+   * Load the demo league row from the database.
+   * Used by guest views (OtherTeam, Standings, DraftRoom, etc.)
+   */
+  async getDemoLeague() {
+    const { data, error } = await typedFrom('leagues')
+      .select(COLUMNS.LEAGUE)
+      .eq('id', DEMO_LEAGUE_ID_FOR_GUESTS)
+      .maybeSingle();
+    if (error) logger.error('[DemoLeagueService] getDemoLeague error:', error);
+    return { data, error };
+  },
+
+  /**
+   * Load all teams in the demo league, ordered by creation date.
+   */
+  async getDemoTeams() {
+    const { data, error } = await typedFrom('teams')
+      .select(COLUMNS.TEAM)
+      .eq('league_id', DEMO_LEAGUE_ID_FOR_GUESTS)
+      .order('created_at', { ascending: true });
+    if (error) logger.error('[DemoLeagueService] getDemoTeams error:', error);
+    return { data: data || [], error };
+  },
+
+  /**
+   * Load draft picks for the demo league, optionally filtered by team.
+   */
+  async getDemoDraftPicks(teamId?: string) {
+    let query = typedFrom('draft_picks')
+      .select(teamId ? 'player_id' : COLUMNS.DRAFT_PICK)
+      .eq('league_id', DEMO_LEAGUE_ID_FOR_GUESTS)
+      .is('deleted_at', null);
+    if (teamId) {
+      query = query.eq('team_id', teamId);
+    }
+    const { data, error } = await query;
+    if (error) logger.error('[DemoLeagueService] getDemoDraftPicks error:', error);
+    return { data: data || [], error };
+  },
   /**
    * Get static demo roster for a team (fallback when DB fails)
    * Returns top 21 players by points for the demo team

@@ -21,13 +21,16 @@ from datetime import datetime, date
 from functools import partial
 from typing import Dict, List, Optional, Tuple, Any
 import statistics
+import logging
+
+logger = logging.getLogger(__name__)
 
 _shutdown_requested = False
 
 def _handle_shutdown(signum, frame):
     global _shutdown_requested
     _shutdown_requested = True
-    print(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
+    logger.info(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
 
 signal.signal(signal.SIGINT, _handle_shutdown)
 signal.signal(signal.SIGTERM, _handle_shutdown)
@@ -105,7 +108,7 @@ def get_rostered_players(db: SupabaseRest, target_date: date, season: int) -> Li
         game_map[away_team] = game_id
     
     # LEFT JOIN Pattern: Get ALL players on playing teams (not just rostered)
-    print(f"   Fetching players from {len(playing_teams)} teams...", flush=True)
+    logger.info(f"   Fetching players from {len(playing_teams)} teams...", flush=True)
     all_players = db.select(
         "player_directory",
         select="player_id,team_abbrev",
@@ -115,7 +118,7 @@ def get_rostered_players(db: SupabaseRest, target_date: date, season: int) -> Li
         ],
         limit=10000  # Large limit for all players
     )
-    print(f"   Found {len(all_players)} players", flush=True)
+    logger.info(f"   Found {len(all_players)} players", flush=True)
     
     if not all_players:
         return []
@@ -125,11 +128,11 @@ def get_rostered_players(db: SupabaseRest, target_date: date, season: int) -> Li
     active_players = []
     
     # Query player_season_stats in batches to check games_played > 0
-    print(f"   Checking active players ({len(player_ids)} total)...", flush=True)
+    logger.info(f"   Checking active players ({len(player_ids)} total)...", flush=True)
     for i in range(0, len(player_ids), 100):
         batch = player_ids[i:i+100]
         if i % 200 == 0:
-            print(f"   Checking batch {i//100 + 1}...", flush=True)
+            logger.info(f"   Checking batch {i//100 + 1}...", flush=True)
         stats_batch = db.select(
             "player_season_stats",
             select="player_id,games_played",
@@ -149,12 +152,12 @@ def get_rostered_players(db: SupabaseRest, target_date: date, season: int) -> Li
             pid = int(player.get("player_id", 0))
             if pid in batch and games_played_map.get(pid, 0) > 0:
                 active_players.append(player)
-    print(f"   Found {len(active_players)} active players", flush=True)
+    logger.info(f"   Found {len(active_players)} active players", flush=True)
     
     # LEFT JOIN with draft_picks to get league_id (if rostered)
     # Create map of player_id -> league_id from draft_picks
     # OPTIMIZATION: Only fetch picks for active players, not all picks
-    print(f"   Fetching draft picks for {len(active_players)} active players...", flush=True)
+    logger.info(f"   Fetching draft picks for {len(active_players)} active players...", flush=True)
     active_player_ids_list = [int(p.get("player_id", 0)) for p in active_players if p.get("player_id")]
     all_picks = db.select(
         "draft_picks",
@@ -162,7 +165,7 @@ def get_rostered_players(db: SupabaseRest, target_date: date, season: int) -> Li
         filters=[("player_id", "in", active_player_ids_list)] if active_player_ids_list else [],
         limit=10000
     )
-    print(f"   Found {len(all_picks)} draft picks", flush=True)
+    logger.info(f"   Found {len(all_picks)} draft picks", flush=True)
     
     player_to_league = {}
     for pick in all_picks:
@@ -239,7 +242,7 @@ def get_league_scoring_settings(db: SupabaseRest, league_id: str) -> Dict[str, A
             }
         }
     except Exception as e:
-        print(f"⚠️  Warning: Could not fetch scoring settings for league {league_id}: {e}")
+        logger.warning(f"⚠️  Warning: Could not fetch scoring settings for league {league_id}: {e}")
         # Return defaults
         return {
             "skater": {
@@ -585,7 +588,7 @@ def save_rejected_projections_log(
         
         return log_path
     except Exception as e:
-        print(f"⚠️  Warning: Could not save rejected projections log: {e}")
+        logger.warning(f"⚠️  Warning: Could not save rejected projections log: {e}")
         return ""
 
 
@@ -636,7 +639,7 @@ def batch_upsert_projections(db: SupabaseRest, projections: List[Dict[str, Any]]
             )
             total_upserted += len(filtered_batch)
         except Exception as e:
-            print(f"⚠️  Error upserting batch {i//batch_size + 1}: {e}")
+            logger.error(f"⚠️  Error upserting batch {i//batch_size + 1}: {e}")
             # Try individual upserts for this batch
             for proj in filtered_batch:
                 try:
@@ -647,7 +650,7 @@ def batch_upsert_projections(db: SupabaseRest, projections: List[Dict[str, Any]]
                     )
                     total_upserted += 1
                 except Exception as err:
-                    print(f"⚠️  Error upserting player {proj.get('player_id')}, game {proj.get('game_id')}: {err}")
+                    logger.error(f"⚠️  Error upserting player {proj.get('player_id')}, game {proj.get('game_id')}: {err}")
     
     return total_upserted
 
@@ -663,10 +666,10 @@ def populate_gp_last_10_metric(db: SupabaseRest, season: int) -> int:
         from populate_gp_last_10_metric import populate_gp_last_10_for_all_players
         return populate_gp_last_10_for_all_players(db, season)
     except ImportError:
-        print("⚠️  Warning: populate_gp_last_10_metric.py not found, skipping GP_Last_10 calculation")
+        logger.warning("⚠️  Warning: populate_gp_last_10_metric.py not found, skipping GP_Last_10 calculation")
         return 0
     except Exception as e:
-        print(f"⚠️  Warning: Error calculating GP_Last_10: {e}")
+        logger.error(f"⚠️  Warning: Error calculating GP_Last_10: {e}")
         return 0
 
 
@@ -733,7 +736,7 @@ def main():
         try:
             target_date = datetime.strptime(args.date, "%Y-%m-%d").date()
         except ValueError:
-            print(f"❌ Invalid date format: {args.date}. Use YYYY-MM-DD")
+            logger.error(f"❌ Invalid date format: {args.date}. Use YYYY-MM-DD")
             sys.exit(1)
     else:
         target_date = date.today()
@@ -746,52 +749,52 @@ def main():
         cpu_count = multiprocessing.cpu_count()
         max_workers = max(4, min(cpu_count * 2, 16))
     
-    print("=" * 80)
-    print("CITRUS PROJECTIONS 3.0 - BATCH DAILY PROJECTIONS")
-    print("=" * 80)
-    print(f"Target Date: {target_date}")
-    print(f"Season: {args.season}")
-    print(f"Workers: {max_workers}")
-    print(f"Chunksize: {args.chunksize}")
-    print()
+    logger.info("=" * 80)
+    logger.info("CITRUS PROJECTIONS 3.0 - BATCH DAILY PROJECTIONS")
+    logger.info("=" * 80)
+    logger.info(f"Target Date: {target_date}")
+    logger.info(f"Season: {args.season}")
+    logger.info(f"Workers: {max_workers}")
+    logger.info(f"Chunksize: {args.chunksize}")
+    logger.info("")
     
     # Initialize database connection (main process)
     db = supabase_client()
     
     # Step 0: Pre-calculate GP_Last_10 metric for "Likely-to-Play" filtering
-    print("📋 Step 0: Pre-calculating GP_Last_10 metric...")
+    logger.info("📋 Step 0: Pre-calculating GP_Last_10 metric...")
     gp_updated = populate_gp_last_10_metric(db, args.season)
     if gp_updated > 0:
-        print(f"   ✅ Updated GP_Last_10 for {gp_updated} players")
-    print()
+        logger.info(f"   ✅ Updated GP_Last_10 for {gp_updated} players")
+    logger.info("")
     
     # Step 1: Get rostered players
-    print("📋 Step 1: Fetching rostered players...")
-    print("   (This may take a moment...)")
+    logger.info("📋 Step 1: Fetching rostered players...")
+    logger.info("   (This may take a moment...)")
     sys.stdout.flush()
     rostered_players = get_rostered_players(db, target_date, args.season)
     
     if not rostered_players:
-        print(f"⚠️  No rostered players found with games on {target_date}")
+        logger.warning(f"⚠️  No rostered players found with games on {target_date}")
         return
     
-    print(f"   Found {len(rostered_players)} player-game combinations")
-    print()
+    logger.info(f"   Found {len(rostered_players)} player-game combinations")
+    logger.info("")
     sys.stdout.flush()
     
     # Step 2: Group by league to get scoring settings
-    print("📋 Step 2: Loading league scoring settings...")
+    logger.info("📋 Step 2: Loading league scoring settings...")
     league_scoring = {}
     unique_leagues = set(league_id for _, _, league_id in rostered_players if league_id is not None)
 
     for league_id in unique_leagues:
         league_scoring[league_id] = get_league_scoring_settings(db, league_id)
     
-    print(f"   Loaded scoring settings for {len(unique_leagues)} leagues")
-    print()
+    logger.info(f"   Loaded scoring settings for {len(unique_leagues)} leagues")
+    logger.info("")
     
     # Step 3: Check existing projections and skip them
-    print("📋 Step 3: Checking existing projections...")
+    logger.info("📋 Step 3: Checking existing projections...")
     existing_projections = set()
     offset = 0
     while True:
@@ -809,10 +812,10 @@ def main():
         if len(batch) < 1000:
             break
         offset += 1000
-    print(f"   Found {len(existing_projections)} existing projections", flush=True)
+    logger.info(f"   Found {len(existing_projections)} existing projections", flush=True)
     
     # Step 4: Prepare worker arguments (skip existing)
-    print("📋 Step 4: Preparing worker tasks...")
+    logger.info("📋 Step 4: Preparing worker tasks...")
     worker_args = []
     skipped = 0
     for player_id, game_id, league_id in rostered_players:
@@ -833,22 +836,22 @@ def main():
             }
         worker_args.append((player_id, game_id, target_date, args.season, scoring_settings))
     
-    print(f"   Prepared {len(worker_args)} calculation tasks (skipped {skipped} existing)", flush=True)
-    print()
+    logger.info(f"   Prepared {len(worker_args)} calculation tasks (skipped {skipped} existing)", flush=True)
+    logger.info("")
     
     if len(worker_args) == 0:
-        print("✅ All projections already exist! Nothing to calculate.")
+        logger.info("✅ All projections already exist! Nothing to calculate.")
         return
     
     # Step 5: Process in parallel or single-threaded
-    print("📋 Step 4: Calculating projections...")
+    logger.info("📋 Step 4: Calculating projections...")
     start_time = time.time()
     results = []
     
     # OPTIMIZATION: Use single-threaded mode for small batches to avoid Windows multiprocessing issues
     if len(worker_args) < 100:
-        print(f"   Small batch detected ({len(worker_args)} players) - using single-threaded mode")
-        print("   (This avoids Windows multiprocessing overhead for small jobs)")
+        logger.info(f"   Small batch detected ({len(worker_args)} players) - using single-threaded mode")
+        logger.info("   (This avoids Windows multiprocessing overhead for small jobs)")
         sys.stdout.flush()
         try:
             last_progress_time = time.time()
@@ -856,7 +859,7 @@ def main():
             
             for idx, worker_task in enumerate(worker_args, 1):
                 if _shutdown_requested:
-                    print(f"\n[SHUTDOWN] Graceful shutdown complete. Processed {idx - 1}/{len(worker_args)} projections.")
+                    logger.info(f"\n[SHUTDOWN] Graceful shutdown complete. Processed {idx - 1}/{len(worker_args)} projections.")
                     sys.exit(0)
 
                 player_id, game_id, _, _, _ = worker_task
@@ -868,7 +871,7 @@ def main():
                     rate = idx / elapsed if elapsed > 0 else 0
                     remaining = (len(worker_args) - idx) / rate if rate > 0 else 0
                     pct = (idx / len(worker_args)) * 100
-                    print(f"   [{elapsed:.0f}s] {pct:5.1f}% | {idx}/{len(worker_args)} players | Rate: {rate:.1f}/s | ETA: {remaining:.0f}s", flush=True)
+                    logger.info(f"   [{elapsed:.0f}s] {pct:5.1f}% | {idx}/{len(worker_args)} players | Rate: {rate:.1f}/s | ETA: {remaining:.0f}s", flush=True)
                     last_progress_time = current_time
 
                 result = calculate_player_projection_worker(worker_task)
@@ -877,15 +880,15 @@ def main():
                 # Add error handling per player to continue on failures
                 if not result.get('success'):
                     if idx <= 10:  # Show first 10 errors
-                        print(f"      ⚠️  Player {result.get('player_id')} failed: {result.get('error', 'Unknown')[:100]}", flush=True)
+                        logger.error(f"      ⚠️  Player {result.get('player_id')} failed: {result.get('error', 'Unknown')[:100]}", flush=True)
         except Exception as e:
-            print(f"❌ Fatal error in single-threaded processing: {e}")
+            logger.error(f"❌ Fatal error in single-threaded processing: {e}")
             import traceback
             traceback.print_exc()
             sys.exit(1)
     else:
-        print(f"   Large batch detected ({len(worker_args)} players) - using multiprocessing ({max_workers} workers)")
-        print(f"   Progress will be shown every 10 seconds...")
+        logger.info(f"   Large batch detected ({len(worker_args)} players) - using multiprocessing ({max_workers} workers)")
+        logger.info(f"   Progress will be shown every 10 seconds...")
         sys.stdout.flush()
         try:
             # Use imap_unordered for progress tracking
@@ -903,7 +906,7 @@ def main():
                 ):
                     if _shutdown_requested:
                         pool.terminate()
-                        print(f"\n[SHUTDOWN] Graceful shutdown complete. Processed {completed}/{len(worker_args)} projections.")
+                        logger.info(f"\n[SHUTDOWN] Graceful shutdown complete. Processed {completed}/{len(worker_args)} projections.")
                         sys.exit(0)
 
                     results.append(result)
@@ -916,38 +919,38 @@ def main():
                         rate = completed / elapsed if elapsed > 0 else 0
                         remaining = (len(worker_args) - completed) / rate if rate > 0 else 0
                         pct = (completed / len(worker_args)) * 100
-                        print(f"   [{elapsed:.0f}s] {pct:5.1f}% | {completed}/{len(worker_args)} players | Rate: {rate:.1f}/s | ETA: {remaining:.0f}s", flush=True)
+                        logger.info(f"   [{elapsed:.0f}s] {pct:5.1f}% | {completed}/{len(worker_args)} players | Rate: {rate:.1f}/s | ETA: {remaining:.0f}s", flush=True)
                         last_progress_time = current_time
                 
                 # Final progress update
                 elapsed = time.time() - start_time
-                print(f"   [{elapsed:.0f}s] 100.0% | {len(worker_args)}/{len(worker_args)} players | Complete!", flush=True)
+                logger.info(f"   [{elapsed:.0f}s] 100.0% | {len(worker_args)}/{len(worker_args)} players | Complete!", flush=True)
         except Exception as e:
-            print(f"❌ Fatal error in parallel processing: {e}")
+            logger.error(f"❌ Fatal error in parallel processing: {e}")
             import traceback
             traceback.print_exc()
             sys.exit(1)
     
     elapsed_time = time.time() - start_time
-    print(f"   Completed in {elapsed_time:.2f} seconds")
-    print()
+    logger.info(f"   Completed in {elapsed_time:.2f} seconds")
+    logger.info("")
     
     # Step 5: Separate successes and failures
     successes = [r for r in results if r.get('success')]
     failures = [r for r in results if not r.get('success')]
     projections = [r['projection'] for r in successes if 'projection' in r]
     
-    print(f"✅ Successful: {len(successes)}")
-    print(f"❌ Failed: {len(failures)}")
-    print()
+    logger.info(f"✅ Successful: {len(successes)}")
+    logger.error(f"❌ Failed: {len(failures)}")
+    logger.info("")
     
     if failures:
-        print("⚠️  Failed calculations (first 10):")
+        logger.error("⚠️  Failed calculations (first 10):")
         for fail in failures[:10]:
-            print(f"   Player {fail.get('player_id')}, Game {fail.get('game_id')}: {fail.get('error', 'Unknown error')}")
+            logger.error(f"   Player {fail.get('player_id')}, Game {fail.get('game_id')}: {fail.get('error', 'Unknown error')}")
         if len(failures) > 10:
-            print(f"   ... and {len(failures) - 10} more")
-        print()
+            logger.info(f"   ... and {len(failures) - 10} more")
+        logger.info("")
     
     # Step 6: Quality Gate - Outlier Detection
     valid_projections = projections
@@ -956,7 +959,7 @@ def main():
     stats = {}
     
     if not args.skip_outlier_detection and projections:
-        print("📋 Step 6: Quality Gate - Outlier Detection...")
+        logger.info("📋 Step 6: Quality Gate - Outlier Detection...")
         rejected, review, valid, stats = detect_outliers(
             projections,
             threshold=args.threshold,
@@ -968,35 +971,33 @@ def main():
         review_projections = review
         valid_projections = valid
         
-        print(f"   Total Projections: {stats.get('total_projections', 0)}")
-        print(f"   Mean Points: {stats.get('mean_points', 0):.3f}")
-        print(f"   Std Dev: {stats.get('stdev_points', 0):.3f}")
-        print(f"   Max Points: {stats.get('max_points', 0):.3f}")
-        print(f"   Min Points: {stats.get('min_points', 0):.3f}")
-        print()
-        print(f"   ✅ Valid: {stats.get('valid', 0)}")
-        print(f"   ⚠️  Review Needed: {stats.get('review', 0)}")
-        print(f"   ❌ Rejected: {stats.get('rejected', 0)}")
-        print()
+        logger.info(f"   Total Projections: {stats.get('total_projections', 0)}")
+        logger.info(f"   Mean Points: {stats.get('mean_points', 0):.3f}")
+        logger.info(f"   Std Dev: {stats.get('stdev_points', 0):.3f}")
+        logger.info(f"   Max Points: {stats.get('max_points', 0):.3f}")
+        logger.info(f"   Min Points: {stats.get('min_points', 0):.3f}")
+        logger.info("")
+        logger.info(f"   ✅ Valid: {stats.get('valid', 0)}")
+        logger.warning(f"   ⚠️  Review Needed: {stats.get('review', 0)}")
+        logger.error(f"   ❌ Rejected: {stats.get('rejected', 0)}")
+        logger.info("")
         
         if rejected_projections:
-            print("❌ REJECTED PROJECTIONS (Impossible - > {:.1f} pts):".format(args.rejection_threshold))
-            print("-" * 80)
+            logger.error("❌ REJECTED PROJECTIONS (Impossible - > {:.1f} pts):".format(args.rejection_threshold))
+            logger.info("-" * 80)
             for rejected in rejected_projections[:10]:  # Show first 10
                 reason = rejected.get('rejection_reason', 'unknown')
                 outlier_reason = rejected.get('outlier_reason', 'unknown')
                 z_score = rejected.get('z_score', 'N/A')
-                print(f"   Player {rejected.get('player_id')}, Game {rejected.get('game_id')}: "
-                      f"{rejected.get('total_projected_points', 0):.3f} pts "
-                      f"(Reason: {reason}, Outlier: {outlier_reason}, Z-score: {z_score})")
+                logger.info(f"   Player {rejected.get('player_id')}, Game {rejected.get('game_id')}: " f"{rejected.get('total_projected_points', 0):.3f} pts " f"(Reason: {reason}, Outlier: {outlier_reason}, Z-score: {z_score})")
             if len(rejected_projections) > 10:
-                print(f"   ... and {len(rejected_projections) - 10} more rejected")
-            print("-" * 80)
-            print()
+                logger.info(f"   ... and {len(rejected_projections) - 10} more rejected")
+            logger.info("-" * 80)
+            logger.info("")
             
             # Generate traceability logs for rejected projections
             if args.reject_outliers:
-                print("📋 Generating traceability logs for rejected projections...")
+                logger.info("📋 Generating traceability logs for rejected projections...")
                 rejected_logs = []
                 for rejected in rejected_projections:
                     # Get scoring settings (use default for traceability - main goal is debugging)
@@ -1012,24 +1013,20 @@ def main():
                 # Save to log file (use traceability logs, not raw projections)
                 rejected_log_path = save_rejected_projections_log(rejected_logs, target_date)
                 if rejected_log_path:
-                    print(f"   ✅ Saved traceability log to: {rejected_log_path}")
-                print()
+                    logger.info(f"   ✅ Saved traceability log to: {rejected_log_path}")
+                logger.info("")
         
         if review_projections:
-            print("⚠️  REVIEW PROJECTIONS (Unusually High - {:.1f} to {:.1f} pts):".format(
-                args.threshold, args.rejection_threshold
-            ))
-            print("-" * 80)
+            logger.warning("⚠️  REVIEW PROJECTIONS (Unusually High - {:.1f} to {:.1f} pts):".format( args.threshold, args.rejection_threshold ))
+            logger.info("-" * 80)
             for review in review_projections[:10]:  # Show first 10
                 reason = review.get('outlier_reason', 'unknown')
                 z_score = review.get('z_score', 'N/A')
-                print(f"   Player {review.get('player_id')}, Game {review.get('game_id')}: "
-                      f"{review.get('total_projected_points', 0):.3f} pts "
-                      f"(Reason: {reason}, Z-score: {z_score})")
+                logger.info(f"   Player {review.get('player_id')}, Game {review.get('game_id')}: " f"{review.get('total_projected_points', 0):.3f} pts " f"(Reason: {reason}, Z-score: {z_score})")
             if len(review_projections) > 10:
-                print(f"   ... and {len(review_projections) - 10} more for review")
-            print("-" * 80)
-            print()
+                logger.info(f"   ... and {len(review_projections) - 10} more for review")
+            logger.info("-" * 80)
+            logger.info("")
     
     # Step 7: Batch Upsert (only valid projections if reject_outliers is enabled)
     projections_to_upsert = valid_projections
@@ -1044,34 +1041,35 @@ def main():
         projections_to_upsert = projections
     
     if projections_to_upsert:
-        print("📋 Step 7: Batch Upserting to Database...")
+        logger.info("📋 Step 7: Batch Upserting to Database...")
         if args.reject_outliers and rejected_projections:
-            print(f"   ⚠️  Skipping {len(rejected_projections)} rejected projections")
+            logger.warning(f"   ⚠️  Skipping {len(rejected_projections)} rejected projections")
         
-        print(f"   Upserting {len(projections_to_upsert)} projections in batches...", flush=True)
+        logger.info(f"   Upserting {len(projections_to_upsert)} projections in batches...", flush=True)
         upsert_start = time.time()
         upserted = batch_upsert_projections(db, projections_to_upsert)
         upsert_elapsed = time.time() - upsert_start
-        print(f"   ✓ Upserted {upserted} projections to player_projected_stats in {upsert_elapsed:.1f}s")
-        print()
+        logger.info(f"   ✓ Upserted {upserted} projections to player_projected_stats in {upsert_elapsed:.1f}s")
+        logger.info("")
     
     # Final Summary
-    print("=" * 80)
-    print("BATCH PROCESSING COMPLETE")
-    print("=" * 80)
-    print(f"Total Time: {elapsed_time:.2f} seconds")
-    print(f"Players Processed: {len(rostered_players)}")
-    print(f"Successful: {len(successes)}")
-    print(f"Failed: {len(failures)}")
+    logger.info("=" * 80)
+    logger.info("BATCH PROCESSING COMPLETE")
+    logger.info("=" * 80)
+    logger.info(f"Total Time: {elapsed_time:.2f} seconds")
+    logger.info(f"Players Processed: {len(rostered_players)}")
+    logger.info(f"Successful: {len(successes)}")
+    logger.error(f"Failed: {len(failures)}")
     if not args.skip_outlier_detection and projections:
-        print(f"✅ Valid: {len(valid_projections)}")
-        print(f"⚠️  Manual Review Needed: {len(review_projections)}")
-        print(f"❌ Rejected: {len(rejected_projections)}")
-    print(f"Projections Upserted: {len(projections_to_upsert)}")
+        logger.info(f"✅ Valid: {len(valid_projections)}")
+        logger.warning(f"⚠️  Manual Review Needed: {len(review_projections)}")
+        logger.error(f"❌ Rejected: {len(rejected_projections)}")
+    logger.info(f"Projections Upserted: {len(projections_to_upsert)}")
     if args.reject_outliers and rejected_projections and rejected_log_path:
-        print(f"📄 Rejected projections log: {rejected_log_path}")
-    print("=" * 80)
+        logger.info(f"📄 Rejected projections log: {rejected_log_path}")
+    logger.info("=" * 80)
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     main()

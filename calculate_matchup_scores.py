@@ -23,13 +23,16 @@ from decimal import Decimal
 
 from dotenv import load_dotenv
 from supabase_rest import SupabaseRest
+import logging
+
+logger = logging.getLogger(__name__)
 
 _shutdown_requested = False
 
 def _handle_shutdown(signum, frame):
     global _shutdown_requested
     _shutdown_requested = True
-    print(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
+    logger.info(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
 
 signal.signal(signal.SIGINT, _handle_shutdown)
 signal.signal(signal.SIGTERM, _handle_shutdown)
@@ -127,12 +130,12 @@ def load_league_scoring_settings(db: SupabaseRest, league_id: str) -> Dict[str, 
     except Exception as e:
         # If column doesn't exist yet, use defaults
         if "does not exist" in str(e) or "42703" in str(e):
-            print(f"[INFO] scoring_settings column not found, using defaults")
+            logger.info(f"[INFO] scoring_settings column not found, using defaults")
             return _get_default_scoring_settings()
         raise
     
     if not league or len(league) == 0:
-        print(f"[WARNING] League {league_id} not found, using defaults")
+        logger.warning(f"[WARNING] League {league_id} not found, using defaults")
         return _get_default_scoring_settings()
     
     settings = league[0].get("scoring_settings") or {}
@@ -244,7 +247,7 @@ def fetch_player_matchup_stats(
                     "games_played": _safe_int(row.get("goalie_gp", 0))  # For goalies
                 }
     except Exception as e:
-        print(f"[WARNING] RPC failed, aggregating manually: {e}")
+        logger.error(f"[WARNING] RPC failed, aggregating manually: {e}")
         # Fallback: aggregate manually from player_game_stats using official nhl_* columns
         for pid in player_ids:
             stats = db.select(
@@ -520,7 +523,7 @@ def get_team_starters(
             # Convert to integers (starters are stored as strings in JSONB array)
             return [_safe_int(sid) for sid in starters if sid]
     except Exception as e:
-        print(f"[WARNING] Could not fetch lineup for team {team_id}: {e}")
+        logger.warning(f"[WARNING] Could not fetch lineup for team {team_id}: {e}")
         # Return empty list - will default to all players as "active" (total_gr = active_gr)
     
     return []
@@ -546,7 +549,7 @@ def get_player_team_abbrev(
             if team:
                 return str(team)
     except Exception as e:
-        print(f"Warning: failed to look up team abbrev from player_directory for player {player_id}: {e}")
+        logger.error(f"Warning: failed to look up team abbrev from player_directory for player {player_id}: {e}")
 
     # Fallback: get most recent team from player_game_stats
     try:
@@ -563,7 +566,7 @@ def get_player_team_abbrev(
             if team:
                 return str(team)
     except Exception as e:
-        print(f"Warning: failed to look up team abbrev from player_game_stats for player {player_id}: {e}")
+        logger.error(f"Warning: failed to look up team abbrev from player_game_stats for player {player_id}: {e}")
 
     return None
 
@@ -613,7 +616,7 @@ def update_matchup_scores(
     )
     
     if not matchup or len(matchup) == 0:
-        print(f"[ERROR] Matchup {matchup_id} not found")
+        logger.error(f"[ERROR] Matchup {matchup_id} not found")
         return
     
     team1_id = matchup[0].get("team1_id")
@@ -656,13 +659,13 @@ def update_matchup_scores(
             result = calibration[0]
             is_calibrated = result.get("is_calibrated", False)
             if not is_calibrated:
-                print(f"[WARNING] Matchup {matchup_id} calibration check failed!")
-                print(f"  Team1: calculated={result.get('team1_calculated')}, stored={result.get('team1_stored')}, discrepancy={result.get('discrepancy_team1')}")
-                print(f"  Team2: calculated={result.get('team2_calculated')}, stored={result.get('team2_stored')}, discrepancy={result.get('discrepancy_team2')}")
+                logger.error(f"[WARNING] Matchup {matchup_id} calibration check failed!")
+                logger.info(f"  Team1: calculated={result.get('team1_calculated')}, stored={result.get('team1_stored')}, discrepancy={result.get('discrepancy_team1')}")
+                logger.info(f"  Team2: calculated={result.get('team2_calculated')}, stored={result.get('team2_stored')}, discrepancy={result.get('discrepancy_team2')}")
             else:
-                print(f"[OK] Matchup {matchup_id} calibration check passed")
+                logger.info(f"[OK] Matchup {matchup_id} calibration check passed")
     except Exception as e:
-        print(f"[WARNING] Calibration check failed: {e}")
+        logger.error(f"[WARNING] Calibration check failed: {e}")
 
 
 def update_active_matchup_scores(
@@ -684,9 +687,9 @@ def update_active_matchup_scores(
     """
     try:
         if game_ids:
-            print(f"[update_active_matchup_scores] Updating matchup scores after processing {len(game_ids)} game(s)")
+            logger.info(f"[update_active_matchup_scores] Updating matchup scores after processing {len(game_ids)} game(s)")
         else:
-            print(f"[update_active_matchup_scores] Updating matchup scores for all active matchups")
+            logger.info(f"[update_active_matchup_scores] Updating matchup scores for all active matchups")
         
         # Call the Supabase RPC function
         # The RPC handles all the calculation logic
@@ -707,7 +710,7 @@ def update_active_matchup_scores(
             updated_count = len(successful)
             failed_count = len(failed)
             
-            print(f"[update_active_matchup_scores] Completed: {updated_count} matchups updated, {failed_count} failed")
+            logger.error(f"[update_active_matchup_scores] Completed: {updated_count} matchups updated, {failed_count} failed")
             
             return {
                 "updated": updated_count,
@@ -716,11 +719,11 @@ def update_active_matchup_scores(
                 "results": result
             }
         else:
-            print(f"[update_active_matchup_scores] RPC returned no results")
+            logger.info(f"[update_active_matchup_scores] RPC returned no results")
             return {"updated": 0, "failed": 0, "total": 0, "results": []}
             
     except Exception as e:
-        print(f"[update_active_matchup_scores] Error updating matchup scores: {e}")
+        logger.error(f"[update_active_matchup_scores] Error updating matchup scores: {e}")
         import traceback
         traceback.print_exc()
         return {"updated": 0, "failed": 0, "total": 0, "error": str(e)}
@@ -737,25 +740,25 @@ def calculate_matchup_scores(
     If up_to_date is provided, calculate for all matchups ending on or before that date.
     Otherwise, calculate for all active matchups.
     """
-    print("=" * 80)
-    print("WORLD CLASS MATCHUP ENGINE - SCORE CALCULATION")
-    print("=" * 80)
+    logger.info("=" * 80)
+    logger.info("WORLD CLASS MATCHUP ENGINE - SCORE CALCULATION")
+    logger.info("=" * 80)
     
     if up_to_date:
-        print(f"[INFO] Processing completed matchups up to {up_to_date.isoformat()}")
+        logger.info(f"[INFO] Processing completed matchups up to {up_to_date.isoformat()}")
         matchups = get_completed_matchups(db, up_to_date, matchup_id)
     else:
         matchups = get_active_matchups(db, matchup_id)
     
     if not matchups:
-        print(f"[INFO] No active matchups found")
+        logger.info(f"[INFO] No active matchups found")
         return 0
     
-    print(f"[INFO] Processing {len(matchups)} matchup(s)")
+    logger.info(f"[INFO] Processing {len(matchups)} matchup(s)")
     
     for matchup in matchups:
         if _shutdown_requested:
-            print(f"\n[SHUTDOWN] Graceful shutdown complete.")
+            logger.info(f"\n[SHUTDOWN] Graceful shutdown complete.")
             sys.exit(0)
 
         matchup_id = matchup["id"]
@@ -765,9 +768,9 @@ def calculate_matchup_scores(
         week_start = matchup["week_start_date"]
         week_end = matchup["week_end_date"]
 
-        print(f"\n[MATCHUP] {matchup_id} (Week {matchup['week_number']})")
-        print(f"  League: {league_id}")
-        print(f"  Date Range: {week_start} to {week_end}")
+        logger.info(f"\n[MATCHUP] {matchup_id} (Week {matchup['week_number']})")
+        logger.info(f"  League: {league_id}")
+        logger.info(f"  Date Range: {week_start} to {week_end}")
         
         # Load league scoring settings
         scoring_settings = load_league_scoring_settings(db, league_id)
@@ -803,7 +806,7 @@ def calculate_matchup_scores(
             for pick in team1_roster + team2_roster
         ]
         
-        print(f"  Players: {len(all_player_ids)} total ({len(team1_roster)} team1, {len(team2_roster)} team2)")
+        logger.info(f"  Players: {len(all_player_ids)} total ({len(team1_roster)} team1, {len(team2_roster)} team2)")
         
         # Get starting lineups
         team1_starters = get_team_starters(db, team1_id, league_id)
@@ -919,18 +922,18 @@ def calculate_matchup_scores(
             player_lines.append(player_line)
         
         # Upsert all lines
-        print(f"  Upserting {len(player_lines)} player lines...")
+        logger.info(f"  Upserting {len(player_lines)} player lines...")
         upsert_matchup_lines(db, matchup_id, player_lines)
         
         # Update matchup scores
-        print(f"  Updating matchup scores...")
+        logger.info(f"  Updating matchup scores...")
         update_matchup_scores(db, matchup_id)
         
-        print(f"[OK] Matchup {matchup_id} calculation complete")
+        logger.info(f"[OK] Matchup {matchup_id} calculation complete")
     
-    print("\n" + "=" * 80)
-    print("[OK] All matchups processed")
-    print("=" * 80)
+    logger.info("\n" + "=" * 80)
+    logger.info("[OK] All matchups processed")
+    logger.info("=" * 80)
     
     return len(matchups)
 
@@ -943,18 +946,18 @@ def run_verification_checks(db: SupabaseRest, matchup_id: Optional[str] = None) 
     matchups = get_active_matchups(db, matchup_id)
     
     if not matchups:
-        print("[VERIFY] No matchups to verify")
+        logger.info("[VERIFY] No matchups to verify")
         return
     
-    print("\n" + "=" * 80)
-    print("VERIFICATION CHECKS")
-    print("=" * 80)
+    logger.info("\n" + "=" * 80)
+    logger.info("VERIFICATION CHECKS")
+    logger.info("=" * 80)
     
     all_passed = True
     
     for matchup in matchups:
         m_id = matchup["id"]
-        print(f"\n[VERIFY] Matchup {m_id}")
+        logger.info(f"\n[VERIFY] Matchup {m_id}")
         
         try:
             result = db.rpc("verify_matchup_scores", {"p_matchup_id": m_id})
@@ -963,24 +966,24 @@ def run_verification_checks(db: SupabaseRest, matchup_id: Optional[str] = None) 
                 is_calibrated = cal.get("is_calibrated", False)
                 
                 if is_calibrated:
-                    print(f"  [OK] Calibration passed")
+                    logger.info(f"  [OK] Calibration passed")
                 else:
                     all_passed = False
-                    print(f"  [FAIL] Calibration failed!")
-                    print(f"    Team1: calculated={cal.get('team1_calculated')}, stored={cal.get('team1_stored')}, discrepancy={cal.get('discrepancy_team1')}")
-                    print(f"    Team2: calculated={cal.get('team2_calculated')}, stored={cal.get('team2_stored')}, discrepancy={cal.get('discrepancy_team2')}")
+                    logger.error(f"  [FAIL] Calibration failed!")
+                    logger.info(f"    Team1: calculated={cal.get('team1_calculated')}, stored={cal.get('team1_stored')}, discrepancy={cal.get('discrepancy_team1')}")
+                    logger.info(f"    Team2: calculated={cal.get('team2_calculated')}, stored={cal.get('team2_stored')}, discrepancy={cal.get('discrepancy_team2')}")
             else:
-                print(f"  [WARNING] Calibration check returned no results")
+                logger.warning(f"  [WARNING] Calibration check returned no results")
         except Exception as e:
-            print(f"  [ERROR] Calibration check failed: {e}")
+            logger.error(f"  [ERROR] Calibration check failed: {e}")
             all_passed = False
     
-    print("\n" + "=" * 80)
+    logger.info("\n" + "=" * 80)
     if all_passed:
-        print("[OK] All verification checks passed")
+        logger.info("[OK] All verification checks passed")
     else:
-        print("[WARNING] Some verification checks failed")
-    print("=" * 80)
+        logger.error("[WARNING] Some verification checks failed")
+    logger.info("=" * 80)
 
 
 def main() -> int:
@@ -999,13 +1002,13 @@ def main() -> int:
         try:
             up_to_date = dt.datetime.strptime(args.up_to_date, "%Y-%m-%d").date()
         except ValueError:
-            print(f"[ERROR] Invalid date format: {args.up_to_date}. Use YYYY-MM-DD")
+            logger.error(f"[ERROR] Invalid date format: {args.up_to_date}. Use YYYY-MM-DD")
             return 1
     
     if matchup_id:
-        print(f"[INFO] Processing specific matchup: {matchup_id}")
+        logger.info(f"[INFO] Processing specific matchup: {matchup_id}")
     if up_to_date:
-        print(f"[INFO] Processing matchups up to: {up_to_date.isoformat()}")
+        logger.info(f"[INFO] Processing matchups up to: {up_to_date.isoformat()}")
     
     db = supabase_client()
     
@@ -1017,11 +1020,12 @@ def main() -> int:
         
         return 0 if count > 0 else 1
     except Exception as e:
-        print(f"[ERROR] Calculation failed: {e}")
+        logger.error(f"[ERROR] Calculation failed: {e}")
         import traceback
         traceback.print_exc()
         return 1
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     sys.exit(main())

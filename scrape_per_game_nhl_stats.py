@@ -34,13 +34,16 @@ from typing import Dict, Optional, List, Any
 from dotenv import load_dotenv
 from supabase_rest import SupabaseRest
 from src.utils.citrus_request import citrus_request
+import logging
+
+logger = logging.getLogger(__name__)
 
 _shutdown_requested = False
 
 def _handle_shutdown(signum, frame):
     global _shutdown_requested
     _shutdown_requested = True
-    print(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
+    logger.info(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
 
 signal.signal(signal.SIGINT, _handle_shutdown)
 signal.signal(signal.SIGTERM, _handle_shutdown)
@@ -160,7 +163,7 @@ def fetch_game_boxscore(game_id: int, db: Optional[SupabaseRest] = None, force_a
             response.raise_for_status()
             return response.json()
         except Exception as e:
-            print(f"  Error fetching game {game_id} boxscore from API: {e}")
+            logger.error(f"  Error fetching game {game_id} boxscore from API: {e}")
             return None
     
     # Try to read from stored data first (for historical games)
@@ -182,8 +185,8 @@ def fetch_game_boxscore(game_id: int, db: Optional[SupabaseRest] = None, force_a
                 return boxscore_json
     except Exception as e:
         # If reading from DB fails, fall back to API fetch
-        print(f"  [WARNING] Could not read stored boxscore for game {game_id}: {e}")
-        print(f"  [INFO] Falling back to API fetch...")
+        logger.warning(f"  [WARNING] Could not read stored boxscore for game {game_id}: {e}")
+        logger.info(f"  [INFO] Falling back to API fetch...")
     
     # Fallback: Fetch from API if not in database (uses proxy rotation)
     url = f"{NHL_API_BASE}/gamecenter/{game_id}/boxscore"
@@ -192,7 +195,7 @@ def fetch_game_boxscore(game_id: int, db: Optional[SupabaseRest] = None, force_a
         response.raise_for_status()
         return response.json()
     except Exception as e:
-        print(f"  Error fetching game {game_id} boxscore from API: {e}")
+        logger.error(f"  Error fetching game {game_id} boxscore from API: {e}")
         return None
 
 
@@ -435,7 +438,7 @@ def get_week_dates(week_start: date, week_end: date) -> List[date]:
 def get_games_for_week(db: SupabaseRest, week_start: date, week_end: date) -> List[Dict]:
     """Get all games for the week from nhl_games table with pagination."""
     # Use pagination to ensure we get all games
-    print(f"  [PAGINATION] Fetching games from {week_start} to {week_end}...")
+    logger.info(f"  [PAGINATION] Fetching games from {week_start} to {week_end}...")
     all_games = _paginate_select(
         db,
         "nhl_games",
@@ -447,7 +450,7 @@ def get_games_for_week(db: SupabaseRest, week_start: date, week_end: date) -> Li
         max_records=100000  # Large limit for full season scraping
     )
     
-    print(f"  [PAGINATION] Fetched {len(all_games)} games total")
+    logger.info(f"  [PAGINATION] Fetched {len(all_games)} games total")
     return all_games or []
 
 
@@ -468,10 +471,10 @@ def _paginate_select(db: SupabaseRest, table: str, select: str, filters: list, m
                 break
             offset += batch_size
             if offset % 5000 == 0:
-                print(f"    [PAGINATION] Fetched {len(all_records)} records so far...")
+                logger.info(f"    [PAGINATION] Fetched {len(all_records)} records so far...")
         except Exception as e:
-            print(f"  [ERROR] Pagination error at offset {offset}: {e}")
-            print(f"  [ERROR] Returning {len(all_records)} records fetched so far")
+            logger.error(f"  [ERROR] Pagination error at offset {offset}: {e}")
+            logger.error(f"  [ERROR] Returning {len(all_records)} records fetched so far")
             break
     
     return all_records
@@ -487,7 +490,7 @@ def get_games_missing_goalies(db: SupabaseRest, week_start: date, week_end: date
     week_start_str = week_start.isoformat()
     week_end_str = week_end.isoformat()
     
-    print(f"  [PAGINATION] Fetching skater games...")
+    logger.info(f"  [PAGINATION] Fetching skater games...")
     # Get distinct game_ids that have skater data (with pagination)
     skater_games = _paginate_select(
         db,
@@ -511,9 +514,9 @@ def get_games_missing_goalies(db: SupabaseRest, week_start: date, week_end: date
             game_ids_with_skaters.add(gid)
             game_dates[gid] = gdate
     
-    print(f"  [PAGINATION] Found {len(game_ids_with_skaters)} games with skaters")
+    logger.info(f"  [PAGINATION] Found {len(game_ids_with_skaters)} games with skaters")
     
-    print(f"  [PAGINATION] Fetching goalie games...")
+    logger.info(f"  [PAGINATION] Fetching goalie games...")
     # Get game_ids that have goalie data (with pagination)
     goalie_games = _paginate_select(
         db,
@@ -528,12 +531,12 @@ def get_games_missing_goalies(db: SupabaseRest, week_start: date, week_end: date
     )
     game_ids_with_goalies = set(g.get("game_id") for g in (goalie_games or []) if g.get("game_date", "") <= week_end_str)
     
-    print(f"  [PAGINATION] Found {len(game_ids_with_goalies)} games with goalies")
+    logger.info(f"  [PAGINATION] Found {len(game_ids_with_goalies)} games with goalies")
     
     # Find games missing goalies
     missing_goalie_game_ids = game_ids_with_skaters - game_ids_with_goalies
     
-    print(f"  [PAGINATION] Found {len(missing_goalie_game_ids)} games missing goalies")
+    logger.info(f"  [PAGINATION] Found {len(missing_goalie_game_ids)} games missing goalies")
     
     if not missing_goalie_game_ids:
         return []
@@ -592,7 +595,7 @@ def update_player_game_stats_nhl_columns(
     
     # Validate that we have stats to process
     if not player_stats:
-        print(f"    [WARNING] No player stats extracted for game {game_id}")
+        logger.warning(f"    [WARNING] No player stats extracted for game {game_id}")
         return {"updated": 0, "created": 0, "skipped": 0}
     
     # Processing {len(player_stats)} players for game {game_id} (logging disabled for cleaner output)
@@ -600,7 +603,7 @@ def update_player_game_stats_nhl_columns(
     for player_id, stats in player_stats.items():
         # Validate stats dict
         if not isinstance(stats, dict):
-            print(f"    [ERROR] Player {player_id} has invalid stats dict (type: {type(stats)})")
+            logger.error(f"    [ERROR] Player {player_id} has invalid stats dict (type: {type(stats)})")
             skipped_count += 1
             continue
         
@@ -630,7 +633,7 @@ def update_player_game_stats_nhl_columns(
                              "nhl_hits", "nhl_blocks", "nhl_toi_seconds"]
             missing_fields = [f for f in required_fields if f not in stats]
             if missing_fields:
-                print(f"    [WARNING] Player {player_id} missing required fields: {missing_fields}")
+                logger.warning(f"    [WARNING] Player {player_id} missing required fields: {missing_fields}")
             
             update_data = {
                 **stats,
@@ -650,7 +653,7 @@ def update_player_game_stats_nhl_columns(
                 updated_count += 1
                 # Verbose logging disabled for cleaner terminal output
             except Exception as e:
-                print(f"    [ERROR] Failed to update player {player_id}: {e}")
+                logger.error(f"    [ERROR] Failed to update player {player_id}: {e}")
                 skipped_count += 1
         
         elif is_goalie:
@@ -714,11 +717,9 @@ def update_player_game_stats_nhl_columns(
             try:
                 db.upsert("player_game_stats", goalie_record, on_conflict="season,game_id,player_id")
                 created_count += 1
-                print(f"    [OK] Created goalie record for player {player_id}: W={stats.get('nhl_wins', 0)}, "
-                      f"Saves={stats.get('nhl_saves', 0)}, GA={stats.get('nhl_goals_against', 0)}, "
-                      f"TOI={stats.get('nhl_toi_seconds', 0)}s")
+                logger.info(f"    [OK] Created goalie record for player {player_id}: W={stats.get('nhl_wins', 0)}, " f"Saves={stats.get('nhl_saves', 0)}, GA={stats.get('nhl_goals_against', 0)}, " f"TOI={stats.get('nhl_toi_seconds', 0)}s")
             except Exception as e:
-                print(f"    [ERROR] Failed to create goalie record for {player_id}: {e}")
+                logger.error(f"    [ERROR] Failed to create goalie record for {player_id}: {e}")
                 skipped_count += 1
         
         else:
@@ -760,12 +761,12 @@ def update_player_game_stats_nhl_columns(
                 created_count += 1
                 # Verbose logging disabled for cleaner terminal output
             except Exception as e:
-                print(f"    [ERROR] Failed to create skater record for {player_id}: {e}")
+                logger.error(f"    [ERROR] Failed to create skater record for {player_id}: {e}")
                 skipped_count += 1
     
     # Print clean summary instead of per-player logging
     if updated_count + created_count > 0:
-        print(f"    [✓] Game {game_id}: {updated_count} updated, {created_count} created, {skipped_count} skipped")
+        logger.info(f"    [✓] Game {game_id}: {updated_count} updated, {created_count} created, {skipped_count} skipped")
     
     return {
         "updated": updated_count,
@@ -775,13 +776,13 @@ def update_player_game_stats_nhl_columns(
 
 
 def main():
-    print("=" * 80)
-    print("SCRAPE PER-GAME NHL STATS")
-    print("=" * 80)
-    print(f"Season: {DEFAULT_SEASON}")
-    print("This script scrapes NHL official game-by-game stats from gamecenter boxscore endpoint")
-    print("and populates player_game_stats.nhl_* columns.")
-    print()
+    logger.info("=" * 80)
+    logger.info("SCRAPE PER-GAME NHL STATS")
+    logger.info("=" * 80)
+    logger.info(f"Season: {DEFAULT_SEASON}")
+    logger.info("This script scrapes NHL official game-by-game stats from gamecenter boxscore endpoint")
+    logger.info("and populates player_game_stats.nhl_* columns.")
+    logger.info("")
     
     # Check for command line arguments for custom week dates
     # Usage: python scrape_per_game_nhl_stats.py [YYYY-MM-DD] [YYYY-MM-DD]
@@ -790,9 +791,9 @@ def main():
         try:
             week_start = datetime.strptime(sys.argv[1], "%Y-%m-%d").date()
             week_end = datetime.strptime(sys.argv[2], "%Y-%m-%d").date()
-            print(f"Using custom date range from command line arguments")
+            logger.info(f"Using custom date range from command line arguments")
         except ValueError as e:
-            print(f"ERROR: Invalid date format. Use YYYY-MM-DD. Error: {e}")
+            logger.error(f"ERROR: Invalid date format. Use YYYY-MM-DD. Error: {e}")
             return 1
     else:
         # Get current week dates (Monday-Sunday)
@@ -802,14 +803,14 @@ def main():
         week_start = today - timedelta(days=days_since_monday)
         week_end = week_start + timedelta(days=6)  # Sunday
     
-    print(f"Week: {week_start.isoformat()} (Mon) to {week_end.isoformat()} (Sun)")
-    print()
+    logger.info(f"Week: {week_start.isoformat()} (Mon) to {week_end.isoformat()} (Sun)")
+    logger.info("")
     
     try:
         db = supabase_client()
-        print("[scrape_nhl_stats] Connected to Supabase")
+        logger.info("[scrape_nhl_stats] Connected to Supabase")
     except Exception as e:
-        print(f"[scrape_nhl_stats] ERROR: Failed to connect: {e}")
+        logger.error(f"[scrape_nhl_stats] ERROR: Failed to connect: {e}")
         return 1
     
     # Check for --missing-goalies flag
@@ -817,17 +818,17 @@ def main():
     
     # Get games for this week
     if missing_goalies_only:
-        print(f"[scrape_nhl_stats] Finding games MISSING GOALIE DATA for {week_start} to {week_end}...")
+        logger.info(f"[scrape_nhl_stats] Finding games MISSING GOALIE DATA for {week_start} to {week_end}...")
         games = get_games_missing_goalies(db, week_start, week_end, DEFAULT_SEASON)
-        print(f"[scrape_nhl_stats] Found {len(games)} games missing goalie records")
+        logger.info(f"[scrape_nhl_stats] Found {len(games)} games missing goalie records")
     else:
-        print(f"[scrape_nhl_stats] Fetching ALL games for {week_start} to {week_end}...")
+        logger.info(f"[scrape_nhl_stats] Fetching ALL games for {week_start} to {week_end}...")
         games = get_games_for_week(db, week_start, week_end)
-        print(f"[scrape_nhl_stats] Found {len(games)} games")
-    print()
+        logger.info(f"[scrape_nhl_stats] Found {len(games)} games")
+    logger.info("")
     
     if not games:
-        print("[scrape_nhl_stats] No games found for this week. Exiting.")
+        logger.info("[scrape_nhl_stats] No games found for this week. Exiting.")
         return 0
     
     # Process each game
@@ -839,8 +840,8 @@ def main():
     
     for idx, game in enumerate(games, 1):
         if _shutdown_requested:
-            print(f"\n[SHUTDOWN] Graceful shutdown complete. Processed {idx - 1}/{len(games)} games.")
-            print(f"  Updated: {total_updated} | Created: {total_created} | Errors: {errors}")
+            logger.info(f"\n[SHUTDOWN] Graceful shutdown complete. Processed {idx - 1}/{len(games)} games.")
+            logger.error(f"  Updated: {total_updated} | Created: {total_created} | Errors: {errors}")
             sys.exit(0)
 
         game_id = game.get("game_id")
@@ -849,13 +850,13 @@ def main():
 
         # Progress output with flushing
         progress_msg = f"[{idx}/{len(games)}] ({idx*100//len(games)}%) Processing game {game_id} ({game_date})..."
-        print(progress_msg, flush=True)
+        logger.info(progress_msg, flush=True)
         sys.stdout.flush()
         
         # Fetch boxscore (reads from stored data first, falls back to API)
         boxscore = fetch_game_boxscore(game_id, db)
         if not boxscore:
-            print(f"  [ERROR] Failed to fetch boxscore (tried stored data and API)", flush=True)
+            logger.error(f"  [ERROR] Failed to fetch boxscore (tried stored data and API)", flush=True)
             errors += 1
             time.sleep(0.5)  # Rate limiting
             continue
@@ -863,14 +864,14 @@ def main():
         # Extract player stats
         player_stats = extract_player_stats_from_boxscore(boxscore)
         if not player_stats:
-            print(f"  [WARNING] No player stats found in boxscore", flush=True)
+            logger.warning(f"  [WARNING] No player stats found in boxscore", flush=True)
             time.sleep(0.5)
             continue
         
         # Count goalies and skaters
         goalie_count = sum(1 for s in player_stats.values() if s.get("_is_goalie", False))
         skater_count = len(player_stats) - goalie_count
-        print(f"  Found {len(player_stats)} players ({skater_count} skaters, {goalie_count} goalies)", flush=True)
+        logger.info(f"  Found {len(player_stats)} players ({skater_count} skaters, {goalie_count} goalies)", flush=True)
         
         # Update database
         game_date_obj = datetime.strptime(game_date, "%Y-%m-%d").date() if isinstance(game_date, str) else game_date
@@ -896,35 +897,36 @@ def main():
         if result["skipped"] > 0:
             parts.append(f"skipped {result['skipped']} skaters (no base record)")
         
-        print(f"  -> {', '.join(parts) if parts else 'no changes'}", flush=True)
+        logger.info(f"  -> {', '.join(parts) if parts else 'no changes'}", flush=True)
         
         # Progress summary every 10 games
         if idx % 10 == 0:
-            print(f"\n[PROGRESS] {idx}/{len(games)} games processed | Updated: {total_updated} | Created: {total_created} | Errors: {errors}\n", flush=True)
+            logger.error(f"\n[PROGRESS] {idx}/{len(games)} games processed | Updated: {total_updated} | Created: {total_created} | Errors: {errors}\n", flush=True)
         
         time.sleep(0.5)  # Rate limiting (500ms between requests)
     
-    print("=" * 80)
-    print("SUMMARY")
-    print("=" * 80)
-    print(f"Games processed: {len(games)}")
-    print(f"Players found: {total_players}")
-    print(f"Players updated: {total_updated}")
-    print(f"Goalies created: {total_created}")
-    print(f"Skaters skipped (no base record): {total_skipped}")
-    print(f"Errors: {errors}")
-    print()
-    print("ARCHITECTURE:")
-    print("  - Skaters: Records created by extractor_job (PBP), updated here with NHL official stats")
-    print("  - Goalies: Records created HERE from NHL boxscore (same official source as skaters)")
-    print("  - Public-facing stats (matchups, fantasy) now use unified NHL official data")
-    print()
-    print("GOALIE STATS NOW AVAILABLE:")
-    print("  nhl_wins, nhl_saves, nhl_shots_faced, nhl_goals_against, nhl_shutouts, nhl_save_pct")
-    print()
+    logger.info("=" * 80)
+    logger.info("SUMMARY")
+    logger.info("=" * 80)
+    logger.info(f"Games processed: {len(games)}")
+    logger.info(f"Players found: {total_players}")
+    logger.info(f"Players updated: {total_updated}")
+    logger.info(f"Goalies created: {total_created}")
+    logger.info(f"Skaters skipped (no base record): {total_skipped}")
+    logger.error(f"Errors: {errors}")
+    logger.info("")
+    logger.info("ARCHITECTURE:")
+    logger.info("  - Skaters: Records created by extractor_job (PBP), updated here with NHL official stats")
+    logger.info("  - Goalies: Records created HERE from NHL boxscore (same official source as skaters)")
+    logger.info("  - Public-facing stats (matchups, fantasy) now use unified NHL official data")
+    logger.info("")
+    logger.info("GOALIE STATS NOW AVAILABLE:")
+    logger.info("  nhl_wins, nhl_saves, nhl_shots_faced, nhl_goals_against, nhl_shutouts, nhl_save_pct")
+    logger.info("")
     
     return 0
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     sys.exit(main())

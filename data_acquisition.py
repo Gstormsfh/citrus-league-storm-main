@@ -5,6 +5,9 @@ import os
 import requests 
 import datetime
 from dotenv import load_dotenv # Used to load your .env file
+import logging
+
+logger = logging.getLogger(__name__)
 try:
     from supabase import create_client, Client
 except BaseException:
@@ -65,12 +68,12 @@ def _verify_model_files():
     critical_files = ['xg_model_moneypuck.joblib', 'xg_model.joblib']
     missing = [f for f in critical_files if not os.path.exists(os.path.join(model_dir, f))]
     if len(missing) == len(critical_files):
-        print("=" * 80)
-        print("ERROR: xG MODEL FILES NOT FOUND")
-        print("=" * 80)
-        print(f"Required model files are missing from {model_dir}")
-        print()
-        print("=" * 80)
+        logger.info("=" * 80)
+        logger.error("ERROR: xG MODEL FILES NOT FOUND")
+        logger.info("=" * 80)
+        logger.info(f"Required model files are missing from {model_dir}")
+        logger.info("")
+        logger.info("=" * 80)
         return False
     return True
 
@@ -82,7 +85,7 @@ def _model_path(filename):
 
 # Verify files before loading
 if not _verify_model_files():
-    print("ERROR: Cannot proceed without model files. Exiting.")
+    logger.error("ERROR: Cannot proceed without model files. Exiting.")
     exit(1)
 
 # Try to load MoneyPuck-aligned model first, fallback to old model
@@ -91,7 +94,7 @@ try:
     try:
         XG_MODEL = joblib.load(_model_path('xg_model_moneypuck.joblib'))
         MODEL_FEATURES = joblib.load(_model_path('model_features_moneypuck.joblib'))
-        print("[OK] Loaded MoneyPuck-aligned xG model")
+        logger.info("[OK] Loaded MoneyPuck-aligned xG model")
         USE_MONEYPUCK_MODEL = True
     except FileNotFoundError:
         # Fallback to old model
@@ -104,37 +107,37 @@ try:
                              'is_slot_shot',
                              'has_pass_before_shot', 'pass_lateral_distance', 'pass_to_net_distance',
                              'pass_zone_encoded', 'pass_immediacy_score', 'goalie_movement_score', 'pass_quality_score']
-        print("[WARNING] Using old xG model. Consider retraining with MoneyPuck targets.")
+        logger.warning("[WARNING] Using old xG model. Consider retraining with MoneyPuck targets.")
         USE_MONEYPUCK_MODEL = False
     
     # Load the last_event_category encoder (for MoneyPuck model)
     try:
         LAST_EVENT_CATEGORY_ENCODER = joblib.load(_model_path('last_event_category_encoder.joblib'))
     except FileNotFoundError:
-        print("WARNING: last_event_category_encoder.joblib not found. Will encode on-the-fly if needed.")
+        logger.warning("WARNING: last_event_category_encoder.joblib not found. Will encode on-the-fly if needed.")
         LAST_EVENT_CATEGORY_ENCODER = None
     
     # Load the shot type encoder
     try:
         SHOT_TYPE_ENCODER = joblib.load(_model_path('shot_type_encoder.joblib'))
     except FileNotFoundError:
-        print("WARNING: shot_type_encoder.joblib not found. Shot type encoding may fail.")
+        logger.warning("WARNING: shot_type_encoder.joblib not found. Shot type encoding may fail.")
         SHOT_TYPE_ENCODER = None
     
     # Load the pass zone encoder
     try:
         PASS_ZONE_ENCODER = joblib.load(_model_path('pass_zone_encoder.joblib'))
     except FileNotFoundError:
-        print("WARNING: pass_zone_encoder.joblib not found. Pass zone encoding may fail.")
+        logger.warning("WARNING: pass_zone_encoder.joblib not found. Pass zone encoding may fail.")
         PASS_ZONE_ENCODER = None
     
     # Load the xA (Expected Assists) model
     try:
         XA_MODEL = joblib.load(_model_path('xa_model.joblib'))
         XA_MODEL_FEATURES = joblib.load(_model_path('xa_model_features.joblib'))
-        print("xA model loaded successfully.")
+        logger.info("xA model loaded successfully.")
     except FileNotFoundError:
-        print("WARNING: xa_model.joblib not found. Expected Assists calculation will be skipped.")
+        logger.warning("WARNING: xa_model.joblib not found. Expected Assists calculation will be skipped.")
         XA_MODEL = None
         XA_MODEL_FEATURES = None
     
@@ -142,13 +145,13 @@ try:
     try:
         REBOUND_MODEL = joblib.load(_model_path('rebound_model.joblib'))
         REBOUND_MODEL_FEATURES = joblib.load(_model_path('rebound_model_features.joblib'))
-        print("[OK] Rebound model loaded successfully.")
+        logger.info("[OK] Rebound model loaded successfully.")
     except FileNotFoundError:
-        print("WARNING: rebound_model.joblib not found. Expected Rebounds calculation will be skipped.")
+        logger.warning("WARNING: rebound_model.joblib not found. Expected Rebounds calculation will be skipped.")
         REBOUND_MODEL = None
         REBOUND_MODEL_FEATURES = None
 except FileNotFoundError:
-    print("ERROR: No xG model found! Please run retrain_xg_with_moneypuck.py first!")
+    logger.error("ERROR: No xG model found! Please run retrain_xg_with_moneypuck.py first!")
     exit()
 
 # Define the center of the net coordinates for calculation (in standard NHL coordinates)
@@ -547,11 +550,11 @@ def get_finished_game_ids_from_db(date_str=None):
         
         if response.data:
             game_ids = [game['game_id'] for game in response.data]
-            print(f"Found {len(game_ids)} finished games in database for {date_to_check}")
+            logger.info(f"Found {len(game_ids)} finished games in database for {date_to_check}")
             return game_ids
     except Exception as e:
-        print(f"Could not query nhl_games table: {e}")
-        print("Falling back to NHL API...")
+        logger.warning(f"Could not query nhl_games table: {e}")
+        logger.info("Falling back to NHL API...")
     
     # Fallback to API
     return get_finished_game_ids(date_str)
@@ -573,12 +576,12 @@ def get_finished_game_ids(date_str=None):
             if response.status_code == 429:
                 if attempt < max_retries - 1:
                     delay = base_delay * (2 ** attempt)  # Exponential backoff: 2, 4, 8, 16, 32 seconds
-                    print(f"[WARNING] Rate limited (429). Waiting {delay} seconds before retry {attempt + 1}/{max_retries}...")
+                    logger.warning(f"[WARNING] Rate limited (429). Waiting {delay} seconds before retry {attempt + 1}/{max_retries}...")
                     import time
                     time.sleep(delay)
                     continue
                 else:
-                    print(f"[ERROR] Rate limited after {max_retries} attempts. Skipping {date_to_check}.")
+                    logger.error(f"[ERROR] Rate limited after {max_retries} attempts. Skipping {date_to_check}.")
                     return []
             
             response.raise_for_status()  # Raise exception for other bad status codes (4xx or 5xx)
@@ -588,12 +591,12 @@ def get_finished_game_ids(date_str=None):
         except requests.exceptions.RequestException as e:
             if attempt < max_retries - 1:
                 delay = base_delay * (2 ** attempt)
-                print(f"[WARNING] Error fetching schedule (attempt {attempt + 1}/{max_retries}): {e}")
-                print(f"  Waiting {delay} seconds before retry...")
+                logger.error(f"[WARNING] Error fetching schedule (attempt {attempt + 1}/{max_retries}): {e}")
+                logger.info(f"  Waiting {delay} seconds before retry...")
                 import time
                 time.sleep(delay)
             else:
-                print(f"[ERROR] Failed to fetch schedule after {max_retries} attempts: {e}")
+                logger.error(f"[ERROR] Failed to fetch schedule after {max_retries} attempts: {e}")
                 return []
     else:
         # This runs if we exhausted all retries
@@ -1633,7 +1636,7 @@ def _extract_shots_from_game(raw_data, game_id, db_client):
         # This is handled in the loop above
         
     except Exception as e:
-        print(f"Error extracting shots from game {game_id}: {e}")
+        logger.error(f"Error extracting shots from game {game_id}: {e}")
         import traceback
         traceback.print_exc()
         return []
@@ -1797,7 +1800,7 @@ def _save_shots_to_database(df_shots, db_client, game_id):
         )
         duplicates_removed = initial_count - len(df_shots_to_save)
         if duplicates_removed > 0:
-            print(f"Game {game_id}: Removed {duplicates_removed} duplicate shot record(s)")
+            logger.info(f"Game {game_id}: Removed {duplicates_removed} duplicate shot record(s)")
         
         cleaned_shot_records = df_shots_to_save.to_dict(orient='records')
         
@@ -1879,14 +1882,14 @@ def _save_shots_to_database(df_shots, db_client, game_id):
                         except Exception:
                             pass
         
-        print(f"Game {game_id}: Saved {total_saved} shot records to database")
+        logger.info(f"Game {game_id}: Saved {total_saved} shot records to database")
         
         # CRITICAL: Raise exception if no shots were saved (prevents marking game as processed)
         if total_saved == 0 and len(cleaned_shot_records) > 0:
             raise Exception(f"Failed to save any shots - attempted {len(cleaned_shot_records)} but saved 0")
         
     except Exception as e:
-        print(f"Game {game_id}: Error saving shots to database: {e}")
+        logger.error(f"Game {game_id}: Error saving shots to database: {e}")
         import traceback
         traceback.print_exc()
         # Re-raise the exception so process_single_game_json knows it failed
@@ -1926,7 +1929,7 @@ def process_single_game(game_id, rate_limit_flag=None):
         if rate_limit_flag and rate_limit_flag.value:
             # Wait for the pool to cool down
             cooldown_time = getattr(rate_limit_flag, 'cooldown_time', 60)
-            print(f"Game {game_id}: Pool throttled. Waiting {cooldown_time}s...")
+            logger.info(f"Game {game_id}: Pool throttled. Waiting {cooldown_time}s...")
             time.sleep(cooldown_time)
         
         try:
@@ -1937,16 +1940,16 @@ def process_single_game(game_id, rate_limit_flag=None):
                 # 429 RATE LIMIT DETECTED - Trigger Pool-Level Throttling
                 if rate_limit_flag:
                     rate_limit_flag.value = True  # Set flag to pause other workers
-                    print(f"!!! 429 Rate Limit Detected (Game {game_id}). Signaling pool throttle !!!")
+                    logger.info(f"!!! 429 Rate Limit Detected (Game {game_id}). Signaling pool throttle !!!")
                 
                 # Use longer exponential backoff for 429 errors
                 if attempt < MAX_429_RETRIES - 1:
                     delay = (BASE_429_DELAY ** (attempt + 1))  # 2^1=2s, 2^2=4s, 2^3=8s, 2^4=16s, 2^5=32s
-                    print(f"Game {game_id}: 429. Retrying in {delay}s...")
+                    logger.info(f"Game {game_id}: 429. Retrying in {delay}s...")
                     time.sleep(delay)
                     continue  # Retry
                 else:
-                    print(f"Game {game_id}: 429 after {MAX_429_RETRIES} attempts. Giving up.")
+                    logger.info(f"Game {game_id}: 429 after {MAX_429_RETRIES} attempts. Giving up.")
                     return None
             
             response.raise_for_status()  # Raise for other 4xx or 5xx errors
@@ -1958,7 +1961,7 @@ def process_single_game(game_id, rate_limit_flag=None):
         except requests.exceptions.HTTPError as e:
             # For other HTTP errors (404, 500, etc.)
             if e.response.status_code != 429:  # Already handled 429 above
-                print(f"Game {game_id}: HTTP error {e.response.status_code}: {e}")
+                logger.error(f"Game {game_id}: HTTP error {e.response.status_code}: {e}")
                 if attempt < MAX_429_RETRIES - 1:
                     time.sleep(1)  # Short delay before retry
                     continue
@@ -1970,12 +1973,12 @@ def process_single_game(game_id, rate_limit_flag=None):
                 
         except Exception as e:
             # Handle non-HTTP errors (timeout, connection issues, etc.)
-            print(f"Game {game_id} failed on attempt {attempt + 1}: {e}")
+            logger.error(f"Game {game_id} failed on attempt {attempt + 1}: {e}")
             if attempt < MAX_429_RETRIES - 1:
                 time.sleep(1)  # Short, generic delay
                 continue
             else:
-                print(f"Game {game_id}: Failed after {MAX_429_RETRIES} attempts.")
+                logger.error(f"Game {game_id}: Failed after {MAX_429_RETRIES} attempts.")
                 return None
     
     # If we couldn't fetch the data, return None
@@ -1988,7 +1991,7 @@ def process_single_game(game_id, rate_limit_flag=None):
         all_shot_data = _extract_shots_from_game(raw_data, game_id, db_client)
         
         if not all_shot_data:
-            print(f"Game {game_id}: No shots found")
+            logger.info(f"Game {game_id}: No shots found")
             return None
         
         # 5. Convert to DataFrame and calculate xG/xA
@@ -2001,7 +2004,7 @@ def process_single_game(game_id, rate_limit_flag=None):
         except ImportError:
             pass  # Skip if not available
         except Exception as e:
-            print(f"Game {game_id}: Warning - error applying calculated features: {e}")
+            logger.error(f"Game {game_id}: Warning - error applying calculated features: {e}")
         
         # Prepare features for xG prediction (same logic as scrape_pbp_and_process)
         if USE_MONEYPUCK_MODEL and 'last_event_category_encoded' in MODEL_FEATURES:
@@ -2121,11 +2124,11 @@ def process_single_game(game_id, rate_limit_flag=None):
         # 6. Save to database using db_client
         _save_shots_to_database(df_shots, db_client, game_id)
         
-        print(f"Game {game_id}: Processed {len(df_shots)} shots")
+        logger.info(f"Game {game_id}: Processed {len(df_shots)} shots")
         return df_shots
     
     except Exception as e:
-        print(f"Game {game_id}: Error processing game data: {e}")
+        logger.error(f"Game {game_id}: Error processing game data: {e}")
         import traceback
         traceback.print_exc()
         return None
@@ -2138,18 +2141,18 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
     Args:
         date_str: Date to process games for (format: YYYY-MM-DD). Defaults to '2025-12-07'.
     """
-    print(f"[DATE] Processing games for date: {date_str}")
-    print("=" * 60)
+    logger.info(f"[DATE] Processing games for date: {date_str}")
+    logger.info("=" * 60)
     
     # Try to get games from database first, fallback to API
     game_ids = get_finished_game_ids_from_db(date_str=date_str)
     
     if not game_ids:
-        print(f"[WARNING]  No finished games found for {date_str}")
+        logger.warning(f"[WARNING]  No finished games found for {date_str}")
         return None
     
-    print(f"Found {len(game_ids)} finished games to process")
-    print()
+    logger.info(f"Found {len(game_ids)} finished games to process")
+    logger.info("")
     
     all_shot_data = []
     games_processed = 0
@@ -2172,12 +2175,12 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                 if response.status_code == 429:
                     if attempt < max_retries - 1:
                         delay = min(base_delay * (2 ** attempt), 60)  # Cap at 60 seconds
-                        print(f"  [WARNING] Rate limited (429) for game {game_id}. Waiting {delay} seconds...")
+                        logger.warning(f"  [WARNING] Rate limited (429) for game {game_id}. Waiting {delay} seconds...")
                         import time
                         time.sleep(delay)
                         continue
                     else:
-                        print(f"  [ERROR] Rate limited after {max_retries} attempts for game {game_id}. Skipping.")
+                        logger.error(f"  [ERROR] Rate limited after {max_retries} attempts for game {game_id}. Skipping.")
                         games_failed += 1
                         raw_data = None
                         break
@@ -2189,28 +2192,28 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
             except requests.exceptions.Timeout:
                 if attempt < max_retries - 1:
                     delay = min(base_delay * (2 ** attempt), 30)
-                    print(f"  [WARNING] Timeout for game {game_id} (attempt {attempt + 1}/{max_retries}). Waiting {delay}s...")
+                    logger.warning(f"  [WARNING] Timeout for game {game_id} (attempt {attempt + 1}/{max_retries}). Waiting {delay}s...")
                     import time
                     time.sleep(delay)
                 else:
-                    print(f"  [ERROR] Timeout after {max_retries} attempts for game {game_id}. Skipping.")
+                    logger.error(f"  [ERROR] Timeout after {max_retries} attempts for game {game_id}. Skipping.")
                     games_failed += 1
                     raw_data = None
                     break
             except requests.exceptions.RequestException as e:
                 if attempt < max_retries - 1:
                     delay = min(base_delay * (2 ** attempt), 30)
-                    print(f"  [WARNING] Error fetching game {game_id} (attempt {attempt + 1}/{max_retries}): {e}")
+                    logger.error(f"  [WARNING] Error fetching game {game_id} (attempt {attempt + 1}/{max_retries}): {e}")
                     import time
                     time.sleep(delay)
                 else:
-                    print(f"  [ERROR] Failed to fetch game {game_id} after {max_retries} attempts: {e}")
+                    logger.error(f"  [ERROR] Failed to fetch game {game_id} after {max_retries} attempts: {e}")
                     games_failed += 1
                     raw_data = None
                     break
         else:
             # Exhausted retries
-            print(f"  [ERROR] Exhausted all retries for game {game_id}. Skipping.")
+            logger.error(f"  [ERROR] Exhausted all retries for game {game_id}. Skipping.")
             games_failed += 1
             raw_data = None
         
@@ -2224,7 +2227,7 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
         
         try:
             # --- FEATURE ENGINEERING: Extracting Shot Coordinates and Calculating Features ---
-            print(f"[{idx}/{len(game_ids)}] Processing Game ID: {game_id}...")
+            logger.info(f"[{idx}/{len(game_ids)}] Processing Game ID: {game_id}...")
             shots_in_game = 0
             
             # We assume the NHL JSON structure has a 'plays' list
@@ -3312,83 +3315,83 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                     last_event_state['period'] = period_number
             
             games_processed += 1
-            print(f"  [OK] Processed {shots_in_game} shots from Game {game_id}")
+            logger.info(f"  [OK] Processed {shots_in_game} shots from Game {game_id}")
             
         except Exception as e:
             # This catches processing errors (after successful fetch)
             games_failed += 1
-            print(f"  [ERROR] Error processing Game ID {game_id}: {e}")
+            logger.error(f"  [ERROR] Error processing Game ID {game_id}: {e}")
             import traceback
             traceback.print_exc()
             continue
     
-    print()
-    print(f"📊 Processing Summary:")
-    print(f"   Games processed: {games_processed}")
-    print(f"   Games failed: {games_failed}")
-    print(f"   Total shots collected: {len(all_shot_data)}")
-    print()
+    logger.info("")
+    logger.info(f"📊 Processing Summary:")
+    logger.info(f"   Games processed: {games_processed}")
+    logger.error(f"   Games failed: {games_failed}")
+    logger.info(f"   Total shots collected: {len(all_shot_data)}")
+    logger.info("")
 
     # ... (End of the loop where you collect all shot features into all_shot_data)
 
     # --- PREDICTION AND AGGREGATION ---
     if not all_shot_data:
-        print("No shots found to process.")
+        logger.info("No shots found to process.")
         return None
     
     # 🔬 GEMINI DEBUG: Audit final data structure before DataFrame creation
-    print("\n" + "=" * 80)
-    print("--- Final Data Structure Audit (Gemini Debug) ---")
-    print("=" * 80)
+    logger.info("\n" + "=" * 80)
+    logger.debug("--- Final Data Structure Audit (Gemini Debug) ---")
+    logger.info("=" * 80)
     if len(all_shot_data) > 0:
         # Check first 10 records
         sample_records = all_shot_data[:10]
-        print(f"\nSample of first 10 shot records:")
+        logger.info(f"\nSample of first 10 shot records:")
         for i, record in enumerate(sample_records, 1):
             speed = record.get('speed_from_last_event', 'MISSING')
             distance = record.get('distance_from_last_event', 'MISSING')
             time = record.get('time_since_last_event', 'MISSING')
             game_id = record.get('game_id', 'MISSING')
-            print(f"  Record {i} (game {game_id}): speed={speed}, distance={distance}, time={time}")
+            logger.info(f"  Record {i} (game {game_id}): speed={speed}, distance={distance}, time={time}")
         
         # Count non-zero values
         non_zero_speed = sum(1 for r in all_shot_data if r.get('speed_from_last_event', 0) and r.get('speed_from_last_event', 0) != 0)
         non_zero_dist = sum(1 for r in all_shot_data if r.get('distance_from_last_event', 0) and r.get('distance_from_last_event', 0) != 0)
         non_zero_time = sum(1 for r in all_shot_data if r.get('time_since_last_event', 0) and r.get('time_since_last_event', 0) != 0)
         
-        print(f"\n📊 Non-zero counts in all_shot_data list:")
-        print(f"   speed_from_last_event: {non_zero_speed}/{len(all_shot_data)} ({non_zero_speed/len(all_shot_data)*100:.2f}%)")
-        print(f"   distance_from_last_event: {non_zero_dist}/{len(all_shot_data)} ({non_zero_dist/len(all_shot_data)*100:.2f}%)")
-        print(f"   time_since_last_event: {non_zero_time}/{len(all_shot_data)} ({non_zero_time/len(all_shot_data)*100:.2f}%)")
-    print("=" * 80 + "\n")
+        logger.info(f"\n📊 Non-zero counts in all_shot_data list:")
+        logger.info(f"   speed_from_last_event: {non_zero_speed}/{len(all_shot_data)} ({non_zero_speed/len(all_shot_data)*100:.2f}%)")
+        logger.info(f"   distance_from_last_event: {non_zero_dist}/{len(all_shot_data)} ({non_zero_dist/len(all_shot_data)*100:.2f}%)")
+        logger.info(f"   time_since_last_event: {non_zero_time}/{len(all_shot_data)} ({non_zero_time/len(all_shot_data)*100:.2f}%)")
+    logger.info("=" * 80 + "\n")
         
     df_shots = pd.DataFrame(all_shot_data)
     
     # 🔬 GEMINI DEBUG: Audit DataFrame after creation
-    print("--- DataFrame Structure Audit (Gemini Debug) ---")
+    logger.debug("--- DataFrame Structure Audit (Gemini Debug) ---")
     if len(df_shots) > 0:
         if 'speed_from_last_event' in df_shots.columns:
             non_zero_speed_df = (pd.to_numeric(df_shots['speed_from_last_event'], errors='coerce') > 0).sum()
-            print(f"   DataFrame speed_from_last_event > 0: {non_zero_speed_df}/{len(df_shots)} ({non_zero_speed_df/len(df_shots)*100:.2f}%)")
-            print(f"   Sample values: {df_shots['speed_from_last_event'].head(10).tolist()}")
+            logger.info(f"   DataFrame speed_from_last_event > 0: {non_zero_speed_df}/{len(df_shots)} ({non_zero_speed_df/len(df_shots)*100:.2f}%)")
+            logger.info(f"   Sample values: {df_shots['speed_from_last_event'].head(10).tolist()}")
         if 'distance_from_last_event' in df_shots.columns:
             non_zero_dist_df = (pd.to_numeric(df_shots['distance_from_last_event'], errors='coerce') > 0).sum()
-            print(f"   DataFrame distance_from_last_event > 0: {non_zero_dist_df}/{len(df_shots)} ({non_zero_dist_df/len(df_shots)*100:.2f}%)")
-    print("=" * 80 + "\n")
+            logger.info(f"   DataFrame distance_from_last_event > 0: {non_zero_dist_df}/{len(df_shots)} ({non_zero_dist_df/len(df_shots)*100:.2f}%)")
+    logger.info("=" * 80 + "\n")
     
     # Apply calculated/derived features (matching MoneyPuck's calculated features)
     try:
         from feature_calculations import apply_calculated_features_to_dataframe
-        print("  🔧 Applying calculated features (arena adjustments, etc.)...")
+        logger.info("  🔧 Applying calculated features (arena adjustments, etc.)...")
         initial_cols = len(df_shots.columns)
         df_shots = apply_calculated_features_to_dataframe(df_shots)
         new_cols = len(df_shots.columns) - initial_cols
-        print(f"  [OK] Applied {new_cols} calculated features")
+        logger.info(f"  [OK] Applied {new_cols} calculated features")
     except ImportError:
-        print("  [WARNING]  feature_calculations.py not found - skipping calculated features")
+        logger.warning("  [WARNING]  feature_calculations.py not found - skipping calculated features")
     except Exception as e:
-        print(f"  [WARNING]  Error applying calculated features: {e}")
-        print("  Continuing with raw features only...")
+        logger.error(f"  [WARNING]  Error applying calculated features: {e}")
+        logger.info("  Continuing with raw features only...")
 
     # 1. Prepare features for prediction
     # Handle last_event_category encoding if using MoneyPuck model
@@ -3423,7 +3426,7 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
     # First, ensure all required features exist in df_shots
     for feature in MODEL_FEATURES:
         if feature not in df_shots.columns:
-            print(f"[WARNING]  Warning: Missing feature '{feature}' in data - creating with default value")
+            logger.warning(f"[WARNING]  Warning: Missing feature '{feature}' in data - creating with default value")
             if feature in ['home_empty_net', 'away_empty_net', 'is_empty_net', 
                           'has_pass_before_shot', 'is_rebound', 'is_slot_shot', 'is_power_play']:
                 df_shots[feature] = 0  # Binary features default to 0
@@ -3505,7 +3508,7 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
     # 2.5. Predict Expected Rebounds (rebound probability)
     if REBOUND_MODEL and REBOUND_MODEL_FEATURES:
         try:
-            print("  🔧 Predicting rebound probabilities...")
+            logger.info("  🔧 Predicting rebound probabilities...")
             # Prepare features for rebound model
             # Filter to shots on goal (types 505, 506) - rebounds only occur after saves
             rebound_mask = df_shots['shot_type_code'].isin([505, 506])
@@ -3554,40 +3557,40 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                 # Set rebound probabilities for shots on goal
                 df_shots.loc[rebound_mask, 'expected_rebound_probability'] = rebound_probs
                 
-                print(f"  [OK] Predicted rebound probabilities for {len(df_rebound_shots):,} shots on goal")
+                logger.info(f"  [OK] Predicted rebound probabilities for {len(df_rebound_shots):,} shots on goal")
             else:
                 df_shots['expected_rebound_probability'] = 0.0
-                print("  [WARNING]  No shots on goal found for rebound prediction")
+                logger.warning("  [WARNING]  No shots on goal found for rebound prediction")
         except Exception as e:
-            print(f"  [WARNING]  Error predicting rebounds: {e}")
+            logger.error(f"  [WARNING]  Error predicting rebounds: {e}")
             import traceback
             traceback.print_exc()
             df_shots['expected_rebound_probability'] = 0.0
     else:
         df_shots['expected_rebound_probability'] = 0.0
-        print("  [WARNING]  Rebound model not loaded - skipping rebound prediction")
+        logger.warning("  [WARNING]  Rebound model not loaded - skipping rebound prediction")
     
     # 2.6. Calculate Expected Goals of Expected Rebounds
     try:
         from feature_calculations import calculate_expected_goals_of_expected_rebounds
-        print("  🔧 Calculating expected goals of expected rebounds...")
+        logger.info("  🔧 Calculating expected goals of expected rebounds...")
         df_shots = calculate_expected_goals_of_expected_rebounds(
             df_shots,
             rebound_prob_col='expected_rebound_probability',
             xg_col='xG_Value'
         )
-        print("  [OK] Expected goals of expected rebounds calculated")
+        logger.info("  [OK] Expected goals of expected rebounds calculated")
     except ImportError:
-        print("  [WARNING]  feature_calculations.py not found - skipping xGoals of xRebounds")
+        logger.warning("  [WARNING]  feature_calculations.py not found - skipping xGoals of xRebounds")
         df_shots['expected_goals_of_expected_rebounds'] = 0.0
     except Exception as e:
-        print(f"  [WARNING]  Error calculating xGoals of xRebounds: {e}")
+        logger.error(f"  [WARNING]  Error calculating xGoals of xRebounds: {e}")
         df_shots['expected_goals_of_expected_rebounds'] = 0.0
     
     # 3. Apply Flurry Adjusted Expected Goals (MoneyPuck post-processing)
     try:
         from feature_calculations import calculate_flurry_adjusted_xg
-        print("  🔧 Applying flurry adjustment to xG values...")
+        logger.info("  🔧 Applying flurry adjustment to xG values...")
         df_shots = calculate_flurry_adjusted_xg(
             df_shots,
             xg_column='xG_Value',
@@ -3597,13 +3600,13 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
             time_in_period_col='time_in_period',
             time_since_last_event_col='time_since_last_event'
         )
-        print("  [OK] Flurry adjustment applied")
+        logger.info("  [OK] Flurry adjustment applied")
     except ImportError:
-        print("  [WARNING]  feature_calculations.py not found - skipping flurry adjustment")
+        logger.warning("  [WARNING]  feature_calculations.py not found - skipping flurry adjustment")
         df_shots['flurry_adjusted_xg'] = df_shots['xG_Value']  # Fallback to regular xG
     except Exception as e:
-        print(f"  [WARNING]  Error applying flurry adjustment: {e}")
-        print("  Continuing with regular xG values only...")
+        logger.error(f"  [WARNING]  Error applying flurry adjustment: {e}")
+        logger.info("  Continuing with regular xG values only...")
         df_shots['flurry_adjusted_xg'] = df_shots['xG_Value']  # Fallback to regular xG
     
     # 3.5. Apply Shooting Talent Adjusted Expected Goals
@@ -3614,47 +3617,47 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
         # Load player shooting talent dictionary
         try:
             player_talent_dict = joblib.load(_model_path('player_shooting_talent.joblib'))
-            print("  🔧 Applying shooting talent adjustment to xG values...")
+            logger.info("  🔧 Applying shooting talent adjustment to xG values...")
             df_shots = calculate_shooting_talent_adjusted_xg(
                 df_shots,
                 player_talent_dict=player_talent_dict,
                 xg_column='flurry_adjusted_xg'  # Apply to flurry-adjusted xG
             )
-            print("  [OK] Shooting talent adjustment applied")
+            logger.info("  [OK] Shooting talent adjustment applied")
         except FileNotFoundError:
-            print("  [WARNING]  player_shooting_talent.joblib not found - skipping shooting talent adjustment")
-            print("     Run calculate_shooting_talent.py first to generate talent multipliers")
+            logger.warning("  [WARNING]  player_shooting_talent.joblib not found - skipping shooting talent adjustment")
+            logger.info("     Run calculate_shooting_talent.py first to generate talent multipliers")
             df_shots['shooting_talent_adjusted_xg'] = df_shots['flurry_adjusted_xg']
             df_shots['shooting_talent_multiplier'] = 1.0
         except Exception as e:
-            print(f"  [WARNING]  Error loading shooting talent: {e}")
+            logger.error(f"  [WARNING]  Error loading shooting talent: {e}")
             df_shots['shooting_talent_adjusted_xg'] = df_shots['flurry_adjusted_xg']
             df_shots['shooting_talent_multiplier'] = 1.0
     except ImportError:
-        print("  [WARNING]  feature_calculations.py not found - skipping shooting talent adjustment")
+        logger.warning("  [WARNING]  feature_calculations.py not found - skipping shooting talent adjustment")
         df_shots['shooting_talent_adjusted_xg'] = df_shots['flurry_adjusted_xg']
         df_shots['shooting_talent_multiplier'] = 1.0
     except Exception as e:
-        print(f"  [WARNING]  Error applying shooting talent adjustment: {e}")
+        logger.error(f"  [WARNING]  Error applying shooting talent adjustment: {e}")
         df_shots['shooting_talent_adjusted_xg'] = df_shots['flurry_adjusted_xg']
         df_shots['shooting_talent_multiplier'] = 1.0
     
     # 3.6. Calculate Created Expected Goals
     try:
         from feature_calculations import calculate_created_expected_goals
-        print("  🔧 Calculating created expected goals...")
+        logger.info("  🔧 Calculating created expected goals...")
         df_shots = calculate_created_expected_goals(
             df_shots,
             xg_col='xG_Value',
             is_rebound_col='is_rebound',
             xgoals_of_xrebounds_col='expected_goals_of_expected_rebounds'
         )
-        print("  [OK] Created expected goals calculated")
+        logger.info("  [OK] Created expected goals calculated")
     except ImportError:
-        print("  [WARNING]  feature_calculations.py not found - skipping created expected goals")
+        logger.warning("  [WARNING]  feature_calculations.py not found - skipping created expected goals")
         df_shots['created_expected_goals'] = df_shots['xG_Value']  # Fallback to regular xG
     except Exception as e:
-        print(f"  [WARNING]  Error calculating created expected goals: {e}")
+        logger.error(f"  [WARNING]  Error calculating created expected goals: {e}")
         df_shots['created_expected_goals'] = df_shots['xG_Value']  # Fallback to regular xG 
 
     # --- EXPECTED ASSISTS (xA) PREDICTION ---
@@ -3691,14 +3694,14 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
             # Update xA values in main dataframe
             df_shots.loc[passes_mask, 'xA_Value'] = df_passes['xA_Value'].values
             
-            print(f"Calculated xA for {len(df_passes)} passes that led to shots.")
+            logger.info(f"Calculated xA for {len(df_passes)} passes that led to shots.")
         else:
-            print("No passes found before shots. Skipping xA calculation.")
+            logger.warning("No passes found before shots. Skipping xA calculation.")
     else:
-        print("xA model not loaded. Skipping Expected Assists calculation.")
+        logger.warning("xA model not loaded. Skipping Expected Assists calculation.")
 
     # --- SAVE RAW SHOTS TO DATABASE FOR VISUALIZATION ---
-    print(f"\n[SAVE] Saving {len(df_shots)} individual shot records to raw_shots table...")
+    logger.info(f"\n[SAVE] Saving {len(df_shots)} individual shot records to raw_shots table...")
     try:
         # Check if table exists by trying to query it
         try:
@@ -3706,13 +3709,13 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
             has_raw_shots_table = True
         except Exception:
             has_raw_shots_table = False
-            print("[WARNING]  raw_shots table not found. Skipping raw shots save.")
-            print("   Run migration: supabase/migrations/20250120000000_create_raw_shots_table.sql")
+            logger.warning("[WARNING]  raw_shots table not found. Skipping raw shots save.")
+            logger.info("   Run migration: supabase/migrations/20250120000000_create_raw_shots_table.sql")
         
         if not has_raw_shots_table:
-            print(f"[WARNING]  Skipped saving {len(df_shots)} shot records (table not found).")
+            logger.warning(f"[WARNING]  Skipped saving {len(df_shots)} shot records (table not found).")
         elif len(df_shots) == 0:
-            print("[WARNING]  No raw shots records to save.")
+            logger.warning("[WARNING]  No raw shots records to save.")
         else:
             # Prepare raw_shots records with all data
             raw_shots_records = []
@@ -3867,7 +3870,7 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
             # CRITICAL FIX: Filter out duplicates based on unique constraint BEFORE batching
             # The unique constraint is: (game_id, player_id, shot_x, shot_y, shot_type_code)
             # This prevents "ON CONFLICT DO UPDATE command cannot affect row a second time" errors
-            print(f"  🔍 Deduplicating {len(raw_shots_records)} shot records...")
+            logger.info(f"  🔍 Deduplicating {len(raw_shots_records)} shot records...")
             df_shots_to_save = pd.DataFrame(raw_shots_records)
             
             # Drop duplicates based on the unique constraint columns
@@ -3880,7 +3883,7 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
             duplicates_removed = initial_count - len(df_shots_to_save)
             
             if duplicates_removed > 0:
-                print(f"  [WARNING]  Removed {duplicates_removed} duplicate shot record(s) before upload")
+                logger.warning(f"  [WARNING]  Removed {duplicates_removed} duplicate shot record(s) before upload")
             
             # Convert back to list of records for batching
             cleaned_shot_records = df_shots_to_save.to_dict(orient='records')
@@ -3929,14 +3932,14 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                                 cleaned[k] = v
                         except (ValueError, TypeError, OverflowError) as e:
                             # If conversion fails, set to None
-                            print(f"  [WARNING]  Warning: Could not convert {k}: {v} ({type(v)}) to int: {e}")
+                            logger.warning(f"  [WARNING]  Warning: Could not convert {k}: {v} ({type(v)}) to int: {e}")
                             cleaned[k] = None
                     else:
                         cleaned[k] = v
                 return cleaned
             
             cleaned_shot_records = [clean_nan_values(record) for record in cleaned_shot_records]
-            print(f"  [OK] {len(cleaned_shot_records)} unique shot records ready for upload")
+            logger.info(f"  [OK] {len(cleaned_shot_records)} unique shot records ready for upload")
             
             # Upload to raw_shots table using upsert with batch processing
             # Process in chunks of 1000 to avoid memory issues and improve reliability
@@ -3960,22 +3963,22 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                     # Note: Supabase upsert doesn't return count of updated vs inserted
                     # We'll just track total records processed
                     total_saved += len(batch)
-                    print(f"  📦 Batch {batch_num}/{total_batches}: Processed {len(batch)} records...")
+                    logger.info(f"  📦 Batch {batch_num}/{total_batches}: Processed {len(batch)} records...")
                     
                 except Exception as batch_error:
                     error_msg = str(batch_error)
                     # Check if error is due to missing constraint
                     if 'constraint' in error_msg.lower() or 'unique' in error_msg.lower():
-                        print(f"  [WARNING]  Error: Unique constraint not found. Run migration:")
-                        print(f"     supabase/migrations/20250120000001_add_raw_shots_unique_constraint.sql")
-                        print(f"  Attempting fallback insert (may create duplicates)...")
+                        logger.error(f"  [WARNING]  Error: Unique constraint not found. Run migration:")
+                        logger.info(f"     supabase/migrations/20250120000001_add_raw_shots_unique_constraint.sql")
+                        logger.info(f"  Attempting fallback insert (may create duplicates)...")
                         # Fallback to regular insert (will fail on duplicates, but that's okay)
                         try:
                             supabase.table('raw_shots').insert(batch).execute()
                             total_saved += len(batch)
-                            print(f"  📦 Batch {batch_num}/{total_batches}: Inserted {len(batch)} records (fallback mode)...")
+                            logger.info(f"  📦 Batch {batch_num}/{total_batches}: Inserted {len(batch)} records (fallback mode)...")
                         except Exception as insert_error:
-                            print(f"  [ERROR] Fallback insert also failed: {insert_error}")
+                            logger.error(f"  [ERROR] Fallback insert also failed: {insert_error}")
                             # Try individual inserts as last resort
                             for record in batch:
                                 try:
@@ -3984,7 +3987,7 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                                 except Exception:
                                     pass  # Skip duplicates silently
                     else:
-                        print(f"  [WARNING]  Error processing batch {batch_num}: {batch_error}")
+                        logger.error(f"  [WARNING]  Error processing batch {batch_num}: {batch_error}")
                         # Try individual inserts for this batch as fallback
                         for record in batch:
                             try:
@@ -4001,13 +4004,13 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                                 except Exception:
                                     pass  # Skip duplicates silently
             
-            print(f"[OK] Successfully saved/updated {total_saved} shot records to raw_shots table.")
+            logger.info(f"[OK] Successfully saved/updated {total_saved} shot records to raw_shots table.")
             
     except Exception as e:
-        print(f"[WARNING]  Error saving raw shots to database: {e}")
+        logger.error(f"[WARNING]  Error saving raw shots to database: {e}")
         import traceback
         traceback.print_exc()
-        print("   Continuing with aggregation...")
+        logger.info("   Continuing with aggregation...")
 
     # 3. Aggregate xG per player (shooter) for the final stats table
     # This groups all the calculated xG values and sums them up per player and per game.
@@ -4018,7 +4021,7 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
         # Removed total_shots as it's not in the database schema
     ).reset_index()
 
-    print(f"Calculated xG for {len(final_stats_df_xg)} unique player/game combinations.")
+    logger.info(f"Calculated xG for {len(final_stats_df_xg)} unique player/game combinations.")
     
     # 4. Aggregate xA per passer for the final stats table
     # Only aggregate for passes that led to shots (passer_id is not None)
@@ -4034,7 +4037,7 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
             # Rename passer_id to playerId for consistency with database schema
             final_stats_df_xa = final_stats_df_xa.rename(columns={'passer_id': 'playerId'})
             
-            print(f"Calculated xA for {len(final_stats_df_xa)} unique passer/game combinations.")
+            logger.info(f"Calculated xA for {len(final_stats_df_xa)} unique passer/game combinations.")
             
             # Merge xG and xA dataframes
             # Some players may have both xG (as shooters) and xA (as passers)
@@ -4051,7 +4054,7 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
             
             return final_stats_df
         else:
-            print("No passes with xA values found. Returning only xG data.")
+            logger.info("No passes with xA values found. Returning only xG data.")
             # Add I_F_xAssists column with 0 values for consistency
             final_stats_df_xg['I_F_xAssists'] = 0.0
             return final_stats_df_xg
@@ -4066,23 +4069,24 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
 
 # --- 2. MAIN EXECUTION ---
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     import sys
     
     # Allow date to be passed as command-line argument
     date_str = '2025-12-07'  # Default date
     if len(sys.argv) > 1:
         date_str = sys.argv[1]
-        print(f"Using date from command line: {date_str}")
+        logger.info(f"Using date from command line: {date_str}")
     else:
-        print(f"Using default date: {date_str}")
-        print("  (To specify a different date, run: python data_acquisition.py YYYY-MM-DD)")
+        logger.info(f"Using default date: {date_str}")
+        logger.info("  (To specify a different date, run: python data_acquisition.py YYYY-MM-DD)")
     
-    print("Starting Advanced Stats Pipeline...")
-    print()
+    logger.info("Starting Advanced Stats Pipeline...")
+    logger.info("")
     final_stats_df = scrape_pbp_and_process(date_str=date_str)
     
     if final_stats_df is not None and not final_stats_df.empty:
-        print(f"Data processing complete. {len(final_stats_df)} records ready for upload.")
+        logger.info(f"Data processing complete. {len(final_stats_df)} records ready for upload.")
         
         # --- UPLOAD TO SUPABASE ---
         # Check if I_F_xAssists column exists by trying a test query
@@ -4093,7 +4097,7 @@ if __name__ == "__main__":
             # Column doesn't exist, remove it from upload data
             has_xa_column = False
             if 'I_F_xAssists' in final_stats_df.columns:
-                print("[WARNING]  I_F_xAssists column not found in database. Uploading xG data only.")
+                logger.warning("[WARNING]  I_F_xAssists column not found in database. Uploading xG data only.")
                 final_stats_df = final_stats_df.drop(columns=['I_F_xAssists'])
         
         # Ensure proper data types for database upload
@@ -4113,8 +4117,8 @@ if __name__ == "__main__":
                 data_to_upload,
                 on_conflict='playerId,game_id'  # Update if this combination already exists
             ).execute()
-            print(f"Successfully uploaded/updated {len(data_to_upload)} advanced stats records to Supabase.")
+            logger.info(f"Successfully uploaded/updated {len(data_to_upload)} advanced stats records to Supabase.")
         except Exception as e:
-            print(f"ERROR: Could not upload data to Supabase: {e}")
-            print(f"Error details: {e}")
+            logger.error(f"ERROR: Could not upload data to Supabase: {e}")
+            logger.error(f"Error details: {e}")
 

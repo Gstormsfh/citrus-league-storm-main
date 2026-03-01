@@ -39,7 +39,7 @@ _shutdown_requested = False
 def _handle_shutdown(signum, frame):
     global _shutdown_requested
     _shutdown_requested = True
-    print(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
+    logger.info(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
 
 signal.signal(signal.SIGINT, _handle_shutdown)
 signal.signal(signal.SIGTERM, _handle_shutdown)
@@ -391,14 +391,14 @@ def main():
         parser.print_help()
         return 1
     
-    print("=" * 80)
-    print("DATA RECONCILIATION SYSTEM (WORLD-CLASS)")
-    print("=" * 80)
-    print(f"Season: {DEFAULT_SEASON} (2025-2026)")
-    print(f"Auto-fix: {args.auto_fix}")
-    print(f"Workers: {args.workers}")
-    print("Architecture: 1 API call per game (not per player) + 100-IP rotation")
-    print()
+    logger.info("=" * 80)
+    logger.info("DATA RECONCILIATION SYSTEM (WORLD-CLASS)")
+    logger.info("=" * 80)
+    logger.info(f"Season: {DEFAULT_SEASON} (2025-2026)")
+    logger.info(f"Auto-fix: {args.auto_fix}")
+    logger.info(f"Workers: {args.workers}")
+    logger.info("Architecture: 1 API call per game (not per player) + 100-IP rotation")
+    logger.info("")
     
     db = supabase_client()
     
@@ -409,7 +409,7 @@ def main():
         return 1
     
     logger.info(f"[RECONCILE] Validating {len(games)} games...")
-    print()
+    logger.info("")
     
     total_checked = 0
     total_fixed = 0
@@ -437,7 +437,7 @@ def main():
         for future in as_completed(futures):
             if _shutdown_requested:
                 executor.shutdown(wait=False, cancel_futures=True)
-                print(f"\n[SHUTDOWN] Graceful shutdown complete. Validated {completed}/{len(games)} games.")
+                logger.info(f"\n[SHUTDOWN] Graceful shutdown complete. Validated {completed}/{len(games)} games.")
                 sys.exit(0)
 
             completed += 1
@@ -459,38 +459,38 @@ def main():
     
     elapsed = time.time() - start_time
     
-    print()
-    print("=" * 80)
-    print("RECONCILIATION COMPLETE")
-    print("=" * 80)
-    print(f"Games validated: {len(games)}")
-    print(f"Players checked: {total_checked}")
-    print(f"Discrepancies found: {len(all_discrepancies)}")
-    print(f"Auto-fixed: {total_fixed}")
-    print(f"Time: {elapsed:.1f}s ({len(games)/elapsed:.1f} games/sec)")
-    print()
+    logger.info("")
+    logger.info("=" * 80)
+    logger.info("RECONCILIATION COMPLETE")
+    logger.info("=" * 80)
+    logger.info(f"Games validated: {len(games)}")
+    logger.info(f"Players checked: {total_checked}")
+    logger.info(f"Discrepancies found: {len(all_discrepancies)}")
+    logger.info(f"Auto-fixed: {total_fixed}")
+    logger.info(f"Time: {elapsed:.1f}s ({len(games)/elapsed:.1f} games/sec)")
+    logger.info("")
     
     if all_discrepancies:
-        print("DISCREPANCIES FOUND:")
-        print("-" * 80)
+        logger.info("DISCREPANCIES FOUND:")
+        logger.info("-" * 80)
         for disc in all_discrepancies[:25]:  # Show first 25
-            print(f"Game {disc['game_id']} ({disc['game_date']}), Player {disc['player_id']}:")
+            logger.info(f"Game {disc['game_id']} ({disc['game_date']}), Player {disc['player_id']}:")
             for stat, diff in disc['differences'].items():
                 our_val = disc['our_stats'][stat]
                 api_val = disc['api_stats'][stat]
-                print(f"  {stat}: {our_val} -> {api_val} (diff: {diff:+d})")
+                logger.info(f"  {stat}: {our_val} -> {api_val} (diff: {diff:+d})")
         
         if len(all_discrepancies) > 25:
-            print(f"  ... and {len(all_discrepancies) - 25} more")
+            logger.info(f"  ... and {len(all_discrepancies) - 25} more")
     else:
-        print("[OK] No discrepancies found - data is accurate!")
+        logger.info("[OK] No discrepancies found - data is accurate!")
     
     if total_fixed > 0:
-        print()
-        print(f"[!] {total_fixed} records were auto-fixed.")
-        print("    Run these to update season totals:")
-        print("      python build_player_season_stats.py")
-        print("      python fetch_nhl_stats_from_landing.py")
+        logger.info("")
+        logger.info(f"[!] {total_fixed} records were auto-fixed.")
+        logger.info("    Run these to update season totals:")
+        logger.info("      python build_player_season_stats.py")
+        logger.info("      python fetch_nhl_stats_from_landing.py")
     
     return 0
 

@@ -24,13 +24,16 @@ import requests
 from dotenv import load_dotenv
 from supabase_rest import SupabaseRest
 from src.utils.citrus_request import citrus_request
+import logging
+
+logger = logging.getLogger(__name__)
 
 _shutdown_requested = False
 
 def _handle_shutdown(signum, frame):
     global _shutdown_requested
     _shutdown_requested = True
-    print(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
+    logger.info(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
 
 signal.signal(signal.SIGINT, _handle_shutdown)
 signal.signal(signal.SIGTERM, _handle_shutdown)
@@ -99,11 +102,11 @@ def detect_active_games() -> bool:
             if (now - game_date).total_seconds() < 7200:  # 2 hours
               return True
           except (ValueError, TypeError, KeyError) as e:
-            print(f"[ingest_live_raw_nhl] Warning: failed to parse game start time for active game check: {e}")
+            logger.error(f"[ingest_live_raw_nhl] Warning: failed to parse game start time for active game check: {e}")
 
     return False
   except Exception as e:
-    print(f"[ingest_live_raw_nhl] Warning: Error detecting active games: {e}")
+    logger.error(f"[ingest_live_raw_nhl] Warning: Error detecting active games: {e}")
     return False
 
 
@@ -143,7 +146,7 @@ def extract_game_state_and_last_updated(pbp_json: dict) -> Tuple[Optional[str], 
       mt_dt = utc_dt.astimezone(ZoneInfo("America/Denver"))
       game_date = mt_dt.strftime('%Y-%m-%d')
     except Exception as e:
-      print(f"[ingest_live_raw_nhl] Warning: failed to parse startTimeUTC '{st}' for timezone conversion: {e}")
+      logger.error(f"[ingest_live_raw_nhl] Warning: failed to parse startTimeUTC '{st}' for timezone conversion: {e}")
       game_date = st.split("T")[0]
 
   return game_state, last_updated, game_date
@@ -163,24 +166,24 @@ def upsert_raw_game(db: SupabaseRest, game_id: int, game_date: str, pbp_json: di
 
 
 def main() -> int:
-  print("=" * 80)
-  print("[ingest_live_raw_nhl] STARTING LIVE INGEST LOOP")
-  print("=" * 80)
+  logger.info("=" * 80)
+  logger.info("[ingest_live_raw_nhl] STARTING LIVE INGEST LOOP")
+  logger.info("=" * 80)
   if ADAPTIVE_MODE:
-    print(f"Adaptive mode: ENABLED")
-    print(f"  Live interval: {LIVE_INTERVAL}s (during active games)")
-    print(f"  Off-hours interval: {OFF_INTERVAL}s (no active games)")
+    logger.info(f"Adaptive mode: ENABLED")
+    logger.info(f"  Live interval: {LIVE_INTERVAL}s (during active games)")
+    logger.info(f"  Off-hours interval: {OFF_INTERVAL}s (no active games)")
   else:
-    print(f"Poll interval: {POLL_SECONDS}s (fixed)")
-  print(f"Cooldown: {COOLDOWN_SECONDS}s")
-  print(f"Timestamp: {_now_iso()}")
-  print()
+    logger.info(f"Poll interval: {POLL_SECONDS}s (fixed)")
+  logger.info(f"Cooldown: {COOLDOWN_SECONDS}s")
+  logger.info(f"Timestamp: {_now_iso()}")
+  logger.info("")
   
   try:
     db = supabase_client()
-    print("[ingest_live_raw_nhl] Connected to Supabase")
+    logger.info("[ingest_live_raw_nhl] Connected to Supabase")
   except Exception as e:
-    print(f"[ingest_live_raw_nhl] ERROR: Failed to connect: {e}")
+    logger.error(f"[ingest_live_raw_nhl] ERROR: Failed to connect: {e}")
     return 1
 
   # game_id -> (lastUpdated, last_fetch_epoch)
@@ -194,7 +197,7 @@ def main() -> int:
 
   while True:
     if _shutdown_requested:
-      print(f"[SHUTDOWN] Graceful shutdown complete. Total ingested: {total_ingested}")
+      logger.info(f"[SHUTDOWN] Graceful shutdown complete. Total ingested: {total_ingested}")
       sys.exit(0)
 
     try:
@@ -204,7 +207,7 @@ def main() -> int:
         current_interval = get_polling_interval()
         last_interval_check = time.time()
         if current_interval != POLL_SECONDS:
-          print(f"[ingest_live_raw_nhl] [ADAPTIVE] Updated polling interval to {current_interval}s")
+          logger.info(f"[ingest_live_raw_nhl] [ADAPTIVE] Updated polling interval to {current_interval}s")
       
       sched = get_schedule_now()
       games = (sched.get("games") or [])
@@ -213,14 +216,14 @@ def main() -> int:
       current_time = time.time()
       if current_time - last_progress_time >= 15:
         mode_str = f"adaptive ({current_interval}s)" if ADAPTIVE_MODE else f"fixed ({POLL_SECONDS}s)"
-        print(f"[ingest_live_raw_nhl] [PROGRESS] Polling schedule... (mode: {mode_str}, total ingested: {total_ingested})")
+        logger.info(f"[ingest_live_raw_nhl] [PROGRESS] Polling schedule... (mode: {mode_str}, total ingested: {total_ingested})")
         last_progress_time = current_time
 
       for g in games:
         try:
           game_id = int(g.get("id"))
         except Exception as e:
-          print(f"[ingest_live_raw_nhl] Warning: failed to parse game ID from schedule entry: {e}")
+          logger.error(f"[ingest_live_raw_nhl] Warning: failed to parse game ID from schedule entry: {e}")
           continue
 
         game_state = g.get("gameState")
@@ -249,7 +252,7 @@ def main() -> int:
         cooldown[game_id] = (last_updated, time.time())
         total_ingested += 1
 
-        print(f"[ingest_live_raw_nhl] upserted game_id={game_id} state={pbp_state} lastUpdated={last_updated}")
+        logger.info(f"[ingest_live_raw_nhl] upserted game_id={game_id} state={pbp_state} lastUpdated={last_updated}")
 
         # If OFF, do a second immediate "gold standard" pull and finalize
         if pbp_state == "OFF" or game_state == "OFF":
@@ -258,21 +261,22 @@ def main() -> int:
           upsert_raw_game(db, game_id, game_date2 or game_date, pbp2)
           finalized[game_id] = True
           cooldown[game_id] = (last_updated2, time.time())
-          print(f"[ingest_live_raw_nhl] finalized game_id={game_id}")
+          logger.info(f"[ingest_live_raw_nhl] finalized game_id={game_id}")
 
       # Use adaptive interval if enabled, otherwise use fixed interval
       sleep_interval = get_polling_interval() if ADAPTIVE_MODE else POLL_SECONDS
       time.sleep(sleep_interval)
 
     except KeyboardInterrupt:
-      print("[ingest_live_raw_nhl] Exiting (Ctrl+C).")
+      logger.info("[ingest_live_raw_nhl] Exiting (Ctrl+C).")
       return 0
     except Exception as e:
-      print(f"[ingest_live_raw_nhl] ERROR: {e}", file=sys.stderr)
+      logger.error(f"[ingest_live_raw_nhl] ERROR: {e}", file=sys.stderr)
       time.sleep(max(5, POLL_SECONDS // 2))
 
 
 if __name__ == "__main__":
+  logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
   raise SystemExit(main())
 
 

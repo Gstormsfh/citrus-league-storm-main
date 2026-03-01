@@ -241,7 +241,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
   // Load leagues on mount and when user changes
   useEffect(() => {
     loadUserLeagues();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadUserLeagues is not memoized; user is the only meaningful trigger
   }, [user]);
 
   // Update active league when URL param changes (with membership validation)
@@ -322,7 +322,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
 
       verifyAndSetLeague();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- setActiveLeagueId/setIsChangingLeague are stable; verifyAndSetLeague is inline. Listed deps are the actual triggers for league verification.
   }, [urlLeagueId, userLeagues, user, activeLeagueId, loading, navigate, toast]);
 
   // Derive league format from active league (memoized to avoid unnecessary re-renders)

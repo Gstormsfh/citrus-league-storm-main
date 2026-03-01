@@ -23,13 +23,16 @@ import sys
 from datetime import datetime, date, timedelta
 from typing import Dict, List, Optional, Tuple, Any
 from decimal import Decimal, ROUND_HALF_UP
+import logging
+
+logger = logging.getLogger(__name__)
 
 _shutdown_requested = False
 
 def _handle_shutdown(signum, frame):
     global _shutdown_requested
     _shutdown_requested = True
-    print(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
+    logger.info(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
 
 signal.signal(signal.SIGINT, _handle_shutdown)
 signal.signal(signal.SIGTERM, _handle_shutdown)
@@ -113,7 +116,7 @@ def get_league_averages(db: SupabaseRest, position: str, season: int) -> Optiona
                 "std_dev_blocks_per_game": avg.get("std_dev_blocks_per_game"),
             }
     except Exception as e:
-        print(f"⚠️  Warning: Could not fetch league averages for {position}: {e}")
+        logger.warning(f"⚠️  Warning: Could not fetch league averages for {position}: {e}")
     
     return None
 
@@ -247,12 +250,12 @@ def get_latest_baselines(db: SupabaseRest, season: int) -> Dict[str, float]:
             if sv_pct and 0.85 <= float(sv_pct) <= 0.95:
                 current_sv_pct = float(sv_pct)
             else:
-                print(f"⚠️  Warning: Invalid league_avg_sv_pct ({sv_pct}), will use fallback")
+                logger.warning(f"⚠️  Warning: Invalid league_avg_sv_pct ({sv_pct}), will use fallback")
             
             if xga_per_60 and 1.5 <= float(xga_per_60) <= 4.0:
                 current_xga_per_60 = float(xga_per_60)
             else:
-                print(f"⚠️  Warning: Invalid league_avg_xga_per_60 ({xga_per_60}), will use fallback")
+                logger.warning(f"⚠️  Warning: Invalid league_avg_xga_per_60 ({xga_per_60}), will use fallback")
         
         # Early season check: if sample size is too small, blend with previous season
         # Check total shots faced from player_season_stats to estimate sample size
@@ -285,7 +288,7 @@ def get_latest_baselines(db: SupabaseRest, season: int) -> Dict[str, float]:
                         blend_weight = total_shots / 500.0  # 0.0 to 1.0
                         blend_weight = max(0.3, min(1.0, blend_weight))  # Cap between 30% and 100%
                         current_sv_pct = (blend_weight * current_sv_pct) + ((1 - blend_weight) * float(prev_sv_pct))
-                        print(f"⚠️  Early season detected ({total_shots} shots), blending baselines: {blend_weight:.1%} current, {1-blend_weight:.1%} previous")
+                        logger.warning(f"⚠️  Early season detected ({total_shots} shots), blending baselines: {blend_weight:.1%} current, {1-blend_weight:.1%} previous")
                     
                     if prev_xga_per_60 and 1.5 <= float(prev_xga_per_60) <= 4.0:
                         blend_weight = total_shots / 500.0
@@ -294,11 +297,11 @@ def get_latest_baselines(db: SupabaseRest, season: int) -> Dict[str, float]:
         
         # Final validation and fallback
         if current_sv_pct is None:
-            print(f"⚠️  Warning: No valid league_avg_sv_pct found, using fallback: 0.900")
+            logger.warning(f"⚠️  Warning: No valid league_avg_sv_pct found, using fallback: 0.900")
             current_sv_pct = 0.900
         
         if current_xga_per_60 is None:
-            print(f"⚠️  Warning: No valid league_avg_xga_per_60 found, using fallback: 2.5")
+            logger.warning(f"⚠️  Warning: No valid league_avg_xga_per_60 found, using fallback: 2.5")
             current_xga_per_60 = 2.5
         
         # Get league average shots for/60
@@ -322,7 +325,7 @@ def get_latest_baselines(db: SupabaseRest, season: int) -> Dict[str, float]:
         _baseline_cache[season] = result
         return result
     except Exception as e:
-        print(f"⚠️  Warning: Could not fetch league baselines: {e}")
+        logger.warning(f"⚠️  Warning: Could not fetch league baselines: {e}")
     
     # Fallback to hardcoded values if query fails
     fallback = {
@@ -425,7 +428,7 @@ def calculate_hybrid_base(
     )
     
     if not player_stats or len(player_stats) == 0:
-        print(f"⚠️  No season stats found for player {player_id}")
+        logger.warning(f"⚠️  No season stats found for player {player_id}")
         return {
             "goals": 0.0, "assists": 0.0, "sog": 0.0, "blocks": 0.0,
             "ppp": 0.0, "shp": 0.0, "hits": 0.0, "pim": 0.0, "ppg": 0.0
@@ -456,7 +459,7 @@ def calculate_hybrid_base(
     # Get league averages
     league_avg = get_league_averages(db, position, season)
     if not league_avg:
-        print(f"⚠️  No league averages found for position {position}, using defaults")
+        logger.warning(f"⚠️  No league averages found for position {position}, using defaults")
         league_avg = {
             "avg_goals_per_game": 0.0,
             "avg_assists_per_game": 0.0,
@@ -589,7 +592,7 @@ def calculate_finishing_talent(db: SupabaseRest, player_id: int, season: int) ->
         return capped_multiplier
         
     except Exception as e:
-        print(f"⚠️  Warning: Could not calculate finishing talent for player {player_id}: {e}")
+        logger.warning(f"⚠️  Warning: Could not calculate finishing talent for player {player_id}: {e}")
         return 1.0
 
 
@@ -612,7 +615,7 @@ def get_opposing_goalie_save_pct(
     """
     try:
         if debug:
-            print(f"  [DDR Debug] Getting goalie SV% for opponent: {opponent_team}")
+            logger.debug(f"  [DDR Debug] Getting goalie SV% for opponent: {opponent_team}")
         # Note: player_projected_stats doesn't currently store goalie-specific projections
         # (projected_saves, projected_goals_against). For now, we'll use team baseline.
         # In the future, if goalie projections are added to player_projected_stats,
@@ -667,15 +670,15 @@ def get_opposing_goalie_save_pct(
                     if top_2:
                         avg_sv_pct = sum(g["save_pct"] for g in top_2) / len(top_2)
                         if debug:
-                            print(f"  [DDR Debug] Team baseline SV%: {avg_sv_pct:.3f} (avg of top {len(top_2)} goalies)")
+                            logger.debug(f"  [DDR Debug] Team baseline SV%: {avg_sv_pct:.3f} (avg of top {len(top_2)} goalies)")
                         return avg_sv_pct
         
         if debug:
-            print(f"  [DDR Debug] No goalie data found for {opponent_team}, returning None")
+            logger.debug(f"  [DDR Debug] No goalie data found for {opponent_team}, returning None")
         return None
         
     except Exception as e:
-        print(f"⚠️  Warning: Could not get opposing goalie save percentage for {opponent_team}: {e}")
+        logger.warning(f"⚠️  Warning: Could not get opposing goalie save percentage for {opponent_team}: {e}")
         return None
 
 
@@ -818,15 +821,15 @@ def get_team_xga_per_60(
         if total_toi > 0:
             xga_per_60 = (total_xga / total_toi) * 3600
             if debug:
-                print(f"  [DDR Debug] {team} xGA/60: {xga_per_60:.3f} (Total xGA: {total_xga:.2f}, Total TOI: {total_toi/60:.1f} min)")
+                logger.debug(f"  [DDR Debug] {team} xGA/60: {xga_per_60:.3f} (Total xGA: {total_xga:.2f}, Total TOI: {total_toi/60:.1f} min)")
             return xga_per_60
         
         if debug:
-            print(f"  [DDR Debug] No TOI data for {team}, returning None")
+            logger.debug(f"  [DDR Debug] No TOI data for {team}, returning None")
         return None
         
     except Exception as e:
-        print(f"⚠️  Warning: Could not calculate team xGA/60 for {team}: {e}")
+        logger.warning(f"⚠️  Warning: Could not calculate team xGA/60 for {team}: {e}")
         return None
 
 
@@ -869,24 +872,24 @@ def get_player_on_ice_xga_per_60(
         if current_xga and prev_xga:
             blended_xga = (current_xga * 0.6) + (prev_xga * 0.4)
             if debug:
-                print(f"  [VOPA Debug] Player {player_id} on-ice xGA/60 (blended): {blended_xga:.3f} (current: {current_xga:.3f} × 0.6 + prev: {prev_xga:.3f} × 0.4)")
+                logger.debug(f"  [VOPA Debug] Player {player_id} on-ice xGA/60 (blended): {blended_xga:.3f} (current: {current_xga:.3f} × 0.6 + prev: {prev_xga:.3f} × 0.4)")
         elif current_xga:
             blended_xga = current_xga
             if debug:
-                print(f"  [VOPA Debug] Player {player_id} on-ice xGA/60 (current only): {blended_xga:.3f} (no previous season data)")
+                logger.debug(f"  [VOPA Debug] Player {player_id} on-ice xGA/60 (current only): {blended_xga:.3f} (no previous season data)")
         elif prev_xga:
             blended_xga = prev_xga
             if debug:
-                print(f"  [VOPA Debug] Player {player_id} on-ice xGA/60 (previous only): {blended_xga:.3f} (no current season data)")
+                logger.debug(f"  [VOPA Debug] Player {player_id} on-ice xGA/60 (previous only): {blended_xga:.3f} (no current season data)")
         else:
             if debug:
-                print(f"  [VOPA Debug] Player {player_id} on-ice xGA/60: No data available")
+                logger.debug(f"  [VOPA Debug] Player {player_id} on-ice xGA/60: No data available")
             return None
         
         return blended_xga
     except Exception as e:
         if debug:
-            print(f"  [VOPA Debug] Error calculating on-ice xGA/60 for player {player_id}: {e}")
+            logger.error(f"  [VOPA Debug] Error calculating on-ice xGA/60 for player {player_id}: {e}")
         return None
 
 
@@ -908,7 +911,7 @@ def get_opponent_shots_for_per_60(
     """
     try:
         if debug:
-            print(f"  [Goalie Projection] Calculating shots for/60 for opponent: {opponent_team}")
+            logger.info(f"  [Goalie Projection] Calculating shots for/60 for opponent: {opponent_team}")
         
         # Get opponent team's last N games
         recent_games = db.select(
@@ -928,7 +931,7 @@ def get_opponent_shots_for_per_60(
         
         if not team_game_ids:
             if debug:
-                print(f"  [Goalie Projection] No games found for {opponent_team}")
+                logger.info(f"  [Goalie Projection] No games found for {opponent_team}")
             return None
         
         # Get shots on goal from player_game_stats for the opponent team
@@ -958,15 +961,15 @@ def get_opponent_shots_for_per_60(
         if total_toi > 0:
             shots_for_per_60 = (total_shots / total_toi) * 3600
             if debug:
-                print(f"  [Goalie Projection] {opponent_team} shots for/60: {shots_for_per_60:.2f} (Total shots: {total_shots}, Total TOI: {total_toi/60:.1f} min)")
+                logger.info(f"  [Goalie Projection] {opponent_team} shots for/60: {shots_for_per_60:.2f} (Total shots: {total_shots}, Total TOI: {total_toi/60:.1f} min)")
             return shots_for_per_60
         
         if debug:
-            print(f"  [Goalie Projection] No TOI data for {opponent_team}")
+            logger.info(f"  [Goalie Projection] No TOI data for {opponent_team}")
         return None
         
     except Exception as e:
-        print(f"⚠️  Warning: Could not calculate shots for/60 for {opponent_team}: {e}")
+        logger.warning(f"⚠️  Warning: Could not calculate shots for/60 for {opponent_team}: {e}")
         return None
 
 
@@ -988,7 +991,7 @@ def get_vegas_win_probability(
     """
     try:
         if debug:
-            print(f"  [Goalie Projection] Getting win probability for {goalie_team}")
+            logger.info(f"  [Goalie Projection] Getting win probability for {goalie_team}")
         
         # Try to get Vegas odds first
         game_info = db.select(
@@ -1012,12 +1015,12 @@ def get_vegas_win_probability(
             
             if implied_prob is not None:
                 if debug:
-                    print(f"  [Goalie Projection] Using Vegas implied probability: {implied_prob:.3f} (moneyline: {moneyline})")
+                    logger.info(f"  [Goalie Projection] Using Vegas implied probability: {implied_prob:.3f} (moneyline: {moneyline})")
                 return float(implied_prob)
         
         # Fallback: Calculate from team's season win rate
         if debug:
-            print(f"  [Goalie Projection] No Vegas odds, calculating from team season win rate")
+            logger.info(f"  [Goalie Projection] No Vegas odds, calculating from team season win rate")
         
         # Try to get team's season win rate from nhl_games
         # Query all final games for this team this season
@@ -1033,10 +1036,10 @@ def get_vegas_win_probability(
         
         if not all_team_games:
             if debug:
-                print(f"  [Goalie Projection] No final games found for season {season}")
+                logger.info(f"  [Goalie Projection] No final games found for season {season}")
             # Last resort: return 0.5 (league average) but log it
             if debug:
-                print(f"  [Goalie Projection] Using default 0.5 (league average) - no game data available")
+                logger.info(f"  [Goalie Projection] Using default 0.5 (league average) - no game data available")
             return 0.5
         
         # Filter to games involving this team and sort by date (most recent first)
@@ -1047,7 +1050,7 @@ def get_vegas_win_probability(
         
         if not team_games:
             if debug:
-                print(f"  [Goalie Projection] No games found for team {goalie_team}")
+                logger.info(f"  [Goalie Projection] No games found for team {goalie_team}")
             return 0.5
         
         # Sort by date (most recent first) - handle date strings
@@ -1070,11 +1073,11 @@ def get_vegas_win_probability(
         
         win_rate = wins / len(recent_games) if recent_games else 0.5
         if debug:
-            print(f"  [Goalie Projection] Team win rate: {win_rate:.3f} ({wins} wins in {len(recent_games)} games)")
+            logger.info(f"  [Goalie Projection] Team win rate: {win_rate:.3f} ({wins} wins in {len(recent_games)} games)")
         return win_rate
         
     except Exception as e:
-        print(f"⚠️  Warning: Could not get win probability for {goalie_team}: {e}")
+        logger.warning(f"⚠️  Warning: Could not get win probability for {goalie_team}: {e}")
         return None
 
 
@@ -1102,7 +1105,7 @@ def get_goalie_gsax(
         if gsax_data and len(gsax_data) > 0:
             gsax = float(gsax_data[0].get("regressed_gsax", 0))
             if debug:
-                print(f"  [Goalie Projection] GSAx: {gsax:.2f}")
+                logger.info(f"  [Goalie Projection] GSAx: {gsax:.2f}")
             return gsax
         
         # Fallback to goalie_gsax if primary not available
@@ -1116,15 +1119,15 @@ def get_goalie_gsax(
         if gsax_data and len(gsax_data) > 0:
             gsax = float(gsax_data[0].get("regressed_gsax", 0))
             if debug:
-                print(f"  [Goalie Projection] GSAx (from goalie_gsax): {gsax:.2f}")
+                logger.info(f"  [Goalie Projection] GSAx (from goalie_gsax): {gsax:.2f}")
             return gsax
         
         if debug:
-            print(f"  [Goalie Projection] No GSAx data found for goalie {player_id}")
+            logger.info(f"  [Goalie Projection] No GSAx data found for goalie {player_id}")
         return None
         
     except Exception as e:
-        print(f"⚠️  Warning: Could not get GSAx for goalie {player_id}: {e}")
+        logger.warning(f"⚠️  Warning: Could not get GSAx for goalie {player_id}: {e}")
         return None
 
 
@@ -1160,49 +1163,49 @@ def get_opponent_strength(
     """
     try:
         if debug:
-            print(f"\n[DDR Debug] Calculating DDR for opponent: {opponent_team}")
-            print(f"  [DDR Debug] League Avg xGA/60: {league_avg_xga_per_60:.3f}")
-            print(f"  [DDR Debug] League Avg SV%: {league_avg_sv_pct:.3f}")
+            logger.debug(f"\n[DDR Debug] Calculating DDR for opponent: {opponent_team}")
+            logger.debug(f"  [DDR Debug] League Avg xGA/60: {league_avg_xga_per_60:.3f}")
+            logger.debug(f"  [DDR Debug] League Avg SV%: {league_avg_sv_pct:.3f}")
         
         # Get team xGA/60 over last 10 games
         opponent_xga_per_60 = get_team_xga_per_60(db, opponent_team, season, last_n_games=10, debug=debug)
         if not opponent_xga_per_60 or opponent_xga_per_60 == 0:
             team_multiplier = 1.0
             if debug:
-                print(f"  [DDR Debug] No xGA data, using team_multiplier = 1.0")
+                logger.debug(f"  [DDR Debug] No xGA data, using team_multiplier = 1.0")
         else:
             # Formula: opponent_xga / league_avg_xga
             # If opponent has HIGHER xGA (worse defense) → multiplier > 1.0 → increases projection ✓
             # If opponent has LOWER xGA (better defense) → multiplier < 1.0 → reduces projection ✓
             team_multiplier = opponent_xga_per_60 / league_avg_xga_per_60
             if debug:
-                print(f"  [DDR Debug] Team multiplier: {team_multiplier:.3f} = {opponent_xga_per_60:.3f} / {league_avg_xga_per_60:.3f}")
+                logger.debug(f"  [DDR Debug] Team multiplier: {team_multiplier:.3f} = {opponent_xga_per_60:.3f} / {league_avg_xga_per_60:.3f}")
                 if opponent_xga_per_60 < league_avg_xga_per_60:
                     pct = (1 - team_multiplier) * 100
-                    print(f"    → {opponent_team} has STRONGER defense (lower xGA {opponent_xga_per_60:.3f} < avg {league_avg_xga_per_60:.3f}) → REDUCES projection by {pct:.1f}%")
+                    logger.info(f"    → {opponent_team} has STRONGER defense (lower xGA {opponent_xga_per_60:.3f} < avg {league_avg_xga_per_60:.3f}) → REDUCES projection by {pct:.1f}%")
                 else:
                     pct = (team_multiplier - 1) * 100
-                    print(f"    → {opponent_team} has WEAKER defense (higher xGA {opponent_xga_per_60:.3f} > avg {league_avg_xga_per_60:.3f}) → INCREASES projection by {pct:.1f}%")
+                    logger.info(f"    → {opponent_team} has WEAKER defense (higher xGA {opponent_xga_per_60:.3f} > avg {league_avg_xga_per_60:.3f}) → INCREASES projection by {pct:.1f}%")
         
         # Get opposing goalie save percentage
         goalie_sv_pct = get_opposing_goalie_save_pct(db, opponent_team, game_id, game_date, season, debug=debug)
         if not goalie_sv_pct or goalie_sv_pct == 0:
             goalie_multiplier = 1.0
             if debug:
-                print(f"  [DDR Debug] No goalie data, using goalie_multiplier = 1.0")
+                logger.debug(f"  [DDR Debug] No goalie data, using goalie_multiplier = 1.0")
         else:
             # Formula: league_avg_sv_pct / goalie_sv_pct
             # If goalie has HIGHER SV% (better goalie) → multiplier < 1.0 → reduces projection ✓
             # If goalie has LOWER SV% (worse goalie) → multiplier > 1.0 → increases projection ✓
             goalie_multiplier = league_avg_sv_pct / goalie_sv_pct
             if debug:
-                print(f"  [DDR Debug] Goalie multiplier: {goalie_multiplier:.3f} = {league_avg_sv_pct:.3f} / {goalie_sv_pct:.3f}")
+                logger.debug(f"  [DDR Debug] Goalie multiplier: {goalie_multiplier:.3f} = {league_avg_sv_pct:.3f} / {goalie_sv_pct:.3f}")
                 if goalie_sv_pct > league_avg_sv_pct:
                     pct = (1 - goalie_multiplier) * 100
-                    print(f"    → {opponent_team} goalie is STRONGER (higher SV% {goalie_sv_pct:.3f} > avg {league_avg_sv_pct:.3f}) → REDUCES projection by {pct:.1f}%")
+                    logger.info(f"    → {opponent_team} goalie is STRONGER (higher SV% {goalie_sv_pct:.3f} > avg {league_avg_sv_pct:.3f}) → REDUCES projection by {pct:.1f}%")
                 else:
                     pct = (goalie_multiplier - 1) * 100
-                    print(f"    → {opponent_team} goalie is WEAKER (lower SV% {goalie_sv_pct:.3f} < avg {league_avg_sv_pct:.3f}) → INCREASES projection by {pct:.1f}%")
+                    logger.info(f"    → {opponent_team} goalie is WEAKER (lower SV% {goalie_sv_pct:.3f} < avg {league_avg_sv_pct:.3f}) → INCREASES projection by {pct:.1f}%")
         
         # NEW: Offensive strength multiplier (Sprint 4)
         # Higher opponent offense → more shots/opportunities → increases projection
@@ -1215,43 +1218,43 @@ def get_opponent_strength(
         if opponent_shots_for and league_avg_shots_for > 0:
             offense_multiplier = opponent_shots_for / league_avg_shots_for
             if debug:
-                print(f"  [DDR Debug] Offense multiplier: {offense_multiplier:.3f} = {opponent_shots_for:.2f} / {league_avg_shots_for:.2f}")
+                logger.debug(f"  [DDR Debug] Offense multiplier: {offense_multiplier:.3f} = {opponent_shots_for:.2f} / {league_avg_shots_for:.2f}")
                 if opponent_shots_for > league_avg_shots_for:
                     pct = (offense_multiplier - 1) * 100
-                    print(f"    → {opponent_team} has STRONGER offense (more shots {opponent_shots_for:.2f} > avg {league_avg_shots_for:.2f}) → INCREASES projection by {pct:.1f}%")
+                    logger.info(f"    → {opponent_team} has STRONGER offense (more shots {opponent_shots_for:.2f} > avg {league_avg_shots_for:.2f}) → INCREASES projection by {pct:.1f}%")
                 elif opponent_shots_for < league_avg_shots_for:
                     pct = (1 - offense_multiplier) * 100
-                    print(f"    → {opponent_team} has WEAKER offense (fewer shots {opponent_shots_for:.2f} < avg {league_avg_shots_for:.2f}) → REDUCES projection by {pct:.1f}%")
+                    logger.info(f"    → {opponent_team} has WEAKER offense (fewer shots {opponent_shots_for:.2f} < avg {league_avg_shots_for:.2f}) → REDUCES projection by {pct:.1f}%")
                 else:
-                    print(f"    → {opponent_team} has AVERAGE offense (shots {opponent_shots_for:.2f} = avg {league_avg_shots_for:.2f}) → No adjustment")
+                    logger.info(f"    → {opponent_team} has AVERAGE offense (shots {opponent_shots_for:.2f} = avg {league_avg_shots_for:.2f}) → No adjustment")
         else:
             offense_multiplier = 1.0
             if debug:
-                print(f"  [DDR Debug] No offense data, using offense_multiplier = 1.0")
+                logger.debug(f"  [DDR Debug] No offense data, using offense_multiplier = 1.0")
         
         # Combined DDR: Team Defense × Goalie × Offense
         ddr = team_multiplier * goalie_multiplier * offense_multiplier
         ddr_capped = max(0.7, min(1.3, ddr))
         
         if debug:
-            print(f"  [DDR Debug] Raw DDR: {ddr:.3f} = {team_multiplier:.3f} × {goalie_multiplier:.3f} × {offense_multiplier:.3f}")
+            logger.debug(f"  [DDR Debug] Raw DDR: {ddr:.3f} = {team_multiplier:.3f} × {goalie_multiplier:.3f} × {offense_multiplier:.3f}")
             if ddr != ddr_capped:
-                print(f"  [DDR Debug] DDR capped: {ddr_capped:.3f} (from {ddr:.3f})")
+                logger.debug(f"  [DDR Debug] DDR capped: {ddr_capped:.3f} (from {ddr:.3f})")
             else:
-                print(f"  [DDR Debug] Final DDR: {ddr_capped:.3f}")
+                logger.debug(f"  [DDR Debug] Final DDR: {ddr_capped:.3f}")
             if ddr_capped < 1.0:
                 pct = (1 - ddr_capped) * 100
-                print(f"    → Projection REDUCED by {pct:.1f}% (tough opponent)")
+                logger.info(f"    → Projection REDUCED by {pct:.1f}% (tough opponent)")
             elif ddr_capped > 1.0:
                 pct = (ddr_capped - 1) * 100
-                print(f"    → Projection INCREASED by {pct:.1f}% (weak opponent)")
+                logger.info(f"    → Projection INCREASED by {pct:.1f}% (weak opponent)")
             else:
-                print(f"    → No adjustment (average opponent)")
+                logger.info(f"    → No adjustment (average opponent)")
         
         return ddr_capped
         
     except Exception as e:
-        print(f"⚠️  Warning: Could not calculate DDR for {opponent_team}: {e}")
+        logger.warning(f"⚠️  Warning: Could not calculate DDR for {opponent_team}: {e}")
         if debug:
             import traceback
             traceback.print_exc()
@@ -1421,7 +1424,7 @@ def check_back_to_back(db: SupabaseRest, team: str, game_date: date) -> float:
         return 1.0
         
     except Exception as e:
-        print(f"⚠️  Warning: Could not check B2B for {team}: {e}")
+        logger.warning(f"⚠️  Warning: Could not check B2B for {team}: {e}")
         return 1.0
 
 
@@ -1504,7 +1507,7 @@ def calculate_goalie_projection(
     """
     try:
         if debug:
-            print(f"\n[Goalie Projection] Calculating for goalie {player_id}, game {game_id}")
+            logger.info(f"\n[Goalie Projection] Calculating for goalie {player_id}, game {game_id}")
         
         # Get goalie info
         player_dir = db.select(
@@ -1515,7 +1518,7 @@ def calculate_goalie_projection(
         )
         
         if not player_dir or len(player_dir) == 0:
-            print(f"⚠️  Goalie {player_id} not found in player_directory")
+            logger.warning(f"⚠️  Goalie {player_id} not found in player_directory")
             return None
         
         goalie_team = player_dir[0].get("team_abbrev", "")
@@ -1529,7 +1532,7 @@ def calculate_goalie_projection(
         )
         
         if not game_info or len(game_info) == 0:
-            print(f"⚠️  Game {game_id} not found")
+            logger.warning(f"⚠️  Game {game_id} not found")
             return None
         
         game = game_info[0]
@@ -1545,7 +1548,7 @@ def calculate_goalie_projection(
         )
 
         if not goalie_stats or len(goalie_stats) == 0:
-            print(f"⚠️  No season stats found for goalie {player_id}")
+            logger.warning(f"⚠️  No season stats found for goalie {player_id}")
             return None
 
         stats = goalie_stats[0]
@@ -1576,10 +1579,10 @@ def calculate_goalie_projection(
             # This shifts elite goalie (0.920) to replacement level (0.905) when tired
             projected_sv_pct = max(0.700, projected_sv_pct - 0.015)
             if debug:
-                print(f"  [Goalie Projection] Fatigue penalty applied: {days_rest} days rest, SV% reduced by 0.015 to {projected_sv_pct:.3f}")
+                logger.info(f"  [Goalie Projection] Fatigue penalty applied: {days_rest} days rest, SV% reduced by 0.015 to {projected_sv_pct:.3f}")
         
         if debug:
-            print(f"  [Goalie Projection] SV%: {projected_sv_pct:.3f} (raw: {raw_sv_pct:.3f}, weight: {shrinkage_weight_sv:.3f}, league avg: {LEAGUE_AVG_SV_PCT:.3f}, days rest: {days_rest})")
+            logger.info(f"  [Goalie Projection] SV%: {projected_sv_pct:.3f} (raw: {raw_sv_pct:.3f}, weight: {shrinkage_weight_sv:.3f}, league avg: {LEAGUE_AVG_SV_PCT:.3f}, days rest: {days_rest})")
         
         # 1. Projected Saves (Shot Funnel)
         opponent_shots_for_per_60 = get_opponent_shots_for_per_60(db, opponent_team, season, last_n_games=10, debug=debug)
@@ -1593,7 +1596,7 @@ def calculate_goalie_projection(
         projected_saves = (opponent_shots_for_per_60 / 60) * projected_sv_pct * expected_toi_minutes
         
         if debug:
-            print(f"  [Goalie Projection] Projected Saves: {projected_saves:.2f} = ({opponent_shots_for_per_60:.2f} shots/60 × {projected_sv_pct:.3f} SV% × {expected_toi_minutes:.1f} min)")
+            logger.info(f"  [Goalie Projection] Projected Saves: {projected_saves:.2f} = ({opponent_shots_for_per_60:.2f} shots/60 × {projected_sv_pct:.3f} SV% × {expected_toi_minutes:.1f} min)")
         
         # Calculate GSAA (Goals Saved Above Average)
         # Preferred formula: GSAA = Saves - (Shots Faced × League SV%)
@@ -1607,7 +1610,7 @@ def calculate_goalie_projection(
             projected_shots = 0.0
         
         if debug:
-            print(f"  [Goalie Projection] GSAA: {projected_gsaa:.2f} = {projected_saves:.2f} saves - ({projected_shots:.2f} shots × {LEAGUE_AVG_SV_PCT:.3f} league SV%)")
+            logger.info(f"  [Goalie Projection] GSAA: {projected_gsaa:.2f} = {projected_saves:.2f} saves - ({projected_shots:.2f} shots × {LEAGUE_AVG_SV_PCT:.3f} league SV%)")
         
         # 2. Projected Wins (Vegas Pivot)
         win_probability = get_vegas_win_probability(db, game_id, goalie_team, season, debug=debug)
@@ -1620,7 +1623,7 @@ def calculate_goalie_projection(
             # If B2B, previous night's starter is unlikely to start → reduce win prob
             win_probability *= 0.85  # 15% reduction for B2B
             if debug:
-                print(f"  [Goalie Projection] B2B detected, reducing win probability by 15%")
+                logger.info(f"  [Goalie Projection] B2B detected, reducing win probability by 15%")
         
         # Get opponent offensive context and adjust win probability
         opponent_context = get_opponent_offensive_context(db, opponent_team, season, last_n_games=10)
@@ -1630,13 +1633,13 @@ def calculate_goalie_projection(
         if opponent_context["finishing_ratio"] > 1.1:
             win_probability *= 0.95
             if debug:
-                print(f"  [Goalie Projection] Opponent finishing talent ({opponent_context['finishing_ratio']:.2f}) > 1.1, reducing win probability by 5%")
+                logger.info(f"  [Goalie Projection] Opponent finishing talent ({opponent_context['finishing_ratio']:.2f}) > 1.1, reducing win probability by 5%")
         
         # High volume of high-danger shots (>8 per game) = additional 3% reduction
         if opponent_context["hd_rate"] > 8.0:
             win_probability *= 0.97
             if debug:
-                print(f"  [Goalie Projection] Opponent high-danger rate ({opponent_context['hd_rate']:.1f}) > 8.0, reducing win probability by additional 3%")
+                logger.info(f"  [Goalie Projection] Opponent high-danger rate ({opponent_context['hd_rate']:.1f}) > 8.0, reducing win probability by additional 3%")
         
         projected_wins = win_probability
         
@@ -1645,7 +1648,7 @@ def calculate_goalie_projection(
         regulation_win_prob = win_probability * 0.85
         
         if debug:
-            print(f"  [Goalie Projection] Projected Wins: {projected_wins:.3f} (win probability)")
+            logger.info(f"  [Goalie Projection] Projected Wins: {projected_wins:.3f} (win probability)")
         
         # 3. Projected Shutouts (Ceiling Variable)
         goalie_gsax = get_goalie_gsax(db, player_id, debug=debug)
@@ -1672,13 +1675,13 @@ def calculate_goalie_projection(
         projected_shutouts = min(projected_shutouts, 0.25)  # Cap at 25% (very rare)
         
         if debug:
-            print(f"  [Goalie Projection] Projected Shutouts: {projected_shutouts:.3f} (base: {base_shutout_rate:.3f}, GSAx factor: {gsax_factor:.2f})")
+            logger.info(f"  [Goalie Projection] Projected Shutouts: {projected_shutouts:.3f} (base: {base_shutout_rate:.3f}, GSAx factor: {gsax_factor:.2f})")
         
         # 4. Projected Goals Against
         projected_goals_against = (opponent_shots_for_per_60 / 60) * (1 - projected_sv_pct) * expected_toi_minutes
         
         if debug:
-            print(f"  [Goalie Projection] Projected GA: {projected_goals_against:.2f}")
+            logger.info(f"  [Goalie Projection] Projected GA: {projected_goals_against:.2f}")
         
         # 5. Projected GAA
         if expected_toi_minutes > 0:
@@ -1687,7 +1690,7 @@ def calculate_goalie_projection(
             projected_gaa = 0.0
         
         if debug:
-            print(f"  [Goalie Projection] Projected GAA: {projected_gaa:.2f}")
+            logger.info(f"  [Goalie Projection] Projected GAA: {projected_gaa:.2f}")
         
         # 6. Projected GP (typically 1.0 for starter, 0.0 for backup)
         projected_gp = 1.0 if expected_toi_minutes > 0 else 0.0
@@ -1750,7 +1753,7 @@ def calculate_goalie_projection(
         }
         
     except Exception as e:
-        print(f"❌ Error calculating goalie projection for player {player_id}, game {game_id}: {e}")
+        logger.error(f"❌ Error calculating goalie projection for player {player_id}, game {game_id}: {e}")
         import traceback
         traceback.print_exc()
         return None
@@ -1897,10 +1900,10 @@ def calculate_physical_projection(
             )
     
     except AssertionError as e:
-        print(f"❌ Data leak protection: {e}")
+        logger.error(f"❌ Data leak protection: {e}")
         return None
     except Exception as e:
-        print(f"❌ Error calculating physical projection for player {player_id}: {e}")
+        logger.error(f"❌ Error calculating physical projection for player {player_id}: {e}")
         import traceback
         traceback.print_exc()
         return None
@@ -2224,7 +2227,7 @@ def save_physical_projection(
             return True
         
         # For other errors, log but don't print full traceback (too noisy)
-        print(f"Warning: Could not cache projection for player {player_id}: {type(e).__name__}")
+        logger.warning(f"Warning: Could not cache projection for player {player_id}: {type(e).__name__}")
         return False
 
 
@@ -2315,7 +2318,7 @@ def get_league_scoring_settings(db: SupabaseRest, league_id: str) -> Dict[str, A
             }
         }
     except Exception as e:
-        print(f"⚠️  Warning: Could not fetch scoring settings for league {league_id}: {e}")
+        logger.warning(f"⚠️  Warning: Could not fetch scoring settings for league {league_id}: {e}")
         return {
             "skater": {"goals": 3, "assists": 2, "shots_on_goal": 0.4, "blocks": 0.5},
             "goalie": {"wins": 4, "shutouts": 3, "saves": 0.2, "goals_against": -1}
@@ -2782,7 +2785,7 @@ def persist_vopa_audit(
             processed += 1
         
         except Exception as e:
-            print(f"⚠️  Error persisting VOPA audit for position {position}: {e}")
+            logger.error(f"⚠️  Error persisting VOPA audit for position {position}: {e}")
             continue
     
     return processed
@@ -2867,7 +2870,7 @@ def calculate_daily_projection(
         )
         
         if not player_dir or len(player_dir) == 0:
-            print(f"⚠️  Player {player_id} not found in player_directory")
+            logger.warning(f"⚠️  Player {player_id} not found in player_directory")
             return None
         
         position = player_dir[0].get("position_code", "C")
@@ -2916,7 +2919,7 @@ def calculate_daily_projection(
         )
         
         if not game_info or len(game_info) == 0:
-            print(f"⚠️  Game {game_id} not found")
+            logger.warning(f"⚠️  Game {game_id} not found")
             return None
         
         game = game_info[0]
@@ -3138,7 +3141,7 @@ def calculate_daily_projection(
         }
         
     except Exception as e:
-        print(f"❌ Error calculating projection for player {player_id}, game {game_id}: {e}")
+        logger.error(f"❌ Error calculating projection for player {player_id}, game {game_id}: {e}")
         import traceback
         traceback.print_exc()
         return None
@@ -3207,18 +3210,18 @@ def main():
         try:
             target_date = datetime.strptime(sys.argv[1], "%Y-%m-%d").date()
         except ValueError:
-            print(f"⚠️  Invalid date format: {sys.argv[1]}. Using today: {target_date}")
+            logger.warning(f"⚠️  Invalid date format: {sys.argv[1]}. Using today: {target_date}")
     
     if len(sys.argv) > 2:
         try:
             season = int(sys.argv[2])
         except ValueError:
-            print(f"⚠️  Invalid season: {sys.argv[2]}. Using default: {DEFAULT_SEASON}")
+            logger.warning(f"⚠️  Invalid season: {sys.argv[2]}. Using default: {DEFAULT_SEASON}")
     
-    print(f"🚀 Citrus Projections 2.0 - Daily Calculation Engine")
-    print(f"   Target Date: {target_date}")
-    print(f"   Season: {season}")
-    print()
+    logger.info(f"🚀 Citrus Projections 2.0 - Daily Calculation Engine")
+    logger.info(f"   Target Date: {target_date}")
+    logger.info(f"   Season: {season}")
+    logger.info("")
     
     # Get games for target date
     games = db.select(
@@ -3228,11 +3231,11 @@ def main():
     )
     
     if not games:
-        print(f"⚠️  No games found for {target_date}")
+        logger.warning(f"⚠️  No games found for {target_date}")
         return
     
-    print(f"📅 Found {len(games)} games on {target_date}")
-    print()
+    logger.info(f"📅 Found {len(games)} games on {target_date}")
+    logger.info("")
     
     # Get default scoring settings (for now, use defaults - can be enhanced to use league-specific)
     # Note: In production, scoring settings come from leagues.scoring_settings JSONB
@@ -3259,10 +3262,11 @@ def main():
     # TODO: In production, query team_lineups or draft_picks to get rostered players
     # For now, this is a placeholder that shows the calculation logic
     
-    print("✅ Calculation engine ready!")
-    print("   Next step: Integrate with roster queries and batch processing")
-    print("   See run_daily_projections.py for full pipeline")
+    logger.info("✅ Calculation engine ready!")
+    logger.info("   Next step: Integrate with roster queries and batch processing")
+    logger.info("   See run_daily_projections.py for full pipeline")
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     main()

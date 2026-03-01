@@ -154,7 +154,7 @@ export function useMatchupScoring({
     };
     
     fetchCachedScores();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchCachedScores is inline; setCachedDailyScores/setIsLoading are stable setters
   }, [currentMatchup?.id, userTeamId, dailyStatsByDate, currentMatchup?.team1_id, currentMatchup?.team2_id]);
 
   // Calculate my team's total points

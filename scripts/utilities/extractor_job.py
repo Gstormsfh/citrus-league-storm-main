@@ -25,13 +25,16 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
 from supabase_rest import SupabaseRest
+import logging
+
+logger = logging.getLogger(__name__)
 
 _shutdown_requested = False
 
 def _handle_shutdown(signum, frame):
     global _shutdown_requested
     _shutdown_requested = True
-    print(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
+    logger.info(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
 
 signal.signal(signal.SIGINT, _handle_shutdown)
 signal.signal(signal.SIGTERM, _handle_shutdown)
@@ -654,7 +657,7 @@ def _compute_toi_from_shifts(db: SupabaseRest, game_id: int, pbp: Optional[dict]
     if pbp:
       pbp_toi = _compute_toi_from_pbp(pbp, game_id)
       if pbp_toi:
-        print(f"[extractor_job] Warning: Using PBP-based TOI for game {game_id} (shifts not available - TOI will be underestimated)")
+        logger.warning(f"[extractor_job] Warning: Using PBP-based TOI for game {game_id} (shifts not available - TOI will be underestimated)")
         return pbp_toi
     
     # No TOI available - return empty dict (TOI will be 0)
@@ -662,7 +665,7 @@ def _compute_toi_from_shifts(db: SupabaseRest, game_id: int, pbp: Optional[dict]
   except Exception as e:
     # Graceful degradation: if TOI computation fails, return empty dict
     # This allows PPP/SHP/hits/blocks to still be extracted
-    print(f"[extractor_job] Warning: Could not compute TOI for game {game_id}: {e}")
+    logger.warning(f"[extractor_job] Warning: Could not compute TOI for game {game_id}: {e}")
     return {}
 
 
@@ -740,20 +743,20 @@ def _get_unextracted_games(db: SupabaseRest, limit: int) -> List[dict]:
 
 
 def main() -> int:
-  print("=" * 80)
-  print("[extractor_job] STARTING EXTRACTOR LOOP")
-  print("=" * 80)
-  print(f"Season: {DEFAULT_SEASON}")
-  print(f"Poll interval: {POLL_SECONDS}s")
-  print(f"Batch size: {MAX_BATCH} games")
-  print(f"Timestamp: {_now_iso()}")
-  print()
+  logger.info("=" * 80)
+  logger.info("[extractor_job] STARTING EXTRACTOR LOOP")
+  logger.info("=" * 80)
+  logger.info(f"Season: {DEFAULT_SEASON}")
+  logger.info(f"Poll interval: {POLL_SECONDS}s")
+  logger.info(f"Batch size: {MAX_BATCH} games")
+  logger.info(f"Timestamp: {_now_iso()}")
+  logger.info("")
   
   try:
     db = supabase_client()
-    print("[extractor_job] Connected to Supabase")
+    logger.info("[extractor_job] Connected to Supabase")
   except Exception as e:
-    print(f"[extractor_job] ERROR: Failed to connect to Supabase: {e}")
+    logger.error(f"[extractor_job] ERROR: Failed to connect to Supabase: {e}")
     return 1
 
   total_processed = 0
@@ -761,7 +764,7 @@ def main() -> int:
 
   while True:
     if _shutdown_requested:
-      print(f"[SHUTDOWN] Graceful shutdown complete. Total games processed: {total_processed}")
+      logger.info(f"[SHUTDOWN] Graceful shutdown complete. Total games processed: {total_processed}")
       sys.exit(0)
 
     try:
@@ -770,19 +773,19 @@ def main() -> int:
         # Progress update even when idle
         current_time = time.time()
         if current_time - last_summary_time >= 15:
-          print(f"[extractor_job] [PROGRESS] Waiting for games... (total processed: {total_processed})")
+          logger.info(f"[extractor_job] [PROGRESS] Waiting for games... (total processed: {total_processed})")
           last_summary_time = current_time
         time.sleep(POLL_SECONDS)
         continue
       
-      print(f"[extractor_job] Found {len(games)} unextracted games")
+      logger.info(f"[extractor_job] Found {len(games)} unextracted games")
 
       processed_count = 0
       last_progress_time = time.time()
       
       for g in games:
         if _shutdown_requested:
-          print(f"[SHUTDOWN] Graceful shutdown complete. Total games processed: {total_processed}")
+          logger.info(f"[SHUTDOWN] Graceful shutdown complete. Total games processed: {total_processed}")
           sys.exit(0)
 
         game_id = _safe_int(g.get("game_id"), 0)
@@ -792,7 +795,7 @@ def main() -> int:
         # Check if shifts exist (soft check - don't fail if missing)
         has_shifts = _validate_game_has_shifts(db, game_id)
         if not has_shifts:
-          print(f"[extractor_job] Warning: Game {game_id} has no shifts - will extract PPP/SHP/hits/blocks but TOI will be 0")
+          logger.warning(f"[extractor_job] Warning: Game {game_id} has no shifts - will extract PPP/SHP/hits/blocks but TOI will be 0")
         
         pbp = g.get("raw_json") or {}
         state = pbp.get("gameState")
@@ -802,36 +805,37 @@ def main() -> int:
         _upsert_player_game_stats(db, rows, game_id, pbp)
 
         processed_count += 1
-        print(f"[extractor_job] upserted player_game_stats game_id={game_id} players={len(rows)} state={state} has_shifts={has_shifts}")
+        logger.info(f"[extractor_job] upserted player_game_stats game_id={game_id} players={len(rows)} state={state} has_shifts={has_shifts}")
 
         # Mark as extracted if game is in a final state (OFF, FINAL, F/SO, OVER)
         if _is_final_game_state(state):
           _mark_extracted_if_final(db, game_id)
-          print(f"[extractor_job] marked stats_extracted for game_id={game_id} (state={state})")
+          logger.info(f"[extractor_job] marked stats_extracted for game_id={game_id} (state={state})")
         
         # Progress every 15 seconds
         current_time = time.time()
         if current_time - last_progress_time >= 15:
-          print(f"[extractor_job] [PROGRESS] Processed {processed_count}/{len(games)} games in this batch (total: {total_processed})...")
+          logger.info(f"[extractor_job] [PROGRESS] Processed {processed_count}/{len(games)} games in this batch (total: {total_processed})...")
           last_progress_time = current_time
       
       total_processed += processed_count
       last_summary_time = time.time()
-      print(f"[extractor_job] Batch complete: {processed_count} games processed (total: {total_processed})")
+      logger.info(f"[extractor_job] Batch complete: {processed_count} games processed (total: {total_processed})")
       time.sleep(2)
 
     except KeyboardInterrupt:
-      print("\n[extractor_job] Exiting (Ctrl+C).")
-      print(f"[extractor_job] Total games processed in this session: {total_processed}")
+      logger.info("\n[extractor_job] Exiting (Ctrl+C).")
+      logger.info(f"[extractor_job] Total games processed in this session: {total_processed}")
       return 0
     except Exception as e:
-      print(f"[extractor_job] ERROR: {e}", file=sys.stderr)
+      logger.error(f"[extractor_job] ERROR: {e}", file=sys.stderr)
       import traceback
       traceback.print_exc()
       time.sleep(max(5, POLL_SECONDS // 2))
 
 
 if __name__ == "__main__":
+  logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
   raise SystemExit(main())
 
 

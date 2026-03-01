@@ -24,13 +24,16 @@ import traceback
 from dotenv import load_dotenv
 import os
 from src.utils.citrus_request import citrus_request
+import logging
+
+logger = logging.getLogger(__name__)
 
 _shutdown_requested = False
 
 def _handle_shutdown(signum, frame):
     global _shutdown_requested
     _shutdown_requested = True
-    print(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
+    logger.info(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
 
 signal.signal(signal.SIGINT, _handle_shutdown)
 signal.signal(signal.SIGTERM, _handle_shutdown)
@@ -95,11 +98,11 @@ def scrape_single_game_json(game_id):
             if response.status_code == 429:
                 if attempt < MAX_429_RETRIES - 1:
                     delay = min(BASE_429_DELAY ** (attempt + 1), 60)
-                    print(f"  Game {game_id}: 429 rate limit. Waiting {delay}s...")
+                    logger.info(f"  Game {game_id}: 429 rate limit. Waiting {delay}s...")
                     time.sleep(delay)
                     continue
                 else:
-                    print(f"  Game {game_id}: 429 after {MAX_429_RETRIES} attempts. Skipping.")
+                    logger.warning(f"  Game {game_id}: 429 after {MAX_429_RETRIES} attempts. Skipping.")
                     return None
             
             response.raise_for_status()
@@ -108,19 +111,19 @@ def scrape_single_game_json(game_id):
         except requests.exceptions.Timeout:
             if attempt < MAX_429_RETRIES - 1:
                 delay = min(BASE_429_DELAY ** attempt, 30)
-                print(f"  Game {game_id}: Timeout (attempt {attempt + 1}/{MAX_429_RETRIES}). Retrying in {delay}s...")
+                logger.info(f"  Game {game_id}: Timeout (attempt {attempt + 1}/{MAX_429_RETRIES}). Retrying in {delay}s...")
                 time.sleep(delay)
             else:
-                print(f"  Game {game_id}: Timeout after {MAX_429_RETRIES} attempts. Skipping.")
+                logger.warning(f"  Game {game_id}: Timeout after {MAX_429_RETRIES} attempts. Skipping.")
                 return None
                 
         except requests.exceptions.RequestException as e:
             if attempt < MAX_429_RETRIES - 1:
                 delay = min(BASE_429_DELAY ** attempt, 30)
-                print(f"  Game {game_id}: Error (attempt {attempt + 1}/{MAX_429_RETRIES}): {e}")
+                logger.error(f"  Game {game_id}: Error (attempt {attempt + 1}/{MAX_429_RETRIES}): {e}")
                 time.sleep(delay)
             else:
-                print(f"  Game {game_id}: Failed after {MAX_429_RETRIES} attempts: {e}")
+                logger.error(f"  Game {game_id}: Failed after {MAX_429_RETRIES} attempts: {e}")
                 return None
     
     return None
@@ -150,11 +153,11 @@ def scrape_single_game_boxscore(game_id):
             if response.status_code == 429:
                 if attempt < MAX_429_RETRIES - 1:
                     delay = min(BASE_429_DELAY ** (attempt + 1), 60)
-                    print(f"  Game {game_id} boxscore: 429 rate limit. Waiting {delay}s...")
+                    logger.info(f"  Game {game_id} boxscore: 429 rate limit. Waiting {delay}s...")
                     time.sleep(delay)
                     continue
                 else:
-                    print(f"  Game {game_id} boxscore: 429 after {MAX_429_RETRIES} attempts. Skipping.")
+                    logger.warning(f"  Game {game_id} boxscore: 429 after {MAX_429_RETRIES} attempts. Skipping.")
                     return None
             
             response.raise_for_status()
@@ -163,19 +166,19 @@ def scrape_single_game_boxscore(game_id):
         except requests.exceptions.Timeout:
             if attempt < MAX_429_RETRIES - 1:
                 delay = min(BASE_429_DELAY ** attempt, 30)
-                print(f"  Game {game_id} boxscore: Timeout (attempt {attempt + 1}/{MAX_429_RETRIES}). Retrying in {delay}s...")
+                logger.info(f"  Game {game_id} boxscore: Timeout (attempt {attempt + 1}/{MAX_429_RETRIES}). Retrying in {delay}s...")
                 time.sleep(delay)
             else:
-                print(f"  Game {game_id} boxscore: Timeout after {MAX_429_RETRIES} attempts. Skipping.")
+                logger.warning(f"  Game {game_id} boxscore: Timeout after {MAX_429_RETRIES} attempts. Skipping.")
                 return None
                 
         except requests.exceptions.RequestException as e:
             if attempt < MAX_429_RETRIES - 1:
                 delay = min(BASE_429_DELAY ** attempt, 30)
-                print(f"  Game {game_id} boxscore: Error (attempt {attempt + 1}/{MAX_429_RETRIES}): {e}")
+                logger.error(f"  Game {game_id} boxscore: Error (attempt {attempt + 1}/{MAX_429_RETRIES}): {e}")
                 time.sleep(delay)
             else:
-                print(f"  Game {game_id} boxscore: Failed after {MAX_429_RETRIES} attempts: {e}")
+                logger.error(f"  Game {game_id} boxscore: Failed after {MAX_429_RETRIES} attempts: {e}")
                 return None
     
     return None
@@ -215,7 +218,7 @@ def save_raw_json_to_db(game_id, json_data, game_date, db_client, boxscore_json=
         
         return True
     except Exception as e:
-        print(f"  Game {game_id}: Error saving to database: {e}")
+        logger.error(f"  Game {game_id}: Error saving to database: {e}")
         return False
 
 
@@ -237,7 +240,7 @@ def extract_game_date_from_json(json_data, game_id):
                 mt_dt = utc_dt.astimezone(ZoneInfo("America/Denver"))
                 return mt_dt.strftime('%Y-%m-%d')
     except Exception as e:
-        print(f"Warning: failed to extract game date from JSON for game {game_id}: {e}")
+        logger.error(f"Warning: failed to extract game date from JSON for game {game_id}: {e}")
 
     return None
 
@@ -259,7 +262,7 @@ def ingest_single_game(game_id, rate_limit_flag=None):
     # Check if pool is throttled
     if rate_limit_flag and rate_limit_flag.value:
         cooldown_time = getattr(rate_limit_flag, 'cooldown_time', COOLDOWN_PERIOD_SECONDS)
-        print(f"Game {game_id}: Pool throttled. Waiting {cooldown_time}s...")
+        logger.info(f"Game {game_id}: Pool throttled. Waiting {cooldown_time}s...")
         time.sleep(cooldown_time)
     
     try:
@@ -277,7 +280,7 @@ def ingest_single_game(game_id, rate_limit_flag=None):
         if not game_date:
             # Fallback to today — only safe for same-day scrapes
             game_date = datetime.date.today().strftime('%Y-%m-%d')
-            print(f"  Game {game_id}: WARNING - Could not extract date from JSON, using today's date")
+            logger.warning(f"  Game {game_id}: WARNING - Could not extract date from JSON, using today's date")
         
         # Save to database (UPSERT) - boxscore is optional, PBP is required
         saved = save_raw_json_to_db(game_id, json_data, game_date, db_client, boxscore_json=boxscore_json)
@@ -309,7 +312,7 @@ def get_finished_game_ids_from_api(start_date, end_date):
     all_game_ids = []
     current_date = start
     
-    print(f"Fetching game IDs from API for {start_date} to {end_date}...")
+    logger.info(f"Fetching game IDs from API for {start_date} to {end_date}...")
     
     while current_date <= end:
         date_str = current_date.strftime('%Y-%m-%d')
@@ -334,15 +337,15 @@ def get_finished_game_ids_from_api(start_date, end_date):
             
             all_game_ids.extend(finished_game_ids)
             if finished_game_ids:
-                print(f"  {date_str}: Found {len(finished_game_ids)} finished games")
+                logger.info(f"  {date_str}: Found {len(finished_game_ids)} finished games")
             
         except Exception as e:
-            print(f"  {date_str}: Error fetching schedule: {e}")
+            logger.error(f"  {date_str}: Error fetching schedule: {e}")
         
         current_date += datetime.timedelta(days=1)
         time.sleep(0.5)  # Small delay to avoid rate limiting
     
-    print(f"Total finished games from API: {len(all_game_ids)}")
+    logger.info(f"Total finished games from API: {len(all_game_ids)}")
     return all_game_ids
 
 
@@ -375,10 +378,10 @@ def get_unprocessed_games(start_date, end_date):
         )
         if games:
             all_game_ids = [g['game_id'] for g in games if g.get('game_id')]
-            print(f"Found {len(all_game_ids)} finished games in database from {start_date} to {end_date}")
+            logger.info(f"Found {len(all_game_ids)} finished games in database from {start_date} to {end_date}")
     except Exception as e:
-        print(f"Could not query nhl_games table: {e}")
-        print("Falling back to API...")
+        logger.warning(f"Could not query nhl_games table: {e}")
+        logger.info("Falling back to API...")
     
     # Fallback to API if database query failed or returned no results
     if not all_game_ids:
@@ -388,7 +391,7 @@ def get_unprocessed_games(start_date, end_date):
         return []
     
     # Check which ones are already in raw_nhl_data
-    print(f"Checking which of {len(all_game_ids)} games are already scraped...")
+    logger.info(f"Checking which of {len(all_game_ids)} games are already scraped...")
     
     # Fetch in batches to avoid memory issues
     already_scraped = set()
@@ -412,15 +415,15 @@ def get_unprocessed_games(start_date, end_date):
             offset += batch_size
     except Exception as e:
         if 'raw_nhl_data' in str(e) or 'PGRST205' in str(e):
-            print(f"[ERROR] raw_nhl_data table does not exist. Please run migration:")
-            print(f"  supabase/migrations/20251217000000_create_raw_nhl_data_table.sql")
-            print(f"  Or apply it via Supabase dashboard.")
+            logger.error(f"[ERROR] raw_nhl_data table does not exist. Please run migration:")
+            logger.info(f"  supabase/migrations/20251217000000_create_raw_nhl_data_table.sql")
+            logger.info(f"  Or apply it via Supabase dashboard.")
             raise
         raise
     
     # Return games that haven't been scraped
     unprocessed = [gid for gid in all_game_ids if gid not in already_scraped]
-    print(f"Found {len(unprocessed)} games to scrape ({len(already_scraped)} already in database)")
+    logger.info(f"Found {len(unprocessed)} games to scrape ({len(already_scraped)} already in database)")
     
     return unprocessed
 
@@ -437,10 +440,10 @@ def ingest_games_parallel(game_ids, max_processes=10):
         dict: Summary with successes and failures
     """
     if not game_ids:
-        print("No games to process.")
+        logger.info("No games to process.")
         return {'successes': 0, 'failures': 0, 'results': []}
     
-    print(f"\nIngesting {len(game_ids):,} games with {max_processes} parallel processes...")
+    logger.info(f"\nIngesting {len(game_ids):,} games with {max_processes} parallel processes...")
     
     # Setup pool-level throttling
     manager = multiprocessing.Manager()
@@ -455,7 +458,7 @@ def ingest_games_parallel(game_ids, max_processes=10):
             worker = partial(ingest_single_game, rate_limit_flag=rate_limit_flag)
             results = pool.map(worker, game_ids)
     except Exception as e:
-        print(f"\n[FATAL ERROR] Parallel pool failed: {e}")
+        logger.error(f"\n[FATAL ERROR] Parallel pool failed: {e}")
         traceback.print_exc()
         return {'successes': 0, 'failures': len(game_ids), 'results': results}
     
@@ -464,20 +467,20 @@ def ingest_games_parallel(game_ids, max_processes=10):
     successes = [r for r in results if r and r.get('success')]
     failures = [r for r in results if r and not r.get('success')]
     
-    print("\n" + "=" * 80)
-    print("INGESTION COMPLETE")
-    print("=" * 80)
-    print(f"Total time: {end_time - start_time:.2f} seconds")
-    print(f"Games processed: {len(game_ids):,}")
-    print(f"Successful: {len(successes):,}")
-    print(f"Failed: {len(failures):,}")
+    logger.info("\n" + "=" * 80)
+    logger.info("INGESTION COMPLETE")
+    logger.info("=" * 80)
+    logger.info(f"Total time: {end_time - start_time:.2f} seconds")
+    logger.info(f"Games processed: {len(game_ids):,}")
+    logger.info(f"Successful: {len(successes):,}")
+    logger.error(f"Failed: {len(failures):,}")
     
     if failures:
-        print(f"\n[FAILED GAMES] (showing first 10):")
+        logger.error(f"\n[FAILED GAMES] (showing first 10):")
         for fail in failures[:10]:
-            print(f"  Game {fail['game_id']}: {fail.get('error', 'Unknown error')}")
+            logger.error(f"  Game {fail['game_id']}: {fail.get('error', 'Unknown error')}")
         if len(failures) > 10:
-            print(f"  ... and {len(failures) - 10} more")
+            logger.info(f"  ... and {len(failures) - 10} more")
     
     return {'successes': len(successes), 'failures': len(failures), 'results': results}
 
@@ -499,12 +502,12 @@ def main():
     if args.end_date is None:
         args.end_date = datetime.date.today().strftime('%Y-%m-%d')
     
-    print("=" * 80)
-    print(f"PHASE 1: RAW NHL DATA INGESTION")
-    print("=" * 80)
-    print(f"Date range: {args.start_date} to {args.end_date}")
-    print(f"Max processes: {args.max_processes}")
-    print()
+    logger.info("=" * 80)
+    logger.info(f"PHASE 1: RAW NHL DATA INGESTION")
+    logger.info("=" * 80)
+    logger.info(f"Date range: {args.start_date} to {args.end_date}")
+    logger.info(f"Max processes: {args.max_processes}")
+    logger.info("")
     
     # Get games to scrape
     if args.skip_check:
@@ -516,19 +519,20 @@ def main():
         game_ids = get_unprocessed_games(args.start_date, args.end_date)
     
     if not game_ids:
-        print("No games to scrape.")
+        logger.info("No games to scrape.")
         return
 
     if _shutdown_requested:
-        print("[SHUTDOWN] Graceful shutdown complete.")
+        logger.info("[SHUTDOWN] Graceful shutdown complete.")
         sys.exit(0)
 
     # Ingest in parallel
     summary = ingest_games_parallel(game_ids, max_processes=args.max_processes)
     
-    print(f"\n[OK] Ingestion complete. {summary['successes']:,} games saved to raw_nhl_data table.")
+    logger.info(f"\n[OK] Ingestion complete. {summary['successes']:,} games saved to raw_nhl_data table.")
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     main()
 

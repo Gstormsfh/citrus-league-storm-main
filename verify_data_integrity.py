@@ -21,6 +21,9 @@ from typing import Dict, List, Optional, Tuple
 from dotenv import load_dotenv
 from supabase_rest import SupabaseRest
 from src.utils.citrus_request import citrus_request
+import logging
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
@@ -55,7 +58,7 @@ def fetch_nhl_landing_stats(player_id: int) -> Optional[Dict]:
             "games": featured.get("gamesPlayed", 0)
         }
     except Exception as e:
-        print(f"  [ERROR] Failed to fetch NHL stats for {player_id}: {e}")
+        logger.error(f"  [ERROR] Failed to fetch NHL stats for {player_id}: {e}")
         return None
 
 def compare_player(db: SupabaseRest, player_id: int, player_name: str, fix: bool = False) -> Tuple[bool, Dict]:
@@ -145,12 +148,12 @@ def main():
     
     args = parser.parse_args()
     
-    print("=" * 80)
-    print("BULLETPROOF DATA INTEGRITY VERIFICATION")
-    print("=" * 80)
-    print(f"Season: {DEFAULT_SEASON} (2025-2026)")
-    print(f"Auto-fix: {args.fix}")
-    print()
+    logger.info("=" * 80)
+    logger.info("BULLETPROOF DATA INTEGRITY VERIFICATION")
+    logger.info("=" * 80)
+    logger.info(f"Season: {DEFAULT_SEASON} (2025-2026)")
+    logger.info(f"Auto-fix: {args.fix}")
+    logger.info("")
     
     db = supabase_client()
     
@@ -167,7 +170,7 @@ def main():
             limit=1
         )
         if not players:
-            print(f"[ERROR] Player {args.player} not found")
+            logger.error(f"[ERROR] Player {args.player} not found")
             return 1
     elif args.all:
         # All players
@@ -209,8 +212,8 @@ def main():
     
     names = {n.get("player_id"): n.get("full_name", "Unknown") for n in names_data}
     
-    print(f"[VERIFY] Checking {len(players)} players against NHL.com...")
-    print()
+    logger.info(f"[VERIFY] Checking {len(players)} players against NHL.com...")
+    logger.info("")
     
     total_checked = 0
     total_mismatches = 0
@@ -228,51 +231,52 @@ def main():
         
         if not all_match:
             total_mismatches += 1
-            print(f"[MISMATCH] {player_name} (ID: {player_id}):")
+            logger.info(f"[MISMATCH] {player_name} (ID: {player_id}):")
             
             if discrepancies.get("error"):
-                print(f"  Error: {discrepancies['error']}")
+                logger.error(f"  Error: {discrepancies['error']}")
             else:
                 for stat, info in discrepancies.items():
                     if stat in ["fixed", "fix_error"]:
                         continue
                     if isinstance(info, dict):
-                        print(f"  {stat}: {info['ours']} -> {info['nhl']} (diff: {info['diff']:+d})")
+                        logger.info(f"  {stat}: {info['ours']} -> {info['nhl']} (diff: {info['diff']:+d})")
                 
                 if discrepancies.get("fixed"):
-                    print(f"  [FIXED]")
+                    logger.info(f"  [FIXED]")
                     total_fixed += 1
                 elif discrepancies.get("fix_error"):
-                    print(f"  [FIX-FAILED] {discrepancies['fix_error']}")
+                    logger.error(f"  [FIX-FAILED] {discrepancies['fix_error']}")
         else:
             if args.player or len(players) <= 20:
-                print(f"[OK] {player_name}")
+                logger.info(f"[OK] {player_name}")
         
         # Rate limiting
         time.sleep(0.3)
         
         # Progress
         if (i + 1) % 10 == 0:
-            print(f"  Progress: {i+1}/{len(players)}...")
+            logger.info(f"  Progress: {i+1}/{len(players)}...")
     
-    print()
-    print("=" * 80)
-    print("VERIFICATION COMPLETE")
-    print("=" * 80)
-    print(f"Players checked: {total_checked}")
-    print(f"Mismatches: {total_mismatches}")
-    print(f"Fixed: {total_fixed}")
-    print()
+    logger.info("")
+    logger.info("=" * 80)
+    logger.info("VERIFICATION COMPLETE")
+    logger.info("=" * 80)
+    logger.info(f"Players checked: {total_checked}")
+    logger.info(f"Mismatches: {total_mismatches}")
+    logger.info(f"Fixed: {total_fixed}")
+    logger.info("")
     
     if total_mismatches == 0:
-        print("[SUCCESS] All stats match NHL.com!")
+        logger.info("[SUCCESS] All stats match NHL.com!")
         return 0
     elif total_fixed == total_mismatches:
-        print("[FIXED] All mismatches were corrected.")
+        logger.info("[FIXED] All mismatches were corrected.")
         return 0
     else:
-        print(f"[WARNING] {total_mismatches - total_fixed} mismatches remain.")
+        logger.warning(f"[WARNING] {total_mismatches - total_fixed} mismatches remain.")
         return 1
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     sys.exit(main())
