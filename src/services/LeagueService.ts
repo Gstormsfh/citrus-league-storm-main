@@ -7,8 +7,8 @@ import { RosterCacheService } from "./RosterCacheService";
 import { LeagueMembershipService } from "./LeagueMembershipService";
 import { DEMO_LEAGUE_ID_FOR_GUESTS } from "./DemoLeagueService";
 import { logger } from "@/utils/logger";
-import { ScoringCalculator } from "@/utils/scoringUtils";
-import { getTodayMST } from "@/utils/timezoneUtils";
+import { ScoringCalculator, type CategoryStats } from "@/utils/scoringUtils";
+import { getTodayMST, getTodayMSTDate } from "@/utils/timezoneUtils";
 import { CURRENT_SEASON } from "@/utils/seasonConstants";
 import type { LeagueType, ScoringFormat, DraftType as LeagueDraftType, LeagueSettings } from "@/types/leagueTypes";
 import { extractFormatSettings } from "@/types/leagueTypes";
@@ -2190,7 +2190,7 @@ async joinLeagueByCode(
       const matchup = matchups[0];
       const weekStart = new Date(matchup.week_start_date);
       const weekEnd = new Date(matchup.week_end_date);
-      const today = new Date();
+      const today = getTodayMSTDate();
       today.setHours(0, 0, 0, 0);
       
       // Generate all dates in the week (Sun-Sat)
@@ -2239,11 +2239,10 @@ async joinLeagueByCode(
         is_locked: boolean;
         locked_at: string | null;
       }> = [];
-      const now = new Date();
-      const todayStr = now.toISOString().split('T')[0];
-      const todayDate = new Date(todayStr);
+      const todayStr = getTodayMST();
+      const todayDate = getTodayMSTDate();
       todayDate.setHours(0, 0, 0, 0);
-      
+
       // Filter to only include TODAY and FUTURE dates
       // PAST DATES ARE PERMANENTLY FROZEN - NO EXCEPTIONS
       let futureDates = weekDates.filter(date => {
@@ -3162,10 +3161,11 @@ async joinLeagueByCode(
           .eq('league_id', leagueId).lt('week_end_date', todayStr).neq('status', 'completed'),
       ]);
 
-      const matchupMap = new Map<string, any>();
-      (completedResult.data ?? []).forEach(m => { if (m.id) matchupMap.set(m.id, m); });
-      (pastResult.data ?? []).forEach(m => { if (m.id && !matchupMap.has(m.id)) matchupMap.set(m.id, m); });
-      const matchups = Array.from(matchupMap.values()).sort((a: any, b: any) => a.week_number - b.week_number);
+      type MatchupRow = { id: string; team1_id: string; team2_id: string | null; team1_score: number | null; team2_score: number | null; week_number: number; status: string; week_end_date: string };
+      const matchupMap = new Map<string, MatchupRow>();
+      (completedResult.data ?? []).forEach(m => { if (m.id) matchupMap.set(m.id, m as MatchupRow); });
+      (pastResult.data ?? []).forEach(m => { if (m.id && !matchupMap.has(m.id)) matchupMap.set(m.id, m as MatchupRow); });
+      const matchups = Array.from(matchupMap.values()).sort((a, b) => a.week_number - b.week_number);
 
       // Import category comparison function from scoringUtils
       const { compareCategoryMatchup } = await import('@/utils/scoringUtils');
@@ -3189,8 +3189,9 @@ async joinLeagueByCode(
         : { data: [] };
 
       // Map player stats by ID
-      const playerStatsMap = new Map<string, any>();
-      (playerStats || []).forEach((p: any) => playerStatsMap.set(String(p.player_id), p));
+      type PlayerStatRow = Record<string, number | string | null> & { player_id: number; position_code: string | null };
+      const playerStatsMap = new Map<string, PlayerStatRow>();
+      (playerStats || []).forEach((p) => playerStatsMap.set(String(p.player_id), p as PlayerStatRow));
 
       // Build per-team category totals
       const teamCategoryTotals: Record<string, Record<string, number>> = {};
@@ -3308,15 +3309,17 @@ async joinLeagueByCode(
           ties: last5Games.filter(g => g.result === 'tie').length,
         };
 
-        delete (stats as any).matchupHistory;
       });
     } catch (err) {
       logger.error('[LeagueService] calculateCategoryStandings error:', err);
     }
 
-    // Clean up matchupHistory before returning
-    Object.values(result).forEach(v => delete (v as any).matchupHistory);
-    return result;
+    // Strip matchupHistory (internal-only) before returning
+    const cleaned: Record<string, Omit<CatStandingsEntry, 'matchupHistory'>> = {};
+    Object.entries(result).forEach(([teamId, { matchupHistory: _, ...rest }]) => {
+      cleaned[teamId] = rest;
+    });
+    return cleaned;
   },
 
   /**
@@ -3403,8 +3406,9 @@ async joinLeagueByCode(
             .eq('season', CURRENT_SEASON)
         : { data: [] };
 
-      const rotoPlayerMap = new Map<string, any>();
-      (rotoPlayerStats || []).forEach((p: any) => rotoPlayerMap.set(String(p.player_id), p));
+      type RotoPlayerRow = Record<string, number | string | null> & { player_id: number; position_code: string | null };
+      const rotoPlayerMap = new Map<string, RotoPlayerRow>();
+      (rotoPlayerStats || []).forEach((p) => rotoPlayerMap.set(String(p.player_id), p as RotoPlayerRow));
 
       // Fetch league settings for minGoalieGames
       const { data: rotoLeagueRow } = await supabase
@@ -3436,12 +3440,12 @@ async joinLeagueByCode(
         categories.forEach(cat => {
           if (belowMinGoalie && rotoGoalieCategories.has(cat)) return;
           const col = catColumnMap[cat] || cat;
-          (teamStats[a.team_id] as any)[cat] = ((teamStats[a.team_id] as any)[cat] || 0) + (stats[col] ?? 0);
+          teamStats[a.team_id][cat] = (teamStats[a.team_id][cat] || 0) + (Number(stats[col]) || 0);
         });
       });
 
       // Use all configured categories (not the broken empty slice)
-      const roto = calcRoto(teamStats as any, categories, categoryMeta);
+      const roto = calcRoto(teamStats as Record<string, Partial<CategoryStats>>, categories, categoryMeta);
 
       // Merge roto results
       Object.entries(roto).forEach(([teamId, rotoResult]) => {

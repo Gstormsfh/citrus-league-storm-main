@@ -25,6 +25,7 @@ This is the source of truth for fantasy scoring - uses NHL official stats, not P
 """
 
 import os
+import signal
 import sys
 import time
 import requests
@@ -33,6 +34,16 @@ from typing import Dict, Optional, List, Any
 from dotenv import load_dotenv
 from supabase_rest import SupabaseRest
 from src.utils.citrus_request import citrus_request
+
+_shutdown_requested = False
+
+def _handle_shutdown(signum, frame):
+    global _shutdown_requested
+    _shutdown_requested = True
+    print(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
+
+signal.signal(signal.SIGINT, _handle_shutdown)
+signal.signal(signal.SIGTERM, _handle_shutdown)
 
 load_dotenv()
 SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
@@ -827,10 +838,15 @@ def main():
     errors = 0
     
     for idx, game in enumerate(games, 1):
+        if _shutdown_requested:
+            print(f"\n[SHUTDOWN] Graceful shutdown complete. Processed {idx - 1}/{len(games)} games.")
+            print(f"  Updated: {total_updated} | Created: {total_created} | Errors: {errors}")
+            sys.exit(0)
+
         game_id = game.get("game_id")
         game_date = game.get("game_date")
         status = game.get("status", "unknown")
-        
+
         # Progress output with flushing
         progress_msg = f"[{idx}/{len(games)}] ({idx*100//len(games)}%) Processing game {game_id} ({game_date})..."
         print(progress_msg, flush=True)

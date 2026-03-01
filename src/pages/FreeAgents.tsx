@@ -24,6 +24,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { isGuestMode, shouldBlockGuestOperation } from '@/utils/guestHelpers';
+import { DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeagueService';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import { getPlayerWithSeasonStats } from '@/utils/playerStatsHelper';
 import { getTodayMST } from '@/utils/timezoneUtils';
@@ -312,8 +313,8 @@ const FreeAgents = () => {
       let weekStart: Date | null = null;
       let weekEnd: Date | null = null;
       
-      const effectiveLeagueId = leagueId || '750f4e1a-92ae-44cf-a798-2f3e06d0d5c9'; // Demo league ID for guests
-      const isDemo = !leagueId || effectiveLeagueId === '750f4e1a-92ae-44cf-a798-2f3e06d0d5c9';
+      const effectiveLeagueId = leagueId || DEMO_LEAGUE_ID_FOR_GUESTS; // Demo league ID for guests
+      const isDemo = !leagueId || effectiveLeagueId === DEMO_LEAGUE_ID_FOR_GUESTS;
       // CRITICAL FIX: For DEMO mode, ALWAYS use current calendar week (Sunday-Saturday)
       // The demo league's DB dates are stale and don't represent the actual current week.
       if (isDemo) {
@@ -475,8 +476,8 @@ const FreeAgents = () => {
       let weekStart: Date | null = null;
       let weekEnd: Date | null = null;
       
-      const effectiveLeagueId = leagueId || '750f4e1a-92ae-44cf-a798-2f3e06d0d5c9'; // Demo league ID for guests
-      const isDemo = !leagueId || effectiveLeagueId === '750f4e1a-92ae-44cf-a798-2f3e06d0d5c9';
+      const effectiveLeagueId = leagueId || DEMO_LEAGUE_ID_FOR_GUESTS; // Demo league ID for guests
+      const isDemo = !leagueId || effectiveLeagueId === DEMO_LEAGUE_ID_FOR_GUESTS;
       // CRITICAL FIX: For DEMO mode, ALWAYS use current calendar week (Sunday-Saturday)
       // The demo league's DB dates are stale and don't represent the actual current week.
       // This matches what the Matchup tab does - it recalculates dates, not trusts DB dates.

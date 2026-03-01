@@ -17,6 +17,7 @@ We can iterate to add more play types later.
 """
 
 import os
+import signal
 import sys
 import time
 import datetime as dt
@@ -24,6 +25,16 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
 from supabase_rest import SupabaseRest
+
+_shutdown_requested = False
+
+def _handle_shutdown(signum, frame):
+    global _shutdown_requested
+    _shutdown_requested = True
+    print(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
+
+signal.signal(signal.SIGINT, _handle_shutdown)
+signal.signal(signal.SIGTERM, _handle_shutdown)
 
 load_dotenv()
 SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
@@ -749,6 +760,10 @@ def main() -> int:
   last_summary_time = time.time()
 
   while True:
+    if _shutdown_requested:
+      print(f"[SHUTDOWN] Graceful shutdown complete. Total games processed: {total_processed}")
+      sys.exit(0)
+
     try:
       games = _get_unextracted_games(db, MAX_BATCH)
       if not games:
@@ -766,10 +781,14 @@ def main() -> int:
       last_progress_time = time.time()
       
       for g in games:
+        if _shutdown_requested:
+          print(f"[SHUTDOWN] Graceful shutdown complete. Total games processed: {total_processed}")
+          sys.exit(0)
+
         game_id = _safe_int(g.get("game_id"), 0)
         if not game_id:
           continue
-        
+
         # Check if shifts exist (soft check - don't fail if missing)
         has_shifts = _validate_game_has_shifts(db, game_id)
         if not has_shifts:

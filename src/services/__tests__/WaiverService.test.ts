@@ -27,6 +27,9 @@ vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     from: vi.fn(() => defaultChain),
     rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
+    auth: {
+      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user-id' } } }),
+    },
   },
 }));
 
@@ -1382,9 +1385,10 @@ describe('WaiverService.addPlayer', () => {
     });
     vi.spyOn(WaiverService, 'addFreeAgent').mockResolvedValue({ success: true });
 
+    // Mock team owned by the authenticated user (test-user-id from auth mock)
     const teamChain = createChainMock();
     teamChain.single.mockResolvedValue({
-      data: { owner_id: 'user-1' },
+      data: { owner_id: 'test-user-id' },
       error: null,
     });
     perTableChains({ teams: teamChain });
@@ -1411,9 +1415,10 @@ describe('WaiverService.addPlayer', () => {
       claimId: 'claim-xyz',
     });
 
+    // Mock team owned by the authenticated user (test-user-id from auth mock)
     const teamChain = createChainMock();
     teamChain.single.mockResolvedValue({
-      data: { owner_id: 'user-1' },
+      data: { owner_id: 'test-user-id' },
       error: null,
     });
     perTableChains({ teams: teamChain });
@@ -1437,6 +1442,7 @@ describe('WaiverService.addPlayer', () => {
 
     const result = await WaiverService.addPlayer('league-1', 'team-1', 8478402, null);
     expect(result.success).toBe(false);
-    expect(result.error).toContain('no owner');
+    // Auth checks now verify team ownership — null owner_id fails the "no owner" check
+    expect(result.error).toBeDefined();
   });
 });

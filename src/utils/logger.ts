@@ -30,15 +30,6 @@ export const logger = {
 if (typeof window !== 'undefined') {
   const noop = () => {};
 
-  // Store original console methods
-  (window as any).__originalConsole = {
-    log: console.log,
-    error: console.error,
-    warn: console.warn,
-    info: console.info,
-    debug: console.debug,
-  };
-
   // Silence verbose methods — keep console.error and console.warn so crashes are visible
   console.log = noop;
   console.info = noop;

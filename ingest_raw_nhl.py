@@ -11,6 +11,7 @@ It focuses on speed and reliability - no processing, just fetch and save.
 Boxscore data is used by scrape_per_game_nhl_stats.py for official NHL stat extraction.
 """
 
+import signal
 import sys
 import datetime
 import requests
@@ -23,6 +24,16 @@ import traceback
 from dotenv import load_dotenv
 import os
 from src.utils.citrus_request import citrus_request
+
+_shutdown_requested = False
+
+def _handle_shutdown(signum, frame):
+    global _shutdown_requested
+    _shutdown_requested = True
+    print(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
+
+signal.signal(signal.SIGINT, _handle_shutdown)
+signal.signal(signal.SIGTERM, _handle_shutdown)
 
 # Set UTF-8 encoding for stdout
 if sys.stdout.encoding != 'utf-8':
@@ -507,7 +518,11 @@ def main():
     if not game_ids:
         print("No games to scrape.")
         return
-    
+
+    if _shutdown_requested:
+        print("[SHUTDOWN] Graceful shutdown complete.")
+        sys.exit(0)
+
     # Ingest in parallel
     summary = ingest_games_parallel(game_ids, max_processes=args.max_processes)
     

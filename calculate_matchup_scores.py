@@ -15,6 +15,7 @@ Features:
 """
 
 import os
+import signal
 import sys
 import datetime as dt
 from typing import Any, Dict, List, Optional, Tuple
@@ -22,6 +23,16 @@ from decimal import Decimal
 
 from dotenv import load_dotenv
 from supabase_rest import SupabaseRest
+
+_shutdown_requested = False
+
+def _handle_shutdown(signum, frame):
+    global _shutdown_requested
+    _shutdown_requested = True
+    print(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
+
+signal.signal(signal.SIGINT, _handle_shutdown)
+signal.signal(signal.SIGTERM, _handle_shutdown)
 
 load_dotenv()
 SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
@@ -743,13 +754,17 @@ def calculate_matchup_scores(
     print(f"[INFO] Processing {len(matchups)} matchup(s)")
     
     for matchup in matchups:
+        if _shutdown_requested:
+            print(f"\n[SHUTDOWN] Graceful shutdown complete.")
+            sys.exit(0)
+
         matchup_id = matchup["id"]
         league_id = matchup["league_id"]
         team1_id = matchup["team1_id"]
         team2_id = matchup.get("team2_id")
         week_start = matchup["week_start_date"]
         week_end = matchup["week_end_date"]
-        
+
         print(f"\n[MATCHUP] {matchup_id} (Week {matchup['week_number']})")
         print(f"  League: {league_id}")
         print(f"  Date Range: {week_start} to {week_end}")

@@ -67,15 +67,19 @@ const Navbar = () => {
   const displayName = profile?.username || user?.email?.split('@')[0] || 'User';
 
   // Flat navigation tabs — one click to anywhere
+  // GM Office, Draft, and Armchair GM require authentication (ProtectedRoutes)
+  // so they are only shown to logged-in users to avoid confusing guest redirects
   const navTabs = [
     { label: 'Matchup', path: activeLeagueId ? `/matchup/${activeLeagueId}` : '/matchup', icon: Swords },
     { label: 'Roster', path: '/roster', icon: Users },
     { label: 'Standings', path: '/standings', icon: BarChart3 },
     ...(activeLeagueId ? [{ label: 'Playoffs', path: `/league/${activeLeagueId}/playoffs`, icon: Trophy }] : []),
     { label: 'Players', path: '/free-agents', icon: Search },
-    { label: 'GM Office', path: '/gm-office', icon: Settings },
-    { label: 'Draft', path: '/draft-room', icon: Sparkles },
-    { label: 'Armchair GM', path: '/armchair-gm', icon: DollarSign },
+    ...(user ? [
+      { label: 'GM Office', path: '/gm-office', icon: Settings },
+      { label: 'Draft', path: '/draft-room', icon: Sparkles },
+      { label: 'Armchair GM', path: '/armchair-gm', icon: DollarSign },
+    ] : []),
   ];
 
   return (

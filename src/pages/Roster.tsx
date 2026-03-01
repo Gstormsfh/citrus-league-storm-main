@@ -5,7 +5,7 @@ import { arrayMove } from '@dnd-kit/sortable';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague, isDemoLeague } from '@/contexts/LeagueContext';
-import { DEMO_LEAGUE_ID } from '@/services/DemoLeagueService';
+import { DEMO_LEAGUE_ID, DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeagueService';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { LeagueCreationCTA, InlineCTA } from '@/components/LeagueCreationCTA';
@@ -1091,8 +1091,8 @@ const Roster = () => {
             setRoster({ starters, bench, ir: [], slotAssignments });
             
             // Set demo team data
-            setUserTeamId(`${DEMO_LEAGUE_ID}-team-3`);
-            setUserTeam({ id: `${DEMO_LEAGUE_ID}-team-3`, league_id: DEMO_LEAGUE_ID, team_name: 'Citrus Crushers' });
+            setUserTeamId(`${DEMO_LEAGUE_ID_FOR_GUESTS}-team-3`);
+            setUserTeam({ id: `${DEMO_LEAGUE_ID_FOR_GUESTS}-team-3`, league_id: DEMO_LEAGUE_ID_FOR_GUESTS, team_name: 'Citrus Crushers' });
           } catch (fallbackError) {
             logger.error('[Roster] Even emergency fallback failed:', fallbackError);
           }
@@ -1790,9 +1790,7 @@ const Roster = () => {
             };
 
             // Now fetch rest-of-season projections from player_projected_stats (matchup system)
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const todayStr = today.toISOString().split('T')[0];
+            const todayStr = getTodayMST();
             
             // Get all player IDs from roster
             const allPlayerIds = [

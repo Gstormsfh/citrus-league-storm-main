@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { PlayerService } from './PlayerService';
 import { LeagueMembershipService } from './LeagueMembershipService';
+import { AuditService } from './AuditService';
 import { COLUMNS } from '@/utils/queryColumns';
 import type { LeagueSettings } from '@/types/leagueTypes';
 import { logger } from '@/utils/logger';
@@ -51,9 +52,28 @@ export class TradeService {
     toTeamId: string,
     offeredPlayerIds: number[],
     requestedPlayerIds: number[],
-    message?: string
+    message?: string,
+    userId?: string
   ): Promise<{ success: boolean; error?: string; tradeId?: string }> {
     try {
+      // Verify auth — the current user must own the from_team
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const effectiveUserId = userId || authUser?.id;
+      if (!effectiveUserId) {
+        return { success: false, error: 'Authentication required to create a trade offer.' };
+      }
+
+      const { data: fromTeam } = await supabase
+        .from('teams')
+        .select('owner_id')
+        .eq('id', fromTeamId)
+        .eq('league_id', leagueId)
+        .single();
+
+      if (!fromTeam || fromTeam.owner_id !== effectiveUserId) {
+        return { success: false, error: 'You can only propose trades from your own team.' };
+      }
+
       // Best Ball leagues prohibit trades (industry standard: zero management after draft)
       // Also fetch settings for dynamic trade expiration (commissioner-configurable)
       const { data: league, error: leagueErr } = await supabase
@@ -114,6 +134,11 @@ export class TradeService {
         };
       }
 
+      AuditService.log('TRADE_OFFER', leagueId, {
+        tradeId: data.id, fromTeamId, toTeamId,
+        offeredPlayerIds, requestedPlayerIds
+      });
+
       return {
         success: true,
         tradeId: data.id
@@ -132,6 +157,13 @@ export class TradeService {
    */
   static async acceptTradeOffer(tradeId: string, userId?: string): Promise<{ success: boolean; error?: string }> {
     try {
+      // Resolve userId — require authentication
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const effectiveUserId = userId || authUser?.id;
+      if (!effectiveUserId) {
+        return { success: false, error: 'Authentication required to accept a trade.' };
+      }
+
       // Get the trade offer details
       const { data: trade, error: fetchError } = await supabase
         .from('trade_offers')
@@ -147,21 +179,19 @@ export class TradeService {
         };
       }
 
-      // Validate that the accepting user owns the to_team
-      if (userId) {
-        const { data: toTeam } = await supabase
-          .from('teams')
-          .select('owner_id')
-          .eq('id', trade.to_team_id)
-          .eq('league_id', trade.league_id)
-          .single();
+      // Validate that the accepting user owns the to_team (always enforced)
+      const { data: toTeam } = await supabase
+        .from('teams')
+        .select('owner_id')
+        .eq('id', trade.to_team_id)
+        .eq('league_id', trade.league_id)
+        .single();
 
-        if (!toTeam || toTeam.owner_id !== userId) {
-          return {
-            success: false,
-            error: 'You can only accept trades sent to your team'
-          };
-        }
+      if (!toTeam || toTeam.owner_id !== effectiveUserId) {
+        return {
+          success: false,
+          error: 'You can only accept trades sent to your team'
+        };
       }
 
       // Validate roster size: ensure neither team exceeds the limit after trade
@@ -308,6 +338,11 @@ export class TradeService {
         logger.error('[TradeService] team_lineups update failed (non-critical):', lineupErr);
       }
 
+      AuditService.log('TRADE_ACCEPT', trade.league_id, {
+        tradeId, fromTeamId: trade.from_team_id, toTeamId: trade.to_team_id,
+        offeredPlayerIds: trade.offered_player_ids, requestedPlayerIds: trade.requested_player_ids
+      });
+
       return { success: true };
     } catch (error: unknown) {
       logger.error('Error accepting trade:', error);
@@ -323,27 +358,34 @@ export class TradeService {
    */
   static async rejectTradeOffer(tradeId: string, userId?: string): Promise<{ success: boolean; error?: string }> {
     try {
-      // Validate ownership if userId provided
-      if (userId) {
-        const { data: trade } = await supabase
-          .from('trade_offers')
-          .select('to_team_id, league_id')
-          .eq('id', tradeId)
-          .eq('status', 'pending')
-          .single();
+      // Resolve userId — require authentication
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const effectiveUserId = userId || authUser?.id;
+      if (!effectiveUserId) {
+        return { success: false, error: 'Authentication required to reject a trade.' };
+      }
 
-        if (trade) {
-          const { data: toTeam } = await supabase
-            .from('teams')
-            .select('owner_id')
-            .eq('id', trade.to_team_id)
-            .eq('league_id', trade.league_id)
-            .single();
+      // Always validate ownership
+      const { data: trade } = await supabase
+        .from('trade_offers')
+        .select('to_team_id, league_id')
+        .eq('id', tradeId)
+        .eq('status', 'pending')
+        .single();
 
-          if (!toTeam || toTeam.owner_id !== userId) {
-            return { success: false, error: 'You can only reject trades sent to your team' };
-          }
-        }
+      if (!trade) {
+        return { success: false, error: 'Trade offer not found or no longer pending' };
+      }
+
+      const { data: toTeam } = await supabase
+        .from('teams')
+        .select('owner_id')
+        .eq('id', trade.to_team_id)
+        .eq('league_id', trade.league_id)
+        .single();
+
+      if (!toTeam || toTeam.owner_id !== effectiveUserId) {
+        return { success: false, error: 'You can only reject trades sent to your team' };
       }
 
       const { error } = await supabase
@@ -362,6 +404,8 @@ export class TradeService {
         };
       }
 
+      AuditService.log('TRADE_REJECT', trade.league_id, { tradeId });
+
       return { success: true };
     } catch (error: unknown) {
       logger.error('Error rejecting trade:', error);
@@ -377,27 +421,34 @@ export class TradeService {
    */
   static async cancelTradeOffer(tradeId: string, userId?: string): Promise<{ success: boolean; error?: string }> {
     try {
-      // Validate ownership if userId provided
-      if (userId) {
-        const { data: trade } = await supabase
-          .from('trade_offers')
-          .select('from_team_id, league_id')
-          .eq('id', tradeId)
-          .eq('status', 'pending')
-          .single();
+      // Resolve userId — require authentication
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const effectiveUserId = userId || authUser?.id;
+      if (!effectiveUserId) {
+        return { success: false, error: 'Authentication required to cancel a trade.' };
+      }
 
-        if (trade) {
-          const { data: fromTeam } = await supabase
-            .from('teams')
-            .select('owner_id')
-            .eq('id', trade.from_team_id)
-            .eq('league_id', trade.league_id)
-            .single();
+      // Always validate ownership
+      const { data: trade } = await supabase
+        .from('trade_offers')
+        .select('from_team_id, league_id')
+        .eq('id', tradeId)
+        .eq('status', 'pending')
+        .single();
 
-          if (!fromTeam || fromTeam.owner_id !== userId) {
-            return { success: false, error: 'You can only cancel trades you proposed' };
-          }
-        }
+      if (!trade) {
+        return { success: false, error: 'Trade offer not found or no longer pending' };
+      }
+
+      const { data: fromTeam } = await supabase
+        .from('teams')
+        .select('owner_id')
+        .eq('id', trade.from_team_id)
+        .eq('league_id', trade.league_id)
+        .single();
+
+      if (!fromTeam || fromTeam.owner_id !== effectiveUserId) {
+        return { success: false, error: 'You can only cancel trades you proposed' };
       }
 
       const { error } = await supabase
@@ -436,10 +487,14 @@ export class TradeService {
     userId?: string
   ): Promise<TradeOfferWithPlayers[]> {
     try {
-      // Validate league membership if userId is provided (defense-in-depth)
-      if (userId) {
-        await LeagueMembershipService.requireMembership(leagueId, userId);
+      // Resolve userId — require authentication and league membership
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const effectiveUserId = userId || authUser?.id;
+      if (!effectiveUserId) {
+        logger.error('[TradeService] getTeamTradeOffers called without authentication');
+        return [];
       }
+      await LeagueMembershipService.requireMembership(leagueId, effectiveUserId);
 
       const { data: trades, error } = await supabase
         .from('trade_offers')
@@ -502,10 +557,14 @@ export class TradeService {
    */
   static async getLeagueTradeHistory(leagueId: string, userId?: string): Promise<Record<string, unknown>[]> {
     try {
-      // Validate league membership if userId is provided (defense-in-depth)
-      if (userId) {
-        await LeagueMembershipService.requireMembership(leagueId, userId);
+      // Resolve userId — require authentication and league membership
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const effectiveUserId = userId || authUser?.id;
+      if (!effectiveUserId) {
+        logger.error('[TradeService] getLeagueTradeHistory called without authentication');
+        return [];
       }
+      await LeagueMembershipService.requireMembership(leagueId, effectiveUserId);
 
       const { data, error } = await supabase
         .from('trade_history')

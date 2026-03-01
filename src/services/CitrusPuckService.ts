@@ -5,6 +5,26 @@ import { CitrusPuckPlayerData, AggregatedPlayerData, Situation } from "@/types/c
 import { CURRENT_SEASON } from "@/utils/seasonConstants";
 import { logger } from '@/utils/logger';
 
+// Supabase client typed query helper for tables not yet in generated types
+// (player_season_stats, player_directory are newer tables missing from codegen)
+type UntypedSupabaseQuery = {
+  from: (table: string) => {
+    select: (columns: string) => {
+      eq: (col: string, val: string | number) => UntypedQueryBuilder;
+      in: (col: string, vals: (string | number)[]) => UntypedQueryBuilder;
+      single: () => Promise<{ data: unknown; error: { message: string } | null }>;
+    };
+  };
+};
+type UntypedQueryBuilder = {
+  eq: (col: string, val: string | number) => UntypedQueryBuilder;
+  in: (col: string, vals: (string | number)[]) => UntypedQueryBuilder;
+  single: () => Promise<{ data: unknown; error: { message: string } | null }>;
+  then: Promise<{ data: unknown[]; error: { message: string } | null }>["then"];
+  [Symbol.toStringTag]: string;
+} & Promise<{ data: unknown[]; error: { message: string } | null }>;
+const untypedSupabase = supabase as unknown as UntypedSupabaseQuery;
+
 type PlayerSeasonStatsRow = {
   season: number;
   player_id: number;
@@ -300,11 +320,11 @@ export const CitrusPuckService = {
       // Fetch stats and directory data
       // Select all columns including NHL stats for proper mapping
       const [statsResponse, directoryResponse] = await Promise.all([
-          (supabase as unknown as { from: (table: string) => { select: (columns: string) => { eq: (col: string, val: number) => Promise<{ data: unknown[]; error: { message: string } | null }> } } })
+          untypedSupabase
             .from("player_season_stats")
             .select("season, player_id, team_abbrev, position_code, is_goalie, games_played, nhl_toi_seconds, goals, primary_assists, secondary_assists, points, nhl_goals, nhl_assists, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_saves, x_goals, pim, hits, blocks, saves, wins, nhl_wins, nhl_losses, nhl_ot_losses, goals_against, shutouts, save_pct, nhl_gaa, nhl_save_pct, nhl_shutouts, shots_faced, nhl_shots_faced, nhl_goals_against, goalie_gp")
             .eq("season", season),
-          (supabase as unknown as { from: (table: string) => { select: (columns: string) => { eq: (col: string, val: number) => Promise<{ data: unknown[]; error: { message: string } | null }> } } })
+          untypedSupabase
             .from("player_directory")
             .select("season, player_id, full_name, team_abbrev, position_code, is_goalie")
             .eq("season", season)
@@ -362,13 +382,13 @@ export const CitrusPuckService = {
     // Fetch stats and directory
     // Select all columns including NHL stats for proper mapping
     const [statsResponse, directoryResponse] = await Promise.all([
-      (supabase as unknown as { from: (table: string) => { select: (columns: string) => { eq: (col: string, val: number) => { eq: (col: string, val: number) => { single: () => Promise<{ data: unknown; error: { message: string } | null }> } } } } })
+      untypedSupabase
         .from("player_season_stats")
         .select("season, player_id, team_abbrev, position_code, is_goalie, games_played, icetime_seconds, nhl_toi_seconds, goals, primary_assists, secondary_assists, points, shots_on_goal, hits, blocks, pim, ppp, shp, plus_minus, nhl_plus_minus, nhl_goals, nhl_assists, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_ppp, nhl_shp, x_goals, x_assists, goalie_gp, wins, saves, shots_faced, goals_against, shutouts, save_pct, nhl_wins, nhl_losses, nhl_ot_losses, nhl_saves, nhl_shots_faced, nhl_goals_against, nhl_shutouts, nhl_save_pct, nhl_gaa")
         .eq("season", season)
         .eq("player_id", playerId)
         .single(),
-      (supabase as unknown as { from: (table: string) => { select: (columns: string) => { eq: (col: string, val: number) => { eq: (col: string, val: number) => { single: () => Promise<{ data: unknown; error: { message: string } | null }> } } } } })
+      untypedSupabase
         .from("player_directory")
         .select("season, player_id, full_name, team_abbrev, position_code, is_goalie")
         .eq("season", season)

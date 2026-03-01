@@ -683,14 +683,4 @@ export const DemoLeagueService = {
   },
 };
 
-// Expose for manual initialization (for debugging - dev mode only)
-if (typeof window !== 'undefined' && import.meta.env.DEV) {
-  (window as any).initDemoLeague = async () => {
-    logger.debug('Manually initializing demo league...');
-    const result = await DemoLeagueService.forceReinitialize();
-    logger.debug('Result:', result);
-    return result;
-  };
-  logger.debug('Demo league initialization available at: window.initDemoLeague()');
-}
 

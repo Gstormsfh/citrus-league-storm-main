@@ -21,6 +21,7 @@ Usage:
 """
 
 import os
+import signal
 import sys
 import time
 import random
@@ -32,6 +33,16 @@ from dotenv import load_dotenv
 from supabase_rest import SupabaseRest
 from src.utils.citrus_request import citrus_request
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+_shutdown_requested = False
+
+def _handle_shutdown(signum, frame):
+    global _shutdown_requested
+    _shutdown_requested = True
+    print(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
+
+signal.signal(signal.SIGINT, _handle_shutdown)
+signal.signal(signal.SIGTERM, _handle_shutdown)
 
 load_dotenv()
 SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
@@ -424,19 +435,24 @@ def main():
         
         completed = 0
         for future in as_completed(futures):
+            if _shutdown_requested:
+                executor.shutdown(wait=False, cancel_futures=True)
+                print(f"\n[SHUTDOWN] Graceful shutdown complete. Validated {completed}/{len(games)} games.")
+                sys.exit(0)
+
             completed += 1
             try:
                 result = future.result()
                 total_checked += result["checked"]
                 total_fixed += result["fixed"]
                 all_discrepancies.extend(result["discrepancies"])
-                
+
                 # Progress every 10 games
                 if completed % 10 == 0 or completed == len(games):
                     elapsed = time.time() - start_time
                     rate = completed / elapsed if elapsed > 0 else 0
                     logger.info(f"  Progress: {completed}/{len(games)} games ({rate:.1f} games/sec)")
-                    
+
             except Exception as e:
                 game_id = futures[future]
                 logger.error(f"  [ERROR] Game {game_id}: {e}")

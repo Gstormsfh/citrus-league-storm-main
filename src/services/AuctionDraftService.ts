@@ -253,7 +253,7 @@ export class AuctionDraftService {
         .from('draft_sessions')
         .select('settings')
         .eq('id', sessionId)
-        .single()).data?.settings as any;
+        .single()).data?.settings as Record<string, number | string | boolean | null | undefined> | null;
 
       await supabase
         .from('draft_sessions')

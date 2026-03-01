@@ -20,6 +20,7 @@ Architecture:
     Phase 6: Matchup Difficulty Table Update
 """
 
+import signal
 import sys
 import os
 import argparse
@@ -29,6 +30,16 @@ from typing import Dict, List, Optional, Any, Tuple
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from collections import defaultdict
 import statistics
+
+_shutdown_requested = False
+
+def _handle_shutdown(signum, frame):
+    global _shutdown_requested
+    _shutdown_requested = True
+    print(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
+
+signal.signal(signal.SIGINT, _handle_shutdown)
+signal.signal(signal.SIGTERM, _handle_shutdown)
 
 # Configure UTF-8 encoding for Windows
 if sys.platform == "win32":
@@ -893,17 +904,22 @@ def main():
         
         with ProcessPoolExecutor(max_workers=args.workers) as executor:
             futures = {executor.submit(calculate_projection_worker, task): task for task in worker_tasks}
-            
+
             for future in as_completed(futures):
+                if _shutdown_requested:
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    print(f"\n[SHUTDOWN] Graceful shutdown complete. Calculated {completed}/{len(worker_tasks)} projections.")
+                    sys.exit(0)
+
                 try:
                     result = future.result(timeout=30)
                     if result:
                         projections.append(result)
                 except Exception:
                     pass
-                
+
                 completed += 1
-                
+
                 # Progress update every 60 seconds
                 current_time = time.time()
                 if current_time - last_progress_time >= 60:
@@ -917,6 +933,10 @@ def main():
     else:
         # Sequential for small batches
         for task in worker_tasks:
+            if _shutdown_requested:
+                print(f"\n[SHUTDOWN] Graceful shutdown complete. Calculated {completed}/{len(worker_tasks)} projections.")
+                sys.exit(0)
+
             result = calculate_projection_worker(task)
             if result:
                 projections.append(result)

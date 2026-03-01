@@ -25,6 +25,7 @@ Fetches comprehensive stats in a single API call per player:
 """
 
 import os
+import signal
 import sys
 import time
 import requests
@@ -32,6 +33,16 @@ from typing import Optional, Dict, Tuple, Any
 from dotenv import load_dotenv
 from supabase_rest import SupabaseRest
 from src.utils.citrus_request import citrus_request
+
+_shutdown_requested = False
+
+def _handle_shutdown(signum, frame):
+    global _shutdown_requested
+    _shutdown_requested = True
+    print(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
+
+signal.signal(signal.SIGINT, _handle_shutdown)
+signal.signal(signal.SIGTERM, _handle_shutdown)
 
 load_dotenv()
 SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
@@ -439,11 +450,16 @@ def main() -> int:
     consecutive_errors = 0  # Track consecutive errors for logging
     
     for idx, player in enumerate(players, 1):
+        if _shutdown_requested:
+            print(f"\n[SHUTDOWN] Graceful shutdown complete. Processed {idx - 1}/{len(players)} players.")
+            print(f"  Skaters updated: {updated_count['skaters']} | Goalies updated: {updated_count['goalies']}")
+            sys.exit(0)
+
         player_id = _safe_int(player.get("player_id"), 0)
         player_name = player.get("full_name", "Unknown")
         if not player_id:
             continue
-        
+
         # Determine if player is a goalie (check player_directory)
         is_goalie = False
         try:
@@ -674,6 +690,10 @@ def main() -> int:
         print()
         
         for idx, (player_id, player_name, is_goalie) in enumerate(players_to_retry, 1):
+            if _shutdown_requested:
+                print(f"\n[SHUTDOWN] Graceful shutdown complete during retry phase.")
+                sys.exit(0)
+
             # Fetch from NHL API (landing endpoint - primary)
             landing_data, error_type = fetch_player_landing_data(player_id)
             

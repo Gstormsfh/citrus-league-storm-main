@@ -610,14 +610,14 @@ export const ScheduleService = {
    * Get games for a team in the current week (Sunday-Saturday)
    */
   async getGamesThisWeek(teamAbbrev: string): Promise<{ games: NHLGame[]; count: number }> {
-    const today = new Date();
+    const today = getTodayMSTDate();
     const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
     const daysFromSunday = dayOfWeek; // Sunday = 0, so offset is just dayOfWeek
-    
+
     const weekStart = new Date(today);
     weekStart.setDate(today.getDate() - daysFromSunday);
     weekStart.setHours(0, 0, 0, 0);
-    
+
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 6); // Saturday
     weekEnd.setHours(23, 59, 59, 999);

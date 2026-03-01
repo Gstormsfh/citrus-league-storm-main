@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { logger } from '@/utils/logger';
 import { Team, LeagueService } from './LeagueService';
@@ -384,10 +385,10 @@ export const DraftService = {
             draft_session_id: targetSessionId,
             picked_at: new Date().toISOString(),
           })
-          .select()
+          .select('id, league_id, team_id, player_id, round_number, pick_number, draft_session_id, picked_at, deleted_at')
           .single();
 
-        data = result.data as unknown as DraftPick | null;
+        data = result.data as DraftPick | null;
         error = result.error;
       } else {
         // RPC succeeded - fetch the inserted pick
@@ -782,15 +783,15 @@ export const DraftService = {
           .single();
 
         const currentSettings = currentLeague?.settings || {};
-        const { timerStartedAt: _, ...settingsWithoutTimer } = currentSettings as Record<string, unknown>;
+        const { timerStartedAt: _, ...settingsWithoutTimer } = currentSettings as Record<string, Json | undefined>;
 
         const { error: leagueError } = await supabase
           .from('leagues')
           .update({
             draft_status: 'not_started',
             scheduled_draft_time: null,
-            settings: { ...settingsWithoutTimer, timerStartedAt: null }
-          } as any)
+            settings: { ...settingsWithoutTimer, timerStartedAt: null } as Json
+          })
           .eq('id', leagueId);
 
         if (leagueError) throw leagueError;
