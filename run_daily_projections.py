@@ -33,7 +33,8 @@ def _handle_shutdown(signum, frame):
     logger.info(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
 
 signal.signal(signal.SIGINT, _handle_shutdown)
-signal.signal(signal.SIGTERM, _handle_shutdown)
+if sys.platform != "win32":
+    signal.signal(signal.SIGTERM, _handle_shutdown)
 
 # Set UTF-8 encoding for stdout (Windows compatibility)
 if sys.stdout.encoding != 'utf-8':
@@ -736,7 +737,12 @@ def main():
         default=35.0,
         help="Rejection threshold for impossible projections (default: 35.0 points)"
     )
-    
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force recalculation of all projections (ignore existing). Use after schema changes."
+    )
+
     args = parser.parse_args()
     
     # Parse target date
@@ -801,34 +807,37 @@ def main():
     logger.info(f"   Loaded scoring settings for {len(unique_leagues)} leagues")
     logger.info("")
     
-    # Step 3: Check existing projections and skip them
-    logger.info("📋 Step 3: Checking existing projections...")
+    # Step 3: Check existing projections and skip them (unless --force)
     existing_projections = set()
-    offset = 0
-    while True:
-        batch = db.select(
-            "player_projected_stats",
-            select="player_id,game_id",
-            filters=[("projection_date", "eq", target_date.isoformat())],
-            limit=1000,
-            offset=offset
-        )
-        if not batch:
-            break
-        for proj in batch:
-            existing_projections.add((int(proj.get("player_id", 0)), int(proj.get("game_id", 0))))
-        if len(batch) < 1000:
-            break
-        offset += 1000
-    logger.info(f"   Found {len(existing_projections)} existing projections")
-    
-    # Step 4: Prepare worker arguments (skip existing)
+    if args.force:
+        logger.info("📋 Step 3: --force flag set, recalculating ALL projections...")
+    else:
+        logger.info("📋 Step 3: Checking existing projections...")
+        offset = 0
+        while True:
+            batch = db.select(
+                "player_projected_stats",
+                select="player_id,game_id",
+                filters=[("projection_date", "eq", target_date.isoformat())],
+                limit=1000,
+                offset=offset
+            )
+            if not batch:
+                break
+            for proj in batch:
+                existing_projections.add((int(proj.get("player_id", 0)), int(proj.get("game_id", 0))))
+            if len(batch) < 1000:
+                break
+            offset += 1000
+        logger.info(f"   Found {len(existing_projections)} existing projections")
+
+    # Step 4: Prepare worker arguments (skip existing unless --force)
     logger.info("📋 Step 4: Preparing worker tasks...")
     worker_args = []
     skipped = 0
     for player_id, game_id, league_id in rostered_players:
-        # Skip if projection already exists
-        if (player_id, game_id) in existing_projections:
+        # Skip if projection already exists (unless --force)
+        if not args.force and (player_id, game_id) in existing_projections:
             skipped += 1
             continue
         # Use league scoring if available, otherwise use defaults
@@ -963,6 +972,7 @@ def main():
     # Step 6: Quality Gate - Outlier Detection
     valid_projections = projections
     rejected_projections = []
+    rejected_log_path = ""
     review_projections = []
     stats = {}
     
