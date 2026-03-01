@@ -18,7 +18,6 @@ import multiprocessing
 import os
 import time
 from datetime import datetime, date
-from functools import partial
 from typing import Dict, List, Optional, Tuple, Any
 import statistics
 import logging
@@ -615,36 +614,69 @@ def batch_upsert_projections(db: SupabaseRest, projections: List[Dict[str, Any]]
     
     total_upserted = 0
     
-    # Columns that don't exist in the schema - filter them out
-    # Only keep columns that exist in player_projected_stats table
-    valid_columns = {
+    # Complete column list from player_projected_stats schema.
+    # Split into NOT NULL (default 0) vs nullable (default None) to avoid constraint violations.
+    not_null_columns = {
+        # These are NOT NULL DEFAULT 0 in the DB — must send 0, never None
         'player_id', 'game_id', 'projection_date', 'season',
         'projected_goals', 'projected_assists', 'projected_sog', 'projected_blocks', 'projected_xg',
-        'projected_ppp', 'projected_shp', 'projected_hits', 'projected_pim',  # 8-stat columns
-        'total_projected_points',
+        'total_projected_points', 'is_goalie',
+    }
+    nullable_columns = {
+        # Skater stat columns (DEFAULT 0 but nullable)
+        'projected_ppp', 'projected_shp', 'projected_hits', 'projected_pim',
+        # Model transparency
         'base_ppg', 'shrinkage_weight', 'finishing_multiplier', 'opponent_adjustment',
         'b2b_penalty', 'home_away_adjustment',
         'calculation_method', 'confidence_score',
-        # Monte Carlo uncertainty columns (Citrus 3.1)
+        # Goalie columns (DEFAULT 0 but nullable)
+        'projected_wins', 'projected_saves', 'projected_shutouts',
+        'projected_goals_against', 'projected_gaa', 'projected_save_pct',
+        'projected_gp', 'starter_confirmed',
+        # Value metrics
+        'projected_vopa',
+        # Monte Carlo uncertainty (Citrus 3.1)
         'projection_mean', 'projection_std_dev',
         'projection_ci_lower', 'projection_ci_upper',
         'projection_ci_50_lower', 'projection_ci_50_upper',
         'projection_median', 'projection_skewness',
         'upside_probability', 'floor_probability', 'dynamic_confidence',
-        # User-facing presentation fields (Citrus 3.1 UX)
         'likely_low', 'likely_high', 'confidence_label',
     }
-    
+    all_valid_columns = not_null_columns | nullable_columns
+
+    # Map calc engine keys → DB column names where they differ
+    key_remap = {
+        'total_vopa': 'projected_vopa',
+    }
+
     # Process in batches
     for i in range(0, len(projections), batch_size):
         batch = projections[i:i+batch_size]
 
-        # Filter to valid columns AND ensure every row has identical keys
-        # (PostgREST requires "All object keys must match" for batch upsert)
+        # Build uniform rows: every row has identical keys (PostgREST requirement).
+        # NOT NULL columns get 0/False defaults; nullable columns get None.
         filtered_batch = []
         for proj in batch:
-            filtered_proj = {col: proj.get(col, None) for col in valid_columns}
-            filtered_batch.append(filtered_proj)
+            # Apply key remapping first
+            remapped = {}
+            for k, v in proj.items():
+                db_key = key_remap.get(k, k)
+                if db_key in all_valid_columns:
+                    remapped[db_key] = v
+
+            # Build uniform row with correct defaults
+            row = {}
+            for col in all_valid_columns:
+                if col in remapped:
+                    row[col] = remapped[col]
+                elif col == 'is_goalie':
+                    row[col] = False
+                elif col in not_null_columns:
+                    row[col] = 0
+                else:
+                    row[col] = None
+            filtered_batch.append(row)
         
         try:
             db.upsert(
@@ -836,7 +868,6 @@ def main():
             logger.info(f"       {len(existing_projections)} already exist, will skip")
 
     # Prepare worker arguments
-    logger.info("[4/7] Preparing tasks...")
     worker_args = []
     skipped = 0
 
@@ -1048,17 +1079,14 @@ def main():
             logger.info("")
     
     # Step 7: Batch Upsert (only valid projections if reject_outliers is enabled)
-    projections_to_upsert = valid_projections
     if args.reject_outliers:
-        # Only upsert valid projections, skip rejected ones
-        projections_to_upsert = valid_projections
-        if review_projections:
-            # Also include review projections (they're high but not impossible)
-            projections_to_upsert.extend(review_projections)
+        # Only upsert valid + review projections, skip rejected
+        projections_to_upsert = valid_projections + review_projections
     else:
         # Upsert all projections (including outliers, for manual review)
         projections_to_upsert = projections
     
+    upserted = 0
     if projections_to_upsert:
         logger.info(f"[7/7] Saving {len(projections_to_upsert)} projections to database...")
         if args.reject_outliers and rejected_projections:
@@ -1069,11 +1097,6 @@ def main():
         logger.info(f"       Done — {upserted} rows in {upsert_elapsed:.1f}s")
         logger.info("")
     
-    # Report cache failures (from worker processes) if any
-    from calculate_daily_projections import save_physical_projection
-    cache_fails = getattr(save_physical_projection, '_fail_count', 0)
-    cache_first_err = getattr(save_physical_projection, '_first_error', '')
-
     # Final Summary
     logger.info("")
     logger.info("=" * 60)
@@ -1085,10 +1108,7 @@ def main():
     logger.info(f"  Calculated: {len(successes)} OK, {len(failures)} failed")
     if not args.skip_outlier_detection and projections:
         logger.info(f"  Quality:    {len(valid_projections)} valid, {len(review_projections)} review, {len(rejected_projections)} rejected")
-    logger.info(f"  Upserted:   {len(projections_to_upsert)} rows to player_projected_stats")
-    if cache_fails > 0:
-        logger.info(f"  Cache:      {cache_fails} cache writes skipped (non-critical)")
-        logger.debug(f"              First error: {cache_first_err}")
+    logger.info(f"  Upserted:   {upserted if projections_to_upsert else 0} rows to player_projected_stats")
     if args.reject_outliers and rejected_projections and rejected_log_path:
         logger.info(f"  Log:        {rejected_log_path}")
     logger.info("=" * 60)

@@ -1340,7 +1340,7 @@ def get_opponent_offensive_context(
         # Get opponent's recent games
         recent_games = db.select(
             "nhl_games",
-            select="game_id",
+            select="game_id,home_team,away_team",
             filters=[
                 ("season", "eq", season),
                 ("game_date", "lte", date.today().isoformat())
@@ -2894,23 +2894,6 @@ def calculate_daily_projection(
             debug_goalie = os.getenv("DEBUG_GOALIE", "false").lower() == "true"
             # For goalies, still use the existing function but save physical projection first
             goalie_proj = calculate_goalie_projection(db, player_id, game_id, game_date, season, scoring_settings, debug=debug_goalie)
-            if goalie_proj:
-                # Save physical projection for goalie too
-                goalie_physical = {
-                    "goals": 0.0,
-                    "assists": 0.0,
-                    "shots": 0.0,
-                    "blocks": 0.0,
-                    "saves": goalie_proj.get("projected_saves", 0.0),
-                    "toi_seconds": 3600,
-                    "base_goals": 0.0,
-                    "base_assists": 0.0,
-                    "opponent_xga_suppression": 0.0,
-                    "goalie_gsax_factor": 1.0,
-                    "finishing_multiplier": 1.0,
-                    "opponent_adjustment": 1.0
-                }
-                save_physical_projection(db, player_id, game_id, game_date, season, goalie_physical)
             return goalie_proj
         
         # Get player's games played
