@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,10 +19,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
  *      to avoid missing events during the PKCE exchange)
  *   3. Check if a session already exists (auto-detect may have finished)
  *   4. Time out after 10 s if nothing happens
+ *
+ * Redirects use window.location.replace() rather than React Router's
+ * navigate() to avoid races with effect cleanup / component re-renders
+ * that can swallow the navigation.
  */
 const AuthCallback = () => {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('Completing sign-in...');
   const handled = useRef(false);
@@ -33,8 +34,6 @@ const AuthCallback = () => {
     let subscription: { unsubscribe: () => void } | null = null;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-    // AuthContext's own onAuthStateChange listener already calls
-    // fetchProfile() on SIGNED_IN, so we only need to navigate here.
     const succeed = (msg: string) => {
       if (!mounted || handled.current) return;
       handled.current = true;
@@ -42,9 +41,9 @@ const AuthCallback = () => {
       if (timeoutId) clearTimeout(timeoutId);
       setStatus('success');
       setMessage(msg);
-      setTimeout(() => {
-        if (mounted) navigate('/profile-setup');
-      }, 1500);
+      // Hard redirect — immune to React lifecycle / effect cleanup races.
+      // AuthContext will pick up the session from localStorage on reload.
+      setTimeout(() => window.location.replace('/profile-setup'), 1500);
     };
 
     const fail = (msg: string) => {
@@ -54,9 +53,7 @@ const AuthCallback = () => {
       if (timeoutId) clearTimeout(timeoutId);
       setStatus('error');
       setMessage(msg);
-      setTimeout(() => {
-        if (mounted) navigate('/auth');
-      }, 3000);
+      setTimeout(() => window.location.replace('/auth'), 3000);
     };
 
     const handleAuthCallback = async () => {
@@ -71,8 +68,9 @@ const AuthCallback = () => {
           return;
         }
 
-        const queryError = searchParams.get('error');
-        const queryErrorDescription = searchParams.get('error_description');
+        const queryParams = new URLSearchParams(window.location.search);
+        const queryError = queryParams.get('error');
+        const queryErrorDescription = queryParams.get('error_description');
         if (queryError) {
           fail(queryErrorDescription || 'Authentication failed. Please try again.');
           return;
@@ -112,11 +110,7 @@ const AuthCallback = () => {
       subscription?.unsubscribe();
       if (timeoutId) clearTimeout(timeoutId);
     };
-    // Note: navigate and searchParams are stable refs from React Router.
-    // refreshProfile was intentionally removed — AuthContext's own
-    // onAuthStateChange handler fetches the profile on SIGNED_IN.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigate, searchParams]);
+  }, []);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#D4E8B8] p-4">

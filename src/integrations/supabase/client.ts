@@ -19,7 +19,7 @@ const getSiteUrl = () => {
   if (typeof window !== 'undefined') {
     return window.location.origin;
   }
-  return 'https://citrus-fantasy-sports.web.app';
+  return 'https://citrusfantasysports.com';
 };
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
