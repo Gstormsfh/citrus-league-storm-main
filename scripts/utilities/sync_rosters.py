@@ -200,18 +200,20 @@ def compute_multi_position_eligibility(
     api_players: Optional[Dict[int, dict]] = None,
 ) -> Dict[int, List[str]]:
     """
-    Compute multi-position eligibility from player_game_stats + NHL roster data.
+    Compute multi-position eligibility from player_game_stats.
+
+    Industry standard (Yahoo Fantasy): A player gains eligibility at a position
+    if they have played MIN_GAMES_FOR_ELIGIBILITY (5) games at that position
+    during the current season.
 
     Data sources (in priority order):
     1. player_game_stats.position_code — actual game-by-game position data
-    2. NHL API roster position — current official position (always eligible)
+    2. NHL API roster position — current official position (always included as primary)
 
     Rules:
-    - The NHL roster position is ALWAYS eligible (it's the league's official designation)
-    - The most-played game stats position is ALWAYS eligible
-    - If these two differ, the player has dual eligibility automatically
-    - Additional secondary positions require MIN_GAMES_FOR_ELIGIBILITY (5) games
-    - Maximum 3 positions per player
+    - Primary position (most games) is always included
+    - Secondary positions require 5+ games played (MIN_GAMES_FOR_ELIGIBILITY)
+    - Maximum 3 positions per player (primary + up to 2 secondary)
     - Goalies cannot gain skater eligibility and vice versa
 
     Returns:
@@ -277,7 +279,7 @@ def compute_multi_position_eligibility(
     for pid in player_ids:
         pos_counts = position_counts.get(pid, {})
 
-        # Get the NHL roster position (always the official primary)
+        # Get the API roster position as baseline (always the primary)
         api_primary = ""
         if api_players and pid in api_players:
             api_primary = api_players[pid].get("position_code", "")
@@ -285,41 +287,47 @@ def compute_multi_position_eligibility(
         if not pos_counts and not api_primary:
             continue
 
-        # Determine if player is a goalie
-        is_goalie = (api_primary == "G") or (pos_counts.get("G", 0) > 0 and not api_primary)
+        # Merge: ensure API primary position is represented
+        if api_primary and api_primary in VALID_POSITIONS and api_primary not in pos_counts:
+            pos_counts[api_primary] = 0  # 0 games but it's their listed position
 
-        if is_goalie:
-            eligibility[pid] = ["G"]
+        # Filter to valid positions only (skip "F" fallback, empty, etc.)
+        pos_counts = {p: c for p, c in pos_counts.items() if p in VALID_POSITIONS}
+
+        # Sort positions by game count (most played first)
+        sorted_positions = sorted(pos_counts.items(), key=lambda x: -x[1])
+
+        if not sorted_positions:
             continue
 
-        # --- Skater eligibility ---
+        # Determine if player is a goalie or skater
+        primary_pos = sorted_positions[0][0]
+        # If API says goalie, treat as goalie even if game stats say otherwise
+        is_goalie = (api_primary == "G") or (primary_pos == "G")
+
         eligible = []
 
-        # 1. NHL roster position is ALWAYS eligible (official designation)
-        if api_primary and api_primary in VALID_POSITIONS and api_primary not in GOALIE_POSITIONS:
-            eligible.append(api_primary)
+        if is_goalie:
+            # Goalies only get G eligibility
+            eligible = ["G"]
+        else:
+            # Skaters: primary + secondary positions meeting threshold
+            for pos, count in sorted_positions:
+                if pos in GOALIE_POSITIONS:
+                    continue  # Skaters can't gain goalie eligibility
 
-        # 2. Most-played game stats position is ALWAYS eligible
-        # Filter to valid skater positions only
-        skater_counts = {p: c for p, c in pos_counts.items() if p in VALID_POSITIONS and p not in GOALIE_POSITIONS}
-        if skater_counts:
-            sorted_positions = sorted(skater_counts.items(), key=lambda x: -x[1])
-            most_played = sorted_positions[0][0]
+                if len(eligible) == 0:
+                    # Primary position: always included (even with 0 game stats,
+                    # because the NHL roster says this is their position)
+                    eligible.append(pos)
+                elif count >= MIN_GAMES_FOR_ELIGIBILITY and len(eligible) < 3:
+                    # Secondary/tertiary: must meet the games threshold
+                    eligible.append(pos)
 
-            if most_played not in eligible:
-                # Roster says X but they play Y — automatic dual eligibility
-                eligible.append(most_played)
-
-            # 3. Additional positions meeting the games threshold
-            for pos, count in sorted_positions[1:]:
-                if count >= MIN_GAMES_FOR_ELIGIBILITY and len(eligible) < 3:
-                    if pos not in eligible:
-                        eligible.append(pos)
-
-        # Ensure API primary is first (it's the "official" position)
-        if api_primary and api_primary in eligible and eligible[0] != api_primary:
-            eligible.remove(api_primary)
-            eligible.insert(0, api_primary)
+            # Ensure API primary is first if it's in the list
+            if api_primary and api_primary in eligible and eligible[0] != api_primary:
+                eligible.remove(api_primary)
+                eligible.insert(0, api_primary)
 
         if eligible:
             eligibility[pid] = eligible
