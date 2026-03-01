@@ -427,8 +427,8 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
         )}
 
         {/* Daily Points Bar OR Projection Bar - VARSITY SCOREBOARD STYLE - COMPACT */}
-        {!hasGameOnDate ? (
-          // CASE 1: NO GAME scheduled for this date - Show "No game today" on mobile
+        {!hasGameOnDate && !hasDailyStats ? (
+          // CASE 1: NO GAME scheduled for this date AND no daily stats - Show "No game today"
           <div className="player-projection-bar-container">
             <div className="w-full py-1 text-center font-display text-xs text-citrus-charcoal/60 bg-[#E8EED9]/50 backdrop-blur-sm/50 rounded border border-dashed border-citrus-sage/30 italic">
               No game {isInDailyViewMode ? 'this day' : 'today'}
@@ -584,8 +584,8 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
 
       {/* Mobile-only score display - Show "No game" when no game, or daily points/weekly total */}
       <div className="player-mobile-score lg:hidden">
-        {!hasGameOnDate ? (
-          // No game today - show "No game" instead of 0.0
+        {!hasGameOnDate && !hasDailyStats ? (
+          // No game today and no daily stats - show "No game" instead of 0.0
           <span className="text-citrus-charcoal/50 text-[10px] font-semibold italic">
             No game
           </span>
