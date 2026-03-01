@@ -52,7 +52,8 @@ def _handle_shutdown(signum, frame):
     logger.info(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
 
 signal.signal(signal.SIGINT, _handle_shutdown)
-signal.signal(signal.SIGTERM, _handle_shutdown)
+if sys.platform != "win32":
+    signal.signal(signal.SIGTERM, _handle_shutdown)
 
 # Configure UTF-8 encoding for Windows
 if sys.platform == "win32":
@@ -2243,8 +2244,13 @@ def save_physical_projection(
             # Silently skip - this is expected for future dates
             return True
         
-        # For other errors, log but don't print full traceback (too noisy)
-        logger.warning(f"Warning: Could not cache projection for player {player_id}: {type(e).__name__}")
+        # Cache is optional — count failures silently and report once at the end
+        if not hasattr(save_projection_to_cache, '_fail_count'):
+            save_projection_to_cache._fail_count = 0
+            save_projection_to_cache._first_error = f"{type(e).__name__}: {e}"
+        save_projection_to_cache._fail_count += 1
+        if save_projection_to_cache._fail_count == 1:
+            logger.debug(f"Cache upsert failed for player {player_id}: {type(e).__name__}")
         return False
 
 
