@@ -40,6 +40,12 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 
 DEFAULT_SEASON = int(os.getenv("CITRUS_DEFAULT_SEASON", "2025"))
 
+# Map canonical/historical team codes to current NHL API team codes.
+# The NHL API only recognizes current franchise abbreviations.
+_NHL_API_TEAM_CODE = {
+    "ARI": "UTA",  # Arizona Coyotes relocated to Utah Hockey Club
+}
+
 
 def supabase_client() -> SupabaseRest:
     return SupabaseRest(SUPABASE_URL, SUPABASE_KEY)
@@ -112,11 +118,13 @@ def fetch_nhl_roster_status(db: SupabaseRest, season: int) -> int:
     # Fetch roster status for each team
     for team_abbrev in sorted(team_abbrevs):
         try:
-            # CRITICAL: Use canonical team code for API call
+            # Use current team abbreviation for NHL API call (not canonical)
+            # The NHL API uses current codes (e.g., UTA), not historical (e.g., ARI)
+            api_team = _NHL_API_TEAM_CODE.get(team_abbrev, team_abbrev)
             canonical_team = get_canonical_team_code(db, team_abbrev)
-            
+
             # Call NHL Roster API
-            api_url = f"https://api-web.nhle.com/v1/roster/{canonical_team}/current"
+            api_url = f"https://api-web.nhle.com/v1/roster/{api_team}/current"
             
             # Retry logic (max 3 retries)
             max_retries = 3

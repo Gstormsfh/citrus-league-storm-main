@@ -1072,7 +1072,10 @@ def main():
                 logger.info("")
         
         if review_projections:
-            logger.warning("⚠️  REVIEW PROJECTIONS (Unusually High - {:.1f} to {:.1f} pts):".format( args.threshold, args.rejection_threshold ))
+            review_pts = [r.get('total_projected_points', 0) for r in review_projections]
+            review_min = min(review_pts)
+            review_max = max(review_pts)
+            logger.warning("⚠️  REVIEW PROJECTIONS (Unusually High - {:.1f} to {:.1f} pts):".format( review_min, review_max ))
             logger.info("-" * 80)
             for review in review_projections[:10]:  # Show first 10
                 reason = review.get('outlier_reason', 'unknown')
