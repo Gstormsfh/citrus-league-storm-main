@@ -625,6 +625,8 @@ def batch_upsert_projections(db: SupabaseRest, projections: List[Dict[str, Any]]
         'projection_ci_50_lower', 'projection_ci_50_upper',
         'projection_median', 'projection_skewness',
         'upside_probability', 'floor_probability', 'dynamic_confidence',
+        # User-facing presentation fields (Citrus 3.1 UX)
+        'likely_low', 'likely_high', 'confidence_label',
     }
     
     # Process in batches

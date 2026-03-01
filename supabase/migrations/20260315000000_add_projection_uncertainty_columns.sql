@@ -20,6 +20,12 @@ ALTER TABLE public.player_projected_stats
   ADD COLUMN IF NOT EXISTS floor_probability NUMERIC(5,4),
   ADD COLUMN IF NOT EXISTS dynamic_confidence NUMERIC(4,3);
 
+-- User-facing presentation fields (Citrus 3.1 UX layer)
+ALTER TABLE public.player_projected_stats
+  ADD COLUMN IF NOT EXISTS likely_low NUMERIC(6,1),
+  ADD COLUMN IF NOT EXISTS likely_high NUMERIC(6,1),
+  ADD COLUMN IF NOT EXISTS confidence_label TEXT;
+
 -- Add comments for documentation
 COMMENT ON COLUMN public.player_projected_stats.projection_mean IS 'Monte Carlo mean of fantasy point distribution (may differ slightly from point estimate due to non-linear interactions)';
 COMMENT ON COLUMN public.player_projected_stats.projection_std_dev IS 'Standard deviation of fantasy point distribution — measures projection uncertainty';
@@ -32,3 +38,6 @@ COMMENT ON COLUMN public.player_projected_stats.projection_skewness IS 'Skewness
 COMMENT ON COLUMN public.player_projected_stats.upside_probability IS 'Probability of exceeding 1.5x the point estimate (boom potential)';
 COMMENT ON COLUMN public.player_projected_stats.floor_probability IS 'Probability of falling below 0.5x the point estimate (bust risk)';
 COMMENT ON COLUMN public.player_projected_stats.dynamic_confidence IS 'MC-derived confidence score based on distribution coefficient of variation (replaces static formula)';
+COMMENT ON COLUMN public.player_projected_stats.likely_low IS '25th percentile of fantasy points, rounded to 1 decimal — primary "likely range" lower bound shown to users';
+COMMENT ON COLUMN public.player_projected_stats.likely_high IS '75th percentile of fantasy points, rounded to 1 decimal — primary "likely range" upper bound shown to users';
+COMMENT ON COLUMN public.player_projected_stats.confidence_label IS 'Plain-English confidence badge: High (>=0.60), Medium (>=0.35), or Low (<0.35)';
