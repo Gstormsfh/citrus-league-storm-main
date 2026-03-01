@@ -90,6 +90,7 @@ function makeDirectoryRow(overrides: Partial<{
   is_goalie: boolean;
   jersey_number: string | null;
   headshot_url: string | null;
+  eligible_positions: string | null;
 }> = {}) {
   return {
     season: 2025,
@@ -100,6 +101,7 @@ function makeDirectoryRow(overrides: Partial<{
     is_goalie: false,
     jersey_number: '97',
     headshot_url: null,
+    eligible_positions: null,
     ...overrides,
   };
 }
@@ -620,6 +622,22 @@ describe('PlayerService', () => {
       expect(players[0].eligible_positions).toContain('C');
       expect(players[0].eligible_positions).toContain('LW');
       expect(players[0].eligible_positions).toHaveLength(2);
+    });
+
+    it('uses pre-computed eligible_positions from DB when available', async () => {
+      // eligible_positions column is set by sync_rosters.py based on game-level data
+      const dirRow = makeDirectoryRow({
+        position_code: 'C',
+        eligible_positions: 'C,LW,RW', // Player has 5+ games at C, LW, and RW
+      });
+      const statRow = makeStatsRow({ position_code: 'C' }); // stats only show C
+
+      setupPlayerTableMocks({ dirRows: [dirRow], statRows: [statRow] });
+
+      const players = await PlayerService.getAllPlayers();
+      expect(players).toHaveLength(1);
+      // Should use DB eligible_positions (3 positions) instead of fallback (1 position)
+      expect(players[0].eligible_positions).toEqual(['C', 'LW', 'RW']);
     });
 
     it('generates headshot URL from team and player ID when not in directory', async () => {

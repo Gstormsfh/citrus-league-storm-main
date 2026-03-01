@@ -818,7 +818,22 @@ def main():
     
     # Initialize database connection (main process)
     db = supabase_client()
-    
+
+    # Step 0: Sync rosters from NHL API (team changes, new players, multi-position)
+    logger.info("[0/7] Syncing rosters from NHL API...")
+    try:
+        scripts_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts", "utilities")
+        if scripts_dir not in sys.path:
+            sys.path.insert(0, scripts_dir)
+        from sync_rosters import sync_rosters
+        roster_sync = sync_rosters(db, args.season)
+        logger.info(f"       {roster_sync.get('team_updates', 0)} team moves, {roster_sync.get('new_players', 0)} new players, {roster_sync.get('multi_position', 0)} multi-pos")
+    except ImportError:
+        logger.warning("       sync_rosters.py not found, skipping roster sync")
+    except Exception as e:
+        logger.warning(f"       Roster sync error (non-fatal): {e}")
+    logger.info("")
+
     # Step 1: Pre-calculate GP_Last_10 metric
     logger.info("[1/7] Updating GP_Last_10 metric...")
     gp_updated = populate_gp_last_10_metric(db, args.season)

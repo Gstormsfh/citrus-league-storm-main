@@ -92,25 +92,18 @@ def fetch_nhl_roster_status(db: SupabaseRest, season: int) -> int:
     
     print(f"   Found {len(team_abbrevs)} unique teams")
     
-    # Create mapping of NHL player ID to our player_id
-    # Note: Assuming player_directory.player_id is the NHL player ID
-    # If there's a separate nhl_player_id field, adjust accordingly
-    player_id_map = {}
+    # Build flat set of known player IDs (player_directory.player_id == NHL player ID)
     all_players = db.select(
         "player_directory",
-        select="player_id,team_abbrev",
+        select="player_id",
         filters=[("season", "eq", season)],
         limit=10000
     )
-    
+    known_player_ids = set()
     for player in all_players:
-        player_id = player.get("player_id")
-        team_abbrev = player.get("team_abbrev")
-        if player_id and team_abbrev:
-            # Use player_id as NHL player ID (adjust if different field exists)
-            if team_abbrev not in player_id_map:
-                player_id_map[team_abbrev] = {}
-            player_id_map[team_abbrev][player_id] = player_id
+        pid = player.get("player_id")
+        if pid:
+            known_player_ids.add(int(pid))
     
     updated_count = 0
     failed_teams = []
@@ -157,18 +150,15 @@ def fetch_nhl_roster_status(db: SupabaseRest, season: int) -> int:
             roster_data = response.json()
             
             # Extract players from roster
-            # API structure may vary - adjust based on actual response
+            # NHL API v1/roster/{team}/current returns: forwards, defensemen, goalies
             roster_players = []
             if isinstance(roster_data, dict):
-                # Try common response structures
                 if "forwards" in roster_data:
                     roster_players.extend(roster_data.get("forwards", []))
-                if "defense" in roster_data:
-                    roster_players.extend(roster_data.get("defense", []))
+                if "defensemen" in roster_data:
+                    roster_players.extend(roster_data.get("defensemen", []))
                 if "goalies" in roster_data:
                     roster_players.extend(roster_data.get("goalies", []))
-                if "players" in roster_data:
-                    roster_players.extend(roster_data.get("players", []))
             elif isinstance(roster_data, list):
                 roster_players = roster_data
             
@@ -187,31 +177,13 @@ def fetch_nhl_roster_status(db: SupabaseRest, season: int) -> int:
                     
                     if not nhl_player_id:
                         continue
-                    
-                    # Map NHL player ID to our player_id
-                    # Note: This assumes player_directory.player_id matches NHL player ID
-                    # If different, adjust mapping logic
-                    our_player_id = None
-                    if team_abbrev in player_id_map:
-                        our_player_id = player_id_map[team_abbrev].get(nhl_player_id)
-                    
-                    # Also try canonical team mapping
-                    if not our_player_id and canonical_team in player_id_map:
-                        our_player_id = player_id_map[canonical_team].get(nhl_player_id)
-                    
-                    if not our_player_id:
-                        # Try direct lookup by NHL player ID across all teams
-                        player_lookup = db.select(
-                            "player_directory",
-                            select="player_id",
-                            filters=[("player_id", "eq", nhl_player_id), ("season", "eq", season)],
-                            limit=1
-                        )
-                        if player_lookup:
-                            our_player_id = player_lookup[0].get("player_id")
-                    
-                    if not our_player_id:
+
+                    # Direct lookup: player_directory.player_id == NHL player ID
+                    # No need for team-based lookup (handles traded players correctly)
+                    nhl_player_id = int(nhl_player_id)
+                    if nhl_player_id not in known_player_ids:
                         continue
+                    our_player_id = nhl_player_id
                     
                     # Map status to is_ir_eligible
                     is_ir_eligible = False

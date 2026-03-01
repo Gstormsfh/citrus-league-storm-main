@@ -49,31 +49,41 @@ const pipelineDb = supabase as unknown as PipelineDb;
  */
 
 /**
- * Derive eligible positions for a player (max 2).
- * Industry standard: primary position + secondary if the player commonly plays both.
- * Currently derived from player_season_stats.position_code vs player_directory.position_code differences,
- * and common NHL position adjacencies (e.g., many Cs also play LW/RW).
- * In future, this will use game-level position data (10+ GP at secondary position = eligibility).
+ * Normalize a raw position code to our standard format.
  */
-function deriveEligiblePositions(primaryPos: string, statsPos: string | null): string[] {
-  const normalize = (p: string): string => {
-    const u = (p || '').toUpperCase();
-    if (u === 'L' || u === 'LEFT' || u === 'LEFTWING') return 'LW';
-    if (u === 'R' || u === 'RIGHT' || u === 'RIGHTWING') return 'RW';
-    if (u === 'CENTRE' || u === 'CENTER') return 'C';
-    if (u === 'DEFENCE' || u === 'DEFENSE') return 'D';
-    if (u === 'GOALIE' || u === 'GOALTENDER') return 'G';
-    return u;
-  };
+function normalizePosition(p: string): string {
+  const u = (p || '').toUpperCase().trim();
+  if (u === 'L' || u === 'LEFT' || u === 'LEFTWING') return 'LW';
+  if (u === 'R' || u === 'RIGHT' || u === 'RIGHTWING') return 'RW';
+  if (u === 'CENTRE' || u === 'CENTER') return 'C';
+  if (u === 'DEFENCE' || u === 'DEFENSE') return 'D';
+  if (u === 'GOALIE' || u === 'GOALTENDER') return 'G';
+  return u;
+}
 
-  const primary = normalize(primaryPos);
+/**
+ * Derive eligible positions for a player.
+ *
+ * Uses three sources in priority order:
+ * 1. eligible_positions from player_directory (computed by sync_rosters.py from game-level data)
+ * 2. Fallback: compare player_directory.position_code vs player_season_stats.position_code
+ * 3. Fallback: primary position only
+ */
+function deriveEligiblePositions(primaryPos: string, statsPos: string | null, dbEligible?: string | null): string[] {
+  const primary = normalizePosition(primaryPos);
   if (!primary) return [];
 
-  const positions = [primary];
+  // Priority 1: Use pre-computed eligible_positions from DB (set by sync_rosters.py)
+  // Format: "C,LW" or "RW,LW" or "D" (comma-separated)
+  if (dbEligible) {
+    const parsed = dbEligible.split(',').map(p => normalizePosition(p)).filter(Boolean);
+    if (parsed.length > 0) return parsed;
+  }
 
-  // If stats table has a different position than directory, the player is dual-eligible
+  // Priority 2: Compare directory position vs stats position
+  const positions = [primary];
   if (statsPos) {
-    const secondary = normalize(statsPos);
+    const secondary = normalizePosition(statsPos);
     if (secondary && secondary !== primary && positions.length < 2) {
       positions.push(secondary);
     }
@@ -135,6 +145,7 @@ type PlayerDirectoryRow = {
   is_goalie: boolean;
   jersey_number: string | null;
   headshot_url: string | null;
+  eligible_positions: string | null; // Comma-separated: "C,LW" or "RW,LW" (from sync_rosters.py)
 };
 
 type PlayerSeasonStatsRow = {
@@ -241,7 +252,7 @@ export const PlayerService = {
       const [{ data: dirRowsRaw, error: dirErr }, { data: statRowsRaw, error: statErr }, { data: talentRowsRaw, error: talentErr }] = await Promise.all([
         pipelineDb
           .from("player_directory")
-          .select("season, player_id, full_name, team_abbrev, position_code, is_goalie, jersey_number, headshot_url")
+          .select("season, player_id, full_name, team_abbrev, position_code, is_goalie, jersey_number, headshot_url, eligible_positions")
           .eq("season", DEFAULT_SEASON)
           .range(0, 4999),
         pipelineDb
@@ -378,7 +389,7 @@ export const PlayerService = {
           : 'active';
 
         // Derive dual-position eligibility from directory vs stats position differences
-        const eligiblePositions = deriveEligiblePositions(pos, sRaw?.position_code || null);
+        const eligiblePositions = deriveEligiblePositions(pos, sRaw?.position_code || null, d.eligible_positions);
 
         return {
           id: String(pid),
@@ -500,7 +511,7 @@ export const PlayerService = {
       const [{ data: dirRowsRaw, error: dirErr }, { data: statRowsRaw, error: statErr }, { data: talentRowsRaw, error: talentErr }] = await Promise.all([
         pipelineDb
           .from("player_directory")
-          .select("season, player_id, full_name, team_abbrev, position_code, is_goalie, jersey_number, headshot_url")
+          .select("season, player_id, full_name, team_abbrev, position_code, is_goalie, jersey_number, headshot_url, eligible_positions")
           .eq("season", DEFAULT_SEASON)
           .in("player_id", intIds),
         pipelineDb
@@ -620,7 +631,7 @@ export const PlayerService = {
         // ALWAYS calculate points from goals + assists to ensure consistency
         const calculatedPoints = calculatedGoals + calculatedAssists;
 
-        const eligiblePositions = deriveEligiblePositions(pos, sRaw?.position_code || null);
+        const eligiblePositions = deriveEligiblePositions(pos, sRaw?.position_code || null, d.eligible_positions);
 
         // Use real roster_status from player_talent_metrics (same as getAllPlayers)
         const talent2 = talentByPlayerId2.get(pid);
