@@ -157,16 +157,16 @@ const App = () => {
                 <Route path="/profile-setup" element={<ProfileSetup />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/verify-email" element={<VerifyEmail />} />
-                <Route path="/roster" element={<ProtectedRoute><ErrorBoundary><Roster /></ErrorBoundary></ProtectedRoute>} />
-                <Route path="/standings" element={<ProtectedRoute><ErrorBoundary><Standings /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/roster" element={<ErrorBoundary><Roster /></ErrorBoundary>} />
+                <Route path="/standings" element={<ErrorBoundary><Standings /></ErrorBoundary>} />
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/blog" element={<Blog />} />
                 <Route path="/podcasts" element={<Podcasts />} />
                 <Route path="/guides" element={<Guides />} />
-                    <Route path="/matchup/:leagueId/:weekId?" element={<ProtectedRoute><ErrorBoundary><Matchup /></ErrorBoundary></ProtectedRoute>} />
-                    <Route path="/matchup" element={<ProtectedRoute><ErrorBoundary><Matchup /></ErrorBoundary></ProtectedRoute>} /> {/* Fallback for /matchup without params */}
+                    <Route path="/matchup/:leagueId/:weekId?" element={<ErrorBoundary><Matchup /></ErrorBoundary>} />
+                    <Route path="/matchup" element={<ErrorBoundary><Matchup /></ErrorBoundary>} /> {/* Fallback for /matchup without params */}
                     <Route path="/league/:leagueId/playoffs" element={<ProtectedRoute><ErrorBoundary><PlayoffBracket /></ErrorBoundary></ProtectedRoute>} />
-                <Route path="/free-agents" element={<ProtectedRoute><ErrorBoundary><FreeAgents /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/free-agents" element={<ErrorBoundary><FreeAgents /></ErrorBoundary>} />
                 <Route path="/gm-office" element={<ProtectedRoute><ErrorBoundary><GMOffice /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/gm-office/stormy" element={<ProtectedRoute><ErrorBoundary><StormyAssistant /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/news" element={<News />} />
