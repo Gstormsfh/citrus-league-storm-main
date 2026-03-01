@@ -16,6 +16,7 @@ import { ScheduleService, NHLGame } from '@/services/ScheduleService';
 import { SEASON_START_YEAR } from '@/utils/seasonConstants';
 import type { LeagueSettings } from '@/types/leagueTypes';
 import { logger } from '@/utils/logger';
+import { COLUMNS } from '@/utils/queryColumns';
 
 // ============================================================================
 // Week / Deadline Helpers
@@ -249,7 +250,7 @@ export class PoolService {
     try {
       const { data, error } = await supabase
         .from('pool_picks')
-        .select('*')
+        .select(COLUMNS.POOL_PICK)
         .eq('league_id', leagueId)
         .eq('user_id', userId)
         .eq('week_number', weekNumber)
@@ -778,7 +779,7 @@ export class PoolService {
     try {
       const { data, error } = await supabase
         .from('confidence_picks')
-        .select('*')
+        .select(COLUMNS.CONFIDENCE_PICK)
         .eq('league_id', leagueId)
         .eq('user_id', userId)
         .eq('week_number', weekNumber)

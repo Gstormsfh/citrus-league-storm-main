@@ -12,6 +12,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { CURRENT_SEASON } from '@/utils/seasonConstants';
 import { logger } from '@/utils/logger';
+import { COLUMNS } from '@/utils/queryColumns';
 
 // ============================================================================
 // TYPES
@@ -130,7 +131,7 @@ export const PlayoffService = {
       // Get bracket
       const { data: bracketData, error: bracketError } = await supabase
         .from('playoff_brackets')
-        .select('*')
+        .select(COLUMNS.PLAYOFF_BRACKET)
         .eq('league_id', leagueId)
         .eq('season', CURRENT_SEASON)
         .maybeSingle();
@@ -146,12 +147,12 @@ export const PlayoffService = {
       const [seedsResult, seriesResult] = await Promise.all([
         supabase
           .from('playoff_seeds')
-          .select('*')
+          .select(COLUMNS.PLAYOFF_SEED)
           .eq('bracket_id', bracket.id)
           .order('seed_number', { ascending: true }),
         supabase
           .from('playoff_series')
-          .select('*')
+          .select(COLUMNS.PLAYOFF_SERIES)
           .eq('bracket_id', bracket.id)
           .order('round_number', { ascending: true })
           .order('match_number', { ascending: true }),

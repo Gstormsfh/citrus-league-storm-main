@@ -4,6 +4,7 @@ import { logger } from '@/utils/logger';
 import { Team, LeagueService } from './LeagueService';
 import { PlayerService } from './PlayerService';
 import { LeagueMembershipService } from './LeagueMembershipService';
+import { COLUMNS } from '@/utils/queryColumns';
 
 export interface DraftPick {
   id: string;
@@ -575,7 +576,7 @@ export const DraftService = {
               .from('teams').select('id, team_name, owner_id').eq('league_id', leagueId);
             if (teamsErr) throw teamsErr;
             const { data: snapshotPicks, error: picksErr } = await supabase
-              .from('draft_picks').select('*')
+              .from('draft_picks').select(COLUMNS.DRAFT_PICK)
               .eq('league_id', leagueId).eq('draft_session_id', targetSessionId).is('deleted_at', null)
               .order('pick_number', { ascending: true });
             if (picksErr) throw picksErr;
@@ -1194,7 +1195,7 @@ export const DraftService = {
     try {
       const { data, error } = await supabase
         .from('draft_snapshots')
-        .select('*')
+        .select(COLUMNS.DRAFT_SNAPSHOT)
         .eq('league_id', leagueId)
         .order('created_at', { ascending: false })
         .limit(1)

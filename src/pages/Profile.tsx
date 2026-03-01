@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { COLUMNS } from '@/utils/queryColumns';
 import { LeagueService } from '@/services/LeagueService';
 import { DraftService } from '@/services/DraftService';
 import { WaiverService } from '@/services/WaiverService';
@@ -201,7 +202,7 @@ const Profile = () => {
         // Load league data
         const { data: leagueData, error: leagueError } = await supabase
           .from('leagues')
-          .select('*')
+          .select(COLUMNS.LEAGUE)
           .eq('id', selectedSettingsLeagueId)
           .single();
         
@@ -211,7 +212,7 @@ const Profile = () => {
         // Load teams for this league
         const { data: teamsData, error: teamsError } = await supabase
           .from('teams')
-          .select('*')
+          .select(COLUMNS.TEAM)
           .eq('league_id', selectedSettingsLeagueId);
         
         if (!teamsError) {

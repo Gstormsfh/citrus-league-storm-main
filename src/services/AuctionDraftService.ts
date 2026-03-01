@@ -18,6 +18,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { CURRENT_SEASON } from '@/utils/seasonConstants';
 import { logger } from '@/utils/logger';
+import { COLUMNS } from '@/utils/queryColumns';
 
 // ============================================================================
 // Types
@@ -148,14 +149,14 @@ export class AuctionDraftService {
       // Get all budgets
       const { data: budgets } = await supabase
         .from('auction_budgets')
-        .select('*')
+        .select(COLUMNS.AUCTION_BUDGET)
         .eq('league_id', leagueId)
         .order('remaining_budget', { ascending: false });
 
       // Get current active nomination (if any)
       const { data: activeNom } = await supabase
         .from('auction_nominations')
-        .select('*')
+        .select(COLUMNS.AUCTION_NOMINATION)
         .eq('league_id', leagueId)
         .eq('draft_session_id', sessionId)
         .eq('status', 'active')
@@ -286,7 +287,7 @@ export class AuctionDraftService {
       // Get current nomination
       const { data: nom } = await supabase
         .from('auction_nominations')
-        .select('*')
+        .select(COLUMNS.AUCTION_NOMINATION)
         .eq('id', nominationId)
         .eq('status', 'active')
         .single();
@@ -382,7 +383,7 @@ export class AuctionDraftService {
       // Get the nomination
       const { data: nom } = await supabase
         .from('auction_nominations')
-        .select('*')
+        .select(COLUMNS.AUCTION_NOMINATION)
         .eq('id', nominationId)
         .single();
 
@@ -496,7 +497,7 @@ export class AuctionDraftService {
     try {
       const { data, error } = await supabase
         .from('auction_bids')
-        .select('*')
+        .select(COLUMNS.AUCTION_BID)
         .eq('nomination_id', nominationId)
         .order('bid_amount', { ascending: false });
 
@@ -567,7 +568,7 @@ export class AuctionDraftService {
     try {
       const { data, error } = await supabase
         .from('auction_budgets')
-        .select('*')
+        .select(COLUMNS.AUCTION_BUDGET)
         .eq('league_id', leagueId)
         .order('remaining_budget', { ascending: false });
 

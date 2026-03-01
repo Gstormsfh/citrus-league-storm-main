@@ -14,6 +14,7 @@ import { CitrusSparkle } from '@/components/icons/CitrusIcons';
 import { getTodayMST } from '@/utils/timezoneUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
+import { COLUMNS } from '@/utils/queryColumns';
 
 // ─── Types for week projections ─────────────────────────────────────
 interface GameProjection {
@@ -152,7 +153,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
         try {
           const { data: projRows } = await supabase
             .from('player_projected_stats')
-            .select('*')
+            .select(COLUMNS.PLAYER_PROJECTED_STATS)
             .eq('player_id', playerId)
             .gte('projection_date', todayStr)
             .in('calculation_method', ['hybrid_bayesian', 'probability_based_volume'])

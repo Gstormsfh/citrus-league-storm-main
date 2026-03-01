@@ -178,9 +178,9 @@ export class TradeService {
 
         // Check both teams' current roster sizes
         const [{ count: fromCount }, { count: toCount }] = await Promise.all([
-          supabase.from('roster_assignments').select('*', { count: 'exact', head: true })
+          supabase.from('roster_assignments').select(COLUMNS.COUNT, { count: 'exact', head: true })
             .eq('league_id', trade.league_id).eq('team_id', trade.from_team_id),
-          supabase.from('roster_assignments').select('*', { count: 'exact', head: true })
+          supabase.from('roster_assignments').select(COLUMNS.COUNT, { count: 'exact', head: true })
             .eq('league_id', trade.league_id).eq('team_id', trade.to_team_id),
         ]);
 

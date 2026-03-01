@@ -1775,7 +1775,7 @@ export const MatchupService = {
         // Guest viewing demo league - use public read
         const { data, error } = await supabase
           .from('leagues')
-          .select('*')
+          .select(COLUMNS.LEAGUE)
           .eq('id', matchup.league_id)
           .single();
         if (error) throw error;
@@ -2901,7 +2901,7 @@ export const MatchupService = {
       // Get league to determine schedule length
       const { data: league, error: leagueError } = await supabase
         .from('leagues')
-        .select('*')
+        .select(COLUMNS.LEAGUE)
         .eq('id', leagueId)
         .maybeSingle();
 
