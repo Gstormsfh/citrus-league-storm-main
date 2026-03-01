@@ -710,10 +710,15 @@ def populate_gp_last_10_metric(db: SupabaseRest, season: int) -> int:
     fast "Likely-to-Play" filtering in VOPA calculations.
     """
     try:
+        # The module lives in scripts/utilities/ — add to path if needed
+        import importlib
+        scripts_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts", "utilities")
+        if scripts_dir not in sys.path:
+            sys.path.insert(0, scripts_dir)
         from populate_gp_last_10_metric import populate_gp_last_10_for_all_players
         return populate_gp_last_10_for_all_players(db, season)
     except ImportError:
-        logger.warning("⚠️  Warning: populate_gp_last_10_metric.py not found, skipping GP_Last_10 calculation")
+        logger.warning("⚠️  populate_gp_last_10_metric.py not found, skipping GP_Last_10")
         return 0
     except Exception as e:
         logger.error(f"⚠️  Warning: Error calculating GP_Last_10: {e}")
