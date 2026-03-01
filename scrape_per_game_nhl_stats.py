@@ -850,13 +850,13 @@ def main():
 
         # Progress output with flushing
         progress_msg = f"[{idx}/{len(games)}] ({idx*100//len(games)}%) Processing game {game_id} ({game_date})..."
-        logger.info(progress_msg, flush=True)
+        logger.info(progress_msg)
         sys.stdout.flush()
         
         # Fetch boxscore (reads from stored data first, falls back to API)
         boxscore = fetch_game_boxscore(game_id, db)
         if not boxscore:
-            logger.error(f"  [ERROR] Failed to fetch boxscore (tried stored data and API)", flush=True)
+            logger.error(f"  [ERROR] Failed to fetch boxscore (tried stored data and API)")
             errors += 1
             time.sleep(0.5)  # Rate limiting
             continue
@@ -864,14 +864,14 @@ def main():
         # Extract player stats
         player_stats = extract_player_stats_from_boxscore(boxscore)
         if not player_stats:
-            logger.warning(f"  [WARNING] No player stats found in boxscore", flush=True)
+            logger.warning(f"  [WARNING] No player stats found in boxscore")
             time.sleep(0.5)
             continue
         
         # Count goalies and skaters
         goalie_count = sum(1 for s in player_stats.values() if s.get("_is_goalie", False))
         skater_count = len(player_stats) - goalie_count
-        logger.info(f"  Found {len(player_stats)} players ({skater_count} skaters, {goalie_count} goalies)", flush=True)
+        logger.info(f"  Found {len(player_stats)} players ({skater_count} skaters, {goalie_count} goalies)")
         
         # Update database
         game_date_obj = datetime.strptime(game_date, "%Y-%m-%d").date() if isinstance(game_date, str) else game_date
@@ -897,11 +897,11 @@ def main():
         if result["skipped"] > 0:
             parts.append(f"skipped {result['skipped']} skaters (no base record)")
         
-        logger.info(f"  -> {', '.join(parts) if parts else 'no changes'}", flush=True)
+        logger.info(f"  -> {', '.join(parts) if parts else 'no changes'}")
         
         # Progress summary every 10 games
         if idx % 10 == 0:
-            logger.error(f"\n[PROGRESS] {idx}/{len(games)} games processed | Updated: {total_updated} | Created: {total_created} | Errors: {errors}\n", flush=True)
+            logger.error(f"\n[PROGRESS] {idx}/{len(games)} games processed | Updated: {total_updated} | Created: {total_created} | Errors: {errors}\n")
         
         time.sleep(0.5)  # Rate limiting (500ms between requests)
     

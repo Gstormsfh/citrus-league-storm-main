@@ -247,7 +247,11 @@ class UncertaintyEngine:
         }
 
         for stat, proj_key in stat_keys.items():
-            mean = float(projection.get(proj_key, 0.0))
+            raw_mean = projection.get(proj_key, 0.0)
+            mean = float(raw_mean) if raw_mean is not None else 0.0
+            # Guard against NaN from upstream data corruption
+            if np.isnan(mean):
+                mean = 0.0
 
             # Get league std dev for this stat (or use default)
             league_sd = float(league_std_devs.get(f"std_dev_{stat}_per_game", 0))
@@ -356,6 +360,11 @@ class UncertaintyEngine:
         # Bayesian posterior for shooting percentage
         alpha_post = FINISHING_PRIOR_ALPHA + actual_goals
         beta_post = FINISHING_PRIOR_BETA + shot_count - actual_goals
+
+        # Safety: clamp beta_post to avoid ValueError from corrupt data
+        # (e.g., actual_goals erroneously exceeding shot_count + prior)
+        alpha_post = max(alpha_post, 1.0)
+        beta_post = max(beta_post, 1.0)
 
         # Sample shooting percentages from posterior
         sh_pct_samples = self.rng.beta(alpha_post, beta_post, self.n_samples)
