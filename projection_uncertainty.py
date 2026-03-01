@@ -723,11 +723,11 @@ def build_player_context(
             # Use shots on goal as proxy for shot count (actual shots table may be large)
             context["shot_count"] = int(float(player_stats[0].get("nhl_shots_on_goal", 0)))
 
-        # Get total xG from raw_shots (aggregated)
+        # Get total xG from raw_shots for current season
         shots = db.select(
             "raw_shots",
             select="xg_value",
-            filters=[("player_id", "eq", player_id)],
+            filters=[("player_id", "eq", player_id), ("season", "eq", season)],
             limit=10000
         )
         if shots:

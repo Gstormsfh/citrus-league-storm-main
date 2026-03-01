@@ -33,10 +33,14 @@ try:
         build_player_context,
     )
     UNCERTAINTY_AVAILABLE = True
-except ImportError:
+except ImportError as _unc_import_err:
     UNCERTAINTY_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
+
+if not UNCERTAINTY_AVAILABLE:
+    logger.warning(f"projection_uncertainty module not available: {_unc_import_err}. "
+                   "Uncertainty propagation will be disabled for this run.")
 
 _shutdown_requested = False
 
@@ -3159,9 +3163,25 @@ def calculate_daily_projection(
                     db, player_id, season, games_played,
                     opponent_team=opponent_team, position=position
                 )
-                result = enrich_projection_with_uncertainty(result, player_ctx)
+                # Reuse a per-process engine to avoid redundant Cholesky decompositions
+                if not hasattr(calculate_daily_projection, '_unc_engine'):
+                    calculate_daily_projection._unc_engine = UncertaintyEngine(n_samples=5000)
+                    calculate_daily_projection._unc_fail_count = 0
+                # Circuit breaker: if >20 consecutive failures, stop trying this run
+                if calculate_daily_projection._unc_fail_count < 20:
+                    result = enrich_projection_with_uncertainty(
+                        result, player_ctx, engine=calculate_daily_projection._unc_engine
+                    )
+                    calculate_daily_projection._unc_fail_count = 0  # Reset on success
             except Exception as unc_err:
-                logger.warning(f"Uncertainty propagation skipped for player {player_id}: {unc_err}")
+                calculate_daily_projection._unc_fail_count = getattr(
+                    calculate_daily_projection, '_unc_fail_count', 0
+                ) + 1
+                if calculate_daily_projection._unc_fail_count <= 5:
+                    logger.warning(f"Uncertainty propagation skipped for player {player_id}: {unc_err}")
+                elif calculate_daily_projection._unc_fail_count == 20:
+                    logger.error(f"Uncertainty propagation failed 20 times consecutively — "
+                                 f"disabling for remainder of this run. Last error: {unc_err}")
 
         return result
         
