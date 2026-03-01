@@ -1,7 +1,6 @@
 // NHL Team Primary Colors
 export const TEAM_COLORS: Record<string, string> = {
   'ANA': '#B9975B', // Anaheim Ducks - Gold
-  'ARI': '#8C2633', // Arizona Coyotes - Brick Red
   'BOS': '#FFB81C', // Boston Bruins - Gold
   'BUF': '#003087', // Buffalo Sabres - Navy Blue
   'CGY': '#C8102E', // Calgary Flames - Red

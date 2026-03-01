@@ -713,13 +713,13 @@ def get_team_xga_per_60(
     Performance-optimized: Uses raw_shots with efficient aggregation.
     For a team's xGA, we sum xG of all shots taken AGAINST that team.
     
-    Uses canonical team code for cache lookups (treats ARI/UTA as single entity).
-    
+    Uses canonical team code for cache lookups.
+
     Returns:
         xGA per 60 minutes (e.g., 2.3) or None if unavailable
     """
     try:
-        # Use canonical team code for cache lookups (ensures ARI/UTA continuity)
+        # Use canonical team code for cache lookups
         canonical_team = get_canonical_team_code(db, team)
         
         # Data leak protection: Only use games up to today
@@ -1787,16 +1787,16 @@ _team_mapping_cache: Dict[str, str] = {}
 def get_canonical_team_code(db: SupabaseRest, team_code: str) -> str:
     """
     Get canonical team code for cache lookups.
-    
-    Uses team_mapping_config table to map relocated franchises (e.g., ARI/UTA)
+
+    Uses team_mapping_config table to map relocated franchises
     to a single canonical code. Results are cached for performance.
-    
+
     Args:
         db: Supabase client
-        team_code: Team code to look up (e.g., "ARI" or "UTA")
-    
+        team_code: Team code to look up (e.g., "UTA")
+
     Returns:
-        Canonical team code (e.g., "ARI" for both "ARI" and "UTA")
+        Canonical team code (e.g., "UTA")
     """
     # Check cache first
     if team_code in _team_mapping_cache:

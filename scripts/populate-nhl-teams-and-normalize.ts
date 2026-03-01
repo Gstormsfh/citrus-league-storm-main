@@ -46,7 +46,7 @@ const NHL_TEAMS = [
   { team_id: 29, name: 'Columbus Blue Jackets', abbreviation: 'CBJ', city: 'Columbus' },
   { team_id: 30, name: 'Minnesota Wild', abbreviation: 'MIN', city: 'Minnesota' },
   { team_id: 52, name: 'Winnipeg Jets', abbreviation: 'WPG', city: 'Winnipeg' },
-  { team_id: 53, name: 'Arizona Coyotes', abbreviation: 'ARI', city: 'Arizona' },
+  { team_id: 53, name: 'Utah Hockey Club', abbreviation: 'UTA', city: 'Salt Lake City' },
   { team_id: 54, name: 'Vegas Golden Knights', abbreviation: 'VGK', city: 'Vegas' },
   { team_id: 55, name: 'Seattle Kraken', abbreviation: 'SEA', city: 'Seattle' },
 ];

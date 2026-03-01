@@ -104,7 +104,7 @@ export const NHL_TEAMS: NHLTeamInfo[] = [
   { abbrev: 'WSH', name: 'Capitals', fullName: 'Washington Capitals', conference: 'Eastern', division: 'Metropolitan', primaryColor: '#C8102E', secondaryColor: '#041E42', logoUrl: 'https://assets.nhle.com/logos/nhl/svg/WSH_light.svg' },
 
   // Central Division
-  { abbrev: 'ARI', name: 'Utah HC', fullName: 'Utah Hockey Club', conference: 'Western', division: 'Central', primaryColor: '#69B3E7', secondaryColor: '#000000', logoUrl: 'https://assets.nhle.com/logos/nhl/svg/UTA_light.svg' },
+  { abbrev: 'UTA', name: 'Utah HC', fullName: 'Utah Hockey Club', conference: 'Western', division: 'Central', primaryColor: '#69B3E7', secondaryColor: '#000000', logoUrl: 'https://assets.nhle.com/logos/nhl/svg/UTA_light.svg' },
   { abbrev: 'CHI', name: 'Blackhawks', fullName: 'Chicago Blackhawks', conference: 'Western', division: 'Central', primaryColor: '#CF0A2C', secondaryColor: '#000000', logoUrl: 'https://assets.nhle.com/logos/nhl/svg/CHI_light.svg' },
   { abbrev: 'COL', name: 'Avalanche', fullName: 'Colorado Avalanche', conference: 'Western', division: 'Central', primaryColor: '#6F263D', secondaryColor: '#236192', logoUrl: 'https://assets.nhle.com/logos/nhl/svg/COL_light.svg' },
   { abbrev: 'DAL', name: 'Stars', fullName: 'Dallas Stars', conference: 'Western', division: 'Central', primaryColor: '#006847', secondaryColor: '#8F8F8C', logoUrl: 'https://assets.nhle.com/logos/nhl/svg/DAL_light.svg' },
@@ -156,7 +156,5 @@ export function getPositionGroup(position: string): PositionGroup {
 
 // Get team info by abbreviation
 export function getTeamInfo(abbrev: string): NHLTeamInfo | undefined {
-  // Handle Utah's special case (API uses UTA, we use ARI for historical reasons)
-  if (abbrev === 'UTA') return NHL_TEAMS.find(t => t.abbrev === 'ARI');
   return NHL_TEAMS.find(t => t.abbrev === abbrev);
 }
