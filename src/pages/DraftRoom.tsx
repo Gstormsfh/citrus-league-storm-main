@@ -45,6 +45,7 @@ import LoadingScreen from '@/components/LoadingScreen';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
+import { ScoringCalculator } from '@/utils/scoringUtils';
 import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { useToast } from '@/hooks/use-toast';
@@ -254,25 +255,27 @@ const DraftRoom = () => {
         const { data: demoLeagueData, error: leagueError } = await supabase
           .from('leagues')
           .select(COLUMNS.LEAGUE)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .eq('id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
           .maybeSingle();
-        
+
         if (leagueError || !demoLeagueData) {
           logger.error('[DraftRoom] Error loading demo league:', leagueError);
           setError('Failed to load demo league. Please try again.');
           setLoading(false);
           return;
         }
-        
+
         const demoLeague = demoLeagueData as League;
         logger.debug('[DraftRoom] Demo league loaded:', demoLeague.id);
         setLeague(demoLeague);
         setIsCommissioner(false); // Guests are never commissioners
-        
+
         // Get teams from the demo league
         const { data: demoTeamsData, error: teamsError } = await supabase
           .from('teams')
           .select(COLUMNS.TEAM)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
           .order('created_at', { ascending: true });
         
@@ -284,7 +287,7 @@ const DraftRoom = () => {
         }
         
         // Map database teams and add owner names from LEAGUE_TEAMS_DATA
-        const demoTeams: (Team & { owner_name?: string })[] = (demoTeamsData as any[]).map((team, index) => {
+        const demoTeams: (Team & { owner_name?: string })[] = (demoTeamsData as Team[]).map((team, index) => {
           const teamData = LEAGUE_TEAMS_DATA[index];
           return {
             ...team,
@@ -303,6 +306,7 @@ const DraftRoom = () => {
         const { data: draftPicksData, error: picksError } = await supabase
           .from('draft_picks')
           .select('*')
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
           .is('deleted_at', null)
           .order('pick_number', { ascending: true });
@@ -961,7 +965,7 @@ const DraftRoom = () => {
           filter: `id=eq.${leagueId}`
         },
         async (payload) => {
-          const updatedLeague = payload.new as any;
+          const updatedLeague = payload.new as League & { settings: LeagueSettings & { timerStartedAt?: string | null; pickTimeLimit?: number } };
           logger.debug('DraftRoom: League status changed via realtime:', updatedLeague.draft_status);
 
           // Update local league state (including settings with timerStartedAt)
@@ -1977,6 +1981,7 @@ const DraftRoom = () => {
     try {
       const { error: updateError } = await supabase
         .from('leagues')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .update({ scheduled_draft_time: scheduledTime } as any)
         .eq('id', leagueId);
 
@@ -2081,6 +2086,7 @@ const DraftRoom = () => {
       // Set league status to 'queued' (ready to start)
       const { error: leagueStatusError } = await supabase
         .from('leagues')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .update({ draft_status: 'queued' as any })
         .eq('id', leagueId);
       
@@ -2172,7 +2178,7 @@ const DraftRoom = () => {
           if (rejoinOrder && rejoinOrder.team_order) {
             const orderedTeams = rejoinOrder.team_order
               .map((teamId: string) => teams.find(t => t.id === teamId))
-              .filter((t: any): t is (Team & { owner_name?: string }) => t !== undefined);
+              .filter((t): t is (Team & { owner_name?: string }) => t !== undefined);
             if (orderedTeams.length === teams.length) {
               setOrderedTeamsForBoard(orderedTeams);
             }
@@ -2349,7 +2355,7 @@ const DraftRoom = () => {
     // Clear timerStartedAt in DB so all clients stop their timers
     if (leagueId) {
       const currentSettings = league?.settings || {};
-      const { timerStartedAt: _, ...settingsWithoutTimer } = currentSettings as any;
+      const { timerStartedAt: _, ...settingsWithoutTimer } = currentSettings as LeagueSettings & { timerStartedAt?: string | null };
       await supabase
         .from('leagues')
         .update({ settings: { ...settingsWithoutTimer, timerStartedAt: null } })
@@ -2480,9 +2486,9 @@ const DraftRoom = () => {
       
       toast({ title: "Success", description: "All draft data has been deleted successfully." });
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Error deleting all draft data:', error);
-      toast({ title: "Error", description: `Failed to delete all draft data: ${error.message || 'Unknown error'}`, variant: "destructive" });
+      toast({ title: "Error", description: `Failed to delete all draft data: ${error instanceof Error ? error.message : 'Unknown error'}`, variant: "destructive" });
     }
   };
 
@@ -2693,7 +2699,11 @@ const DraftRoom = () => {
         status: player.status === 'injured' ? 'IR' : null,
         image: player.headshot_url || undefined,
         projectedPoints: player.games_played > 0
-          ? ((player.goals || 0) * 3 + (player.assists || 0) * 2 + (player.shots || 0) * 0.4 + (player.blocks || 0) * 0.5 + (player.hits || 0) * 0.2 + (player.pim || 0) * 0.5) / player.games_played
+          ? new ScoringCalculator().calculatePointsPerGame({
+              goals: player.goals || 0, assists: player.assists || 0, shots: player.shots || 0,
+              blocks: player.blocks || 0, hits: player.hits || 0, pim: player.pim || 0,
+              ppp: player.ppp || 0, shp: player.shp || 0
+            }, false, player.games_played)
           : 0
       };
       
@@ -2808,7 +2818,7 @@ const DraftRoom = () => {
       name: t.team_name || 'Unnamed Team',
       owner: (t as { owner_name?: string }).owner_name || (t.owner_id ? 'User' : 'AI Team'),
       color: '#7CB518',
-      picks: [] as any[],
+      picks: [] as unknown[],
     }));
   }, [teams]);
 
@@ -3338,7 +3348,7 @@ const DraftRoom = () => {
                            teams={(orderedTeamsForBoard.length > 0 ? orderedTeamsForBoard : teams).map(t => ({
                              id: t.id,
                              name: t.team_name,
-                             owner: (t as any).owner_name || (t.owner_id ? 'User' : 'AI'),
+                             owner: t.owner_name || (t.owner_id ? 'User' : 'AI'),
                              color: '#7CB518',
                              picks: teamPicksMap.get(t.id) || []
                            }))}

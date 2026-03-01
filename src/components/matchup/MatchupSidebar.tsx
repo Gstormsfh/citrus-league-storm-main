@@ -6,6 +6,7 @@ import { TrendingUp, Flame, Award } from 'lucide-react';
 import { CitrusSparkle, CitrusLeaf, CitrusSlice } from '@/components/icons/CitrusIcons';
 import { cn } from '@/lib/utils';
 import { MatchupPlayer } from './types';
+import { ScoringCalculator } from '@/utils/scoringUtils';
 import { AdSpace } from '@/components/AdSpace';
 
 interface MatchupSidebarProps {
@@ -51,12 +52,18 @@ export const MatchupSidebar: React.FC<MatchupSidebarProps> = ({
       else if (p.points && p.points > 0) {
         totalPoints = p.points;
       }
-      // 3. Check matchupStats for weekly totals
+      // 3. Check matchupStats for weekly totals — use centralized ScoringCalculator
       else if (p.matchupStats) {
         const stats = p.matchupStats;
-        totalPoints = (stats.goals || 0) + (stats.assists || 0) + (stats.sog || 0) * 0.2 + 
-                     (stats.powerPlayPoints || 0) + (stats.shortHandedPoints || 0) + 
-                     (stats.hits || 0) * 0.25 + (stats.blocks || 0) * 0.25;
+        const sidebarScorer = new ScoringCalculator();
+        const isGoalie = (stats.wins !== undefined && stats.wins !== null) && !stats.goals;
+        totalPoints = sidebarScorer.calculatePoints({
+          goals: stats.goals || 0, assists: stats.assists || 0, sog: stats.sog || 0,
+          blocks: stats.blocks || 0, ppp: stats.ppp || 0, shp: stats.shp || 0,
+          hits: stats.hits || 0, pim: stats.pim || 0,
+          wins: stats.wins || 0, saves: stats.saves || 0, shutouts: stats.shutouts || 0,
+          goals_against: stats.goals_against || 0
+        }, isGoalie);
       }
       
       return { ...p, calculatedPoints: totalPoints };

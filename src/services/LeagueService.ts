@@ -7,6 +7,7 @@ import { RosterCacheService } from "./RosterCacheService";
 import { LeagueMembershipService } from "./LeagueMembershipService";
 import { DEMO_LEAGUE_ID_FOR_GUESTS } from "./DemoLeagueService";
 import { logger } from "@/utils/logger";
+import { ScoringCalculator } from "@/utils/scoringUtils";
 import { getTodayMST } from "@/utils/timezoneUtils";
 import { CURRENT_SEASON } from "@/utils/seasonConstants";
 import type { LeagueType, ScoringFormat, DraftType as LeagueDraftType, LeagueSettings } from "@/types/leagueTypes";
@@ -1143,13 +1144,14 @@ async joinLeagueByCode(
       const pos = getNormalizedPos(p);
       if (pos === 'G') {
         // Rough fantasy point equivalent for goalies to make them draftable
-        // Wins * 4 + Saves * 0.2 - GoalsAgainst * 2
+        // Uses centralized ScoringCalculator for consistent scoring weights
         // If stats are null, give them a baseline value to ensure they get drafted
         const wins = p.wins || 0;
         const saves = p.saves || 0;
         // If no stats (e.g. start of season or fallback data without stats), give arbitrary high value
         if (wins === 0 && saves === 0) return 100; // Middle tier
-        return (wins * 4) + (saves * 0.2); 
+        const goalieScorer = new ScoringCalculator();
+        return goalieScorer.calculatePoints({ wins, saves }, true);
       }
       return p.points || 0;
     };

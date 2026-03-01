@@ -3,8 +3,8 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import { supabase } from '@/integrations/supabase/client';
-import Navbar from '../components/Navbar';
-import Footer from '../components/Footer';
+import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -33,6 +33,7 @@ import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { GameLogosBar } from '@/components/matchup/GameLogosBar';
 import { logger } from '@/utils/logger';
+import { ScoringCalculator } from '@/utils/scoringUtils';
 
 // Helper function to format position for display (L -> LW, R -> RW)
 const formatPositionForDisplay = (position: string): string => {
@@ -734,7 +735,7 @@ const FreeAgents = () => {
         });
         return;
       }
-      const lineupData = lineupDataResult as any;
+      const lineupData = lineupDataResult as { starters?: string[]; bench?: string[]; ir?: string[] } | null;
 
       // Calculate current roster size
       // If lineup exists, use it; otherwise count roster_assignments (source of truth)
@@ -750,7 +751,9 @@ const FreeAgents = () => {
         const { count: rosterCount, error: rosterError } = await supabase
           .from('roster_assignments')
           .select(COLUMNS.COUNT, { count: 'exact', head: true })
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .eq('team_id' as any, teamData.id as any)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .eq('league_id' as any, leagueId as any);
         
         if (rosterError) {
@@ -1129,11 +1132,17 @@ const FreeAgents = () => {
       // Fallback uses season PPG * games this week (not the broken points/20 formula)
       const seasonPPG = p.games_played > 0 ? (p.points || 0) / p.games_played : 0;
       const isGoalie = p.position === 'G';
-      // Goalies: W*4 + SV*0.2 + SO*3 + GA*-1. Skaters: full fantasy scoring formula.
+      // Use centralized ScoringCalculator for fantasy PPG
+      const scorer = new ScoringCalculator();
       const estimatedFantasyPPG = isGoalie
-        ? ((p.wins || 0) > 0 && p.games_played > 0 ? ((p.wins || 0) * 4 + (p.saves || 0) * 0.2 + (p.shutouts || 0) * 3 + (p.goals_against || 0) * -1) / p.games_played : 3.0)
+        ? ((p.wins || 0) > 0 && p.games_played > 0 ? scorer.calculatePointsPerGame({
+            wins: p.wins || 0, saves: p.saves || 0, shutouts: p.shutouts || 0, goals_against: p.goals_against || 0
+          }, true, p.games_played) : 3.0)
         : (p.games_played > 0
-          ? ((p.goals || 0) * 3 + (p.assists || 0) * 2 + (p.ppp || 0) * 1 + (p.shp || 0) * 2 + (p.shots || 0) * 0.4 + (p.blocks || 0) * 0.5 + (p.hits || 0) * 0.2 + (p.pim || 0) * 0.5) / p.games_played
+          ? scorer.calculatePointsPerGame({
+              goals: p.goals || 0, assists: p.assists || 0, ppp: p.ppp || 0, shp: p.shp || 0,
+              sog: p.shots || 0, blocks: p.blocks || 0, hits: p.hits || 0, pim: p.pim || 0
+            }, false, p.games_played)
           : 0);
       const weeklyProjection = gamesThisWeek === 0
         ? 0
@@ -1810,10 +1819,16 @@ const FreeAgents = () => {
                           // Fallback uses actual fantasy PPG * games (not broken points/20)
                           const gw = player.gamesThisWeek || 0;
                           const isG = player.position === 'G';
+                          const faScorer = new ScoringCalculator();
                           const estPPG = isG
-                            ? ((player.wins || 0) > 0 && player.games_played > 0 ? ((player.wins || 0) * 4 + (player.saves || 0) * 0.2 + (player.shutouts || 0) * 3 + (player.goals_against || 0) * -1) / player.games_played : 3.0)
+                            ? ((player.wins || 0) > 0 && player.games_played > 0 ? faScorer.calculatePointsPerGame({
+                                wins: player.wins || 0, saves: player.saves || 0, shutouts: player.shutouts || 0, goals_against: player.goals_against || 0
+                              }, true, player.games_played) : 3.0)
                             : (player.games_played > 0
-                              ? ((player.goals || 0) * 3 + (player.assists || 0) * 2 + (player.ppp || 0) * 1 + (player.shp || 0) * 2 + (player.shots || 0) * 0.4 + (player.blocks || 0) * 0.5 + (player.hits || 0) * 0.2 + (player.pim || 0) * 0.5) / player.games_played
+                              ? faScorer.calculatePointsPerGame({
+                                  goals: player.goals || 0, assists: player.assists || 0, ppp: player.ppp || 0, shp: player.shp || 0,
+                                  sog: player.shots || 0, blocks: player.blocks || 0, hits: player.hits || 0, pim: player.pim || 0
+                                }, false, player.games_played)
                               : 0);
                           const weeklyProjection = gw === 0
                             ? 0

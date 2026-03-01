@@ -1,6 +1,7 @@
 import { MatchupPlayer } from "./types";
 import { PlayerCard } from "./PlayerCard";
 import { CenterColumn } from "./CenterColumn";
+import { ScoringCalculator } from "@/utils/scoringUtils";
 
 interface MatchupComparisonRowProps {
   userPlayer: MatchupPlayer | null;
@@ -22,10 +23,15 @@ export const MatchupComparisonRow = ({
   dailyStatsMap
 }: MatchupComparisonRowProps) => {
   // Calculate projected points using actual fantasy PPG from season stats
-  const calcPPG = (p: HockeyPlayer | null) => {
+  const scorer = new ScoringCalculator();
+  const calcPPG = (p: MatchupPlayer | null) => {
     if (!p || !p.stats?.gamesPlayed) return 0;
     const s = p.stats;
-    return ((s.goals || 0) * 3 + (s.assists || 0) * 2 + (s.shots || 0) * 0.4 + (s.blocks || 0) * 0.5 + (s.hits || 0) * 0.2 + (s.pim || 0) * 0.5) / s.gamesPlayed;
+    return scorer.calculatePointsPerGame({
+      goals: s.goals || 0, assists: s.assists || 0, sog: s.sog || 0,
+      blocks: s.blk || 0, hits: (s as any).hits || 0, pim: (s as any).pim || 0,
+      ppp: s.powerPlayPoints || 0, shp: (s as any).shortHandedPoints || 0
+    }, false, s.gamesPlayed);
   };
   const userProjectedPoints = calcPPG(userPlayer);
   const opponentProjectedPoints = calcPPG(opponentPlayer);

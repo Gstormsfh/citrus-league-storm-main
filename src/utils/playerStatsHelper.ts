@@ -1,5 +1,6 @@
 import { PlayerService, Player } from '@/services/PlayerService';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
+import { ScoringCalculator } from '@/utils/scoringUtils';
 import { logger } from '@/utils/logger';
 
 /**
@@ -90,7 +91,16 @@ export async function getPlayerWithSeasonStats(
       is_ir_eligible: player.is_ir_eligible,
       image: player.headshot_url || undefined,
       projectedPoints: player.games_played > 0
-        ? ((player.goals || 0) * 3 + (player.assists || 0) * 2 + (player.shots || 0) * 0.4 + (player.blocks || 0) * 0.5 + (player.hits || 0) * 0.2 + (player.pim || 0) * 0.5) / player.games_played
+        ? new ScoringCalculator().calculatePointsPerGame({
+            goals: player.goals || 0,
+            assists: player.assists || 0,
+            shots: player.shots || 0,
+            blocks: player.blocks || 0,
+            hits: player.hits || 0,
+            pim: player.pim || 0,
+            ppp: powerPlayPoints,
+            shp: shortHandedPoints
+          }, false, player.games_played)
         : 0
     };
 
