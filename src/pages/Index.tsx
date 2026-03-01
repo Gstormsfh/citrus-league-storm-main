@@ -1,12 +1,12 @@
 
 import { useEffect, Suspense } from 'react';
-import Navbar from '../components/Navbar';
-import TestingPhaseBanner from '../components/TestingPhaseBanner';
-import HeroSection from '../components/HeroSection';
-import FeaturesSection from '../components/FeaturesSection';
-import StormySection from '../components/StormySection';
-import CtaSection from '../components/CtaSection';
-import Footer from '../components/Footer';
+import Navbar from '@/components/Navbar';
+import TestingPhaseBanner from '@/components/TestingPhaseBanner';
+import HeroSection from '@/components/HeroSection';
+import FeaturesSection from '@/components/FeaturesSection';
+import StormySection from '@/components/StormySection';
+import CtaSection from '@/components/CtaSection';
+import Footer from '@/components/Footer';
 import { AdSpace } from '@/components/AdSpace';
 import { CitrusBackground } from '@/components/CitrusBackground';
 import { CitrusSectionDivider } from '@/components/CitrusSectionDivider';
