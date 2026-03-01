@@ -108,7 +108,7 @@ def get_rostered_players(db: SupabaseRest, target_date: date, season: int) -> Li
         game_map[away_team] = game_id
     
     # LEFT JOIN Pattern: Get ALL players on playing teams (not just rostered)
-    logger.info(f"   Fetching players from {len(playing_teams)} teams...", flush=True)
+    logger.info(f"   Fetching players from {len(playing_teams)} teams...")
     all_players = db.select(
         "player_directory",
         select="player_id,team_abbrev",
@@ -118,7 +118,7 @@ def get_rostered_players(db: SupabaseRest, target_date: date, season: int) -> Li
         ],
         limit=10000  # Large limit for all players
     )
-    logger.info(f"   Found {len(all_players)} players", flush=True)
+    logger.info(f"   Found {len(all_players)} players")
     
     if not all_players:
         return []
@@ -128,11 +128,11 @@ def get_rostered_players(db: SupabaseRest, target_date: date, season: int) -> Li
     active_players = []
     
     # Query player_season_stats in batches to check games_played > 0
-    logger.info(f"   Checking active players ({len(player_ids)} total)...", flush=True)
+    logger.info(f"   Checking active players ({len(player_ids)} total)...")
     for i in range(0, len(player_ids), 100):
         batch = player_ids[i:i+100]
         if i % 200 == 0:
-            logger.info(f"   Checking batch {i//100 + 1}...", flush=True)
+            logger.info(f"   Checking batch {i//100 + 1}...")
         stats_batch = db.select(
             "player_season_stats",
             select="player_id,games_played",
@@ -152,12 +152,12 @@ def get_rostered_players(db: SupabaseRest, target_date: date, season: int) -> Li
             pid = int(player.get("player_id", 0))
             if pid in batch and games_played_map.get(pid, 0) > 0:
                 active_players.append(player)
-    logger.info(f"   Found {len(active_players)} active players", flush=True)
+    logger.info(f"   Found {len(active_players)} active players")
     
     # LEFT JOIN with draft_picks to get league_id (if rostered)
     # Create map of player_id -> league_id from draft_picks
     # OPTIMIZATION: Only fetch picks for active players, not all picks
-    logger.info(f"   Fetching draft picks for {len(active_players)} active players...", flush=True)
+    logger.info(f"   Fetching draft picks for {len(active_players)} active players...")
     active_player_ids_list = [int(p.get("player_id", 0)) for p in active_players if p.get("player_id")]
     all_picks = db.select(
         "draft_picks",
@@ -165,7 +165,7 @@ def get_rostered_players(db: SupabaseRest, target_date: date, season: int) -> Li
         filters=[("player_id", "in", active_player_ids_list)] if active_player_ids_list else [],
         limit=10000
     )
-    logger.info(f"   Found {len(all_picks)} draft picks", flush=True)
+    logger.info(f"   Found {len(all_picks)} draft picks")
     
     player_to_league = {}
     for pick in all_picks:
@@ -820,7 +820,7 @@ def main():
         if len(batch) < 1000:
             break
         offset += 1000
-    logger.info(f"   Found {len(existing_projections)} existing projections", flush=True)
+    logger.info(f"   Found {len(existing_projections)} existing projections")
     
     # Step 4: Prepare worker arguments (skip existing)
     logger.info("📋 Step 4: Preparing worker tasks...")
@@ -844,7 +844,7 @@ def main():
             }
         worker_args.append((player_id, game_id, target_date, args.season, scoring_settings))
     
-    logger.info(f"   Prepared {len(worker_args)} calculation tasks (skipped {skipped} existing)", flush=True)
+    logger.info(f"   Prepared {len(worker_args)} calculation tasks (skipped {skipped} existing)")
     logger.info("")
     
     if len(worker_args) == 0:
@@ -879,7 +879,7 @@ def main():
                     rate = idx / elapsed if elapsed > 0 else 0
                     remaining = (len(worker_args) - idx) / rate if rate > 0 else 0
                     pct = (idx / len(worker_args)) * 100
-                    logger.info(f"   [{elapsed:.0f}s] {pct:5.1f}% | {idx}/{len(worker_args)} players | Rate: {rate:.1f}/s | ETA: {remaining:.0f}s", flush=True)
+                    logger.info(f"   [{elapsed:.0f}s] {pct:5.1f}% | {idx}/{len(worker_args)} players | Rate: {rate:.1f}/s | ETA: {remaining:.0f}s")
                     last_progress_time = current_time
 
                 result = calculate_player_projection_worker(worker_task)
@@ -888,7 +888,7 @@ def main():
                 # Add error handling per player to continue on failures
                 if not result.get('success'):
                     if idx <= 10:  # Show first 10 errors
-                        logger.error(f"      ⚠️  Player {result.get('player_id')} failed: {result.get('error', 'Unknown')[:100]}", flush=True)
+                        logger.error(f"      ⚠️  Player {result.get('player_id')} failed: {result.get('error', 'Unknown')[:100]}")
         except Exception as e:
             logger.error(f"❌ Fatal error in single-threaded processing: {e}")
             import traceback
@@ -927,12 +927,12 @@ def main():
                         rate = completed / elapsed if elapsed > 0 else 0
                         remaining = (len(worker_args) - completed) / rate if rate > 0 else 0
                         pct = (completed / len(worker_args)) * 100
-                        logger.info(f"   [{elapsed:.0f}s] {pct:5.1f}% | {completed}/{len(worker_args)} players | Rate: {rate:.1f}/s | ETA: {remaining:.0f}s", flush=True)
+                        logger.info(f"   [{elapsed:.0f}s] {pct:5.1f}% | {completed}/{len(worker_args)} players | Rate: {rate:.1f}/s | ETA: {remaining:.0f}s")
                         last_progress_time = current_time
                 
                 # Final progress update
                 elapsed = time.time() - start_time
-                logger.info(f"   [{elapsed:.0f}s] 100.0% | {len(worker_args)}/{len(worker_args)} players | Complete!", flush=True)
+                logger.info(f"   [{elapsed:.0f}s] 100.0% | {len(worker_args)}/{len(worker_args)} players | Complete!")
         except Exception as e:
             logger.error(f"❌ Fatal error in parallel processing: {e}")
             import traceback
@@ -1053,7 +1053,7 @@ def main():
         if args.reject_outliers and rejected_projections:
             logger.warning(f"   ⚠️  Skipping {len(rejected_projections)} rejected projections")
         
-        logger.info(f"   Upserting {len(projections_to_upsert)} projections in batches...", flush=True)
+        logger.info(f"   Upserting {len(projections_to_upsert)} projections in batches...")
         upsert_start = time.time()
         upserted = batch_upsert_projections(db, projections_to_upsert)
         upsert_elapsed = time.time() - upsert_start
