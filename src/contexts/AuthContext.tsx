@@ -85,14 +85,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }, 5000); // 5 second timeout
 
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // Register auth listener FIRST so we don't miss SIGNED_IN events
+    // that fire during the getSession() call (e.g., OAuth callback redirect)
+    let initialSessionHandled = false;
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+        if (session?.user) {
+          initialSessionHandled = true;
+          clearTimeout(timeout);
+          analyticsService.setUserId(session.user.id);
+          setSentryUser({ id: session.user.id, email: session.user.email });
+          fetchProfile(session.user.id).finally(() => {
+            if (mounted) setLoading(false);
+          });
+        }
+      } else if (event === 'SIGNED_OUT') {
+        analyticsService.setUserId(null);
+        setSentryUser(null);
+        setProfile(null);
+        setLoading(false);
+      }
+    });
+
+    // Now get the initial session — if the listener already handled it
+    // (e.g., OAuth SIGNED_IN fired), skip duplicate work
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted || initialSessionHandled) return;
       clearTimeout(timeout);
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        // Set user ID for analytics
         analyticsService.setUserId(session.user.id);
         fetchProfile(session.user.id).finally(() => {
           if (mounted) setLoading(false);
@@ -102,30 +130,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoading(false);
       }
     }).catch((error) => {
-      if (!mounted) return;
+      if (!mounted || initialSessionHandled) return;
       clearTimeout(timeout);
       logger.error("Error getting session:", error);
       setLoading(false);
-    });
-
-    // Listen for auth changes — only re-fetch profile on actual login/logout/update,
-    // not on token refreshes (which fire every ~55 min and don't change user data)
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
-        if (session?.user) {
-          analyticsService.setUserId(session.user.id);
-          setSentryUser({ id: session.user.id, email: session.user.email });
-          fetchProfile(session.user.id);
-        }
-      } else if (event === 'SIGNED_OUT') {
-        analyticsService.setUserId(null);
-        setSentryUser(null);
-        setProfile(null);
-      }
     });
 
     return () => {
