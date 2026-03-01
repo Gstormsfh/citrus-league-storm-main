@@ -7,7 +7,7 @@ Calculates daily fantasy point projections for all rostered players across all l
 Uses multiprocessing for sub-60-second execution on 600+ players.
 
 Usage:
-    python run_daily_projections.py [--date YYYY-MM-DD] [--workers N] [--chunksize N] [--threshold X] [--z-score-threshold X]
+    python run_daily_projections.py [--date YYYY-MM-DD] [--force] [--workers N] [--chunksize N]
 """
 
 import signal
@@ -265,16 +265,21 @@ def calculate_player_projection_worker(args: Tuple[int, int, date, int, Dict[str
     """
     Worker function for multiprocessing pool.
     Each worker creates its own database connection (process-safe).
-    
+
     Args:
         args: (player_id, game_id, game_date, season, scoring_settings)
-    
+
     Returns:
         Dict with 'success', 'player_id', 'game_id', and either 'projection' or 'error'
     """
     player_id, game_id, game_date, season, scoring_settings = args
-    
+
     try:
+        # Suppress verbose per-player logging from calc engine in batch mode.
+        # Only warnings/errors will show; info-level detail (DDR, goalie debug) is silenced.
+        calc_logger = logging.getLogger("calculate_daily_projections")
+        calc_logger.setLevel(logging.WARNING)
+
         # Create fresh database connection for this worker
         db = get_fresh_supabase_client()
         
@@ -763,56 +768,53 @@ def main():
         cpu_count = multiprocessing.cpu_count()
         max_workers = max(4, min(cpu_count * 2, 16))
     
-    logger.info("=" * 80)
-    logger.info("CITRUS PROJECTIONS 3.0 - BATCH DAILY PROJECTIONS")
-    logger.info("=" * 80)
-    logger.info(f"Target Date: {target_date}")
-    logger.info(f"Season: {args.season}")
-    logger.info(f"Workers: {max_workers}")
-    logger.info(f"Chunksize: {args.chunksize}")
+    logger.info("")
+    logger.info("=" * 60)
+    logger.info("  CITRUS PROJECTIONS 3.0")
+    logger.info("=" * 60)
+    logger.info(f"  Date: {target_date}  |  Season: {args.season}  |  Workers: {max_workers}")
+    if args.force:
+        logger.info("  Mode: --force (recalculating ALL projections)")
+    logger.info("=" * 60)
     logger.info("")
     
     # Initialize database connection (main process)
     db = supabase_client()
     
-    # Step 0: Pre-calculate GP_Last_10 metric for "Likely-to-Play" filtering
-    logger.info("📋 Step 0: Pre-calculating GP_Last_10 metric...")
+    # Step 1: Pre-calculate GP_Last_10 metric
+    logger.info("[1/7] Updating GP_Last_10 metric...")
     gp_updated = populate_gp_last_10_metric(db, args.season)
     if gp_updated > 0:
-        logger.info(f"   ✅ Updated GP_Last_10 for {gp_updated} players")
-    logger.info("")
-    
-    # Step 1: Get rostered players
-    logger.info("📋 Step 1: Fetching rostered players...")
-    logger.info("   (This may take a moment...)")
+        logger.info(f"       Updated {gp_updated} players")
+
+    # Step 2: Get players with games on this date
+    logger.info("[2/7] Finding players with games on {target_date}...".format(target_date=target_date))
     sys.stdout.flush()
     rostered_players = get_rostered_players(db, target_date, args.season)
-    
+
     if not rostered_players:
-        logger.warning(f"⚠️  No rostered players found with games on {target_date}")
+        logger.warning(f"⚠️  No players found with games on {target_date}. Is there an NHL game today?")
         return
-    
-    logger.info(f"   Found {len(rostered_players)} player-game combinations")
-    logger.info("")
+
+    logger.info(f"       {len(rostered_players)} players across teams playing today")
     sys.stdout.flush()
     
-    # Step 2: Group by league to get scoring settings
-    logger.info("📋 Step 2: Loading league scoring settings...")
+    # Step 3: Group by league to get scoring settings
+    logger.info("[3/7] Loading league scoring settings...")
     league_scoring = {}
     unique_leagues = set(league_id for _, _, league_id in rostered_players if league_id is not None)
 
     for league_id in unique_leagues:
         league_scoring[league_id] = get_league_scoring_settings(db, league_id)
     
-    logger.info(f"   Loaded scoring settings for {len(unique_leagues)} leagues")
-    logger.info("")
-    
-    # Step 3: Check existing projections and skip them (unless --force)
+    logger.info(f"       {len(unique_leagues)} leagues loaded")
+
+    # Step 4: Check existing projections (unless --force)
     existing_projections = set()
     if args.force:
-        logger.info("📋 Step 3: --force flag set, recalculating ALL projections...")
+        logger.info("[4/7] --force set, recalculating ALL projections")
     else:
-        logger.info("📋 Step 3: Checking existing projections...")
+        logger.info("[4/7] Checking for existing projections...")
         offset = 0
         while True:
             batch = db.select(
@@ -829,10 +831,11 @@ def main():
             if len(batch) < 1000:
                 break
             offset += 1000
-        logger.info(f"   Found {len(existing_projections)} existing projections")
+        if existing_projections:
+            logger.info(f"       {len(existing_projections)} already exist, will skip")
 
-    # Step 4: Prepare worker arguments (skip existing unless --force)
-    logger.info("📋 Step 4: Preparing worker tasks...")
+    # Prepare worker arguments
+    logger.info("[4/7] Preparing tasks...")
     worker_args = []
     skipped = 0
     for player_id, game_id, league_id in rostered_players:
@@ -853,69 +856,69 @@ def main():
             }
         worker_args.append((player_id, game_id, target_date, args.season, scoring_settings))
     
-    logger.info(f"   Prepared {len(worker_args)} calculation tasks (skipped {skipped} existing)")
-    logger.info("")
-    
+    logger.info(f"       {len(worker_args)} to calculate, {skipped} skipped")
+
     if len(worker_args) == 0:
         logger.info("✅ All projections already exist! Nothing to calculate.")
         return
+    logger.info("")
     
-    # Step 5: Process in parallel or single-threaded
-    logger.info("📋 Step 4: Calculating projections...")
+    # Step 5: Calculate projections
+    logger.info("[5/7] Calculating projections...")
+    total = len(worker_args)
     start_time = time.time()
     results = []
-    
+    errors_shown = 0
+    MAX_INLINE_ERRORS = 5  # Only show first N errors during processing
+
+    def _progress_bar(done, total_count, elapsed_s):
+        """Build a clean visual progress bar string."""
+        pct = (done / total_count) * 100 if total_count else 0
+        rate = done / elapsed_s if elapsed_s > 0 else 0
+        eta = (total_count - done) / rate if rate > 0 else 0
+        filled = int(pct / 5)  # 20-char bar
+        bar = "█" * filled + "░" * (20 - filled)
+        return f"   [{bar}] {pct:5.1f}%  {done}/{total_count}  ({rate:.1f}/s, ~{eta:.0f}s left)"
+
     # OPTIMIZATION: Use single-threaded mode for small batches to avoid Windows multiprocessing issues
-    if len(worker_args) < 100:
-        logger.info(f"   Small batch detected ({len(worker_args)} players) - using single-threaded mode")
-        logger.info("   (This avoids Windows multiprocessing overhead for small jobs)")
+    if total < 100:
+        logger.info(f"   Processing {total} players (single-threaded)...")
         sys.stdout.flush()
         try:
             last_progress_time = time.time()
-            progress_interval = 5.0  # Show progress every 5 seconds (more frequent)
-            
+
             for idx, worker_task in enumerate(worker_args, 1):
                 if _shutdown_requested:
-                    logger.info(f"\n[SHUTDOWN] Graceful shutdown complete. Processed {idx - 1}/{len(worker_args)} projections.")
+                    logger.info(f"\n[SHUTDOWN] Stopped after {idx - 1}/{total} players.")
                     sys.exit(0)
 
-                player_id, game_id, _, _, _ = worker_task
                 current_time = time.time()
-
-                # Show progress every 5 seconds OR every 3 players OR first/last
-                if (current_time - last_progress_time >= progress_interval) or (idx % 3 == 0) or (idx == 1) or (idx == len(worker_args)):
+                # Show progress every 5 seconds or on first/last player
+                if (current_time - last_progress_time >= 5.0) or (idx == 1) or (idx == total):
                     elapsed = current_time - start_time
-                    rate = idx / elapsed if elapsed > 0 else 0
-                    remaining = (len(worker_args) - idx) / rate if rate > 0 else 0
-                    pct = (idx / len(worker_args)) * 100
-                    logger.info(f"   [{elapsed:.0f}s] {pct:5.1f}% | {idx}/{len(worker_args)} players | Rate: {rate:.1f}/s | ETA: {remaining:.0f}s")
+                    logger.info(_progress_bar(idx, total, elapsed))
                     last_progress_time = current_time
 
                 result = calculate_player_projection_worker(worker_task)
                 results.append(result)
-                
-                # Add error handling per player to continue on failures
-                if not result.get('success'):
-                    if idx <= 10:  # Show first 10 errors
-                        logger.error(f"      ⚠️  Player {result.get('player_id')} failed: {result.get('error', 'Unknown')[:100]}")
+
+                if not result.get('success') and errors_shown < MAX_INLINE_ERRORS:
+                    errors_shown += 1
+                    logger.error(f"      Player {result.get('player_id')} failed: {result.get('error', 'Unknown')[:80]}")
         except Exception as e:
-            logger.error(f"❌ Fatal error in single-threaded processing: {e}")
+            logger.error(f"❌ Fatal error: {e}")
             import traceback
             traceback.print_exc()
             sys.exit(1)
     else:
-        logger.info(f"   Large batch detected ({len(worker_args)} players) - using multiprocessing ({max_workers} workers)")
-        logger.info(f"   Progress will be shown every 10 seconds...")
+        logger.info(f"   Processing {total} players across {max_workers} workers...")
         sys.stdout.flush()
         try:
-            # Use imap_unordered for progress tracking
             with multiprocessing.Pool(max_workers) as pool:
                 results = []
                 completed = 0
                 last_progress_time = time.time()
-                progress_interval = 10.0  # Show progress every 10 seconds
-                
-                # Use imap_unordered to get results as they complete
+
                 for result in pool.imap_unordered(
                     calculate_player_projection_worker,
                     worker_args,
@@ -923,27 +926,29 @@ def main():
                 ):
                     if _shutdown_requested:
                         pool.terminate()
-                        logger.info(f"\n[SHUTDOWN] Graceful shutdown complete. Processed {completed}/{len(worker_args)} projections.")
+                        logger.info(f"\n[SHUTDOWN] Stopped after {completed}/{total} players.")
                         sys.exit(0)
 
                     results.append(result)
                     completed += 1
 
-                    # Show progress every 10 seconds
                     current_time = time.time()
-                    if current_time - last_progress_time >= progress_interval:
+                    # Show progress every 5 seconds (more frequent than before)
+                    if current_time - last_progress_time >= 5.0:
                         elapsed = current_time - start_time
-                        rate = completed / elapsed if elapsed > 0 else 0
-                        remaining = (len(worker_args) - completed) / rate if rate > 0 else 0
-                        pct = (completed / len(worker_args)) * 100
-                        logger.info(f"   [{elapsed:.0f}s] {pct:5.1f}% | {completed}/{len(worker_args)} players | Rate: {rate:.1f}/s | ETA: {remaining:.0f}s")
+                        logger.info(_progress_bar(completed, total, elapsed))
+                        sys.stdout.flush()
                         last_progress_time = current_time
-                
-                # Final progress update
+
+                    if not result.get('success') and errors_shown < MAX_INLINE_ERRORS:
+                        errors_shown += 1
+                        logger.error(f"      Player {result.get('player_id')} failed: {result.get('error', 'Unknown')[:80]}")
+
+                # Final bar
                 elapsed = time.time() - start_time
-                logger.info(f"   [{elapsed:.0f}s] 100.0% | {len(worker_args)}/{len(worker_args)} players | Complete!")
+                logger.info(_progress_bar(total, total, elapsed))
         except Exception as e:
-            logger.error(f"❌ Fatal error in parallel processing: {e}")
+            logger.error(f"❌ Fatal error: {e}")
             import traceback
             traceback.print_exc()
             sys.exit(1)
@@ -952,22 +957,19 @@ def main():
     logger.info(f"   Completed in {elapsed_time:.2f} seconds")
     logger.info("")
     
-    # Step 5: Separate successes and failures
+    # Tally results
     successes = [r for r in results if r.get('success')]
     failures = [r for r in results if not r.get('success')]
     projections = [r['projection'] for r in successes if 'projection' in r]
-    
-    logger.info(f"✅ Successful: {len(successes)}")
-    logger.error(f"❌ Failed: {len(failures)}")
-    logger.info("")
-    
-    if failures:
-        logger.error("⚠️  Failed calculations (first 10):")
+
+    logger.info(f"       {len(successes)} succeeded, {len(failures)} failed")
+
+    if failures and len(failures) <= 20:
         for fail in failures[:10]:
-            logger.error(f"   Player {fail.get('player_id')}, Game {fail.get('game_id')}: {fail.get('error', 'Unknown error')}")
+            logger.warning(f"       Player {fail.get('player_id')}: {fail.get('error', 'Unknown')[:80]}")
         if len(failures) > 10:
-            logger.info(f"   ... and {len(failures) - 10} more")
-        logger.info("")
+            logger.info(f"       ... and {len(failures) - 10} more")
+    logger.info("")
     
     # Step 6: Quality Gate - Outlier Detection
     valid_projections = projections
@@ -977,7 +979,7 @@ def main():
     stats = {}
     
     if not args.skip_outlier_detection and projections:
-        logger.info("📋 Step 6: Quality Gate - Outlier Detection...")
+        logger.info("[6/7] Quality gate — outlier detection...")
         rejected, review, valid, stats = detect_outliers(
             projections,
             threshold=args.threshold,
@@ -989,16 +991,9 @@ def main():
         review_projections = review
         valid_projections = valid
         
-        logger.info(f"   Total Projections: {stats.get('total_projections', 0)}")
-        logger.info(f"   Mean Points: {stats.get('mean_points', 0):.3f}")
-        logger.info(f"   Std Dev: {stats.get('stdev_points', 0):.3f}")
-        logger.info(f"   Max Points: {stats.get('max_points', 0):.3f}")
-        logger.info(f"   Min Points: {stats.get('min_points', 0):.3f}")
-        logger.info("")
-        logger.info(f"   ✅ Valid: {stats.get('valid', 0)}")
-        logger.warning(f"   ⚠️  Review Needed: {stats.get('review', 0)}")
-        logger.error(f"   ❌ Rejected: {stats.get('rejected', 0)}")
-        logger.info("")
+        logger.info(f"       {stats.get('valid', 0)} valid, {stats.get('review', 0)} review, {stats.get('rejected', 0)} rejected")
+        logger.info(f"       Points: mean={stats.get('mean_points', 0):.2f}, std={stats.get('stdev_points', 0):.2f}, "
+                     f"range=[{stats.get('min_points', 0):.2f}, {stats.get('max_points', 0):.2f}]")
         
         if rejected_projections:
             logger.error("❌ REJECTED PROJECTIONS (Impossible - > {:.1f} pts):".format(args.rejection_threshold))
@@ -1059,35 +1054,49 @@ def main():
         projections_to_upsert = projections
     
     if projections_to_upsert:
-        logger.info("📋 Step 7: Batch Upserting to Database...")
+        logger.info(f"[7/7] Saving {len(projections_to_upsert)} projections to database...")
         if args.reject_outliers and rejected_projections:
-            logger.warning(f"   ⚠️  Skipping {len(rejected_projections)} rejected projections")
-        
-        logger.info(f"   Upserting {len(projections_to_upsert)} projections in batches...")
+            logger.info(f"       (skipping {len(rejected_projections)} rejected)")
         upsert_start = time.time()
         upserted = batch_upsert_projections(db, projections_to_upsert)
         upsert_elapsed = time.time() - upsert_start
-        logger.info(f"   ✓ Upserted {upserted} projections to player_projected_stats in {upsert_elapsed:.1f}s")
+        logger.info(f"       Done — {upserted} rows in {upsert_elapsed:.1f}s")
         logger.info("")
     
+    # Report cache failures (from worker processes) if any
+    from calculate_daily_projections import save_projection_to_cache
+    cache_fails = getattr(save_projection_to_cache, '_fail_count', 0)
+    cache_first_err = getattr(save_projection_to_cache, '_first_error', '')
+
     # Final Summary
-    logger.info("=" * 80)
-    logger.info("BATCH PROCESSING COMPLETE")
-    logger.info("=" * 80)
-    logger.info(f"Total Time: {elapsed_time:.2f} seconds")
-    logger.info(f"Players Processed: {len(rostered_players)}")
-    logger.info(f"Successful: {len(successes)}")
-    logger.error(f"Failed: {len(failures)}")
+    logger.info("")
+    logger.info("=" * 60)
+    logger.info("  DONE — CITRUS PROJECTIONS 3.0")
+    logger.info("=" * 60)
+    logger.info(f"  Date:       {target_date}")
+    logger.info(f"  Time:       {elapsed_time:.1f}s")
+    logger.info(f"  Players:    {len(rostered_players)} (teams with games today)")
+    logger.info(f"  Calculated: {len(successes)} OK, {len(failures)} failed")
     if not args.skip_outlier_detection and projections:
-        logger.info(f"✅ Valid: {len(valid_projections)}")
-        logger.warning(f"⚠️  Manual Review Needed: {len(review_projections)}")
-        logger.error(f"❌ Rejected: {len(rejected_projections)}")
-    logger.info(f"Projections Upserted: {len(projections_to_upsert)}")
+        logger.info(f"  Quality:    {len(valid_projections)} valid, {len(review_projections)} review, {len(rejected_projections)} rejected")
+    logger.info(f"  Upserted:   {len(projections_to_upsert)} rows to player_projected_stats")
+    if cache_fails > 0:
+        logger.info(f"  Cache:      {cache_fails} cache writes skipped (non-critical)")
+        logger.debug(f"              First error: {cache_first_err}")
     if args.reject_outliers and rejected_projections and rejected_log_path:
-        logger.info(f"📄 Rejected projections log: {rejected_log_path}")
-    logger.info("=" * 80)
+        logger.info(f"  Log:        {rejected_log_path}")
+    logger.info("=" * 60)
+    logger.info("")
+    logger.info("Projections are live! Refresh your browser to see updated data.")
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Clean, human-friendly log format (no module name noise)
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s  %(message)s',
+        datefmt='%H:%M:%S'
+    )
+    # Suppress verbose per-player logs from the calculation engine
+    logging.getLogger("calculate_daily_projections").setLevel(logging.WARNING)
     main()
