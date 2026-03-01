@@ -573,7 +573,7 @@ def section_5_antithetic():
     print_header("SECTION 5: Antithetic Variates Variance Reduction")
     print()
     print("  Scenario: Run 100 independent simulations of the same matchup")
-    print("  with and without antithetic variates (1,000 sims each).")
+    print("  with and without antithetic variates (500 sims each).")
     print("  Measure variance of win probability estimates across runs.")
     print()
 
@@ -601,7 +601,7 @@ def section_5_antithetic():
     games_b, sched_b = build_games_dicts(team_b, N_GAMES_PER_PLAYER)
 
     n_runs = 100
-    n_sims_per_run = 1000
+    n_sims_per_run = 500
 
     win_probs_antithetic = []
     win_probs_standard = []
@@ -754,7 +754,7 @@ def section_7_full_vs_naive():
     print("  Scenario: Same matchup simulated with full Citrus Quant Engine")
     print("  vs a naive simulation (flat correlation, no confidence weighting,")
     print("  no GSAx, no O/U, no antithetic variates, Gaussian copula).")
-    print("  200 runs of 1,000 sims each to compare stability.")
+    print("  50 runs of 500 sims each to compare stability.")
     print()
 
     # Build a realistic asymmetric matchup:
@@ -861,7 +861,7 @@ def section_7_full_vs_naive():
     team_b_naive.append(goalie_b_naive)
 
     # Run both engines N times
-    n_runs = 200
+    n_runs = 50
     n_sims_per_run = 500
 
     full_win_probs = []
