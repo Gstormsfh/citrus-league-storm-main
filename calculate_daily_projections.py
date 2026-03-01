@@ -26,6 +26,7 @@ from decimal import Decimal, ROUND_HALF_UP
 import logging
 
 # Monte Carlo uncertainty propagation (Citrus Projections 3.1)
+_unc_import_err_msg = None
 try:
     from projection_uncertainty import (
         UncertaintyEngine,
@@ -33,13 +34,14 @@ try:
         build_player_context,
     )
     UNCERTAINTY_AVAILABLE = True
-except ImportError as _unc_import_err:
+except ImportError as e:
     UNCERTAINTY_AVAILABLE = False
+    _unc_import_err_msg = str(e)
 
 logger = logging.getLogger(__name__)
 
 if not UNCERTAINTY_AVAILABLE:
-    logger.warning(f"projection_uncertainty module not available: {_unc_import_err}. "
+    logger.warning(f"projection_uncertainty module not available: {_unc_import_err_msg}. "
                    "Uncertainty propagation will be disabled for this run.")
 
 _shutdown_requested = False
@@ -1293,7 +1295,7 @@ def calculate_goalie_days_rest(
         # Get team's last game before this date
         previous_games = db.select(
             "nhl_games",
-            select="game_date",
+            select="game_date,home_team,away_team",
             filters=[
                 ("game_date", "lt", game_date.isoformat()),
                 ("season", "eq", season)
@@ -1301,7 +1303,7 @@ def calculate_goalie_days_rest(
             order="game_date.desc",
             limit=20  # Check last 20 games to find team's most recent
         )
-        
+
         for game in previous_games:
             # Check if team played in this game
             if game.get("home_team") == team_abbrev or game.get("away_team") == team_abbrev:
@@ -1414,7 +1416,7 @@ def check_back_to_back(db: SupabaseRest, team: str, game_date: date) -> float:
         # Get previous game date for this team
         previous_games = db.select(
             "nhl_games",
-            select="game_date",
+            select="game_date,home_team,away_team",
             filters=[
                 ("game_date", "lt", game_date.isoformat()),
                 ("season", "eq", DEFAULT_SEASON)
@@ -1422,7 +1424,7 @@ def check_back_to_back(db: SupabaseRest, team: str, game_date: date) -> float:
             order="game_date.desc",
             limit=10
         )
-        
+
         for game in previous_games:
             if game.get("home_team") == team or game.get("away_team") == team:
                 prev_date_str = game.get("game_date")
