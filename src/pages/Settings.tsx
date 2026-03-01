@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { UserAccountService } from '@/services/UserAccountService';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -80,19 +80,17 @@ const Settings = () => {
     setChangePasswordLoading(true);
 
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword
-      });
-
-      if (error) throw error;
-
+      const result = await UserAccountService.changePassword(newPassword);
+      if (!result.success) {
+        throw new Error(result.error);
+      }
       setMessage({ type: 'success', text: 'Password updated successfully!' });
       setNewPassword('');
       setConfirmPassword('');
     } catch (error: unknown) {
       logger.error('Password change error:', error);
-      setMessage({ 
-        type: 'error', 
+      setMessage({
+        type: 'error',
         text: error instanceof Error ? error.message : 'Failed to update password'
       });
     } finally {
@@ -105,16 +103,13 @@ const Settings = () => {
     setMessage(null);
 
     try {
-      const { data, error } = await supabase.rpc('export_user_data');
-      if (error) throw error;
-
-      const result = data as Record<string, unknown>;
-      if (result && result.success === false) {
-        throw new Error((result.error as string) || 'Export failed');
+      const result = await UserAccountService.exportUserData();
+      if (!result.success || !result.data) {
+        throw new Error(result.error || 'Export failed');
       }
 
       // Download as JSON file
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const blob = new Blob([JSON.stringify(result.data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -146,12 +141,9 @@ const Settings = () => {
     setMessage(null);
 
     try {
-      const { data, error } = await supabase.rpc('delete_user_account');
-      if (error) throw error;
-
-      const result = data as Record<string, unknown>;
-      if (result && result.success === false) {
-        throw new Error((result.error as string) || 'Deletion failed');
+      const result = await UserAccountService.deleteAccount();
+      if (!result.success) {
+        throw new Error(result.error || 'Deletion failed');
       }
 
       await signOut();

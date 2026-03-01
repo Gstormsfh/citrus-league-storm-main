@@ -29,7 +29,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import LoadingScreen from '@/components/LoadingScreen';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
-import { supabase } from '@/integrations/supabase/client';
+
 import { AdSpace } from '@/components/AdSpace';
 import { PlayoffService, type PlayoffPictureTeam, type PlayoffBracket as BracketType } from '@/services/PlayoffService';
 import { logger } from '@/utils/logger';
@@ -220,7 +220,7 @@ const Standings = () => {
           // to ensure the page renders even if the RPC has issues
           try {
             // First, auto-complete matchups (this also updates scores for completed weeks)
-            const { error: autoCompleteError } = await supabase.rpc('auto_complete_matchups');
+            const { error: autoCompleteError } = await MatchupService.autoCompleteMatchups();
             if (autoCompleteError) {
               // Don't block standings load if auto-complete fails - continue with score updates and standings calculation
             }
@@ -556,7 +556,7 @@ const Standings = () => {
                     try {
                       // Auto-complete matchups
                       if (activeLeagueId) {
-                        await supabase.rpc('auto_complete_matchups');
+                        await MatchupService.autoCompleteMatchups();
                       }
                       // Reload standings
                       window.location.reload();

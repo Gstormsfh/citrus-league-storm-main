@@ -599,7 +599,7 @@ const Matchup = () => {
 
           const { getDraftCompletionDate: gDCD, getFirstWeekStartDate: gFWSD, getAvailableWeeks: gAW, getWeekStartDate: gWSD, getWeekEndDate: gWED } = await import('@/utils/weekCalculator');
           const draftDate = gDCD(demoLeague as any);
-          const firstWeek = draftDate ? gFWSD(draftDate) : new Date();
+          const firstWeek = draftDate ? gFWSD(draftDate) : getTodayMSTDate();
           setFirstWeekStart(firstWeek);
 
           const weeks = cachedPayload.availableWeeks.length > 0 ? cachedPayload.availableWeeks : gAW(firstWeek);
@@ -1581,16 +1581,6 @@ const Matchup = () => {
 
   // Removed duplicate frozen lineup fetch - data now loaded directly in getMatchupRosters()
   // This eliminates score flashing and ensures single source of truth
-
-  // Debug backfill function - only exposed in development
-  // Removed useEffect - exposed only when DEBUG_MATCHUP is true
-  if (DEBUG_MATCHUP && typeof window !== 'undefined') {
-    (window as any).backfillLeague = async (leagueId?: string) => {
-      const targetLeagueId = leagueId || currentMatchup?.league_id;
-      if (!targetLeagueId) return;
-      return await LeagueService.backfillAllMatchupsForLeague(targetLeagueId);
-    };
-  }
 
   // Fetch projections for a specific date - memoized to prevent recreation
   // CRITICAL: Works for BOTH active users AND demo/guest users

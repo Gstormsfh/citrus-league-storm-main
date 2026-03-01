@@ -13,6 +13,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { ScheduleService, NHLGame } from '@/services/ScheduleService';
+import { getTodayMSTDate } from '@/utils/timezoneUtils';
 import { SEASON_START_YEAR } from '@/utils/seasonConstants';
 import type { LeagueSettings } from '@/types/leagueTypes';
 import { logger } from '@/utils/logger';
@@ -53,7 +54,7 @@ function getCurrentWeekNumber(seasonStartYear: number = SEASON_START_YEAR): numb
   const firstSunday = new Date(oct1);
   firstSunday.setDate(oct1.getDate() + daysUntilSunday);
 
-  const today = new Date();
+  const today = getTodayMSTDate();
   const diffMs = today.getTime() - firstSunday.getTime();
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
   return Math.max(1, Math.floor(diffDays / 7) + 1);

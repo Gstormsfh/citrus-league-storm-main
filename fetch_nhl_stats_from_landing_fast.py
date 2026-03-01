@@ -25,6 +25,7 @@ Fetches comprehensive stats in a single API call per player:
 """
 
 import os
+import signal
 import sys
 import time
 import threading
@@ -34,6 +35,16 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dotenv import load_dotenv
 from supabase_rest import SupabaseRest
 from src.utils.citrus_request import citrus_request
+
+_shutdown_requested = False
+
+def _handle_shutdown(signum, frame):
+    global _shutdown_requested
+    _shutdown_requested = True
+    print(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
+
+signal.signal(signal.SIGINT, _handle_shutdown)
+signal.signal(signal.SIGTERM, _handle_shutdown)
 
 load_dotenv()
 SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
@@ -691,6 +702,12 @@ def main() -> int:
         
         # Wait for completion and track progress
         for future in as_completed(futures):
+            if _shutdown_requested:
+                print(f"\n[SHUTDOWN] Cancelling remaining futures...")
+                executor.shutdown(wait=False, cancel_futures=True)
+                print(f"[SHUTDOWN] Graceful shutdown complete. Processed {processed_count[0]}/{len(players)} players.")
+                sys.exit(0)
+
             try:
                 future.result()  # This will raise if there was an exception
                 processed_count[0] += 1
@@ -772,6 +789,10 @@ def main() -> int:
         base_delay = 1.0  # Retry phase uses sequential requests — small courtesy delay between them
         
         for idx, (player_id, player_name, is_goalie) in enumerate(players_to_retry, 1):
+            if _shutdown_requested:
+                print(f"\n[SHUTDOWN] Graceful shutdown complete during retry phase.")
+                sys.exit(0)
+
             # Fetch from NHL API (landing endpoint - primary)
             landing_data, error_type = fetch_player_landing_data(player_id)
             

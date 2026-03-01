@@ -3,9 +3,11 @@ import { PlayerService } from './PlayerService';
 import { COLUMNS } from '@/utils/queryColumns';
 import { GameLockService } from './GameLockService';
 import { LeagueMembershipService } from './LeagueMembershipService';
+import { AuditService } from './AuditService';
 import { CURRENT_SEASON } from '@/utils/seasonConstants';
 import type { LeagueSettings } from '@/types/leagueTypes';
 import { logger } from '@/utils/logger';
+import { getTodayMSTDate } from '@/utils/timezoneUtils';
 
 export interface WaiverClaim {
   id: string;
@@ -84,13 +86,13 @@ export class WaiverService {
 
       // Check weekly limit
       if (weeklyLimit > 0) {
-        // Calculate start of current NHL week (Monday 00:00 UTC)
-        const now = new Date();
-        const dayOfWeek = now.getUTCDay(); // 0=Sun, 1=Mon, ...
+        // Calculate start of current NHL week (Monday 00:00) using MST
+        const now = getTodayMSTDate();
+        const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon, ...
         const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
         const weekStart = new Date(now);
-        weekStart.setUTCDate(now.getUTCDate() - daysSinceMonday);
-        weekStart.setUTCHours(0, 0, 0, 0);
+        weekStart.setDate(now.getDate() - daysSinceMonday);
+        weekStart.setHours(0, 0, 0, 0);
 
         const { count, error } = await supabase
           .from('transaction_ledger')
@@ -291,23 +293,28 @@ export class WaiverService {
     skipLimitCheck = false
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      // Get userId from team if not provided
-      let actualUserId = userId;
+      // Resolve userId — require authentication
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      let actualUserId = userId || authUser?.id;
       if (!actualUserId) {
-        const { data: team } = await supabase
-          .from('teams')
-          .select('owner_id')
-          .eq('id', teamId)
-          .single();
-
-        if (!team || !team.owner_id) {
-          return {
-            success: false,
-            error: 'Team not found or has no owner'
-          };
-        }
-        actualUserId = team.owner_id;
+        return { success: false, error: 'Authentication required to add a player.' };
       }
+
+      // Verify the authenticated user owns this team
+      const { data: team } = await supabase
+        .from('teams')
+        .select('owner_id')
+        .eq('id', teamId)
+        .single();
+
+      if (!team || !team.owner_id) {
+        return { success: false, error: 'Team not found or has no owner' };
+      }
+
+      if (team.owner_id !== actualUserId) {
+        return { success: false, error: 'You can only add players to your own team.' };
+      }
+      actualUserId = team.owner_id;
 
       // NOTE: Availability check is done in addPlayer() before this is called.
       // No need to check again here — avoids redundant API calls.
@@ -342,11 +349,18 @@ export class WaiverService {
 
       const rpcResult = result as { success: boolean; error?: string; status?: string; message?: string };
       if (rpcResult.success === false || rpcResult.status === 'error') {
+        AuditService.logRosterMove(leagueId, {
+          addPlayerId: String(playerId), dropPlayerId: dropPlayerId ? String(dropPlayerId) : undefined, teamId
+        }, false);
         return {
           success: false,
           error: rpcResult.error || rpcResult.message || 'Failed to add player'
         };
       }
+
+      AuditService.logRosterMove(leagueId, {
+        addPlayerId: String(playerId), dropPlayerId: dropPlayerId ? String(dropPlayerId) : undefined, teamId
+      });
 
       // After successful RPC, update team_lineups to reflect the change in UI
       // Get current lineup
@@ -470,6 +484,10 @@ export class WaiverService {
         };
       }
 
+      AuditService.log('WAIVER_CLAIM', leagueId, {
+        claimId: data.id, teamId, playerId, dropPlayerId
+      });
+
       return {
         success: true,
         claimId: data.id
@@ -495,23 +513,28 @@ export class WaiverService {
     userId?: string
   ): Promise<{ success: boolean; error?: string; claimId?: string; isFreeAgent?: boolean }> {
     try {
-      // Get userId from team if not provided
-      let actualUserId = userId;
+      // Resolve userId — require authentication
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      let actualUserId = userId || authUser?.id;
       if (!actualUserId) {
-        const { data: team } = await supabase
-          .from('teams')
-          .select('owner_id')
-          .eq('id', teamId)
-          .single();
-        
-        if (!team || !team.owner_id) {
-          return {
-            success: false,
-            error: 'Team not found or has no owner'
-          };
-        }
-        actualUserId = team.owner_id;
+        return { success: false, error: 'Authentication required to add a player.' };
       }
+
+      // Verify the authenticated user owns this team
+      const { data: team } = await supabase
+        .from('teams')
+        .select('owner_id')
+        .eq('id', teamId)
+        .single();
+
+      if (!team || !team.owner_id) {
+        return { success: false, error: 'Team not found or has no owner' };
+      }
+
+      if (team.owner_id !== actualUserId) {
+        return { success: false, error: 'You can only add players to your own team.' };
+      }
+      actualUserId = team.owner_id;
 
       // Check if player is available for free agent pickup (requires userId)
       const availability = await this.checkPlayerAvailability(playerId, leagueId, actualUserId);

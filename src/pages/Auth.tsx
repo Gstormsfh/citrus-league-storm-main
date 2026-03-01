@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { UserAccountService } from '@/services/UserAccountService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -130,8 +131,8 @@ const Auth = () => {
       
       // Record consent for ToS and Privacy Policy (best-effort)
       if (data?.session || data?.user) {
-        supabase.rpc('record_user_consent', { p_policy_type: 'terms_of_service', p_policy_version: '2026-01-13' }).catch(() => {});
-        supabase.rpc('record_user_consent', { p_policy_type: 'privacy_policy', p_policy_version: '2026-01-13' }).catch(() => {});
+        UserAccountService.recordConsent('terms_of_service', '2026-01-13');
+        UserAccountService.recordConsent('privacy_policy', '2026-01-13');
       }
 
       // If email confirmation is required (no session), show verify message

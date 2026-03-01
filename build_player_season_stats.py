@@ -27,11 +27,22 @@ Optionally enrich with xG/xA totals from public.raw_shots (if available).
 
 from dotenv import load_dotenv
 import os
+import signal
 import sys
 import datetime as dt
 from typing import Dict, List
 
 from supabase_rest import SupabaseRest
+
+_shutdown_requested = False
+
+def _handle_shutdown(signum, frame):
+    global _shutdown_requested
+    _shutdown_requested = True
+    print(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
+
+signal.signal(signal.SIGINT, _handle_shutdown)
+signal.signal(signal.SIGTERM, _handle_shutdown)
 
 load_dotenv()
 SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
@@ -386,6 +397,10 @@ def main() -> int:
     print(f"[build_player_season_stats] Warning: Plus/minus computation failed: {e}")
     import traceback
     traceback.print_exc()
+
+  if _shutdown_requested:
+    print("[SHUTDOWN] Graceful shutdown complete.")
+    sys.exit(0)
 
   print()
   print("[build_player_season_stats] Upserting to player_season_stats...")

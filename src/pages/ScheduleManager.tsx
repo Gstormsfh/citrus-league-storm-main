@@ -15,6 +15,7 @@ import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { format } from 'date-fns';
 import { COLUMNS } from '@/utils/queryColumns';
 import { logger } from '@/utils/logger';
+import { getTodayMST, getTodayMSTDate, formatDateToString } from '@/utils/timezoneUtils';
 
 const ScheduleManager = () => {
   const { user } = useAuth();
@@ -33,15 +34,17 @@ const ScheduleManager = () => {
     setLoading(true);
     try {
       // Load this week's NHL games
-      const today = new Date();
+      const todayStr = getTodayMST();
+      const today = getTodayMSTDate();
       const nextWeek = new Date(today);
       nextWeek.setDate(nextWeek.getDate() + 7);
+      const nextWeekStr = formatDateToString(nextWeek);
 
       const { data: games } = await supabase
         .from('nhl_games')
         .select(COLUMNS.NHL_GAME)
-        .gte('game_date', today.toISOString().split('T')[0])
-        .lte('game_date', nextWeek.toISOString().split('T')[0])
+        .gte('game_date', todayStr)
+        .lte('game_date', nextWeekStr)
         .order('game_date', { ascending: true })
         .order('game_time', { ascending: true });
 

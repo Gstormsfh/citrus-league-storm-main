@@ -3,6 +3,7 @@ import type { PostgrestError } from '@supabase/supabase-js';
 import { League, Team, LeagueService } from './LeagueService';
 import { DraftService } from './DraftService';
 import { PlayerService, Player } from './PlayerService';
+import { DEMO_LEAGUE_ID_FOR_GUESTS } from './DemoLeagueService';
 import { MatchupPlayer, StatBreakdown } from '@/components/matchup/types';
 import { getFirstWeekStartDate, getWeekStartDate, getWeekEndDate, getAvailableWeeks, getScheduleLength } from '@/utils/weekCalculator';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
@@ -1277,8 +1278,8 @@ export const MatchupService = {
       is_ir_eligible: p.is_ir_eligible,
       stats: {
         // For goalies, use goalie_gp instead of games_played
-        gamesPlayed: (p.position === 'G' || p.position === 'Goalie') && (p as any).goalie_gp 
-          ? (p as any).goalie_gp 
+        gamesPlayed: (p.position === 'G' || p.position === 'Goalie') && p.goalie_gp
+          ? p.goalie_gp
           : (p.games_played || 0),
         goals: p.goals || 0,
         assists: p.assists || 0,
@@ -1288,15 +1289,15 @@ export const MatchupService = {
         hits: p.hits || 0,
         blockedShots: p.blocks || 0,
         xGoals: p.xGoals || 0,
-        pim: (p as any).pim || 0,
-        powerPlayPoints: (p as any).ppp || 0,
-        shortHandedPoints: (p as any).shp || 0,
+        pim: p.pim || 0,
+        powerPlayPoints: p.ppp || 0,
+        shortHandedPoints: p.shp || 0,
         wins: p.wins || 0,
         losses: p.losses || 0,
         otl: p.ot_losses || 0,
         gaa: p.goals_against_average || 0,
         savePct: p.save_percentage || 0,
-        shutouts: (p as any).shutouts || 0,
+        shutouts: p.shutouts || 0,
         saves: p.saves || 0,
         goalsAgainst: p.goals_against || 0,
         goalsSavedAboveExpected: p.goalsSavedAboveExpected || 0
@@ -1310,7 +1311,7 @@ export const MatchupService = {
         ? new ScoringCalculator().calculatePointsPerGame({
             goals: p.goals || 0, assists: p.assists || 0, sog: p.shots || 0,
             blocks: p.blocks || 0, hits: p.hits || 0, pim: p.pim || 0,
-            ppp: (p as any).ppp || 0, shp: (p as any).shp || 0
+            ppp: p.ppp || 0, shp: p.shp || 0
           }, false, p.games_played)
         : 0
     };
@@ -1770,7 +1771,7 @@ export const MatchupService = {
       // Get league to access scoring settings
       // For demo league, bypass membership check (guests can view)
       let league: League | null = null;
-      const isDemoLeague = matchup.league_id === '750f4e1a-92ae-44cf-a798-2f3e06d0d5c9';
+      const isDemoLeague = matchup.league_id === DEMO_LEAGUE_ID_FOR_GUESTS;
       if (isDemoLeague && !userId) {
         // Guest viewing demo league - use public read
         const { data, error } = await supabase
@@ -3388,6 +3389,25 @@ export const MatchupService = {
       logger.error('[MatchupService] getDailyLineup exception:', error);
       return [];
     }
+  },
+
+  /**
+   * Auto-complete matchups and update scores for completed weeks.
+   * Called before standings calculation to ensure scores are current.
+   * Best-effort — failures should not block page rendering.
+   */
+  async autoCompleteMatchups(): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { error } = await supabase.rpc('auto_complete_matchups');
+      if (error) {
+        logger.error('[MatchupService] auto_complete_matchups RPC error:', error);
+        return { success: false, error: error.message };
+      }
+      return { success: true };
+    } catch (error: unknown) {
+      logger.error('[MatchupService] autoCompleteMatchups exception:', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
   }
 };
 
@@ -3551,7 +3571,7 @@ export const CategoryScoringService = {
       });
 
       if (error) throw error;
-      return { standings: (data || []) as any[], error: null };
+      return { standings: (data || []) as Array<{ team_id: string; team_name: string; total_points: number; games_played: number; ppg: number; rank: number }>, error: null };
     } catch (error: unknown) {
       logger.error('[CategoryScoringService] getPPGStandings error:', error);
       return { standings: [], error };

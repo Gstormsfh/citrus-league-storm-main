@@ -177,8 +177,4 @@ export const MatchupScoreJobService = {
   }
 };
 
-// Expose job service globally for manual triggering in console
-if (typeof window !== 'undefined') {
-  (window as any).MatchupScoreJobService = MatchupScoreJobService;
-}
 

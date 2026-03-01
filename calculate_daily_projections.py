@@ -18,10 +18,21 @@ Usage:
 
 from dotenv import load_dotenv
 import os
+import signal
 import sys
 from datetime import datetime, date, timedelta
 from typing import Dict, List, Optional, Tuple, Any
 from decimal import Decimal, ROUND_HALF_UP
+
+_shutdown_requested = False
+
+def _handle_shutdown(signum, frame):
+    global _shutdown_requested
+    _shutdown_requested = True
+    print(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
+
+signal.signal(signal.SIGINT, _handle_shutdown)
+signal.signal(signal.SIGTERM, _handle_shutdown)
 
 # Configure UTF-8 encoding for Windows
 if sys.platform == "win32":

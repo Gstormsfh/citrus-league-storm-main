@@ -13,6 +13,7 @@ This script only writes raw JSON. It does NOT compute stats; that is extractor_j
 """
 
 import os
+import signal
 import sys
 import time
 import json
@@ -23,6 +24,16 @@ import requests
 from dotenv import load_dotenv
 from supabase_rest import SupabaseRest
 from src.utils.citrus_request import citrus_request
+
+_shutdown_requested = False
+
+def _handle_shutdown(signum, frame):
+    global _shutdown_requested
+    _shutdown_requested = True
+    print(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
+
+signal.signal(signal.SIGINT, _handle_shutdown)
+signal.signal(signal.SIGTERM, _handle_shutdown)
 
 load_dotenv()
 
@@ -182,6 +193,10 @@ def main() -> int:
   last_interval_check = time.time()
 
   while True:
+    if _shutdown_requested:
+      print(f"[SHUTDOWN] Graceful shutdown complete. Total ingested: {total_ingested}")
+      sys.exit(0)
+
     try:
       # Update polling interval if adaptive mode is enabled (check every 5 minutes)
       current_interval = POLL_SECONDS

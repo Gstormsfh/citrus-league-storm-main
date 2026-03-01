@@ -13,6 +13,8 @@ We only persist rows where typeCode == 517 (actual shifts). typeCode == 505 are 
 import argparse
 import datetime as dt
 import os
+import signal
+import sys
 import time
 from typing import Dict, List, Optional
 
@@ -20,6 +22,16 @@ import requests
 from dotenv import load_dotenv
 from supabase_rest import SupabaseRest
 from src.utils.citrus_request import citrus_request
+
+_shutdown_requested = False
+
+def _handle_shutdown(signum, frame):
+    global _shutdown_requested
+    _shutdown_requested = True
+    print(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
+
+signal.signal(signal.SIGINT, _handle_shutdown)
+signal.signal(signal.SIGTERM, _handle_shutdown)
 
 load_dotenv()
 SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
@@ -116,6 +128,11 @@ def main() -> int:
   error_count = 0
   
   for idx, gid in enumerate(game_ids, start=1):
+    if _shutdown_requested:
+      print(f"\n[SHUTDOWN] Graceful shutdown complete. Processed {idx - 1}/{len(game_ids)} games.")
+      print(f"  Success: {success_count} | Skipped: {skip_count} | No data: {no_data_count} | Errors: {error_count}")
+      sys.exit(0)
+
     try:
       # Quick check: skip if this game already has shifts (simple query for this specific game)
       existing = db.select("player_shifts_official", select="shift_id", filters=[("game_id", "eq", gid)], limit=1)

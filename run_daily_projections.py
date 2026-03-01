@@ -10,6 +10,7 @@ Usage:
     python run_daily_projections.py [--date YYYY-MM-DD] [--workers N] [--chunksize N] [--threshold X] [--z-score-threshold X]
 """
 
+import signal
 import sys
 import argparse
 import json
@@ -20,6 +21,16 @@ from datetime import datetime, date
 from functools import partial
 from typing import Dict, List, Optional, Tuple, Any
 import statistics
+
+_shutdown_requested = False
+
+def _handle_shutdown(signum, frame):
+    global _shutdown_requested
+    _shutdown_requested = True
+    print(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
+
+signal.signal(signal.SIGINT, _handle_shutdown)
+signal.signal(signal.SIGTERM, _handle_shutdown)
 
 # Set UTF-8 encoding for stdout (Windows compatibility)
 if sys.stdout.encoding != 'utf-8':
@@ -844,9 +855,13 @@ def main():
             progress_interval = 5.0  # Show progress every 5 seconds (more frequent)
             
             for idx, worker_task in enumerate(worker_args, 1):
+                if _shutdown_requested:
+                    print(f"\n[SHUTDOWN] Graceful shutdown complete. Processed {idx - 1}/{len(worker_args)} projections.")
+                    sys.exit(0)
+
                 player_id, game_id, _, _, _ = worker_task
                 current_time = time.time()
-                
+
                 # Show progress every 5 seconds OR every 3 players OR first/last
                 if (current_time - last_progress_time >= progress_interval) or (idx % 3 == 0) or (idx == 1) or (idx == len(worker_args)):
                     elapsed = current_time - start_time
@@ -855,7 +870,7 @@ def main():
                     pct = (idx / len(worker_args)) * 100
                     print(f"   [{elapsed:.0f}s] {pct:5.1f}% | {idx}/{len(worker_args)} players | Rate: {rate:.1f}/s | ETA: {remaining:.0f}s", flush=True)
                     last_progress_time = current_time
-                
+
                 result = calculate_player_projection_worker(worker_task)
                 results.append(result)
                 
@@ -886,9 +901,14 @@ def main():
                     worker_args,
                     chunksize=args.chunksize
                 ):
+                    if _shutdown_requested:
+                        pool.terminate()
+                        print(f"\n[SHUTDOWN] Graceful shutdown complete. Processed {completed}/{len(worker_args)} projections.")
+                        sys.exit(0)
+
                     results.append(result)
                     completed += 1
-                    
+
                     # Show progress every 10 seconds
                     current_time = time.time()
                     if current_time - last_progress_time >= progress_interval:

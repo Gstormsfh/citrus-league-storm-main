@@ -279,7 +279,7 @@ class StormyServiceImpl {
 
       let opponentTeamId: string | null = null;
       let opponentName = "Bye";
-      let currentMatchup: typeof matchups extends (infer T)[] ? T : never = null as any;
+      let currentMatchup: { week_number: number; team1_id: string; team2_id: string; team1_score: number | null; team2_score: number | null; status: string } | null = null;
 
       if (matchups?.length) {
         currentMatchup = matchups[0];
@@ -383,12 +383,16 @@ class StormyServiceImpl {
 
         const results = await Promise.allSettled(parallelQueries);
 
-        const dirData = results[0].status === "fulfilled" ? ((results[0].value as any)?.data ?? []) as DirRow[] : [];
-        const lineupData = results[1].status === "fulfilled" ? (results[1].value as any)?.data : null;
-        const seasonStatsData = results[2].status === "fulfilled" ? ((results[2].value as any)?.data ?? []) as SeasonStatRow[] : [];
-        const talentData = results[3].status === "fulfilled" ? ((results[3].value as any)?.data ?? []) as TalentRow[] : [];
-        const allMatchupsData = results[4].status === "fulfilled" ? ((results[4].value as any)?.data ?? []) : [];
-        const rosProjectionsData = results[5].status === "fulfilled" ? ((results[5].value as any)?.data ?? []) : [];
+        // Helper to safely extract .data from a fulfilled Promise.allSettled result
+        const getFulfilledData = <T>(r: PromiseSettledResult<{ data: T; error: unknown }>): T | null =>
+          r.status === "fulfilled" ? r.value?.data ?? null : null;
+
+        const dirData = (getFulfilledData(results[0] as PromiseSettledResult<{ data: DirRow[] | null; error: unknown }>) ?? []) as DirRow[];
+        const lineupData = getFulfilledData(results[1] as PromiseSettledResult<{ data: { starters: string[]; bench: string[]; ir: string[] } | null; error: unknown }>);
+        const seasonStatsData = (getFulfilledData(results[2] as PromiseSettledResult<{ data: SeasonStatRow[] | null; error: unknown }>) ?? []) as SeasonStatRow[];
+        const talentData = (getFulfilledData(results[3] as PromiseSettledResult<{ data: TalentRow[] | null; error: unknown }>) ?? []) as TalentRow[];
+        const allMatchupsData = getFulfilledData(results[4] as PromiseSettledResult<{ data: Array<{ week_number: number; team1_id: string; team2_id: string; team1_score: number | null; team2_score: number | null; status: string }> | null; error: unknown }>) ?? [];
+        const rosProjectionsData = getFulfilledData(results[5] as PromiseSettledResult<{ data: Array<{ player_id: number; player_name: string; position: string; team_abbrev: string; total_projected_points: number; avg_points_per_game: number; games_remaining: number }> | null; error: unknown }>) ?? [];
 
         // Build lookup maps
         const dirMap = new Map(dirData.map(p => [p.player_id, p]));

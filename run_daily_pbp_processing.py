@@ -13,6 +13,7 @@ This script:
 """
 
 import os
+import signal
 import sys
 import time
 import datetime as dt
@@ -20,6 +21,16 @@ from typing import Dict, List, Optional
 from dotenv import load_dotenv
 from supabase_rest import SupabaseRest
 from src.utils.citrus_request import citrus_request
+
+_shutdown_requested = False
+
+def _handle_shutdown(signum, frame):
+    global _shutdown_requested
+    _shutdown_requested = True
+    print(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
+
+signal.signal(signal.SIGINT, _handle_shutdown)
+signal.signal(signal.SIGTERM, _handle_shutdown)
 
 load_dotenv()
 
@@ -198,10 +209,14 @@ def process_recently_finished_games(max_age_hours: int = 2) -> Dict[str, int]:
     processed_game_ids = []  # Track successfully processed game IDs
     
     for idx, game in enumerate(recently_finished, 1):
+        if _shutdown_requested:
+            print(f"\n[SHUTDOWN] Graceful shutdown complete. Processed {processed_count}/{len(recently_finished)} games.")
+            sys.exit(0)
+
         game_id = game.get("game_id")
         raw_json = game.get("raw_json")
         game_date = game.get("game_date", "unknown")
-        
+
         if not game_id or not raw_json:
             print(f"[run_daily_pbp_processing] Skipping invalid game record: {game_id}")
             skipped_count += 1
@@ -296,6 +311,10 @@ def process_all_unprocessed_games() -> Dict[str, int]:
     max_batches = (total_unprocessed // BATCH_SIZE) + 10  # Safety limit to prevent infinite loops
     
     while batch_num <= max_batches:
+        if _shutdown_requested:
+            print(f"\n[SHUTDOWN] Graceful shutdown complete. Processed: {processed_count}, Failed: {failed_count}")
+            sys.exit(0)
+
         # Fetch batch
         games = get_unprocessed_games(db, limit=BATCH_SIZE)
         
