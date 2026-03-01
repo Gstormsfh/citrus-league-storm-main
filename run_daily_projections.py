@@ -1064,9 +1064,9 @@ def main():
         logger.info("")
     
     # Report cache failures (from worker processes) if any
-    from calculate_daily_projections import save_projection_to_cache
-    cache_fails = getattr(save_projection_to_cache, '_fail_count', 0)
-    cache_first_err = getattr(save_projection_to_cache, '_first_error', '')
+    from calculate_daily_projections import save_physical_projection
+    cache_fails = getattr(save_physical_projection, '_fail_count', 0)
+    cache_first_err = getattr(save_physical_projection, '_first_error', '')
 
     # Final Summary
     logger.info("")

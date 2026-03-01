@@ -2245,12 +2245,10 @@ def save_physical_projection(
             return True
         
         # Cache is optional — count failures silently and report once at the end
-        if not hasattr(save_projection_to_cache, '_fail_count'):
-            save_projection_to_cache._fail_count = 0
-            save_projection_to_cache._first_error = f"{type(e).__name__}: {e}"
-        save_projection_to_cache._fail_count += 1
-        if save_projection_to_cache._fail_count == 1:
-            logger.debug(f"Cache upsert failed for player {player_id}: {type(e).__name__}")
+        if not hasattr(save_physical_projection, '_fail_count'):
+            save_physical_projection._fail_count = 0
+            save_physical_projection._first_error = f"{type(e).__name__}: {e}"
+        save_physical_projection._fail_count += 1
         return False
 
 
@@ -2863,10 +2861,13 @@ def calculate_daily_projection(
             if not physical_projection:
                 return None
             
-            # Save physical projection to cache for future use
-            save_physical_projection(
-                db, player_id, game_id, game_date, season, physical_projection
-            )
+            # Save physical projection to cache (optional, never fatal)
+            try:
+                save_physical_projection(
+                    db, player_id, game_id, game_date, season, physical_projection
+                )
+            except Exception:
+                pass  # Cache is optional — failures tracked inside the function
         
         # LAYER 2: Transform physical to fantasy points
         # Get league_id if not provided (try to get from first league)
