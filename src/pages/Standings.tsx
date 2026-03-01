@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
-import Navbar from '../components/Navbar';
-import Footer from '../components/Footer';
+import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -101,9 +101,10 @@ const Standings = () => {
           const { data: demoLeagueData, error: leagueError } = await supabase
             .from('leagues')
             .select(COLUMNS.LEAGUE)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .eq('id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
             .maybeSingle();
-          
+
           if (leagueError || !demoLeagueData) {
             logger.error('[Standings] Error loading demo league:', leagueError);
             // Fallback to empty teams
@@ -111,13 +112,14 @@ const Standings = () => {
             setLoading(false);
             return;
           }
-          
+
           const demoLeague = demoLeagueData as League;
 
           // Get teams from the demo league
           const { data: demoTeamsData, error: teamsError } = await supabase
             .from('teams')
             .select(COLUMNS.TEAM)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
             .order('created_at', { ascending: true });
           
@@ -128,16 +130,17 @@ const Standings = () => {
             return;
           }
           
-          const demoTeamsFromDb = demoTeamsData as any[];
+          const demoTeamsFromDb = demoTeamsData as Team[];
 
           // Get draft picks for calculating team stats
           const { data: draftPicksData } = await supabase
             .from('draft_picks')
             .select('*')
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
             .is('deleted_at', null);
-          
-          const draftPicks = (draftPicksData || []) as any[];
+
+          const draftPicks = (draftPicksData || []) as Array<{ team_id: string; player_id: string }>;
           
           // Get all players
           const allPlayers = await PlayerService.getAllPlayers();
@@ -183,7 +186,7 @@ const Standings = () => {
               pointsAgainst: parseFloat((stats.pointsAgainst || 0).toFixed(1)),
               streak: stats.streak || '-',
               winPercentage: winPercentage !== undefined && !isNaN(winPercentage) ? parseFloat(winPercentage.toFixed(1)) : 0,
-              last5: { wins: stats.last5?.wins || 0, losses: stats.last5?.losses || 0, ties: (stats.last5 as any)?.ties || 0 },
+              last5: { wins: stats.last5?.wins || 0, losses: stats.last5?.losses || 0, ties: stats.last5?.ties || 0 },
             };
           });
 
@@ -254,7 +257,7 @@ const Standings = () => {
           setLeagueTeams(leagueTeamsData);
 
           // Only calculate stats if draft is completed
-          let teamStats: Record<string, { pointsFor: number; pointsAgainst: number; wins: number; losses: number; ties?: number; streak?: string; last5?: { wins: number; losses: number; ties?: number }; gamesPlayed?: number }> = {};
+          let teamStats: Record<string, { pointsFor: number; pointsAgainst: number; wins: number; losses: number; ties?: number; streak?: string; last5?: { wins: number; losses: number; ties?: number }; gamesPlayed?: number; categoryRanks?: Record<string, number>; categoryRecord?: Record<string, { wins: number; losses: number; ties: number }> }> = {};
 
           if (leagueData && leagueData.draft_status === 'completed') {
             // Get draft picks for this league to calculate team stats
@@ -336,23 +339,23 @@ const Standings = () => {
               : 0;
 
             // For PPG: use gamesPlayed from season standings if available
-            const gp = (stats as any).gamesPlayed || totalGames || 0;
+            const gp = stats.gamesPlayed || totalGames || 0;
 
             return {
               id: team.id,
               name: team.team_name,
-              owner: (team as any).owner_name || (team.owner_id ? 'User' : 'AI Team'),
+              owner: (team as { owner_name?: string }).owner_name || (team.owner_id ? 'User' : 'AI Team'),
               logo: team.team_name.substring(0, 2).toUpperCase(),
               record: { wins: stats.wins, losses: stats.losses, ties: (stats.ties as number) || 0 },
               points: stats.pointsFor,
               pointsFor: parseFloat((stats.pointsFor || 0).toFixed(1)),
               pointsAgainst: parseFloat((stats.pointsAgainst || 0).toFixed(1)),
-              streak: (stats as any).streak || '-',
+              streak: stats.streak || '-',
               winPercentage: winPercentage !== undefined && !isNaN(winPercentage) ? parseFloat(winPercentage.toFixed(1)) : 0,
-              last5: { wins: (stats as any).last5?.wins || 0, losses: (stats as any).last5?.losses || 0, ties: (stats as any).last5?.ties || 0 },
+              last5: { wins: stats.last5?.wins || 0, losses: stats.last5?.losses || 0, ties: stats.last5?.ties || 0 },
               gamesPlayed: gp,
-              categoryRanks: (stats as any).categoryRanks || undefined,
-              categoryRecord: (stats as any).categoryRecord || undefined,
+              categoryRanks: stats.categoryRanks || undefined,
+              categoryRecord: stats.categoryRecord || undefined,
             } as StandingsTeam;
           });
 
@@ -376,11 +379,11 @@ const Standings = () => {
           setTeams([]);
           setLeagues([]);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         logger.error('[Standings] Error loading standings:', err);
         toast({
           title: 'Error',
-          description: err.message || 'Failed to load standings',
+          description: err instanceof Error ? err.message : 'Failed to load standings',
           variant: 'destructive',
         });
         // Fallback to empty teams on error - ensure component still renders
@@ -813,7 +816,7 @@ const Standings = () => {
 
                     return (
                       <div
-                        key={team.team_id || (team as any).id}
+                        key={team.team_id}
                         className={cn(
                           'flex items-center justify-between p-2.5 rounded-lg transition-colors',
                           isInPlayoffZone ? 'bg-green-50/50 dark:bg-green-950/10 hover:bg-green-100/50 dark:hover:bg-green-950/20' : 'bg-muted/10 hover:bg-muted/20',
@@ -830,7 +833,7 @@ const Standings = () => {
                           )}>
                             {i + 1}
                           </div>
-                          <div className="font-semibold text-sm truncate">{team.team_name || (team as any).name}</div>
+                          <div className="font-semibold text-sm truncate">{team.team_name}</div>
                           {/* Clinch/elimination badges */}
                           {clinchStatus === 'clinched' && (
                             <span className="text-[9px] font-bold text-green-700 bg-green-100 dark:bg-green-900/40 dark:text-green-400 px-1.5 py-0.5 rounded shrink-0">
@@ -853,7 +856,7 @@ const Standings = () => {
                           <div className="text-xs font-bold bg-[#E8EED9]/60 backdrop-blur-sm px-2 py-1 rounded-md shadow-sm border border-citrus-sage/20 tabular-nums">
                             {hasMatchups
                               ? `${team.wins}-${team.losses}${team.ties > 0 ? `-${team.ties}` : ''}`
-                              : `${team.pf?.toFixed?.(1) ?? (team as any).pointsFor?.toFixed(1)} pts`}
+                              : `${team.pf?.toFixed?.(1) ?? '0.0'} pts`}
                           </div>
                         </div>
                       </div>

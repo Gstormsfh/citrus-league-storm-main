@@ -210,6 +210,15 @@ export class ScoringCalculator {
   }
 
   /**
+   * Calculate fantasy points per game for a player
+   * Returns 0 if gamesPlayed is 0 to avoid division by zero
+   */
+  calculatePointsPerGame(stats: Record<string, number> | null | undefined, isGoalie: boolean, gamesPlayed: number): number {
+    if (!gamesPlayed || gamesPlayed <= 0) return 0;
+    return this.calculatePoints(stats, isGoalie) / gamesPlayed;
+  }
+
+  /**
    * Get the scoring settings being used
    * Useful for debugging or displaying scoring rules
    */

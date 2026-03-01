@@ -39,6 +39,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { logger } from '@/utils/logger';
+import { ScoringCalculator } from '@/utils/scoringUtils';
 
 const TradeAnalyzer = () => {
   const [searchParams] = useSearchParams();
@@ -362,7 +363,16 @@ const TradeAnalyzer = () => {
     status: p.status === 'injured' ? 'IR' : null,
     image: p.headshot_url || undefined,
     projectedPoints: p.games_played > 0
-      ? ((p.goals || 0) * 3 + (p.assists || 0) * 2 + (p.shots || 0) * 0.4 + (p.blocks || 0) * 0.5 + (p.hits || 0) * 0.2 + (p.pim || 0) * 0.5) / p.games_played
+      ? new ScoringCalculator().calculatePointsPerGame({
+          goals: p.goals || 0,
+          assists: p.assists || 0,
+          shots: p.shots || 0,
+          blocks: p.blocks || 0,
+          hits: p.hits || 0,
+          pim: p.pim || 0,
+          ppp: p.ppp || 0,
+          shp: p.shp || 0
+        }, false, p.games_played)
       : 0
   });
 
