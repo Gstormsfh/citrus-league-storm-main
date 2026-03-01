@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -17,14 +16,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
  *
  * Instead we:
  *   1. Check for error params in the URL (OAuth denied, expired link, etc.)
- *   2. Check if a session already exists (auto-detect may have finished)
- *   3. Listen for `onAuthStateChange` SIGNED_IN in case it hasn't yet
+ *   2. Listen for `onAuthStateChange` SIGNED_IN (registered BEFORE getSession
+ *      to avoid missing events during the PKCE exchange)
+ *   3. Check if a session already exists (auto-detect may have finished)
  *   4. Time out after 10 s if nothing happens
  */
 const AuthCallback = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { refreshProfile } = useAuth();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('Completing sign-in...');
   const handled = useRef(false);
@@ -34,15 +33,18 @@ const AuthCallback = () => {
     let subscription: { unsubscribe: () => void } | null = null;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-    const succeed = async (msg: string) => {
+    // AuthContext's own onAuthStateChange listener already calls
+    // fetchProfile() on SIGNED_IN, so we only need to navigate here.
+    const succeed = (msg: string) => {
       if (!mounted || handled.current) return;
       handled.current = true;
       subscription?.unsubscribe();
       if (timeoutId) clearTimeout(timeoutId);
       setStatus('success');
       setMessage(msg);
-      await refreshProfile();
-      if (mounted) setTimeout(() => navigate('/profile-setup'), 1500);
+      setTimeout(() => {
+        if (mounted) navigate('/profile-setup');
+      }, 1500);
     };
 
     const fail = (msg: string) => {
@@ -52,7 +54,9 @@ const AuthCallback = () => {
       if (timeoutId) clearTimeout(timeoutId);
       setStatus('error');
       setMessage(msg);
-      setTimeout(() => navigate('/auth'), 3000);
+      setTimeout(() => {
+        if (mounted) navigate('/auth');
+      }, 3000);
     };
 
     const handleAuthCallback = async () => {
@@ -74,21 +78,22 @@ const AuthCallback = () => {
           return;
         }
 
-        // ----- Check if detectSessionInUrl already established a session -----
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          await succeed('Signed in! Redirecting...');
-          return;
-        }
-
-        // ----- Listen for session to be established -----
-        // detectSessionInUrl may still be processing the PKCE code or hash tokens
-        const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+        // ----- Register listener BEFORE getSession to avoid race -----
+        // detectSessionInUrl may fire SIGNED_IN while getSession() is
+        // in-flight; subscribing first guarantees we never miss it.
+        const { data } = supabase.auth.onAuthStateChange((event, session) => {
           if (event === 'SIGNED_IN' && session) {
-            await succeed('Signed in! Redirecting...');
+            succeed('Signed in! Redirecting...');
           }
         });
         subscription = data.subscription;
+
+        // ----- Check if detectSessionInUrl already established a session -----
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          succeed('Signed in! Redirecting...');
+          return;
+        }
 
         // ----- Timeout after 10 seconds -----
         timeoutId = setTimeout(() => {
@@ -107,7 +112,11 @@ const AuthCallback = () => {
       subscription?.unsubscribe();
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [navigate, searchParams, refreshProfile]);
+    // Note: navigate and searchParams are stable refs from React Router.
+    // refreshProfile was intentionally removed — AuthContext's own
+    // onAuthStateChange handler fetches the profile on SIGNED_IN.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigate, searchParams]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#D4E8B8] p-4">
