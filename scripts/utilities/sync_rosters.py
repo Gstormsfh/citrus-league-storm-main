@@ -200,20 +200,18 @@ def compute_multi_position_eligibility(
     api_players: Optional[Dict[int, dict]] = None,
 ) -> Dict[int, List[str]]:
     """
-    Compute multi-position eligibility from player_game_stats.
-
-    Industry standard (Yahoo Fantasy): A player gains eligibility at a position
-    if they have played MIN_GAMES_FOR_ELIGIBILITY (5) games at that position
-    during the current season.
+    Compute multi-position eligibility from player_game_stats + NHL roster data.
 
     Data sources (in priority order):
     1. player_game_stats.position_code — actual game-by-game position data
-    2. NHL API roster position — current official position (always included as primary)
+    2. NHL API roster position — current official position (always eligible)
 
     Rules:
-    - Primary position (most games) is always included
-    - Secondary positions require 5+ games played (MIN_GAMES_FOR_ELIGIBILITY)
-    - Maximum 3 positions per player (primary + up to 2 secondary)
+    - The NHL roster position is ALWAYS eligible (it's the league's official designation)
+    - The most-played game stats position is ALWAYS eligible
+    - If these two differ, the player has dual eligibility automatically
+    - Additional secondary positions require MIN_GAMES_FOR_ELIGIBILITY (5) games
+    - Maximum 3 positions per player
     - Goalies cannot gain skater eligibility and vice versa
 
     Returns:
@@ -222,8 +220,13 @@ def compute_multi_position_eligibility(
     if not player_ids:
         return {}
 
+    VALID_POSITIONS = {"C", "LW", "RW", "D", "G"}
+    GOALIE_POSITIONS = {"G"}
+
     # Query game-level position data in batches
     position_counts: Dict[int, Dict[str, int]] = {}  # player_id -> {position: game_count}
+    _diag_null_count = 0
+    _diag_total_rows = 0
 
     for i in range(0, len(player_ids), 100):
         batch = player_ids[i:i+100]
@@ -240,27 +243,41 @@ def compute_multi_position_eligibility(
             )
 
             for row in rows:
+                _diag_total_rows += 1
                 pid = int(row.get("player_id", 0))
-                pos = _normalize_position(row.get("position_code", ""))
-                if pid and pos:
+                raw_pos = row.get("position_code") or ""
+                pos = _normalize_position(raw_pos)
+                # Skip invalid/generic positions (NULL, empty, "F" fallback)
+                if pid and pos and pos in VALID_POSITIONS:
                     if pid not in position_counts:
                         position_counts[pid] = {}
                     position_counts[pid][pos] = position_counts[pid].get(pos, 0) + 1
+                elif pid and not pos:
+                    _diag_null_count += 1
         except Exception as e:
             print(f"   [sync_rosters] WARNING: Error fetching game positions batch: {e}")
             continue
 
+    # Diagnostic: report data quality
+    _players_with_data = len(position_counts)
+    if _diag_total_rows > 0:
+        null_pct = (_diag_null_count / _diag_total_rows * 100)
+        print(f"   [sync_rosters] Position data: {_diag_total_rows} game rows, "
+              f"{_players_with_data} players with position data, "
+              f"{_diag_null_count} NULL position_codes ({null_pct:.0f}%)")
+        if null_pct > 50:
+            print(f"   [sync_rosters] NOTE: Most position_codes are NULL. "
+                  f"Run scrape_per_game_nhl_stats.py to backfill game positions.")
+    else:
+        print(f"   [sync_rosters] Position data: no game rows found for season {season}")
+
     # Build eligibility map
     eligibility: Dict[int, List[str]] = {}
-
-    # Skater positions (forwards + defense) and goalie are separate pools
-    SKATER_POSITIONS = {"C", "LW", "RW", "D"}
-    GOALIE_POSITIONS = {"G"}
 
     for pid in player_ids:
         pos_counts = position_counts.get(pid, {})
 
-        # Get the API roster position as baseline (always the primary)
+        # Get the NHL roster position (always the official primary)
         api_primary = ""
         if api_players and pid in api_players:
             api_primary = api_players[pid].get("position_code", "")
@@ -268,44 +285,41 @@ def compute_multi_position_eligibility(
         if not pos_counts and not api_primary:
             continue
 
-        # Merge: ensure API primary position is represented
-        if api_primary and api_primary not in pos_counts:
-            pos_counts[api_primary] = 0  # 0 games but it's their listed position
-
-        # Sort positions by game count (most played first)
-        sorted_positions = sorted(pos_counts.items(), key=lambda x: -x[1])
-
-        if not sorted_positions:
-            continue
-
-        # Determine if player is a goalie or skater
-        primary_pos = sorted_positions[0][0]
-        # If API says goalie, treat as goalie even if game stats say otherwise
-        is_goalie = (api_primary == "G") or (primary_pos == "G")
-
-        eligible = []
+        # Determine if player is a goalie
+        is_goalie = (api_primary == "G") or (pos_counts.get("G", 0) > 0 and not api_primary)
 
         if is_goalie:
-            # Goalies only get G eligibility
-            eligible = ["G"]
-        else:
-            # Skaters: primary + secondary positions meeting threshold
-            for pos, count in sorted_positions:
-                if pos in GOALIE_POSITIONS:
-                    continue  # Skaters can't gain goalie eligibility
+            eligibility[pid] = ["G"]
+            continue
 
-                if len(eligible) == 0:
-                    # Primary position: always included (even with 0 game stats,
-                    # because the NHL roster says this is their position)
-                    eligible.append(pos)
-                elif count >= MIN_GAMES_FOR_ELIGIBILITY and len(eligible) < 3:
-                    # Secondary/tertiary: must meet the games threshold
-                    eligible.append(pos)
+        # --- Skater eligibility ---
+        eligible = []
 
-            # Ensure API primary is first if it's in the list
-            if api_primary and api_primary in eligible and eligible[0] != api_primary:
-                eligible.remove(api_primary)
-                eligible.insert(0, api_primary)
+        # 1. NHL roster position is ALWAYS eligible (official designation)
+        if api_primary and api_primary in VALID_POSITIONS and api_primary not in GOALIE_POSITIONS:
+            eligible.append(api_primary)
+
+        # 2. Most-played game stats position is ALWAYS eligible
+        # Filter to valid skater positions only
+        skater_counts = {p: c for p, c in pos_counts.items() if p in VALID_POSITIONS and p not in GOALIE_POSITIONS}
+        if skater_counts:
+            sorted_positions = sorted(skater_counts.items(), key=lambda x: -x[1])
+            most_played = sorted_positions[0][0]
+
+            if most_played not in eligible:
+                # Roster says X but they play Y — automatic dual eligibility
+                eligible.append(most_played)
+
+            # 3. Additional positions meeting the games threshold
+            for pos, count in sorted_positions[1:]:
+                if count >= MIN_GAMES_FOR_ELIGIBILITY and len(eligible) < 3:
+                    if pos not in eligible:
+                        eligible.append(pos)
+
+        # Ensure API primary is first (it's the "official" position)
+        if api_primary and api_primary in eligible and eligible[0] != api_primary:
+            eligible.remove(api_primary)
+            eligible.insert(0, api_primary)
 
         if eligible:
             eligibility[pid] = eligible
@@ -467,6 +481,17 @@ def sync_rosters(
     # Batch update eligible_positions
     if multi_pos_updates:
         print(f"   [sync_rosters] {multi_pos_count} players have multi-position eligibility")
+        # Show a few examples
+        examples = multi_pos_updates[:5]
+        for ex in examples:
+            name = ""
+            if api_players and ex["player_id"] in api_players:
+                name = api_players[ex["player_id"]].get("full_name", "")
+            elif ex["player_id"] in current_dir:
+                name = current_dir[ex["player_id"]].get("full_name", "")
+            print(f"      {name or ex['player_id']}: {ex['eligible_positions']}")
+        if len(multi_pos_updates) > 5:
+            print(f"      ... and {len(multi_pos_updates) - 5} more")
         for update in multi_pos_updates:
             try:
                 db.update(
