@@ -26,10 +26,10 @@ jobs:
       - run: npm ci
 
       - name: Run ESLint (fail on warnings)
-        run: npx eslint src/ --max-warnings 0
+        run: npx eslint apps/web/src/ --max-warnings 0
 
   typecheck:
-    name: Type Check
+    name: Type Check (Web)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -42,11 +42,28 @@ jobs:
 
       - run: npm ci
 
-      - name: TypeScript compile check
-        run: npx tsc --noEmit
+      - name: TypeScript compile check (web)
+        run: cd apps/web && npx tsc --noEmit
+
+  typecheck-server:
+    name: Type Check (Server)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: TypeScript compile check (server)
+        run: cd server && npx tsc --noEmit
 
   build:
-    name: Build
+    name: Build (Web)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -59,7 +76,10 @@ jobs:
 
       - run: npm ci
 
-      - name: Production build
+      - name: Build shared package
+        run: npm run build --workspace=packages/shared
+
+      - name: Production build (web)
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
@@ -67,13 +87,14 @@ jobs:
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
           VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
-        run: npm run build
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+        run: npm run build --workspace=apps/web
 
       - name: Bundle size check (600KB per chunk)
         run: |
           echo "=== Bundle Size Report ==="
           oversized=0
-          for file in dist/assets/*.js; do
+          for file in apps/web/dist/assets/*.js; do
             [ -f "$file" ] || continue
             size=$(stat --format=%s "$file")
             size_kb=$((size / 1024))
@@ -92,8 +113,8 @@ jobs:
             echo "All chunks are within the 600KB budget."
           fi
 
-  test:
-    name: Test
+  build-server:
+    name: Build (Server)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -106,5 +127,25 @@ jobs:
 
       - run: npm ci
 
-      - name: Run tests
-        run: npx vitest run
+      - name: Build shared package
+        run: npm run build --workspace=packages/shared
+
+      - name: Build server
+        run: npm run build --workspace=server
+
+  test:
+    name: Test (Web)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run web tests
+        run: npm run test --workspace=apps/web

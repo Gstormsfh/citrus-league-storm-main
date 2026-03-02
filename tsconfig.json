@@ -1,19 +1,21 @@
 {
-  "files": [],
-  "references": [
-    { "path": "./tsconfig.app.json" },
-    { "path": "./tsconfig.node.json" }
-  ],
   "compilerOptions": {
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./src/*"]
-    },
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "skipLibCheck": true,
     "noImplicitAny": false,
     "noUnusedParameters": false,
-    "skipLibCheck": true,
-    "allowJs": true,
     "noUnusedLocals": false,
-    "strictNullChecks": false
-  }
+    "strictNullChecks": false,
+    "allowJs": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./apps/web/src/*"],
+      "@citrus/shared": ["./packages/shared/src"],
+      "@citrus/shared/*": ["./packages/shared/src/*"]
+    }
+  },
+  "include": [],
+  "exclude": ["node_modules"]
 }

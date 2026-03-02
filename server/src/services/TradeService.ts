@@ -1,0 +1,393 @@
+import { SupabaseClient } from '@supabase/supabase-js';
+import { COLUMNS } from '@citrus/shared';
+import { LeagueMembershipService } from './LeagueMembershipService';
+
+/**
+ * TradeService — Server-side trade management with DI Supabase client.
+ *
+ * Extracted from apps/web/src/services/TradeService.ts.
+ * Supports all 3 review types: none, commissioner, league_vote.
+ */
+export class TradeService {
+  private supabase: SupabaseClient;
+  private membership: LeagueMembershipService;
+
+  constructor(supabase: SupabaseClient) {
+    this.supabase = supabase;
+    this.membership = new LeagueMembershipService(supabase);
+  }
+
+  /** Get all trades for a league */
+  async getLeagueTrades(leagueId: string, status?: string) {
+    let query = this.supabase
+      .from('trade_offers')
+      .select(COLUMNS.TRADE)
+      .eq('league_id', leagueId)
+      .order('created_at', { ascending: false });
+
+    if (status) {
+      query = query.eq('status', status);
+    }
+
+    const { data, error } = await query;
+    return { trades: data || [], error };
+  }
+
+  /** Create a trade offer with validation */
+  async createTradeOffer(
+    leagueId: string,
+    fromTeamId: string,
+    toTeamId: string,
+    offeredPlayerIds: number[],
+    requestedPlayerIds: number[],
+    userId: string,
+    message?: string,
+  ) {
+    // Verify user owns the from_team
+    const { data: team } = await this.supabase
+      .from('teams')
+      .select('owner_id')
+      .eq('id', fromTeamId)
+      .single();
+
+    if (team?.owner_id !== userId) {
+      return { success: false, error: 'You do not own the offering team' };
+    }
+
+    // Check league settings for best ball (trades not allowed)
+    const { data: league } = await this.supabase
+      .from('leagues')
+      .select('settings')
+      .eq('id', leagueId)
+      .single();
+
+    if (league?.settings?.scoring_format === 'best-ball') {
+      return { success: false, error: 'Trades are not allowed in Best Ball leagues' };
+    }
+
+    // Check trade deadline
+    if (league?.settings?.trade_deadline) {
+      const deadline = new Date(league.settings.trade_deadline);
+      if (new Date() > deadline) {
+        return { success: false, error: 'Trade deadline has passed' };
+      }
+    }
+
+    // Calculate expiration
+    const expirationDays = league?.settings?.trade_expiration_days || 7;
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + expirationDays);
+
+    const { data, error } = await this.supabase
+      .from('trade_offers')
+      .insert({
+        league_id: leagueId,
+        from_team_id: fromTeamId,
+        to_team_id: toTeamId,
+        offered_player_ids: offeredPlayerIds,
+        requested_player_ids: requestedPlayerIds,
+        message,
+        status: 'pending',
+        expires_at: expiresAt.toISOString(),
+      })
+      .select(COLUMNS.TRADE)
+      .single();
+
+    return { success: !error, error: error?.message, tradeId: (data as any)?.id };
+  }
+
+  /** Accept a trade offer with review routing */
+  async acceptTradeOffer(tradeId: string, userId: string) {
+    // Get the trade
+    const { data: tradeData, error: tradeError } = await this.supabase
+      .from('trade_offers')
+      .select(COLUMNS.TRADE)
+      .eq('id', tradeId)
+      .eq('status', 'pending')
+      .single();
+
+    const trade = tradeData as any;
+    if (tradeError || !trade) {
+      return { success: false, error: 'Trade not found or already processed' };
+    }
+
+    // Verify user owns the to_team
+    const { data: toTeam } = await this.supabase
+      .from('teams')
+      .select('owner_id')
+      .eq('id', trade.to_team_id)
+      .single();
+
+    if (toTeam?.owner_id !== userId) {
+      return { success: false, error: 'You are not the recipient of this trade' };
+    }
+
+    // Check roster size limits for both teams
+    const { data: league } = await this.supabase
+      .from('leagues')
+      .select('roster_size, trade_review_type, trade_review_period_hours')
+      .eq('id', trade.league_id)
+      .single();
+
+    const maxRoster = (league?.roster_size || 21) + 3; // +3 for IR
+
+    const { count: fromCount } = await this.supabase
+      .from('roster_assignments')
+      .select('id', { count: 'exact', head: true })
+      .eq('team_id', trade.from_team_id)
+      .eq('league_id', trade.league_id);
+
+    const { count: toCount } = await this.supabase
+      .from('roster_assignments')
+      .select('id', { count: 'exact', head: true })
+      .eq('team_id', trade.to_team_id)
+      .eq('league_id', trade.league_id);
+
+    const offeredCount = trade.offered_player_ids?.length || 0;
+    const requestedCount = trade.requested_player_ids?.length || 0;
+
+    const newFromSize = (fromCount || 0) - offeredCount + requestedCount;
+    const newToSize = (toCount || 0) - requestedCount + offeredCount;
+
+    if (newFromSize > maxRoster || newToSize > maxRoster) {
+      return { success: false, error: 'Trade would exceed roster size limit' };
+    }
+
+    // Check if review is required
+    const reviewType = league?.trade_review_type || 'none';
+
+    if (reviewType !== 'none') {
+      return this.submitTradeForReview(tradeId, trade.league_id);
+    }
+
+    // Execute trade immediately
+    const { error } = await this.supabase.rpc('execute_trade', {
+      p_trade_id: tradeId,
+    });
+
+    return { success: !error, error: error?.message };
+  }
+
+  /** Reject a trade offer */
+  async rejectTradeOffer(tradeId: string, userId: string) {
+    const { data: trade } = await this.supabase
+      .from('trade_offers')
+      .select('to_team_id')
+      .eq('id', tradeId)
+      .eq('status', 'pending')
+      .single();
+
+    if (!trade) {
+      return { success: false, error: 'Trade not found or already processed' };
+    }
+
+    // Verify user owns the to_team
+    const { data: team } = await this.supabase
+      .from('teams')
+      .select('owner_id')
+      .eq('id', trade.to_team_id)
+      .single();
+
+    if (team?.owner_id !== userId) {
+      return { success: false, error: 'Only the trade recipient can reject' };
+    }
+
+    const { error } = await this.supabase
+      .from('trade_offers')
+      .update({ status: 'rejected', processed_at: new Date().toISOString() })
+      .eq('id', tradeId);
+
+    return { success: !error, error: error?.message };
+  }
+
+  /** Cancel a trade offer (proposer only) */
+  async cancelTradeOffer(tradeId: string, userId: string) {
+    const { data: trade } = await this.supabase
+      .from('trade_offers')
+      .select('from_team_id')
+      .eq('id', tradeId)
+      .eq('status', 'pending')
+      .single();
+
+    if (!trade) {
+      return { success: false, error: 'Trade not found or already processed' };
+    }
+
+    const { data: team } = await this.supabase
+      .from('teams')
+      .select('owner_id')
+      .eq('id', trade.from_team_id)
+      .single();
+
+    if (team?.owner_id !== userId) {
+      return { success: false, error: 'Only the trade proposer can cancel' };
+    }
+
+    const { error } = await this.supabase
+      .from('trade_offers')
+      .update({ status: 'cancelled', processed_at: new Date().toISOString() })
+      .eq('id', tradeId);
+
+    return { success: !error, error: error?.message };
+  }
+
+  /** Submit trade for review (commissioner or league vote) */
+  async submitTradeForReview(tradeId: string, leagueId: string) {
+    const { data: league } = await this.supabase
+      .from('leagues')
+      .select('trade_review_type, trade_review_period_hours')
+      .eq('id', leagueId)
+      .single();
+
+    const reviewType = league?.trade_review_type || 'none';
+    if (reviewType === 'none') {
+      return { success: true, reviewType: 'none' };
+    }
+
+    const reviewHours = league?.trade_review_period_hours || 48;
+    const reviewEndsAt = new Date();
+    reviewEndsAt.setHours(reviewEndsAt.getHours() + reviewHours);
+
+    const { error } = await this.supabase
+      .from('trade_offers')
+      .update({
+        status: 'under_review',
+        review_type: reviewType,
+        review_ends_at: reviewEndsAt.toISOString(),
+      })
+      .eq('id', tradeId);
+
+    if (!error) {
+      await this.supabase.rpc('notify_league_members', {
+        p_league_id: leagueId,
+        p_message: 'A trade has been submitted for review.',
+        p_title: 'Trade Under Review',
+      });
+    }
+
+    return { success: !error, reviewType, error: error?.message };
+  }
+
+  /** Submit a vote on a trade */
+  async submitTradeVote(tradeOfferId: string, voterTeamId: string, vote: 'approve' | 'veto') {
+    const { data, error } = await this.supabase.rpc('submit_trade_vote', {
+      p_trade_offer_id: tradeOfferId,
+      p_voter_team_id: voterTeamId,
+      p_vote: vote,
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    const result = typeof data === 'string' ? JSON.parse(data) : data;
+    return {
+      success: true,
+      vetoCount: result?.veto_count || 0,
+      approveCount: result?.approve_count || 0,
+      votesNeeded: result?.votes_needed || 0,
+      isVetoed: result?.is_vetoed || false,
+      error: null,
+    };
+  }
+
+  /** Get votes on a trade */
+  async getTradeVotes(tradeOfferId: string) {
+    const { data, error } = await this.supabase
+      .from('trade_votes')
+      .select('voter_team_id, vote, created_at')
+      .eq('trade_offer_id', tradeOfferId);
+
+    return {
+      votes: (data || []).map((v: any) => ({
+        voterTeamId: v.voter_team_id,
+        vote: v.vote,
+        createdAt: v.created_at,
+      })),
+      error,
+    };
+  }
+
+  /** Commissioner decision on a trade */
+  async commissionerDecision(
+    tradeId: string,
+    leagueId: string,
+    decision: 'approve' | 'veto',
+    commissionerId: string,
+  ) {
+    await this.membership.requireCommissioner(leagueId, commissionerId);
+
+    if (decision === 'veto') {
+      const { error } = await this.supabase
+        .from('trade_offers')
+        .update({ status: 'vetoed', processed_at: new Date().toISOString() })
+        .eq('id', tradeId);
+
+      if (!error) {
+        await this.supabase.rpc('notify_league_members', {
+          p_league_id: leagueId,
+          p_message: 'A trade has been vetoed by the commissioner.',
+          p_title: 'Trade Vetoed',
+        });
+      }
+
+      return { success: !error, error: error?.message };
+    }
+
+    // Approve: execute the trade
+    const { error } = await this.supabase.rpc('execute_trade', {
+      p_trade_id: tradeId,
+    });
+
+    return { success: !error, error: error?.message };
+  }
+
+  /** Get trade review settings for a league */
+  async getTradeReviewSettings(leagueId: string) {
+    const { data, error } = await this.supabase
+      .from('leagues')
+      .select('trade_review_type, trade_review_period_hours, trade_veto_threshold')
+      .eq('id', leagueId)
+      .single();
+
+    return {
+      reviewType: data?.trade_review_type || 'none',
+      reviewPeriodHours: data?.trade_review_period_hours || 48,
+      vetoThreshold: data?.trade_veto_threshold || 0.5,
+      error,
+    };
+  }
+
+  /** Update trade review settings (commissioner only) */
+  async updateTradeReviewSettings(
+    leagueId: string,
+    commissionerId: string,
+    settings: {
+      trade_review_type: 'none' | 'commissioner' | 'league_vote';
+      trade_review_period_hours: number;
+      trade_veto_threshold: number;
+    },
+  ) {
+    await this.membership.requireCommissioner(leagueId, commissionerId);
+
+    const { error } = await this.supabase
+      .from('leagues')
+      .update({
+        trade_review_type: settings.trade_review_type,
+        trade_review_period_hours: settings.trade_review_period_hours,
+        trade_veto_threshold: settings.trade_veto_threshold,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', leagueId);
+
+    if (!error) {
+      await this.supabase.rpc('notify_league_members', {
+        p_league_id: leagueId,
+        p_message: 'Trade review settings have been updated.',
+        p_title: 'Trade Settings Updated',
+      });
+    }
+
+    return { success: !error, error };
+  }
+}

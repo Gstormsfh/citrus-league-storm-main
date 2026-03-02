@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "outDir": "./dist",
+    "strict": false,
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "paths": {
+      "@citrus/shared": ["../packages/shared/src/index.ts"],
+      "@citrus/shared/*": ["../packages/shared/src/*"]
+    }
+  },
+  "include": ["src"]
+}

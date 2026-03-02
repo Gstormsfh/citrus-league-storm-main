@@ -1,0 +1,25 @@
+{
+  "name": "@citrus/server",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@citrus/shared": "*",
+    "@hono/node-server": "^1.13.7",
+    "@supabase/supabase-js": "^2.56.1",
+    "hono": "^4.6.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.5",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.3",
+    "vitest": "^4.0.18"
+  }
+}
