@@ -1345,18 +1345,37 @@ export const MatchupService = {
         return new Map();
       }
 
-      const { data, error } = await supabase.rpc('get_daily_projections', {
+      let data: DailyProjectionRow[] | null = null;
+
+      // Try RPC first (fastest path — uses pre-built function with proper indexes)
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_daily_projections', {
         p_player_ids: playerIds,
         p_target_date: targetDate
       });
 
-      if (error) {
-        logger.error('[MatchupService.getDailyProjections] ❌ RPC error:', error);
-        return new Map(); // Return empty map on error (graceful degradation)
+      if (rpcError) {
+        // RPC failed — likely column mismatch from un-applied migration.
+        // Fall back to a direct table query that only selects core columns.
+        logger.warn('[MatchupService.getDailyProjections] RPC failed, falling back to direct query:', rpcError.message);
+
+        const { data: directData, error: directError } = await supabase
+          .from('player_projected_stats')
+          .select('player_id, game_id, projection_date, season, projected_goals, projected_assists, projected_sog, projected_blocks, projected_ppp, projected_shp, projected_hits, projected_pim, projected_xg, total_projected_points, base_ppg, shrinkage_weight, finishing_multiplier, opponent_adjustment, b2b_penalty, home_away_adjustment, confidence_score, calculation_method, is_goalie, projected_wins, projected_saves, projected_shutouts, projected_goals_against, projected_gaa, projected_save_pct, projected_gp, starter_confirmed')
+          .in('player_id', playerIds)
+          .eq('projection_date', targetDate);
+
+        if (directError) {
+          logger.error('[MatchupService.getDailyProjections] ❌ Direct query also failed:', directError);
+          return new Map();
+        }
+
+        data = directData as DailyProjectionRow[] | null;
+      } else {
+        data = rpcData as DailyProjectionRow[] | null;
       }
 
       if (!data || data.length === 0) {
-        logger.warn('[MatchupService.getDailyProjections] ⚠️ RPC returned empty array - no projections for this date');
+        logger.warn('[MatchupService.getDailyProjections] ⚠️ No projections found for date', targetDate, '- checked', playerIds.length, 'players');
       }
 
       // Create a map for O(1) lookup during player transformation
