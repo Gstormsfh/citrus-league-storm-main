@@ -72,6 +72,28 @@ if not SUPABASE_URL or not SUPABASE_KEY:
     raise RuntimeError("Missing VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment.")
 
 
+# Single source of truth for fallback scoring — matches DEFAULT_SCORING in src/utils/scoringUtils.ts
+# Used when a player has no league context (free agents) or when league settings can't be loaded.
+DEFAULT_FALLBACK_SCORING = {
+    "skater": {
+        "goals": 3,
+        "assists": 2,
+        "power_play_points": 1,
+        "short_handed_points": 2,
+        "shots_on_goal": 0.4,
+        "blocks": 0.5,
+        "hits": 0.2,
+        "penalty_minutes": 0.5,
+    },
+    "goalie": {
+        "wins": 4,
+        "shutouts": 3,
+        "saves": 0.2,
+        "goals_against": -1,
+    }
+}
+
+
 def get_fresh_supabase_client() -> SupabaseRest:
     """Create a fresh Supabase client for process-safe multiprocessing."""
     return SupabaseRest(SUPABASE_URL, SUPABASE_KEY)
@@ -226,38 +248,11 @@ def get_league_scoring_settings(db: SupabaseRest, league_id: str) -> Dict[str, A
             if settings and isinstance(settings, dict):
                 return settings
         
-        # Return defaults
-        return {
-            "skater": {
-                "goals": 3,
-                "assists": 2,
-                "shots_on_goal": 0.4,
-                "blocks": 0.5,
-            },
-            "goalie": {
-                "wins": 4,
-                "shutouts": 3,
-                "saves": 0.2,
-                "goals_against": -1,
-            }
-        }
+        # Return defaults — must match DEFAULT_SCORING in src/utils/scoringUtils.ts
+        return DEFAULT_FALLBACK_SCORING
     except Exception as e:
         logger.warning(f"⚠️  Warning: Could not fetch scoring settings for league {league_id}: {e}")
-        # Return defaults
-        return {
-            "skater": {
-                "goals": 3,
-                "assists": 2,
-                "shots_on_goal": 0.4,
-                "blocks": 0.5,
-            },
-            "goalie": {
-                "wins": 4,
-                "shutouts": 3,
-                "saves": 0.2,
-                "goals_against": -1,
-            }
-        }
+        return DEFAULT_FALLBACK_SCORING
 
 
 def calculate_player_projection_worker(args: Tuple[int, int, date, int, Dict[str, Any]]) -> Dict[str, Any]:
@@ -897,10 +892,7 @@ def main():
     if league_scoring:
         fallback_scoring = next(iter(league_scoring.values()))
     if not fallback_scoring:
-        fallback_scoring = {
-            "skater": {"goals": 3, "assists": 2, "shots_on_goal": 0.4, "blocks": 0.5},
-            "goalie": {"wins": 4, "shutouts": 3, "saves": 0.2, "goals_against": -1}
-        }
+        fallback_scoring = DEFAULT_FALLBACK_SCORING
 
     for player_id, game_id, league_id in rostered_players:
         # Skip if projection already exists (unless --force)
