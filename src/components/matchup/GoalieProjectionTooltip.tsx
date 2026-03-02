@@ -3,36 +3,40 @@
  * Shows "Performance Outlook" for goalies - clean projected stat lines
  * Displays: GP, Wins, Saves, Shutouts, GAA, SV%
  * Works on hover (desktop) and tap (mobile)
+ *
+ * Trigger is the children prop (e.g. the projected points badge).
+ * Desktop: hover shows tooltip. Mobile: tap opens popover, tap outside closes.
  */
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { MatchupPlayer } from "./types";
-import { useState, useEffect } from "react";
+import { useState, useEffect, ReactNode } from "react";
 import { X } from "lucide-react";
 
 // Hook to detect mobile
 const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState(false);
-  
+
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 1024);
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
-  
+
   return isMobile;
 };
 
 interface GoalieProjectionTooltipProps {
   projection: MatchupPlayer['goalieProjection'];
+  children?: ReactNode;
 }
 
-export const GoalieProjectionTooltip = ({ projection }: GoalieProjectionTooltipProps) => {
+export const GoalieProjectionTooltip = ({ projection, children }: GoalieProjectionTooltipProps) => {
   const [open, setOpen] = useState(false);
   const isMobile = useIsMobile();
-  
+
   if (!projection) return null;
 
   // Goalie stats - flat array for grid
@@ -96,25 +100,33 @@ export const GoalieProjectionTooltip = ({ projection }: GoalieProjectionTooltipP
     </>
   );
 
-  // Mobile: Use Popover (tap to open, stays open)
+  // Default trigger: the projected points value as a tappable/hoverable badge
+  const defaultTrigger = (
+    <span className="text-xs font-varsity font-black text-citrus-orange bg-citrus-peach/30 px-1.5 py-0.5 rounded border border-citrus-peach/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)] cursor-pointer hover:text-citrus-forest transition-all">
+      {projection.total_projected_points.toFixed(1)} pts
+    </span>
+  );
+
+  const trigger = children || defaultTrigger;
+
+  // Mobile: Use Popover (tap to open, tap outside to close)
   if (isMobile) {
     return (
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
-            className="w-11 h-11 rounded-lg bg-citrus-sage border-2 border-citrus-forest shadow-patch flex items-center justify-center hover:scale-110 transition-all touch-manipulation"
+            className="touch-manipulation"
             onClick={(e) => {
               e.stopPropagation();
-              // Don't prevent default - let Popover handle the click
             }}
           >
-            <span className="text-xs font-varsity font-black text-citrus-forest">i</span>
+            {trigger}
           </button>
         </PopoverTrigger>
-        <PopoverContent 
+        <PopoverContent
           className="p-0 bg-[#E8EED9]/95 backdrop-blur-md rounded-xl border-2 border-citrus-forest shadow-lg w-[280px] !z-[9999]"
           side="top"
-          align="end"
+          align="center"
           sideOffset={8}
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
@@ -129,20 +141,20 @@ export const GoalieProjectionTooltip = ({ projection }: GoalieProjectionTooltipP
     <Tooltip open={open} onOpenChange={setOpen}>
       <TooltipTrigger asChild>
         <button
-          className="w-11 h-11 rounded-lg bg-citrus-sage border-2 border-citrus-forest shadow-patch flex items-center justify-center hover:scale-110 transition-all"
+          className="transition-all"
           onClick={(e) => {
             e.stopPropagation();
             e.preventDefault();
             setOpen(!open);
           }}
         >
-          <span className="text-xs font-varsity font-black text-citrus-forest">i</span>
+          {trigger}
         </button>
       </TooltipTrigger>
-      <TooltipContent 
+      <TooltipContent
         className="p-0 bg-[#E8EED9]/95 backdrop-blur-md rounded-xl border-2 border-citrus-forest shadow-lg w-[280px] !z-[9999]"
         side="top"
-        align="end"
+        align="center"
         sideOffset={8}
       >
         {content}

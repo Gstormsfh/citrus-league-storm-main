@@ -512,20 +512,27 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
             </div>
             {/* Centered total above bar - Premium Badge - COMPACT */}
             <div className="flex justify-center items-center gap-1 mb-0.5">
-              <span className="text-xs font-varsity font-black text-citrus-orange bg-citrus-peach/30 px-1.5 py-0.5 rounded border border-citrus-peach/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)]">
-                {hasProjection && isStarterConfirmed
-                  ? `${projectedPoints.toFixed(1)} pts`
-                  : showTBD
+              {hasProjection && isStarterConfirmed && dailyProjection ? (
+                isGoalie ? (
+                  <GoalieProjectionTooltip projection={player.goalieProjection}>
+                    <span className="text-xs font-varsity font-black text-citrus-orange bg-citrus-peach/30 px-1.5 py-0.5 rounded border border-citrus-peach/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)] cursor-pointer hover:text-citrus-forest transition-all">
+                      {projectedPoints.toFixed(1)} pts
+                    </span>
+                  </GoalieProjectionTooltip>
+                ) : (
+                  <ProjectionTooltip projection={player.daily_projection}>
+                    <span className="text-xs font-varsity font-black text-citrus-orange bg-citrus-peach/30 px-1.5 py-0.5 rounded border border-citrus-peach/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)] cursor-pointer hover:text-citrus-forest transition-all">
+                      {projectedPoints.toFixed(1)} pts
+                    </span>
+                  </ProjectionTooltip>
+                )
+              ) : (
+                <span className="text-xs font-varsity font-black text-citrus-orange bg-citrus-peach/30 px-1.5 py-0.5 rounded border border-citrus-peach/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)]">
+                  {showTBD
                     ? (isGoalie && !isStarterConfirmed ? 'Probable' : 'TBD')
                     : '0.0 pts'
-                }
-              </span>
-              {hasProjection && dailyProjection && (
-                isGoalie ? (
-                  <GoalieProjectionTooltip projection={player.goalieProjection} />
-                ) : (
-                  <ProjectionTooltip projection={player.daily_projection} />
-                )
+                  }
+                </span>
               )}
             </div>
             {/* Likely Range - "3.2 – 5.8 likely" (50% CI) - HIDDEN ON MOBILE */}
@@ -615,6 +622,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
       )}
 
       {/* Mobile-only score display - Show "No game" when no game, or daily points/weekly total */}
+      {/* Tappable: daily points open scoring breakdown, projected points open projection breakdown */}
       <div className="player-mobile-score lg:hidden">
         {!hasGameOnDate && !hasDailyStats ? (
           // No game today and no daily stats - show "No game" instead of 0.0
@@ -622,11 +630,18 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
             No game
           </span>
         ) : shouldShowDailyPoints && dailyTotalPoints > 0 ? (
-          // Has game that's final/live with points - show daily points
+          // Has game that's final/live with points - tappable daily points
           <div className="flex flex-col items-end">
-            <span className="text-citrus-sage font-black text-xs">
-              {dailyTotalPoints.toFixed(1)}
-            </span>
+            {player.daily_stats_breakdown && Object.keys(player.daily_stats_breakdown).length > 0 ? (
+              <PointsTooltip
+                breakdown={player.daily_stats_breakdown}
+                totalPoints={dailyTotalPoints}
+              />
+            ) : (
+              <span className="text-citrus-sage font-black text-xs">
+                {dailyTotalPoints.toFixed(1)}
+              </span>
+            )}
             <span className="text-[8px] text-citrus-sage/70 font-semibold">Daily</span>
           </div>
         ) : shouldShowDailyPoints ? (
@@ -638,11 +653,21 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
             <span className="text-[8px] text-citrus-charcoal/40 font-medium">Daily</span>
           </div>
         ) : hasProjection && projectedPoints > 0 ? (
-          // Has upcoming game with projection
+          // Has upcoming game with projection - tappable to see breakdown
           <div className="flex flex-col items-end">
-            <span className="text-citrus-orange font-black text-xs">
-              {projectedPoints.toFixed(1)}
-            </span>
+            {isGoalie ? (
+              <GoalieProjectionTooltip projection={player.goalieProjection}>
+                <span className="text-citrus-orange font-black text-xs cursor-pointer">
+                  {projectedPoints.toFixed(1)}
+                </span>
+              </GoalieProjectionTooltip>
+            ) : (
+              <ProjectionTooltip projection={player.daily_projection}>
+                <span className="text-citrus-orange font-black text-xs cursor-pointer">
+                  {projectedPoints.toFixed(1)}
+                </span>
+              </ProjectionTooltip>
+            )}
             <span className="text-[8px] text-citrus-orange/70 font-semibold">Proj</span>
           </div>
         ) : (

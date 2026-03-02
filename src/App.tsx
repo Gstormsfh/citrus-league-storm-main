@@ -178,7 +178,7 @@ const App = () => {
                 <Route path="/waiver-wire" element={<ProtectedRoute><ErrorBoundary><WaiverWire /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/schedule-manager" element={<ProtectedRoute><ErrorBoundary><ScheduleManager /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/trade-analyzer" element={<ProtectedRoute><ErrorBoundary><TradeAnalyzer /></ErrorBoundary></ProtectedRoute>} />
-                <Route path="/armchair-gm" element={<ProtectedRoute><ErrorBoundary><ArmchairGM /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/armchair-gm" element={<ErrorBoundary><ArmchairGM /></ErrorBoundary>} />
                 <Route path="/team/:teamId" element={<ProtectedRoute><ErrorBoundary><OtherTeam /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/features" element={<Features />} />
                 <Route path="/pricing" element={<Pricing />} />
