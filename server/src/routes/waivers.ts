@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { membershipMiddleware } from '../middleware/membership';
+import { validateBody, schemas } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { WaiverService } from '../services/WaiverService';
 
@@ -82,9 +83,9 @@ waiverRoutes.get('/league/:leagueId/settings', membershipMiddleware, async (c) =
 });
 
 // POST /api/waivers/league/:leagueId — Submit a waiver claim
-waiverRoutes.post('/league/:leagueId', membershipMiddleware, async (c) => {
+waiverRoutes.post('/league/:leagueId', membershipMiddleware, validateBody(schemas.submitWaiverClaim), async (c) => {
   const leagueId = c.req.param('leagueId');
-  const body = await c.req.json();
+  const body = (c as any).get('validatedBody');
   const supabase = createUserClient(c.get('userToken'));
   const service = new WaiverService(supabase);
 
@@ -103,9 +104,9 @@ waiverRoutes.post('/league/:leagueId', membershipMiddleware, async (c) => {
 });
 
 // POST /api/waivers/league/:leagueId/faab-bid — Submit a FAAB bid
-waiverRoutes.post('/league/:leagueId/faab-bid', membershipMiddleware, async (c) => {
+waiverRoutes.post('/league/:leagueId/faab-bid', membershipMiddleware, validateBody(schemas.submitFAABBid), async (c) => {
   const leagueId = c.req.param('leagueId');
-  const body = await c.req.json();
+  const body = (c as any).get('validatedBody');
   const supabase = createUserClient(c.get('userToken'));
   const service = new WaiverService(supabase);
 
@@ -126,10 +127,10 @@ waiverRoutes.post('/league/:leagueId/faab-bid', membershipMiddleware, async (c) 
 });
 
 // POST /api/waivers/league/:leagueId/add-free-agent — Add free agent (instant)
-waiverRoutes.post('/league/:leagueId/add-free-agent', membershipMiddleware, async (c) => {
+waiverRoutes.post('/league/:leagueId/add-free-agent', membershipMiddleware, validateBody(schemas.addFreeAgent), async (c) => {
   const leagueId = c.req.param('leagueId');
   const userId = c.get('userId');
-  const body = await c.req.json();
+  const body = (c as any).get('validatedBody');
   const supabase = createUserClient(c.get('userToken'));
   const service = new WaiverService(supabase);
 

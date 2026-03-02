@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { membershipMiddleware, commissionerMiddleware } from '../middleware/membership';
+import { validateBody, schemas } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { LeagueService } from '../services/LeagueService';
 
@@ -43,9 +44,9 @@ leagueRoutes.get('/:leagueId', membershipMiddleware, async (c) => {
 });
 
 // POST /api/leagues — Create a new league
-leagueRoutes.post('/', async (c) => {
+leagueRoutes.post('/', validateBody(schemas.createLeague), async (c) => {
   const userId = c.get('userId');
-  const body = await c.req.json();
+  const body = (c as any).get('validatedBody');
   const supabase = createUserClient(c.get('userToken'));
   const service = new LeagueService(supabase);
 
@@ -67,9 +68,9 @@ leagueRoutes.post('/', async (c) => {
 });
 
 // POST /api/leagues/join — Join a league by invite code
-leagueRoutes.post('/join', async (c) => {
+leagueRoutes.post('/join', validateBody(schemas.joinLeague), async (c) => {
   const userId = c.get('userId');
-  const body = await c.req.json();
+  const body = (c as any).get('validatedBody');
   const supabase = createUserClient(c.get('userToken'));
   const service = new LeagueService(supabase);
 

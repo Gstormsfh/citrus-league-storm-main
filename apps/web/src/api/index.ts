@@ -18,3 +18,5 @@ export { tradeApi } from './trades';
 export { waiverApi } from './waivers';
 export { notificationApi } from './notifications';
 export { stormyApi } from './stormy';
+export { scheduleApi } from './schedule';
+export { adminApi } from './admin';

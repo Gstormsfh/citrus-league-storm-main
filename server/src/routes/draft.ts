@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { membershipMiddleware, commissionerMiddleware } from '../middleware/membership';
+import { validateBody, schemas } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { DraftService } from '../services/DraftService';
 
@@ -24,17 +25,13 @@ draftRoutes.get('/league/:leagueId', membershipMiddleware, async (c) => {
 });
 
 // POST /api/draft/league/:leagueId/pick — Make a draft pick
-draftRoutes.post('/league/:leagueId/pick', membershipMiddleware, async (c) => {
+draftRoutes.post('/league/:leagueId/pick', membershipMiddleware, validateBody(schemas.makeDraftPick), async (c) => {
   const leagueId = c.req.param('leagueId');
-  const body = await c.req.json();
+  const body = (c as any).get('validatedBody');
   const supabase = createUserClient(c.get('userToken'));
   const service = new DraftService(supabase);
 
   const { playerId, teamId, pickNumber, roundNumber, draftSessionId, teamsCount } = body;
-
-  if (!playerId || !teamId) {
-    return c.json({ error: 'playerId and teamId are required' }, 400);
-  }
 
   const { pick, error, isComplete } = await service.makePick(
     leagueId,

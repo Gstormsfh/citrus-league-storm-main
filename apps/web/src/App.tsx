@@ -97,6 +97,7 @@ const Waitlist = lazyWithErrorHandling(() => import("./pages/Waitlist"));
 const PoolPickem = lazyWithErrorHandling(() => import("./pages/PoolPickem"));
 const PoolSurvivor = lazyWithErrorHandling(() => import("./pages/PoolSurvivor"));
 const PoolConfidence = lazyWithErrorHandling(() => import("./pages/PoolConfidence"));
+const Admin = lazyWithErrorHandling(() => import("./pages/Admin"));
 
 // Use the picturesque LoadingScreen as the Suspense fallback for lazy-loaded routes
 const PageLoader = () => <LoadingScreen />;
@@ -187,6 +188,7 @@ const App = () => {
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/settings" element={<ProtectedRoute><ErrorBoundary><Settings /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/admin" element={<ProtectedRoute><ErrorBoundary><Admin /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/waitlist" element={<Waitlist />} />
                 <Route path="/pool/pickem" element={<ProtectedRoute><ErrorBoundary><PoolPickem /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/pool/survivor" element={<ProtectedRoute><ErrorBoundary><PoolSurvivor /></ErrorBoundary></ProtectedRoute>} />

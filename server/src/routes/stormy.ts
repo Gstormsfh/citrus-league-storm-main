@@ -1,21 +1,18 @@
 import { Hono } from 'hono';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
+import { validateBody, schemas } from '../middleware/validate';
 
 const stormyRoutes = new Hono<Env>();
 
 stormyRoutes.use('*', authMiddleware);
 
 // POST /api/stormy/chat — Send a message to Stormy AI assistant
-stormyRoutes.post('/chat', async (c) => {
+stormyRoutes.post('/chat', validateBody(schemas.stormyChat), async (c) => {
   const userId = c.get('userId');
-  const body = await c.req.json();
+  const body = (c as any).get('validatedBody');
 
   const { message, leagueId, context } = body;
-
-  if (!message) {
-    return c.json({ error: 'Message is required' }, 400);
-  }
 
   // TODO: Migrate stormy-chat edge function logic here
   // For now, proxy to the existing edge function

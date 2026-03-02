@@ -21,6 +21,17 @@ export const playerApi = {
     return apiClient.get(`/api/players${qs ? `?${qs}` : ''}`);
   },
 
+  /** Get trending players */
+  getTrendingPlayers(days?: number) {
+    const qs = days ? `?days=${days}` : '';
+    return apiClient.get(`/api/players/trending${qs}`);
+  },
+
+  /** Get players by IDs (batch) */
+  getPlayersByIds(ids: string[]) {
+    return apiClient.get(`/api/players/by-ids?ids=${ids.join(',')}`);
+  },
+
   /** Get a single player */
   getPlayer(playerId: string) {
     return apiClient.get(`/api/players/${playerId}`);

@@ -14,13 +14,20 @@ export const notificationApi = {
     return apiClient.get(`/api/notifications${qs ? `?${qs}` : ''}`);
   },
 
+  /** Get unread notification count */
+  getUnreadCount(leagueId?: string) {
+    const qs = leagueId ? `?leagueId=${leagueId}` : '';
+    return apiClient.get(`/api/notifications/unread-count${qs}`);
+  },
+
   /** Mark a notification as read */
   markAsRead(notificationId: string) {
     return apiClient.put(`/api/notifications/${notificationId}/read`);
   },
 
   /** Mark all notifications as read */
-  markAllAsRead() {
-    return apiClient.put('/api/notifications/read-all');
+  markAllAsRead(leagueId?: string) {
+    const qs = leagueId ? `?leagueId=${leagueId}` : '';
+    return apiClient.put(`/api/notifications/read-all${qs}`);
   },
 };

@@ -10,6 +10,11 @@ export const rosterApi = {
     return apiClient.get(`/api/rosters/league/${leagueId}/team/${teamId}`);
   },
 
+  /** Get roster player IDs for a team */
+  getPlayerIds(leagueId: string, teamId: string) {
+    return apiClient.get(`/api/rosters/league/${leagueId}/team/${teamId}/player-ids`);
+  },
+
   /** Get all rosters in a league */
   getLeagueRosters(leagueId: string) {
     return apiClient.get(`/api/rosters/league/${leagueId}`);
@@ -17,11 +22,16 @@ export const rosterApi = {
 
   /** Update lineup for a team */
   updateLineup(leagueId: string, teamId: string, lineup: {
-    starters?: unknown;
-    bench?: unknown;
-    ir?: unknown;
-    slot_assignments?: unknown;
+    starters?: string[];
+    bench?: string[];
+    ir?: string[];
+    slot_assignments?: Record<string, unknown>;
   }) {
     return apiClient.put(`/api/rosters/league/${leagueId}/team/${teamId}/lineup`, lineup);
+  },
+
+  /** Get team lineup */
+  getLineup(leagueId: string, teamId: string) {
+    return apiClient.get(`/api/rosters/league/${leagueId}/team/${teamId}/lineup`);
   },
 };

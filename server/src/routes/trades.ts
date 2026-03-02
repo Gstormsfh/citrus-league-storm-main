@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { membershipMiddleware } from '../middleware/membership';
+import { validateBody, schemas } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { TradeService } from '../services/TradeService';
 
@@ -35,10 +36,10 @@ tradeRoutes.get('/league/:leagueId/review-settings', membershipMiddleware, async
 });
 
 // POST /api/trades/league/:leagueId — Create a trade offer
-tradeRoutes.post('/league/:leagueId', membershipMiddleware, async (c) => {
+tradeRoutes.post('/league/:leagueId', membershipMiddleware, validateBody(schemas.createTrade), async (c) => {
   const leagueId = c.req.param('leagueId');
   const userId = c.get('userId');
-  const body = await c.req.json();
+  const body = (c as any).get('validatedBody');
   const supabase = createUserClient(c.get('userToken'));
   const service = new TradeService(supabase);
 
@@ -135,9 +136,9 @@ tradeRoutes.put('/:tradeId/respond', async (c) => {
 });
 
 // POST /api/trades/:tradeId/vote — Submit a trade vote
-tradeRoutes.post('/:tradeId/vote', async (c) => {
+tradeRoutes.post('/:tradeId/vote', validateBody(schemas.tradeVote), async (c) => {
   const tradeId = c.req.param('tradeId');
-  const body = await c.req.json();
+  const body = (c as any).get('validatedBody');
   const supabase = createUserClient(c.get('userToken'));
   const service = new TradeService(supabase);
 
@@ -164,10 +165,10 @@ tradeRoutes.get('/:tradeId/votes', async (c) => {
 });
 
 // PUT /api/trades/:tradeId/commissioner-decision — Commissioner approve/veto
-tradeRoutes.put('/:tradeId/commissioner-decision', async (c) => {
+tradeRoutes.put('/:tradeId/commissioner-decision', validateBody(schemas.commissionerDecision), async (c) => {
   const tradeId = c.req.param('tradeId');
   const userId = c.get('userId');
-  const body = await c.req.json();
+  const body = (c as any).get('validatedBody');
   const supabase = createUserClient(c.get('userToken'));
   const service = new TradeService(supabase);
 
