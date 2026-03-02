@@ -56,7 +56,7 @@ interface StandingsTeam {
 
 const Standings = () => {
   const { user } = useAuth();
-  const { userLeagueState, activeLeagueId, isChangingLeague } = useLeague();
+  const { userLeagueState, activeLeagueId, activeLeague, isChangingLeague } = useLeague();
   const { toast } = useToast();
   const [season, setSeason] = useState(String(CURRENT_SEASON));
   const [loading, setLoading] = useState(true);
@@ -469,10 +469,15 @@ const Standings = () => {
         <Navbar />
       </div>
 
-      {/* MOBILE: Compact header */}
+      {/* MOBILE: Compact header with league context */}
       <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-center h-12 px-4">
+        <div className="flex items-center justify-between h-12 px-4">
           <h1 className="text-lg font-varsity font-bold text-citrus-forest">Standings</h1>
+          {(activeLeague?.name || leagueTeams.length > 0) && (
+            <span className="text-[11px] font-display text-citrus-charcoal/50 truncate max-w-[160px] ml-2">
+              {activeLeague?.name}{leagueTeams.length > 0 ? ` \u2022 ${leagueTeams.length} teams` : ''}
+            </span>
+          )}
         </div>
       </div>
 

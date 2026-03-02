@@ -5084,12 +5084,31 @@ const Matchup = () => {
         <Navbar />
       </div>
       
-      {/* MOBILE: Compact sticky header */}
+      {/* MOBILE: Compact sticky header with matchup context */}
       <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
-          <h1 className="text-lg font-varsity font-bold text-citrus-forest">Matchup</h1>
-          <div className="text-xs font-display text-citrus-charcoal/60">
-            {currentMatchup ? `Week ${selectedWeek}` : ''}
+          <div className="min-w-0 flex-1">
+            <h1 className="text-sm font-varsity font-bold text-citrus-forest truncate">
+              {(() => {
+                const myName = userLeagueState === 'active-user' ? (userTeam?.team_name || 'My Team') : 'Citrus Crushers';
+                const oppName = userLeagueState === 'active-user' ? (opponentTeam?.team_name || 'Opponent') : 'Thunder Titans';
+                return `${myName} vs ${oppName}`;
+              })()}
+            </h1>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+            <span className="text-xs font-varsity font-black text-citrus-sage">
+              {parseFloat(myTeamPoints || '0').toFixed(1)}
+            </span>
+            <span className="text-[10px] text-citrus-charcoal/40">-</span>
+            <span className="text-xs font-varsity font-black text-citrus-orange">
+              {parseFloat(opponentTeamPoints || '0').toFixed(1)}
+            </span>
+            {currentMatchup && (
+              <span className="text-[10px] font-display text-citrus-charcoal/50 ml-1">
+                Wk {selectedWeek}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -5265,7 +5284,7 @@ const Matchup = () => {
           {/* Main Lineup View */}
           <div className="mt-6 matchup-wrapper" style={{ boxSizing: 'border-box', padding: 0, margin: 0 }}>
             {userLeagueState === 'logged-in-no-league' ? (
-              <div className="grid gap-6 lg:gap-8 matchup-grid" style={{ gridTemplateColumns: '1fr 1fr', width: '100%', display: 'grid', boxSizing: 'border-box', margin: 0, padding: 0 }}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 matchup-grid" style={{ width: '100%', boxSizing: 'border-box', margin: 0, padding: 0 }}>
                 <LeagueCreationCTA 
                   title="Your Team Here"
                   description="Create your league to start building your roster and competing in matchups."
@@ -5375,7 +5394,25 @@ const Matchup = () => {
           )}
             </div>
 
-            {/* Dynamic Matchup Sidebar - Hidden on mobile, shown on desktop */}
+            {/* Dynamic Matchup Sidebar - Compact on mobile, full sidebar on desktop */}
+            {/* Mobile: Rendered BELOW lineup (users see their players first, then Top Performers) */}
+            <div className="lg:hidden px-2 order-3">
+              <MatchupSidebar
+                myStarters={weeklyMyStarters}
+                opponentStarters={weeklyOpponentStarters}
+                myTeamScore={parseFloat(myTeamPoints) || 0}
+                opponentTeamScore={parseFloat(opponentTeamPoints) || 0}
+                myTeamName={userLeagueState === 'active-user' ? (userTeam?.team_name || 'My Team') : 'Citrus Crushers'}
+                opponentTeamName={userLeagueState === 'active-user' ? (opponentTeam?.team_name || 'Opponent') : 'Thunder Titans'}
+                myTeamProjection={myTotalProjection}
+                opponentTeamProjection={opponentTotalProjection}
+                onPlayerClick={(player) => {
+                  setSelectedPlayer(player as any);
+                  setIsPlayerDialogOpen(true);
+                }}
+              />
+            </div>
+            {/* Desktop: Sticky sidebar */}
             <aside className="hidden lg:block w-full lg:w-auto order-2 lg:order-1">
               <div className="lg:sticky lg:top-24">
                 <MatchupSidebar

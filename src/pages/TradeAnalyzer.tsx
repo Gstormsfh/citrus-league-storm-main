@@ -625,13 +625,13 @@ const TradeAnalyzer = () => {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                           <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground" onClick={(e) => handlePlayerClick(e, player)}>
+                           <Button size="icon" variant="ghost" className="h-9 w-9 text-muted-foreground touch-manipulation" onClick={(e) => handlePlayerClick(e, player)}>
                              <Info className="h-4 w-4" />
                            </Button>
                            {isSelected ? (
-                             <CheckCircle2 className="h-4 w-4 text-red-500" />
+                             <CheckCircle2 className="h-5 w-5 text-red-500" />
                            ) : (
-                             <UserPlus className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                             <UserPlus className="h-5 w-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                            )}
                         </div>
                       </div>
@@ -689,8 +689,8 @@ const TradeAnalyzer = () => {
                              <Badge variant="outline" className="h-5 px-1 text-[10px]">{p.position}</Badge>
                              <span className="text-sm font-medium cursor-pointer hover:underline" onClick={(e) => handlePlayerClick(e, p)}>{p.full_name}</span>
                           </div>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => toggleTheirPlayer(p.id)}>
-                            <UserMinus className="h-3 w-3" />
+                          <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-destructive touch-manipulation" onClick={() => toggleTheirPlayer(p.id)}>
+                            <UserMinus className="h-4 w-4" />
                           </Button>
                         </div>
                       ))
@@ -718,8 +718,8 @@ const TradeAnalyzer = () => {
                              <Badge variant="outline" className="h-5 px-1 text-[10px]">{p.position}</Badge>
                              <span className="text-sm font-medium cursor-pointer hover:underline" onClick={(e) => handlePlayerClick(e, p)}>{p.full_name}</span>
                           </div>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => toggleMyPlayer(p.id)}>
-                            <UserMinus className="h-3 w-3" />
+                          <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-destructive touch-manipulation" onClick={() => toggleMyPlayer(p.id)}>
+                            <UserMinus className="h-4 w-4" />
                           </Button>
                         </div>
                       ))
@@ -840,7 +840,7 @@ const TradeAnalyzer = () => {
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
-                               <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground" onClick={(e) => handlePlayerClick(e, player)}>
+                               <Button size="icon" variant="ghost" className="h-9 w-9 text-muted-foreground touch-manipulation" onClick={(e) => handlePlayerClick(e, player)}>
                                  <Info className="h-4 w-4" />
                                </Button>
                                {isSelected ? (

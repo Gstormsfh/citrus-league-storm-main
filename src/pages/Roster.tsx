@@ -233,7 +233,7 @@ interface RosterState {
 
 const Roster = () => {
   const { user, profile } = useAuth();
-  const { userLeagueState, loading: leagueLoading, activeLeagueId, demoLeagueId, isChangingLeague } = useLeague();
+  const { userLeagueState, loading: leagueLoading, activeLeagueId, activeLeague, demoLeagueId, isChangingLeague } = useLeague();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
@@ -2768,13 +2768,20 @@ const Roster = () => {
         <Navbar />
       </div>
       
-      {/* MOBILE: Compact sticky header */}
+      {/* MOBILE: Compact sticky header with roster context */}
       <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
-          <h1 className="text-lg font-varsity font-bold text-citrus-forest">
-            {userLeagueState === 'guest' ? 'Citrus Crushers' : (userTeam?.team_name || 'My Roster')}
-          </h1>
-          <div className="text-xs font-display text-citrus-charcoal/60">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-sm font-varsity font-bold text-citrus-forest truncate">
+              {userLeagueState === 'guest' ? 'Citrus Crushers' : (userTeam?.team_name || 'My Roster')}
+            </h1>
+            {activeLeague?.name && (
+              <div className="text-[10px] font-display text-citrus-charcoal/40 truncate -mt-0.5">
+                {activeLeague.name}
+              </div>
+            )}
+          </div>
+          <div className="text-xs font-varsity font-bold text-citrus-forest/70 flex-shrink-0 ml-2">
             {teamStats.record}
           </div>
         </div>

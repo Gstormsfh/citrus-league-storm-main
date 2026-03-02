@@ -67,19 +67,18 @@ const Navbar = () => {
   const displayName = profile?.username || user?.email?.split('@')[0] || 'User';
 
   // Flat navigation tabs — one click to anywhere
-  // GM Office, Draft, and Armchair GM require authentication (ProtectedRoutes)
-  // so they are only shown to logged-in users to avoid confusing guest redirects
+  // All items shown to all users for full feature discovery
+  // GM Office and Draft redirect to /auth via ProtectedRoute if not logged in
+  // Armchair GM is fully public (read-only NHL data)
   const navTabs = [
     { label: 'Matchup', path: activeLeagueId ? `/matchup/${activeLeagueId}` : '/matchup', icon: Swords },
     { label: 'Roster', path: '/roster', icon: Users },
     { label: 'Standings', path: '/standings', icon: BarChart3 },
     ...(activeLeagueId ? [{ label: 'Playoffs', path: `/league/${activeLeagueId}/playoffs`, icon: Trophy }] : []),
     { label: 'Players', path: '/free-agents', icon: Search },
-    ...(user ? [
-      { label: 'GM Office', path: '/gm-office', icon: Settings },
-      { label: 'Draft', path: '/draft-room', icon: Sparkles },
-      { label: 'Armchair GM', path: '/armchair-gm', icon: DollarSign },
-    ] : []),
+    { label: 'GM Office', path: '/gm-office', icon: Settings },
+    { label: 'Draft', path: '/draft-room', icon: Sparkles },
+    { label: 'Armchair GM', path: '/armchair-gm', icon: DollarSign },
   ];
 
   return (
@@ -252,15 +251,19 @@ const Navbar = () => {
         </div>
       </div>
 
-      {/* ===== MOBILE: Top bar with logo + hamburger ===== */}
+      {/* ===== MOBILE: Top bar with logo + league context + hamburger ===== */}
       <div className="lg:hidden container mx-auto px-4">
         <div className="flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <CitrusLogo className="w-8 h-8 drop-shadow-sm" />
-            <span className="font-varsity font-black text-base uppercase text-citrus-forest tracking-tight hidden sm:block">
-              Citrus
-            </span>
-          </Link>
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <Link to="/" className="flex items-center gap-1.5 flex-shrink-0">
+              <CitrusLogo className="w-8 h-8 drop-shadow-sm" />
+            </Link>
+            {activeLeague?.name && (
+              <span className="text-[11px] font-display font-semibold text-citrus-forest/60 truncate max-w-[140px]">
+                {activeLeague.name}
+              </span>
+            )}
+          </div>
 
           <div className="flex items-center gap-1">
             {user && (
@@ -293,13 +296,54 @@ const Navbar = () => {
       {mobileMenuOpen && (
         <div className="lg:hidden fixed inset-0 top-[56px] z-50 bg-white/95 backdrop-blur-xl animate-in fade-in slide-in-from-top duration-200 shadow-2xl border-t border-citrus-sage/20">
           <div className="flex flex-col h-[calc(100dvh-56px-env(safe-area-inset-bottom)-4.5rem)] px-4 py-3 bg-gradient-to-b from-white to-[#F5F8ED]">
-            {/* League context */}
+            {/* League context + switcher */}
             {userLeagues.length > 0 && (
-              <div className="flex items-center gap-3 px-3 py-2.5 mb-3 bg-citrus-forest/5 rounded-xl">
-                <Trophy className="h-4 w-4 text-citrus-orange" />
-                <span className="text-sm font-display font-semibold text-citrus-forest truncate">
-                  {activeLeague?.name || 'Select League'}
-                </span>
+              <div className="mb-3">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="flex items-center gap-3 px-3 py-2.5 bg-citrus-forest/5 rounded-xl w-full hover:bg-citrus-forest/10 transition-colors">
+                      <Trophy className="h-4 w-4 text-citrus-orange flex-shrink-0" />
+                      <span className="text-sm font-display font-semibold text-citrus-forest truncate flex-1 text-left">
+                        {activeLeague?.name || 'Select League'}
+                      </span>
+                      <ChevronDown className="h-3.5 w-3.5 text-citrus-charcoal/50 flex-shrink-0" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-[calc(100vw-2rem)] max-w-[320px]">
+                    <DropdownMenuLabel className="text-xs font-display uppercase text-citrus-forest">
+                      My Leagues ({userLeagues.length})
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {userLeagues.map((l) => (
+                      <DropdownMenuItem
+                        key={l.id}
+                        onClick={() => {
+                          setActiveLeagueId(l.id);
+                          if (location.pathname.startsWith('/matchup')) {
+                            navigate(`/matchup/${l.id}`);
+                          }
+                          closeMobileMenu();
+                        }}
+                        className={cn(
+                          "cursor-pointer",
+                          activeLeagueId === l.id && "bg-citrus-sage/20 font-semibold"
+                        )}
+                      >
+                        <Trophy className="h-4 w-4 mr-2" />
+                        <div className="flex-1">
+                          <div className="font-medium truncate">{l.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {l.draft_status === 'completed' ? 'Season Active' : 'Draft Pending'}
+                          </div>
+                        </div>
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => { navigate('/create-league'); closeMobileMenu(); }} className="text-citrus-sage font-medium">
+                      <UserPlus className="h-4 w-4 mr-2" /> Create / Join League
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             )}
 

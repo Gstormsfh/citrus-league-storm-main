@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Swords, Users, BarChart3, User } from 'lucide-react';
+import { Swords, Users, BarChart3, User, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect } from 'react';
 import { useLeague } from '@/contexts/LeagueContext';
@@ -27,9 +27,9 @@ const MobileBottomNav = () => {
 
   // Build paths: only Matchup needs the league ID in its route
   const navItems = [
-    { icon: Home, label: 'Home', path: '/' },
     { icon: Swords, label: 'Matchup', path: activeLeagueId ? `/matchup/${activeLeagueId}` : '/matchup' },
     { icon: Users, label: 'Roster', path: '/roster' },
+    { icon: Search, label: 'Players', path: '/free-agents' },
     { icon: BarChart3, label: 'Standings', path: '/standings' },
     { icon: User, label: user ? 'Profile' : 'Sign In', path: user ? '/profile' : '/auth' },
   ];

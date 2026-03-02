@@ -486,8 +486,8 @@ export const PlayerPool = ({
         </Button>
       </div>
 
-      {/* Mobile: Card list view */}
-      <div className="md:hidden border border-fantasy-border rounded-lg overflow-hidden bg-[#E8EED9]/50 backdrop-blur-sm max-h-[60vh] overflow-y-auto scrollbar-styled">
+      {/* Mobile: Card list view — no max-height so it scrolls naturally with the page */}
+      <div className="md:hidden border border-fantasy-border rounded-lg overflow-hidden bg-[#E8EED9]/50 backdrop-blur-sm">
         {visiblePlayers.map(player => (
           <PlayerCard key={player.id} player={player} />
         ))}
