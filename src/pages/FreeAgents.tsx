@@ -587,7 +587,9 @@ const FreeAgents = () => {
         // Include all players (no minimum game requirement)
         // Get day abbreviations for each game
         const gameDays = games.map(game => {
-          const gameDate = new Date(game.game_date);
+          // CRITICAL: Append 'T00:00:00' to force local-time parsing.
+          // new Date("YYYY-MM-DD") parses as UTC midnight, which in MST gives the wrong day.
+          const gameDate = new Date(game.game_date.split('T')[0] + 'T00:00:00');
           const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
           return dayNames[gameDate.getDay()];
         });

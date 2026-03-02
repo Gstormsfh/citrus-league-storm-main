@@ -986,11 +986,10 @@ export const MatchupService = {
       let userDailyPoints: number[] = [];
       let opponentDailyPoints: number[] = [];
 
-      // Get week dates
-      const weekStart = new Date(matchup.week_start_date);
-      const weekEnd = new Date(matchup.week_end_date);
-      const weekStartStr = weekStart.toISOString().split('T')[0];
-      const weekEndStr = weekEnd.toISOString().split('T')[0];
+      // Get week dates — use string dates directly to avoid timezone issues
+      // new Date("YYYY-MM-DD") parses as UTC midnight, which shifts in local time
+      const weekStartStr = matchup.week_start_date;
+      const weekEndStr = matchup.week_end_date;
 
       // Calculate daily scores for user team
       try {
@@ -1446,10 +1445,12 @@ export const MatchupService = {
       });
       
       // Calculate games remaining from week games only
+      // Use string comparison to avoid timezone issues with new Date() UTC parsing
+      const todayCompare = getTodayString();
       const gamesRemaining = weekGames.filter(g => {
-        const gameDate = new Date(g.game_date);
-        gameDate.setHours(0, 0, 0, 0);
-        return gameDate >= today && (g.status === 'scheduled' || g.status === 'live');
+        if (!g || !g.game_date) return false;
+        const gameDateStr = g.game_date.split('T')[0];
+        return gameDateStr >= todayCompare && (g.status === 'scheduled' || g.status === 'live');
       }).length;
       
       // Also calculate total games in week for validation
@@ -1812,8 +1813,11 @@ export const MatchupService = {
       const scorer = new ScoringCalculator(scoringSettings);
 
       // Get week date range
-      const weekStart = new Date(matchup.week_start_date);
-      const weekEnd = new Date(matchup.week_end_date);
+      // CRITICAL: Append 'T00:00:00' to force local-time parsing.
+      // Without it, new Date("2026-03-01") is parsed as UTC midnight,
+      // which in MST (UTC-7) becomes Feb 28 5pm — shifting the query window back 1 day.
+      const weekStart = new Date(matchup.week_start_date + 'T00:00:00');
+      const weekEnd = new Date(matchup.week_end_date + 'T00:00:00');
 
       // =============================================================================
       // YAHOO/SLEEPER FROZEN ROSTER LOGIC: Use daily lineup for past dates
@@ -2506,9 +2510,9 @@ export const MatchupService = {
             transformed.games_remaining_active = team1Starters.has(String(p.id)) ? gamesRemaining : 0;
           }
           
-          // Add games array for GameLogosBar
-          transformed.games = playerGames;
-          
+          // games array for GameLogosBar is already set by transformToMatchupPlayerWithGames
+          // (filtered to weekGames only — do NOT overwrite with unfiltered playerGames)
+
           return transformed;
         })
       );
@@ -2716,9 +2720,9 @@ export const MatchupService = {
             transformed.games_remaining_active = team2Starters.has(String(p.id)) ? gamesRemaining : 0;
           }
           
-          // Add games array for GameLogosBar
-          transformed.games = playerGames;
-          
+          // games array for GameLogosBar is already set by transformToMatchupPlayerWithGames
+          // (filtered to weekGames only — do NOT overwrite with unfiltered playerGames)
+
           return transformed;
         })
       );
