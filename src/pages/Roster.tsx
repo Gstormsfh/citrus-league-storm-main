@@ -865,8 +865,13 @@ const Roster = () => {
               const missing = needed - current;
               
               if (missing > 0) {
-                // Find best available players of this position from bench
-                const positionPlayers = availableBench.filter(p => getFantasyPosition(p.position) === pos);
+                // Find best available players eligible for this position (includes multi-pos)
+                const positionPlayers = availableBench.filter(p => {
+                  const eligible = (p.eligible_positions && p.eligible_positions.length > 0)
+                    ? p.eligible_positions.map(ep => getFantasyPosition(ep))
+                    : [getFantasyPosition(p.position)];
+                  return eligible.includes(pos);
+                });
                 const bestOfPosition = positionPlayers
                   .sort((a, b) => ((b.stats?.points || 0) - (a.stats?.points || 0)))
                   .slice(0, missing);
@@ -986,14 +991,31 @@ const Roster = () => {
               return;
             }
             
-            const pos = getFantasyPosition(p.position);
+            // Use eligible_positions for multi-position slot assignment
+            const eligiblePos = (p.eligible_positions && p.eligible_positions.length > 0)
+              ? p.eligible_positions.map(ep => getFantasyPosition(ep))
+              : [getFantasyPosition(p.position)];
+            const primaryPos = eligiblePos[0];
             let assigned = false;
-            
-            if (pos !== 'UTIL' && slotsFilled[pos] < slotsNeeded[pos]) {
-              slotsFilled[pos]++;
+
+            // Try primary position first
+            if (primaryPos !== 'UTIL' && slotsFilled[primaryPos] < slotsNeeded[primaryPos]) {
+              slotsFilled[primaryPos]++;
               assigned = true;
-              assignments[p.id] = `slot-${pos}-${slotsFilled[pos]}`;
-            } else if (pos !== 'G' && slotsFilled['UTIL'] < slotsNeeded['UTIL']) {
+              assignments[p.id] = `slot-${primaryPos}-${slotsFilled[primaryPos]}`;
+            } else {
+              // Try secondary eligible positions
+              for (const pos of eligiblePos.slice(1)) {
+                if (pos !== 'UTIL' && pos !== 'G' && slotsFilled[pos] < slotsNeeded[pos]) {
+                  slotsFilled[pos]++;
+                  assigned = true;
+                  assignments[p.id] = `slot-${pos}-${slotsFilled[pos]}`;
+                  break;
+                }
+              }
+            }
+            // Fallback to UTIL if not assigned and not a goalie
+            if (!assigned && primaryPos !== 'G' && slotsFilled['UTIL'] < slotsNeeded['UTIL']) {
               slotsFilled['UTIL']++;
               assigned = true;
               assignments[p.id] = 'slot-UTIL';
