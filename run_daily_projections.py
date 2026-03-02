@@ -72,6 +72,28 @@ if not SUPABASE_URL or not SUPABASE_KEY:
     raise RuntimeError("Missing VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment.")
 
 
+# Single source of truth for fallback scoring — matches DEFAULT_SCORING in src/utils/scoringUtils.ts
+# Used when a player has no league context (free agents) or when league settings can't be loaded.
+DEFAULT_FALLBACK_SCORING = {
+    "skater": {
+        "goals": 3,
+        "assists": 2,
+        "power_play_points": 1,
+        "short_handed_points": 2,
+        "shots_on_goal": 0.4,
+        "blocks": 0.5,
+        "hits": 0.2,
+        "penalty_minutes": 0.5,
+    },
+    "goalie": {
+        "wins": 4,
+        "shutouts": 3,
+        "saves": 0.2,
+        "goals_against": -1,
+    }
+}
+
+
 def get_fresh_supabase_client() -> SupabaseRest:
     """Create a fresh Supabase client for process-safe multiprocessing."""
     return SupabaseRest(SUPABASE_URL, SUPABASE_KEY)
@@ -116,7 +138,7 @@ def get_rostered_players(db: SupabaseRest, target_date: date, season: int) -> Li
             ("team_abbrev", "in", list(playing_teams)),
             ("season", "eq", season)
         ],
-        limit=10000  # Large limit for all players
+        limit=100000  # No artificial cap — supports full league across multiple seasons
     )
     logger.info(f"   Found {len(all_players)} players")
     
@@ -129,15 +151,15 @@ def get_rostered_players(db: SupabaseRest, target_date: date, season: int) -> Li
     
     # Query player_season_stats in batches to check games_played > 0
     logger.info(f"   Checking active players ({len(player_ids)} total)...")
-    for i in range(0, len(player_ids), 100):
-        batch = player_ids[i:i+100]
-        if i % 200 == 0:
-            logger.info(f"   Checking batch {i//100 + 1}...")
+    for i in range(0, len(player_ids), 500):
+        batch = player_ids[i:i+500]
+        if i % 1000 == 0:
+            logger.info(f"   Checking batch {i//500 + 1}...")
         stats_batch = db.select(
             "player_season_stats",
             select="player_id,games_played",
             filters=[("player_id", "in", batch), ("season", "eq", season)],
-            limit=100
+            limit=100000  # Must exceed batch size — no artificial cap
         )
         
         # Create map of player_id -> games_played
@@ -163,7 +185,7 @@ def get_rostered_players(db: SupabaseRest, target_date: date, season: int) -> Li
         "draft_picks",
         select="player_id,league_id",
         filters=[("player_id", "in", active_player_ids_list)] if active_player_ids_list else [],
-        limit=10000
+        limit=100000  # No artificial cap — supports multi-season, multi-league scenarios
     )
     logger.info(f"   Found {len(all_picks)} draft picks")
     
@@ -226,38 +248,11 @@ def get_league_scoring_settings(db: SupabaseRest, league_id: str) -> Dict[str, A
             if settings and isinstance(settings, dict):
                 return settings
         
-        # Return defaults
-        return {
-            "skater": {
-                "goals": 3,
-                "assists": 2,
-                "shots_on_goal": 0.4,
-                "blocks": 0.5,
-            },
-            "goalie": {
-                "wins": 4,
-                "shutouts": 3,
-                "saves": 0.2,
-                "goals_against": -1,
-            }
-        }
+        # Return defaults — must match DEFAULT_SCORING in src/utils/scoringUtils.ts
+        return DEFAULT_FALLBACK_SCORING
     except Exception as e:
         logger.warning(f"⚠️  Warning: Could not fetch scoring settings for league {league_id}: {e}")
-        # Return defaults
-        return {
-            "skater": {
-                "goals": 3,
-                "assists": 2,
-                "shots_on_goal": 0.4,
-                "blocks": 0.5,
-            },
-            "goalie": {
-                "wins": 4,
-                "shutouts": 3,
-                "saves": 0.2,
-                "goals_against": -1,
-            }
-        }
+        return DEFAULT_FALLBACK_SCORING
 
 
 def calculate_player_projection_worker(args: Tuple[int, int, date, int, Dict[str, Any]]) -> Dict[str, Any]:
@@ -897,10 +892,7 @@ def main():
     if league_scoring:
         fallback_scoring = next(iter(league_scoring.values()))
     if not fallback_scoring:
-        fallback_scoring = {
-            "skater": {"goals": 3, "assists": 2, "shots_on_goal": 0.4, "blocks": 0.5},
-            "goalie": {"wins": 4, "shutouts": 3, "saves": 0.2, "goals_against": -1}
-        }
+        fallback_scoring = DEFAULT_FALLBACK_SCORING
 
     for player_id, game_id, league_id in rostered_players:
         # Skip if projection already exists (unless --force)
