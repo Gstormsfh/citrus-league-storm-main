@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Citrus Fantasy Sports - System Architecture</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
   :root {
     --citrus-orange: #FF6B00;
@@ -21,6 +21,7 @@
     --citrus-purple: #BC8CFF;
     --citrus-red: #FF7B72;
     --citrus-teal: #3FB9B0;
+    --citrus-pink: #F778BA;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -33,7 +34,6 @@
     min-height: 100vh;
   }
 
-  /* Animated background */
   body::before {
     content: '';
     position: fixed;
@@ -130,7 +130,6 @@
     position: relative;
   }
 
-  /* Connecting lines */
   .flow-connector {
     display: flex;
     justify-content: center;
@@ -199,6 +198,7 @@
     justify-content: center;
     font-size: 22px;
     flex-shrink: 0;
+    font-weight: 800;
   }
 
   .layer-header-text h3 {
@@ -313,6 +313,11 @@
   .theme-red .layer-tag { background: rgba(255,123,114,0.12); color: var(--citrus-red); }
   .theme-red .item-badge { background: rgba(255,123,114,0.12); color: var(--citrus-red); }
 
+  .theme-pink .layer-icon { background: rgba(247,120,186,0.15); color: var(--citrus-pink); }
+  .theme-pink .layer-header { background: rgba(247,120,186,0.05); }
+  .theme-pink .layer-tag { background: rgba(247,120,186,0.12); color: var(--citrus-pink); }
+  .theme-pink .item-badge { background: rgba(247,120,186,0.12); color: var(--citrus-pink); }
+
   /* DATA FLOW INLINE */
   .data-flow-row {
     display: flex;
@@ -391,6 +396,26 @@
     color: var(--citrus-text);
   }
 
+  /* CODE BLOCK */
+  .code-block {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-top: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--citrus-muted);
+    line-height: 1.6;
+    overflow-x: auto;
+  }
+
+  .code-block .kw { color: var(--citrus-purple); }
+  .code-block .fn { color: var(--citrus-blue); }
+  .code-block .num { color: var(--citrus-orange); }
+  .code-block .cmt { color: #555; font-style: italic; }
+  .code-block .str { color: var(--citrus-green); }
+
   /* FOOTER */
   .footer {
     text-align: center;
@@ -410,7 +435,6 @@
     text-decoration: none;
   }
 
-  /* Responsive for smaller viewports (in-presentation zoom) */
   @media (max-width: 768px) {
     .header h1 { font-size: 36px; }
     .header h2 { font-size: 16px; }
@@ -418,7 +442,6 @@
     .container { padding: 20px 16px; }
   }
 
-  /* Print / screenshot mode */
   @media print {
     body::before { display: none; }
     .layer:hover { transform: none; box-shadow: none; }
@@ -430,22 +453,23 @@
 
   <!-- HEADER -->
   <div class="header">
-    <div class="header-badge">Web Summit 2026 &mdash; Tech in Sports</div>
+    <div class="header-badge">Engineering Architecture &mdash; March 2026</div>
     <h1>Citrus Fantasy Sports</h1>
     <h2>Real-Time Fantasy Hockey Platform &mdash; System Architecture</h2>
     <div class="stats-bar">
       <div class="stat-item"><div class="number">95K+</div><div class="label">Lines of Code</div></div>
       <div class="stat-item"><div class="number">60+</div><div class="label">Database Tables</div></div>
-      <div class="stat-item"><div class="number">7</div><div class="label">ML Models</div></div>
+      <div class="stat-item"><div class="number">10K</div><div class="label">MC Sims / Matchup</div></div>
+      <div class="stat-item"><div class="number">8</div><div class="label">ML Models</div></div>
       <div class="stat-item"><div class="number">200+</div><div class="label">Migrations</div></div>
-      <div class="stat-item"><div class="number">30s</div><div class="label">Live Update Latency</div></div>
-      <div class="stat-item"><div class="number">100</div><div class="label">Rotating Proxy IPs</div></div>
+      <div class="stat-item"><div class="number">30s</div><div class="label">Live Latency</div></div>
+      <div class="stat-item"><div class="number">100</div><div class="label">Proxy IPs</div></div>
     </div>
   </div>
 
   <div class="architecture">
 
-    <!-- LAYER 1: DATA SOURCES -->
+    <!-- ================= LAYER 1: DATA SOURCES ================= -->
     <div class="layer theme-orange">
       <div class="layer-header">
         <div class="layer-icon">1</div>
@@ -474,7 +498,7 @@
           </div>
           <div class="item-card">
             <div class="item-title">Play-by-Play API</div>
-            <div class="item-desc">Raw event-level data: shot coordinates, pass sequences, zone entries, shifts.</div>
+            <div class="item-desc">Raw event-level data: shot coordinates, pass sequences, zone entries, shift overlaps.</div>
             <div class="item-badge">Every 30s</div>
           </div>
         </div>
@@ -492,7 +516,7 @@
 
     <div class="flow-connector"><div class="arrow">&darr;</div></div>
 
-    <!-- LAYER 2: DATABASE -->
+    <!-- ================= LAYER 2: DATABASE ================= -->
     <div class="layer theme-yellow">
       <div class="layer-header">
         <div class="layer-icon">2</div>
@@ -506,7 +530,7 @@
         <div class="items-grid grid-5">
           <div class="item-card">
             <div class="item-title">player_game_stats</div>
-            <div class="item-desc">Per-game per-player stats. 8 categories. Updated every 30s during live games.</div>
+            <div class="item-desc">Per-game per-player stats. 8 skater + 4 goalie categories. Updated every 30s during live games.</div>
             <div class="item-badge">Time-Series</div>
           </div>
           <div class="item-card">
@@ -515,19 +539,19 @@
             <div class="item-badge">Daily</div>
           </div>
           <div class="item-card">
-            <div class="item-title">raw_nhl_data</div>
-            <div class="item-desc">Raw play-by-play JSON. Foundation for xG/xA calculations &amp; advanced analytics.</div>
-            <div class="item-badge">Per Game</div>
-          </div>
-          <div class="item-card">
             <div class="item-title">raw_shots</div>
-            <div class="item-desc">Every shot: coordinates, type, angle, distance, strength state, rebound flag.</div>
+            <div class="item-desc">Every shot: coordinates, type, angle, distance, strength state, rebound flag, pass context.</div>
             <div class="item-badge">Per Shot</div>
           </div>
           <div class="item-card">
-            <div class="item-title">nhl_games</div>
-            <div class="item-desc">Schedule, game states, scores, period info. Drives the live-game polling logic.</div>
-            <div class="item-badge">Per Game</div>
+            <div class="item-title">player_shifts_official</div>
+            <div class="item-desc">Shift-level ice time. Mined for linemate overlap correlations in MC simulation engine.</div>
+            <div class="item-badge">Per Shift</div>
+          </div>
+          <div class="item-card">
+            <div class="item-title">matchup_simulations</div>
+            <div class="item-desc">Monte Carlo results: win prob, margins, percentiles, Brier scores. 10K sims per matchup.</div>
+            <div class="item-badge">MC Output</div>
           </div>
         </div>
         <div class="data-flow-row" style="margin-top:14px">
@@ -542,7 +566,7 @@
 
     <div class="flow-connector"><div class="arrow">&darr;</div></div>
 
-    <!-- LAYER 3: ML / ANALYTICS -->
+    <!-- ================= LAYER 3: ML / ANALYTICS ================= -->
     <div class="layer theme-purple">
       <div class="layer-header">
         <div class="layer-icon">3</div>
@@ -550,14 +574,14 @@
           <h3>Machine Learning &amp; Analytics Engine</h3>
           <div class="subtitle">XGBoost Models &bull; Expected Goals &bull; GAR &bull; GSAx &bull; Bayesian Regression</div>
         </div>
-        <div class="layer-tag">The Secret Sauce</div>
+        <div class="layer-tag">The Analytics Core</div>
       </div>
       <div class="layer-body">
         <div class="items-grid grid-4">
           <div class="item-card">
             <div class="item-title">xG v3 Model (XGBoost)</div>
             <div class="item-desc">31 features. Trained on 863K real NHL shots (7 seasons). AUC-ROC 0.817, Brier 0.054. Distance, angle, strength state, rebounds, pass quality &amp; more.</div>
-            <div class="item-badge">7 Models</div>
+            <div class="item-badge">863K Shots</div>
           </div>
           <div class="item-card">
             <div class="item-title">xA (Expected Assists)</div>
@@ -567,16 +591,16 @@
           <div class="item-card">
             <div class="item-title">GAR (Goals Above Replacement)</div>
             <div class="item-desc">Composite value metric. 5 components: EVO, EVD, PPO, PPD, Penalties. Bayesian stabilized.</div>
-            <div class="item-badge">Per Player</div>
+            <div class="item-badge">5-Component</div>
           </div>
           <div class="item-card">
             <div class="item-title">GSAx (Goals Saved Above Expected)</div>
-            <div class="item-desc">Goalie quality metric. Shot-by-shot save probability vs actual. Bayesian regression (C=500).</div>
+            <div class="item-desc">Goalie quality metric. Shot-by-shot save probability vs actual. Bayesian regression (C=500). Feeds MC goalie distributions.</div>
             <div class="item-badge">Per Goalie</div>
           </div>
         </div>
         <div class="data-flow-row" style="margin-top:14px;">
-          <span class="flow-chip" style="color:var(--citrus-purple)">raw_shots</span>
+          <span class="flow-chip" style="color:var(--citrus-purple)">raw_shots (863K+)</span>
           <span class="flow-arrow">&rarr;</span>
           <span class="flow-chip">Feature Extraction (31 features)</span>
           <span class="flow-arrow">&rarr;</span>
@@ -591,7 +615,7 @@
 
     <div class="flow-connector"><div class="arrow">&darr;</div></div>
 
-    <!-- LAYER 4: PROJECTIONS -->
+    <!-- ================= LAYER 4: PROJECTIONS ================= -->
     <div class="layer theme-teal">
       <div class="layer-header">
         <div class="layer-icon">4</div>
@@ -605,7 +629,7 @@
         <div class="items-grid grid-3">
           <div class="item-card">
             <div class="item-title">Bayesian Shrinkage</div>
-            <div class="item-desc">Weights player history vs league average. GP&#60;10 = 20% trust, GP&#8805;30 = 90% trust. Prevents small-sample volatility.</div>
+            <div class="item-desc">Weights player history vs league average. GP&lt;10 = 20% trust, GP&ge;30 = 90% trust. Prevents small-sample volatility.</div>
             <div class="item-badge">Stabilization</div>
           </div>
           <div class="item-card">
@@ -615,7 +639,7 @@
           </div>
           <div class="item-card">
             <div class="item-title">Finishing Talent</div>
-            <div class="item-desc">Actual goals / xG ratio. Stabilized for shot volume (&#60;50 shots blended). Capped [0.7, 1.5].</div>
+            <div class="item-desc">Actual goals / xG ratio. Stabilized for shot volume (&lt;50 shots blended). Capped [0.7, 1.5].</div>
             <div class="item-badge">Skill Multiplier</div>
           </div>
           <div class="item-card">
@@ -648,10 +672,120 @@
 
     <div class="flow-connector"><div class="arrow">&darr;</div></div>
 
-    <!-- LAYER 5: SCORING ENGINE -->
-    <div class="layer theme-green">
+    <!-- ================= LAYER 5: MONTE CARLO SIMULATION ================= -->
+    <div class="layer theme-pink">
       <div class="layer-header">
         <div class="layer-icon">5</div>
+        <div class="layer-header-text">
+          <h3>Monte Carlo Simulation Engine</h3>
+          <div class="subtitle">10,000 Sims &bull; Student-t Copula &bull; Data-Driven Correlations &bull; Antithetic Variates &bull; Brier Calibration</div>
+        </div>
+        <div class="layer-tag">NEW &mdash; Quant-Grade</div>
+      </div>
+      <div class="layer-body">
+
+        <!-- Sub-section: Uncertainty Propagation -->
+        <div style="font-size:12px; font-weight:700; color:var(--citrus-pink); text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;">Stage A &mdash; Projection Uncertainty Propagation</div>
+        <div class="items-grid grid-4">
+          <div class="item-card">
+            <div class="item-title">Per-Player Distributions</div>
+            <div class="item-desc">5,000 MC samples per player-game. Converts point estimates to full probability distributions with 90% and 50% confidence intervals.</div>
+            <div class="item-badge">5K Samples</div>
+          </div>
+          <div class="item-card">
+            <div class="item-title">Bayesian Finishing Posterior</div>
+            <div class="item-desc">Beta-Binomial conjugate prior (&alpha;=10, &beta;=90). Updates with actual goals &amp; shots. Stabilizes at 50+ shots. Multiplier capped [0.7, 1.5].</div>
+            <div class="item-badge">Conjugate Prior</div>
+          </div>
+          <div class="item-card">
+            <div class="item-title">8&times;8 Stat Correlation Matrix</div>
+            <div class="item-desc">Empirical inter-stat correlations from 2023&ndash;2025 NHL data. Goals&harr;SOG: 0.55, Goals&harr;PPP: 0.42, Hits&harr;PIM: 0.28. Cholesky-decomposed Gaussian copula.</div>
+            <div class="item-badge">Cholesky</div>
+          </div>
+          <div class="item-card">
+            <div class="item-title">Dynamic Confidence Scores</div>
+            <div class="item-desc">CV = &sigma;/&mu; from MC distribution. Confidence = clip(1&minus;CV, 0.05, 0.99). Labels: High (&ge;0.60), Medium (&ge;0.35), Low (&lt;0.35).</div>
+            <div class="item-badge">MC-Derived</div>
+          </div>
+        </div>
+
+        <!-- Sub-section: Matchup Simulation -->
+        <div style="font-size:12px; font-weight:700; color:var(--citrus-pink); text-transform:uppercase; letter-spacing:1px; margin:18px 0 10px;">Stage B &mdash; Matchup Simulation (simulate_matchups.py)</div>
+        <div class="items-grid grid-4">
+          <div class="item-card">
+            <div class="item-title">PlayerDistribution</div>
+            <div class="item-desc">Empirical distributions from per-game stats. Gamma for count stats, Normal for continuous. Confidence-weighted variance inflation: &sigma;&prime; = &sigma; &times; (1 + (1 &minus; confidence)).</div>
+            <div class="item-badge">Per Player</div>
+          </div>
+          <div class="item-card">
+            <div class="item-title">CorrelationEngine</div>
+            <div class="item-desc">Student-t copula (&nu;=5) with 15&ndash;20% tail dependence. 3 data sources: shift overlap mining (&rho; up to 0.65), assist chain boost (+0.20), Kendall&rsquo;s &tau; co-movement.</div>
+            <div class="item-badge">t-Copula</div>
+          </div>
+          <div class="item-card">
+            <div class="item-title">MatchupSimulator</div>
+            <div class="item-desc">10K simulations per matchup. Antithetic variates (2&times; efficiency). Stratified sampling by game-count tiers. Vectorized fantasy point calc (10&times; faster).</div>
+            <div class="item-badge">10K Sims</div>
+          </div>
+          <div class="item-card">
+            <div class="item-title">Vegas Calibration</div>
+            <div class="item-desc">Over/Under game totals scale offensive projections. ou_scale = O/U &divide; 6.0, capped [0.80, 1.25]. GSAx adjusts goalie distributions &plusmn;15%.</div>
+            <div class="item-badge">Market Signal</div>
+          </div>
+        </div>
+
+        <!-- Sub-section: Season Simulation -->
+        <div style="font-size:12px; font-weight:700; color:var(--citrus-pink); text-transform:uppercase; letter-spacing:1px; margin:18px 0 10px;">Stage C &mdash; Season &amp; Calibration</div>
+        <div class="items-grid grid-3">
+          <div class="item-card">
+            <div class="item-title">SeasonSimulator</div>
+            <div class="item-desc">Simulates all remaining league matchups to compute playoff probability, championship odds, and final standings distributions for every team.</div>
+            <div class="item-badge">Full Season</div>
+          </div>
+          <div class="item-card">
+            <div class="item-title">BrierTracker</div>
+            <div class="item-desc">Prediction calibration: BS = mean((p&minus;outcome)&sup2;). Tracked per league per week. Ratings: Excellent (&lt;0.10), Good (&lt;0.15), Adequate (&lt;0.20).</div>
+            <div class="item-badge">Calibration</div>
+          </div>
+          <div class="item-card">
+            <div class="item-title">Output Fields (14 new columns)</div>
+            <div class="item-desc">mean, std_dev, median, 90% CI, 50% CI, skewness, upside_probability, floor_probability, dynamic_confidence, likely_low/high, confidence_label.</div>
+            <div class="item-badge">Full Distribution</div>
+          </div>
+        </div>
+
+        <!-- Data flow -->
+        <div class="data-flow-row" style="margin-top:14px;">
+          <span class="flow-chip" style="color:var(--citrus-pink)">player_projected_stats</span>
+          <span class="flow-arrow">&rarr;</span>
+          <span class="flow-chip">UncertaintyEngine (5K samples)</span>
+          <span class="flow-arrow">&rarr;</span>
+          <span class="flow-chip">PlayerDistribution + CorrelationEngine</span>
+          <span class="flow-arrow">&rarr;</span>
+          <span class="flow-chip">t-Copula &rarr; Antithetic Variates</span>
+          <span class="flow-arrow">&rarr;</span>
+          <span class="flow-chip" style="color:var(--citrus-pink)">matchup_simulations (10K sims)</span>
+        </div>
+
+        <!-- Code snippet: copula -->
+        <div class="code-block">
+          <span class="cmt"># Student-t Copula &mdash; tail-dependent correlation (nu=5 &rArr; ~18% extreme co-movement)</span><br>
+          L = <span class="fn">np.linalg.cholesky</span>(corr_matrix) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cmt"># Cholesky decomposition</span><br>
+          Z = rng.<span class="fn">standard_normal</span>((n_sims, d)) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cmt"># Independent normals</span><br>
+          X = Z @ L.T &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cmt"># Correlated normals</span><br>
+          S = rng.<span class="fn">chisquare</span>(<span class="num">5</span>, n_sims) / <span class="num">5</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cmt"># Chi-squared / nu</span><br>
+          T = X / <span class="fn">np.sqrt</span>(S[:, <span class="kw">None</span>]) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cmt"># Student-t transformation</span><br>
+          U = <span class="fn">stats.t.cdf</span>(T, <span class="num">5</span>) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cmt"># Uniform marginals [0, 1]</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="flow-connector"><div class="arrow">&darr;</div></div>
+
+    <!-- ================= LAYER 6: SCORING ENGINE ================= -->
+    <div class="layer theme-green">
+      <div class="layer-header">
+        <div class="layer-icon">6</div>
         <div class="layer-header-text">
           <h3>Fantasy Scoring Engine</h3>
           <div class="subtitle">League-Specific Scoring &bull; Live Matchup Calculation &bull; Real-Time via WebSocket</div>
@@ -670,7 +804,7 @@
           <div class="item-card">
             <div class="item-title">Goalie Fantasy Points</div>
             <div class="item-desc">
-              Wins (4pts) + Saves (0.2pts) + Shutouts (3pts) + Goals Against (-1pt). Per-league configurable.
+              Wins (4pts) + Saves (0.2pts) + Shutouts (3pts) + Goals Against (-1pt). Per-league configurable via ScoringCalculator.
             </div>
             <div class="item-badge">Per League Settings</div>
           </div>
@@ -689,63 +823,63 @@
 
     <div class="flow-connector"><div class="arrow">&darr;</div></div>
 
-    <!-- LAYER 6: FRONTEND -->
+    <!-- ================= LAYER 7: API SERVER ================= -->
     <div class="layer theme-blue">
       <div class="layer-header">
-        <div class="layer-icon">6</div>
+        <div class="layer-icon">7</div>
         <div class="layer-header-text">
-          <h3>User Experience Layer</h3>
-          <div class="subtitle">React 18 + TypeScript &bull; Real-Time Subscriptions &bull; 14+ Pages &bull; Mobile-Ready</div>
+          <h3>API Server &amp; User Experience Layer</h3>
+          <div class="subtitle">Hono (TypeScript) + React 18 &bull; Real-Time Subscriptions &bull; 14+ Pages &bull; Mobile-Ready</div>
         </div>
         <div class="layer-tag">citrus-fantasy-sports.web.app</div>
       </div>
       <div class="layer-body">
         <div class="items-grid grid-4">
           <div class="item-card">
+            <div class="item-title">Hono API Server</div>
+            <div class="item-desc">JWT auth middleware, per-request Supabase clients, league membership enforcement, DI services. TypeScript end-to-end.</div>
+          </div>
+          <div class="item-card">
             <div class="item-title">Live Draft Room</div>
-            <div class="item-desc">Real-time snake draft with auto-pick, live board updates via WebSocket, player search.</div>
+            <div class="item-desc">Real-time snake draft with auto-pick, live board updates via WebSocket, player search &amp; projections.</div>
           </div>
           <div class="item-card">
-            <div class="item-title">Roster Management</div>
-            <div class="item-desc">Drag-and-drop lineup editor, game lock enforcement, active/bench slots, daily rosters.</div>
-          </div>
-          <div class="item-card">
-            <div class="item-title">Live Matchups</div>
-            <div class="item-desc">30-second live score updates, daily breakdowns, player stat cards, games remaining.</div>
+            <div class="item-title">MC Matchup Dashboard</div>
+            <div class="item-desc">Win probability bars, confidence intervals, "Likely X&ndash;Y pts" ranges (p25&ndash;p75), blowout risk, Brier calibration badges.</div>
           </div>
           <div class="item-card">
             <div class="item-title">Stormy AI Assistant</div>
-            <div class="item-desc">Claude-powered AI chat. Lineup advice, trade analysis, waiver recommendations with context.</div>
+            <div class="item-desc">Claude-powered AI chat. Lineup advice, trade analysis, waiver recommendations with full projection context.</div>
+          </div>
+          <div class="item-card">
+            <div class="item-title">Roster Management</div>
+            <div class="item-desc">Drag-and-drop lineup editor, game lock enforcement, active/bench slots, daily rosters with confidence bars.</div>
           </div>
           <div class="item-card">
             <div class="item-title">Free Agents &amp; Waivers</div>
-            <div class="item-desc">Player search with projection sorting, waiver claims, FAAB bidding, priority system.</div>
+            <div class="item-desc">Player search with projection sorting, waiver claims, FAAB bidding, upside/floor probability display.</div>
           </div>
           <div class="item-card">
             <div class="item-title">Trade Analyzer</div>
-            <div class="item-desc">Multi-player trade proposals, before/after impact analysis, commissioner approval flow.</div>
+            <div class="item-desc">Multi-player trade proposals, before/after impact analysis with MC confidence ranges, commissioner approval flow.</div>
           </div>
           <div class="item-card">
-            <div class="item-title">Advanced Analytics</div>
-            <div class="item-desc">xG, xA, GAR, GSAx visualizations. Strength of schedule. Player talent metrics.</div>
-          </div>
-          <div class="item-card">
-            <div class="item-title">League Dashboard</div>
-            <div class="item-desc">Standings, GM Office, transaction history, league settings, commissioner tools.</div>
+            <div class="item-title">Season Simulator</div>
+            <div class="item-desc">Playoff probabilities, championship odds, final standings distributions. Simulates all remaining matchups per season.</div>
           </div>
         </div>
         <div class="tech-stack">
           <span class="tech-pill">React 18</span>
           <span class="tech-pill">TypeScript</span>
           <span class="tech-pill">Vite</span>
+          <span class="tech-pill">Hono</span>
           <span class="tech-pill">Tailwind CSS</span>
           <span class="tech-pill">Zustand</span>
-          <span class="tech-pill">Radix UI</span>
           <span class="tech-pill">shadcn/ui</span>
           <span class="tech-pill">Recharts</span>
           <span class="tech-pill">@dnd-kit</span>
           <span class="tech-pill">React Router v6</span>
-          <span class="tech-pill">React Hook Form</span>
+          <span class="tech-pill">React Query</span>
           <span class="tech-pill">Zod</span>
         </div>
       </div>
@@ -753,13 +887,13 @@
 
     <div class="flow-connector"><div class="arrow">&darr;</div></div>
 
-    <!-- LAYER 7: SECURITY -->
+    <!-- ================= LAYER 8: SECURITY ================= -->
     <div class="layer theme-red">
       <div class="layer-header">
-        <div class="layer-icon">7</div>
+        <div class="layer-icon">8</div>
         <div class="layer-header-text">
           <h3>Security &amp; Data Protection</h3>
-          <div class="subtitle">7-Layer Protection &bull; Zero-Data-Loss Guarantee &bull; Row-Level Security &bull; Auto-Recovery</div>
+          <div class="subtitle">7-Layer Defense &bull; Zero-Data-Loss Guarantee &bull; Row-Level Security &bull; Auto-Recovery</div>
         </div>
         <div class="layer-tag">Enterprise-Grade</div>
       </div>
@@ -782,15 +916,15 @@
         <div class="items-grid grid-3" style="margin-top:14px;">
           <div class="item-card">
             <div class="item-title">Row-Level Security</div>
-            <div class="item-desc">45+ RLS policies. Database automatically filters data by user + league. Zero cross-league leakage.</div>
+            <div class="item-desc">45+ RLS policies. Database automatically filters data by user + league. Zero cross-league leakage. MC results scoped to league members.</div>
           </div>
           <div class="item-card">
             <div class="item-title">PKCE Auth Flow</div>
-            <div class="item-desc">Supabase Auth with email verification, OAuth (Google/Apple), auto token refresh, secure storage.</div>
+            <div class="item-desc">Supabase Auth with email verification, OAuth (Google/Apple), auto token refresh, secure JWT validation in Hono middleware.</div>
           </div>
           <div class="item-card">
             <div class="item-title">Audit &amp; Recovery</div>
-            <div class="item-desc">Security audit log, backup snapshots, integrity checks, failed transaction replay, GDPR consent.</div>
+            <div class="item-desc">Security audit log, backup snapshots, integrity checks, failed transaction replay, GDPR consent tracking.</div>
           </div>
         </div>
       </div>
@@ -802,18 +936,19 @@
   <div style="margin-top:40px; text-align:center;">
     <div style="font-size:11px; text-transform:uppercase; letter-spacing:1.5px; color:var(--citrus-muted); margin-bottom:14px; font-weight:600;">Infrastructure &amp; Deployment</div>
     <div class="tech-stack" style="justify-content:center;">
-      <span class="tech-pill" style="border-color:rgba(255,107,0,0.3); color:var(--citrus-orange);">Firebase Hosting</span>
+      <span class="tech-pill" style="border-color:rgba(255,107,0,0.3); color:var(--citrus-orange);">Firebase Hosting + CDN</span>
       <span class="tech-pill" style="border-color:rgba(255,184,0,0.3); color:var(--citrus-yellow);">Supabase PostgreSQL</span>
       <span class="tech-pill" style="border-color:rgba(0,200,83,0.3); color:var(--citrus-green);">Supabase Realtime (WebSocket)</span>
-      <span class="tech-pill" style="border-color:rgba(188,140,255,0.3); color:var(--citrus-purple);">Python 3 + XGBoost + scikit-learn</span>
-      <span class="tech-pill" style="border-color:rgba(88,166,255,0.3); color:var(--citrus-blue);">Webshare 100-IP Proxy</span>
+      <span class="tech-pill" style="border-color:rgba(188,140,255,0.3); color:var(--citrus-purple);">Python 3 + XGBoost + NumPy + SciPy</span>
+      <span class="tech-pill" style="border-color:rgba(247,120,186,0.3); color:var(--citrus-pink);">Monte Carlo Engine (10K sims)</span>
+      <span class="tech-pill" style="border-color:rgba(88,166,255,0.3); color:var(--citrus-blue);">Hono API + Supabase Edge Functions</span>
       <span class="tech-pill" style="border-color:rgba(255,123,114,0.3); color:var(--citrus-red);">APScheduler (24/7 Service)</span>
       <span class="tech-pill" style="border-color:rgba(63,185,176,0.3); color:var(--citrus-teal);">Claude API (Stormy AI)</span>
     </div>
   </div>
 
   <div class="footer">
-    <p><span class="url">citrus-fantasy-sports.web.app</span> &nbsp;&middot;&nbsp; Web Summit 2026 &nbsp;&middot;&nbsp; Tech in Sports</p>
+    <p><span class="url">citrus-fantasy-sports.web.app</span> &nbsp;&middot;&nbsp; March 2026 &nbsp;&middot;&nbsp; Monte Carlo Edition</p>
   </div>
 
 </div>
