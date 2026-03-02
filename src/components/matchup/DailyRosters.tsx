@@ -49,12 +49,19 @@ export const DailyRosters = ({
   // Get all dates in the week
   const getWeekDates = (start: string, end: string): string[] => {
     const dates: string[] = [];
-    const startDate = new Date(start);
-    const endDate = new Date(end);
+    // Parse date strings manually to avoid UTC midnight shift
+    // new Date("YYYY-MM-DD") parses as UTC midnight, which in MST becomes the previous day
+    const [sy, sm, sd] = start.split('-').map(Number);
+    const [ey, em, ed] = end.split('-').map(Number);
+    const startDate = new Date(sy, sm - 1, sd);
+    const endDate = new Date(ey, em - 1, ed);
     const current = new Date(startDate);
 
     while (current <= endDate) {
-      dates.push(current.toISOString().split('T')[0]);
+      const y = current.getFullYear();
+      const m = String(current.getMonth() + 1).padStart(2, '0');
+      const d = String(current.getDate()).padStart(2, '0');
+      dates.push(`${y}-${m}-${d}`);
       current.setDate(current.getDate() + 1);
     }
     return dates;

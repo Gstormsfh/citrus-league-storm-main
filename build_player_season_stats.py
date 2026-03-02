@@ -37,6 +37,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Import CACHE_VERSION from the projection engine so season stats stay in sync
+# with the xG model version. When CACHE_VERSION is bumped, this script MUST be
+# re-run to recalculate x_goals from the updated raw_shots values.
+try:
+    from calculate_daily_projections import CACHE_VERSION as PROJECTION_CACHE_VERSION
+except ImportError:
+    PROJECTION_CACHE_VERSION = "unknown"
+
 _shutdown_requested = False
 
 def _handle_shutdown(signum, frame):
@@ -97,7 +105,7 @@ def try_fetch_xg_totals(db: SupabaseRest, season: int) -> Dict[int, Dict[str, fl
     last_progress_time = time.time()
     use_talent_adjusted = False
     
-    logger.info("[build_player_season_stats] Fetching xG/xA from raw_shots (with pagination)...")
+    logger.info(f"[build_player_season_stats] Fetching xG/xA from raw_shots (CACHE_VERSION={PROJECTION_CACHE_VERSION})...")
     
     # Try to determine which columns are available by testing first batch
     try:
@@ -193,7 +201,12 @@ def main() -> int:
   logger.info("[build_player_season_stats] STARTING")
   logger.info("=" * 80)
   logger.info(f"Season: {DEFAULT_SEASON}")
+  logger.info(f"Projection CACHE_VERSION: {PROJECTION_CACHE_VERSION}")
   logger.info(f"Timestamp: {_now_iso()}")
+  logger.info("")
+  logger.info("NOTE: If the xG model was recently updated (CACHE_VERSION bumped),")
+  logger.info("      run this script with no arguments to recalculate x_goals from")
+  logger.info("      the updated raw_shots.shooting_talent_adjusted_xg values.")
   logger.info("")
   
   try:

@@ -55,7 +55,8 @@ export const GameLockService = {
   ): Promise<PlayerLockInfo> {
     try {
       const dateToCheck = targetDate || getTodayDate();
-      const dateStr = dateToCheck.toISOString().split('T')[0];
+      // Use local date formatting to avoid UTC shift from toISOString()
+      const dateStr = `${dateToCheck.getFullYear()}-${String(dateToCheck.getMonth() + 1).padStart(2, '0')}-${String(dateToCheck.getDate()).padStart(2, '0')}`;
       const now = new Date();
 
       // Get game for this team on the target date
@@ -171,7 +172,8 @@ export const GameLockService = {
     }
 
     const dateToCheck = targetDate || getTodayDate();
-    const dateStr = dateToCheck.toISOString().split('T')[0];
+    // Use local date formatting to avoid UTC shift from toISOString()
+    const dateStr = `${dateToCheck.getFullYear()}-${String(dateToCheck.getMonth() + 1).padStart(2, '0')}-${String(dateToCheck.getDate()).padStart(2, '0')}`;
 
     // Batch fetch all games for these teams on this date
     const teamList = Array.from(uniqueTeams);

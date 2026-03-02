@@ -334,11 +334,14 @@ export class BestBallService {
   ): Promise<{ daysOptimized: number; error?: string }> {
     try {
       let daysOptimized = 0;
-      const start = new Date(weekStartDate);
-      const end = new Date(weekEndDate);
+      // Parse date strings manually to avoid UTC midnight shift
+      const [sy, sm, sd] = weekStartDate.split('-').map(Number);
+      const [ey, em, ed] = weekEndDate.split('-').map(Number);
+      const start = new Date(sy, sm - 1, sd);
+      const end = new Date(ey, em - 1, ed);
 
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        const dateStr = d.toISOString().split('T')[0];
+        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         const { error } = await this.triggerServerOptimization(leagueId, dateStr);
         if (!error) daysOptimized++;
       }

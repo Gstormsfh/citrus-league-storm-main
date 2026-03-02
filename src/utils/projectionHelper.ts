@@ -21,7 +21,11 @@ export async function getWeeklyProjections(
     const dates: string[] = [];
     const current = new Date(weekStart);
     while (current <= weekEnd) {
-      dates.push(current.toISOString().split('T')[0]);
+      // Use local date formatting to avoid UTC shift (toISOString converts to UTC first)
+      const y = current.getFullYear();
+      const m = String(current.getMonth() + 1).padStart(2, '0');
+      const d = String(current.getDate()).padStart(2, '0');
+      dates.push(`${y}-${m}-${d}`);
       current.setDate(current.getDate() + 1);
     }
 
