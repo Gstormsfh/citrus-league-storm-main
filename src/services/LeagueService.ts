@@ -1959,12 +1959,18 @@ async joinLeagueByCode(
       }
       
       // Generate all dates in the matchup week
-      const weekStart = new Date(matchup.week_start_date);
-      const weekEnd = new Date(matchup.week_end_date);
+      // CRITICAL: Append 'T00:00:00' to force local-time parsing.
+      // Without it, new Date("2026-03-01") is parsed as UTC midnight,
+      // which in MST (UTC-7) becomes Feb 28 5pm — shifting the date back 1 day.
+      const weekStart = new Date(matchup.week_start_date + 'T00:00:00');
+      const weekEnd = new Date(matchup.week_end_date + 'T00:00:00');
       const weekDates: string[] = [];
       const currentDate = new Date(weekStart);
       while (currentDate <= weekEnd) {
-        weekDates.push(currentDate.toISOString().split('T')[0]);
+        const year = currentDate.getFullYear();
+        const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+        const day = String(currentDate.getDate()).padStart(2, '0');
+        weekDates.push(`${year}-${month}-${day}`);
         currentDate.setDate(currentDate.getDate() + 1);
       }
       
@@ -2188,8 +2194,11 @@ async joinLeagueByCode(
       }
       
       const matchup = matchups[0];
-      const weekStart = new Date(matchup.week_start_date);
-      const weekEnd = new Date(matchup.week_end_date);
+      // CRITICAL: Append 'T00:00:00' to force local-time parsing.
+      // Without it, new Date("2026-03-01") is parsed as UTC midnight,
+      // which in MST (UTC-7) becomes Feb 28 5pm — shifting the date back 1 day.
+      const weekStart = new Date(matchup.week_start_date + 'T00:00:00');
+      const weekEnd = new Date(matchup.week_end_date + 'T00:00:00');
       const today = getTodayMSTDate();
       today.setHours(0, 0, 0, 0);
       
@@ -2397,7 +2406,8 @@ async joinLeagueByCode(
         // Filter out records that are already locked
         // NEVER overwrite a locked day - this prevents score manipulation
         const recordsToUpsert = rosterRecords.filter(record => {
-          const recordDate = new Date(record.roster_date);
+          // Append 'T00:00:00' to force local-time parsing (avoid UTC midnight shift)
+          const recordDate = new Date(record.roster_date + 'T00:00:00');
           recordDate.setHours(0, 0, 0, 0);
           
           // Check if this specific player+date combination is locked

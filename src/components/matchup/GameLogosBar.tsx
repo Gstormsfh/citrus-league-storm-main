@@ -86,12 +86,13 @@ export const GameLogosBar = ({ games, playerTeam, selectedDate }: GameLogosBarPr
   const viewDateStr = selectedDate || todayStr;
   
   // Sort games by date, with error handling
+  // Append 'T00:00:00' to force local-time parsing (avoid UTC midnight shift)
   const sortedGames = [...games]
     .filter(game => game && game.game_date) // Filter out invalid games
     .sort((a, b) => {
       try {
-        const dateA = new Date(a.game_date);
-        const dateB = new Date(b.game_date);
+        const dateA = new Date(a.game_date.split('T')[0] + 'T00:00:00');
+        const dateB = new Date(b.game_date.split('T')[0] + 'T00:00:00');
         return dateA.getTime() - dateB.getTime();
       } catch {
         return 0;

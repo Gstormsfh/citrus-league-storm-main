@@ -1340,7 +1340,7 @@ const FreeAgents = () => {
                                   <div className="flex gap-1 mt-1">
                                     {player.games
                                       .filter((game: NHLGame) => game && game.game_date)
-                                      .sort((a: NHLGame, b: NHLGame) => new Date(a.game_date).getTime() - new Date(b.game_date).getTime())
+                                      .sort((a: NHLGame, b: NHLGame) => new Date(a.game_date.split('T')[0] + 'T00:00:00').getTime() - new Date(b.game_date.split('T')[0] + 'T00:00:00').getTime())
                                       .slice(0, 4)
                                       .map((game: NHLGame, idx: number) => {
                                         const isHome = game.home_team === player.team;
@@ -1407,7 +1407,7 @@ const FreeAgents = () => {
                                     <div className="flex justify-center gap-1">
                                       {player.games
                                         .filter((game: NHLGame) => game && game.game_date)
-                                        .sort((a: NHLGame, b: NHLGame) => new Date(a.game_date).getTime() - new Date(b.game_date).getTime())
+                                        .sort((a: NHLGame, b: NHLGame) => new Date(a.game_date.split('T')[0] + 'T00:00:00').getTime() - new Date(b.game_date.split('T')[0] + 'T00:00:00').getTime())
                                         .map((game: NHLGame, idx: number) => {
                                           const isHome = game.home_team === player.team;
                                           const opponentAbbrev = isHome ? game.away_team : game.home_team;
@@ -1872,7 +1872,7 @@ const FreeAgents = () => {
                                          const todayMST = getTodayMST();
                                          return player.games
                                            .filter(game => game && game.game_date)
-                                           .sort((a, b) => new Date(a.game_date).getTime() - new Date(b.game_date).getTime())
+                                           .sort((a, b) => new Date(a.game_date.split('T')[0] + 'T00:00:00').getTime() - new Date(b.game_date.split('T')[0] + 'T00:00:00').getTime())
                                            .map((game, idx) => {
                                              const gameDateStr = game.game_date.split('T')[0];
                                              const isPastDate = gameDateStr < todayMST;
