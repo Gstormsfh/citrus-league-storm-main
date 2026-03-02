@@ -1,5 +1,6 @@
 import { League } from '@/services/LeagueService';
 import { DEFAULT_TEST_DATE } from '@/utils/seasonConstants';
+import { getTodayMST } from '@/utils/timezoneUtils';
 
 /**
  * Get the date when the draft was completed
@@ -36,7 +37,9 @@ export function getTestFirstWeekStartDate(): Date {
  * use the test anchor Sunday as the first week start
  */
 export function getFirstWeekStartDate(draftCompletionDate: Date): Date {
-  const today = new Date();
+  // Use MST-based today for consistency with game dates
+  const todayStr = getTodayMST();
+  const today = new Date(todayStr + 'T00:00:00');
   today.setHours(0, 0, 0, 0);
 
   const testAnchor = getTestFirstWeekStartDate();
@@ -91,21 +94,30 @@ export function getWeekEndDate(weekNumber: number, firstWeekStart: Date): Date {
 
 /**
  * Get the current week number (1-based) based on the first week start date
+ *
+ * CRITICAL: Uses MST-based "today" and Math.round for day counting to avoid:
+ * 1. Browser timezone inconsistencies (user in EST vs MST)
+ * 2. DST transition bugs where Math.floor loses a day at the spring-forward boundary
  */
 export function getCurrentWeekNumber(firstWeekStart: Date): number {
-  const today = new Date();
+  // Use MST-based today for consistency with game dates
+  const todayStr = getTodayMST(); // "YYYY-MM-DD" in Mountain Time
+  const today = new Date(todayStr + 'T00:00:00');
   today.setHours(0, 0, 0, 0);
-  
+
   const firstWeek = new Date(firstWeekStart);
   firstWeek.setHours(0, 0, 0, 0);
-  
+
   // Calculate difference in days
+  // Use Math.round instead of Math.floor to handle DST transitions correctly.
+  // DST shifts by at most 1 hour, so the millisecond diff is always within
+  // 1 hour of the true calendar day count. Math.round gives the correct result.
   const diffTime = today.getTime() - firstWeek.getTime();
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-  
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
   // Calculate week number (1-based)
   const weekNumber = Math.floor(diffDays / 7) + 1;
-  
+
   // Return at least week 1
   return Math.max(1, weekNumber);
 }
@@ -146,8 +158,9 @@ export function getAvailableWeeks(firstWeekStart: Date): number[] {
   regularSeasonEnd.setHours(23, 59, 59, 999);
   
   // Calculate how many weeks from first week to regular season end
+  // Use Math.round for day counting to handle DST transitions correctly
   const diffTime = regularSeasonEnd.getTime() - firstWeekStart.getTime();
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
   const totalWeeks = Math.floor(diffDays / 7) + 1;
   
   // Ensure we have at least 1 week

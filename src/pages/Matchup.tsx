@@ -647,8 +647,9 @@ const Matchup = () => {
           setOpponentTeamSlotAssignments(team2SlotAssignments || {});
 
           // Daily scores from cached payload (already pre-computed by edge fn)
+          // Append 'T00:00:00' to force local-time parsing (avoid UTC midnight shift)
           const sortScores = (arr: any[]) =>
-            [...arr].sort((a, b) => new Date(a.roster_date).getTime() - new Date(b.roster_date).getTime()).map(d => parseFloat(d.daily_score) || 0);
+            [...arr].sort((a, b) => new Date(a.roster_date + 'T00:00:00').getTime() - new Date(b.roster_date + 'T00:00:00').getTime()).map(d => parseFloat(d.daily_score) || 0);
           const team1DailyPoints = cachedPayload.team1DailyScores.length > 0 ? sortScores(cachedPayload.team1DailyScores) : Array(7).fill(0);
           const team2DailyPoints = cachedPayload.team2DailyScores.length > 0 ? sortScores(cachedPayload.team2DailyScores) : Array(7).fill(0);
 
@@ -947,8 +948,9 @@ const Matchup = () => {
 
           if (!team1Error && team1DailyScores) {
             // Sort by date and extract scores (same logic as logged-in users)
+            // Append 'T00:00:00' to force local-time parsing (avoid UTC midnight shift)
             const sorted = (team1DailyScores as any[]).sort((a, b) =>
-              new Date(a.roster_date).getTime() - new Date(b.roster_date).getTime()
+              new Date(a.roster_date + 'T00:00:00').getTime() - new Date(b.roster_date + 'T00:00:00').getTime()
             );
             team1DailyPoints = sorted.map(d => parseFloat(d.daily_score) || 0);
             log(' Team1 daily points calculated:', team1DailyPoints);
@@ -977,8 +979,9 @@ const Matchup = () => {
 
             if (!team2Error && team2DailyScores) {
               // Sort by date and extract scores (same logic as logged-in users)
+              // Append 'T00:00:00' to force local-time parsing (avoid UTC midnight shift)
               const sorted = (team2DailyScores as any[]).sort((a, b) =>
-                new Date(a.roster_date).getTime() - new Date(b.roster_date).getTime()
+                new Date(a.roster_date + 'T00:00:00').getTime() - new Date(b.roster_date + 'T00:00:00').getTime()
               );
               team2DailyPoints = sorted.map(d => parseFloat(d.daily_score) || 0);
               log(' Team2 daily points calculated:', team2DailyPoints);
@@ -4448,7 +4451,11 @@ const Matchup = () => {
         for (let i = 0; i < 7; i++) {
           const date = new Date(weekStart);
           date.setDate(weekStart.getDate() + i);
-          weekDates.push(date.toISOString().split('T')[0]);
+          // Use local timezone formatting to avoid UTC shift from toISOString()
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          weekDates.push(`${year}-${month}-${day}`);
         }
         
         // ============================================================

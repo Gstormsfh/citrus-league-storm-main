@@ -1,18 +1,27 @@
 /**
  * useMatchupScoring - Custom hook for matchup score calculations
- * 
+ *
  * Extracts frozen score calculation logic from Matchup.tsx
  * Uses Yahoo/Sleeper-style scoring:
  * - Past days: Frozen scores (won't change when roster changes)
  * - Today/Future: Live calculation from current roster
- * 
+ *
  * This reduces Matchup.tsx size and improves maintainability
  */
 
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { DataCacheService, TTL } from '@/services/DataCacheService';
+import { getTodayMSTDate } from '@/utils/timezoneUtils';
 import { logger } from '@/utils/logger';
+
+/** Format a Date to YYYY-MM-DD using local timezone (avoids UTC shift from toISOString) */
+const formatDateLocal = (d: Date): string => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 interface DailyScore {
   myScore: number;
@@ -56,10 +65,10 @@ export function useMatchupScoring({
       if (!currentMatchup || !userTeamId || dailyStatsByDate.size === 0) {
         return;
       }
-      
+
       setIsLoading(true);
       const cacheKey = DataCacheService.getCacheKey.frozenScores(currentMatchup.id);
-      
+
       // Check cache first
       const cachedData = DataCacheService.get<Map<string, DailyScore>>(cacheKey);
       if (cachedData) {
@@ -67,11 +76,14 @@ export function useMatchupScoring({
         setIsLoading(false);
         return;
       }
-      
-      const today = new Date();
+
+      const today = getTodayMSTDate();
       today.setHours(0, 0, 0, 0);
-      const weekStart = new Date(currentMatchup.week_start_date);
-      
+      // CRITICAL: Append 'T00:00:00' to force local-time parsing.
+      // Without it, new Date("2026-03-01") is parsed as UTC midnight,
+      // which in MST (UTC-7) becomes Feb 28 5pm — shifting the date back 1 day.
+      const weekStart = new Date(currentMatchup.week_start_date + 'T00:00:00');
+
       // Build list of past dates
       const pastDates: string[] = [];
       for (let i = 0; i < 7; i++) {
@@ -79,20 +91,20 @@ export function useMatchupScoring({
         date.setDate(weekStart.getDate() + i);
         date.setHours(0, 0, 0, 0);
         if (date < today) {
-          pastDates.push(date.toISOString().split('T')[0]);
+          pastDates.push(formatDateLocal(date));
         }
       }
-      
+
       if (pastDates.length === 0) {
         setCachedDailyScores(new Map());
         setIsLoading(false);
         return;
       }
-      
-      const oppTeamId = currentMatchup.team1_id === userTeamId 
-        ? currentMatchup.team2_id 
+
+      const oppTeamId = currentMatchup.team1_id === userTeamId
+        ? currentMatchup.team2_id
         : currentMatchup.team1_id;
-      
+
       // Single batched query for all past days
       const { data: allRosters, error } = await supabase
         .from('fantasy_daily_rosters')
@@ -101,13 +113,13 @@ export function useMatchupScoring({
         .in('team_id', oppTeamId ? [userTeamId, oppTeamId] : [userTeamId])
         .in('roster_date', pastDates)
         .eq('slot_type', 'active');
-      
+
       if (error) {
         logger.error('[useMatchupScoring] Error fetching rosters:', error);
         setIsLoading(false);
         return;
       }
-      
+
       // Group rosters by date and team
       const rostersByDateTeam = new Map<string, Map<string, number[]>>();
       allRosters?.forEach(r => {
@@ -120,23 +132,23 @@ export function useMatchupScoring({
         }
         dateMap.get(r.team_id)!.push(parseInt(r.player_id));
       });
-      
+
       // Calculate scores
       const scores = new Map<string, DailyScore>();
-      
+
       for (const dateStr of pastDates) {
         const dayStats = dailyStatsByDate.get(dateStr);
         const dateRosters = rostersByDateTeam.get(dateStr);
-        
+
         let myScore = 0;
         let oppScore = 0;
-        
+
         if (dayStats && dateRosters) {
           const myPlayerIds = dateRosters.get(userTeamId) || [];
           myPlayerIds.forEach(playerId => {
             myScore += dayStats.get(playerId)?.daily_total_points ?? 0;
           });
-          
+
           if (oppTeamId) {
             const oppPlayerIds = dateRosters.get(oppTeamId) || [];
             oppPlayerIds.forEach(playerId => {
@@ -144,15 +156,15 @@ export function useMatchupScoring({
             });
           }
         }
-        
+
         scores.set(dateStr, { myScore, oppScore, isLocked: true });
       }
-      
+
       DataCacheService.set(cacheKey, scores, TTL.VERY_LONG);
       setCachedDailyScores(scores);
       setIsLoading(false);
     };
-    
+
     fetchCachedScores();
   // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchCachedScores is inline; setCachedDailyScores/setIsLoading are stable setters
   }, [currentMatchup?.id, userTeamId, dailyStatsByDate, currentMatchup?.team1_id, currentMatchup?.team2_id]);
@@ -164,20 +176,21 @@ export function useMatchupScoring({
       return fallback.toFixed(1);
     }
 
-    const today = new Date();
+    const today = getTodayMSTDate();
     today.setHours(0, 0, 0, 0);
-    const weekStart = new Date(currentMatchup.week_start_date);
+    // CRITICAL: Append 'T00:00:00' to force local-time parsing (avoid UTC midnight shift)
+    const weekStart = new Date(currentMatchup.week_start_date + 'T00:00:00');
     let total = 0;
-    
+
     for (let i = 0; i < 7; i++) {
       const date = new Date(weekStart);
       date.setDate(weekStart.getDate() + i);
       date.setHours(0, 0, 0, 0);
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = formatDateLocal(date);
       const isPast = date < today;
-      
+
       const cachedScore = cachedDailyScores.get(dateStr);
-      
+
       if (isPast && cachedScore?.isLocked) {
         total += cachedScore.myScore;
       } else {
@@ -191,7 +204,7 @@ export function useMatchupScoring({
         }
       }
     }
-    
+
     return total.toFixed(1);
   }, [currentMatchup, dailyStatsByDate, myStarters, cachedDailyScores]);
 
@@ -201,20 +214,21 @@ export function useMatchupScoring({
       return "0.0";
     }
 
-    const today = new Date();
+    const today = getTodayMSTDate();
     today.setHours(0, 0, 0, 0);
-    const weekStart = new Date(currentMatchup.week_start_date);
+    // CRITICAL: Append 'T00:00:00' to force local-time parsing (avoid UTC midnight shift)
+    const weekStart = new Date(currentMatchup.week_start_date + 'T00:00:00');
     let total = 0;
-    
+
     for (let i = 0; i < 7; i++) {
       const date = new Date(weekStart);
       date.setDate(weekStart.getDate() + i);
       date.setHours(0, 0, 0, 0);
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = formatDateLocal(date);
       const isPast = date < today;
-      
+
       const cachedScore = cachedDailyScores.get(dateStr);
-      
+
       if (isPast && cachedScore?.isLocked) {
         total += cachedScore.oppScore;
       } else {
@@ -228,7 +242,7 @@ export function useMatchupScoring({
         }
       }
     }
-    
+
     return total.toFixed(1);
   }, [currentMatchup, dailyStatsByDate, opponentStarters, cachedDailyScores]);
 
@@ -239,4 +253,3 @@ export function useMatchupScoring({
     isLoading
   };
 }
-

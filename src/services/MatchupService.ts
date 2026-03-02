@@ -408,13 +408,15 @@ export const MatchupService = {
             continue;
           }
 
+          // Use local timezone formatting to avoid UTC shift from toISOString()
+          const formatLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
           const insertData = {
             league_id: leagueId,
             week_number: weekNumber,
             team1_id: pair.team1.id,
             team2_id: pair.team2?.id || null,
-            week_start_date: weekStart.toISOString().split('T')[0],
-            week_end_date: weekEnd.toISOString().split('T')[0],
+            week_start_date: formatLocal(weekStart),
+            week_end_date: formatLocal(weekEnd),
             status: 'scheduled'
           };
           
@@ -716,7 +718,7 @@ export const MatchupService = {
 
         if (!viewingError && viewingDailyScores) {
           const sorted = (viewingDailyScores as Array<{ roster_date: string; daily_score: string | number }>).sort((a, b) =>
-            new Date(a.roster_date).getTime() - new Date(b.roster_date).getTime()
+            new Date(a.roster_date + 'T00:00:00').getTime() - new Date(b.roster_date + 'T00:00:00').getTime()
           );
           viewingDailyPoints = sorted.map(d => parseFloat(String(d.daily_score)) || 0);
         } else {
@@ -740,7 +742,7 @@ export const MatchupService = {
 
           if (!oppError && oppDailyScores) {
             const sorted = (oppDailyScores as Array<{ roster_date: string; daily_score: string | number }>).sort((a, b) =>
-              new Date(a.roster_date).getTime() - new Date(b.roster_date).getTime()
+              new Date(a.roster_date + 'T00:00:00').getTime() - new Date(b.roster_date + 'T00:00:00').getTime()
             );
             opponentDailyPoints = sorted.map(d => parseFloat(String(d.daily_score)) || 0);
           } else {
@@ -1006,7 +1008,7 @@ export const MatchupService = {
         if (!userError && userDailyScores) {
           // Sort by date and extract scores
           const sorted = (userDailyScores as Array<{ roster_date: string; daily_score: string | number }>).sort((a, b) =>
-            new Date(a.roster_date).getTime() - new Date(b.roster_date).getTime()
+            new Date(a.roster_date + 'T00:00:00').getTime() - new Date(b.roster_date + 'T00:00:00').getTime()
           );
           userDailyPoints = sorted.map(d => parseFloat(String(d.daily_score)) || 0);
         } else {
@@ -1035,7 +1037,7 @@ export const MatchupService = {
           if (!oppError && oppDailyScores) {
             // Sort by date and extract scores
             const sorted = (oppDailyScores as Array<{ roster_date: string; daily_score: string | number }>).sort((a, b) => 
-              new Date(a.roster_date).getTime() - new Date(b.roster_date).getTime()
+              new Date(a.roster_date + 'T00:00:00').getTime() - new Date(b.roster_date + 'T00:00:00').getTime()
             );
             opponentDailyPoints = sorted.map(d => parseFloat(String(d.daily_score)) || 0);
           } else {
@@ -2899,7 +2901,7 @@ export const MatchupService = {
         team2Id: m.team2_id,
         team1Score: parseFloat(m.team1_score) || 0,
         team2Score: parseFloat(m.team2_score) || 0,
-        weekStart: new Date(m.week_start_date)
+        weekStart: new Date(m.week_start_date + 'T00:00:00')
       }));
 
       return { matchups, error: null };
@@ -3069,8 +3071,10 @@ export const MatchupService = {
     endDate: Date
   ): Promise<Map<number, { goals: number; assists: number; sog: number; blocks: number; ppp: number; shp: number; hits: number; pim: number; plus_minus: number; xGoals: number; wins?: number; saves?: number; shutouts?: number; goals_against?: number }>> {
     try {
-      const startDateStr = startDate.toISOString().split('T')[0];
-      const endDateStr = endDate.toISOString().split('T')[0];
+      // Use local timezone formatting to avoid UTC shift from toISOString()
+      const formatLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const startDateStr = formatLocal(startDate);
+      const endDateStr = formatLocal(endDate);
       
       const rpcPromise = supabase.rpc('get_matchup_stats', {
         p_player_ids: playerIds,
