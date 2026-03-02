@@ -1,0 +1,452 @@
+#!/usr/bin/env python3
+"""
+build_player_season_stats.py
+
+Rollup: aggregate public.player_game_stats into public.player_season_stats for fast UI loads.
+Optionally enrich with xG/xA totals from public.raw_shots (if available).
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║ 🚨 CRITICAL WARNING - READ BEFORE MODIFYING 🚨                               ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║ This script aggregates per-game stats into season totals.                    ║
+║                                                                              ║
+║ ⚠️  PPP and SHP are INTENTIONALLY NOT AGGREGATED here!                      ║
+║                                                                              ║
+║ WHY: The boxscore API only provides powerPlayGoals, NOT powerPlayAssists.    ║
+║      If we aggregate per-game PPG, we get WRONG PPP values.                  ║
+║      PPP = PPGoals + PPAssists (must come from landing endpoint)             ║
+║                                                                              ║
+║ The del row["nhl_ppp"] and del row["nhl_shp"] lines before upsert are       ║
+║ REQUIRED to prevent overwriting correct values from landing endpoint.        ║
+║                                                                              ║
+║ See: CRITICAL_DATA_ARCHITECTURE.md for full documentation.                   ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+"""
+
+from dotenv import load_dotenv
+import os
+import signal
+import sys
+import datetime as dt
+from typing import Dict, List
+
+from data_pipeline.utils.supabase_rest import SupabaseRest
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Import CACHE_VERSION from the projection engine so season stats stay in sync
+# with the xG model version. When CACHE_VERSION is bumped, this script MUST be
+# re-run to recalculate x_goals from the updated raw_shots values.
+try:
+    from calculate_daily_projections import CACHE_VERSION as PROJECTION_CACHE_VERSION
+except ImportError:
+    PROJECTION_CACHE_VERSION = "unknown"
+
+_shutdown_requested = False
+
+def _handle_shutdown(signum, frame):
+    global _shutdown_requested
+    _shutdown_requested = True
+    logger.info(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
+
+signal.signal(signal.SIGINT, _handle_shutdown)
+signal.signal(signal.SIGTERM, _handle_shutdown)
+
+load_dotenv()
+SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+if not SUPABASE_URL or not SUPABASE_KEY:
+  raise RuntimeError("Missing VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment.")
+
+DEFAULT_SEASON = int(os.getenv("CITRUS_DEFAULT_SEASON", "2025"))
+
+
+def supabase_client() -> SupabaseRest:
+  return SupabaseRest(SUPABASE_URL, SUPABASE_KEY)
+
+
+def _now_iso() -> str:
+  return dt.datetime.now(dt.timezone.utc).isoformat()
+
+
+def fetch_all_player_game_stats(db: SupabaseRest, season: int) -> List[dict]:
+  # Paginated pull to get all rows
+  all_rows = []
+  offset = 0
+  page_size = 1000
+  while True:
+    page = db.select("player_game_stats", select="*", filters=[("season", "eq", season)], limit=page_size, offset=offset)
+    if not page:
+      break
+    all_rows.extend(page)
+    if len(page) < page_size:
+      break
+    offset += page_size
+    if offset % 5000 == 0:
+      logger.info(f"[build_player_season_stats] Fetched {len(all_rows)} rows so far...")
+  return all_rows
+
+
+def try_fetch_xg_totals(db: SupabaseRest, season: int) -> Dict[int, Dict[str, float]]:
+  """
+  Returns player_id -> {x_goals, x_assists}
+  Best-effort: handles multiple column name variations in raw_shots with pagination.
+  Uses shooting_talent_adjusted_xg if available (preferred), otherwise falls back to xg_value.
+  """
+  import time
+  try:
+    out: Dict[int, Dict[str, float]] = {}
+    batch_size = 1000  # PostgREST max limit
+    offset = 0
+    shot_count = 0
+    last_progress_time = time.time()
+    use_talent_adjusted = False
+    
+    logger.info(f"[build_player_season_stats] Fetching xG/xA from raw_shots (CACHE_VERSION={PROJECTION_CACHE_VERSION})...")
+    
+    # Try to determine which columns are available by testing first batch
+    try:
+      test_batch = db.select("raw_shots", select="player_id,shooting_talent_adjusted_xg,xg_value,xa_value", limit=1, offset=0)
+      if test_batch and len(test_batch) > 0:
+        if "shooting_talent_adjusted_xg" in test_batch[0]:
+          use_talent_adjusted = True
+          select_cols = "player_id,shooting_talent_adjusted_xg,xg_value,xa_value"
+        else:
+          select_cols = "player_id,xg_value,xa_value"
+      else:
+        select_cols = "player_id,xg_value,xa_value"
+    except Exception:
+      # Fallback to basic columns
+      try:
+        test_batch = db.select("raw_shots", select="player_id,xg_value,xa_value", limit=1, offset=0)
+        select_cols = "player_id,xg_value,xa_value"
+      except Exception:
+        # Last resort: try old column names
+        select_cols = "player_id,xg,xa"
+    
+    # Fetch all rows with pagination
+    while True:
+      try:
+        rows = db.select("raw_shots", select=select_cols, limit=batch_size, offset=offset)
+      except Exception as e:
+        logger.warning(f"[build_player_season_stats] Warning: Could not fetch xG/xA batch at offset {offset}: {e}")
+        break
+      
+      if not rows:
+        break
+      
+      for r in rows:
+        shot_count += 1
+        pid = r.get("player_id")
+        if pid is None:
+          continue
+        pid = int(pid)
+        if pid not in out:
+          out[pid] = {"x_goals": 0.0, "x_assists": 0.0}
+        
+        # Prefer shooting_talent_adjusted_xg if available, otherwise use xg_value or xg
+        xg_val = 0.0
+        if use_talent_adjusted and r.get("shooting_talent_adjusted_xg") is not None:
+          xg_val = float(r.get("shooting_talent_adjusted_xg") or 0.0)
+        elif r.get("xg_value") is not None:
+          xg_val = float(r.get("xg_value") or 0.0)
+        elif r.get("xg") is not None:
+          xg_val = float(r.get("xg") or 0.0)
+        
+        # xA: prefer xa_value, fallback to xa
+        xa_val = 0.0
+        if r.get("xa_value") is not None:
+          xa_val = float(r.get("xa_value") or 0.0)
+        elif r.get("xa") is not None:
+          xa_val = float(r.get("xa") or 0.0)
+        
+        out[pid]["x_goals"] += xg_val
+        out[pid]["x_assists"] += xa_val
+      
+      # Progress every 15 seconds
+      current_time = time.time()
+      if current_time - last_progress_time >= 15:
+        logger.info(f"  [PROGRESS] Scanned {shot_count:,} shots, enriched {len(out)} players...")
+        last_progress_time = current_time
+      
+      # Check if we got fewer rows than batch_size (last page)
+      if len(rows) < batch_size:
+        break
+      
+      offset += batch_size
+    
+    logger.info(f"[build_player_season_stats] Enriched xG/xA for {len(out)} players from {shot_count:,} shots")
+    return out
+  except Exception as e:
+    logger.error(f"[build_player_season_stats] Warning: Error enriching xG/xA: {e}")
+    import traceback
+    traceback.print_exc()
+    return {}
+
+
+def upsert_player_season_stats(db: SupabaseRest, season_rows: List[dict]) -> None:
+  if not season_rows:
+    return
+  CHUNK = 500
+  for i in range(0, len(season_rows), CHUNK):
+    db.upsert("player_season_stats", season_rows[i:i + CHUNK], on_conflict="season,player_id")
+
+
+def main() -> int:
+  import time
+  logger.info("=" * 80)
+  logger.info("[build_player_season_stats] STARTING")
+  logger.info("=" * 80)
+  logger.info(f"Season: {DEFAULT_SEASON}")
+  logger.info(f"Projection CACHE_VERSION: {PROJECTION_CACHE_VERSION}")
+  logger.info(f"Timestamp: {_now_iso()}")
+  logger.info("")
+  logger.info("NOTE: If the xG model was recently updated (CACHE_VERSION bumped),")
+  logger.info("      run this script with no arguments to recalculate x_goals from")
+  logger.info("      the updated raw_shots.shooting_talent_adjusted_xg values.")
+  logger.info("")
+  
+  try:
+    db = supabase_client()
+    logger.info("[build_player_season_stats] Connected to Supabase")
+  except Exception as e:
+    logger.error(f"[build_player_season_stats] ERROR: Failed to connect to Supabase: {e}")
+    return 1
+  
+  season = DEFAULT_SEASON
+
+  logger.info("[build_player_season_stats] Fetching player_game_stats...")
+  rows = fetch_all_player_game_stats(db, season)
+  if not rows:
+    logger.info("[build_player_season_stats] No player_game_stats rows found.")
+    return 0
+  
+  logger.info(f"[build_player_season_stats] Fetched {len(rows):,} player_game_stats rows")
+  logger.info("[build_player_season_stats] Aggregating season stats...")
+
+  # Pure-Python rollup (no pandas) for Windows friendliness
+  acc: Dict[tuple, dict] = {}
+  last_progress_time = time.time()
+
+  for idx, r in enumerate(rows, 1):
+    pid = int(r.get("player_id"))
+    key = (season, pid)
+
+    if key not in acc:
+      acc[key] = {
+        "season": season,
+        "player_id": pid,
+        "team_abbrev": r.get("team_abbrev"),
+        "position_code": r.get("position_code"),
+        "is_goalie": bool(r.get("is_goalie") or False),
+        "games_played": 0,
+        "icetime_seconds": 0,
+        "nhl_toi_seconds": 0,
+
+        "goals": 0,
+        "primary_assists": 0,
+        "secondary_assists": 0,
+        "points": 0,
+        "shots_on_goal": 0,
+        "hits": 0,
+        "blocks": 0,
+        "pim": 0,
+        "ppp": 0,
+        "shp": 0,
+        "plus_minus": 0,
+        "nhl_plus_minus": 0,
+
+        # NHL.com official stats (for display and fantasy scoring)
+        # These come from per-game boxscore API (api-web.nhle.com) and are aggregated here
+        "nhl_goals": 0,
+        "nhl_assists": 0,
+        "nhl_points": 0,
+        "nhl_shots_on_goal": 0,
+        "nhl_hits": 0,      # From boxscore API per-game data
+        "nhl_blocks": 0,    # From boxscore API per-game data
+        "nhl_pim": 0,
+        # nhl_ppp and nhl_shp are NOT aggregated here - they come from fetch_nhl_stats_from_landing.py
+        # because the boxscore API only has powerPlayGoals, not powerPlayPoints (goals + assists)
+
+        "x_goals": 0.0,
+        "x_assists": 0.0,
+
+        "goalie_gp": 0,
+        "wins": 0,
+        "saves": 0,
+        "shots_faced": 0,
+        "goals_against": 0,
+        "shutouts": 0,
+        "save_pct": None,
+
+        # NHL.com official goalie stats
+        "nhl_wins": 0,
+        "nhl_losses": 0,
+        "nhl_ot_losses": 0,
+        "nhl_saves": 0,
+        "nhl_shots_faced": 0,
+        "nhl_goals_against": 0,
+        "nhl_shutouts": 0,
+        "nhl_save_pct": None,
+        "nhl_gaa": None,
+
+        "updated_at": _now_iso(),
+      }
+
+    out = acc[key]
+    out["team_abbrev"] = r.get("team_abbrev") or out["team_abbrev"]
+    out["position_code"] = r.get("position_code") or out["position_code"]
+    out["is_goalie"] = bool(out["is_goalie"] or (r.get("is_goalie") or False))
+
+    # games_played is count distinct games
+    # We'll approximate by incrementing once per row, since table is (season, game_id, player_id) PK.
+    out["games_played"] += 1
+
+    out["icetime_seconds"] += int(r.get("icetime_seconds") or 0)
+    out["nhl_toi_seconds"] += int(r.get("nhl_toi_seconds") or 0)
+    out["goals"] += int(r.get("goals") or 0)
+    out["primary_assists"] += int(r.get("primary_assists") or 0)
+    out["secondary_assists"] += int(r.get("secondary_assists") or 0)
+    out["points"] += int(r.get("points") or 0)
+    out["shots_on_goal"] += int(r.get("shots_on_goal") or 0)
+    out["hits"] += int(r.get("hits") or 0)
+    out["blocks"] += int(r.get("blocks") or 0)
+    out["pim"] += int(r.get("pim") or 0)
+    out["ppp"] += int(r.get("ppp") or 0)
+    out["shp"] += int(r.get("shp") or 0)
+    out["plus_minus"] += int(r.get("plus_minus") or 0)
+    out["nhl_plus_minus"] += int(r.get("nhl_plus_minus") or 0)
+
+    # Aggregate NHL.com official stats (CRITICAL for frontend display)
+    # These come from per-game boxscore API data (api-web.nhle.com/v1/gamecenter/{id}/boxscore)
+    out["nhl_goals"] += int(r.get("nhl_goals") or 0)
+    out["nhl_assists"] += int(r.get("nhl_assists") or 0)
+    out["nhl_points"] += int(r.get("nhl_points") or 0)
+    out["nhl_shots_on_goal"] += int(r.get("nhl_shots_on_goal") or 0)
+    out["nhl_hits"] += int(r.get("nhl_hits") or 0)      # From boxscore API per-game
+    out["nhl_blocks"] += int(r.get("nhl_blocks") or 0)  # From boxscore API per-game
+    out["nhl_pim"] += int(r.get("nhl_pim") or 0)
+    # CRITICAL: Do NOT aggregate nhl_ppp and nhl_shp from per-game stats!
+    # The boxscore API only provides powerPlayGoals, NOT powerPlayPoints (which includes assists).
+    # PPP/SHP must come from fetch_nhl_stats_from_landing.py which gets powerPlayPoints directly.
+    # out["nhl_ppp"] += int(r.get("nhl_ppp") or 0)  # WRONG - boxscore only has PPG!
+    # out["nhl_shp"] += int(r.get("nhl_shp") or 0)  # WRONG - boxscore only has SHG!
+
+    out["goalie_gp"] += int(r.get("goalie_gp") or 0)
+    out["wins"] += int(r.get("wins") or 0)
+    out["saves"] += int(r.get("saves") or 0)
+    out["shots_faced"] += int(r.get("shots_faced") or 0)
+    out["goals_against"] += int(r.get("goals_against") or 0)
+    out["shutouts"] += int(r.get("shutouts") or 0)
+
+    # Aggregate NHL.com official goalie stats
+    out["nhl_wins"] += int(r.get("nhl_wins") or 0)
+    out["nhl_losses"] += int(r.get("nhl_losses") or 0)
+    out["nhl_ot_losses"] += int(r.get("nhl_ot_losses") or 0)
+    out["nhl_saves"] += int(r.get("nhl_saves") or 0)
+    out["nhl_shots_faced"] += int(r.get("nhl_shots_faced") or 0)
+    out["nhl_goals_against"] += int(r.get("nhl_goals_against") or 0)
+    out["nhl_shutouts"] += int(r.get("nhl_shutouts") or 0)
+    
+    # Progress every 15 seconds
+    current_time = time.time()
+    if current_time - last_progress_time >= 15:
+      logger.info(f"  [PROGRESS] Processed {idx:,}/{len(rows):,} game stats rows ({len(acc)} unique players)...")
+      last_progress_time = current_time
+
+  logger.info(f"[build_player_season_stats] Aggregated stats for {len(acc)} unique players")
+  
+  # Save pct (both PBP and NHL)
+  for out in acc.values():
+    sf = float(out.get("shots_faced") or 0)
+    sv = float(out.get("saves") or 0)
+    out["save_pct"] = (sv / sf) if sf > 0 else None
+    
+    # NHL save pct
+    nhl_sf = float(out.get("nhl_shots_faced") or 0)
+    nhl_sv = float(out.get("nhl_saves") or 0)
+    out["nhl_save_pct"] = (nhl_sv / nhl_sf) if nhl_sf > 0 else None
+    
+    # NHL GAA (goals against average per 60 minutes)
+    nhl_ga = float(out.get("nhl_goals_against") or 0)
+    nhl_toi_minutes = float(out.get("nhl_toi_seconds") or 0) / 60.0
+    out["nhl_gaa"] = (nhl_ga * 60.0 / nhl_toi_minutes) if nhl_toi_minutes > 0 else None
+
+  # xG enrich (optional)
+  logger.info("")
+  logger.info("[build_player_season_stats] Enriching with xG/xA from raw_shots...")
+  xg = try_fetch_xg_totals(db, season)
+  if xg:
+    enriched_count = 0
+    for out in acc.values():
+      pid = int(out["player_id"])
+      if pid in xg:
+        out["x_goals"] = float(xg[pid].get("x_goals", 0.0))
+        out["x_assists"] = float(xg[pid].get("x_assists", 0.0))
+        enriched_count += 1
+    logger.info(f"[build_player_season_stats] Enriched xG/xA for {enriched_count} players")
+  else:
+    logger.info("[build_player_season_stats] No xG/xA data available (will use 0.0)")
+
+  # Plus/minus computation (integrated)
+  logger.info("")
+  logger.info("[build_player_season_stats] Computing plus/minus from shifts and goals...")
+  try:
+    from compute_player_season_plus_minus import compute_plus_minus
+    pm = compute_plus_minus(season, db)
+    if pm:
+      pm_count = 0
+      for out in acc.values():
+        pid = int(out["player_id"])
+        if pid in pm:
+          out["plus_minus"] = int(pm[pid])
+          pm_count += 1
+      logger.info(f"[build_player_season_stats] Computed plus/minus for {pm_count} players")
+    else:
+      logger.info("[build_player_season_stats] No plus/minus computed (will use 0)")
+  except ImportError:
+    logger.warning("[build_player_season_stats] Warning: Could not import compute_plus_minus (plus/minus will remain 0)")
+  except Exception as e:
+    logger.error(f"[build_player_season_stats] Warning: Plus/minus computation failed: {e}")
+    import traceback
+    traceback.print_exc()
+
+  if _shutdown_requested:
+    logger.info("[SHUTDOWN] Graceful shutdown complete.")
+    sys.exit(0)
+
+  logger.info("")
+  logger.info("[build_player_season_stats] Upserting to player_season_stats...")
+  logger.info("[build_player_season_stats] Aggregating all nhl_* stats from per-game boxscore data")
+  season_rows = list(acc.values())
+  
+  # NOTE: nhl_hits, nhl_blocks are AGGREGATED from player_game_stats boxscore data
+  # HOWEVER: nhl_ppp and nhl_shp should NOT be aggregated from per-game stats!
+  # The boxscore API only provides powerPlayGoals/shorthandedGoals, NOT the assists.
+  # PPP = powerPlayPoints (goals + assists) must come from fetch_nhl_stats_from_landing.py
+  # SHP = shorthandedPoints (goals + assists) must come from fetch_nhl_stats_from_landing.py
+  # 
+  # CRITICAL: Remove nhl_ppp and nhl_shp from upsert - let landing endpoint populate them
+  for row in season_rows:
+    if "nhl_ppp" in row:
+      del row["nhl_ppp"]
+    if "nhl_shp" in row:
+      del row["nhl_shp"]
+  
+  upsert_player_season_stats(db, season_rows)
+
+  logger.info("")
+  logger.info("=" * 80)
+  logger.info(f"[build_player_season_stats] [OK] COMPLETE: upserted {len(season_rows)} player_season_stats rows for season {season}")
+  logger.info("=" * 80)
+  return 0
+
+
+if __name__ == "__main__":
+  logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+  raise SystemExit(main())
+
+
