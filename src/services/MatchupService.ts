@@ -36,6 +36,7 @@ interface MatchupWeekStats {
 // Shape for daily projection rows returned from RPC
 interface DailyProjectionRow {
   player_id: number;
+  projection_date?: string;
   is_goalie?: boolean;
   total_projected_points?: number;
   projected_goals?: number;
@@ -2296,11 +2297,56 @@ export const MatchupService = {
         // Continue with empty Map - page should still load
       }
       
-      // Fetch daily projections for today's games
+      // Fetch daily projections for ALL game dates in the matchup week (not just today)
+      // This fixes the TBD bug where future-date games showed no projections
       const todayMST = getTodayMST();
       let dailyProjectionsMap = new Map<number, DailyProjectionRow>();
       try {
-        dailyProjectionsMap = await this.getDailyProjectionsForMatchup(allPlayerIds, todayMST);
+        // Collect all unique game dates from the schedule
+        const allGameDates = new Set<string>();
+        gamesByTeam.forEach(games => {
+          games.forEach(g => {
+            const gameDate = g.game_date?.split('T')[0];
+            if (gameDate) allGameDates.add(gameDate);
+          });
+        });
+
+        // Fetch projections for each game date in parallel
+        const dateProjectionPromises = Array.from(allGameDates).map(async (gameDate) => {
+          return { gameDate, projections: await this.getDailyProjectionsForMatchup(allPlayerIds, gameDate) };
+        });
+        const dateProjectionResults = await Promise.all(dateProjectionPromises);
+
+        // Merge: each player gets their most relevant projection
+        // Priority: today's projection > nearest future date > any other date
+        const playerDateTracker = new Map<number, string>(); // Track which date each player's projection is from
+        for (const { gameDate, projections } of dateProjectionResults) {
+          projections.forEach((proj, playerId) => {
+            const existingDate = playerDateTracker.get(playerId);
+            let shouldReplace = false;
+
+            if (!existingDate) {
+              shouldReplace = true;
+            } else if (gameDate === todayMST) {
+              // Today always wins
+              shouldReplace = true;
+            } else if (existingDate !== todayMST) {
+              // Both are non-today dates: prefer nearest future date
+              const existingIsFuture = existingDate >= todayMST;
+              const newIsFuture = gameDate >= todayMST;
+              if (newIsFuture && !existingIsFuture) {
+                shouldReplace = true; // Future beats past
+              } else if (newIsFuture && existingIsFuture && gameDate < existingDate) {
+                shouldReplace = true; // Nearer future date wins
+              }
+            }
+
+            if (shouldReplace) {
+              dailyProjectionsMap.set(playerId, proj);
+              playerDateTracker.set(playerId, gameDate);
+            }
+          });
+        }
       } catch (error: unknown) {
         logger.warn('[MatchupService] Failed to fetch daily projections, continuing without them:', error);
       }
@@ -2334,7 +2380,31 @@ export const MatchupService = {
             garMap.get(playerId),
             dailyProjection
           );
-          
+
+          // Recalculate projection total_projected_points with league-specific scoring
+          if (transformed.daily_projection && !transformed.isGoalie) {
+            const dp = transformed.daily_projection;
+            transformed.daily_projection.total_projected_points = scorer.calculatePoints({
+              goals: dp.projected_goals || 0,
+              assists: dp.projected_assists || 0,
+              sog: dp.projected_sog || 0,
+              blocks: dp.projected_blocks || 0,
+              ppp: dp.projected_ppp || 0,
+              shp: dp.projected_shp || 0,
+              hits: dp.projected_hits || 0,
+              pim: dp.projected_pim || 0,
+            }, false);
+          }
+          if (transformed.goalieProjection && transformed.isGoalie) {
+            const gp = transformed.goalieProjection;
+            transformed.goalieProjection.total_projected_points = scorer.calculatePoints({
+              wins: gp.projected_wins || 0,
+              saves: gp.projected_saves || 0,
+              shutouts: gp.projected_shutouts || 0,
+              goals_against: gp.projected_goals_against || 0,
+            }, true);
+          }
+
           // Get calculated games remaining from transformed player (already filtered to week)
           const gamesRemaining = transformed.games_remaining_total || 0;
 
@@ -2544,7 +2614,31 @@ export const MatchupService = {
             garMap.get(playerId),
             dailyProjection
           );
-          
+
+          // Recalculate projection total_projected_points with league-specific scoring
+          if (transformed.daily_projection && !transformed.isGoalie) {
+            const dp = transformed.daily_projection;
+            transformed.daily_projection.total_projected_points = scorer.calculatePoints({
+              goals: dp.projected_goals || 0,
+              assists: dp.projected_assists || 0,
+              sog: dp.projected_sog || 0,
+              blocks: dp.projected_blocks || 0,
+              ppp: dp.projected_ppp || 0,
+              shp: dp.projected_shp || 0,
+              hits: dp.projected_hits || 0,
+              pim: dp.projected_pim || 0,
+            }, false);
+          }
+          if (transformed.goalieProjection && transformed.isGoalie) {
+            const gp = transformed.goalieProjection;
+            transformed.goalieProjection.total_projected_points = scorer.calculatePoints({
+              wins: gp.projected_wins || 0,
+              saves: gp.projected_saves || 0,
+              shutouts: gp.projected_shutouts || 0,
+              goals_against: gp.projected_goals_against || 0,
+            }, true);
+          }
+
           // Get calculated games remaining from transformed player (already filtered to week)
           const gamesRemaining = transformed.games_remaining_total || 0;
 

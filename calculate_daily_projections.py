@@ -224,9 +224,20 @@ def get_positional_std_dev_fantasy_pts_per_60(
     return default_std_dev.get(position, 1.3)
 
 
-# Module-level cache to prevent redundant database queries
-# Note: @lru_cache cannot be used because db (SupabaseRest) is not hashable
+# Module-level caches to prevent redundant database queries.
+# Each multiprocessing worker gets its own copy (process-isolated).
+# Note: @lru_cache cannot be used because db (SupabaseRest) is not hashable.
+
 _baseline_cache: Dict[int, Dict[str, float]] = {}
+
+# Team-level caches — avoid re-querying the same team data for every player
+# These provide massive speedups when many players share the same opponent.
+_team_xga_cache: Dict[Tuple[str, int], Any] = {}            # (team, season) → xGA/60
+_opponent_strength_cache: Dict[Tuple[str, int, int], float] = {}  # (team, game_id, season) → adjustment
+_goalie_sv_pct_cache: Dict[Tuple[str, int, int], Any] = {}  # (team, game_id, season) → sv%
+_b2b_cache: Dict[Tuple[str, str], float] = {}               # (team, date_iso) → penalty
+_finishing_talent_cache: Dict[Tuple[int, int], float] = {}   # (player_id, season) → multiplier
+_league_avg_cache: Dict[Tuple[str, int], Any] = {}           # (position, season) → league averages
 
 def get_latest_baselines(db: SupabaseRest, season: int) -> Dict[str, float]:
     """
@@ -554,6 +565,11 @@ def calculate_finishing_talent(db: SupabaseRest, player_id: int, season: int) ->
     Returns:
         Multiplier (typically 0.7 to 1.5, capped)
     """
+    # Check cache — same player + season yields same finishing talent
+    cache_key = (player_id, season)
+    if cache_key in _finishing_talent_cache:
+        return _finishing_talent_cache[cache_key]
+
     # Get player's actual goals from season stats (official NHL.com)
     player_stats = db.select(
         "player_season_stats",
@@ -593,22 +609,22 @@ def calculate_finishing_talent(db: SupabaseRest, player_id: int, season: int) ->
             total_xg += xg_val
         
         if total_xg == 0:
+            _finishing_talent_cache[cache_key] = 1.0
             return 1.0
-        
+
         # Calculate raw finishing talent
         raw_multiplier = actual_goals / total_xg
-        
+
         # Stabilization: If < 50 shots, regress toward 1.0
-        # Formula: stabilized = raw * (shots/50) + 1.0 * (1 - shots/50)
-        # But cap shots/50 at 1.0 (so 50+ shots = no regression)
         stabilization_factor = min(shot_count / 50.0, 1.0)
         stabilized_multiplier = (raw_multiplier * stabilization_factor) + (1.0 * (1 - stabilization_factor))
-        
+
         # Cap multiplier to reasonable range [0.7, 1.5]
         capped_multiplier = max(0.7, min(1.5, stabilized_multiplier))
-        
+
+        _finishing_talent_cache[cache_key] = capped_multiplier
         return capped_multiplier
-        
+
     except Exception as e:
         logger.warning(f"⚠️  Warning: Could not calculate finishing talent for player {player_id}: {e}")
         return 1.0
@@ -632,6 +648,11 @@ def get_opposing_goalie_save_pct(
         Save percentage as decimal (e.g., 0.930) or None if unavailable
     """
     try:
+        # Check cache — same opponent + game yields same goalie SV%
+        cache_key = (opponent_team, game_id, season)
+        if cache_key in _goalie_sv_pct_cache and not debug:
+            return _goalie_sv_pct_cache[cache_key]
+
         if debug:
             logger.debug(f"  [DDR Debug] Getting goalie SV% for opponent: {opponent_team}")
         # Note: player_projected_stats doesn't currently store goalie-specific projections
@@ -689,10 +710,12 @@ def get_opposing_goalie_save_pct(
                         avg_sv_pct = sum(g["save_pct"] for g in top_2) / len(top_2)
                         if debug:
                             logger.debug(f"  [DDR Debug] Team baseline SV%: {avg_sv_pct:.3f} (avg of top {len(top_2)} goalies)")
+                        _goalie_sv_pct_cache[cache_key] = avg_sv_pct
                         return avg_sv_pct
-        
+
         if debug:
             logger.debug(f"  [DDR Debug] No goalie data found for {opponent_team}, returning None")
+        _goalie_sv_pct_cache[cache_key] = None
         return None
         
     except Exception as e:
@@ -721,10 +744,15 @@ def get_team_xga_per_60(
     try:
         # Use canonical team code for cache lookups
         canonical_team = get_canonical_team_code(db, team)
-        
+
+        # Check cache first — same team + season yields same xGA/60
+        cache_key = (canonical_team, season)
+        if cache_key in _team_xga_cache:
+            return _team_xga_cache[cache_key]
+
         # Data leak protection: Only use games up to today
         today = date.today()
-        
+
         # Get team's last N games (use canonical team for historical continuity)
         recent_games = db.select(
             "nhl_games",
@@ -840,12 +868,14 @@ def get_team_xga_per_60(
             xga_per_60 = (total_xga / total_toi) * 3600
             if debug:
                 logger.debug(f"  [DDR Debug] {team} xGA/60: {xga_per_60:.3f} (Total xGA: {total_xga:.2f}, Total TOI: {total_toi/60:.1f} min)")
+            _team_xga_cache[cache_key] = xga_per_60
             return xga_per_60
-        
+
         if debug:
             logger.debug(f"  [DDR Debug] No TOI data for {team}, returning None")
+        _team_xga_cache[cache_key] = None
         return None
-        
+
     except Exception as e:
         logger.warning(f"⚠️  Warning: Could not calculate team xGA/60 for {team}: {e}")
         return None
@@ -1180,11 +1210,16 @@ def get_opponent_strength(
         Multiplier (typically 0.7 to 1.3)
     """
     try:
+        # Check cache — same opponent + game yields same DDR
+        cache_key = (opponent_team, game_id, season)
+        if cache_key in _opponent_strength_cache and not debug:
+            return _opponent_strength_cache[cache_key]
+
         if debug:
             logger.debug(f"\n[DDR Debug] Calculating DDR for opponent: {opponent_team}")
             logger.debug(f"  [DDR Debug] League Avg xGA/60: {league_avg_xga_per_60:.3f}")
             logger.debug(f"  [DDR Debug] League Avg SV%: {league_avg_sv_pct:.3f}")
-        
+
         # Get team xGA/60 over last 10 games
         opponent_xga_per_60 = get_team_xga_per_60(db, opponent_team, season, last_n_games=10, debug=debug)
         if not opponent_xga_per_60 or opponent_xga_per_60 == 0:
@@ -1269,8 +1304,9 @@ def get_opponent_strength(
             else:
                 logger.info(f"    → No adjustment (average opponent)")
         
+        _opponent_strength_cache[cache_key] = ddr_capped
         return ddr_capped
-        
+
     except Exception as e:
         logger.warning(f"⚠️  Warning: Could not calculate DDR for {opponent_team}: {e}")
         if debug:
@@ -1409,10 +1445,15 @@ def get_opponent_offensive_context(
 def check_back_to_back(db: SupabaseRest, team: str, game_date: date) -> float:
     """
     Check if team is playing back-to-back games.
-    
+
     Returns:
         0.95 if B2B (5% penalty), 1.0 otherwise
     """
+    # Check cache — same team + date yields same B2B result
+    cache_key = (team, game_date.isoformat())
+    if cache_key in _b2b_cache:
+        return _b2b_cache[cache_key]
+
     try:
         # Get previous game date for this team
         previous_games = db.select(
@@ -1434,13 +1475,15 @@ def check_back_to_back(db: SupabaseRest, team: str, game_date: date) -> float:
                         prev_date = datetime.fromisoformat(prev_date_str.replace("Z", "+00:00")).date()
                         days_diff = (game_date - prev_date).days
                         if days_diff == 1:
+                            _b2b_cache[cache_key] = 0.95
                             return 0.95  # B2B penalty
                     except Exception:
                         pass
                 break
-        
+
+        _b2b_cache[cache_key] = 1.0
         return 1.0
-        
+
     except Exception as e:
         logger.warning(f"⚠️  Warning: Could not check B2B for {team}: {e}")
         return 1.0
@@ -1906,12 +1949,15 @@ def calculate_physical_projection(
         
         if is_goalie:
             # Goalie physical projection
-            return calculate_goalie_physical_projection(
-                db, player_id, game_id, game_date, season, 
+            result = calculate_goalie_physical_projection(
+                db, player_id, game_id, game_date, season,
                 opponent_team, canonical_opponent, games_played
             )
+            if result:
+                result["is_goalie"] = True
+            return result
         else:
-            # Skater physical projection
+            # Skater physical projection (returns ALL 8 stats + model components)
             return calculate_skater_physical_projection(
                 db, player_id, game_id, game_date, season,
                 position, player_team, opponent_team, canonical_opponent, games_played
@@ -1937,41 +1983,54 @@ def calculate_skater_physical_projection(
     player_team: str,
     opponent_team: str,
     canonical_opponent: str,
-    games_played: int
+    games_played: int,
+    scoring_settings: Optional[Dict[str, Any]] = None
 ) -> Optional[Dict[str, Any]]:
-    """Calculate physical projection for skaters."""
-    # Get base projection using Bayesian shrinkage
-    # Note: We pass empty scoring_settings since we don't need fantasy points here
+    """
+    Calculate physical projection for skaters.
+
+    Returns a comprehensive dict with ALL 8 projected stats, model components,
+    and metadata needed by calculate_daily_projection() — avoiding duplicate queries.
+    """
+    # Use DEFAULT_FALLBACK_SCORING if not provided (for base_ppg calculation)
+    if not scoring_settings:
+        scoring_settings = {
+            "skater": {"goals": 3, "assists": 2, "power_play_points": 1, "short_handed_points": 2,
+                       "shots_on_goal": 0.4, "blocks": 0.5, "hits": 0.2, "penalty_minutes": 0.5},
+            "goalie": {"wins": 4, "shutouts": 3, "saves": 0.2, "goals_against": -1}
+        }
+
+    # Get base projection using Bayesian shrinkage (ALL 8 stats + ppg)
     base_projection = calculate_hybrid_base(
-        db, player_id, position, games_played, season, {"skater": {}, "goalie": {}}
+        db, player_id, position, games_played, season, scoring_settings
     )
-    
+
     # Get finishing talent multiplier (for goals only)
     finishing_multiplier = calculate_finishing_talent(db, player_id, season)
-    
+
     # Get opponent strength adjustment
     baselines = get_latest_baselines(db, season)
     league_avg_xga = baselines.get("league_avg_xga_per_60", 2.5)
     league_avg_sv_pct = baselines.get("league_avg_sv_pct", 0.91)
-    
+
     opponent_adjustment = get_opponent_strength(
         db, canonical_opponent, game_id, game_date, season,
         league_avg_xga, league_avg_sv_pct, debug=False
     )
-    
+
     # Get opponent xGA suppression (for model transparency)
     opponent_xga_suppression = get_team_xga_per_60(
         db, canonical_opponent, season, last_n_games=10, debug=False
     ) or league_avg_xga
-    
+
     # Get opposing goalie GSAx factor
-    goalie_gsax_factor = 1.0  # Default
+    goalie_gsax_factor = 1.0
     goalie_sv_pct = get_opposing_goalie_save_pct(
         db, opponent_team, game_id, game_date, season, debug=False
     )
     if goalie_sv_pct and league_avg_sv_pct > 0:
         goalie_gsax_factor = league_avg_sv_pct / goalie_sv_pct
-    
+
     # Get game info for home/away adjustment
     game_info_list = db.select(
         "nhl_games",
@@ -1980,54 +2039,76 @@ def calculate_skater_physical_projection(
         limit=1
     )
     game_info = game_info_list[0] if game_info_list else {"home_team": "", "away_team": ""}
-    
+
     # Get B2B and home/away adjustments
     b2b_penalty = check_back_to_back(db, player_team, game_date)
     home_away_adjustment = get_home_away_adjustment(player_team, game_info)
-    
-    # Apply adjustments to physical stats
-    # Goals: Apply finishing multiplier
-    # All stats: Apply opponent, B2B, home/away
+
+    # Apply adjustments to ALL 8 physical stats
+    # Goals: Apply finishing multiplier + environmental
+    # All other stats: Apply environmental only
+    env_factor = opponent_adjustment * b2b_penalty * home_away_adjustment
+
     physical_projection = {
-        "goals": base_projection["goals"] * finishing_multiplier * opponent_adjustment * b2b_penalty * home_away_adjustment,
-        "assists": base_projection["assists"] * opponent_adjustment * b2b_penalty * home_away_adjustment,
-        "shots": base_projection["sog"] * opponent_adjustment * b2b_penalty * home_away_adjustment,
-        "blocks": base_projection["blocks"] * opponent_adjustment * b2b_penalty * home_away_adjustment,
-        "saves": 0.0,  # Skaters don't have saves
-        "toi_seconds": int(base_projection.get("toi_seconds", 0))  # Will be calculated separately
+        # Core 4 stats (original)
+        "goals": base_projection["goals"] * finishing_multiplier * env_factor,
+        "assists": base_projection["assists"] * env_factor,
+        "shots": base_projection["sog"] * env_factor,
+        "blocks": base_projection["blocks"] * env_factor,
+        # Extended 4 stats (ALL 8 now included)
+        "ppp": base_projection["ppp"] * env_factor,
+        "shp": base_projection["shp"] * env_factor,
+        "hits": base_projection["hits"] * env_factor,
+        "pim": base_projection["pim"] * env_factor,
+        # xG projection
+        "xg": base_projection["goals"] / finishing_multiplier if finishing_multiplier > 0 else base_projection["goals"],
+        # Skaters don't have saves
+        "saves": 0.0,
+        "is_goalie": False,
     }
-    
-    # Calculate projected TOI (simplified - can be enhanced)
-    # Use position-specific defaults for now
+
+    # Calculate projected TOI
     toi_map = {"C": 17.5, "LW": 16.5, "RW": 16.5, "D": 21.0}
     projected_toi_minutes = toi_map.get(position, 18.0)
     physical_projection["toi_seconds"] = int(projected_toi_minutes * 60)
-    
-    # Store model components for transparency
+    physical_projection["projected_toi_minutes"] = projected_toi_minutes
+
+    # Store ALL model components for transparency and reuse by calculate_daily_projection()
     physical_projection["base_goals"] = base_projection["goals"]
     physical_projection["base_assists"] = base_projection["assists"]
-    physical_projection["opponent_xga_suppression"] = opponent_xga_suppression
-    physical_projection["goalie_gsax_factor"] = goalie_gsax_factor
+    physical_projection["base_ppg"] = base_projection.get("ppg", 0)
+    physical_projection["shrinkage_weight"] = calculate_bayesian_weight(games_played)
     physical_projection["finishing_multiplier"] = finishing_multiplier
     physical_projection["opponent_adjustment"] = opponent_adjustment
-    
+    physical_projection["b2b_penalty"] = b2b_penalty
+    physical_projection["home_away_adjustment"] = home_away_adjustment
+    physical_projection["opponent_xga_suppression"] = opponent_xga_suppression
+    physical_projection["goalie_gsax_factor"] = goalie_gsax_factor
+    # Metadata for reuse
+    physical_projection["position"] = position
+    physical_projection["player_team"] = player_team
+    physical_projection["opponent_team"] = opponent_team
+    physical_projection["games_played"] = games_played
+    physical_projection["game_info"] = game_info
+    # Baselines for VOPA
+    physical_projection["league_avg_sv_pct"] = league_avg_sv_pct
+    physical_projection["league_avg_xga_per_60"] = league_avg_xga
+
     # CRITICAL: TOI Synchronization - Zero TOI for IR players
-    # Check IR status and set toi_seconds to 0 if player is IR-eligible
     talent_metrics = db.select(
         "player_talent_metrics",
         select="is_ir_eligible",
         filters=[("player_id", "eq", player_id), ("season", "eq", season)],
         limit=1
     )
-    
+
     is_ir_eligible = False
     if talent_metrics and len(talent_metrics) > 0:
         is_ir_eligible = talent_metrics[0].get("is_ir_eligible") or False
-    
-    # Zero TOI for IR players
+
     if is_ir_eligible:
         physical_projection["toi_seconds"] = 0
-    
+
     return physical_projection
 
 
@@ -2257,93 +2338,54 @@ def save_physical_projection(
 # ============================================================================
 
 def transform_physical_to_fantasy(
-    db: SupabaseRest,
     physical_projection: Dict[str, Any],
-    league_id: str,
     scoring_settings: Dict[str, Any]
 ) -> float:
     """
     Layer 2: Transform physical projections into fantasy points.
-    
-    Applies league-specific scoring weights to physical stats.
-    This is "reactive" - can be recalculated without re-running Layer 1.
-    
+
+    Applies scoring weights to physical stats. League-agnostic in the pipeline
+    (uses DEFAULT_FALLBACK_SCORING). League-specific scoring is applied on the
+    frontend via ScoringCalculator.
+
     Args:
-        db: Supabase client
         physical_projection: Physical projection dict from Layer 1
-        league_id: League ID for scoring settings
-        scoring_settings: Scoring settings dict (can be passed or loaded)
-    
+        scoring_settings: Scoring settings dict
+
     Returns:
         Total projected fantasy points
     """
-    # Load scoring settings if not provided
-    if not scoring_settings:
-        scoring_settings = get_league_scoring_settings(db, league_id)
-    
-    is_goalie = physical_projection.get("saves", 0) > 0
-    
+    is_goalie = physical_projection.get("is_goalie", False) or physical_projection.get("saves", 0) > 0
+
     if is_goalie:
-        # Goalie scoring
         goalie_scoring = scoring_settings.get("goalie", {})
         fantasy_points = (
             physical_projection.get("saves", 0) * float(goalie_scoring.get("saves", 0.2)) +
-            # Note: Wins and shutouts would need to be projected separately
-            # For now, we only have saves in physical projection
-            0.0  # Wins and shutouts are binary events, not continuous
+            physical_projection.get("wins", 0) * float(goalie_scoring.get("wins", 4)) +
+            physical_projection.get("shutouts", 0) * float(goalie_scoring.get("shutouts", 3)) +
+            physical_projection.get("goals_against", 0) * float(goalie_scoring.get("goals_against", -1))
         )
     else:
-        # Skater scoring
         skater_scoring = scoring_settings.get("skater", {})
         fantasy_points = (
             physical_projection.get("goals", 0) * float(skater_scoring.get("goals", 3)) +
             physical_projection.get("assists", 0) * float(skater_scoring.get("assists", 2)) +
             physical_projection.get("shots", 0) * float(skater_scoring.get("shots_on_goal", 0.4)) +
             physical_projection.get("blocks", 0) * float(skater_scoring.get("blocks", 0.5)) +
-            # Note: PPP, SHP, Hits, PIM would need to be in physical projection
-            # For now, we only have the core 4 stats
-            0.0  # Additional stats can be added when physical projection includes them
+            physical_projection.get("ppp", 0) * float(skater_scoring.get("power_play_points", 1)) +
+            physical_projection.get("shp", 0) * float(skater_scoring.get("short_handed_points", 2)) +
+            physical_projection.get("hits", 0) * float(skater_scoring.get("hits", 0.2)) +
+            physical_projection.get("pim", 0) * float(skater_scoring.get("penalty_minutes", 0.5))
         )
-    
+
     return round(fantasy_points, 3)
 
 
-def get_league_scoring_settings(db: SupabaseRest, league_id: str) -> Dict[str, Any]:
-    """Get scoring settings for a league."""
-    try:
-        leagues = db.select(
-            "leagues",
-            select="scoring_settings",
-            filters=[("id", "eq", league_id)],
-            limit=1
-        )
-        
-        if leagues and len(leagues) > 0:
-            settings = leagues[0].get("scoring_settings")
-            if settings and isinstance(settings, dict):
-                return settings
-        
-        # Return defaults
-        return {
-            "skater": {
-                "goals": 3,
-                "assists": 2,
-                "shots_on_goal": 0.4,
-                "blocks": 0.5,
-            },
-            "goalie": {
-                "wins": 4,
-                "shutouts": 3,
-                "saves": 0.2,
-                "goals_against": -1,
-            }
-        }
-    except Exception as e:
-        logger.warning(f"⚠️  Warning: Could not fetch scoring settings for league {league_id}: {e}")
-        return {
-            "skater": {"goals": 3, "assists": 2, "shots_on_goal": 0.4, "blocks": 0.5},
-            "goalie": {"wins": 4, "shutouts": 3, "saves": 0.2, "goals_against": -1}
-        }
+## get_league_scoring_settings() — REMOVED
+## League-specific scoring is no longer applied in the calculation engine.
+## The pipeline uses DEFAULT_FALLBACK_SCORING from run_daily_projections.py.
+## League-specific scoring is applied dynamically on the frontend
+## via ScoringCalculator (src/utils/scoringUtils.ts).
 
 
 def recalculate_fantasy_points_for_league(
@@ -2637,22 +2679,20 @@ def calculate_vopa_score(
     player_id: int,
     game_id: int,
     projection_date: date,
-    league_id: str,
     season: int
 ) -> float:
     """
     Calculate VOPA (Value Over Positional Average) score.
-    
+
     Formula: VOPA = (player_points - replacement_level) / std_dev
-    
+
     Args:
         db: Supabase client
         player_id: Player ID
         game_id: Game ID
         projection_date: Projection date
-        league_id: League ID
         season: Season year
-    
+
     Returns:
         VOPA score
     """
@@ -2709,12 +2749,12 @@ def calculate_vopa_score(
     
     position = player_dir[0].get("position_code", "C")
     
-    # Get positional statistics
-    pos_stats = calculate_positional_statistics(db, position, league_id, season)
+    # Get positional statistics (league-agnostic)
+    pos_stats = calculate_positional_statistics(db, position, None, season)
     std_dev = pos_stats.get("std_dev", 1.0)
-    
-    # Get replacement level
-    replacement_level = calculate_dynamic_replacement_level(db, league_id, position)
+
+    # Get replacement level (league-agnostic)
+    replacement_level = calculate_dynamic_replacement_level(db, None, position)
     
     # Calculate VOPA
     if std_dev > 0:
@@ -2818,341 +2858,193 @@ def calculate_daily_projection(
     game_id: int,
     game_date: date,
     season: int,
-    scoring_settings: Dict[str, Any],
-    league_id: Optional[str] = None
+    scoring_settings: Dict[str, Any]
 ) -> Optional[Dict[str, Any]]:
     """
     Main orchestration function for calculating daily projection.
-    
-    NOTE: This function has been refactored to use the three-layer architecture:
-    - Layer 1: Physical Projection (calculate_physical_projection) → saved to projection_cache
-    - Layer 2: Dynamic Scoring (transform_physical_to_fantasy) → saved to player_projected_stats
-    - Layer 3: VOPA Calculation (calculate_vopa_score) → called separately after all projections
-    
-    Order of operations (critical for preventing multiplier bloat):
-    1. Base Projection (Shrinkage applied)
-    2. Talent Multiplier (xG adjustment)
-    3. Environmental Factors (Opponent Strength × B2B × Home/Away)
-    
+
+    Three-layer architecture:
+    - Layer 1: Physical Projection (calculate_physical_projection) — all DB queries happen here
+    - Layer 2: Fantasy Scoring (calculate_fantasy_points) — applies scoring weights (no DB queries)
+    - Layer 3: VOPA Calculation — value over positional average
+
+    PERFORMANCE: This function reuses ALL results from Layer 1's physical projection.
+    No duplicate DB queries — calculate_physical_projection() returns comprehensive stats
+    and model components that are used directly.
+
     Args:
         db: Supabase client
         player_id: Player ID
         game_id: Game ID
         game_date: Game date
         season: Season year
-        scoring_settings: Scoring settings dict
-        league_id: Optional league ID for Layer 2 transformation
-    
+        scoring_settings: Scoring settings dict (DEFAULT_FALLBACK_SCORING)
+
     Returns:
         Projection dict with all stats and model components, or None if error
     """
     try:
-        # LAYER 1: Calculate physical projection
-        # (Cache disabled — projection_cache table has schema mismatch.
-        #  With --force, we always recalculate anyway.)
-        physical_projection = calculate_physical_projection(
+        # LAYER 1: Calculate physical projection (ALL DB queries happen here)
+        physical = calculate_physical_projection(
             db, player_id, game_id, game_date, season
         )
 
-        if not physical_projection:
+        if not physical:
             return None
-        
-        # LAYER 2: Transform physical to fantasy points
-        # Get league_id if not provided (try to get from first league)
-        if not league_id:
-            leagues = db.select("leagues", select="id", limit=1)
-            league_id = leagues[0].get("id") if leagues else None
-        
-        if league_id:
-            fantasy_points = transform_physical_to_fantasy(
-                db, physical_projection, league_id, scoring_settings
-            )
-        else:
-            # Fallback: Calculate fantasy points directly if no league_id
-            fantasy_points = transform_physical_to_fantasy(
-                db, physical_projection, "", scoring_settings
-            )
-        
-        # Get player info for return structure
-        player_dir = db.select(
-            "player_directory",
-            select="position_code,team_abbrev",
-            filters=[("player_id", "eq", player_id), ("season", "eq", season)],
-            limit=1
-        )
-        
-        if not player_dir or len(player_dir) == 0:
-            logger.warning(f"⚠️  Player {player_id} not found in player_directory")
-            return None
-        
-        position = player_dir[0].get("position_code", "C")
-        player_team = player_dir[0].get("team_abbrev", "")
-        
-        # Check if player is goalie - route to goalie projection function
-        is_goalie = position == "G" or position == "Goalie"
-        if is_goalie:
+
+        # Route goalies to dedicated projection function
+        if physical.get("is_goalie", False):
             debug_goalie = os.getenv("DEBUG_GOALIE", "false").lower() == "true"
-            # For goalies, still use the existing function but save physical projection first
             goalie_proj = calculate_goalie_projection(db, player_id, game_id, game_date, season, scoring_settings, debug=debug_goalie)
             return goalie_proj
-        
-        # Get player's games played
-        player_stats = db.select(
-            "player_season_stats",
-            select="games_played",
-            filters=[("player_id", "eq", player_id), ("season", "eq", season)],
-            limit=1
-        )
-        games_played = int(player_stats[0].get("games_played", 0)) if player_stats else 0
-        
-        # Get game info
-        game_info = db.select(
-            "nhl_games",
-            select="home_team,away_team",
-            filters=[("game_id", "eq", game_id)],
-            limit=1
-        )
-        
-        if not game_info or len(game_info) == 0:
-            logger.warning(f"⚠️  Game {game_id} not found")
-            return None
-        
-        game = game_info[0]
-        opponent_team = game.get("away_team") if game.get("home_team") == player_team else game.get("home_team")
-        
-        # Step 1: Calculate hybrid base (Bayesian shrinkage)
-        base_projection = calculate_hybrid_base(db, player_id, position, games_played, season, scoring_settings)
-        shrinkage_weight = calculate_bayesian_weight(games_played)
-        
-        # Step 2: Get finishing talent multiplier (xG adjustment)
-        finishing_multiplier = calculate_finishing_talent(db, player_id, season)
-        
-        # Step 3: Get environmental adjustments using DDR (Defensive Difficulty Rating)
-        # Fetch dynamic league baselines
-        baselines = get_latest_baselines(db, season)
-        LEAGUE_AVG_XGA_PER_60 = baselines["league_avg_xga_per_60"]
-        LEAGUE_AVG_SV_PCT = baselines["league_avg_sv_pct"]
-        
-        # Calculate DDR (combines team xGA/60 and goalie SV%)
-        # Enable debug mode if needed (can be controlled via environment variable or parameter)
-        debug_ddr = os.getenv("DEBUG_DDR", "false").lower() == "true"
-        opponent_adjustment = get_opponent_strength(
-            db, opponent_team, game_id, game_date, season,
-            LEAGUE_AVG_XGA_PER_60, LEAGUE_AVG_SV_PCT, debug=debug_ddr
-        )
-        
-        b2b_penalty = check_back_to_back(db, player_team, game_date)
-        home_away_adjustment = get_home_away_adjustment(player_team, game)
-        
-        # Apply adjustments in correct order
-        # Base → Talent (goals only) → Environmental
-        # Note: finishing_multiplier applies ONLY to goals
-        final_projection = {
-            "goals": base_projection["goals"] * finishing_multiplier * opponent_adjustment * b2b_penalty * home_away_adjustment,
-            "assists": base_projection["assists"] * opponent_adjustment * b2b_penalty * home_away_adjustment,
-            "sog": base_projection["sog"] * opponent_adjustment * b2b_penalty * home_away_adjustment,
-            "blocks": base_projection["blocks"] * opponent_adjustment * b2b_penalty * home_away_adjustment,
-            # New stats: apply environmental adjustments but NOT finishing_multiplier
-            "ppp": base_projection["ppp"] * opponent_adjustment * b2b_penalty * home_away_adjustment,
-            "shp": base_projection["shp"] * opponent_adjustment * b2b_penalty * home_away_adjustment,
-            "hits": base_projection["hits"] * opponent_adjustment * b2b_penalty * home_away_adjustment,
-            "pim": base_projection["pim"] * opponent_adjustment * b2b_penalty * home_away_adjustment,
-        }
-        
-        # Calculate xG projection (base xG from finishing talent)
-        final_projection["xg"] = base_projection["goals"] / finishing_multiplier if finishing_multiplier > 0 else base_projection["goals"]
-        
-        # Calculate fantasy points (includes all 8 stats)
-        total_projected_points = calculate_fantasy_points(final_projection, scoring_settings, is_goalie=False)
-        
-        # Step 4: Calculate Positional Value Metrics (VOPA)
-        # Get position-specific fantasy points per 60 baseline (REPLACEMENT LEVEL, not mean)
+
+        # SKATER PATH — Reuse physical projection results (no duplicate queries)
+
+        # Extract model components from physical projection
+        position = physical.get("position", "C")
+        player_team = physical.get("player_team", "")
+        opponent_team = physical.get("opponent_team", "")
+        games_played = physical.get("games_played", 0)
+        finishing_multiplier = physical.get("finishing_multiplier", 1.0)
+        opponent_adjustment = physical.get("opponent_adjustment", 1.0)
+        b2b_penalty = physical.get("b2b_penalty", 1.0)
+        home_away_adjustment = physical.get("home_away_adjustment", 1.0)
+        shrinkage_weight = physical.get("shrinkage_weight", 0.0)
+        projected_toi_minutes = physical.get("projected_toi_minutes", 18.0)
+        league_avg_xga = physical.get("league_avg_xga_per_60", 2.5)
+        league_avg_sv_pct = physical.get("league_avg_sv_pct", 0.91)
+
+        # LAYER 2: Calculate fantasy points from physical stats (no DB queries)
+        total_projected_points = calculate_fantasy_points({
+            "goals": physical["goals"],
+            "assists": physical["assists"],
+            "sog": physical["shots"],
+            "blocks": physical["blocks"],
+            "ppp": physical.get("ppp", 0),
+            "shp": physical.get("shp", 0),
+            "hits": physical.get("hits", 0),
+            "pim": physical.get("pim", 0),
+        }, scoring_settings, is_goalie=False)
+
+        # LAYER 3: Calculate VOPA metrics
         pos_replacement_fpts_60 = get_positional_avg_fantasy_pts_per_60(
             db, position, season, scoring_settings, use_replacement_level=True
         )
-        
-        # Get positional standard deviation for Z-Score normalization
         pos_std_dev_fpts_60 = get_positional_std_dev_fantasy_pts_per_60(
             db, position, season
         )
-        
-        # Get league baselines for defensive value
-        league_baselines = get_latest_baselines(db, season)
-        
-        # Get player's projected TOI for this game (in minutes, official NHL.com)
-        # Use season average TOI as projection (can be enhanced with game-specific TOI projection)
-        player_season = db.select(
-            "player_season_stats",
-            select="nhl_toi_seconds,games_played",
-            filters=[("player_id", "eq", player_id), ("season", "eq", season)],
-            limit=1
-        )
-        if player_season and len(player_season) > 0:
-            season_toi_seconds = int(player_season[0].get("nhl_toi_seconds", 0))
-            season_gp = int(player_season[0].get("games_played", 0))
-            if season_gp > 0:
-                projected_toi_minutes = (season_toi_seconds / season_gp) / 60.0
-            else:
-                # Estimate based on position
-                toi_map = {"C": 17.5, "LW": 16.5, "RW": 16.5, "D": 21.0}
-                projected_toi_minutes = toi_map.get(position, 18.0)
-        else:
-            toi_map = {"C": 17.5, "LW": 16.5, "RW": 16.5, "D": 21.0}
-            projected_toi_minutes = toi_map.get(position, 18.0)
-        
-        # Calculate player's projected fantasy points per 60
+
+        # TOI-based calculations
         projected_toi_hours = projected_toi_minutes / 60.0
         player_projected_fpts_60 = (total_projected_points / projected_toi_hours) if projected_toi_hours > 0 else 0.0
-        
-        # 1. Calculate Offensive Value Above Replacement (Per 60) with Z-Score Normalization
-        # Formula: (Player Rate - Replacement Rate) / σ_position
-        # CRITICAL: Check for NULL/0 std dev to avoid ZeroDivisionError
+
+        # Offensive Value Above Replacement
         offensive_paa_60_raw = player_projected_fpts_60 - pos_replacement_fpts_60
         if pos_std_dev_fpts_60 is not None and pos_std_dev_fpts_60 > 0:
             offensive_paa_60_z = offensive_paa_60_raw / pos_std_dev_fpts_60
         else:
-            # Fallback: Use raw difference if std dev is NULL or 0
             offensive_paa_60_z = offensive_paa_60_raw
-        
-        # 2. Calculate Defensive Value (VOPA_D)
-        # Weight = Fantasy Points for 1 Goal (e.g., 3.0)
+
+        # Defensive Value (VOPA_D)
         goal_weight = float(scoring_settings.get("skater", {}).get("goals", 3.0))
-        
-        # Get positional average xGA/60
-        # For now, use league average with position-specific adjustment
-        # TODO: Add positional xGA/60 to league_averages table in future sprint
-        league_avg_xga_per_60 = league_baselines["league_avg_xga_per_60"]
         if position == "D":
-            pos_avg_xga_per_60 = league_avg_xga_per_60 - 0.25  # Defensemen typically 0.2-0.3 lower
+            pos_avg_xga_per_60 = league_avg_xga - 0.25
         else:
-            pos_avg_xga_per_60 = league_avg_xga_per_60
-        
-        # Get player's on-ice xGA/60
+            pos_avg_xga_per_60 = league_avg_xga
+
         player_xga_per_60_raw = get_player_on_ice_xga_per_60(
             db, player_id, player_team, season, last_n_games=10, debug=False
         )
-        
-        # Apply Bayesian shrinkage to xGA/60 for players with small sample sizes
-        # This prevents outlier games from skewing defensive value
+
         if player_xga_per_60_raw is not None:
             player_xga_per_60 = calculate_xga_shrinkage(
-                player_xga_per_60_raw,
-                pos_avg_xga_per_60,
-                games_played,
-                min_games_for_stability=20
+                player_xga_per_60_raw, pos_avg_xga_per_60, games_played, min_games_for_stability=20
             )
         else:
             player_xga_per_60 = None
-        
-        # Calculate defensive value per 60
-        # Positive value if player_xga < pos_avg_xga (suppressing more than average)
+
         if player_xga_per_60 is not None:
             xga_suppressed = pos_avg_xga_per_60 - player_xga_per_60
             defensive_value_60_raw = xga_suppressed * goal_weight
-            
-            # Apply Z-Score normalization to defensive value
-            # For now, use a simplified approach: normalize by goal_weight (since 1 xGA = 1 goal)
-            # In future, we could calculate std dev of xGA suppression if needed
-            # For defensive value, we'll use the same std dev as offensive (simplified)
-            # CRITICAL: Check for NULL/0 std dev to avoid ZeroDivisionError
             if pos_std_dev_fpts_60 is not None and pos_std_dev_fpts_60 > 0:
                 defensive_value_60_z = defensive_value_60_raw / pos_std_dev_fpts_60
             else:
-                # Fallback: Use raw value if std dev is NULL or 0
                 defensive_value_60_z = defensive_value_60_raw
         else:
             xga_suppressed = 0.0
             defensive_value_60_raw = 0.0
             defensive_value_60_z = 0.0
-        
-        # 3. Total VOPA (Projected for the night's TOI) with Z-Score Normalization
-        # VOPA = (Offensive PAA/60 (Z-Score) + Defensive Value/60 (Z-Score)) × Projected TOI (in hours)
-        # This makes VOPA comparable across positions and increases spread
+
         total_vopa = (offensive_paa_60_z + defensive_value_60_z) * projected_toi_hours
-        
-        # Also calculate per-60 metrics for transparency (raw values, not Z-Score)
-        offensive_paa_per_60 = offensive_paa_60_raw
-        defensive_value_per_60 = defensive_value_60_raw
-        
-        # Calculate confidence score with temporal decay and opponent data quality factors
-        # Base confidence from sample size (unchanged)
+
+        # Confidence score with temporal decay and opponent data quality
         base_confidence = min(games_played / 30.0, 1.0) if games_played > 0 else 0.1
-        
-        # Temporal decay: projections farther out are less confident
-        # ~1.0 for tomorrow, ~0.85 at 30 days, ~0.70 at 60 days
         days_out = (game_date - date.today()).days
         temporal_factor = max(0.50, 1.0 - (days_out * 0.005))
-        
-        # Opponent data quality: extreme adjustments = less confidence
-        # If opponent_adjustment is very high (>1.2) or very low (<0.8), reduce confidence
         opp_deviation = abs(opponent_adjustment - 1.0)
         opponent_factor = max(0.75, 1.0 - opp_deviation)
-        
         confidence_score = round(base_confidence * temporal_factor * opponent_factor, 2)
 
         result = {
             "player_id": player_id,
             "game_id": game_id,
             "projection_date": game_date.isoformat(),
-            "projected_goals": round(final_projection["goals"], 3),
-            "projected_assists": round(final_projection["assists"], 3),
-            "projected_sog": round(final_projection["sog"], 3),
-            "projected_blocks": round(final_projection["blocks"], 3),
-            "projected_ppp": round(final_projection["ppp"], 3),
-            "projected_shp": round(final_projection["shp"], 3),
-            "projected_hits": round(final_projection["hits"], 3),
-            "projected_pim": round(final_projection["pim"], 3),
-            "projected_xg": round(final_projection["xg"], 3),
+            "projected_goals": round(physical["goals"], 3),
+            "projected_assists": round(physical["assists"], 3),
+            "projected_sog": round(physical["shots"], 3),
+            "projected_blocks": round(physical["blocks"], 3),
+            "projected_ppp": round(physical.get("ppp", 0), 3),
+            "projected_shp": round(physical.get("shp", 0), 3),
+            "projected_hits": round(physical.get("hits", 0), 3),
+            "projected_pim": round(physical.get("pim", 0), 3),
+            "projected_xg": round(physical.get("xg", 0), 3),
             "total_projected_points": round(total_projected_points, 3),
-            "base_ppg": round(base_projection["ppg"], 3),
+            "base_ppg": round(physical.get("base_ppg", 0), 3),
             "shrinkage_weight": round(shrinkage_weight, 3),
             "finishing_multiplier": round(finishing_multiplier, 3),
             "opponent_adjustment": round(opponent_adjustment, 3),
             "b2b_penalty": round(b2b_penalty, 3),
             "home_away_adjustment": round(home_away_adjustment, 3),
-            "confidence_score": round(confidence_score, 2),
+            "confidence_score": confidence_score,
             "calculation_method": "hybrid_bayesian",
             "model_baselines": {
-                "league_avg_sv_pct": LEAGUE_AVG_SV_PCT,
-                "league_avg_xga_per_60": LEAGUE_AVG_XGA_PER_60
+                "league_avg_sv_pct": league_avg_sv_pct,
+                "league_avg_xga_per_60": league_avg_xga
             },
-            "projected_paa": round(offensive_paa_60_raw * projected_toi_hours, 3),  # Points Above Average (fantasy points, raw)
-            "projected_paa_per_60": round(offensive_paa_60_raw, 3),  # PAA per 60 minutes (raw)
+            "projected_paa": round(offensive_paa_60_raw * projected_toi_hours, 3),
+            "projected_paa_per_60": round(offensive_paa_60_raw, 3),
             "on_ice_xga_per_60": round(player_xga_per_60, 3) if player_xga_per_60 else None,
             "on_ice_xga_per_60_raw": round(player_xga_per_60_raw, 3) if player_xga_per_60_raw else None,
-            "xga_suppressed": round(xga_suppressed, 3),  # xGA suppressed vs positional average
-            "defensive_value": round(defensive_value_60_raw * projected_toi_hours, 3),  # Defensive value in fantasy points
-            "defensive_value_per_60": round(defensive_value_60_raw, 3),  # Defensive value per 60 (raw)
-            "defensive_value_per_60_z": round(defensive_value_60_z, 3),  # Defensive value per 60 (Z-Score normalized)
-            "total_vopa": round(total_vopa, 3),  # Total Value Over Positional Average (Z-Score normalized)
-            "offensive_paa_per_60": round(offensive_paa_60_raw, 3),  # Offensive PAA per 60 (raw)
-            "offensive_paa_per_60_z": round(offensive_paa_60_z, 3),  # Offensive PAA per 60 (Z-Score normalized)
-            "position_replacement_fpts_per_60": round(pos_replacement_fpts_60, 3),  # Replacement level (25th percentile)
-            "position_std_dev_fpts_per_60": round(pos_std_dev_fpts_60, 3),  # Standard deviation for Z-Score
+            "xga_suppressed": round(xga_suppressed, 3),
+            "defensive_value": round(defensive_value_60_raw * projected_toi_hours, 3),
+            "defensive_value_per_60": round(defensive_value_60_raw, 3),
+            "defensive_value_per_60_z": round(defensive_value_60_z, 3),
+            "total_vopa": round(total_vopa, 3),
+            "offensive_paa_per_60": round(offensive_paa_60_raw, 3),
+            "offensive_paa_per_60_z": round(offensive_paa_60_z, 3),
+            "position_replacement_fpts_per_60": round(pos_replacement_fpts_60, 3),
+            "position_std_dev_fpts_per_60": round(pos_std_dev_fpts_60, 3),
             "position_avg_xga_per_60": round(pos_avg_xga_per_60, 3),
             "projected_toi_minutes": round(projected_toi_minutes, 2),
             "is_goalie": False,
             "season": season,
         }
 
-        # LAYER 0: Monte Carlo Uncertainty Propagation (Citrus 3.1)
-        # Wraps point estimates in proper probability distributions
+        # Monte Carlo Uncertainty Propagation (Citrus 3.1)
         if UNCERTAINTY_AVAILABLE:
             try:
                 player_ctx = build_player_context(
                     db, player_id, season, games_played,
                     opponent_team=opponent_team, position=position
                 )
-                # Reuse a per-process engine to avoid redundant Cholesky decompositions
                 if not hasattr(calculate_daily_projection, '_unc_engine'):
                     calculate_daily_projection._unc_engine = UncertaintyEngine(n_samples=5000)
                     calculate_daily_projection._unc_fail_count = 0
-                # Circuit breaker: if >20 consecutive failures, stop trying this run
                 if calculate_daily_projection._unc_fail_count < 20:
                     result = enrich_projection_with_uncertainty(
                         result, player_ctx, engine=calculate_daily_projection._unc_engine
                     )
-                    calculate_daily_projection._unc_fail_count = 0  # Reset on success
+                    calculate_daily_projection._unc_fail_count = 0
             except Exception as unc_err:
                 calculate_daily_projection._unc_fail_count = getattr(
                     calculate_daily_projection, '_unc_fail_count', 0
@@ -3164,7 +3056,7 @@ def calculate_daily_projection(
                                  f"disabling for remainder of this run. Last error: {unc_err}")
 
         return result
-        
+
     except Exception as e:
         logger.error(f"❌ Error calculating projection for player {player_id}, game {game_id}: {e}")
         import traceback

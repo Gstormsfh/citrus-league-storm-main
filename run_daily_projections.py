@@ -3,8 +3,10 @@
 run_daily_projections.py
 
 Citrus Projections 3.0 - Batch Daily Projections with Parallel Processing
-Calculates daily fantasy point projections for all rostered players across all leagues.
-Uses multiprocessing for sub-60-second execution on 600+ players.
+Calculates daily projections for ALL active NHL players (league-agnostic).
+Uses DEFAULT_FALLBACK_SCORING for total_projected_points as a convenience baseline.
+League-specific scoring is applied dynamically on the frontend via ScoringCalculator.
+Uses multiprocessing for fast execution on 600+ players.
 
 Usage:
     python run_daily_projections.py [--date YYYY-MM-DD] [--force] [--workers N] [--chunksize N]
@@ -99,13 +101,16 @@ def get_fresh_supabase_client() -> SupabaseRest:
     return SupabaseRest(SUPABASE_URL, SUPABASE_KEY)
 
 
-def get_rostered_players(db: SupabaseRest, target_date: date, season: int) -> List[Tuple[int, int, Optional[str]]]:
+def get_active_players_with_games(db: SupabaseRest, target_date: date, season: int) -> List[Tuple[int, int]]:
     """
-    Get all active players who have games on target date (LEFT JOIN approach).
-    
+    Get all active NHL players who have games on target date.
+
+    Universal approach: finds ALL active players on playing teams, regardless of
+    league roster status. Projections are league-agnostic — scoring is applied
+    dynamically on the frontend using ScoringCalculator.
+
     Returns:
-        List of (player_id, game_id, league_id) tuples
-        - league_id is None if player is not rostered (still calculate projection)
+        List of (player_id, game_id) tuples
     """
     # Get all games on target date
     games = db.select(
@@ -113,10 +118,10 @@ def get_rostered_players(db: SupabaseRest, target_date: date, season: int) -> Li
         select="game_id,home_team,away_team",
         filters=[("game_date", "eq", target_date.isoformat()), ("season", "eq", season)]
     )
-    
+
     if not games:
         return []
-    
+
     # Get all teams playing on this date
     playing_teams = set()
     game_map = {}  # team -> game_id
@@ -128,8 +133,8 @@ def get_rostered_players(db: SupabaseRest, target_date: date, season: int) -> Li
         playing_teams.add(away_team)
         game_map[home_team] = game_id
         game_map[away_team] = game_id
-    
-    # LEFT JOIN Pattern: Get ALL players on playing teams (not just rostered)
+
+    # Get ALL players on playing teams
     logger.info(f"   Fetching players from {len(playing_teams)} teams...")
     all_players = db.select(
         "player_directory",
@@ -138,18 +143,17 @@ def get_rostered_players(db: SupabaseRest, target_date: date, season: int) -> Li
             ("team_abbrev", "in", list(playing_teams)),
             ("season", "eq", season)
         ],
-        limit=100000  # No artificial cap — supports full league across multiple seasons
+        limit=100000
     )
     logger.info(f"   Found {len(all_players)} players")
-    
+
     if not all_players:
         return []
-    
-    # LEFT JOIN with player_season_stats to filter inactive players
+
+    # Filter to active players (games_played > 0 in player_season_stats)
     player_ids = [int(p.get("player_id")) for p in all_players if p.get("player_id")]
     active_players = []
-    
-    # Query player_season_stats in batches to check games_played > 0
+
     logger.info(f"   Checking active players ({len(player_ids)} total)...")
     for i in range(0, len(player_ids), 500):
         batch = player_ids[i:i+500]
@@ -159,100 +163,50 @@ def get_rostered_players(db: SupabaseRest, target_date: date, season: int) -> Li
             "player_season_stats",
             select="player_id,games_played",
             filters=[("player_id", "in", batch), ("season", "eq", season)],
-            limit=100000  # Must exceed batch size — no artificial cap
+            limit=100000
         )
-        
-        # Create map of player_id -> games_played
+
         games_played_map = {}
         for stat in stats_batch:
             pid = stat.get("player_id")
             if pid:
                 games_played_map[int(pid)] = int(stat.get("games_played", 0))
-        
-        # Filter to active players (games_played > 0)
+
         for player in all_players:
             pid = int(player.get("player_id", 0))
             if pid in batch and games_played_map.get(pid, 0) > 0:
                 active_players.append(player)
     logger.info(f"   Found {len(active_players)} active players")
-    
-    # LEFT JOIN with draft_picks to get league_id (if rostered)
-    # Create map of player_id -> league_id from draft_picks
-    # OPTIMIZATION: Only fetch picks for active players, not all picks
-    logger.info(f"   Fetching draft picks for {len(active_players)} active players...")
-    active_player_ids_list = [int(p.get("player_id", 0)) for p in active_players if p.get("player_id")]
-    all_picks = db.select(
-        "draft_picks",
-        select="player_id,league_id",
-        filters=[("player_id", "in", active_player_ids_list)] if active_player_ids_list else [],
-        limit=100000  # No artificial cap — supports multi-season, multi-league scenarios
-    )
-    logger.info(f"   Found {len(all_picks)} draft picks")
-    
-    player_to_league = {}
-    for pick in all_picks:
-        pid_str = pick.get("player_id")
-        if pid_str:
-            try:
-                pid = int(pid_str)
-                league_id = pick.get("league_id")
-                if league_id:
-                    player_to_league[pid] = league_id
-            except (ValueError, TypeError):
-                continue
-    
-    # Build result list: (player_id, game_id, league_id)
-    # league_id is None if not rostered (LEFT JOIN behavior)
+
+    # Build result list: (player_id, game_id) — no league coupling
+    seen = set()
     result = []
     for player in active_players:
         player_id = int(player.get("player_id", 0))
         if not player_id:
             continue
-        
+
         team_abbrev = player.get("team_abbrev", "")
         if not team_abbrev or team_abbrev not in playing_teams:
             continue
-        
+
         game_id = game_map.get(team_abbrev)
         if not game_id:
             continue
-        
-        # LEFT JOIN: league_id from draft_picks, or None if not rostered
-        league_id = player_to_league.get(player_id)
-        
-        result.append((player_id, game_id, league_id))
-    
-    # Remove duplicates (same player, same game, different leagues)
-    # If player is in multiple leagues, use first league_id found
-    unique_players = {}
-    for player_id, game_id, league_id in result:
+
         key = (player_id, game_id)
-        if key not in unique_players:
-            unique_players[key] = league_id
-    
-    return [(pid, gid, lid) for (pid, gid), lid in unique_players.items()]
+        if key not in seen:
+            seen.add(key)
+            result.append(key)
+
+    return result
 
 
-def get_league_scoring_settings(db: SupabaseRest, league_id: str) -> Dict[str, Any]:
-    """Get scoring settings for a league, with defaults if missing."""
-    try:
-        leagues = db.select(
-            "leagues",
-            select="scoring_settings",
-            filters=[("id", "eq", league_id)],
-            limit=1
-        )
-        
-        if leagues and len(leagues) > 0:
-            settings = leagues[0].get("scoring_settings")
-            if settings and isinstance(settings, dict):
-                return settings
-        
-        # Return defaults — must match DEFAULT_SCORING in src/utils/scoringUtils.ts
-        return DEFAULT_FALLBACK_SCORING
-    except Exception as e:
-        logger.warning(f"⚠️  Warning: Could not fetch scoring settings for league {league_id}: {e}")
-        return DEFAULT_FALLBACK_SCORING
+## get_league_scoring_settings() — REMOVED
+## League-specific scoring is no longer applied in the pipeline.
+## The pipeline uses DEFAULT_FALLBACK_SCORING universally.
+## League-specific scoring is applied dynamically on the frontend
+## via ScoringCalculator (src/utils/scoringUtils.ts).
 
 
 def calculate_player_projection_worker(args: Tuple[int, int, date, int, Dict[str, Any]]) -> Dict[str, Any]:
@@ -722,7 +676,7 @@ def populate_gp_last_10_metric(db: SupabaseRest, season: int) -> int:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Calculate daily projections for all rostered players with parallel processing"
+        description="Calculate daily projections for all active NHL players with parallel processing"
     )
     parser.add_argument(
         "--date",
@@ -872,34 +826,28 @@ def main():
             logger.info(f"  DATE {date_idx + 1}/{len(target_dates)}: {target_date}")
             logger.info(f"{'─' * 60}")
 
-        # Step 2: Get players with games on this date
-        logger.info("[2/7] Finding players with games on {target_date}...".format(target_date=target_date))
+        # Step 2: Get ALL active players with games on this date (league-agnostic)
+        logger.info("[2/6] Finding active players with games on {target_date}...".format(target_date=target_date))
         sys.stdout.flush()
-        rostered_players = get_rostered_players(db, target_date, args.season)
+        active_players = get_active_players_with_games(db, target_date, args.season)
 
-        if not rostered_players:
-            logger.warning(f"⚠️  No players found with games on {target_date}. Is there an NHL game scheduled?")
+        if not active_players:
+            logger.warning(f"⚠️  No active players found with games on {target_date}. Is there an NHL game scheduled?")
             continue
 
-        logger.info(f"       {len(rostered_players)} players across teams playing on {target_date}")
+        logger.info(f"       {len(active_players)} active players across teams playing on {target_date}")
         sys.stdout.flush()
 
-        # Step 3: Group by league to get scoring settings
-        logger.info("[3/7] Loading league scoring settings...")
-        league_scoring = {}
-        unique_leagues = set(league_id for _, _, league_id in rostered_players if league_id is not None)
+        # Step 3: REMOVED — League scoring settings no longer loaded in pipeline.
+        # Projections use DEFAULT_FALLBACK_SCORING universally.
+        # League-specific scoring is applied dynamically on the frontend.
 
-        for league_id in unique_leagues:
-            league_scoring[league_id] = get_league_scoring_settings(db, league_id)
-
-        logger.info(f"       {len(unique_leagues)} leagues loaded")
-
-        # Step 4: Check existing projections (unless --force)
+        # Step 3: Check existing projections (unless --force)
         existing_projections = set()
         if args.force:
-            logger.info("[4/7] --force set, recalculating ALL projections")
+            logger.info("[3/6] --force set, recalculating ALL projections")
         else:
-            logger.info("[4/7] Checking for existing projections...")
+            logger.info("[3/6] Checking for existing projections...")
             offset = 0
             while True:
                 batch = db.select(
@@ -919,28 +867,16 @@ def main():
             if existing_projections:
                 logger.info(f"       {len(existing_projections)} already exist, will skip")
 
-        # Prepare worker arguments
+        # Prepare worker arguments — universal scoring for all players
         worker_args = []
         skipped = 0
 
-        # Build a fallback: use the first league's scoring settings for unrostered players
-        # (free agents still exist in a league context — use league settings, not hardcoded defaults)
-        fallback_scoring = None
-        if league_scoring:
-            fallback_scoring = next(iter(league_scoring.values()))
-        if not fallback_scoring:
-            fallback_scoring = DEFAULT_FALLBACK_SCORING
-
-        for player_id, game_id, league_id in rostered_players:
+        for player_id, game_id in active_players:
             # Skip if projection already exists (unless --force)
             if not args.force and (player_id, game_id) in existing_projections:
                 skipped += 1
                 continue
-            # Use the player's league scoring, or fall back to first league's settings
-            scoring_settings = league_scoring.get(league_id) if league_id else fallback_scoring
-            if not scoring_settings:
-                scoring_settings = fallback_scoring
-            worker_args.append((player_id, game_id, target_date, args.season, scoring_settings))
+            worker_args.append((player_id, game_id, target_date, args.season, DEFAULT_FALLBACK_SCORING))
 
         logger.info(f"       {len(worker_args)} to calculate, {skipped} skipped")
 
@@ -949,8 +885,8 @@ def main():
             continue
         logger.info("")
 
-        # Step 5: Calculate projections
-        logger.info("[5/7] Calculating projections...")
+        # Step 4: Calculate projections
+        logger.info("[4/6] Calculating projections...")
         total = len(worker_args)
         start_time = time.time()
         results = []
@@ -1065,7 +1001,7 @@ def main():
         stats = {}
 
         if not args.skip_outlier_detection and projections:
-            logger.info("[6/7] Quality gate — outlier detection...")
+            logger.info("[5/6] Quality gate — outlier detection...")
             rejected, review, valid, stats = detect_outliers(
                 projections,
                 threshold=args.threshold,
@@ -1140,7 +1076,7 @@ def main():
 
         upserted = 0
         if projections_to_upsert:
-            logger.info(f"[7/7] Saving {len(projections_to_upsert)} projections to database...")
+            logger.info(f"[6/6] Saving {len(projections_to_upsert)} projections to database...")
             if args.reject_outliers and rejected_projections:
                 logger.info(f"       (skipping {len(rejected_projections)} rejected)")
             upsert_start = time.time()
@@ -1156,7 +1092,7 @@ def main():
         logger.info("=" * 60)
         logger.info(f"  Date:       {target_date}")
         logger.info(f"  Time:       {elapsed_time:.1f}s")
-        logger.info(f"  Players:    {len(rostered_players)} (teams with games)")
+        logger.info(f"  Players:    {len(active_players)} (teams with games)")
         logger.info(f"  Calculated: {len(successes)} OK, {len(failures)} failed")
         if not args.skip_outlier_detection and projections:
             logger.info(f"  Quality:    {len(valid_projections)} valid, {len(review_projections)} review, {len(rejected_projections)} rejected")
