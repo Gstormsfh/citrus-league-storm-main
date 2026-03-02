@@ -3483,6 +3483,31 @@ const DraftRoom = () => {
                                 canUndo={isCommissioner && draftHistory.length > 0}
                                 pickTimeLimit={draftSettings.pickTimeLimit}
                               />
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="destructive" size="sm" className="w-full">
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete Draft &amp; Start Over
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Draft Completely?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This will permanently delete ALL draft picks, reset the draft order, and return everyone to the lobby. This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={handleNuclearDeleteDraft}
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    >
+                                      Yes, Delete Everything
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
                             </div>
                           </details>
                         )}
