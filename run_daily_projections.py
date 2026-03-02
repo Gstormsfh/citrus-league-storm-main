@@ -138,7 +138,7 @@ def get_rostered_players(db: SupabaseRest, target_date: date, season: int) -> Li
             ("team_abbrev", "in", list(playing_teams)),
             ("season", "eq", season)
         ],
-        limit=10000  # Large limit for all players
+        limit=100000  # No artificial cap — supports full league across multiple seasons
     )
     logger.info(f"   Found {len(all_players)} players")
     
@@ -151,15 +151,15 @@ def get_rostered_players(db: SupabaseRest, target_date: date, season: int) -> Li
     
     # Query player_season_stats in batches to check games_played > 0
     logger.info(f"   Checking active players ({len(player_ids)} total)...")
-    for i in range(0, len(player_ids), 100):
-        batch = player_ids[i:i+100]
-        if i % 200 == 0:
-            logger.info(f"   Checking batch {i//100 + 1}...")
+    for i in range(0, len(player_ids), 500):
+        batch = player_ids[i:i+500]
+        if i % 1000 == 0:
+            logger.info(f"   Checking batch {i//500 + 1}...")
         stats_batch = db.select(
             "player_season_stats",
             select="player_id,games_played",
             filters=[("player_id", "in", batch), ("season", "eq", season)],
-            limit=100
+            limit=100000  # Must exceed batch size — no artificial cap
         )
         
         # Create map of player_id -> games_played
@@ -185,7 +185,7 @@ def get_rostered_players(db: SupabaseRest, target_date: date, season: int) -> Li
         "draft_picks",
         select="player_id,league_id",
         filters=[("player_id", "in", active_player_ids_list)] if active_player_ids_list else [],
-        limit=10000
+        limit=100000  # No artificial cap — supports multi-season, multi-league scenarios
     )
     logger.info(f"   Found {len(all_picks)} draft picks")
     
