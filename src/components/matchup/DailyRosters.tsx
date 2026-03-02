@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Lock, Unlock } from 'lucide-react';
 import { MatchupPlayer } from './types';
 import { MatchupService, DailyLineupPlayer } from '@/services/MatchupService';
-import { getTodayMST } from '@/utils/timezoneUtils';
+import { getTodayMST, parseDateStringLocal } from '@/utils/timezoneUtils';
 import { logger } from '@/utils/logger';
 
 interface DailyRostersProps {
@@ -47,14 +47,20 @@ export const DailyRosters = ({
   const [initialLoading, setInitialLoading] = useState(true);
 
   // Get all dates in the week
+  // CRITICAL: Use parseDateStringLocal to avoid UTC interpretation.
+  // new Date("2026-03-01") parses as UTC midnight, which in MST (UTC-7)
+  // becomes Feb 28 5pm — shifting the week back by one day.
   const getWeekDates = (start: string, end: string): string[] => {
     const dates: string[] = [];
-    const startDate = new Date(start);
-    const endDate = new Date(end);
+    const startDate = parseDateStringLocal(start);
+    const endDate = parseDateStringLocal(end);
     const current = new Date(startDate);
 
     while (current <= endDate) {
-      dates.push(current.toISOString().split('T')[0]);
+      const year = current.getFullYear();
+      const month = String(current.getMonth() + 1).padStart(2, '0');
+      const day = String(current.getDate()).padStart(2, '0');
+      dates.push(`${year}-${month}-${day}`);
       current.setDate(current.getDate() + 1);
     }
     return dates;
@@ -143,16 +149,14 @@ export const DailyRosters = ({
   }, [matchupId, teamId, opponentTeamId, weekStart, weekEnd, allDates.join(',')]);
 
   const formatDate = (dateStr: string): string => {
-    const date = new Date(dateStr);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const dateOnly = new Date(date);
-    dateOnly.setHours(0, 0, 0, 0);
-
-    if (dateOnly.getTime() === today.getTime()) {
+    // Use string comparison for "Today" check to avoid UTC parsing issues
+    const todayStr = getTodayMST();
+    if (dateStr === todayStr) {
       return 'Today';
     }
 
+    // Parse using local timezone to avoid UTC shift
+    const date = parseDateStringLocal(dateStr);
     return date.toLocaleDateString('en-US', {
       weekday: 'short',
       month: 'short',
