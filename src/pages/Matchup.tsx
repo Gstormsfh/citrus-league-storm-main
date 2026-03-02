@@ -5265,7 +5265,7 @@ const Matchup = () => {
           {/* Main Lineup View */}
           <div className="mt-6 matchup-wrapper" style={{ boxSizing: 'border-box', padding: 0, margin: 0 }}>
             {userLeagueState === 'logged-in-no-league' ? (
-              <div className="grid gap-6 lg:gap-8 matchup-grid" style={{ gridTemplateColumns: '1fr 1fr', width: '100%', display: 'grid', boxSizing: 'border-box', margin: 0, padding: 0 }}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 matchup-grid" style={{ width: '100%', boxSizing: 'border-box', margin: 0, padding: 0 }}>
                 <LeagueCreationCTA 
                   title="Your Team Here"
                   description="Create your league to start building your roster and competing in matchups."
@@ -5375,7 +5375,25 @@ const Matchup = () => {
           )}
             </div>
 
-            {/* Dynamic Matchup Sidebar - Hidden on mobile, shown on desktop */}
+            {/* Dynamic Matchup Sidebar - Compact on mobile, full sidebar on desktop */}
+            {/* Mobile: Rendered inline above lineup in main content */}
+            <div className="lg:hidden px-2 order-1">
+              <MatchupSidebar
+                myStarters={weeklyMyStarters}
+                opponentStarters={weeklyOpponentStarters}
+                myTeamScore={parseFloat(myTeamPoints) || 0}
+                opponentTeamScore={parseFloat(opponentTeamPoints) || 0}
+                myTeamName={userLeagueState === 'active-user' ? (userTeam?.team_name || 'My Team') : 'Citrus Crushers'}
+                opponentTeamName={userLeagueState === 'active-user' ? (opponentTeam?.team_name || 'Opponent') : 'Thunder Titans'}
+                myTeamProjection={myTotalProjection}
+                opponentTeamProjection={opponentTotalProjection}
+                onPlayerClick={(player) => {
+                  setSelectedPlayer(player as any);
+                  setIsPlayerDialogOpen(true);
+                }}
+              />
+            </div>
+            {/* Desktop: Sticky sidebar */}
             <aside className="hidden lg:block w-full lg:w-auto order-2 lg:order-1">
               <div className="lg:sticky lg:top-24">
                 <MatchupSidebar

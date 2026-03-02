@@ -3450,6 +3450,22 @@ const DraftRoom = () => {
                           </Card>
                         )}
 
+                        {/* Draft Queue on mobile */}
+                        {draftQueue.length > 0 && (
+                          <DraftQueue
+                            queue={draftQueue}
+                            players={availablePlayers}
+                            draftedPlayers={Array.from(draftedPlayerIds)}
+                            onQueueChange={handleQueueChange}
+                            onDraftFromQueue={handleDraftFromQueue}
+                            isDraftActive={draftPhase === DraftPhase.ACTIVE}
+                            isYourTurn={currentTeam?.owner_id === user?.id}
+                            leagueId={leagueId || undefined}
+                            currentPick={draftState?.currentPick}
+                            totalPicks={teams.length * draftSettings.rounds}
+                          />
+                        )}
+
                         {/* Commissioner controls on mobile */}
                         {isCommissioner && (
                           <details className="group">
