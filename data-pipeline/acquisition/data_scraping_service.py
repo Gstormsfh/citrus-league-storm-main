@@ -20,10 +20,16 @@ import random
 import logging
 import signal
 import datetime as dt
+from pathlib import Path
 from typing import Optional, Dict, Any, List, Tuple
 from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from data_pipeline.utils.citrus_request import citrus_request
+
+# Resolve script paths relative to the data-pipeline directory
+DATA_PIPELINE_DIR = Path(__file__).resolve().parent.parent
+SYNC_PPP_SCRIPT = str(DATA_PIPELINE_DIR / "projections" / "sync_ppp_from_gamelog.py")
+RECONCILE_SCRIPT = str(DATA_PIPELINE_DIR / "scoring" / "reconcile_player_stats.py")
 
 load_dotenv()
 
@@ -392,7 +398,7 @@ def run_unified_loop() -> Tuple[str, int]:
         try:
             import subprocess
             ppp_result = subprocess.run(
-                [sys.executable, "sync_ppp_from_gamelog.py", "--days", "1"],
+                [sys.executable, SYNC_PPP_SCRIPT, "--days", "1"],
                 capture_output=True,
                 text=True,
                 timeout=600  # 10 min timeout
@@ -486,7 +492,7 @@ def run_unified_loop() -> Tuple[str, int]:
             try:
                 import subprocess
                 result = subprocess.run(
-                    [sys.executable, "reconcile_player_stats.py", "--recent", "--auto-fix"],
+                    [sys.executable, RECONCILE_SCRIPT, "--recent", "--auto-fix"],
                     capture_output=True, text=True, timeout=1800
                 )
                 if result.returncode == 0:
@@ -528,7 +534,7 @@ def run_unified_loop() -> Tuple[str, int]:
             try:
                 import subprocess
                 result = subprocess.run(
-                    [sys.executable, "sync_ppp_from_gamelog.py", "--days", "3"],
+                    [sys.executable, SYNC_PPP_SCRIPT, "--days", "3"],
                     capture_output=True, text=True, timeout=600
                 )
                 if result.returncode == 0:
