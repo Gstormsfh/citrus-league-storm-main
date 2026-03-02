@@ -637,6 +637,7 @@ def update_player_game_stats_nhl_columns(
             
             update_data = {
                 **stats,
+                "position_code": position_code,  # Fix: was being popped but never included in updates
                 "updated_at": datetime.now().isoformat()
             }
             

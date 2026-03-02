@@ -222,8 +222,13 @@ def compute_multi_position_eligibility(
     if not player_ids:
         return {}
 
+    VALID_POSITIONS = {"C", "LW", "RW", "D", "G"}
+    GOALIE_POSITIONS = {"G"}
+
     # Query game-level position data in batches
     position_counts: Dict[int, Dict[str, int]] = {}  # player_id -> {position: game_count}
+    _diag_null_count = 0
+    _diag_total_rows = 0
 
     for i in range(0, len(player_ids), 100):
         batch = player_ids[i:i+100]
@@ -240,22 +245,36 @@ def compute_multi_position_eligibility(
             )
 
             for row in rows:
+                _diag_total_rows += 1
                 pid = int(row.get("player_id", 0))
-                pos = _normalize_position(row.get("position_code", ""))
-                if pid and pos:
+                raw_pos = row.get("position_code") or ""
+                pos = _normalize_position(raw_pos)
+                # Skip invalid/generic positions (NULL, empty, "F" fallback)
+                if pid and pos and pos in VALID_POSITIONS:
                     if pid not in position_counts:
                         position_counts[pid] = {}
                     position_counts[pid][pos] = position_counts[pid].get(pos, 0) + 1
+                elif pid and not pos:
+                    _diag_null_count += 1
         except Exception as e:
             print(f"   [sync_rosters] WARNING: Error fetching game positions batch: {e}")
             continue
 
+    # Diagnostic: report data quality
+    _players_with_data = len(position_counts)
+    if _diag_total_rows > 0:
+        null_pct = (_diag_null_count / _diag_total_rows * 100)
+        print(f"   [sync_rosters] Position data: {_diag_total_rows} game rows, "
+              f"{_players_with_data} players with position data, "
+              f"{_diag_null_count} NULL position_codes ({null_pct:.0f}%)")
+        if null_pct > 50:
+            print(f"   [sync_rosters] NOTE: Most position_codes are NULL. "
+                  f"Run scrape_per_game_nhl_stats.py to backfill game positions.")
+    else:
+        print(f"   [sync_rosters] Position data: no game rows found for season {season}")
+
     # Build eligibility map
     eligibility: Dict[int, List[str]] = {}
-
-    # Skater positions (forwards + defense) and goalie are separate pools
-    SKATER_POSITIONS = {"C", "LW", "RW", "D"}
-    GOALIE_POSITIONS = {"G"}
 
     for pid in player_ids:
         pos_counts = position_counts.get(pid, {})
@@ -269,8 +288,11 @@ def compute_multi_position_eligibility(
             continue
 
         # Merge: ensure API primary position is represented
-        if api_primary and api_primary not in pos_counts:
+        if api_primary and api_primary in VALID_POSITIONS and api_primary not in pos_counts:
             pos_counts[api_primary] = 0  # 0 games but it's their listed position
+
+        # Filter to valid positions only (skip "F" fallback, empty, etc.)
+        pos_counts = {p: c for p, c in pos_counts.items() if p in VALID_POSITIONS}
 
         # Sort positions by game count (most played first)
         sorted_positions = sorted(pos_counts.items(), key=lambda x: -x[1])
@@ -467,6 +489,17 @@ def sync_rosters(
     # Batch update eligible_positions
     if multi_pos_updates:
         print(f"   [sync_rosters] {multi_pos_count} players have multi-position eligibility")
+        # Show a few examples
+        examples = multi_pos_updates[:5]
+        for ex in examples:
+            name = ""
+            if api_players and ex["player_id"] in api_players:
+                name = api_players[ex["player_id"]].get("full_name", "")
+            elif ex["player_id"] in current_dir:
+                name = current_dir[ex["player_id"]].get("full_name", "")
+            print(f"      {name or ex['player_id']}: {ex['eligible_positions']}")
+        if len(multi_pos_updates) > 5:
+            print(f"      ... and {len(multi_pos_updates) - 5} more")
         for update in multi_pos_updates:
             try:
                 db.update(
