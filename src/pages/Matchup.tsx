@@ -634,7 +634,7 @@ const Matchup = () => {
           const { PlayerService: PS } = await import('@/services/PlayerService');
           const allPlayers = await PS.getAllPlayers();
           const { team1Roster, team2Roster, team1SlotAssignments, team2SlotAssignments, error: rosterError } =
-            await MatchupService.getMatchupRosters(guestMatchup as MatchupType, allPlayers, 'America/Denver', undefined);
+            await MatchupService.getMatchupRosters(matchupWithDates, allPlayers, 'America/Denver', undefined);
           if (rosterError) throw rosterError;
 
           setDemoMyTeam(team1Roster);
@@ -880,7 +880,7 @@ const Matchup = () => {
         const allPlayers = await PlayerService.getAllPlayers();
 
         const { team1Roster, team2Roster, team1SlotAssignments, team2SlotAssignments, error: rosterError } =
-          await MatchupService.getMatchupRosters(guestMatchup as MatchupType, allPlayers, 'America/Denver', undefined);
+          await MatchupService.getMatchupRosters(matchupWithDates, allPlayers, 'America/Denver', undefined);
 
         if (rosterError) throw rosterError;
 
