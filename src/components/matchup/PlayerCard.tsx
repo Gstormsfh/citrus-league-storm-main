@@ -493,7 +493,12 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
         ) : (
           // CASE 3: Show projection bar (game not final yet) - VARSITY SCOREBOARD - COMPACT
           <div className="player-projection-bar-container relative bg-gradient-to-br from-citrus-peach/10 via-citrus-cream/30 to-citrus-sage/10 p-1 rounded border border-citrus-peach/40 shadow-sm">
-            {/* Label + Confidence Badge - HIDDEN ON MOBILE */}
+            {/* Label - MOBILE */}
+            <div className="lg:hidden flex text-[8px] font-varsity font-bold text-citrus-forest uppercase tracking-wider mb-0.5 items-center gap-0.5 bg-[#E8EED9]/50 backdrop-blur-sm/70 px-1 py-0 rounded border border-citrus-peach/40 w-fit mx-auto">
+              <span className="w-1 h-1 rounded-full bg-citrus-orange animate-pulse" />
+              Projected
+            </div>
+            {/* Label + Confidence Badge - DESKTOP */}
             <div className="hidden lg:flex text-[7px] font-varsity font-bold text-citrus-forest uppercase tracking-wider mb-0.5 items-center gap-1 w-full">
               <div className="flex items-center gap-0.5 bg-[#E8EED9]/50 backdrop-blur-sm/70 px-1 py-0 rounded border border-citrus-peach/40 w-fit">
                 <span className="w-1 h-1 rounded-full bg-citrus-orange animate-pulse" />

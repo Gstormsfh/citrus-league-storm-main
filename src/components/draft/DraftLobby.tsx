@@ -270,23 +270,23 @@ export const DraftLobby = ({
   return (
     <div className="space-y-6">
       {/* Draft Header */}
-      <div className="text-center space-y-4">
+      <div className="text-center space-y-2 sm:space-y-4">
         <div className="flex items-center justify-center gap-2">
-          <Trophy className="h-8 w-8 text-primary" />
-          <h1 className="text-3xl font-bold">NHL Fantasy Draft Lobby</h1>
+          <Trophy className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
+          <h1 className="text-xl sm:text-3xl font-bold">Draft Lobby</h1>
         </div>
-        <p className="text-muted-foreground max-w-2xl mx-auto">
+        <p className="text-sm sm:text-base text-muted-foreground max-w-2xl mx-auto px-4">
           {hasExistingDraft
             ? `Draft in progress (Pick ${currentPick} of ${totalPicks}). Click "Continue Draft" to rejoin.`
-            : isCommissioner 
+            : isCommissioner
               ? "Configure your draft settings and wait for all managers to join before starting the draft."
               : "Waiting for the league commissioner to start the draft. Review the settings below."}
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Draft Settings */}
-        <div className="lg:col-span-2 space-y-6">
+        {/* Draft Settings — appears second on mobile (after controls), first on desktop */}
+        <div className="lg:col-span-2 space-y-6 order-2 lg:order-1">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -689,8 +689,8 @@ export const DraftLobby = ({
           </DialogContent>
         </Dialog>
 
-        {/* Sidebar */}
-        <div className="space-y-6">
+        {/* Sidebar — appears first on mobile (controls + invite), second on desktop */}
+        <div className="space-y-6 order-1 lg:order-2">
           {/* League Invite Code - Commissioner Only */}
           {isCommissioner && joinCode && (
             <Card>

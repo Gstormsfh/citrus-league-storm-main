@@ -251,15 +251,19 @@ const Navbar = () => {
         </div>
       </div>
 
-      {/* ===== MOBILE: Top bar with logo + hamburger ===== */}
+      {/* ===== MOBILE: Top bar with logo + league context + hamburger ===== */}
       <div className="lg:hidden container mx-auto px-4">
         <div className="flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <CitrusLogo className="w-8 h-8 drop-shadow-sm" />
-            <span className="font-varsity font-black text-base uppercase text-citrus-forest tracking-tight hidden sm:block">
-              Citrus
-            </span>
-          </Link>
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <Link to="/" className="flex items-center gap-1.5 flex-shrink-0">
+              <CitrusLogo className="w-8 h-8 drop-shadow-sm" />
+            </Link>
+            {activeLeague?.name && (
+              <span className="text-[11px] font-display font-semibold text-citrus-forest/60 truncate max-w-[140px]">
+                {activeLeague.name}
+              </span>
+            )}
+          </div>
 
           <div className="flex items-center gap-1">
             {user && (
