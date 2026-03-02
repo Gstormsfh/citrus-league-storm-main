@@ -198,10 +198,9 @@ def compute_multi_position_eligibility(
     season: int,
     player_ids: List[int],
     api_players: Optional[Dict[int, dict]] = None,
-    current_dir: Optional[Dict[int, dict]] = None,
 ) -> Dict[int, List[str]]:
     """
-    Compute multi-position eligibility from multiple data sources.
+    Compute multi-position eligibility from player_game_stats.
 
     Industry standard (Yahoo Fantasy): A player gains eligibility at a position
     if they have played MIN_GAMES_FOR_ELIGIBILITY (5) games at that position
@@ -210,18 +209,10 @@ def compute_multi_position_eligibility(
     Data sources (in priority order):
     1. player_game_stats.position_code — actual game-by-game position data
     2. NHL API roster position — current official position (always included as primary)
-    3. player_directory position — stored position (may differ from API after trades/role changes)
-    4. Forward cross-eligibility — NHL boxscores report registered position, not deployment.
-       Centers who take faceoffs on the wing (and vice versa) are detected via the API vs
-       directory position mismatch, plus known forward flexibility rules.
 
     Rules:
     - Primary position (most games) is always included
     - Secondary positions require 5+ games played (MIN_GAMES_FOR_ELIGIBILITY)
-    - If a player's API position differs from their directory/game-stats position,
-      BOTH positions are granted (reflects actual role change)
-    - Centers with 10+ GP gain LW eligibility (NHL centers routinely play wing)
-    - Wingers (LW/RW) with 10+ GP gain cross-wing eligibility
     - Maximum 3 positions per player (primary + up to 2 secondary)
     - Goalies cannot gain skater eligibility and vice versa
 
@@ -233,9 +224,6 @@ def compute_multi_position_eligibility(
 
     VALID_POSITIONS = {"C", "LW", "RW", "D", "G"}
     GOALIE_POSITIONS = {"G"}
-    FORWARD_POSITIONS = {"C", "LW", "RW"}
-    # Minimum GP to trigger forward cross-eligibility (higher bar than secondary)
-    FORWARD_FLEX_GP = 10
 
     # Query game-level position data in batches (with pagination per batch)
     position_counts: Dict[int, Dict[str, int]] = {}  # player_id -> {position: game_count}
@@ -287,14 +275,21 @@ def compute_multi_position_eligibility(
 
     # Diagnostic: report data quality
     _players_with_data = len(position_counts)
+    _multi_pos_from_data = sum(1 for pc in position_counts.values() if len(pc) > 1)
     if _diag_total_rows > 0:
         null_pct = (_diag_null_count / _diag_total_rows * 100)
         print(f"   [sync_rosters] Position data: {_diag_total_rows} game rows, "
               f"{_players_with_data} players with position data, "
               f"{_diag_null_count} NULL position_codes ({null_pct:.0f}%)")
+        print(f"   [sync_rosters] Players with 2+ positions in game data: {_multi_pos_from_data}")
         if null_pct > 50:
             print(f"   [sync_rosters] NOTE: Most position_codes are NULL. "
                   f"Run scrape_per_game_nhl_stats.py to backfill game positions.")
+        if _multi_pos_from_data == 0 and _players_with_data > 0:
+            print(f"   [sync_rosters] NOTE: No position variation found in game data. "
+                  f"The NHL boxscore 'position' field may only reflect registered "
+                  f"position, not deployment. Check scrape_per_game_nhl_stats.py "
+                  f"for position_code sourcing.")
     else:
         print(f"   [sync_rosters] Position data: no game rows found for season {season}")
 
@@ -309,12 +304,7 @@ def compute_multi_position_eligibility(
         if api_players and pid in api_players:
             api_primary = api_players[pid].get("position_code", "")
 
-        # Get the stored directory position (may differ from API after role changes)
-        dir_position = ""
-        if current_dir and pid in current_dir:
-            dir_position = current_dir[pid].get("position_code", "")
-
-        if not pos_counts and not api_primary and not dir_position:
+        if not pos_counts and not api_primary:
             continue
 
         # Merge: ensure API primary position is represented
@@ -353,32 +343,6 @@ def compute_multi_position_eligibility(
                 elif count >= MIN_GAMES_FOR_ELIGIBILITY and len(eligible) < 3:
                     # Secondary/tertiary: must meet the games threshold
                     eligible.append(pos)
-
-            # Cross-reference: if API and directory positions differ, grant both.
-            # This catches players who changed roles (e.g., moved from C to LW)
-            # that the game-by-game data misses because NHL boxscores report
-            # registered position, not actual deployment.
-            if (dir_position and dir_position in VALID_POSITIONS
-                    and dir_position not in GOALIE_POSITIONS
-                    and dir_position not in eligible and len(eligible) < 3):
-                if api_primary and dir_position != api_primary:
-                    eligible.append(dir_position)
-
-            # Forward cross-eligibility: NHL centers routinely take shifts on
-            # the wing and vice versa.  Since boxscore position_code doesn't
-            # reflect deployment, we use a games-played threshold to infer
-            # that any forward with significant playing time has likely
-            # taken shifts at adjacent forward positions.
-            total_gp = sum(c for p, c in sorted_positions if p in FORWARD_POSITIONS)
-            if total_gp >= FORWARD_FLEX_GP and primary_pos in FORWARD_POSITIONS:
-                if primary_pos == "C" and "LW" not in eligible and len(eligible) < 3:
-                    eligible.append("LW")
-                elif primary_pos == "LW":
-                    if "RW" not in eligible and len(eligible) < 3:
-                        eligible.append("RW")
-                elif primary_pos == "RW":
-                    if "LW" not in eligible and len(eligible) < 3:
-                        eligible.append("LW")
 
             # Ensure API primary is first if it's in the list
             if api_primary and api_primary in eligible and eligible[0] != api_primary:
@@ -528,7 +492,7 @@ def sync_rosters(
     # Step 7: Compute multi-position eligibility (industry standard: 5 GP threshold)
     print(f"   [sync_rosters] Computing multi-position eligibility (threshold: {MIN_GAMES_FOR_ELIGIBILITY} GP)...")
     all_player_ids = list(set(list(api_players.keys()) + list(current_dir.keys())))
-    eligibility = compute_multi_position_eligibility(db, season, all_player_ids, api_players, current_dir)
+    eligibility = compute_multi_position_eligibility(db, season, all_player_ids, api_players)
 
     multi_pos_count = 0
     multi_pos_updates = []
