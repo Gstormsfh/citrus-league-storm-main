@@ -48,7 +48,7 @@ class SupabaseRest:
     retry_strategy = Retry(
       total=5,
       backoff_factor=1,
-      status_forcelist=[502, 503, 504, 429],  # Bad Gateway, Service Unavailable, Gateway Timeout, Too Many Requests
+      status_forcelist=[500, 502, 503, 504, 429],  # Internal Server Error, Bad Gateway, Service Unavailable, Gateway Timeout, Too Many Requests
       allowed_methods=["GET", "POST", "PATCH", "DELETE"]
     )
     
