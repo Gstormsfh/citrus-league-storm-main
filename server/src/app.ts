@@ -26,17 +26,22 @@ export type Env = {
 
 const app = new Hono<Env>();
 
+// ── CORS origins — environment-aware ─────────────────────────────────
+const isProduction = process.env.NODE_ENV === 'production';
+const corsOrigins: string[] = [
+  'https://citrusfantasysports.com',
+  'https://www.citrusfantasysports.com',
+];
+if (!isProduction) {
+  corsOrigins.push('http://localhost:8080', 'http://localhost:5173');
+}
+
 // ── Global middleware ─────────────────────────────────────────────────
 app.use('*', requestId());
 app.use('*', honoLogger());
 app.use('*', secureHeaders());
 app.use('*', cors({
-  origin: [
-    'http://localhost:8080',
-    'http://localhost:5173',
-    'https://citrusfantasysports.com',
-    'https://www.citrusfantasysports.com',
-  ],
+  origin: corsOrigins,
   credentials: true,
   allowHeaders: ['Content-Type', 'Authorization', 'x-client-info'],
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

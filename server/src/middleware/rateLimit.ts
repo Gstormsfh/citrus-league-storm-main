@@ -71,10 +71,6 @@ interface RateLimitOptions {
  * Rate limiting middleware.
  *
  * Default: 100 requests per IP per minute, 200 per authenticated user per minute.
- *
- * Usage:
- *   app.use('/api/*', rateLimitMiddleware());
- *   app.post('/api/stormy/chat', rateLimitMiddleware({ maxRequests: 10, windowMs: 60000 }), handler);
  */
 export function rateLimitMiddleware(options: RateLimitOptions = {}) {
   const {
@@ -87,7 +83,6 @@ export function rateLimitMiddleware(options: RateLimitOptions = {}) {
   return async (c: Context, next: Next) => {
     const ip = getClientIp(c);
 
-    // IP-level rate limit
     const ipResult = checkLimit(ipBuckets, ip, maxRequests, windowMs);
 
     c.header('X-RateLimit-Limit', String(maxRequests));
@@ -95,22 +90,15 @@ export function rateLimitMiddleware(options: RateLimitOptions = {}) {
     c.header('X-RateLimit-Reset', String(Math.ceil(ipResult.resetAt / 1000)));
 
     if (!ipResult.allowed) {
-      return c.json(
-        { error: 'Too many requests. Please try again later.' },
-        429,
-      );
+      return c.json({ error: 'Too many requests. Please try again later.' }, 429);
     }
 
-    // Per-user rate limit (more generous — authenticated users get higher limits)
     if (perUser) {
       const userId = (c as any).get?.('userId');
       if (userId) {
         const userResult = checkLimit(userBuckets, userId, maxUserRequests, windowMs);
         if (!userResult.allowed) {
-          return c.json(
-            { error: 'Too many requests. Please try again later.' },
-            429,
-          );
+          return c.json({ error: 'Too many requests. Please try again later.' }, 429);
         }
       }
     }
@@ -119,17 +107,8 @@ export function rateLimitMiddleware(options: RateLimitOptions = {}) {
   };
 }
 
-/**
- * Strict rate limit for sensitive operations (login, AI chat, etc.)
- * 10 requests per minute per IP.
- */
-export const strictRateLimit = rateLimitMiddleware({
-  maxRequests: 10,
-  windowMs: 60_000,
-});
+/** Strict rate limit for sensitive operations — 10 req/min per IP */
+export const strictRateLimit = rateLimitMiddleware({ maxRequests: 10, windowMs: 60_000 });
 
-/**
- * Standard API rate limit.
- * 100 requests per minute per IP, 200 per authenticated user.
- */
+/** Standard API rate limit — 100 req/min per IP, 200 per user */
 export const standardRateLimit = rateLimitMiddleware();
