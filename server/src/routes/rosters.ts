@@ -3,6 +3,7 @@ import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { membershipMiddleware } from '../middleware/membership';
 import { createUserClient } from '../lib/supabase';
+import { MatchupService } from '../services/MatchupService';
 import { COLUMNS } from '@citrus/shared';
 
 const rosterRoutes = new Hono<Env>();
@@ -26,6 +27,17 @@ rosterRoutes.get('/league/:leagueId/team/:teamId', membershipMiddleware, async (
   }
 
   return c.json({ data: data || [] });
+});
+
+// GET /api/rosters/league/:leagueId/team/:teamId/player-ids — Get roster player IDs
+rosterRoutes.get('/league/:leagueId/team/:teamId/player-ids', membershipMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const teamId = c.req.param('teamId');
+  const supabase = createUserClient(c.get('userToken'));
+  const matchupService = new MatchupService(supabase);
+
+  const playerIds = await matchupService.getRosterPlayerIds(teamId, leagueId);
+  return c.json({ data: playerIds });
 });
 
 // GET /api/rosters/league/:leagueId — Get all rosters in a league
@@ -69,6 +81,7 @@ rosterRoutes.put('/league/:leagueId/team/:teamId/lineup', membershipMiddleware, 
     .from('team_lineups')
     .upsert({
       team_id: parseInt(teamId, 10),
+      league_id: leagueId,
       starters: body.starters,
       bench: body.bench,
       ir: body.ir,
@@ -80,6 +93,28 @@ rosterRoutes.put('/league/:leagueId/team/:teamId/lineup', membershipMiddleware, 
 
   if (error) {
     return c.json({ error: error.message }, 400);
+  }
+
+  return c.json({ data });
+});
+
+// GET /api/rosters/league/:leagueId/team/:teamId/lineup — Get team lineup
+rosterRoutes.get('/league/:leagueId/team/:teamId/lineup', membershipMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const teamId = c.req.param('teamId');
+  const supabase = createUserClient(c.get('userToken'));
+
+  const { data, error } = await supabase
+    .from('team_lineups')
+    .select('*')
+    .eq('team_id', parseInt(teamId, 10))
+    .eq('league_id', leagueId)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    return c.json({ error: error.message }, 500);
   }
 
   return c.json({ data });

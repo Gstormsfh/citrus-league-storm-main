@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
-import { membershipMiddleware } from '../middleware/membership';
+import { membershipMiddleware, commissionerMiddleware } from '../middleware/membership';
 import { createUserClient } from '../lib/supabase';
-import { COLUMNS } from '@citrus/shared';
+import { DraftService } from '../services/DraftService';
 
 const draftRoutes = new Hono<Env>();
 
@@ -13,85 +13,214 @@ draftRoutes.use('*', authMiddleware);
 draftRoutes.get('/league/:leagueId', membershipMiddleware, async (c) => {
   const leagueId = c.req.param('leagueId');
   const supabase = createUserClient(c.get('userToken'));
+  const service = new DraftService(supabase);
 
-  const { data: league } = await supabase
-    .from('leagues')
-    .select('id, draft_status, settings, scheduled_draft_time')
-    .eq('id', leagueId)
-    .single();
+  const { league, picks, order, error } = await service.getDraftState(leagueId);
+  if (error) {
+    return c.json({ error: 'Failed to fetch draft state' }, 500);
+  }
 
-  const { data: picks } = await supabase
-    .from('draft_picks')
-    .select(COLUMNS.DRAFT_PICK)
-    .eq('league_id', leagueId)
-    .is('deleted_at', null)
-    .order('pick_number', { ascending: true });
-
-  const { data: order } = await supabase
-    .from('draft_order')
-    .select(COLUMNS.DRAFT_ORDER)
-    .eq('league_id', leagueId)
-    .order('round_number', { ascending: true });
-
-  return c.json({
-    data: {
-      league,
-      picks: picks || [],
-      order: order || [],
-    },
-  });
+  return c.json({ data: { league, picks, order } });
 });
 
 // POST /api/draft/league/:leagueId/pick — Make a draft pick
 draftRoutes.post('/league/:leagueId/pick', membershipMiddleware, async (c) => {
   const leagueId = c.req.param('leagueId');
-  const userId = c.get('userId');
   const body = await c.req.json();
   const supabase = createUserClient(c.get('userToken'));
+  const service = new DraftService(supabase);
 
-  const { playerId, teamId, pickNumber, roundNumber, draftSessionId } = body;
+  const { playerId, teamId, pickNumber, roundNumber, draftSessionId, teamsCount } = body;
 
   if (!playerId || !teamId) {
     return c.json({ error: 'playerId and teamId are required' }, 400);
   }
 
-  const { data, error } = await supabase
-    .from('draft_picks')
-    .insert({
-      league_id: leagueId,
-      team_id: teamId,
-      player_id: playerId,
-      pick_number: pickNumber,
-      round_number: roundNumber,
-      draft_session_id: draftSessionId,
-    })
-    .select(COLUMNS.DRAFT_PICK)
-    .single();
+  const { pick, error, isComplete } = await service.makePick(
+    leagueId,
+    teamId,
+    playerId,
+    roundNumber,
+    pickNumber,
+    draftSessionId,
+    teamsCount,
+  );
 
   if (error) {
-    return c.json({ error: error.message }, 400);
+    return c.json({ error }, 400);
   }
 
-  return c.json({ data }, 201);
+  return c.json({ data: { pick, isComplete } }, 201);
 });
 
 // POST /api/draft/league/:leagueId/start — Start the draft (commissioner only)
-draftRoutes.post('/league/:leagueId/start', membershipMiddleware, async (c) => {
+draftRoutes.post('/league/:leagueId/start', commissionerMiddleware, async (c) => {
   const leagueId = c.req.param('leagueId');
+  const userId = c.get('userId');
   const supabase = createUserClient(c.get('userToken'));
+  const service = new DraftService(supabase);
 
-  const { data, error } = await supabase
-    .from('leagues')
-    .update({ draft_status: 'in_progress' })
-    .eq('id', leagueId)
-    .select('id, draft_status')
-    .single();
+  try {
+    const { league, error } = await service.startDraft(leagueId, userId);
+    if (error) {
+      return c.json({ error: 'Failed to start draft' }, 400);
+    }
+    return c.json({ data: league });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 403);
+  }
+});
+
+// POST /api/draft/league/:leagueId/initialize-order — Initialize draft order
+draftRoutes.post('/league/:leagueId/initialize-order', commissionerMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const body = await c.req.json();
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new DraftService(supabase);
+
+  const { error, sessionId } = await service.initializeDraftOrder(
+    leagueId,
+    body.teams,
+    body.totalRounds,
+    body.customTeamOrder,
+    body.draftType,
+  );
 
   if (error) {
-    return c.json({ error: error.message }, 400);
+    return c.json({ error: 'Failed to initialize draft order' }, 400);
   }
 
-  return c.json({ data });
+  return c.json({ data: { sessionId } });
+});
+
+// POST /api/draft/league/:leagueId/reset — Reset draft (commissioner only)
+draftRoutes.post('/league/:leagueId/reset', commissionerMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new DraftService(supabase);
+
+  const { error, newSessionId } = await service.resetDraft(leagueId);
+  if (error) {
+    return c.json({ error: 'Failed to reset draft' }, 400);
+  }
+
+  return c.json({ data: { newSessionId } });
+});
+
+// POST /api/draft/league/:leagueId/undo — Undo last pick
+draftRoutes.post('/league/:leagueId/undo', commissionerMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new DraftService(supabase);
+
+  const { undone, error } = await service.undoLastPick(leagueId);
+  if (error) {
+    return c.json({ error }, 400);
+  }
+
+  return c.json({ data: { undone } });
+});
+
+// POST /api/draft/league/:leagueId/autopick — Autopick for a team
+draftRoutes.post('/league/:leagueId/autopick', membershipMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const body = await c.req.json();
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new DraftService(supabase);
+
+  const result = await service.autopickForTeam(
+    leagueId,
+    body.teamId,
+    body.sessionId,
+    body.roundNumber,
+    body.pickNumber,
+  );
+
+  if (result.error) {
+    return c.json({ error: result.error }, 400);
+  }
+
+  return c.json({ data: result });
+});
+
+// POST /api/draft/league/:leagueId/full-autopick — Run full autopick draft
+draftRoutes.post('/league/:leagueId/full-autopick', commissionerMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new DraftService(supabase);
+
+  const { picks, error } = await service.runFullAutopickDraft(leagueId);
+  if (error) {
+    return c.json({ error }, 400);
+  }
+
+  return c.json({ data: { picks } });
+});
+
+// GET /api/draft/league/:leagueId/snapshot — Get draft snapshot
+draftRoutes.get('/league/:leagueId/snapshot', membershipMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new DraftService(supabase);
+
+  const { snapshot, error } = await service.getDraftSnapshot(leagueId);
+  if (error) {
+    return c.json({ error: 'Failed to fetch snapshot' }, 500);
+  }
+
+  return c.json({ data: snapshot });
+});
+
+// POST /api/draft/league/:leagueId/snapshot — Save draft snapshot
+draftRoutes.post('/league/:leagueId/snapshot', membershipMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const userId = c.get('userId');
+  const body = await c.req.json();
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new DraftService(supabase);
+
+  const { snapshotId, error } = await service.saveDraftSnapshot(
+    leagueId,
+    body.draftSessionId,
+    body.snapshotData,
+    userId,
+  );
+
+  if (error) {
+    return c.json({ error: 'Failed to save snapshot' }, 400);
+  }
+
+  return c.json({ data: { snapshotId } }, 201);
+});
+
+// GET /api/draft/league/:leagueId/rankings — Get autopick rankings
+draftRoutes.get('/league/:leagueId/rankings', membershipMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const teamId = c.req.query('teamId');
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new DraftService(supabase);
+
+  const { rankings, error } = await service.getAutopickRankings(leagueId, teamId);
+  if (error) {
+    return c.json({ error: 'Failed to fetch rankings' }, 500);
+  }
+
+  return c.json({ data: rankings });
+});
+
+// POST /api/draft/league/:leagueId/rankings — Save autopick rankings
+draftRoutes.post('/league/:leagueId/rankings', membershipMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const body = await c.req.json();
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new DraftService(supabase);
+
+  const { error } = await service.saveAutopickRankings(leagueId, body.teamId, body.rankings);
+  if (error) {
+    return c.json({ error: 'Failed to save rankings' }, 400);
+  }
+
+  return c.json({ success: true });
 });
 
 export { draftRoutes };
