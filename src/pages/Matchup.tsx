@@ -12,7 +12,7 @@ import { MatchupScheduleSelector } from "@/components/matchup/MatchupScheduleSel
 import { ScoreCard } from "@/components/matchup/ScoreCard";
 import { WeeklySchedule } from "@/components/matchup/WeeklySchedule";
 import { DailyRosters } from "@/components/matchup/DailyRosters";
-import { getTodayMST, getTodayMSTDate } from '@/utils/timezoneUtils';
+import { getTodayMST, getTodayMSTDate, formatDateToString } from '@/utils/timezoneUtils';
 import { CURRENT_SEASON } from '@/utils/seasonConstants';
 import LeagueNotifications from "@/components/matchup/LeagueNotifications";
 import { MatchupSidebar } from "@/components/matchup/MatchupSidebar";
@@ -615,8 +615,8 @@ const Matchup = () => {
           const matchupWeekEnd = gWED(guestMatchup.week_number, firstWeek);
           const matchupWithDates: MatchupType = {
             ...guestMatchup,
-            week_start_date: matchupWeekStart.toISOString().split('T')[0],
-            week_end_date: matchupWeekEnd.toISOString().split('T')[0],
+            week_start_date: formatDateToString(matchupWeekStart),
+            week_end_date: formatDateToString(matchupWeekEnd),
           };
           setCurrentMatchup(matchupWithDates);
           setSelectedMatchupId(guestMatchup.id);
@@ -631,10 +631,13 @@ const Matchup = () => {
           setOpponentTeam(cachedPayload.team2 as unknown as Team | null);
 
           // Build MatchupPlayer rosters from cached lineup + player data
+          // CRITICAL: Use matchupWithDates (corrected week boundaries), NOT guestMatchup (raw DB dates).
+          // The DB may store wrong dates (e.g., Feb 28 instead of Mar 1), which causes
+          // getGamesForTeams to fetch games outside the actual week range.
           const { PlayerService: PS } = await import('@/services/PlayerService');
           const allPlayers = await PS.getAllPlayers();
           const { team1Roster, team2Roster, team1SlotAssignments, team2SlotAssignments, error: rosterError } =
-            await MatchupService.getMatchupRosters(guestMatchup as MatchupType, allPlayers, 'America/Denver', undefined);
+            await MatchupService.getMatchupRosters(matchupWithDates, allPlayers, 'America/Denver', undefined);
           if (rosterError) throw rosterError;
 
           setDemoMyTeam(team1Roster);
@@ -820,14 +823,14 @@ const Matchup = () => {
 
         log(' Setting matchup week dates (same logic as database):', {
           matchupWeekNumber,
-          firstWeekStart: firstWeek.toISOString().split('T')[0],
-          calculatedWeekStart: matchupWeekStart.toISOString().split('T')[0],
-          calculatedWeekEnd: matchupWeekEnd.toISOString().split('T')[0],
+          firstWeekStart: formatDateToString(firstWeek),
+          calculatedWeekStart: formatDateToString(matchupWeekStart),
+          calculatedWeekEnd: formatDateToString(matchupWeekEnd),
           dbWeekStart: guestMatchup.week_start_date,
           dbWeekEnd: guestMatchup.week_end_date,
           datesMatch: (
-            matchupWeekStart.toISOString().split('T')[0] === guestMatchup.week_start_date &&
-            matchupWeekEnd.toISOString().split('T')[0] === guestMatchup.week_end_date
+            formatDateToString(matchupWeekStart) === guestMatchup.week_start_date &&
+            formatDateToString(matchupWeekEnd) === guestMatchup.week_end_date
           )
         });
 
@@ -835,8 +838,8 @@ const Matchup = () => {
         // Always use calculated dates to ensure they're correct, even if DB dates are wrong
         const matchupWithDates: MatchupType = {
           ...(guestMatchup as any),
-          week_start_date: matchupWeekStart.toISOString().split('T')[0],
-          week_end_date: matchupWeekEnd.toISOString().split('T')[0]
+          week_start_date: formatDateToString(matchupWeekStart),
+          week_end_date: formatDateToString(matchupWeekEnd)
         };
 
         setCurrentMatchup(matchupWithDates);
@@ -876,11 +879,14 @@ const Matchup = () => {
         setOpponentTeam(team2.data as unknown as Team | null);
 
         // Get matchup rosters using the same service as logged-in users
+        // CRITICAL: Use matchupWithDates (corrected week boundaries), NOT guestMatchup (raw DB dates).
+        // The DB may store wrong dates (e.g., Feb 28 instead of Mar 1), which causes
+        // getGamesForTeams to fetch games outside the actual week range.
         const { PlayerService } = await import('@/services/PlayerService');
         const allPlayers = await PlayerService.getAllPlayers();
 
         const { team1Roster, team2Roster, team1SlotAssignments, team2SlotAssignments, error: rosterError } =
-          await MatchupService.getMatchupRosters(guestMatchup as MatchupType, allPlayers, 'America/Denver', undefined);
+          await MatchupService.getMatchupRosters(matchupWithDates, allPlayers, 'America/Denver', undefined);
 
         if (rosterError) throw rosterError;
 
