@@ -197,74 +197,6 @@ export const PlayerPool = ({
     }
   };
 
-  // Mobile card view for a player
-  const PlayerCard = ({ player }: { player: Player }) => {
-    const isSelected = selectedPlayer?.id === player.id;
-    const isDrafted = draftedSet.has(player.id);
-    const isInQueue = queue.includes(player.id);
-
-    return (
-      <div
-        className={cn(
-          'border-b border-fantasy-border/50 px-3 py-3 transition-colors cursor-pointer active:bg-fantasy-light/50',
-          isSelected && 'bg-fantasy-primary/10 border-l-2 border-l-fantasy-primary',
-          isDrafted && 'opacity-40'
-        )}
-        onClick={() => !isDrafted && onPlayerSelect(player)}
-      >
-        <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              {isInQueue && <Star className="h-3 w-3 fill-fantasy-tertiary text-fantasy-tertiary flex-shrink-0" />}
-              <span className="font-medium text-sm truncate">{player.full_name}</span>
-              <Badge variant="outline" className="text-[10px] flex-shrink-0 px-1 py-0">{player.eligible_positions && player.eligible_positions.length > 1 ? player.eligible_positions.join('/') : normalizePosition(player.position)}</Badge>
-              <span className="text-[10px] text-muted-foreground flex-shrink-0">{player.team}</span>
-            </div>
-            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-muted-foreground overflow-x-auto scrollbar-styled pb-0.5">
-              {player.position === 'G' ? (
-                <>
-                  <span className="font-semibold text-foreground flex-shrink-0">{player.wins || 0}W</span>
-                  <span className="flex-shrink-0">{player.losses || 0}L</span>
-                  <span className="flex-shrink-0">{player.goals_against_average ? player.goals_against_average.toFixed(2) : '0.00'} GAA</span>
-                  <span className="flex-shrink-0">{player.save_percentage ? (player.save_percentage * 100).toFixed(1) : '0.0'}%</span>
-                  <span className="flex-shrink-0">{player.saves || 0}SV</span>
-                  <span className="flex-shrink-0">{player.shutouts || 0}SO</span>
-                </>
-              ) : (
-                <>
-                  <span className="font-semibold text-foreground flex-shrink-0">{player.points} PTS</span>
-                  <span className="flex-shrink-0">{player.goals}G</span>
-                  <span className="flex-shrink-0">{player.assists}A</span>
-                  <span className="flex-shrink-0">{player.plus_minus > 0 ? '+' : ''}{player.plus_minus}</span>
-                  <span className="flex-shrink-0">{player.ppp || 0}PPP</span>
-                  <span className="flex-shrink-0">{player.shp || 0}SHP</span>
-                  <span className="flex-shrink-0">{player.shots}SOG</span>
-                  <span className="flex-shrink-0">{player.hits}HIT</span>
-                  <span className="flex-shrink-0">{player.blocks}BLK</span>
-                  <span className="flex-shrink-0">{player.pim || 0}PIM</span>
-                </>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-            {onAddToQueue && (
-              <Button variant="ghost" size="sm" className="h-9 w-9 p-0"
-                onClick={(e) => { e.stopPropagation(); e.preventDefault(); onAddToQueue(player.id); }}>
-                <Star className={cn("h-4 w-4", isInQueue ? "fill-fantasy-tertiary text-fantasy-tertiary" : "text-muted-foreground")} />
-              </Button>
-            )}
-            {isSelected && isDraftActive && !isDrafted && (
-              <Button size="sm" className="h-9 px-4 text-xs bg-fantasy-primary hover:bg-fantasy-primary/90"
-                onClick={(e) => { e.stopPropagation(); e.preventDefault(); onPlayerDraft(player); }}>
-                Draft
-              </Button>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   // Desktop table row for a player
   const PlayerRow = ({ player }: { player: Player }) => {
     const isSelected = selectedPlayer?.id === player.id;
@@ -486,11 +418,108 @@ export const PlayerPool = ({
         </Button>
       </div>
 
-      {/* Mobile: Card list view — no max-height so it scrolls naturally with the page */}
-      <div className="md:hidden border border-fantasy-border rounded-lg overflow-hidden bg-[#E8EED9]/50 backdrop-blur-sm">
-        {visiblePlayers.map(player => (
-          <PlayerCard key={player.id} player={player} />
-        ))}
+      {/* Mobile: Table view with unified horizontal scroll — scrolls all players as one */}
+      <div className="md:hidden border border-fantasy-border rounded-lg overflow-hidden bg-[#E8EED9]/50 backdrop-blur-sm max-w-full">
+        <div className="overflow-x-auto w-full scrollbar-styled" style={{ scrollbarGutter: 'stable' }}>
+          <table className="w-full min-w-[700px] text-sm border-collapse">
+            <thead className="bg-fantasy-light/50 border-b border-fantasy-border">
+              <tr>
+                <th className="px-2 py-1.5 text-left font-semibold text-fantasy-dark sticky left-0 bg-fantasy-light/95 z-10 min-w-[120px] text-xs">Player</th>
+                {selectedPosition === 'G' ? (
+                  <>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('wins')}>W</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('losses')}>L</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('gaa')}>GAA</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('savePct')}>SV%</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('saves')}>SV</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('shutouts')}>SO</th>
+                  </>
+                ) : (
+                  <>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('points')}>PTS</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('goals')}>G</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('assists')}>A</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('plusMinus')}>+/-</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('ppp')}>PPP</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('shp')}>SHP</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('shots')}>SOG</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('hits')}>HIT</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('blocks')}>BLK</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('pim')}>PIM</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('xGoals')}>xG</th>
+                  </>
+                )}
+                <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px]"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {visiblePlayers.map(player => {
+                const isSelected = selectedPlayer?.id === player.id;
+                const isDrafted = draftedSet.has(player.id);
+                const isInQueue = queue.includes(player.id);
+                return (
+                  <tr
+                    key={player.id}
+                    className={cn(
+                      'border-b border-fantasy-border/50 transition-colors cursor-pointer active:bg-fantasy-light/50',
+                      isSelected && 'bg-fantasy-primary/10',
+                      isDrafted && 'opacity-40'
+                    )}
+                    onClick={() => !isDrafted && onPlayerSelect(player)}
+                  >
+                    <td className="px-2 py-1.5 sticky left-0 bg-[#E8EED9]/95 z-10">
+                      <div className="flex items-center gap-1">
+                        {isInQueue && <Star className="h-3 w-3 fill-fantasy-tertiary text-fantasy-tertiary flex-shrink-0" />}
+                        <span className="font-medium text-xs truncate max-w-[100px]">{player.full_name}</span>
+                        <Badge variant="outline" className="text-[9px] px-0.5 py-0 flex-shrink-0">{normalizePosition(player.position)}</Badge>
+                      </div>
+                    </td>
+                    {player.position === 'G' ? (
+                      <>
+                        <td className="px-1.5 py-1 text-[11px] text-center font-semibold">{player.wins || 0}</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center">{player.losses || 0}</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center">{player.goals_against_average ? player.goals_against_average.toFixed(2) : '0.00'}</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center">{player.save_percentage ? (player.save_percentage * 100).toFixed(1) : '0.0'}%</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center">{player.saves || 0}</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center">{player.shutouts || 0}</td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-1.5 py-1 text-[11px] text-center font-semibold">{player.points}</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center">{player.goals}</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center">{player.assists}</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center">{player.plus_minus > 0 ? '+' : ''}{player.plus_minus}</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center">{player.ppp || 0}</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center">{player.shp || 0}</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center">{player.shots}</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center">{player.hits}</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center">{player.blocks}</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center">{player.pim || 0}</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center text-muted-foreground">{player.xGoals.toFixed(1)}</td>
+                      </>
+                    )}
+                    <td className="px-1.5 py-1" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-0.5">
+                        {onAddToQueue && (
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0"
+                            onClick={(e) => { e.stopPropagation(); e.preventDefault(); onAddToQueue(player.id); }}>
+                            <Star className={cn("h-3.5 w-3.5", isInQueue ? "fill-fantasy-tertiary text-fantasy-tertiary" : "text-muted-foreground")} />
+                          </Button>
+                        )}
+                        {isSelected && isDraftActive && !isDrafted && (
+                          <Button size="sm" className="h-7 px-2 text-[10px] bg-fantasy-primary hover:bg-fantasy-primary/90"
+                            onClick={(e) => { e.stopPropagation(); e.preventDefault(); onPlayerDraft(player); }}>
+                            Draft
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
         {hasMore && (
           <button
             onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
