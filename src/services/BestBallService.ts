@@ -30,6 +30,7 @@ const SLOT_ELIGIBLE_POSITIONS: Record<string, string[]> = {
 interface PlayerScore {
   player_id: string;
   position: string;
+  eligible_positions?: string[]; // Multi-position eligibility (e.g., ['C', 'LW'])
   points: number;
   is_goalie: boolean;
 }
@@ -83,8 +84,13 @@ export class BestBallService {
       if (!eligible) continue;
 
       // Find the highest-scoring unassigned player eligible for this slot
+      // Uses eligible_positions (multi-pos) when available, falls back to primary position
       const best = sorted.find(
-        p => !assigned.has(p.player_id) && eligible.some(pos => p.position === pos)
+        p => !assigned.has(p.player_id) && (
+          (p.eligible_positions && p.eligible_positions.length > 0)
+            ? p.eligible_positions.some(ep => eligible.includes(ep))
+            : eligible.some(pos => p.position === pos)
+        )
       );
 
       if (best) {
@@ -154,15 +160,21 @@ export class BestBallService {
 
       const season = CURRENT_SEASON;
 
-      // Get player positions
+      // Get player positions and eligible_positions
       const { data: players } = await supabase
         .from('player_directory')
-        .select('player_id, position_code')
+        .select('player_id, position_code, eligible_positions')
         .eq('season', season)
         .in('player_id', playerIds.map(Number));
 
       const posMap = new Map<string, string>();
-      (players ?? []).forEach((p: { player_id: number; position_code: string | null }) => posMap.set(String(p.player_id), p.position_code || 'UTIL'));
+      const eligibleMap = new Map<string, string[]>();
+      (players ?? []).forEach((p: { player_id: number; position_code: string | null; eligible_positions: string | null }) => {
+        posMap.set(String(p.player_id), p.position_code || 'UTIL');
+        if (p.eligible_positions) {
+          eligibleMap.set(String(p.player_id), p.eligible_positions.split(',').map(s => s.trim()).filter(Boolean));
+        }
+      });
 
       // Get weekly stats for these players
       const { data: weeklyStats } = await supabase
@@ -183,6 +195,7 @@ export class BestBallService {
         return {
           player_id: String(s.player_id),
           position: pos,
+          eligible_positions: eligibleMap.get(String(s.player_id)),
           points,
           is_goalie: isGoalie,
         };
