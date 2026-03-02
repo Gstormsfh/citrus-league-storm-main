@@ -141,7 +141,7 @@ const ScheduleManager = () => {
                         <div className="flex-1">
                           <div className="flex items-center gap-4">
                             <Badge className="bg-citrus-orange text-citrus-cream font-varsity font-bold">
-                              {format(new Date(game.game_date), 'MMM d')}
+                              {format(new Date(game.game_date.split('T')[0] + 'T00:00:00'), 'MMM d')}
                             </Badge>
                             <div className="font-varsity font-bold text-citrus-forest">
                               {game.away_team} @ {game.home_team}

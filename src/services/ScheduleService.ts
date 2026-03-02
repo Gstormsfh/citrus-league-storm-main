@@ -584,13 +584,13 @@ export const ScheduleService = {
     weekEnd: Date
   ): Promise<number> {
     const { games } = await this.getGamesForTeamInWeek(teamAbbrev, weekStart, weekEnd);
-    const today = getTodayDate();
-    today.setHours(0, 0, 0, 0);
 
+    // Use string comparison to avoid timezone issues with new Date("YYYY-MM-DD") UTC parsing
+    const todayStr = getTodayMST();
     return games.filter(g => {
-      const gameDate = new Date(g.game_date);
-      gameDate.setHours(0, 0, 0, 0);
-      return gameDate >= today && (g.status === 'scheduled' || g.status === 'live');
+      if (!g || !g.game_date) return false;
+      const gameDateStr = g.game_date.split('T')[0];
+      return gameDateStr >= todayStr && (g.status === 'scheduled' || g.status === 'live');
     }).length;
   },
 
@@ -637,16 +637,18 @@ export const ScheduleService = {
       if (!gameDate) {
         const { game } = await this.getNextGameForTeam(teamAbbrev);
         if (!game) return 'Yet to Play';
-        gameDate = new Date(game.game_date);
+        // Append T00:00:00 to force local-time parsing (avoid UTC midnight shift)
+        gameDate = new Date(game.game_date.split('T')[0] + 'T00:00:00');
       }
 
       const { games } = await this.getGamesForTeam(teamAbbrev);
+      // Use string comparison to avoid timezone issues with new Date("YYYY-MM-DD") UTC parsing
+      const checkDateStr = gameDate.getFullYear() + '-' +
+        String(gameDate.getMonth() + 1).padStart(2, '0') + '-' +
+        String(gameDate.getDate()).padStart(2, '0');
       const game = games.find(g => {
-        const gDate = new Date(g.game_date);
-        gDate.setHours(0, 0, 0, 0);
-        const checkDate = new Date(gameDate!);
-        checkDate.setHours(0, 0, 0, 0);
-        return gDate.getTime() === checkDate.getTime();
+        const gDateStr = (g.game_date || '').split('T')[0];
+        return gDateStr === checkDateStr;
       });
 
       if (!game) return 'Yet to Play';

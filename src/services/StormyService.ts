@@ -422,7 +422,7 @@ class StormyServiceImpl {
             const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
             for (const [abbrev, games] of gamesResult.value) {
               teamGamesCountMap.set(abbrev, games.length);
-              teamGameDaysMap.set(abbrev, games.map(g => dayNames[new Date(g.game_date).getDay()]));
+              teamGameDaysMap.set(abbrev, games.map(g => dayNames[new Date(g.game_date.split('T')[0] + 'T00:00:00').getDay()]));
             }
           }
         }

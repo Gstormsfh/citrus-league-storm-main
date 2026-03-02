@@ -1287,12 +1287,17 @@ const Matchup = () => {
         // For active users, refs are populated. For guests, we use demo teams directly.
 
         // Generate all 7 dates in the week
-        const weekStart = new Date(currentMatchup.week_start_date);
+        // CRITICAL: Append 'T00:00:00' to force local-time parsing.
+        // new Date("YYYY-MM-DD") parses as UTC midnight, which in MST becomes the previous day.
+        const weekStartLocal = new Date(currentMatchup.week_start_date + 'T00:00:00');
         const dates: string[] = [];
         for (let i = 0; i < 7; i++) {
-          const date = new Date(weekStart);
-          date.setDate(weekStart.getDate() + i);
-          dates.push(date.toISOString().split('T')[0]);
+          const date = new Date(weekStartLocal);
+          date.setDate(weekStartLocal.getDate() + i);
+          const y = date.getFullYear();
+          const m = String(date.getMonth() + 1).padStart(2, '0');
+          const d = String(date.getDate()).padStart(2, '0');
+          dates.push(`${y}-${m}-${d}`);
         }
 
         // Fetch stats for all 7 days in parallel
@@ -1551,29 +1556,26 @@ const Matchup = () => {
     }
 
     const todayStr = getTodayMST();
-    const weekStart = new Date(currentMatchup.week_start_date);
-    const weekEnd = new Date(currentMatchup.week_end_date);
-    const today = new Date(todayStr);
-    
-    // Check if today is in the matchup week
-    if (today >= weekStart && today <= weekEnd) {
+    // Use string comparison to avoid timezone issues with new Date("YYYY-MM-DD") UTC parsing
+    const weekStartStr = currentMatchup.week_start_date;
+    const weekEndStr = currentMatchup.week_end_date;
+
+    // Check if today is in the matchup week (string comparison works for YYYY-MM-DD)
+    if (todayStr >= weekStartStr && todayStr <= weekEndStr) {
       setSelectedDate(todayStr);
       return;
     }
 
     // Find the most recent date with games within the matchup week
     let mostRecentDate: string | null = null;
-    let mostRecentDateObj: Date | null = null;
-    
+
     for (const [dateStr, dayStats] of dailyStatsByDate.entries()) {
-      const date = new Date(dateStr);
-      // Only consider dates within the matchup week
-      if (date >= weekStart && date <= weekEnd) {
+      // Only consider dates within the matchup week (string comparison)
+      if (dateStr >= weekStartStr && dateStr <= weekEndStr) {
         // Check if this date has any stats (not empty map)
         if (dayStats && dayStats.size > 0) {
-          if (!mostRecentDateObj || date > mostRecentDateObj) {
+          if (!mostRecentDate || dateStr > mostRecentDate) {
             mostRecentDate = dateStr;
-            mostRecentDateObj = date;
           }
         }
       }
@@ -1585,7 +1587,7 @@ const Matchup = () => {
     }
 
     // Fallback: use first day of matchup week
-    setSelectedDate(weekStart.toISOString().split('T')[0]);
+    setSelectedDate(weekStartStr);
   }, [currentMatchup, dailyStatsByDate, selectedDate]);
 
   // Removed duplicate frozen lineup fetch - data now loaded directly in getMatchupRosters()
