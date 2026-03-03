@@ -264,7 +264,34 @@ const standingsCache = new Map<string, {
   timestamp: number;
 }>();
 
+// ─── Request deduplication for league fetches ─────────────────────
+// Prevents identical in-flight HTTP requests from being duplicated.
+const LEAGUE_CACHE_TTL = 30_000; // 30 seconds
+const leagueRequestCache = new Map<string, { promise: Promise<any>; timestamp: number }>();
+
+function getLeagueCachedOrFetch<T>(cacheKey: string, fetcher: () => Promise<T>): Promise<T> {
+  const existing = leagueRequestCache.get(cacheKey);
+  if (existing && Date.now() - existing.timestamp < LEAGUE_CACHE_TTL) {
+    return existing.promise as Promise<T>;
+  }
+  const promise = fetcher().finally(() => {
+    setTimeout(() => {
+      const entry = leagueRequestCache.get(cacheKey);
+      if (entry && entry.promise === promise) {
+        leagueRequestCache.delete(cacheKey);
+      }
+    }, LEAGUE_CACHE_TTL);
+  });
+  leagueRequestCache.set(cacheKey, { promise, timestamp: Date.now() });
+  return promise;
+}
+
 export const LeagueService = {
+  /** Clear the league request cache (useful after mutations like joining/creating) */
+  clearLeagueCache() {
+    leagueRequestCache.clear();
+  },
+
   /**
    * Create a new league and automatically create the commissioner's team
    */
@@ -304,12 +331,14 @@ export const LeagueService = {
    * REQUIRES: User must be a member of the league (commissioner or team owner)
    */
   async getLeague(leagueId: string, _userId?: string): Promise<{ league: League | null; error: unknown }> {
-    try {
-      const response = await leagueApi.getLeague(leagueId);
-      return { league: response.data || null, error: null };
-    } catch (error) {
-      return { league: null, error };
-    }
+    return getLeagueCachedOrFetch(`league:${leagueId}`, async () => {
+      try {
+        const response = await leagueApi.getLeague(leagueId);
+        return { league: response.data || null, error: null };
+      } catch (error) {
+        return { league: null, error };
+      }
+    });
   },
 
   /**
@@ -699,13 +728,15 @@ async joinLeagueByCode(
    * Get all leagues the user belongs to (as commissioner or team owner)
    */
   async getUserLeagues(_userId: string): Promise<{ leagues: League[]; error: unknown }> {
-    try {
-      const response = await leagueApi.getUserLeagues();
-      return { leagues: response.data || [], error: null };
-    } catch (error) {
-      logger.error('[LeagueService] Error in getUserLeagues:', error);
-      return { leagues: [], error };
-    }
+    return getLeagueCachedOrFetch('userLeagues', async () => {
+      try {
+        const response = await leagueApi.getUserLeagues();
+        return { leagues: response.data || [], error: null };
+      } catch (error) {
+        logger.error('[LeagueService] Error in getUserLeagues:', error);
+        return { leagues: [], error };
+      }
+    });
   },
 
   /**
