@@ -30,7 +30,8 @@ const ALLOWED_ORIGINS = [
 ];
 
 function getCorsHeaders(origin: string): Record<string, string> {
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  // Only reflect the origin if it's in the allow list; reject unknown origins
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : "";
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Headers":

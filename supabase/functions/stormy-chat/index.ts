@@ -13,7 +13,8 @@ const ALLOWED_ORIGINS = [
 
 function getCorsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get("origin") ?? "";
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  // Only reflect the origin if it's in the allow list; reject unknown origins
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : "";
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Headers":
@@ -224,37 +225,43 @@ serve(async (req) => {
     const { data: { user } } = await authClient.auth.getUser();
 
     // ── 3-Layer Rate Limiting ──────────────────────────────────
-    if (supabaseServiceKey) {
-      const svc = createClient(supabaseUrl, supabaseServiceKey);
+    // SECURITY: If service key is missing, DENY all requests (fail-closed)
+    if (!supabaseServiceKey) {
+      console.error("SUPABASE_SERVICE_ROLE_KEY not set — rate limiting unavailable, denying request");
+      return makeJsonResponse({
+        error: "Stormy is temporarily unavailable. Please try again later.",
+      }, 503);
+    }
 
-      // Layer 1: Monthly token budget (hard kill-switch)
-      const budget = await checkMonthlyTokenBudget(svc);
-      if (budget && !budget.allowed) {
-        console.warn(`BUDGET KILL-SWITCH: ${budget.totalTokens}/${MONTHLY_TOKEN_BUDGET} tokens`);
+    const svc = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Layer 1: Monthly token budget (hard kill-switch)
+    const budget = await checkMonthlyTokenBudget(svc);
+    if (budget && !budget.allowed) {
+      console.warn(`BUDGET KILL-SWITCH: ${budget.totalTokens}/${MONTHLY_TOKEN_BUDGET} tokens`);
+      return makeJsonResponse({
+        error: "Stormy has hit the monthly usage cap. We'll be back next month!",
+      }, 429);
+    }
+
+    // Layer 2: Global daily cap (all users)
+    const globalRL = await checkGlobalDailyLimit(svc);
+    if (globalRL && !globalRL.allowed) {
+      console.warn(`GLOBAL DAILY CAP: ${globalRL.used}/${GLOBAL_DAILY_MESSAGE_LIMIT}`);
+      return makeJsonResponse({
+        error: "Stormy is resting — daily capacity reached. Try again tomorrow!",
+      }, 429);
+    }
+
+    // Layer 3: Per-user weekly cap
+    if (user) {
+      const userRL = await checkUserWeeklyLimit(svc, user.id);
+      if (userRL && !userRL.allowed) {
         return makeJsonResponse({
-          error: "Stormy has hit the monthly usage cap. We'll be back next month!",
+          error: `You've used your ${WEEKLY_MESSAGE_LIMIT} Stormy questions for this matchup week. They reset every 7 days!`,
+          limit: WEEKLY_MESSAGE_LIMIT,
+          used: userRL.used,
         }, 429);
-      }
-
-      // Layer 2: Global daily cap (all users)
-      const globalRL = await checkGlobalDailyLimit(svc);
-      if (globalRL && !globalRL.allowed) {
-        console.warn(`GLOBAL DAILY CAP: ${globalRL.used}/${GLOBAL_DAILY_MESSAGE_LIMIT}`);
-        return makeJsonResponse({
-          error: "Stormy is resting — daily capacity reached. Try again tomorrow!",
-        }, 429);
-      }
-
-      // Layer 3: Per-user weekly cap
-      if (user) {
-        const userRL = await checkUserWeeklyLimit(svc, user.id);
-        if (userRL && !userRL.allowed) {
-          return makeJsonResponse({
-            error: `You've used your ${WEEKLY_MESSAGE_LIMIT} Stormy questions for this matchup week. They reset every 7 days!`,
-            limit: WEEKLY_MESSAGE_LIMIT,
-            used: userRL.used,
-          }, 429);
-        }
       }
     }
 

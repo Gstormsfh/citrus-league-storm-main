@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import { logger as honoLogger } from 'hono/logger';
 import { secureHeaders } from 'hono/secure-headers';
 import { requestId } from 'hono/request-id';
+import { bodyLimit } from 'hono/body-limit';
 import { leagueRoutes } from './routes/leagues';
 import { playerRoutes } from './routes/players';
 import { matchupRoutes } from './routes/matchups';
@@ -46,6 +47,9 @@ app.use('*', cors({
   allowHeaders: ['Content-Type', 'Authorization', 'x-client-info'],
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 }));
+
+// Request body size limit — 1 MB max (prevents payload bombs)
+app.use('/api/*', bodyLimit({ maxSize: 1024 * 1024 }));
 
 // Rate limiting — 100 req/min per IP for standard routes
 app.use('/api/*', standardRateLimit);

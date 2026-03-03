@@ -26,7 +26,8 @@ const ALLOWED_ORIGINS = [
 ];
 
 function getCorsHeaders(origin: string): Record<string, string> {
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  // Only reflect the origin if it's in the allow list; reject unknown origins
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : "";
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -36,6 +37,30 @@ function getCorsHeaders(origin: string): Record<string, string> {
 
 // In-memory cache: keyed by week number
 const cache = new Map<number, { data: unknown; timestamp: number }>();
+
+// Simple IP rate limiting — 30 requests/minute per IP (prevents abuse on this unauthenticated endpoint)
+const ipHits = new Map<string, { count: number; resetAt: number }>();
+const IP_RATE_LIMIT = 30;
+const IP_RATE_WINDOW_MS = 60_000;
+
+function checkIpRate(ip: string): boolean {
+  const now = Date.now();
+  const entry = ipHits.get(ip);
+  if (!entry || entry.resetAt <= now) {
+    ipHits.set(ip, { count: 1, resetAt: now + IP_RATE_WINDOW_MS });
+    return true;
+  }
+  entry.count++;
+  return entry.count <= IP_RATE_LIMIT;
+}
+
+// Cleanup stale IP entries every 2 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of ipHits) {
+    if (entry.resetAt <= now) ipHits.delete(key);
+  }
+}, 120_000);
 
 serve(async (req) => {
   const origin = req.headers.get("origin") || "";
@@ -49,6 +74,15 @@ serve(async (req) => {
   if (req.method !== "GET") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // IP rate limiting
+  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (!checkIpRate(clientIp)) {
+    return new Response(JSON.stringify({ error: "Too many requests" }), {
+      status: 429,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

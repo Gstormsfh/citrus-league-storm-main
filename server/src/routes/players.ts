@@ -70,7 +70,7 @@ playerRoutes.get('/by-ids', authMiddleware, async (c) => {
 
   const supabase = createUserClient(c.get('userToken'));
   const service = new PlayerService(supabase);
-  const playerIds = ids.split(',').map((id) => id.trim());
+  const playerIds = ids.split(',').map((id) => id.trim()).slice(0, 100);
 
   const { players, error } = await service.getPlayersByIds(playerIds);
   if (error) {
