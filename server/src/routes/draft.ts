@@ -10,6 +10,65 @@ const draftRoutes = new Hono<Env>();
 
 draftRoutes.use('*', authMiddleware);
 
+// GET /api/draft/league/:leagueId/session — Get active draft session
+draftRoutes.get('/league/:leagueId/session', membershipMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new DraftService(supabase);
+
+  const { sessionId, error } = await service.getActiveDraftSession(leagueId);
+  if (error) {
+    return c.json({ error: 'Failed to get draft session' }, 500);
+  }
+
+  return c.json({ data: { sessionId } });
+});
+
+// GET /api/draft/league/:leagueId/picks — Get draft picks
+draftRoutes.get('/league/:leagueId/picks', membershipMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const sessionId = c.req.query('sessionId');
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new DraftService(supabase);
+
+  const { picks, error } = await service.getDraftPicks(leagueId, sessionId);
+  if (error) {
+    return c.json({ error: 'Failed to fetch draft picks' }, 500);
+  }
+
+  return c.json({ data: picks });
+});
+
+// GET /api/draft/league/:leagueId/order/:roundNumber — Get draft order for a round
+draftRoutes.get('/league/:leagueId/order/:roundNumber', membershipMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const roundNumber = parseInt(c.req.param('roundNumber'), 10);
+  const sessionId = c.req.query('sessionId');
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new DraftService(supabase);
+
+  const { order, error } = await service.getDraftOrder(leagueId, roundNumber, sessionId);
+  if (error) {
+    return c.json({ error: 'Failed to fetch draft order' }, 500);
+  }
+
+  return c.json({ data: order });
+});
+
+// DELETE /api/draft/league/:leagueId — Hard delete draft data (commissioner only)
+draftRoutes.delete('/league/:leagueId', commissionerMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new DraftService(supabase);
+
+  const { error } = await service.hardDeleteDraft(leagueId);
+  if (error) {
+    return c.json({ error: 'Failed to delete draft data' }, 500);
+  }
+
+  return c.json({ data: { success: true } });
+});
+
 // GET /api/draft/league/:leagueId — Get draft state for a league
 draftRoutes.get('/league/:leagueId', membershipMiddleware, async (c) => {
   const leagueId = c.req.param('leagueId');
