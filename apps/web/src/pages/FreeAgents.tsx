@@ -527,25 +527,9 @@ const FreeAgents = () => {
         }
       }
 
-      // Batch fetch games for all teams in parallel
-      const teamGamesPromises = uniqueTeams.map(team => 
-        ScheduleService.getGamesForTeamInWeek(team, weekStart, weekEnd)
-          .then(({ games, error }) => {
-            if (error) {
-              return { team, games: [] };
-            }
-            return { team, games: games || [] };
-          })
-          .catch(() => {
-            return { team, games: [] };
-          })
-      );
-      
-      const teamGamesResults = await Promise.all(teamGamesPromises);
-      const teamGamesMap = new Map<string, NHLGame[]>();
-      teamGamesResults.forEach(({ team, games }) => {
-        teamGamesMap.set(team, games);
-      });
+      // Single batch API call for all teams (instead of N individual calls)
+      const { gamesByTeam } = await ScheduleService.getGamesForTeams(uniqueTeams, weekStart, weekEnd);
+      const teamGamesMap = gamesByTeam;
       
       // Calculate games for each player using cached data
       // Filter games to only include those within the matchup week (not next week)

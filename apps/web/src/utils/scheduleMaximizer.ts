@@ -16,6 +16,11 @@ export interface WeekDates {
   weekEnd: Date;
 }
 
+// Cache for calculateWeekDates — prevents repeated LeagueService.getLeague() calls
+// within the same session. Keyed by "leagueId:userId", TTL 60s.
+const weekDatesCache = new Map<string, { result: WeekDates; timestamp: number }>();
+const WEEK_DATES_CACHE_TTL = 60_000;
+
 /**
  * Calculate week dates (calendar week or matchup week based on league)
  */
@@ -23,10 +28,16 @@ export async function calculateWeekDates(
   leagueId?: string,
   userId?: string
 ): Promise<WeekDates> {
+  const cacheKey = `${leagueId || ''}:${userId || ''}`;
+  const cached = weekDatesCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < WEEK_DATES_CACHE_TTL) {
+    return cached.result;
+  }
+
   // Test mode controlled via VITE_TEST_MODE environment variable (defaults to false)
   const TEST_MODE = import.meta.env.VITE_TEST_MODE === 'true';
   const TEST_DATE = import.meta.env.VITE_TEST_DATE || DEFAULT_TEST_DATE;
-  
+
   const getTodayDate = () => {
     if (TEST_MODE) {
       const date = new Date(TEST_DATE + 'T00:00:00');
@@ -41,7 +52,6 @@ export async function calculateWeekDates(
   // Default to calendar week (Sunday-Saturday)
   const today = getTodayDate();
   const dayOfWeek = today.getDay();
-  // Calculate days from Sunday (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
   const daysFromSunday = dayOfWeek;
   let weekStart = new Date(today);
   weekStart.setDate(today.getDate() - daysFromSunday);
@@ -64,12 +74,13 @@ export async function calculateWeekDates(
         }
       }
     } catch (error) {
-      // Silently fall back to calendar week if league fetch fails
       logger.warn('Could not fetch league data for matchup week calculation, using calendar week:', error);
     }
   }
 
-  return { weekStart, weekEnd };
+  const result = { weekStart, weekEnd };
+  weekDatesCache.set(cacheKey, { result, timestamp: Date.now() });
+  return result;
 }
 
 /**

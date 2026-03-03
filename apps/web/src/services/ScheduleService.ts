@@ -55,7 +55,37 @@ export interface GameInfo {
   date?: string; // Game date
 }
 
+// ─── Request deduplication cache ───────────────────────────────────
+// Prevents identical in-flight HTTP requests from being duplicated.
+// Each entry caches the promise for a pending request; once resolved
+// the entry is kept for CACHE_TTL_MS so subsequent calls get instant results.
+const CACHE_TTL_MS = 30_000; // 30 seconds
+const requestCache = new Map<string, { promise: Promise<any>; timestamp: number }>();
+
+function getCachedOrFetch<T>(cacheKey: string, fetcher: () => Promise<T>): Promise<T> {
+  const existing = requestCache.get(cacheKey);
+  if (existing && Date.now() - existing.timestamp < CACHE_TTL_MS) {
+    return existing.promise as Promise<T>;
+  }
+  const promise = fetcher().finally(() => {
+    // Remove stale entries after TTL
+    setTimeout(() => {
+      const entry = requestCache.get(cacheKey);
+      if (entry && entry.promise === promise) {
+        requestCache.delete(cacheKey);
+      }
+    }, CACHE_TTL_MS);
+  });
+  requestCache.set(cacheKey, { promise, timestamp: Date.now() });
+  return promise;
+}
+
 export const ScheduleService = {
+  /** Clear the schedule request cache (useful after mutations) */
+  clearCache() {
+    requestCache.clear();
+  },
+
   /**
    * Get games for a specific date range
    */
@@ -63,23 +93,25 @@ export const ScheduleService = {
     startDate: Date,
     endDate: Date
   ): Promise<{ games: NHLGame[]; error: PostgrestError | null }> {
-    try {
-      const formatDateLocal = (d: Date) => {
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-      };
+    const formatDateLocal = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    const startStr = formatDateLocal(startDate);
+    const endStr = formatDateLocal(endDate);
+    const cacheKey = `dateRange:${startStr}:${endStr}`;
 
-      const response = await scheduleApi.getGames({
-        startDate: formatDateLocal(startDate),
-        endDate: formatDateLocal(endDate),
-      });
-      return { games: response.data || [], error: null };
-    } catch (error) {
-      logger.error('Error fetching games for date range:', error);
-      return { games: [], error: error as PostgrestError };
-    }
+    return getCachedOrFetch(cacheKey, async () => {
+      try {
+        const response = await scheduleApi.getGames({ startDate: startStr, endDate: endStr });
+        return { games: response.data || [], error: null };
+      } catch (error) {
+        logger.error('Error fetching games for date range:', error);
+        return { games: [], error: error as PostgrestError };
+      }
+    });
   },
 
   /**
@@ -91,37 +123,41 @@ export const ScheduleService = {
     startDate?: Date,
     endDate?: Date
   ): Promise<{ gamesByTeam: Map<string, NHLGame[]>; error: PostgrestError | null }> {
-    try {
-      if (teamAbbrevs.length === 0) {
-        return { gamesByTeam: new Map(), error: null };
-      }
-
-      const normalizedTeams = teamAbbrevs.map(t => t.toUpperCase());
-      const formatDateLocal = (d: Date) => {
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-      };
-
-      const response = await scheduleApi.getGamesForTeams(
-        normalizedTeams,
-        startDate ? formatDateLocal(startDate) : undefined,
-        endDate ? formatDateLocal(endDate) : undefined,
-      );
-
-      // Server returns Record<string, NHLGame[]>, convert to Map
-      const gamesByTeam = new Map<string, NHLGame[]>();
-      const data = response.data || {};
-      normalizedTeams.forEach(team => {
-        gamesByTeam.set(team, data[team] || []);
-      });
-
-      return { gamesByTeam, error: null };
-    } catch (error) {
-      logger.error('Error fetching games for teams:', error);
-      return { gamesByTeam: new Map(), error: error as PostgrestError };
+    if (teamAbbrevs.length === 0) {
+      return { gamesByTeam: new Map(), error: null };
     }
+
+    const normalizedTeams = teamAbbrevs.map(t => t.toUpperCase()).sort();
+    const formatDateLocal = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    const startStr = startDate ? formatDateLocal(startDate) : '';
+    const endStr = endDate ? formatDateLocal(endDate) : '';
+    const cacheKey = `teams:${normalizedTeams.join(',')}:${startStr}:${endStr}`;
+
+    return getCachedOrFetch(cacheKey, async () => {
+      try {
+        const response = await scheduleApi.getGamesForTeams(
+          normalizedTeams,
+          startStr || undefined,
+          endStr || undefined,
+        );
+
+        const gamesByTeam = new Map<string, NHLGame[]>();
+        const data = response.data || {};
+        normalizedTeams.forEach(team => {
+          gamesByTeam.set(team, data[team] || []);
+        });
+
+        return { gamesByTeam, error: null };
+      } catch (error) {
+        logger.error('Error fetching games for teams:', error);
+        return { gamesByTeam: new Map(), error: error as PostgrestError };
+      }
+    });
   },
 
   /**
@@ -132,25 +168,30 @@ export const ScheduleService = {
     startDate?: Date | string,
     endDate?: Date | string
   ): Promise<{ games: NHLGame[]; error: PostgrestError | null }> {
-    try {
-      const formatDateLocal = (d: Date | string) => {
-        if (typeof d === 'string') return d;
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-      };
+    const formatDateLocal = (d: Date | string) => {
+      if (typeof d === 'string') return d;
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    const startStr = startDate ? formatDateLocal(startDate) : '';
+    const endStr = endDate ? formatDateLocal(endDate) : '';
+    const cacheKey = `team:${teamAbbrev.toUpperCase()}:${startStr}:${endStr}`;
 
-      const response = await scheduleApi.getGames({
-        team: teamAbbrev,
-        startDate: startDate ? formatDateLocal(startDate) : undefined,
-        endDate: endDate ? formatDateLocal(endDate) : undefined,
-      });
-      return { games: response.data || [], error: null };
-    } catch (error) {
-      logger.error('Error fetching games for team:', error);
-      return { games: [], error: error as PostgrestError };
-    }
+    return getCachedOrFetch(cacheKey, async () => {
+      try {
+        const response = await scheduleApi.getGames({
+          team: teamAbbrev,
+          startDate: startStr || undefined,
+          endDate: endStr || undefined,
+        });
+        return { games: response.data || [], error: null };
+      } catch (error) {
+        logger.error('Error fetching games for team:', error);
+        return { games: [], error: error as PostgrestError };
+      }
+    });
   },
 
   /**

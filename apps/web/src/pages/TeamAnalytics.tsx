@@ -64,25 +64,31 @@ const TeamAnalytics = () => {
             .sort((a, b) => (b.points || 0) - (a.points || 0))
             .slice(0, 10);
           
-          const maximizers: FreeAgentRec[] = [];
-          for (const player of topPlayers) {
-            try {
-              const { count } = await ScheduleService.getGamesThisWeek(player.team);
-              maximizers.push({
-                id: parseInt(player.id) || 0,
-                name: player.full_name,
-                position: player.position,
-                team: player.team,
-                pointsPerGame: (player.points || 0) / Math.max(1, player.games_played || 1),
-                gamesThisWeek: count || 0,
-                scheduleAdvantage: (count || 0) >= 4,
-                rostered: 0
-              });
-            } catch (error) {
-              // Skip players with schedule errors
-              logger.warn(`Error getting games for ${player.team}:`, error);
-            }
-          }
+          // Batch fetch games for all teams at once
+          const uniqueTeams = [...new Set(topPlayers.map(p => p.team))];
+          const today = new Date();
+          const dayOfWeek = today.getDay();
+          const wkStart = new Date(today);
+          wkStart.setDate(today.getDate() - dayOfWeek);
+          wkStart.setHours(0, 0, 0, 0);
+          const wkEnd = new Date(wkStart);
+          wkEnd.setDate(wkStart.getDate() + 6);
+          wkEnd.setHours(23, 59, 59, 999);
+          const { gamesByTeam } = await ScheduleService.getGamesForTeams(uniqueTeams, wkStart, wkEnd);
+
+          const maximizers: FreeAgentRec[] = topPlayers.map(player => {
+            const count = (gamesByTeam.get(player.team.toUpperCase()) || []).length;
+            return {
+              id: parseInt(player.id) || 0,
+              name: player.full_name,
+              position: player.position,
+              team: player.team,
+              pointsPerGame: (player.points || 0) / Math.max(1, player.games_played || 1),
+              gamesThisWeek: count,
+              scheduleAdvantage: count >= 4,
+              rostered: 0
+            };
+          });
           
           maximizers.sort((a, b) => {
             if (b.gamesThisWeek !== a.gamesThisWeek) {
@@ -127,12 +133,22 @@ const TeamAnalytics = () => {
       const allPlayers = await PlayerService.getAllPlayers();
       const freeAgents = await LeagueService.getFreeAgents(allPlayers, currentLeagueId, user.id);
       
-      // Calculate games this week for each free agent
-      const maximizers: FreeAgentRec[] = [];
-      for (const player of freeAgents.slice(0, 10)) { // Top 10 for preview
-        const { count } = await ScheduleService.getGamesThisWeek(player.team);
-        
-        maximizers.push({
+      // Batch fetch games for all teams at once (instead of per-team for-loop)
+      const top10 = freeAgents.slice(0, 10);
+      const faUniqueTeams = [...new Set(top10.map(p => p.team))];
+      const today = new Date();
+      const dayOfWeek = today.getDay();
+      const faWeekStart = new Date(today);
+      faWeekStart.setDate(today.getDate() - dayOfWeek);
+      faWeekStart.setHours(0, 0, 0, 0);
+      const faWeekEnd = new Date(faWeekStart);
+      faWeekEnd.setDate(faWeekStart.getDate() + 6);
+      faWeekEnd.setHours(23, 59, 59, 999);
+      const { gamesByTeam: faGamesByTeam } = await ScheduleService.getGamesForTeams(faUniqueTeams, faWeekStart, faWeekEnd);
+
+      const maximizers: FreeAgentRec[] = top10.map(player => {
+        const count = (faGamesByTeam.get(player.team.toUpperCase()) || []).length;
+        return {
           id: parseInt(player.id) || 0,
           name: player.full_name,
           position: player.position,
@@ -140,9 +156,9 @@ const TeamAnalytics = () => {
           pointsPerGame: (player.points || 0) / Math.max(1, player.games_played || 1),
           gamesThisWeek: count,
           scheduleAdvantage: count >= 4,
-          rostered: 0 // Would need to calculate from league data
-        });
-      }
+          rostered: 0
+        };
+      });
       
       // Sort by games this week (descending), then by points per game
       maximizers.sort((a, b) => {
