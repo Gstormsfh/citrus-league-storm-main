@@ -163,13 +163,21 @@ const OtherTeam = () => {
             projectedPoints: 0 // Will be set by daily projections system
           }));
           
-          // Load schedule data for demo players
+          // Load schedule data for demo players (batch)
           const userTimezone = 'America/Denver';
+          const uniqueTeams = Array.from(new Set(
+            transformedPlayers.map(p => p.teamAbbreviation || p.team || '').filter(t => t)
+          ));
+          const [hasGamesTodayMap, nextGamesMap] = await Promise.all([
+            ScheduleService.hasGamesTodayBatch(uniqueTeams),
+            ScheduleService.getNextGamesForTeams(uniqueTeams)
+          ]);
           for (const player of transformedPlayers) {
-            const { game: nextGame } = await ScheduleService.getNextGameForTeam(player.teamAbbreviation || player.team || '');
-            const hasGameToday = await ScheduleService.hasGameToday(player.teamAbbreviation || player.team || '');
-            const gameInfo = ScheduleService.getGameInfo(nextGame, player.teamAbbreviation || player.team || '', userTimezone);
-            
+            const team = player.teamAbbreviation || player.team || '';
+            const nextGame = nextGamesMap.get(team) || null;
+            const hasGameToday = hasGamesTodayMap.get(team) || false;
+            const gameInfo = ScheduleService.getGameInfo(nextGame, team, userTimezone);
+
             if (gameInfo) {
               player.nextGame = {
                 opponent: gameInfo.opponent,
@@ -369,14 +377,21 @@ const OtherTeam = () => {
           projectedPoints: 0 // Will be set by daily projections system
         }));
 
-        // Load real NHL schedule data for each player
-        // Get user timezone from profile (default to Mountain Time)
+        // Load real NHL schedule data for players (batch instead of per-team)
         const userTimezone = profile?.timezone || 'America/Denver';
+        const uniqueTeams = Array.from(new Set(
+          transformedPlayers.map(p => p.teamAbbreviation || p.team || '').filter(t => t)
+        ));
+        const [hasGamesTodayMap, nextGamesMap] = await Promise.all([
+          ScheduleService.hasGamesTodayBatch(uniqueTeams),
+          ScheduleService.getNextGamesForTeams(uniqueTeams)
+        ]);
         for (const player of transformedPlayers) {
-          const { game: nextGame } = await ScheduleService.getNextGameForTeam(player.teamAbbreviation || player.team || '');
-          const hasGameToday = await ScheduleService.hasGameToday(player.teamAbbreviation || player.team || '');
-          const gameInfo = ScheduleService.getGameInfo(nextGame, player.teamAbbreviation || player.team || '', userTimezone);
-          
+          const team = player.teamAbbreviation || player.team || '';
+          const nextGame = nextGamesMap.get(team) || null;
+          const hasGameToday = hasGamesTodayMap.get(team) || false;
+          const gameInfo = ScheduleService.getGameInfo(nextGame, team, userTimezone);
+
           if (gameInfo) {
             player.nextGame = {
               opponent: gameInfo.opponent,
