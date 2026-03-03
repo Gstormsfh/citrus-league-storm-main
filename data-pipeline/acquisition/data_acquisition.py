@@ -15,6 +15,10 @@ except BaseException:
     # All DB operations use SupabaseRest instead
     create_client = None
     Client = None
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import _bootstrap  # noqa: F401
+
 from data_pipeline.utils.citrus_request import citrus_request
 
 # Set UTF-8 encoding for stdout to handle Unicode characters on Windows

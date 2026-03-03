@@ -24,6 +24,9 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List, Tuple
 from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor, as_completed
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import _bootstrap  # noqa: F401
+
 from data_pipeline.utils.citrus_request import citrus_request
 
 # Resolve script paths relative to the data-pipeline directory

@@ -10,6 +10,9 @@ from dotenv import load_dotenv
 import os
 import logging
 from datetime import date
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import _bootstrap  # noqa: F401
+
 from data_pipeline.utils.citrus_request import citrus_request
 
 logger = logging.getLogger(__name__)

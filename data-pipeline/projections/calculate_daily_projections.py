@@ -62,6 +62,9 @@ if sys.platform == "win32":
     if sys.stderr.encoding != "utf-8":
         sys.stderr.reconfigure(encoding="utf-8")
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import _bootstrap  # noqa: F401
+
 from data_pipeline.utils.supabase_rest import SupabaseRest
 
 load_dotenv()

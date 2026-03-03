@@ -32,6 +32,9 @@ import sys
 import datetime as dt
 from typing import Dict, List
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import _bootstrap  # noqa: F401
+
 from data_pipeline.utils.supabase_rest import SupabaseRest
 import logging
 

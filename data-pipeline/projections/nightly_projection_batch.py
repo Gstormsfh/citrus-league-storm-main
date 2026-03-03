@@ -55,6 +55,7 @@ if sys.platform == "win32":
 
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import _bootstrap  # noqa: F401
 
 from dotenv import load_dotenv
 from data_pipeline.utils.supabase_rest import SupabaseRest
