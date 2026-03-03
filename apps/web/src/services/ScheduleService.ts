@@ -5,6 +5,7 @@ import { COLUMNS } from '@/utils/queryColumns';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { DEFAULT_TEST_DATE } from '@/utils/seasonConstants';
 import { logger } from '@/utils/logger';
+import { scheduleApi } from '@/api/schedule';
 
 // Test mode: Controlled via VITE_TEST_MODE environment variable
 // Set VITE_TEST_MODE=true in .env to use test date for development
@@ -63,34 +64,18 @@ export const ScheduleService = {
     endDate: Date
   ): Promise<{ games: NHLGame[]; error: PostgrestError | null }> {
     try {
-      // Helper to format date in local timezone (avoids UTC shift issues with toISOString)
       const formatDateLocal = (d: Date) => {
         const year = d.getFullYear();
         const month = String(d.getMonth() + 1).padStart(2, '0');
         const day = String(d.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
       };
-      
-      const startStr = formatDateLocal(startDate);
-      const endStr = formatDateLocal(endDate);
-      
-      const { data, error } = await supabase
-        .from('nhl_games')
-        .select(COLUMNS.NHL_GAME)
-        .gte('game_date', startStr)
-        .lte('game_date', endStr)
-        .order('game_date', { ascending: true })
-        .order('game_time', { ascending: true });
 
-      if (error) {
-        // If table doesn't exist, return empty array (schedule not loaded yet)
-        if (error.message?.includes('does not exist') || error.message?.includes('relation')) {
-          logger.warn('nhl_games table does not exist yet. Run the migration and fetch script.');
-          return { games: [], error: null };
-        }
-        throw error;
-      }
-      return { games: data || [], error: null };
+      const response = await scheduleApi.getGames({
+        startDate: formatDateLocal(startDate),
+        endDate: formatDateLocal(endDate),
+      });
+      return { games: response.data || [], error: null };
     } catch (error) {
       logger.error('Error fetching games for date range:', error);
       return { games: [], error: error as PostgrestError };
@@ -111,78 +96,25 @@ export const ScheduleService = {
         return { gamesByTeam: new Map(), error: null };
       }
 
-      // CRITICAL: Normalize all team abbreviations to uppercase for consistent matching
-      // Database stores teams in uppercase, so we need to match that
       const normalizedTeams = teamAbbrevs.map(t => t.toUpperCase());
-
-      // Build OR condition for all teams (using uppercase)
-      // Format: (home_team.eq.TEAM1,away_team.eq.TEAM1),(home_team.eq.TEAM2,away_team.eq.TEAM2),...
-      const orConditions = normalizedTeams
-        .map(team => `home_team.eq.${team},away_team.eq.${team}`)
-        .join(',');
-
-      // Helper to format date in local timezone (avoids UTC shift issues with toISOString)
       const formatDateLocal = (d: Date) => {
         const year = d.getFullYear();
         const month = String(d.getMonth() + 1).padStart(2, '0');
         const day = String(d.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
       };
-      
-      let query = supabase
-        .from('nhl_games')
-        .select(COLUMNS.NHL_GAME)
-        .or(orConditions)
-        .order('game_date', { ascending: true })
-        .order('game_time', { ascending: true });
 
-      if (startDate) {
-        query = query.gte('game_date', formatDateLocal(startDate));
-      }
-      if (endDate) {
-        query = query.lte('game_date', formatDateLocal(endDate));
-      }
+      const response = await scheduleApi.getGamesForTeams(
+        normalizedTeams,
+        startDate ? formatDateLocal(startDate) : undefined,
+        endDate ? formatDateLocal(endDate) : undefined,
+      );
 
-      let data: NHLGame[] | null = null;
-      let error: PostgrestError | null = null;
-      try {
-        const result = await withTimeout(query, 10000, 'getGamesForTeams query timeout');
-        data = result.data;
-        error = result.error;
-      } catch (timeoutError: unknown) {
-        logger.error('[ScheduleService.getGamesForTeams] Query timeout:', timeoutError);
-        error = timeoutError as PostgrestError;
-      }
-      
-      if (error) {
-        if (error.message?.includes('does not exist') || error.message?.includes('relation')) {
-          logger.warn('nhl_games table does not exist yet. Run the migration and fetch script.');
-          return { gamesByTeam: new Map(), error: null };
-        }
-        if (error.message?.includes('timeout')) {
-          logger.error('[ScheduleService.getGamesForTeams] Query timed out after 10s');
-          return { gamesByTeam: new Map(), error };
-        }
-        throw error;
-      }
-
-      // Group games by team (using uppercase keys for consistent lookup)
+      // Server returns Record<string, NHLGame[]>, convert to Map
       const gamesByTeam = new Map<string, NHLGame[]>();
+      const data = response.data || {};
       normalizedTeams.forEach(team => {
-        gamesByTeam.set(team, []);
-      });
-
-      (data || []).forEach((game: NHLGame) => {
-        // Database stores teams in uppercase, so direct matching works
-        const homeTeam = (game.home_team || '').toUpperCase();
-        const awayTeam = (game.away_team || '').toUpperCase();
-        
-        if (homeTeam && gamesByTeam.has(homeTeam)) {
-          gamesByTeam.get(homeTeam)!.push(game);
-        }
-        if (awayTeam && gamesByTeam.has(awayTeam)) {
-          gamesByTeam.get(awayTeam)!.push(game);
-        }
+        gamesByTeam.set(team, data[team] || []);
       });
 
       return { gamesByTeam, error: null };
@@ -197,42 +129,24 @@ export const ScheduleService = {
    */
   async getGamesForTeam(
     teamAbbrev: string,
-    startDate?: Date,
-    endDate?: Date
+    startDate?: Date | string,
+    endDate?: Date | string
   ): Promise<{ games: NHLGame[]; error: PostgrestError | null }> {
     try {
-      // Helper to format date in local timezone (avoids UTC shift issues with toISOString)
-      const formatDateLocal = (d: Date) => {
+      const formatDateLocal = (d: Date | string) => {
+        if (typeof d === 'string') return d;
         const year = d.getFullYear();
         const month = String(d.getMonth() + 1).padStart(2, '0');
         const day = String(d.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
       };
 
-      let query = supabase
-        .from('nhl_games')
-        .select(COLUMNS.NHL_GAME)
-        .or(`home_team.eq.${teamAbbrev},away_team.eq.${teamAbbrev}`)
-        .order('game_date', { ascending: true })
-        .order('game_time', { ascending: true });
-
-      if (startDate) {
-        query = query.gte('game_date', formatDateLocal(startDate));
-      }
-      if (endDate) {
-        query = query.lte('game_date', formatDateLocal(endDate));
-      }
-
-      const { data, error } = await query;
-      if (error) {
-        // If table doesn't exist, return empty array
-        if (error.message?.includes('does not exist') || error.message?.includes('relation')) {
-          logger.warn('nhl_games table does not exist yet. Run the migration and fetch script.');
-          return { games: [], error: null };
-        }
-        throw error;
-      }
-      return { games: data || [], error: null };
+      const response = await scheduleApi.getGames({
+        team: teamAbbrev,
+        startDate: startDate ? formatDateLocal(startDate) : undefined,
+        endDate: endDate ? formatDateLocal(endDate) : undefined,
+      });
+      return { games: response.data || [], error: null };
     } catch (error) {
       logger.error('Error fetching games for team:', error);
       return { games: [], error: error as PostgrestError };
@@ -244,27 +158,8 @@ export const ScheduleService = {
    */
   async getNextGameForTeam(teamAbbrev: string): Promise<{ game: NHLGame | null; error: PostgrestError | null }> {
     try {
-      const todayStr = getTodayString();
-
-      const { data, error } = await supabase
-        .from('nhl_games')
-        .select(COLUMNS.NHL_GAME)
-        .or(`home_team.eq.${teamAbbrev},away_team.eq.${teamAbbrev}`)
-        .gte('game_date', todayStr)
-        .in('status', ['scheduled', 'live', 'final'])
-        .order('game_date', { ascending: true })
-        .order('game_time', { ascending: true })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        // If table doesn't exist, return null
-        if (error.message?.includes('does not exist') || error.message?.includes('relation')) {
-          return { game: null, error: null };
-        }
-        throw error;
-      }
-      return { game: data || null, error: null };
+      const response = await scheduleApi.getNextGame(teamAbbrev);
+      return { game: response.data || null, error: null };
     } catch (error) {
       logger.error('Error fetching next game:', error);
       return { game: null, error: error as PostgrestError };
@@ -414,34 +309,17 @@ export const ScheduleService = {
         return new Map();
       }
 
-      const orConditions = teamAbbrevs
-        .map(team => `home_team.eq.${team},away_team.eq.${team}`)
-        .join(',');
+      // Use the batch API endpoint
+      const { gamesByTeam } = await this.getGamesForTeams(
+        teamAbbrevs,
+        new Date(targetDate + 'T00:00:00'),
+        new Date(targetDate + 'T00:00:00')
+      );
 
-      const { data: games, error } = await supabase
-        .from('nhl_games')
-        .select('home_team, away_team')
-        .or(orConditions)
-        .eq('game_date', targetDate)
-        .in('status', ['scheduled', 'live', 'final']);
-
-      if (error) {
-        if (error.message?.includes('does not exist') || error.message?.includes('relation')) {
-          return new Map(teamAbbrevs.map(team => [team, false]));
-        }
-        logger.error('Error checking games on date batch:', error);
-        return new Map(teamAbbrevs.map(team => [team, false]));
-      }
-
-      // Build set of teams with games on that date
-      const teamsWithGames = new Set<string>();
-      (games || []).forEach((game: { home_team: string; away_team: string }) => {
-        if (teamAbbrevs.includes(game.home_team)) teamsWithGames.add(game.home_team);
-        if (teamAbbrevs.includes(game.away_team)) teamsWithGames.add(game.away_team);
-      });
-
-      // Return map
-      return new Map(teamAbbrevs.map(team => [team, teamsWithGames.has(team)]));
+      return new Map(teamAbbrevs.map(team => [
+        team,
+        (gamesByTeam.get(team.toUpperCase()) || []).length > 0
+      ]));
     } catch (error) {
       logger.error('Error checking games on date batch:', error);
       return new Map(teamAbbrevs.map(team => [team, false]));
@@ -458,33 +336,16 @@ export const ScheduleService = {
         return new Map();
       }
 
-      const orConditions = teamAbbrevs
-        .map(team => `home_team.eq.${team},away_team.eq.${team}`)
-        .join(',');
+      const { gamesByTeam } = await this.getGamesForTeams(
+        teamAbbrevs,
+        new Date(targetDate + 'T00:00:00'),
+        new Date(targetDate + 'T00:00:00')
+      );
 
-      const { data: games, error } = await supabase
-        .from('nhl_games')
-        .select(COLUMNS.NHL_GAME)
-        .or(orConditions)
-        .eq('game_date', targetDate)
-        .in('status', ['scheduled', 'live', 'final'])
-        .order('game_time', { ascending: true });
-
-      if (error) {
-        if (error.message?.includes('does not exist') || error.message?.includes('relation')) {
-          return new Map(teamAbbrevs.map(team => [team, null]));
-        }
-        logger.error('Error fetching games for date batch:', error);
-        return new Map(teamAbbrevs.map(team => [team, null]));
-      }
-
-      // Find game for each team on this date
       const gamesMap = new Map<string, NHLGame | null>();
       teamAbbrevs.forEach(team => {
-        const game = (games || []).find(
-          (g: NHLGame) => g.home_team === team || g.away_team === team
-        ) || null;
-        gamesMap.set(team, game);
+        const teamGames = gamesByTeam.get(team.toUpperCase()) || [];
+        gamesMap.set(team, teamGames[0] || null);
       });
 
       return gamesMap;
@@ -505,34 +366,15 @@ export const ScheduleService = {
       }
 
       const todayStr = getTodayString();
-      const orConditions = teamAbbrevs
-        .map(team => `home_team.eq.${team},away_team.eq.${team}`)
-        .join(',');
+      const { gamesByTeam } = await this.getGamesForTeams(
+        teamAbbrevs,
+        new Date(todayStr + 'T00:00:00'),
+      );
 
-      const { data: games, error } = await supabase
-        .from('nhl_games')
-        .select(COLUMNS.NHL_GAME)
-        .or(orConditions)
-        .gte('game_date', todayStr)
-        .in('status', ['scheduled', 'live', 'final'])
-        .order('game_date', { ascending: true })
-        .order('game_time', { ascending: true });
-
-      if (error) {
-        if (error.message?.includes('does not exist') || error.message?.includes('relation')) {
-          return new Map(teamAbbrevs.map(team => [team, null]));
-        }
-        logger.error('Error fetching next games batch:', error);
-        return new Map(teamAbbrevs.map(team => [team, null]));
-      }
-
-      // Find next game for each team
       const nextGames = new Map<string, NHLGame | null>();
       teamAbbrevs.forEach(team => {
-        const teamGame = (games || []).find((g: NHLGame) => 
-          g.home_team === team || g.away_team === team
-        );
-        nextGames.set(team, teamGame || null);
+        const teamGames = gamesByTeam.get(team.toUpperCase()) || [];
+        nextGames.set(team, teamGames[0] || null);
       });
 
       return nextGames;
@@ -547,28 +389,9 @@ export const ScheduleService = {
    */
   async hasGameToday(teamAbbrev: string): Promise<boolean> {
     try {
-      // Get today's date in YYYY-MM-DD format (uses test date if in test mode)
       const todayStr = getTodayString();
-      
-      // Query for games on today's date
-      const { data: games, error } = await supabase
-        .from('nhl_games')
-        .select(COLUMNS.NHL_GAME)
-        .or(`home_team.eq.${teamAbbrev},away_team.eq.${teamAbbrev}`)
-        .eq('game_date', todayStr)
-        .in('status', ['scheduled', 'live', 'final']);
-
-      if (error) {
-        // If table doesn't exist, return false
-        if (error.message?.includes('does not exist') || error.message?.includes('relation')) {
-          logger.warn('nhl_games table does not exist yet. Run the migration and fetch script.');
-          return false;
-        }
-        logger.error('Error checking if team has game today:', error);
-        return false;
-      }
-
-      return (games || []).length > 0;
+      const { games } = await this.getGamesForTeam(teamAbbrev, todayStr, todayStr);
+      return games.length > 0;
     } catch (error) {
       logger.error('Error checking if team has game today:', error);
       return false;
