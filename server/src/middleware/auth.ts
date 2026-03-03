@@ -2,8 +2,8 @@ import { Context, Next } from 'hono';
 import { createClient } from '@supabase/supabase-js';
 import type { Env } from '../app';
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+// NOTE: env vars are read inside each middleware function (not at module scope)
+// because ESM import hoisting causes module-level code to run before .env is loaded.
 
 /**
  * Auth middleware — validates Supabase JWT from Authorization header.
@@ -21,6 +21,9 @@ export async function authMiddleware(c: Context<Env>, next: Next) {
   }
 
   const token = authHeader.slice(7); // Remove "Bearer "
+
+  const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     return c.json({ error: 'Server configuration error' }, 500);
@@ -55,6 +58,9 @@ export async function authMiddleware(c: Context<Env>, next: Next) {
  */
 export async function optionalAuthMiddleware(c: Context<Env>, next: Next) {
   const authHeader = c.req.header('Authorization');
+
+  const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
   if (authHeader && authHeader.startsWith('Bearer ') && SUPABASE_URL && SUPABASE_ANON_KEY) {
     const token = authHeader.slice(7);
