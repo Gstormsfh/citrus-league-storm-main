@@ -1,26 +1,35 @@
 /**
  * Centralized logging utility - SLEEPER STYLE
- * Completely silent console - no noise, clean browser console
- * All logging methods are no-ops to eliminate console clutter
+ * Clean console in production, errors/warns visible in development
  */
+
+const isDev = typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+// Keep a reference to native console methods before anything overrides them
+const nativeConsole = {
+  error: typeof console !== 'undefined' ? console.error.bind(console) : () => {},
+  warn: typeof console !== 'undefined' ? console.warn.bind(console) : () => {},
+};
 
 export const logger = {
   log: (..._args: any[]) => {
     // Silent - no console output (Sleeper-style)
   },
-  
-  error: (..._args: any[]) => {
-    // Silent - no console output (Sleeper-style)
+
+  error: (...args: any[]) => {
+    // Always surface errors so developers can debug
+    nativeConsole.error(...args);
   },
-  
-  warn: (..._args: any[]) => {
-    // Silent - no console output (Sleeper-style)
+
+  warn: (...args: any[]) => {
+    if (isDev) nativeConsole.warn(...args);
   },
-  
+
   debug: (..._args: any[]) => {
     // Silent - no console output (Sleeper-style)
   },
-  
+
   info: (..._args: any[]) => {
     // Silent - no console output (Sleeper-style)
   },
