@@ -715,7 +715,7 @@ def update_active_matchup_scores(
             updated_count = len(successful)
             failed_count = len(failed)
             
-            logger.error(f"[update_active_matchup_scores] Completed: {updated_count} matchups updated, {failed_count} failed")
+            logger.info(f"[update_active_matchup_scores] Completed: {updated_count} matchups updated, {failed_count} failed")
             
             return {
                 "updated": updated_count,
