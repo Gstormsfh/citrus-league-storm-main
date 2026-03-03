@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -139,12 +139,25 @@ export const TeamIntelHub = () => {
   // League averages for comparison
   const [leagueAverages, setLeagueAverages] = useState<Map<string, number>>(new Map());
 
+  // Track if we've already loaded data for this league to prevent duplicate calls
+  const loadedLeagueRef = useRef<string | null>(null);
+
+  // Derive draft status as a stable primitive to avoid re-renders from activeLeague object changes
+  const draftCompleted = activeLeague?.draft_status === 'completed';
+
   // Load roster data
   useEffect(() => {
     if (!user || !activeLeagueId || userLeagueState !== 'active-user') {
       setLoading(false);
       return;
     }
+
+    // Skip if we already loaded for this league+user combo
+    const loadKey = `${activeLeagueId}:${user.id}:${draftCompleted}`;
+    if (loadedLeagueRef.current === loadKey) {
+      return;
+    }
+    loadedLeagueRef.current = loadKey;
 
     const loadRosterData = async () => {
       try {
@@ -166,7 +179,7 @@ export const TeamIntelHub = () => {
         setMyTeamId(userTeam.id);
 
         // Check if draft is completed
-        if (!activeLeague || activeLeague.draft_status !== 'completed') {
+        if (!draftCompleted) {
           setLoading(false);
           return;
         }
@@ -259,7 +272,10 @@ export const TeamIntelHub = () => {
         if (myPrio && myPrio.priority > 0 && myPrio.priority <= priority.length) {
           setMyPriority(myPrio.priority);
         } else {
-          logger.warn('Invalid waiver priority:', myPrio?.priority, 'of', priority.length);
+          // Only warn if we actually found a priority entry (not just missing data)
+          if (myPrio) {
+            logger.warn('Invalid waiver priority:', myPrio.priority, 'of', priority.length);
+          }
           setMyPriority(null);
         }
 
@@ -288,7 +304,8 @@ export const TeamIntelHub = () => {
     };
 
     loadRosterData();
-  }, [user, activeLeagueId, userLeagueState, activeLeague]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- use draftCompleted primitive instead of activeLeague object to prevent re-triggers
+  }, [user?.id, activeLeagueId, userLeagueState, draftCompleted]);
 
   // Format day label
   const formatDayLabel = (date: Date): string => {

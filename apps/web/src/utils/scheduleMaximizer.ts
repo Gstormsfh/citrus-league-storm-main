@@ -73,7 +73,7 @@ export async function calculateWeekDates(
 }
 
 /**
- * Batch fetch games for multiple teams in parallel
+ * Batch fetch games for multiple teams in a SINGLE API call
  * Returns a map of team abbreviation -> games array
  */
 export async function fetchGamesForTeams(
@@ -82,30 +82,19 @@ export async function fetchGamesForTeams(
   weekEnd: Date
 ): Promise<Map<string, NHLGame[]>> {
   const uniqueTeams = [...new Set(teams)];
-  
-  // Batch fetch games for all teams in parallel
-  const teamGamesPromises = uniqueTeams.map(team => 
-    ScheduleService.getGamesForTeamInWeek(team, weekStart, weekEnd)
-      .then(({ games, error }) => {
-        if (error) {
-          logger.warn(`Error fetching games for ${team}:`, error);
-          return { team, games: [] };
-        }
-        return { team, games: games || [] };
-      })
-      .catch((error) => {
-        logger.warn(`Exception fetching games for ${team}:`, error);
-        return { team, games: [] };
-      })
-  );
 
-  const teamGamesResults = await Promise.all(teamGamesPromises);
-  const teamGamesMap = new Map<string, NHLGame[]>();
-  teamGamesResults.forEach(({ team, games }) => {
-    teamGamesMap.set(team, games);
-  });
+  if (uniqueTeams.length === 0) {
+    return new Map();
+  }
 
-  return teamGamesMap;
+  try {
+    // Single batch API call instead of N individual calls
+    const { gamesByTeam } = await ScheduleService.getGamesForTeams(uniqueTeams, weekStart, weekEnd);
+    return gamesByTeam;
+  } catch (error) {
+    logger.warn('Error batch fetching games for teams:', error);
+    return new Map();
+  }
 }
 
 /**

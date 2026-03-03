@@ -338,10 +338,10 @@ const HockeyPlayerCardContent = ({
   // Disable drag if player is locked
   const canDrag = draggable && !isLocked;
   
+  // Don't pass isDragging as a DOM prop — it's used in className logic only
   const dragProps = canDrag ? {
     ...attributes,
     ...listeners,
-    isDragging // Ensure isDragging is passed or handled if used elsewhere
   } : {};
 
   return (
