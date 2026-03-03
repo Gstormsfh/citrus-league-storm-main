@@ -22,6 +22,23 @@ try {
   // .env file is optional — Cloud Run / production injects env vars directly
 }
 
+// ── Proxy support ─────────────────────────────────────────────────────
+// Some environments (e.g., Cloud Run, container sandboxes) route outbound
+// traffic through an HTTP proxy. Node.js's native fetch() does not honor
+// https_proxy by default, so we configure undici's global dispatcher.
+const proxyUrl = process.env.https_proxy || process.env.HTTPS_PROXY || process.env.GLOBAL_AGENT_HTTP_PROXY;
+if (proxyUrl) {
+  try {
+    const { createRequire } = await import('node:module');
+    const require = createRequire(import.meta.url);
+    const { ProxyAgent, setGlobalDispatcher } = require('undici');
+    setGlobalDispatcher(new ProxyAgent(proxyUrl));
+    console.log('[proxy] Global fetch proxy configured');
+  } catch (e: any) {
+    console.warn('[proxy] Failed to configure proxy:', e.message);
+  }
+}
+
 import { serve } from '@hono/node-server';
 import { app } from './app';
 
