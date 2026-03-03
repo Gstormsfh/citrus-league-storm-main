@@ -2070,7 +2070,8 @@ async joinLeagueByCode(
         const isPlayerLockedForDate = (playerId: number): boolean => {
           // Only check lock status for TODAY - future dates are never locked
           if (!isToday) return false;
-          
+
+          const now = new Date();
           const team = playerTeamMap.get(playerId);
           if (!team) return false; // Can't determine team, don't lock
           
