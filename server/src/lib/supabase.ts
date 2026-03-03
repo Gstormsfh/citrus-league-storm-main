@@ -1,28 +1,47 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
-
-if (!SUPABASE_URL) {
-  throw new Error('Missing SUPABASE_URL environment variable');
+// Read env vars lazily — Cloud Run may inject them after module load,
+// and the server must start (for health checks) even if they're missing.
+function getSupabaseUrl(): string {
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  if (!url) throw new Error('Missing SUPABASE_URL environment variable');
+  return url;
 }
 
-if (!SUPABASE_ANON_KEY) {
-  throw new Error('Missing SUPABASE_ANON_KEY environment variable');
+function getSupabaseAnonKey(): string {
+  const key = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+  if (!key) throw new Error('Missing SUPABASE_ANON_KEY environment variable');
+  return key;
 }
 
 /**
  * Admin Supabase client — uses service role key to bypass RLS.
  * ONLY use for admin operations and background jobs.
  * Never use for user-facing requests.
+ *
+ * Lazily initialized on first access so the server can start without env vars.
  */
-export const supabaseAdmin: SupabaseClient = SUPABASE_SERVICE_KEY
-  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+let _adminClient: SupabaseClient | null = null;
+export function getSupabaseAdmin(): SupabaseClient {
+  if (!_adminClient) {
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!serviceKey) {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY not set — admin client unavailable');
+    }
+    _adminClient = createClient(getSupabaseUrl(), serviceKey, {
       auth: { persistSession: false, autoRefreshToken: false },
       global: { headers: { 'x-client-info': 'citrus-api-admin' } },
-    })
-  : (() => { console.warn('SUPABASE_SERVICE_ROLE_KEY not set — admin client unavailable'); return null as any; })();
+    });
+  }
+  return _adminClient;
+}
+
+/** @deprecated Use getSupabaseAdmin() — kept for backward compatibility */
+export const supabaseAdmin: SupabaseClient = new Proxy({} as SupabaseClient, {
+  get(_, prop) {
+    return (getSupabaseAdmin() as any)[prop];
+  },
+});
 
 /**
  * Create a per-request Supabase client using the user's JWT.
@@ -31,7 +50,7 @@ export const supabaseAdmin: SupabaseClient = SUPABASE_SERVICE_KEY
  * @param userToken - The user's JWT from the Authorization header
  */
 export function createUserClient(userToken: string): SupabaseClient {
-  return createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
+  return createClient(getSupabaseUrl(), getSupabaseAnonKey(), {
     auth: { persistSession: false, autoRefreshToken: false },
     global: {
       headers: {
