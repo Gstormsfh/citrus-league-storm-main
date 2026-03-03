@@ -43,6 +43,8 @@ function removeCrossorigin(): Plugin {
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   base: "/",
+  // Load .env from monorepo root (where .env.example lives)
+  envDir: path.resolve(__dirname, '../../'),
   server: {
     host: "0.0.0.0",
     port: 8080,
