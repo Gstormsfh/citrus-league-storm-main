@@ -36,6 +36,9 @@ from typing import Dict, List, Optional, Set
 import requests
 from dotenv import load_dotenv
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import _bootstrap  # noqa: F401
+
 from data_pipeline.utils.supabase_rest import SupabaseRest
 from data_pipeline.utils.citrus_request import citrus_request
 

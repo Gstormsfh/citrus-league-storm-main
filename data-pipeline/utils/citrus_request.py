@@ -34,6 +34,10 @@ from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 from dotenv import load_dotenv
 
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import _bootstrap  # noqa: F401
+
 from data_pipeline.utils.proxy_manager import get_proxy_manager, get_realistic_headers
 from data_pipeline.utils.proxy_health import get_health_monitor
 

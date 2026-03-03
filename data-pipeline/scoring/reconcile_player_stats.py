@@ -30,6 +30,9 @@ import logging
 from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional, Tuple, Set, Any
 from dotenv import load_dotenv
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import _bootstrap  # noqa: F401
+
 from data_pipeline.utils.supabase_rest import SupabaseRest
 from data_pipeline.utils.citrus_request import citrus_request
 from concurrent.futures import ThreadPoolExecutor, as_completed
