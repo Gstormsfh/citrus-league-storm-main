@@ -3,6 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // Allowed origins — restrict CORS to known deployment URLs only
 const ALLOWED_ORIGINS = [
+  "https://citrusfantasysports.com",
+  "https://www.citrusfantasysports.com",
   "https://citrus-fantasy-sports.web.app",
   "https://citrus-fantasy-sports.firebaseapp.com",
   "http://localhost:5173",  // Vite dev server

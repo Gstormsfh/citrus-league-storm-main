@@ -17,6 +17,8 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 // Allowed origins — restrict CORS to known deployment URLs only
 const ALLOWED_ORIGINS = [
+  "https://citrusfantasysports.com",
+  "https://www.citrusfantasysports.com",
   "https://citrus-fantasy-sports.web.app",
   "https://citrus-fantasy-sports.firebaseapp.com",
   "http://localhost:5173",
