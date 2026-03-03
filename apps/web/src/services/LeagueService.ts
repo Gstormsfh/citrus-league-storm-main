@@ -12,6 +12,7 @@ import { getTodayMST, getTodayMSTDate } from "@/utils/timezoneUtils";
 import { CURRENT_SEASON } from "@/utils/seasonConstants";
 import type { LeagueType, ScoringFormat, DraftType as LeagueDraftType, LeagueSettings } from "@/types/leagueTypes";
 import { extractFormatSettings } from "@/types/leagueTypes";
+import { leagueApi } from "@/api/leagues";
 
 export interface League {
   id: string;
@@ -269,7 +270,7 @@ export const LeagueService = {
    */
   async createLeague(
     name: string,
-    commissionerId: string,
+    _commissionerId: string,
     rosterSize: number = 21,
     draftRounds: number = 21,
     settings: LeagueSettings = {},
@@ -283,69 +284,15 @@ export const LeagueService = {
     }
   ): Promise<{ league: League | null; team: Team | null; error: unknown }> {
     try {
-      // Create the league with waiver settings
-      const { data: league, error: leagueError } = await supabase
-        .from('leagues')
-        .insert({
-          name,
-          commissioner_id: commissionerId,
-          roster_size: rosterSize,
-          draft_rounds: draftRounds,
-          settings,
-          scoring_settings: scoringSettings,
-          // Include waiver settings if provided
-          waiver_process_time: waiverSettings?.waiver_process_time || '02:00:00',
-          waiver_period_hours: waiverSettings?.waiver_period_hours || 48,
-          waiver_game_lock: waiverSettings?.waiver_game_lock !== undefined ? waiverSettings.waiver_game_lock : true,
-          waiver_type: waiverSettings?.waiver_type || 'rolling',
-          allow_trades_during_games: waiverSettings?.allow_trades_during_games !== undefined ? waiverSettings.allow_trades_during_games : true,
-        })
-        .select()
-        .single();
-
-      if (leagueError) throw leagueError;
-
-      // Get the commissioner's profile for default team name
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('username, default_team_name')
-        .eq('id', commissionerId)
-        .single();
-
-      // Use default_team_name if set, otherwise fall back to username-based name
-      const teamName = profile?.default_team_name?.trim() 
-        || (profile?.username 
-          ? `${profile.username}'s Team`
-          : 'My Team');
-
-      // Create the commissioner's team
-      const { data: team, error: teamError } = await supabase
-        .from('teams')
-        .insert({
-          league_id: league.id,
-          owner_id: commissionerId,
-          team_name: teamName,
-        })
-        .select()
-        .single();
-
-      if (teamError) throw teamError;
-
-      // Initialize FAAB budget if league uses FAAB waivers
-      if (waiverSettings?.waiver_type === 'faab') {
-        const faabBudget = (settings?.faabBudget ?? 100) as number;
-        const { error: faabError } = await supabase
-          .from('faab_budgets')
-          .insert({
-            league_id: league.id,
-            team_id: team.id,
-            initial_budget: faabBudget,
-            remaining_budget: faabBudget,
-          });
-        if (faabError) logger.error('Failed to initialize FAAB budget:', faabError);
-      }
-
-      return { league, team, error: null };
+      const response = await leagueApi.createLeague({
+        name,
+        settings: { ...settings, ...waiverSettings } as Record<string, unknown>,
+        scoring_settings: scoringSettings as Record<string, unknown>,
+        roster_size: rosterSize,
+        draft_rounds: draftRounds,
+      });
+      const data = response.data;
+      return { league: data?.league || null, team: data?.team || null, error: null };
     } catch (error) {
       logger.error('Error creating league:', error);
       return { league: null, team: null, error };
@@ -356,19 +303,10 @@ export const LeagueService = {
    * Get a league by ID
    * REQUIRES: User must be a member of the league (commissioner or team owner)
    */
-  async getLeague(leagueId: string, userId: string): Promise<{ league: League | null; error: unknown }> {
+  async getLeague(leagueId: string, _userId?: string): Promise<{ league: League | null; error: unknown }> {
     try {
-      // CRITICAL: Validate membership BEFORE querying (application-level security)
-      await LeagueMembershipService.requireMembership(leagueId, userId);
-
-      const { data, error} = await supabase
-        .from('leagues')
-        .select('id, name, commissioner_id, draft_status, join_code, roster_size, draft_rounds, settings, waiver_process_time, waiver_period_hours, waiver_game_lock, waiver_type, allow_trades_during_games, scoring_settings, scheduled_draft_time, created_at, updated_at')
-        .eq('id', leagueId)
-        .single();
-
-      if (error) throw error;
-      return { league: data, error: null };
+      const response = await leagueApi.getLeague(leagueId);
+      return { league: response.data || null, error: null };
     } catch (error) {
       return { league: null, error };
     }
@@ -385,59 +323,20 @@ export const LeagueService = {
  */
 async joinLeagueByCode(
   joinCode: string,
-  userId: string,
+  _userId: string,
   teamName?: string
 ): Promise<{ league: League | null; team: Team | null; error: unknown }> {
   try {
-    // Validate inputs
     if (!joinCode || !joinCode.trim()) {
-      return { 
-        league: null, 
-        team: null, 
-        error: new Error('Join code is required') 
-      };
+      return { league: null, team: null, error: new Error('Join code is required') };
     }
 
-    if (!userId) {
-      return { 
-        league: null, 
-        team: null, 
-        error: new Error('User ID is required') 
-      };
-    }
-
-    // Call atomic join function (handles all validation and team creation)
-    const { data, error } = await supabase.rpc('join_league_with_code', {
-      p_join_code: joinCode.trim(),
-      p_user_id: userId,
-      p_team_name: teamName || null
-    });
-
-    if (error) {
-      logger.error('Error calling join_league_with_code RPC:', error);
-      throw error;
-    }
-
-    // Parse response
-    const result = data as { 
-      success: boolean; 
-      league?: League; 
-      team?: Team; 
-      error?: string 
-    };
-    
-    if (!result.success) {
-      return {
-        league: null, 
-        team: null, 
-        error: new Error(result.error || 'Failed to join league') 
-      };
-    }
-
+    const response = await leagueApi.joinLeague({ joinCode: joinCode.trim(), teamName });
+    const data = response.data;
     return {
-      league: result.league || null, 
-      team: result.team || null, 
-      error: null 
+      league: data?.league || null,
+      team: data?.team || null,
+      error: null
     };
   } catch (error) {
     logger.error('Exception in joinLeagueByCode:', error);
@@ -799,63 +698,10 @@ async joinLeagueByCode(
   /**
    * Get all leagues the user belongs to (as commissioner or team owner)
    */
-  async getUserLeagues(userId: string): Promise<{ leagues: League[]; error: unknown }> {
+  async getUserLeagues(_userId: string): Promise<{ leagues: League[]; error: unknown }> {
     try {
-      // Get leagues where user is commissioner (exclude demo league)
-      const { data: commissionerLeagues, error: commError } = await supabase
-        .from('leagues')
-        .select('id, name, commissioner_id, draft_status, join_code, roster_size, draft_rounds, settings, waiver_process_time, waiver_period_hours, waiver_game_lock, waiver_type, allow_trades_during_games, scoring_settings, scheduled_draft_time, created_at, updated_at')
-        .eq('commissioner_id', userId)
-        .neq('id', DEMO_LEAGUE_ID_FOR_GUESTS) // Exclude demo league - guests only
-        .order('created_at', { ascending: false });
-
-      if (commError) throw commError;
-
-      // Get leagues where user owns a team (exclude demo league teams)
-      // CRITICAL: RLS policies filter this automatically, but we add explicit validation
-      const { data: userTeams, error: teamsError } = await supabase
-        .from('teams')
-        .select('id, league_id, team_name, owner_id')
-        .eq('owner_id', userId)
-        .neq('league_id', DEMO_LEAGUE_ID_FOR_GUESTS); // Exclude demo league - guests only
-
-      if (teamsError) {
-        logger.error('[LeagueService] Error fetching user teams:', teamsError);
-        throw teamsError;
-      }
-
-      // SECURITY: Double-check that all returned teams actually belong to this user
-      // (Defense in depth - should never fail if RLS is working)
-      const validTeams = (userTeams || []).filter(t => t.owner_id === userId);
-      if (validTeams.length !== (userTeams || []).length) {
-        logger.error('[LeagueService] SECURITY WARNING: RLS returned teams not owned by user!', {
-          userId,
-          allTeams: userTeams?.length,
-          validTeams: validTeams.length
-        });
-      }
-
-      const leagueIds = validTeams.map(t => t.league_id);
-      
-      let ownerLeagues: League[] = [];
-      if (leagueIds.length > 0) {
-        const { data, error: ownerError } = await supabase
-          .from('leagues')
-          .select('id, name, commissioner_id, draft_status, join_code, roster_size, draft_rounds, settings, waiver_process_time, waiver_period_hours, waiver_game_lock, waiver_type, allow_trades_during_games, scoring_settings, scheduled_draft_time, created_at, updated_at')
-          .in('id', leagueIds)
-          .neq('id', DEMO_LEAGUE_ID_FOR_GUESTS) // Exclude demo league - guests only
-          .order('created_at', { ascending: false });
-
-        if (ownerError) throw ownerError;
-        ownerLeagues = data || [];
-      }
-
-      // Combine and deduplicate
-      const allLeagues = [...(commissionerLeagues || []), ...ownerLeagues];
-      const uniqueLeagues = Array.from(
-        new Map(allLeagues.map(l => [l.id, l])).values()
-      );
-      return { leagues: uniqueLeagues, error: null };
+      const response = await leagueApi.getUserLeagues();
+      return { leagues: response.data || [], error: null };
     } catch (error) {
       logger.error('[LeagueService] Error in getUserLeagues:', error);
       return { leagues: [], error };
@@ -868,17 +714,8 @@ async joinLeagueByCode(
    */
   async getLeagueTeams(leagueId: string): Promise<{ teams: Team[]; error: unknown }> {
     try {
-      logger.debug('Fetching teams for league:', leagueId);
-      
-      // Use RPC function to bypass RLS infinite recursion issue
-      const { data, error } = await supabase
-        .rpc('get_league_teams', { p_league_id: leagueId });
-
-      if (error) {
-        logger.error('Error fetching teams:', error);
-        throw error;
-      }
-      return { teams: data || [], error: null };
+      const response = await leagueApi.getTeams(leagueId);
+      return { teams: response.data || [], error: null };
     } catch (error) {
       logger.error('Exception in getLeagueTeams:', error);
       return { teams: [], error };
@@ -889,23 +726,9 @@ async joinLeagueByCode(
    * Delete a team from a league (Commissioner only)
    * Also cleans up related data (roster_assignments, team_lineups, draft_picks, etc.)
    */
-  async deleteTeam(teamId: string, leagueId: string, userId: string): Promise<{ success: boolean; error: unknown }> {
+  async deleteTeam(teamId: string, leagueId: string, _userId: string): Promise<{ success: boolean; error: unknown }> {
     try {
-      logger.debug(`[LeagueService] Deleting team ${teamId} from league ${leagueId}`);
-      
-      // CRITICAL: Verify user is the commissioner (application-level security)
-      await LeagueMembershipService.requireCommissioner(leagueId, userId);
-
-      // Delete the team (cascade will handle related data)
-      const { error: deleteError } = await supabase
-        .from('teams')
-        .delete()
-        .eq('id', teamId)
-        .eq('league_id', leagueId);
-
-      if (deleteError) throw deleteError;
-
-      logger.debug(`[LeagueService] Successfully deleted team ${teamId}`);
+      await leagueApi.deleteTeam(leagueId, teamId);
       return { success: true, error: null };
     } catch (error) {
       logger.error('[LeagueService] Error deleting team:', error);
@@ -918,61 +741,8 @@ async joinLeagueByCode(
    */
   async getLeagueTeamsWithOwners(leagueId: string): Promise<{ teams: (Team & { owner_name?: string })[]; error: unknown }> {
     try {
-      logger.debug('Fetching teams with owners for league:', leagueId);
-      
-      // Use RPC function to bypass RLS infinite recursion issue
-      // This function checks that the user is in the league, then returns all teams
-      const { data: teams, error: teamsError } = await supabase
-        .rpc('get_league_teams', { p_league_id: leagueId });
-
-      if (teamsError) {
-        logger.error('Error fetching teams:', teamsError);
-        throw teamsError;
-      }
-
-      if (!teams || teams.length === 0) {
-        return { teams: [], error: null };
-      }
-
-      // Get unique owner IDs
-      const ownerIds = teams
-        .map(t => t.owner_id)
-        .filter((id): id is string => id !== null);
-
-      // Fetch owner profiles
-      const ownerProfiles: Record<string, { first_name?: string; last_name?: string; username?: string }> = {};
-      if (ownerIds.length > 0) {
-        const { data: profiles, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, first_name, last_name, username')
-          .in('id', ownerIds);
-
-        if (!profilesError && profiles) {
-          profiles.forEach(profile => {
-            ownerProfiles[profile.id] = profile;
-          });
-        }
-      }
-
-      // Map teams with owner names
-      const teamsWithOwners = teams.map(team => {
-        if (!team.owner_id) {
-          return { ...team, owner_name: 'AI Team' };
-        }
-
-        const owner = ownerProfiles[team.owner_id];
-        if (owner) {
-          const ownerName = owner.first_name && owner.last_name
-            ? `${owner.first_name} ${owner.last_name}`
-            : owner.username || 'User';
-          return { ...team, owner_name: ownerName };
-        }
-
-        return { ...team, owner_name: 'User' };
-      });
-
-      logger.debug('Fetched teams with owners:', teamsWithOwners);
-      return { teams: teamsWithOwners, error: null };
+      const response = await leagueApi.getTeams(leagueId, true);
+      return { teams: response.data || [], error: null };
     } catch (error) {
       logger.error('Exception in getLeagueTeamsWithOwners:', error);
       return { teams: [], error };
@@ -1069,17 +839,10 @@ async joinLeagueByCode(
   /**
    * Get user's team in a league
    */
-  async getUserTeam(leagueId: string, userId: string): Promise<{ team: Team | null; error: unknown }> {
+  async getUserTeam(leagueId: string, _userId: string): Promise<{ team: Team | null; error: unknown }> {
     try {
-      const { data, error } = await supabase
-        .from('teams')
-        .select('id, league_id, owner_id, team_name, created_at, updated_at')
-        .eq('league_id', leagueId)
-        .eq('owner_id', userId)
-        .single();
-
-      if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows
-      return { team: data || null, error: null };
+      const response = await leagueApi.getMyTeam(leagueId);
+      return { team: response.data || null, error: null };
     } catch (error) {
       return { team: null, error };
     }
