@@ -11,7 +11,10 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+// In development, use empty string (same-origin) so requests go through
+// the Vite proxy which forwards /api/* to the API server. In production,
+// VITE_API_URL should be set to the deployed API server URL.
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 interface ApiResponse<T = any> {
   data?: T;
