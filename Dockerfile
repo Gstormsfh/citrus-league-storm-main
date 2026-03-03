@@ -27,6 +27,11 @@ COPY --from=deps /app/package.json ./
 COPY server/ ./server/
 COPY packages/shared/ ./packages/shared/
 
+# Fix workspace symlink — COPY --from follows symlinks, breaking the
+# @citrus/shared link. Recreate it so Node resolves imports correctly.
+RUN rm -rf node_modules/@citrus/shared && \
+    ln -s ../../packages/shared node_modules/@citrus/shared
+
 # Cloud Run injects PORT env var (default 8080)
 ENV NODE_ENV=production
 ENV PORT=8080
@@ -35,4 +40,4 @@ EXPOSE 8080
 
 # Use tsx to run TypeScript directly — avoids complex build chain
 # since @citrus/shared exports raw .ts files
-CMD ["npx", "tsx", "server/src/index.ts"]
+CMD ["./node_modules/.bin/tsx", "server/src/index.ts"]

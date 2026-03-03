@@ -11,6 +11,11 @@ apps/web/dist/
 .env.local
 .env.*.local
 
+# Frontend source (not needed for API server — only package.json for workspace)
+apps/web/src/
+apps/web/public/
+apps/web/index.html
+
 # Data pipeline (separate container later)
 data-pipeline/
 
