@@ -51,9 +51,12 @@ def _handle_shutdown(signum, frame):
     _shutdown_requested = True
     logger.info(f"\n[SHUTDOWN] Signal {signum} received, finishing current operation...")
 
-signal.signal(signal.SIGINT, _handle_shutdown)
+import threading
+if threading.current_thread() is threading.main_thread():
+    signal.signal(signal.SIGINT, _handle_shutdown)
 if sys.platform != "win32":
-    signal.signal(signal.SIGTERM, _handle_shutdown)
+    if threading.current_thread() is threading.main_thread():
+        signal.signal(signal.SIGTERM, _handle_shutdown)
 
 # Configure UTF-8 encoding for Windows
 if sys.platform == "win32":

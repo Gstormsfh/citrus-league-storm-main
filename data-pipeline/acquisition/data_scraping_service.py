@@ -94,9 +94,12 @@ def signal_handler(signum, frame):
     logger.info("[SHUTDOWN] Signal received, finishing current sync...")
 
 # Register signal handlers (works on Unix/Linux, safe on Windows)
+import threading
+
 try:
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
+    if threading.current_thread() is threading.main_thread():
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
 except OSError:
     pass  # Windows may not support all signals
 
@@ -379,7 +382,7 @@ def run_unified_loop() -> Tuple[str, int]:
 
     # 3. Matchup Refresh
     try:
-        from calculate_matchup_scores import update_active_matchup_scores
+        from data_pipeline.scoring.calculate_matchup_scores import update_active_matchup_scores
         update_active_matchup_scores(db)
         logger.info("🏆 [MATCHUPS] Scoreboard Balanced.")
     except Exception as e:
@@ -448,7 +451,7 @@ def run_unified_loop() -> Tuple[str, int]:
     if now.hour == 23 and now.minute >= 50:
         logger.info("[NIGHTLY] END OF NIGHT DETECTED. Starting Deep PBP Audit...")
         try:
-            from run_daily_pbp_processing import process_all_unprocessed_games
+            from data_pipeline.scoring.run_daily_pbp_processing import process_all_unprocessed_games
             process_all_unprocessed_games()
             logger.info("[NIGHTLY] PBP processing complete.")
         except Exception as e: 
@@ -520,7 +523,7 @@ def run_unified_loop() -> Tuple[str, int]:
         if _has_run_today(db, "reconcile", today_str) and not _has_run_today(db, "aggregate", today_str):
             logger.info("[AGGREGATE] Re-building player_season_stats from per-game data...")
             try:
-                from build_player_season_stats import main as build_season_stats
+                from data_pipeline.projections.build_player_season_stats import main as build_season_stats
                 agg_result = build_season_stats()
                 if agg_result == 0:
                     _mark_job(db, "aggregate", today_str)
