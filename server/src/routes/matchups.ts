@@ -112,6 +112,31 @@ matchupRoutes.get('/:matchupId/daily-scores', async (c) => {
   return c.json({ data });
 });
 
+// POST /api/matchups/projections/daily — Get daily projections for a batch of players
+matchupRoutes.post('/projections/daily', async (c) => {
+  const body = await c.req.json<{ playerIds: number[]; date: string }>();
+
+  if (!body.playerIds?.length || !body.date) {
+    return c.json({ error: 'playerIds (number[]) and date (YYYY-MM-DD) are required' }, 400);
+  }
+
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new MatchupService(supabase);
+
+  const { projMap, error } = await service.getDailyProjections(body.playerIds, body.date);
+  if (error) {
+    return c.json({ error: error.message || 'Failed to fetch projections' }, 500);
+  }
+
+  // Convert Map to plain object for JSON serialization
+  const projections: Record<string, any> = {};
+  projMap.forEach((value, key) => {
+    projections[String(key)] = value;
+  });
+
+  return c.json({ data: projections });
+});
+
 // POST /api/matchups/update-scores — Update all matchup scores
 matchupRoutes.post('/update-scores', async (c) => {
   const body = await c.req.json().catch(() => ({}));

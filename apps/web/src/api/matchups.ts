@@ -43,6 +43,11 @@ export const matchupApi = {
     return apiClient.get(`/api/matchups/${matchupId}/daily-scores`);
   },
 
+  /** Get daily projections for a batch of players on a given date */
+  getDailyProjections(playerIds: number[], date: string) {
+    return apiClient.post('/api/matchups/projections/daily', { playerIds, date });
+  },
+
   /** Update matchup scores */
   updateScores(leagueId?: string) {
     return apiClient.post('/api/matchups/update-scores', leagueId ? { leagueId } : {});

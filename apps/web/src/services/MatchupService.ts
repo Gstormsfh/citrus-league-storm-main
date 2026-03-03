@@ -14,6 +14,7 @@ import { COLUMNS } from '@/utils/queryColumns';
 import { ScoringCalculator, DEFAULT_SCORING, extractScoringSettings } from '@/utils/scoringUtils';
 import { DEFAULT_TEST_DATE } from '@/utils/seasonConstants';
 import { logger } from '@/utils/logger';
+import { matchupApi } from '@/api/matchups';
 
 // Shared stat shape used by calculateMatchupWeekPoints and matchup stats
 interface MatchupWeekStats {
@@ -1345,34 +1346,24 @@ export const MatchupService = {
         return new Map();
       }
 
-      const { data, error } = await supabase.rpc('get_daily_projections', {
-        p_player_ids: playerIds,
-        p_target_date: targetDate
-      });
+      const response = await matchupApi.getDailyProjections(playerIds, targetDate);
 
-      if (error) {
-        logger.error('[MatchupService.getDailyProjections] ❌ RPC error:', error);
-        return new Map(); // Return empty map on error (graceful degradation)
+      if (!response.data) {
+        logger.warn('[MatchupService.getDailyProjections] ⚠️ API returned no data - no projections for this date');
+        return new Map();
       }
 
-      if (!data || data.length === 0) {
-        logger.warn('[MatchupService.getDailyProjections] ⚠️ RPC returned empty array - no projections for this date');
-      }
-
-      // Create a map for O(1) lookup during player transformation
+      // API returns Record<string, DailyProjectionRow> — convert to Map
       const projectionMap = new Map<number, DailyProjectionRow>();
-      if (data && Array.isArray(data)) {
-        data.forEach((p: DailyProjectionRow) => {
-          if (p.player_id) {
-            projectionMap.set(Number(p.player_id), p);
-          }
-        });
+      const projections = response.data as Record<string, DailyProjectionRow>;
+      for (const [key, value] of Object.entries(projections)) {
+        projectionMap.set(Number(key), value);
       }
 
       return projectionMap;
     } catch (error: unknown) {
-      logger.error('[MatchupService.getDailyProjections] ❌ Unexpected error:', error);
-      return new Map(); // Return empty map on error
+      logger.error('[MatchupService.getDailyProjections] ❌ API error:', error);
+      return new Map(); // Return empty map on error (graceful degradation)
     }
   },
 
