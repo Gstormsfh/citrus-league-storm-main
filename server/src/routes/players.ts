@@ -119,15 +119,36 @@ playerRoutes.get('/:playerId/projections', authMiddleware, async (c) => {
   const playerId = c.req.param('playerId');
   const startDate = c.req.query('startDate');
   const supabase = createUserClient(c.get('userToken'));
-  const service = new PlayerService(supabase);
 
-  const { projections, error } = await service.getPlayerProjections(playerId, startDate);
-  if (error) {
-    console.error(`[players/:id/projections] Error for player ${playerId}:`, error.message);
-    return c.json({ error: 'Failed to fetch projections' }, 500);
+  try {
+    // Direct query to bypass any cached COLUMNS import issues
+    let query = supabase
+      .from('player_projected_stats')
+      .select('projection_id, player_id, projection_date, game_id, calculation_method, total_projected_points, projected_goals, projected_assists, projected_sog, projected_blocks, projected_ppp, projected_shp, projected_hits, projected_pim, projected_wins, projected_saves, projected_shutouts, projected_goals_against, projected_gaa, projected_save_pct, shrinkage_weight, opponent_adjustment, confidence_score, dynamic_confidence, likely_low, likely_high, confidence_label, projection_mean, projection_std_dev, created_at, updated_at')
+      .eq('player_id', parseInt(String(playerId), 10))
+      .order('projection_date', { ascending: true });
+
+    if (startDate) {
+      query = query.gte('projection_date', startDate);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error(`[players/:id/projections] Supabase error for player ${playerId}:`, JSON.stringify({
+        message: error.message,
+        details: (error as any).details,
+        hint: (error as any).hint,
+        code: (error as any).code,
+      }));
+      return c.json({ error: 'Failed to fetch projections', details: error.message }, 500);
+    }
+
+    return c.json({ data: data || [] });
+  } catch (err: any) {
+    console.error(`[players/:id/projections] Unexpected error for player ${playerId}:`, err.message, err.stack);
+    return c.json({ error: 'Failed to fetch projections', details: err.message }, 500);
   }
-
-  return c.json({ data: projections });
 });
 
 export { playerRoutes };
