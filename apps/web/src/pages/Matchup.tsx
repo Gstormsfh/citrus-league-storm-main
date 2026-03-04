@@ -2177,16 +2177,17 @@ const Matchup = () => {
         dayMySlots = frozenRoster.mySlots;
         dayOppSlots = frozenRoster.oppSlots;
       } else {
-        // For non-frozen dates, use displayMyTeam/displayOpponentTeam logic
-        // CRITICAL: Use the SAME base team source as displayMyTeam uses
-        // displayMyTeam uses: userLeagueState === 'active-user' ? myTeam : demoMyTeam
-        // But we need to replicate displayMyTeam's enrichment for this specific date
-        // Since displayMyTeam depends on selectedDate, we can't use it directly
-        // Instead, we replicate its logic here for each date
-        
-        // Use the EXACT same base team source as displayMyTeam (line 2180)
-        const baseMyTeam = userLeagueState === 'active-user' ? myTeam : demoMyTeam;
-        const baseOppTeam = userLeagueState === 'active-user' ? opponentTeamPlayers : demoOpponentTeam;
+        // For non-frozen dates, use the STABLE base roster (not myTeam which changes on date click).
+        // CRITICAL: baseCurrentRoster is set once during initial load and never changes when
+        // the user clicks different dates. Using myTeam here would cause the initial calc to
+        // re-run with the wrong players when a past date is selected (myTeam gets set to
+        // the frozen roster for that date, corrupting today/future calculations).
+        const baseMyTeam = userLeagueState === 'active-user'
+          ? (baseCurrentRoster?.myRoster || myTeam)
+          : demoMyTeam;
+        const baseOppTeam = userLeagueState === 'active-user'
+          ? (baseCurrentRoster?.oppRoster || opponentTeamPlayers)
+          : demoOpponentTeam;
         
         // Wait for base teams to be populated
         if (baseMyTeam.length === 0 || baseOppTeam.length === 0) {
@@ -2494,8 +2495,12 @@ const Matchup = () => {
         dayMyStarters = enrichedMyTeam.filter(p => p.isStarter);
         dayOppStarters = enrichedOppTeam.filter(p => p.isStarter);
         
-        dayMySlots = userLeagueState === 'active-user' ? myTeamSlotAssignments : demoMyTeamSlotAssignments;
-        dayOppSlots = userLeagueState === 'active-user' ? opponentTeamSlotAssignments : demoOpponentTeamSlotAssignments;
+        dayMySlots = userLeagueState === 'active-user'
+          ? (baseCurrentRoster?.mySlots || myTeamSlotAssignments)
+          : demoMyTeamSlotAssignments;
+        dayOppSlots = userLeagueState === 'active-user'
+          ? (baseCurrentRoster?.oppSlots || opponentTeamSlotAssignments)
+          : demoOpponentTeamSlotAssignments;
       }
       
       // Use organizeMatchupData (same as MatchupComparison line 33-38)
@@ -2569,6 +2574,7 @@ const Matchup = () => {
   // redundant re-calculations since it updates in sync with dailyStatsByDate.
   }, [
     currentMatchup,
+    baseCurrentRoster,
     myTeam,
     demoMyTeam,
     opponentTeamPlayers,
@@ -4653,12 +4659,12 @@ const Matchup = () => {
               // Build opponent frozen roster
               const oppRoster: MatchupPlayer[] = [];
               const oppSlots: Record<string, string> = {};
-              
-              if (oppDailyRoster) {
+
+              if (oppDailyRoster && oppDailyRoster.length > 0) {
                 oppDailyRoster.forEach((entry: any) => {
                   const playerId = String(entry.player_id);
                   const enrichedPlayer = enrichedOppPlayerMap.get(playerId);
-                  
+
                   if (enrichedPlayer) {
                     const isStarter = entry.slot_type === 'active';
                     oppRoster.push({
@@ -4668,6 +4674,20 @@ const Matchup = () => {
                     if (entry.slot_id) {
                       oppSlots[playerId] = entry.slot_id;
                     }
+                  }
+                });
+              } else if (matchupData.opponentTeam) {
+                // FALLBACK: No fantasy_daily_rosters records for opponent on this past date.
+                // This happens when the opponent hasn't updated their lineup during the matchup week
+                // (auto-sync trigger only fires on team_lineups UPDATE).
+                // Use the opponent's current roster as the best approximation of their historical lineup.
+                log(` No frozen roster for opponent on ${date}, using current roster as fallback`);
+                (matchupData.opponentTeam.roster || []).forEach((p: MatchupPlayer) => {
+                  oppRoster.push({ ...p } as MatchupPlayer);
+                  const pid = String(p.id);
+                  const slotId = matchupData.opponentTeam?.slotAssignments?.[pid];
+                  if (slotId) {
+                    oppSlots[pid] = slotId;
                   }
                 });
               }
