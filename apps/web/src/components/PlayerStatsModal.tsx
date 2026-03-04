@@ -148,31 +148,34 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
         }
 
         // Batch-fetch ALL projections for this player from today onward (single query)
-        // Filter to only canonical calculation methods to avoid stale test data
+        // No calculation_method filter — aligns with the get_daily_projections RPC
+        // which returns all methods. Stale test data was cleaned up via migration.
         const projectionMap = new Map<string, any>();
         try {
-          const { data: projRows } = await supabase
+          const { data: projRows, error: projError } = await supabase
             .from('player_projected_stats')
             .select(COLUMNS.PLAYER_PROJECTED_STATS)
             .eq('player_id', playerId)
             .gte('projection_date', todayStr)
-            .in('calculation_method', ['hybrid_bayesian', 'probability_based_volume'])
             .order('projection_date', { ascending: true });
+
+          if (projError) {
+            logger.warn('[PlayerStatsModal] Error fetching projections:', projError.message);
+          }
 
           if (projRows) {
             for (const row of projRows) {
               const dateKey = (row.projection_date as string).split('T')[0];
               const existing = projectionMap.get(dateKey);
-              
+
               // If duplicate date, prefer row with higher total_projected_points
-              // (more likely to be the correct/proper projection)
               if (!existing || (Number(row.total_projected_points || 0) > Number(existing.total_projected_points || 0))) {
                 projectionMap.set(dateKey, row);
               }
             }
           }
-        } catch {
-          // Projections not available - that's OK, we still show the games
+        } catch (projFetchError) {
+          logger.warn('[PlayerStatsModal] Projections not available:', projFetchError);
         }
 
         const projections: GameProjection[] = [];

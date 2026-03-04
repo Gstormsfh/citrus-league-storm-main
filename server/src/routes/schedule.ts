@@ -31,13 +31,13 @@ scheduleRoutes.get('/games', optionalAuthMiddleware, async (c) => {
     return c.json({ data: games });
   }
 
-  if (startDate && endDate) {
+  if (startDate) {
     if (team) {
       const { games, error } = await service.getGamesForTeam(team, startDate, endDate);
       if (error) return c.json({ error: error.message }, 500);
       return c.json({ data: games });
     }
-    const { games, error } = await service.getGamesForDateRange(startDate, endDate);
+    const { games, error } = await service.getGamesForDateRange(startDate, endDate || startDate);
     if (error) return c.json({ error: error.message }, 500);
     return c.json({ data: games });
   }
