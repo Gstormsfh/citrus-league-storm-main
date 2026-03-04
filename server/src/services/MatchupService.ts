@@ -265,9 +265,102 @@ export class MatchupService {
   }
 
   /**
+   * Build a default lineup from roster_assignments + player_directory and
+   * persist it to team_lineups so the INSERT trigger fires.
+   * Returns true if a lineup was created, false if no roster players found.
+   */
+  private async buildAndSaveDefaultLineup(
+    admin: ReturnType<typeof getSupabaseAdmin>,
+    teamId: string,
+    leagueId: string,
+  ): Promise<boolean> {
+    // Get all players assigned to this team
+    const { data: assignments } = await admin
+      .from('roster_assignments')
+      .select('player_id')
+      .eq('team_id', teamId)
+      .eq('league_id', leagueId);
+
+    if (!assignments || assignments.length === 0) return false;
+
+    const playerIds = assignments.map((a: { player_id: number }) => a.player_id);
+
+    // Get position info from player_directory
+    const { data: players } = await admin
+      .from('player_directory')
+      .select('player_id, position_code, is_goalie')
+      .in('player_id', playerIds);
+
+    if (!players || players.length === 0) return false;
+
+    // Build a lineup: fill position slots, overflow to bench
+    const slotsNeeded: Record<string, number> = { C: 2, LW: 2, RW: 2, D: 4, G: 2, UTIL: 1 };
+    const slotsFilled: Record<string, number> = { C: 0, LW: 0, RW: 0, D: 0, G: 0, UTIL: 0 };
+    const starters: number[] = [];
+    const bench: number[] = [];
+    const slotAssignments: Record<string, string> = {};
+
+    const getPos = (p: { position_code: string; is_goalie: boolean }): string => {
+      if (p.is_goalie || p.position_code === 'G') return 'G';
+      const code = (p.position_code || '').toUpperCase();
+      if (code === 'C') return 'C';
+      if (code === 'LW' || code === 'L') return 'LW';
+      if (code === 'RW' || code === 'R') return 'RW';
+      if (code === 'D') return 'D';
+      return 'UTIL';
+    };
+
+    for (const player of players) {
+      const pos = getPos(player);
+      let assigned = false;
+
+      if (pos !== 'UTIL' && slotsFilled[pos] < (slotsNeeded[pos] || 0)) {
+        slotsFilled[pos]++;
+        assigned = true;
+        slotAssignments[String(player.player_id)] = `slot-${pos}-${slotsFilled[pos]}`;
+      } else if (pos !== 'G' && slotsFilled['UTIL'] < slotsNeeded['UTIL']) {
+        slotsFilled['UTIL']++;
+        assigned = true;
+        slotAssignments[String(player.player_id)] = 'slot-UTIL';
+      }
+
+      if (assigned) {
+        starters.push(player.player_id);
+      } else {
+        bench.push(player.player_id);
+      }
+    }
+
+    if (starters.length === 0) return false;
+
+    // Save to team_lineups via admin (bypasses RLS for AI teams)
+    // JSONB columns accept arrays/objects directly via Supabase client
+    await admin
+      .from('team_lineups')
+      .upsert(
+        {
+          team_id: teamId,
+          league_id: leagueId,
+          starters,
+          bench,
+          ir: [],
+          slot_assignments: slotAssignments,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'league_id,team_id' },
+      );
+
+    return true;
+  }
+
+  /**
    * Backfill fantasy_daily_rosters for a team if any dates are missing.
    * This handles AI teams (or any team) whose lineup was INSERTed but the
    * auto-sync trigger only populated today+future dates, leaving past dates empty.
+   *
+   * If no team_lineups entry exists (common for AI teams), falls back to
+   * roster_assignments + player_directory to build a default lineup, then
+   * persists it to team_lineups so the INSERT trigger can fire for future matchups.
    *
    * Uses admin client to bypass RLS (AI teams have owner_id = NULL).
    */
@@ -278,8 +371,9 @@ export class MatchupService {
     weekStart: string,
     weekEnd: string,
   ) {
-    // Read current lineup from team_lineups
     const admin = getSupabaseAdmin();
+
+    // Try team_lineups first
     const { data: lineup } = await admin
       .from('team_lineups')
       .select('starters, bench, ir, slot_assignments')
@@ -287,7 +381,22 @@ export class MatchupService {
       .eq('league_id', leagueId)
       .maybeSingle();
 
-    if (!lineup?.starters || lineup.starters.length === 0) return;
+    // If no team_lineups entry, build one from roster_assignments
+    if (!lineup?.starters || lineup.starters.length === 0) {
+      const built = await this.buildAndSaveDefaultLineup(admin, teamId, leagueId);
+      if (!built) return;
+      // Re-read after save (trigger may have created some daily rosters)
+    }
+
+    // Re-read lineup (may have just been created above)
+    const { data: finalLineup } = await admin
+      .from('team_lineups')
+      .select('starters, bench, ir, slot_assignments')
+      .eq('team_id', teamId)
+      .eq('league_id', leagueId)
+      .maybeSingle();
+
+    if (!finalLineup?.starters || finalLineup.starters.length === 0) return;
 
     // Generate all dates in the matchup week
     const dates: string[] = [];
@@ -321,7 +430,7 @@ export class MatchupService {
       slot_id: string | null;
       is_locked: boolean;
     }> = [];
-    const slotAssignments = lineup.slot_assignments || {};
+    const slotAssignments = finalLineup.slot_assignments || {};
     const today = new Date().toISOString().split('T')[0];
 
     const addRows = (playerIds: number[] | string[], slotType: string, useSlot: boolean) => {
@@ -343,9 +452,9 @@ export class MatchupService {
       }
     };
 
-    addRows(lineup.starters, 'active', true);
-    addRows(lineup.bench || [], 'bench', false);
-    addRows(lineup.ir || [], 'ir', true);
+    addRows(finalLineup.starters, 'active', true);
+    addRows(finalLineup.bench || [], 'bench', false);
+    addRows(finalLineup.ir || [], 'ir', true);
 
     if (rows.length > 0) {
       await admin
