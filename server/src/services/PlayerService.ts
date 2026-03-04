@@ -204,17 +204,21 @@ export class PlayerService {
     return { stats: data || [], error };
   }
 
-  /** Get player projections */
-  async getPlayerProjections(playerId: string | number) {
-    const { data, error } = await this.supabase
+  /** Get player projections — returns all projections from startDate onward */
+  async getPlayerProjections(playerId: string | number, startDate?: string) {
+    let query = this.supabase
       .from('player_projected_stats')
       .select(COLUMNS.PLAYER_PROJECTED_STATS)
       .eq('player_id', parseInt(String(playerId), 10))
-      .order('projection_date', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .order('projection_date', { ascending: true });
 
-    return { projection: data, error };
+    if (startDate) {
+      query = query.gte('projection_date', startDate);
+    }
+
+    const { data, error } = await query;
+
+    return { projections: data || [], error };
   }
 
   /** Get trending players (platform-wide add/drop activity) */

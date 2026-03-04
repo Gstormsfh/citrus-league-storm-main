@@ -43,8 +43,9 @@ export const playerApi = {
     return apiClient.get(`/api/players/${playerId}/stats${qs}`);
   },
 
-  /** Get player projections */
-  getPlayerProjections(playerId: string) {
-    return apiClient.get(`/api/players/${playerId}/projections`);
+  /** Get player projections — pass startDate to get all from that date onward */
+  getPlayerProjections(playerId: string, startDate?: string) {
+    const qs = startDate ? `?startDate=${startDate}` : '';
+    return apiClient.get(`/api/players/${playerId}/projections${qs}`);
   },
 };

@@ -114,17 +114,19 @@ playerRoutes.get('/:playerId/stats', authMiddleware, async (c) => {
 });
 
 // GET /api/players/:playerId/projections — Get player projections
+// ?startDate=YYYY-MM-DD returns all projections from that date onward
 playerRoutes.get('/:playerId/projections', authMiddleware, async (c) => {
   const playerId = c.req.param('playerId');
+  const startDate = c.req.query('startDate');
   const supabase = createUserClient(c.get('userToken'));
   const service = new PlayerService(supabase);
 
-  const { projection, error } = await service.getPlayerProjections(playerId);
+  const { projections, error } = await service.getPlayerProjections(playerId, startDate);
   if (error) {
     return c.json({ error: 'Failed to fetch projections' }, 500);
   }
 
-  return c.json({ data: projection });
+  return c.json({ data: projections });
 });
 
 export { playerRoutes };

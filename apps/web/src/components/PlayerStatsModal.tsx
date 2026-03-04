@@ -12,9 +12,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useState, useEffect, useRef } from 'react';
 import { CitrusSparkle } from '@/components/icons/CitrusIcons';
 import { getTodayMST } from '@/utils/timezoneUtils';
-import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
-import { COLUMNS } from '@/utils/queryColumns';
+import { playerApi } from '@/api/players';
 
 // ─── Types for week projections ─────────────────────────────────────
 interface GameProjection {
@@ -147,31 +146,19 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
           return;
         }
 
-        // Batch-fetch ALL projections for this player from today onward (single query)
-        // No calculation_method filter — aligns with the get_daily_projections RPC
-        // which returns all methods. Stale test data was cleaned up via migration.
+        // Fetch ALL projections for this player from today onward via API
         const projectionMap = new Map<string, any>();
         try {
-          const { data: projRows, error: projError } = await supabase
-            .from('player_projected_stats')
-            .select(COLUMNS.PLAYER_PROJECTED_STATS)
-            .eq('player_id', playerId)
-            .gte('projection_date', todayStr)
-            .order('projection_date', { ascending: true });
+          const response = await playerApi.getPlayerProjections(String(playerId), todayStr);
+          const projRows = response.data || [];
 
-          if (projError) {
-            logger.warn('[PlayerStatsModal] Error fetching projections:', projError.message);
-          }
+          for (const row of projRows) {
+            const dateKey = (row.projection_date as string).split('T')[0];
+            const existing = projectionMap.get(dateKey);
 
-          if (projRows) {
-            for (const row of projRows) {
-              const dateKey = (row.projection_date as string).split('T')[0];
-              const existing = projectionMap.get(dateKey);
-
-              // If duplicate date, prefer row with higher total_projected_points
-              if (!existing || (Number(row.total_projected_points || 0) > Number(existing.total_projected_points || 0))) {
-                projectionMap.set(dateKey, row);
-              }
+            // If duplicate date, prefer row with higher total_projected_points
+            if (!existing || (Number(row.total_projected_points || 0) > Number(existing.total_projected_points || 0))) {
+              projectionMap.set(dateKey, row);
             }
           }
         } catch (projFetchError) {
