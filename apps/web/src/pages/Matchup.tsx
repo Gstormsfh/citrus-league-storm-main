@@ -26,7 +26,6 @@ import { LeagueService, League, Team } from '@/services/LeagueService';
 import { MatchupService, Matchup as MatchupType } from '@/services/MatchupService';
 import { PlayerService, Player } from '@/services/PlayerService';
 import { ScheduleService } from '@/services/ScheduleService';
-import { supabase } from '@/integrations/supabase/client';
 import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekLabel, getWeekDateLabel, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
 import LoadingScreen from '@/components/LoadingScreen';
 import { DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeagueService';
@@ -38,9 +37,11 @@ import { CitrusSlice, CitrusSparkle, CitrusLeaf, CitrusWedge, CitrusBurst, Citru
 import { CitrusBackground } from '@/components/CitrusBackground';
 import { CitrusSectionDivider } from '@/components/CitrusSectionDivider';
 import { calculateEligibleGamesRemaining } from '@/utils/rosterUtils';
-import { COLUMNS } from '@/utils/queryColumns';
 import { ScoringCalculator } from '@/utils/scoringUtils';
 import { logger } from '@/utils/logger';
+import { matchupApi } from '@/api/matchups';
+import { leagueApi } from '@/api/leagues';
+import { playerApi } from '@/api/players';
 
 // ============================================================
 // Local type definitions for data used throughout this file
@@ -344,12 +345,8 @@ const Matchup = () => {
           // Step 3: Refresh matchup data to get updated scores from DB
           if (result.updatedCount > 0) {
             log(' Refreshing matchup data after score update...');
-            const { data: refreshedMatchup } = await supabase
-              .from('matchups')
-              .select('team1_score, team2_score')
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              .eq('id' as any, currentMatchup.id as any)
-              .single();
+            const matchupResp = await matchupApi.getMatchupScores(currentMatchup.id);
+            const refreshedMatchup = matchupResp.data;
 
             if (refreshedMatchup) {
               const scores = refreshedMatchup as { team1_score: number; team2_score: number };
@@ -425,24 +422,15 @@ const Matchup = () => {
         return;
       }
       
-      // Build team ID list for query (always include both teams from the matchup)
-      const teamIds = team2Id ? [team1Id, team2Id] : [team1Id];
-      
-      // SINGLE BATCHED QUERY: Fetch ALL past days' rosters for BOTH teams at once
-      const { data: allRosters, error } = await supabase
-        .from('fantasy_daily_rosters')
-        .select('player_id, roster_date, team_id')
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .eq('matchup_id' as any, currentMatchup.id as any)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .in('team_id' as any, teamIds as any)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .in('roster_date' as any, pastDates as any)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .eq('slot_type' as any, 'active' as any);
-      
-      if (error) {
-        logger.error('[Matchup] Error fetching cached rosters:', error);
+      // SINGLE BATCHED API CALL: Fetch ALL past days' rosters for BOTH teams at once
+      let allRosters: FrozenRosterEntry[] = [];
+      try {
+        const response = await matchupApi.getFrozenRosterBatch(currentMatchup.id, pastDates);
+        // Filter to active slots only (matching previous query behavior)
+        allRosters = ((response.data || []) as any[])
+          .filter((r: any) => r.slot_type === 'active') as FrozenRosterEntry[];
+      } catch (err) {
+        logger.error('[Matchup] Error fetching cached rosters:', err);
         return;
       }
       
@@ -691,15 +679,8 @@ const Matchup = () => {
         // ===================================================================
 
         // Get the league data directly (using maybeSingle to avoid single() coercion error)
-        const { data: demoLeagueData, error: leagueError } = await supabase
-          .from('leagues')
-          .select(COLUMNS.LEAGUE)
-          .eq('id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
-          .maybeSingle();
-
-        if (leagueError) {
-          throw new Error(`Failed to load demo league: ${leagueError.message || 'Unknown error'}`);
-        }
+        const demoLeagueResp = await leagueApi.getLeague(DEMO_LEAGUE_ID_FOR_GUESTS);
+        const demoLeagueData = demoLeagueResp.data;
 
         if (!demoLeagueData) {
           throw new Error('Demo league not found');
@@ -756,38 +737,21 @@ const Matchup = () => {
           availableWeeks: weeks
         });
 
-        // Get all matchups for this week (same as logged-in users)
-        const { data: weekMatchupsData, error: matchupsError } = await supabase
-          .from('matchups')
-          .select(COLUMNS.MATCHUP)
-          .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
-          .eq('week_number' as any, weekToShow as any)
-          .order('created_at', { ascending: true });
-
-        if (matchupsError) throw matchupsError;
-
-        let weekMatchups = weekMatchupsData as any[];
+        // Get all matchups for this week via API
+        const weekMatchupsResp = await matchupApi.getLeagueMatchups(DEMO_LEAGUE_ID_FOR_GUESTS, weekToShow);
+        let weekMatchups = (weekMatchupsResp.data || []) as any[];
 
         // If no matchups found for calculated week, try to find ANY matchup
         if (!weekMatchups || weekMatchups.length === 0) {
           log(' No matchups found for week', weekToShow, '- trying to find any matchup in demo league');
 
           // Get ANY matchup from the demo league (fallback)
-          const { data: anyMatchupsData, error: anyMatchupsError } = await supabase
-            .from('matchups')
-            .select(COLUMNS.MATCHUP)
-            .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
-            .order('week_number', { ascending: true })
-            .limit(1);
+          const anyMatchupsResp = await matchupApi.getLeagueMatchups(DEMO_LEAGUE_ID_FOR_GUESTS);
+          const anyMatchupsData = (anyMatchupsResp.data || []) as any[];
 
-          if (anyMatchupsError) {
-            log(' Error fetching any matchups:', anyMatchupsError);
-            throw new Error(`Failed to load matchups: ${anyMatchupsError.message}`);
-          }
-
-          if (anyMatchupsData && anyMatchupsData.length > 0) {
+          if (anyMatchupsData.length > 0) {
             // Use the first available matchup and update weekToShow
-            weekMatchups = anyMatchupsData;
+            weekMatchups = [anyMatchupsData[0]];
             weekToShow = anyMatchupsData[0].week_number;
             setSelectedWeek(weekToShow);
             log(' Using fallback matchup from week', weekToShow);
@@ -863,17 +827,18 @@ const Matchup = () => {
           });
         }
 
-        // Get teams (parallel)
-        const [team1, team2] = await Promise.all([
-          supabase.from('teams').select(COLUMNS.TEAM).eq('id' as any, guestMatchup.team1_id as any).maybeSingle(),
-          guestMatchup.team2_id ? supabase.from('teams').select(COLUMNS.TEAM).eq('id' as any, guestMatchup.team2_id as any).maybeSingle() : Promise.resolve({ data: null, error: null })
+        // Get teams via API (parallel)
+        const [team1Resp, team2Resp] = await Promise.all([
+          leagueApi.getTeams(guestMatchup.league_id),
+          Promise.resolve(null), // Teams come in one call
         ]);
 
-        if (team1.error) throw team1.error;
-        if (team2.error) throw team2.error;
+        const allTeams = (team1Resp.data || []) as Team[];
+        const team1Data = allTeams.find((t: Team) => t.id === guestMatchup.team1_id) || null;
+        const team2Data = guestMatchup.team2_id ? allTeams.find((t: Team) => t.id === guestMatchup.team2_id) || null : null;
 
-        setUserTeam(team1.data as unknown as Team);
-        setOpponentTeam(team2.data as unknown as Team | null);
+        setUserTeam(team1Data);
+        setOpponentTeam(team2Data);
 
         // Get matchup rosters using the same service as logged-in users
         const { PlayerService } = await import('@/services/PlayerService');
@@ -933,67 +898,28 @@ const Matchup = () => {
         const weekStartStr = matchupWithDates.week_start_date;
         const weekEndStr = matchupWithDates.week_end_date;
 
-        // Calculate daily scores for team1 (same logic as logged-in users)
+        // Calculate daily scores via API (single call for both teams)
         let team1DailyPoints: number[] = [];
-        try {
-          const { data: team1DailyScores, error: team1Error } = await supabase.rpc(
-            'calculate_daily_matchup_scores',
-            {
-              p_matchup_id: guestMatchup.id,
-              p_team_id: (team1.data as any).id,
-              p_week_start: weekStartStr,
-              p_week_end: weekEndStr
-            }
-          );
-
-          if (!team1Error && team1DailyScores) {
-            // Sort by date and extract scores (same logic as logged-in users)
-            // Append 'T00:00:00' to force local-time parsing (avoid UTC midnight shift)
-            const sorted = (team1DailyScores as any[]).sort((a, b) =>
-              new Date(a.roster_date + 'T00:00:00').getTime() - new Date(b.roster_date + 'T00:00:00').getTime()
-            );
-            team1DailyPoints = sorted.map(d => parseFloat(d.daily_score) || 0);
-            log(' Team1 daily points calculated:', team1DailyPoints);
-          } else {
-            log('WARN: Error calculating team1 daily scores:', team1Error);
-            team1DailyPoints = Array(7).fill(0);
-          }
-        } catch (error) {
-          logger.error('[Matchup] Exception calculating team1 daily scores:', error);
-          team1DailyPoints = Array(7).fill(0);
-        }
-
-        // Calculate daily scores for team2 (if exists)
         let team2DailyPoints: number[] = [];
-        if (team2.data) {
-          try {
-            const { data: team2DailyScores, error: team2Error } = await supabase.rpc(
-              'calculate_daily_matchup_scores',
-              {
-                p_matchup_id: guestMatchup.id,
-                p_team_id: (team2.data as any).id,
-                p_week_start: weekStartStr,
-                p_week_end: weekEndStr
-              }
-            );
-
-            if (!team2Error && team2DailyScores) {
-              // Sort by date and extract scores (same logic as logged-in users)
-              // Append 'T00:00:00' to force local-time parsing (avoid UTC midnight shift)
-              const sorted = (team2DailyScores as any[]).sort((a, b) =>
-                new Date(a.roster_date + 'T00:00:00').getTime() - new Date(b.roster_date + 'T00:00:00').getTime()
-              );
-              team2DailyPoints = sorted.map(d => parseFloat(d.daily_score) || 0);
-              log(' Team2 daily points calculated:', team2DailyPoints);
-            } else {
-              log('WARN: Error calculating team2 daily scores:', team2Error);
-              team2DailyPoints = Array(7).fill(0);
-            }
-          } catch (error) {
-            logger.error('[Matchup] Exception calculating team2 daily scores:', error);
+        try {
+          const response = await matchupApi.getDailyScores(guestMatchup.id);
+          const dailyScoresData = response.data;
+          if (dailyScoresData && Array.isArray(dailyScoresData)) {
+            const parseDailyScores = (teamId: string) => {
+              const teamEntries = (dailyScoresData as Array<{ team_id: string; roster_date: string; daily_score: string | number }>)
+                .filter((d) => d.team_id === teamId)
+                .sort((a, b) => new Date(a.roster_date + 'T00:00:00').getTime() - new Date(b.roster_date + 'T00:00:00').getTime());
+              return teamEntries.length > 0 ? teamEntries.map(d => parseFloat(String(d.daily_score)) || 0) : Array(7).fill(0);
+            };
+            team1DailyPoints = team1Data ? parseDailyScores(team1Data.id) : Array(7).fill(0);
+            team2DailyPoints = team2Data ? parseDailyScores(team2Data.id) : Array(7).fill(0);
+          } else {
+            team1DailyPoints = Array(7).fill(0);
             team2DailyPoints = Array(7).fill(0);
           }
-        } else {
+        } catch (error) {
+          logger.error('[Matchup] Exception calculating daily scores:', error);
+          team1DailyPoints = Array(7).fill(0);
           team2DailyPoints = Array(7).fill(0);
         }
 
@@ -1166,19 +1092,11 @@ const Matchup = () => {
       }
 
       try {
-        const { data: matchups, error } = await supabase
-          .from('matchups')
-          .select(`
-            *,
-            team1:teams!team1_id(team_name),
-            team2:teams!team2_id(team_name)
-          `)
-          .eq('league_id' as any, league.id as any)
-          .eq('week_number' as any, selectedWeek as any)
-          .order('created_at', { ascending: true });
+        const matchupsResp = await matchupApi.getLeagueMatchups(league.id, selectedWeek);
+        const matchups = matchupsResp.data as any[] | null;
 
-        if (error) {
-          log('WARN: Error fetching all week matchups:', error);
+        if (!matchups) {
+          log('WARN: Error fetching all week matchups');
           return;
         }
 
@@ -1308,41 +1226,13 @@ const Matchup = () => {
         const todayStr = getTodayMST();
         
         await Promise.all(dates.map(async (date) => {
-          const { data, error } = await supabase.rpc('get_daily_game_stats', {
-            p_player_ids: allPlayerIds,
-            p_game_date: date
-          });
-
-          if (error) {
-            log(`WARN: Error fetching stats for ${date}:`, error);
+          let data: any[] | null = null;
+          try {
+            const response = await matchupApi.getDailyGameStats(allPlayerIds, date);
+            data = response.data as any[] | null;
+          } catch (err) {
+            log(`WARN: Error fetching stats for ${date}:`, err);
             return;
-          }
-
-          // DEBUG: Log raw RPC data for today (ALWAYS log for today, even if empty)
-          if (date === todayStr) {
-            logger.debug('[DEBUG fetchAllDailyStats] Raw RPC data for TODAY:', {
-              date,
-              todayMST: todayStr,
-              rowCount: data?.length || 0,
-              isEmpty: !data || data.length === 0,
-              requestedPlayerCount: allPlayerIds.length,
-              requestedPlayerIds: allPlayerIds.slice(0, 10), // First 10 for debugging
-              firstFewRows: (data || []).slice(0, 5).map((r: any) => ({
-                player_id: r.player_id,
-                is_goalie: r.is_goalie,
-                goals: r.goals,
-                assists: r.assists,
-                shots_on_goal: r.shots_on_goal,
-                blocks: r.blocks,
-                ppp: r.ppp,
-                shp: r.shp,
-                hits: r.hits,
-                pim: r.pim,
-                wins: r.wins,
-                saves: r.saves,
-                game_id: r.game_id
-              }))
-            });
           }
 
           // Create map of player_id -> daily stats for this date
@@ -1732,14 +1622,12 @@ const Matchup = () => {
 
         // Fetch comprehensive daily game stats using new RPC
         
-        const { data, error } = await supabase.rpc('get_daily_game_stats', {
-          p_player_ids: allPlayerIds,
-          p_game_date: dateToFetch
-        });
+        const response = await matchupApi.getDailyGameStats(allPlayerIds, dateToFetch);
+        const data = response.data as any[] | null;
 
-        if (error) {
-          logger.error('[Matchup] Error calling get_daily_game_stats:', error);
-          throw error;
+        if (!data) {
+          logger.error('[Matchup] No data returned from getDailyGameStats');
+          throw new Error('No data returned');
         }
         
         const statsDataArr = (data || []) as any[];
@@ -2623,16 +2511,11 @@ const Matchup = () => {
         };
         setSelectedPlayer(toHockeyPlayer(player, seasonStats));
       } else {
-        // Fallback: try to fetch directly from player_season_stats
-        const DEFAULT_SEASON = CURRENT_SEASON;
-        const { data: seasonStatsData, error } = await supabase
-          .from('player_season_stats')
-          .select(COLUMNS.PLAYER_STATS)
-          .eq('player_id', player.id as any)
-          .eq('season', DEFAULT_SEASON as any)
-          .single();
-        
-        if (!error && seasonStatsData) {
+        // Fallback: try to fetch directly via API
+        const statsRes = await playerApi.getPlayerStats(String(player.id), CURRENT_SEASON);
+        const seasonStatsData = statsRes?.data;
+
+        if (seasonStatsData) {
           const statsData = seasonStatsData as any;
           const calculatedGoals = Number(statsData.nhl_goals ?? 0);
           const calculatedAssists = Number(statsData.nhl_assists ?? 0);
@@ -2672,7 +2555,7 @@ const Matchup = () => {
     }
     
     setIsPlayerDialogOpen(true);
-  }, []); // All dependencies are stable: setSelectedPlayer, setIsPlayerDialogOpen (React state setters), PlayerService, supabase (module-level imports)
+  }, []); // All dependencies are stable: setSelectedPlayer, setIsPlayerDialogOpen (React state setters), PlayerService, playerApi (module-level imports)
 
   // Use real data if active user, otherwise demo data
   // CRITICAL: Ensure myTeam is always the user's team (left side)
@@ -4097,14 +3980,10 @@ const Matchup = () => {
           }
           const leagueTeams = cachedLeagueTeams;
 
-          // Check if ANY matchups exist for this league
-          const { data: anyMatchups } = await supabase
-            .from('matchups')
-            .select('week_number')
-            .eq('league_id' as any, currentLeague.id as any)
-            .limit(1);
-          
-          const hasAnyMatchups = anyMatchups && anyMatchups.length > 0;
+          // Check if ANY matchups exist for this league (via API)
+          const anyMatchupsRes = await matchupApi.getLeagueMatchups(currentLeague.id);
+          const anyMatchups = anyMatchupsRes?.data || [];
+          const hasAnyMatchups = anyMatchups.length > 0;
           
           // If no matchups exist at all, force regenerate ALL weeks
           // Otherwise, generate only missing weeks (which will include this one)
@@ -4140,32 +4019,24 @@ const Matchup = () => {
           // Wait longer to ensure database commits complete
           await new Promise(resolve => setTimeout(resolve, 2000));
           
-          // Debug: Check what matchups actually exist in the database BEFORE verification
-          const { data: allMatchups, error: checkError } = await supabase
-            .from('matchups')
-            .select('week_number, team1_id, team2_id, league_id')
-            .eq('league_id' as any, currentLeague.id as any)
-            .eq('week_number' as any, weekToShow as any);
-          
+          // Debug: Check what matchups actually exist via API
+          // Invalidate cache first since we just generated matchups
+          matchupApi.invalidate(`matchups:league:${currentLeague.id}`);
+          const weekMatchupsRes = await matchupApi.getLeagueMatchups(currentLeague.id, weekToShow);
+          const allMatchups = weekMatchupsRes?.data || [];
           log(' Debug - All matchups for week', weekToShow, ':', allMatchups);
-          
-          // Also check ALL weeks in database to see what's actually stored
-          const { data: allWeeksMatchups } = await supabase
-            .from('matchups')
-            .select('week_number')
-            .eq('league_id' as any, currentLeague.id as any);
-          
+
+          // Also check ALL weeks via API
+          const allWeeksRes = await matchupApi.getLeagueMatchups(currentLeague.id);
+          const allWeeksMatchups = allWeeksRes?.data || [];
           const uniqueWeeks = new Set((allWeeksMatchups as any[])?.map((m: any) => m.week_number) || []);
           log(' Debug - All week numbers in database:', Array.from(uniqueWeeks).sort((a, b) => a - b));
           log(' Debug - Requested week', weekToShow, 'exists in database?', uniqueWeeks.has(weekToShow));
-          
-          // Also check user's team
-          const { data: userTeamData } = await supabase
-            .from('teams')
-            .select('id, team_name, owner_id')
-            .eq('league_id' as any, currentLeague.id as any)
-            .eq('owner_id' as any, user.id as any)
-            .maybeSingle();
+
+          // Also check user's team via API
+          const teamsRes = await leagueApi.getTeams(currentLeague.id);
+          const allTeamsData = teamsRes?.data || [];
+          const userTeamData = allTeamsData.find((t: any) => t.owner_id === user.id) || null;
           
           log(' Debug - User team:', userTeamData);
           
@@ -4533,11 +4404,8 @@ const Matchup = () => {
           // Fetch any players in saved rosters who are no longer on the team
           // Query ONLY past dates (not today/future)
           // ============================================================
-          const { data: allFrozenEntries } = await supabase
-            .from('fantasy_daily_rosters')
-            .select('player_id, team_id, roster_date')
-            .eq('matchup_id' as any, matchupData.matchup.id)
-            .in('roster_date' as any, datesToLoad as any); // datesToLoad is already filtered to past dates only
+          const frozenBatchResponse = await matchupApi.getFrozenRosterBatch(matchupData.matchup.id, datesToLoad);
+          const allFrozenEntries = frozenBatchResponse.data as any[] | null;
           
           if (allFrozenEntries && allFrozenEntries.length > 0) {
             // Get all current player IDs
@@ -4615,20 +4483,15 @@ const Matchup = () => {
           // For today/future, the current roster from matchupData is used instead
           const frozenLoadPromises = datesToLoad.map(async (date) => {
             try {
-              // Query fantasy_daily_rosters directly for lineup info
-              const { data: myDailyRoster } = await supabase
-                .from('fantasy_daily_rosters')
-                .select('player_id, slot_type, slot_id')
-                .eq('team_id' as any, matchupData.userTeam.id as any)
-                .eq('matchup_id' as any, matchupData.matchup.id as any)
-                .eq('roster_date' as any, date as any);
-              
-              const { data: oppDailyRoster } = matchupData.opponentTeam ? await supabase
-                .from('fantasy_daily_rosters')
-                .select('player_id, slot_type, slot_id')
-                .eq('team_id' as any, matchupData.opponentTeam.id as any)
-                .eq('matchup_id' as any, matchupData.matchup.id as any)
-                .eq('roster_date' as any, date as any) : { data: null };
+              // Query frozen roster via API
+              const [myFrozenResp, oppFrozenResp] = await Promise.all([
+                matchupApi.getFrozenRoster(matchupData.matchup.id, matchupData.userTeam.id, date),
+                matchupData.opponentTeam
+                  ? matchupApi.getFrozenRoster(matchupData.matchup.id, matchupData.opponentTeam.id, date)
+                  : Promise.resolve({ data: null }),
+              ]);
+              const myDailyRoster = myFrozenResp.data as any[] | null;
+              const oppDailyRoster = oppFrozenResp.data as any[] | null;
               
               if (!myDailyRoster || myDailyRoster.length === 0) {
                 log(` No frozen roster found for ${date}`);

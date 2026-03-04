@@ -363,4 +363,90 @@ export class MatchupService {
 
     return { standings: data || [], error };
   }
+
+  /** Get daily game stats for players on a specific date */
+  async getDailyGameStats(playerIds: number[], gameDate: string) {
+    const { data, error } = await this.supabase.rpc('get_daily_game_stats', {
+      p_player_ids: playerIds,
+      p_game_date: gameDate,
+    });
+
+    return { stats: data || [], error };
+  }
+
+  /** Get frozen daily roster entries for a team/matchup/date */
+  async getFrozenRoster(teamId: string, matchupId: string, date: string) {
+    const { data, error } = await this.supabase
+      .from('fantasy_daily_rosters')
+      .select('player_id, slot_type, slot_id')
+      .eq('team_id', teamId)
+      .eq('matchup_id', matchupId)
+      .eq('roster_date', date);
+
+    return { roster: data || [], error };
+  }
+
+  /** Get all frozen roster entries for a matchup (multiple dates) */
+  async getFrozenRosterBatch(matchupId: string, dates: string[]) {
+    const { data, error } = await this.supabase
+      .from('fantasy_daily_rosters')
+      .select('player_id, team_id, roster_date, slot_type, slot_id')
+      .eq('matchup_id', matchupId)
+      .in('roster_date', dates);
+
+    return { entries: data || [], error };
+  }
+
+  /** Lock completed days in fantasy_daily_rosters */
+  async lockCompletedDays() {
+    // Find all games that are 'final' (completed)
+    const { data: finalGames, error: gamesError } = await this.supabase
+      .from('nhl_games')
+      .select('game_date')
+      .eq('status', 'final');
+
+    if (gamesError || !finalGames?.length) {
+      return { lockedCount: 0, error: gamesError };
+    }
+
+    const gameDates = [...new Set(finalGames.map((g: any) => g.game_date))];
+
+    const { data: updated, error: updateError } = await this.supabase
+      .from('fantasy_daily_rosters')
+      .update({
+        is_locked: true,
+        locked_at: new Date().toISOString(),
+      })
+      .in('roster_date', gameDates)
+      .eq('is_locked', false)
+      .select('player_id');
+
+    return { lockedCount: updated?.length || 0, error: updateError };
+  }
+
+  /** Get matchup score job status */
+  async getJobStatus() {
+    const [matchupResult, lockedResult, recentResult] = await Promise.all([
+      this.supabase
+        .from('matchups')
+        .select('*', { count: 'exact', head: true })
+        .in('status', ['scheduled', 'in_progress']),
+      this.supabase
+        .from('fantasy_daily_rosters')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_locked', true),
+      this.supabase
+        .from('matchups')
+        .select('updated_at')
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+
+    return {
+      lastRun: recentResult.data?.updated_at || null,
+      totalMatchups: matchupResult.count || 0,
+      lockedDays: lockedResult.count || 0,
+    };
+  }
 }

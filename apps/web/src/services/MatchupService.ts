@@ -532,70 +532,9 @@ export const MatchupService = {
     weekNumber: number
   ): Promise<{ matchup: Matchup | null; error: PostgrestError | Error | null }> {
     try {
-      // First, get user's team
-      let userTeam: { id: string } | null = null;
-      let teamError: PostgrestError | Error | null = null;
-      try {
-        const result = await withTimeout(
-          supabase.from('teams').select('id').eq('league_id', leagueId).eq('owner_id', userId).maybeSingle(),
-          5000,
-          'getUserTeam timeout in getUserMatchup'
-        );
-        userTeam = result.data;
-        teamError = result.error;
-      } catch (timeoutError: unknown) {
-        logger.error('[MatchupService.getUserMatchup] User team query timeout:', timeoutError);
-        teamError = timeoutError instanceof Error ? timeoutError : new Error(String(timeoutError));
-      }
-
-      if (teamError) throw teamError;
-      if (!userTeam) {
-        logger.warn('[MatchupService.getUserMatchup] User team not found');
-        return { matchup: null, error: null };
-      }
-
-      // Find matchup where user's team is team1 or team2
-      // Use .limit(1) instead of .maybeSingle() to handle potential duplicates gracefully
-      // Ensure week_number is treated as a number in the query
-      const query = supabase
-        .from('matchups')
-        .select(COLUMNS.MATCHUP)
-        .eq('league_id', leagueId)
-        .eq('week_number', weekNumber)
-        .or(`team1_id.eq.${userTeam.id},team2_id.eq.${userTeam.id}`)
-        .limit(1);
-
-      let matchups: Record<string, unknown>[] | null = null;
-      let error: PostgrestError | Error | null = null;
-      try {
-        const result = await withTimeout(query, 5000, 'getUserMatchup query timeout');
-        matchups = result.data;
-        error = result.error;
-      } catch (timeoutError: unknown) {
-        logger.error('[MatchupService.getUserMatchup] Matchup query timeout:', timeoutError);
-        error = timeoutError instanceof Error ? timeoutError : new Error(String(timeoutError));
-      }
-
-      if (error) {
-        logger.error('[MatchupService.getUserMatchup] Database query error:', error);
-        throw error;
-      }
-
-      // Additional verification: Check if week_number matches what we queried for
-      if (matchups && matchups.length > 0) {
-        const firstMatchup = matchups[0] as Record<string, unknown>;
-        if (firstMatchup.week_number !== weekNumber) {
-          logger.error('[MatchupService.getUserMatchup] WARNING: Week number mismatch!', {
-            requested: weekNumber,
-            received: firstMatchup.week_number,
-            matchup_id: firstMatchup.id
-          });
-        }
-      }
-
-      const data = matchups && matchups.length > 0 ? matchups[0] : null;
-
-      return { matchup: (data as Matchup) || null, error: null };
+      // Use API server which handles team lookup + matchup query in one round-trip
+      const response = await matchupApi.getUserMatchup(leagueId, weekNumber);
+      return { matchup: (response.data as Matchup) || null, error: null };
     } catch (error: unknown) {
       return { matchup: null, error: error instanceof Error ? error : new Error(String(error)) };
     }
@@ -708,51 +647,27 @@ export const MatchupService = {
       let opponentDailyPoints: number[] = [];
 
       try {
-        const { data: viewingDailyScores, error: viewingError } = await supabase.rpc(
-          'calculate_daily_matchup_scores',
-          {
-            p_matchup_id: matchup.id,
-            p_team_id: viewingTeam.id,
-            p_week_start: weekStartStr,
-            p_week_end: weekEndStr
+        const response = await matchupApi.getDailyScores(matchup.id);
+        const dailyScoresData = response.data;
+        if (dailyScoresData && Array.isArray(dailyScoresData)) {
+          // The RPC returns entries per team — split by team_id
+          const parseDailyScores = (teamId: string) => {
+            const teamEntries = (dailyScoresData as Array<{ team_id: string; roster_date: string; daily_score: string | number }>)
+              .filter((d) => d.team_id === teamId)
+              .sort((a, b) => new Date(a.roster_date + 'T00:00:00').getTime() - new Date(b.roster_date + 'T00:00:00').getTime());
+            return teamEntries.length > 0 ? teamEntries.map(d => parseFloat(String(d.daily_score)) || 0) : Array(7).fill(0);
+          };
+          viewingDailyPoints = parseDailyScores(viewingTeam.id);
+          if (opponentTeamObj) {
+            opponentDailyPoints = parseDailyScores(opponentTeamObj.id);
           }
-        );
-
-        if (!viewingError && viewingDailyScores) {
-          const sorted = (viewingDailyScores as Array<{ roster_date: string; daily_score: string | number }>).sort((a, b) =>
-            new Date(a.roster_date + 'T00:00:00').getTime() - new Date(b.roster_date + 'T00:00:00').getTime()
-          );
-          viewingDailyPoints = sorted.map(d => parseFloat(String(d.daily_score)) || 0);
         } else {
           viewingDailyPoints = Array(7).fill(0);
+          opponentDailyPoints = Array(7).fill(0);
         }
       } catch (error: unknown) {
         viewingDailyPoints = Array(7).fill(0);
-      }
-
-      if (opponentTeamObj) {
-        try {
-          const { data: oppDailyScores, error: oppError } = await supabase.rpc(
-            'calculate_daily_matchup_scores',
-            {
-              p_matchup_id: matchup.id,
-              p_team_id: opponentTeamObj.id,
-              p_week_start: weekStartStr,
-              p_week_end: weekEndStr
-            }
-          );
-
-          if (!oppError && oppDailyScores) {
-            const sorted = (oppDailyScores as Array<{ roster_date: string; daily_score: string | number }>).sort((a, b) =>
-              new Date(a.roster_date + 'T00:00:00').getTime() - new Date(b.roster_date + 'T00:00:00').getTime()
-            );
-            opponentDailyPoints = sorted.map(d => parseFloat(String(d.daily_score)) || 0);
-          } else {
-            opponentDailyPoints = Array(7).fill(0);
-          }
-        } catch (error: unknown) {
-          opponentDailyPoints = Array(7).fill(0);
-        }
+        opponentDailyPoints = Array(7).fill(0);
       }
 
       // Build response
@@ -817,23 +732,10 @@ export const MatchupService = {
     targetDate?: string // Optional: if provided and is past date, load frozen roster for that date
   ): Promise<{ data: MatchupDataResponse | null; error: PostgrestError | Error | null }> {
     try {
-      // Get league to determine first week start
-      let league: Record<string, unknown> | null = null;
-      let leagueError: PostgrestError | Error | null = null;
-      try {
-        const result = await withTimeout(
-          supabase.from('leagues').select(COLUMNS.LEAGUE).eq('id', leagueId).maybeSingle(),
-          5000,
-          'getLeague timeout in getMatchupData'
-        );
-        league = result.data;
-        leagueError = result.error;
-      } catch (timeoutError: unknown) {
-        logger.error('[MatchupService.getMatchupData] League query timeout:', timeoutError);
-        leagueError = timeoutError instanceof Error ? timeoutError : new Error(String(timeoutError));
-      }
-
-      if (leagueError) throw leagueError;
+      // Get league via API
+      const { leagueApi } = await import('@/api/leagues');
+      const leagueResponse = await leagueApi.getLeague(leagueId);
+      const league = leagueResponse.data as Record<string, unknown> | null;
       if (!league) {
         return { data: null, error: new Error('League not found') };
       }
@@ -844,23 +746,10 @@ export const MatchupService = {
       const scheduleLength = getScheduleLength(firstWeekStart);
       const isPlayoffWeek = weekNumber > scheduleLength;
 
-      // Get user's team
-      let userTeam: Record<string, unknown> | null = null;
-      let teamError: PostgrestError | Error | null = null;
-      try {
-        const result = await withTimeout(
-          supabase.from('teams').select(COLUMNS.TEAM).eq('league_id', leagueId).eq('owner_id', userId).maybeSingle(),
-          5000,
-          'getUserTeam timeout in getMatchupData'
-        );
-        userTeam = result.data;
-        teamError = result.error;
-      } catch (timeoutError: unknown) {
-        logger.error('[MatchupService.getMatchupData] User team query timeout:', timeoutError);
-        teamError = timeoutError instanceof Error ? timeoutError : new Error(String(timeoutError));
-      }
-
-      if (teamError) throw teamError;
+      // Get user's team via API
+      const { leagueApi: leagueApiForTeam } = await import('@/api/leagues');
+      const teamResponse = await leagueApiForTeam.getMyTeam(leagueId);
+      const userTeam = teamResponse.data as Record<string, unknown> | null;
       if (!userTeam) {
         return { data: null, error: new Error('User team not found') };
       }
@@ -995,62 +884,28 @@ export const MatchupService = {
       const weekStartStr = matchup.week_start_date;
       const weekEndStr = matchup.week_end_date;
 
-      // Calculate daily scores for user team
+      // Calculate daily scores via API (single call for both teams)
       try {
-        const { data: userDailyScores, error: userError } = await supabase.rpc(
-          'calculate_daily_matchup_scores',
-          {
-            p_matchup_id: matchup.id,
-            p_team_id: userTeamData.id,
-            p_week_start: weekStartStr,
-            p_week_end: weekEndStr
+        const response = await matchupApi.getDailyScores(matchup.id);
+        const dailyScoresData = response.data;
+        if (dailyScoresData && Array.isArray(dailyScoresData)) {
+          const parseDailyScores = (teamId: string) => {
+            const teamEntries = (dailyScoresData as Array<{ team_id: string; roster_date: string; daily_score: string | number }>)
+              .filter((d) => d.team_id === teamId)
+              .sort((a, b) => new Date(a.roster_date + 'T00:00:00').getTime() - new Date(b.roster_date + 'T00:00:00').getTime());
+            return teamEntries.length > 0 ? teamEntries.map(d => parseFloat(String(d.daily_score)) || 0) : Array(7).fill(0);
+          };
+          userDailyPoints = parseDailyScores(userTeamData.id);
+          if (opponentTeamObj) {
+            opponentDailyPoints = parseDailyScores(opponentTeamObj.id);
           }
-        );
-
-        if (!userError && userDailyScores) {
-          // Sort by date and extract scores
-          const sorted = (userDailyScores as Array<{ roster_date: string; daily_score: string | number }>).sort((a, b) =>
-            new Date(a.roster_date + 'T00:00:00').getTime() - new Date(b.roster_date + 'T00:00:00').getTime()
-          );
-          userDailyPoints = sorted.map(d => parseFloat(String(d.daily_score)) || 0);
         } else {
-          logger.warn('[getMatchupData] Error calculating user daily scores:', userError);
-          // Fallback: use placeholder if calculation fails
           userDailyPoints = Array(7).fill(0);
-        }
-      } catch (error: unknown) {
-        logger.error('[getMatchupData] Exception calculating user daily scores:', error);
-        userDailyPoints = Array(7).fill(0);
-      }
-
-      // Calculate daily scores for opponent team (if exists)
-      if (opponentTeamObj) {
-        try {
-          const { data: oppDailyScores, error: oppError } = await supabase.rpc(
-            'calculate_daily_matchup_scores',
-            {
-              p_matchup_id: matchup.id,
-              p_team_id: opponentTeamObj.id,
-              p_week_start: weekStartStr,
-              p_week_end: weekEndStr
-            }
-          );
-
-          if (!oppError && oppDailyScores) {
-            // Sort by date and extract scores
-            const sorted = (oppDailyScores as Array<{ roster_date: string; daily_score: string | number }>).sort((a, b) => 
-              new Date(a.roster_date + 'T00:00:00').getTime() - new Date(b.roster_date + 'T00:00:00').getTime()
-            );
-            opponentDailyPoints = sorted.map(d => parseFloat(String(d.daily_score)) || 0);
-          } else {
-            logger.warn('[getMatchupData] Error calculating opponent daily scores:', oppError);
-            opponentDailyPoints = Array(7).fill(0);
-          }
-        } catch (error: unknown) {
-          logger.error('[getMatchupData] Exception calculating opponent daily scores:', error);
           opponentDailyPoints = Array(7).fill(0);
         }
-      } else {
+      } catch (error: unknown) {
+        logger.error('[getMatchupData] Exception calculating daily scores:', error);
+        userDailyPoints = Array(7).fill(0);
         opponentDailyPoints = Array(7).fill(0);
       }
 
@@ -3147,24 +3002,8 @@ export const MatchupService = {
       const startDateStr = formatLocal(startDate);
       const endDateStr = formatLocal(endDate);
       
-      const rpcPromise = supabase.rpc('get_matchup_stats', {
-        p_player_ids: playerIds,
-        p_start_date: startDateStr,
-        p_end_date: endDateStr
-      });
-      
-      let data: unknown[] | null = null;
-      let error: PostgrestError | Error | null = null;
-      try {
-        const result = await withTimeout(rpcPromise, 5000, 'fetchMatchupStatsForPlayers timeout');
-        data = result.data as unknown[] | null;
-        error = result.error;
-      } catch (timeoutError: unknown) {
-        logger.error('[MatchupService.fetchMatchupStatsForPlayers] RPC timeout:', timeoutError);
-        error = timeoutError instanceof Error ? timeoutError : new Error(String(timeoutError));
-      }
-
-      if (error) throw error;
+      const response = await matchupApi.getMatchupStats(playerIds, startDateStr, endDateStr);
+      const data = response.data ? Object.values(response.data) : [];
 
       const statsMap = new Map<number, {
         goals: number;
@@ -3360,9 +3199,9 @@ export const MatchupService = {
         throw new Error('leagueId must be a string');
       }
 
-      const { data, error } = await supabase.rpc('update_all_matchup_scores', {
-        p_league_id: leagueId || null
-      });
+      const response = await matchupApi.updateScores(leagueId);
+      const data = response.data;
+      const error = null;
       
       if (error) {
         logger.error('[MatchupService] RPC error updating matchup scores:', error);
@@ -3435,14 +3274,11 @@ export const MatchupService = {
     }
     
     try {
-      const { data, error } = await supabase.rpc('get_daily_lineup', {
-        p_team_id: teamId,
-        p_matchup_id: matchupId,
-        p_date: date
-      });
-      
-      if (error) {
-        logger.error('[MatchupService] getDailyLineup RPC error:', error);
+      const response = await matchupApi.getDailyLineup(matchupId, teamId, date);
+      const data = response.data;
+
+      if (!data) {
+        logger.warn('[MatchupService] getDailyLineup returned no data');
         return [];
       }
       
@@ -3496,12 +3332,8 @@ export const MatchupService = {
    */
   async autoCompleteMatchups(): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await supabase.rpc('auto_complete_matchups');
-      if (error) {
-        logger.error('[MatchupService] auto_complete_matchups RPC error:', error);
-        return { success: false, error: error.message };
-      }
-      return { success: true };
+      const response = await matchupApi.autoComplete();
+      return { success: !!response.data?.success };
     } catch (error: unknown) {
       logger.error('[MatchupService] autoCompleteMatchups exception:', error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -3558,18 +3390,11 @@ export const CategoryScoringService = {
     categories: string[]
   ): Promise<{ results: CategoryMatchupResult[]; error: unknown }> {
     try {
-      const { data, error } = await supabase.rpc('calculate_h2h_category_matchup', {
-        p_league_id: leagueId,
-        p_matchup_id: matchupId,
-        p_team1_id: team1Id,
-        p_team2_id: team2Id,
-        p_week_start: weekStart,
-        p_week_end: weekEnd,
-        p_categories: categories,
+      const response = await matchupApi.getH2HCategoryResults({
+        leagueId, matchupId, team1Id, team2Id, weekStart, weekEnd, categories,
       });
 
-      if (error) throw error;
-      return { results: (data || []) as CategoryMatchupResult[], error: null };
+      return { results: (response.data || []) as CategoryMatchupResult[], error: null };
     } catch (error: unknown) {
       logger.error('[CategoryScoringService] getH2HCategoryResults error:', error);
       return { results: [], error };
@@ -3590,14 +3415,9 @@ export const CategoryScoringService = {
     throughWeek?: number
   ): Promise<{ standings: RotoStandingRow[]; error: unknown }> {
     try {
-      const { data, error } = await supabase.rpc('calculate_roto_standings', {
-        p_league_id: leagueId,
-        p_categories: categories,
-        p_through_week: throughWeek ?? null,
-      });
+      const response = await matchupApi.getRotoStandings(leagueId, categories, throughWeek);
 
-      if (error) throw error;
-      return { standings: (data || []) as RotoStandingRow[], error: null };
+      return { standings: (response.data || []) as RotoStandingRow[], error: null };
     } catch (error: unknown) {
       logger.error('[CategoryScoringService] getRotoStandings error:', error);
       return { standings: [], error };
@@ -3663,13 +3483,9 @@ export const CategoryScoringService = {
     error: unknown;
   }> {
     try {
-      const { data, error } = await supabase.rpc('calculate_ppg_standings', {
-        p_league_id: leagueId,
-        p_through_week: throughWeek ?? null,
-      });
+      const response = await matchupApi.getPPGStandings(leagueId, throughWeek);
 
-      if (error) throw error;
-      return { standings: (data || []) as Array<{ team_id: string; team_name: string; total_points: number; games_played: number; ppg: number; rank: number }>, error: null };
+      return { standings: (response.data || []) as Array<{ team_id: string; team_name: string; total_points: number; games_played: number; ppg: number; rank: number }>, error: null };
     } catch (error: unknown) {
       logger.error('[CategoryScoringService] getPPGStandings error:', error);
       return { standings: [], error };
