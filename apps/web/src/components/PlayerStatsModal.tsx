@@ -14,6 +14,7 @@ import { CitrusSparkle } from '@/components/icons/CitrusIcons';
 import { getTodayMST } from '@/utils/timezoneUtils';
 import { logger } from '@/utils/logger';
 import { playerApi } from '@/api/players';
+import { MatchupService } from '@/services/MatchupService';
 
 // ─── Types for week projections ─────────────────────────────────────
 interface GameProjection {
@@ -146,19 +147,24 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
           return;
         }
 
-        // Fetch ALL projections for this player from today onward via API
+        // Fetch projections using the same proven RPC path as matchup view
+        // (POST /api/matchups/projections/daily → get_daily_projections RPC)
         const projectionMap = new Map<string, any>();
         try {
-          const response = await playerApi.getPlayerProjections(String(playerId), todayStr);
-          const projRows = response.data || [];
+          // Collect unique game dates
+          const gameDates = [...new Set(games.map((g: any) => g.game_date.split('T')[0]))];
 
-          for (const row of projRows) {
-            const dateKey = (row.projection_date as string).split('T')[0];
-            const existing = projectionMap.get(dateKey);
+          // Batch-fetch projections for each game date in parallel
+          const results = await Promise.all(
+            gameDates.map(async (date) => {
+              const projMap = await MatchupService.getDailyProjectionsForMatchup([playerId], date);
+              return { date, projection: projMap.get(playerId) || null };
+            })
+          );
 
-            // If duplicate date, prefer row with higher total_projected_points
-            if (!existing || (Number(row.total_projected_points || 0) > Number(existing.total_projected_points || 0))) {
-              projectionMap.set(dateKey, row);
+          for (const { date, projection } of results) {
+            if (projection) {
+              projectionMap.set(date, projection);
             }
           }
         } catch (projFetchError) {
