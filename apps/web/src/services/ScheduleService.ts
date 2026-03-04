@@ -80,6 +80,88 @@ function getCachedOrFetch<T>(cacheKey: string, fetcher: () => Promise<T>): Promi
   return promise;
 }
 
+// ─── Batch coalescing for team-schedule requests ──────────────────
+// When multiple components concurrently request games for the SAME teams
+// with different date ranges (e.g., today-only vs full-week), we collect
+// them within a microtask window, merge into ONE API call with the widest
+// range, then filter results for each caller.
+type TeamBatchEntry = {
+  startStr: string;
+  endStr: string;
+  resolve: (value: { gamesByTeam: Map<string, NHLGame[]>; error: PostgrestError | null }) => void;
+  reject: (reason: unknown) => void;
+};
+
+const pendingTeamBatches = new Map<string, {
+  requests: TeamBatchEntry[];
+  normalizedTeams: string[];
+}>();
+
+function filterGamesToRange(
+  gamesByTeam: Map<string, NHLGame[]>,
+  startStr: string,
+  endStr: string,
+): Map<string, NHLGame[]> {
+  const filtered = new Map<string, NHLGame[]>();
+  gamesByTeam.forEach((games, team) => {
+    filtered.set(team, games.filter(g => {
+      const d = (g.game_date || '').split('T')[0];
+      return d >= startStr && d <= endStr;
+    }));
+  });
+  return filtered;
+}
+
+function flushTeamBatch(teamsKey: string) {
+  const batch = pendingTeamBatches.get(teamsKey);
+  pendingTeamBatches.delete(teamsKey);
+  if (!batch || batch.requests.length === 0) return;
+
+  // Find the widest bounded date range across all requests
+  let minStart = batch.requests[0].startStr;
+  let maxEnd = batch.requests[0].endStr;
+  for (const r of batch.requests) {
+    if (r.startStr && (!minStart || r.startStr < minStart)) minStart = r.startStr;
+    if (r.endStr && (!maxEnd || r.endStr > maxEnd)) maxEnd = r.endStr;
+  }
+
+  // Single API call with widest range
+  const wideKey = `teams:${teamsKey}:${minStart}:${maxEnd}`;
+  const resultPromise = getCachedOrFetch(wideKey, async () => {
+    try {
+      const response = await scheduleApi.getGamesForTeams(
+        batch.normalizedTeams,
+        minStart || undefined,
+        maxEnd || undefined,
+      );
+      const gamesByTeam = new Map<string, NHLGame[]>();
+      const data = response.data || {};
+      batch.normalizedTeams.forEach(team => {
+        gamesByTeam.set(team, data[team] || []);
+      });
+      return { gamesByTeam, error: null };
+    } catch (error) {
+      logger.error('Error fetching games for teams (batched):', error);
+      return { gamesByTeam: new Map(), error: error as PostgrestError };
+    }
+  });
+
+  // Resolve each original caller — filter to their requested range
+  for (const r of batch.requests) {
+    const isExactMatch = r.startStr === minStart && r.endStr === maxEnd;
+    resultPromise.then(result => {
+      if (result.error || isExactMatch) {
+        r.resolve(result);
+      } else {
+        r.resolve({
+          gamesByTeam: filterGamesToRange(result.gamesByTeam, r.startStr, r.endStr || r.startStr),
+          error: null,
+        });
+      }
+    }).catch(r.reject);
+  }
+}
+
 /**
  * Check if a cached team-schedule entry exists for a WIDER date range.
  * If found, we can filter from that superset instead of making a new API call.
@@ -174,37 +256,54 @@ export const ScheduleService = {
     const teamsKey = normalizedTeams.join(',');
     const cacheKey = `teams:${teamsKey}:${startStr}:${endStr}`;
 
-    // Check for a cached superset (same teams, wider date range) — avoids redundant API calls
-    const superset = findCachedTeamsSuperset(teamsKey, startStr, endStr);
-    if (superset && superset.key !== cacheKey) {
-      return superset.promise.then((result: { gamesByTeam: Map<string, NHLGame[]>; error: PostgrestError | null }) => {
-        if (result.error) return result;
-        // Filter cached superset data to the requested date range
-        const filtered = new Map<string, NHLGame[]>();
-        result.gamesByTeam.forEach((games, team) => {
-          filtered.set(team, games.filter(g => {
-            const gameDate = (g.game_date || '').split('T')[0];
-            return gameDate >= startStr && gameDate <= endStr;
-          }));
+    // 1. Exact cache hit
+    const existing = requestCache.get(cacheKey);
+    if (existing && Date.now() - existing.timestamp < CACHE_TTL_MS) {
+      return existing.promise;
+    }
+
+    // 2. Superset cache hit (already-resolved wider range)
+    if (startStr && endStr) {
+      const superset = findCachedTeamsSuperset(teamsKey, startStr, endStr);
+      if (superset && superset.key !== cacheKey) {
+        return superset.promise.then((result: { gamesByTeam: Map<string, NHLGame[]>; error: PostgrestError | null }) => {
+          if (result.error) return result;
+          return { gamesByTeam: filterGamesToRange(result.gamesByTeam, startStr, endStr), error: null };
         });
-        return { gamesByTeam: filtered, error: null };
+      }
+    }
+
+    // 3. Bounded requests: batch-coalesce concurrent calls for the same teams.
+    //    Collects all requests in the same microtask, merges into ONE API call
+    //    with the widest date range, then filters results per caller.
+    if (startStr && endStr) {
+      return new Promise((resolve, reject) => {
+        const batch = pendingTeamBatches.get(teamsKey);
+        if (batch) {
+          batch.requests.push({ startStr, endStr, resolve, reject });
+          return;
+        }
+        pendingTeamBatches.set(teamsKey, {
+          requests: [{ startStr, endStr, resolve, reject }],
+          normalizedTeams,
+        });
+        queueMicrotask(() => flushTeamBatch(teamsKey));
       });
     }
 
+    // 4. Unbounded requests — go through standard dedup cache
     return getCachedOrFetch(cacheKey, async () => {
       try {
         const response = await scheduleApi.getGamesForTeams(
           normalizedTeams,
           startStr || undefined,
-          endStr || undefined,
+          undefined,
         );
-
         const gamesByTeam = new Map<string, NHLGame[]>();
         const data = response.data || {};
         normalizedTeams.forEach(team => {
           gamesByTeam.set(team, data[team] || []);
         });
-
         return { gamesByTeam, error: null };
       } catch (error) {
         logger.error('Error fetching games for teams:', error);
