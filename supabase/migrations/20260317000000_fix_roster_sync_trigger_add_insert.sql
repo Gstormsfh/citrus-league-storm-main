@@ -13,7 +13,7 @@
 CREATE TRIGGER trigger_auto_sync_roster_to_daily_on_insert
 AFTER INSERT ON team_lineups
 FOR EACH ROW
-EXECUTE FUNCTION auto_sync_team_lineup_to_daily_rosters();
+EXECUTE FUNCTION bulletproof_auto_sync_team_lineup_to_daily_rosters();
 
 COMMENT ON TRIGGER trigger_auto_sync_roster_to_daily_on_insert ON team_lineups IS
 'Fires on INSERT to sync new team lineups (e.g. AI teams, first-time saves) to fantasy_daily_rosters. Complements the UPDATE trigger.';
