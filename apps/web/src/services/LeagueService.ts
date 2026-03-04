@@ -744,13 +744,15 @@ async joinLeagueByCode(
    * Uses RPC function to bypass RLS and return all teams
    */
   async getLeagueTeams(leagueId: string): Promise<{ teams: Team[]; error: unknown }> {
-    try {
-      const response = await leagueApi.getTeams(leagueId);
-      return { teams: response.data || [], error: null };
-    } catch (error) {
-      logger.error('Exception in getLeagueTeams:', error);
-      return { teams: [], error };
-    }
+    return getLeagueCachedOrFetch(`leagueTeams:${leagueId}`, async () => {
+      try {
+        const response = await leagueApi.getTeams(leagueId);
+        return { teams: response.data || [], error: null };
+      } catch (error) {
+        logger.error('Exception in getLeagueTeams:', error);
+        return { teams: [], error };
+      }
+    });
   },
 
   /**
@@ -871,12 +873,14 @@ async joinLeagueByCode(
    * Get user's team in a league
    */
   async getUserTeam(leagueId: string, _userId: string): Promise<{ team: Team | null; error: unknown }> {
-    try {
-      const response = await leagueApi.getMyTeam(leagueId);
-      return { team: response.data || null, error: null };
-    } catch (error) {
-      return { team: null, error };
-    }
+    return getLeagueCachedOrFetch(`userTeam:${leagueId}`, async () => {
+      try {
+        const response = await leagueApi.getMyTeam(leagueId);
+        return { team: response.data || null, error: null };
+      } catch (error) {
+        return { team: null, error };
+      }
+    });
   },
 
   /**

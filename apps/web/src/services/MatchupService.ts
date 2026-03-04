@@ -1333,8 +1333,10 @@ export const MatchupService = {
   },
 
 
-  // In-flight request deduplication for daily projections
+  // In-flight request deduplication + result cache for daily projections
   _projectionInflight: new Map<string, Promise<Map<number, DailyProjectionRow>>>(),
+  _projectionCache: new Map<string, { result: Map<number, DailyProjectionRow>; timestamp: number }>(),
+  _PROJECTION_CACHE_TTL: 30_000,
 
   /**
    * Fetch daily projections for players from player_projected_stats table.
@@ -1348,8 +1350,17 @@ export const MatchupService = {
       return new Map();
     }
 
-    // Dedup key: use date + sorted player IDs hash
-    const dedupKey = `${targetDate}:${playerIds.length}`;
+    // Dedup key: use date + sorted player IDs for exact match
+    const sortedIds = [...playerIds].sort((a, b) => a - b).join(',');
+    const dedupKey = `${targetDate}:${sortedIds}`;
+
+    // Check result cache first (avoids network call entirely)
+    const cached = this._projectionCache.get(dedupKey);
+    if (cached && Date.now() - cached.timestamp < this._PROJECTION_CACHE_TTL) {
+      return cached.result;
+    }
+
+    // Check in-flight dedup
     const existing = this._projectionInflight.get(dedupKey);
     if (existing) {
       return existing;
@@ -1370,6 +1381,8 @@ export const MatchupService = {
           projectionMap.set(Number(key), value);
         }
 
+        // Cache the result for subsequent calls
+        this._projectionCache.set(dedupKey, { result: projectionMap, timestamp: Date.now() });
         return projectionMap;
       } catch (error: unknown) {
         logger.error('[MatchupService.getDailyProjections] ❌ API error:', error);

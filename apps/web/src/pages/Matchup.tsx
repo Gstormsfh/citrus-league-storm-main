@@ -3795,6 +3795,7 @@ const Matchup = () => {
         // This ensures that when user switches leagues, we use the selected league, not the URL
         let targetLeagueId: string | null = null;
         let cachedUserLeagues: League[] | null = null;
+        let cachedLeagueTeams: Team[] | null = null;
         
         // Step 1: Always prioritize activeLeagueId from LeagueContext (source of truth)
         // CRITICAL: If activeLeagueId differs from URL, redirect IMMEDIATELY before any data loading
@@ -4084,8 +4085,12 @@ const Matchup = () => {
         if (!existingMatchup) {
           // No matchup found for this week - generate all missing weeks
           log(' No matchup found for week', weekToShow, '- generating matchups...');
-          const { teams: leagueTeams } = await LeagueService.getLeagueTeams(currentLeague.id);
-          
+          if (!cachedLeagueTeams) {
+            const { teams } = await LeagueService.getLeagueTeams(currentLeague.id);
+            cachedLeagueTeams = teams;
+          }
+          const leagueTeams = cachedLeagueTeams;
+
           // Check if ANY matchups exist for this league
           const { data: anyMatchups } = await supabase
             .from('matchups')
@@ -4199,7 +4204,11 @@ const Matchup = () => {
                 await MatchupService.deleteAllMatchupsForLeague(currentLeague.id);
                 
                 // Get all teams again to ensure we have the complete list
-                const { teams: allLeagueTeams } = await LeagueService.getLeagueTeams(currentLeague.id);
+                if (!cachedLeagueTeams) {
+                  const { teams } = await LeagueService.getLeagueTeams(currentLeague.id);
+                  cachedLeagueTeams = teams;
+                }
+                const allLeagueTeams = cachedLeagueTeams;
                 
                 // Verify user's team is in the list
                 const userTeamInList = allLeagueTeams.some(t => t.id === teamData.id);
@@ -4448,8 +4457,11 @@ const Matchup = () => {
 
         // Get opponent team object for display
         if (matchupData.opponentTeam) {
-          const { teams } = await LeagueService.getLeagueTeams(targetLeagueId);
-          const oppTeam = teams.find(t => t.id === matchupData.opponentTeam!.id);
+          if (!cachedLeagueTeams) {
+            const { teams } = await LeagueService.getLeagueTeams(targetLeagueId);
+            cachedLeagueTeams = teams;
+          }
+          const oppTeam = cachedLeagueTeams.find(t => t.id === matchupData.opponentTeam!.id);
           setOpponentTeam(oppTeam || null);
         } else {
           setOpponentTeam(null);

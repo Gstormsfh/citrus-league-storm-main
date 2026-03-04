@@ -65,6 +65,27 @@ export interface DraftSnapshot {
   created_by: string | null;
 }
 
+// ─── Request deduplication for draft fetches ─────────────────────
+const DRAFT_CACHE_TTL = 30_000; // 30 seconds
+const draftRequestCache = new Map<string, { promise: Promise<any>; timestamp: number }>();
+
+function getDraftCachedOrFetch<T>(cacheKey: string, fetcher: () => Promise<T>): Promise<T> {
+  const existing = draftRequestCache.get(cacheKey);
+  if (existing && Date.now() - existing.timestamp < DRAFT_CACHE_TTL) {
+    return existing.promise as Promise<T>;
+  }
+  const promise = fetcher().finally(() => {
+    setTimeout(() => {
+      const entry = draftRequestCache.get(cacheKey);
+      if (entry && entry.promise === promise) {
+        draftRequestCache.delete(cacheKey);
+      }
+    }, DRAFT_CACHE_TTL);
+  });
+  draftRequestCache.set(cacheKey, { promise, timestamp: Date.now() });
+  return promise;
+}
+
 export const DraftService = {
   /**
    * Get or create active draft session for a league
@@ -85,12 +106,14 @@ export const DraftService = {
    * Get all draft picks for a league (active session only)
    */
   async getDraftPicks(leagueId: string, _userId: string, sessionId?: string): Promise<{ picks: DraftPick[]; error: unknown }> {
-    try {
-      const response = await draftApi.getDraftPicks(leagueId, sessionId);
-      return { picks: response.data || [], error: null };
-    } catch (error: unknown) {
-      return { picks: [], error };
-    }
+    return getDraftCachedOrFetch(`draftPicks:${leagueId}:${sessionId || ''}`, async () => {
+      try {
+        const response = await draftApi.getDraftPicks(leagueId, sessionId);
+        return { picks: response.data || [], error: null };
+      } catch (error: unknown) {
+        return { picks: [], error };
+      }
+    });
   },
 
   /**
