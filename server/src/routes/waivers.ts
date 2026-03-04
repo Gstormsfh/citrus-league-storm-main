@@ -19,6 +19,7 @@ waiverRoutes.get('/league/:leagueId', membershipMiddleware, async (c) => {
 
   const { claims, error } = await service.getLeagueWaivers(leagueId, status);
   if (error) {
+    console.error('[waivers] Failed to fetch league waivers:', JSON.stringify(error));
     return c.json({ error: 'Failed to fetch waivers' }, 500);
   }
 
@@ -29,11 +30,13 @@ waiverRoutes.get('/league/:leagueId', membershipMiddleware, async (c) => {
 waiverRoutes.get('/league/:leagueId/team/:teamId', membershipMiddleware, async (c) => {
   const leagueId = c.req.param('leagueId');
   const teamId = c.req.param('teamId');
+  const status = c.req.query('status');
   const supabase = createUserClient(c.get('userToken'));
   const service = new WaiverService(supabase);
 
-  const { claims, error } = await service.getTeamWaiverClaims(leagueId, teamId);
+  const { claims, error } = await service.getTeamWaiverClaims(leagueId, teamId, status);
   if (error) {
+    console.error('[waivers] Failed to fetch team waivers:', JSON.stringify(error));
     return c.json({ error: 'Failed to fetch team waivers' }, 500);
   }
 

@@ -87,16 +87,20 @@ export class WaiverService {
     return { claims: data || [], error };
   }
 
-  /** Get pending waiver claims for a specific team */
-  async getTeamWaiverClaims(leagueId: string, teamId: string) {
-    const { data, error } = await this.supabase
+  /** Get waiver claims for a specific team, optionally filtered by status */
+  async getTeamWaiverClaims(leagueId: string, teamId: string, status?: string) {
+    let query = this.supabase
       .from('waiver_claims')
       .select(COLUMNS.WAIVER)
       .eq('league_id', leagueId)
       .eq('team_id', teamId)
-      .eq('status', 'pending')
       .order('created_at', { ascending: false });
 
+    if (status) {
+      query = query.eq('status', status);
+    }
+
+    const { data, error } = await query;
     return { claims: data || [], error };
   }
 

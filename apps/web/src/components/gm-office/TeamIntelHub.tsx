@@ -253,33 +253,36 @@ export const TeamIntelHub = () => {
 
         setDepths(positionDepths);
 
-        // Load waiver priority
-        const priority = await WaiverService.getWaiverPriority(activeLeagueId);
-        setWaiverPriority(priority);
-        const myPrio = priority.find(p => p.team_id === userTeam.id);
-        
-        // Validate priority (fix bug where priority > team count)
-        if (myPrio && myPrio.priority > 0 && myPrio.priority <= priority.length) {
-          setMyPriority(myPrio.priority);
-        } else {
-          // Only warn if we actually found a priority entry (not just missing data)
-          if (myPrio) {
-            logger.warn('Invalid waiver priority:', myPrio.priority, 'of', priority.length);
-          }
-          setMyPriority(null);
-        }
+        // Load waiver data (non-fatal — don't let waiver errors block the page)
+        try {
+          const priority = await WaiverService.getWaiverPriority(activeLeagueId);
+          setWaiverPriority(priority);
+          const myPrio = priority.find(p => p.team_id === userTeam.id);
 
-        // Get last successful claim date via API
-        const { data: teamWaivers } = await waiverApi.getTeamWaivers(activeLeagueId, userTeam.id);
-        if (teamWaivers && Array.isArray(teamWaivers)) {
-          const lastSuccessful = teamWaivers
-            .filter((w: { status: string }) => w.status === 'successful')
-            .sort((a: { processed_at: string }, b: { processed_at: string }) =>
-              (b.processed_at || '').localeCompare(a.processed_at || ''))
-            [0];
-          if (lastSuccessful?.processed_at) {
-            setLastClaimDate(lastSuccessful.processed_at);
+          // Validate priority (fix bug where priority > team count)
+          if (myPrio && myPrio.priority > 0 && myPrio.priority <= priority.length) {
+            setMyPriority(myPrio.priority);
+          } else {
+            if (myPrio) {
+              logger.warn('Invalid waiver priority:', myPrio.priority, 'of', priority.length);
+            }
+            setMyPriority(null);
           }
+
+          // Get last successful claim date via API
+          const { data: teamWaivers } = await waiverApi.getTeamWaivers(activeLeagueId, userTeam.id);
+          if (teamWaivers && Array.isArray(teamWaivers)) {
+            const lastSuccessful = teamWaivers
+              .filter((w: { status: string }) => w.status === 'successful')
+              .sort((a: { processed_at: string }, b: { processed_at: string }) =>
+                (b.processed_at || '').localeCompare(a.processed_at || ''))
+              [0];
+            if (lastSuccessful?.processed_at) {
+              setLastClaimDate(lastSuccessful.processed_at);
+            }
+          }
+        } catch (waiverError) {
+          logger.warn('Failed to load waiver data (non-fatal):', waiverError);
         }
 
         // Note: Next Man Up suggestions will be loaded when news items are available
