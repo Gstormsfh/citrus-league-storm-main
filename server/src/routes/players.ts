@@ -121,10 +121,25 @@ playerRoutes.get('/:playerId/projections', authMiddleware, async (c) => {
   const supabase = createUserClient(c.get('userToken'));
 
   try {
-    // Direct query to bypass any cached COLUMNS import issues
+    // Core columns only — guaranteed to exist from base + goalie + expanded migrations
+    const coreColumns = [
+      'projection_id', 'player_id', 'game_id', 'projection_date', 'season',
+      'projected_goals', 'projected_assists', 'projected_sog', 'projected_blocks',
+      'projected_ppp', 'projected_shp', 'projected_hits', 'projected_pim',
+      'projected_xg', 'total_projected_points',
+      'base_ppg', 'shrinkage_weight', 'finishing_multiplier',
+      'opponent_adjustment', 'b2b_penalty', 'home_away_adjustment',
+      'calculation_method', 'confidence_score',
+      'projected_wins', 'projected_saves', 'projected_shutouts',
+      'projected_goals_against', 'projected_gaa', 'projected_save_pct',
+      'is_goalie', 'starter_confirmed',
+      'opponent_abbrev', 'is_home_game', 'matchup_difficulty',
+      'created_at', 'updated_at',
+    ].join(', ');
+
     let query = supabase
       .from('player_projected_stats')
-      .select('projection_id, player_id, projection_date, game_id, calculation_method, total_projected_points, projected_goals, projected_assists, projected_sog, projected_blocks, projected_ppp, projected_shp, projected_hits, projected_pim, projected_wins, projected_saves, projected_shutouts, projected_goals_against, projected_gaa, projected_save_pct, shrinkage_weight, opponent_adjustment, confidence_score, dynamic_confidence, likely_low, likely_high, confidence_label, projection_mean, projection_std_dev, created_at, updated_at')
+      .select(coreColumns)
       .eq('player_id', parseInt(String(playerId), 10))
       .order('projection_date', { ascending: true });
 
