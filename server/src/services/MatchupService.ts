@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { COLUMNS } from '@citrus/shared';
+import { getSupabaseAdmin } from '../lib/supabase';
 
 /**
  * MatchupService — Server-side matchup management with DI Supabase client.
@@ -346,7 +347,10 @@ export class MatchupService {
     }
 
     if (rows.length > 0) {
-      await this.supabase
+      // Use admin client to bypass RLS — user-scoped client can't insert
+      // rows for opponent teams (AI teams have no owner_id)
+      const admin = getSupabaseAdmin();
+      await admin
         .from('fantasy_daily_rosters')
         .upsert(rows, { onConflict: 'team_id,matchup_id,player_id,roster_date' });
     }
