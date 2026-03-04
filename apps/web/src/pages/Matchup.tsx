@@ -4493,30 +4493,39 @@ const Matchup = () => {
               ? (allFrozenEntries as any[]).filter((e: any) => e.roster_date === date && String(e.team_id) === oppTeamId)
               : [];
 
-            if (myDailyRoster.length === 0) {
-              log(` No frozen roster found for ${date}`);
-              return null;
-            }
-
-            // Build frozen roster using enriched players
+            // Build my frozen roster (or fallback to current roster)
             const myRoster: MatchupPlayer[] = [];
             const mySlots: Record<string, string> = {};
 
-            myDailyRoster.forEach((entry: any) => {
-              const playerId = String(entry.player_id);
-              const enrichedPlayer = enrichedMyPlayerMap.get(playerId);
+            if (myDailyRoster.length > 0) {
+              myDailyRoster.forEach((entry: any) => {
+                const playerId = String(entry.player_id);
+                const enrichedPlayer = enrichedMyPlayerMap.get(playerId);
 
-              if (enrichedPlayer) {
-                const isStarter = entry.slot_type === 'active';
-                myRoster.push({
-                  ...enrichedPlayer,
-                  isStarter
-                } as MatchupPlayer);
-                if (entry.slot_id) {
-                  mySlots[playerId] = entry.slot_id;
+                if (enrichedPlayer) {
+                  const isStarter = entry.slot_type === 'active';
+                  myRoster.push({
+                    ...enrichedPlayer,
+                    isStarter
+                  } as MatchupPlayer);
+                  if (entry.slot_id) {
+                    mySlots[playerId] = entry.slot_id;
+                  }
                 }
-              }
-            });
+              });
+            } else {
+              // FALLBACK: No frozen roster for my team on this past date.
+              // Use current roster as best approximation.
+              log(` No frozen roster for my team on ${date}, using current roster as fallback`);
+              (matchupData.userTeam.roster || []).forEach((p: MatchupPlayer) => {
+                myRoster.push({ ...p } as MatchupPlayer);
+                const pid = String(p.id);
+                const slotId = matchupData.userTeam.slotAssignments?.[pid];
+                if (slotId) {
+                  mySlots[pid] = slotId;
+                }
+              });
+            }
 
             // Build opponent frozen roster
             const oppRoster: MatchupPlayer[] = [];
