@@ -1333,38 +1333,54 @@ export const MatchupService = {
   },
 
 
+  // In-flight request deduplication for daily projections
+  _projectionInflight: new Map<string, Promise<Map<number, DailyProjectionRow>>>(),
+
   /**
-   * Fetch daily projections for players from player_projected_stats table
+   * Fetch daily projections for players from player_projected_stats table.
+   * Deduplicates concurrent requests for the same date.
    */
   async getDailyProjectionsForMatchup(
     playerIds: number[],
     targetDate: string
   ): Promise<Map<number, DailyProjectionRow>> {
-    try {
-      if (!playerIds || playerIds.length === 0) {
-        logger.warn('[MatchupService.getDailyProjections] No player IDs provided');
-        return new Map();
-      }
-
-      const response = await matchupApi.getDailyProjections(playerIds, targetDate);
-
-      if (!response.data) {
-        logger.warn('[MatchupService.getDailyProjections] ⚠️ API returned no data - no projections for this date');
-        return new Map();
-      }
-
-      // API returns Record<string, DailyProjectionRow> — convert to Map
-      const projectionMap = new Map<number, DailyProjectionRow>();
-      const projections = response.data as Record<string, DailyProjectionRow>;
-      for (const [key, value] of Object.entries(projections)) {
-        projectionMap.set(Number(key), value);
-      }
-
-      return projectionMap;
-    } catch (error: unknown) {
-      logger.error('[MatchupService.getDailyProjections] ❌ API error:', error);
-      return new Map(); // Return empty map on error (graceful degradation)
+    if (!playerIds || playerIds.length === 0) {
+      return new Map();
     }
+
+    // Dedup key: use date + sorted player IDs hash
+    const dedupKey = `${targetDate}:${playerIds.length}`;
+    const existing = this._projectionInflight.get(dedupKey);
+    if (existing) {
+      return existing;
+    }
+
+    const promise = (async () => {
+      try {
+        const response = await matchupApi.getDailyProjections(playerIds, targetDate);
+
+        if (!response.data) {
+          return new Map<number, DailyProjectionRow>();
+        }
+
+        // API returns Record<string, DailyProjectionRow> — convert to Map
+        const projectionMap = new Map<number, DailyProjectionRow>();
+        const projections = response.data as Record<string, DailyProjectionRow>;
+        for (const [key, value] of Object.entries(projections)) {
+          projectionMap.set(Number(key), value);
+        }
+
+        return projectionMap;
+      } catch (error: unknown) {
+        logger.error('[MatchupService.getDailyProjections] ❌ API error:', error);
+        return new Map<number, DailyProjectionRow>();
+      } finally {
+        this._projectionInflight.delete(dedupKey);
+      }
+    })();
+
+    this._projectionInflight.set(dedupKey, promise);
+    return promise;
   },
 
   /**
@@ -2288,56 +2304,13 @@ export const MatchupService = {
         // Continue with empty Map - page should still load
       }
       
-      // Fetch daily projections for ALL game dates in the matchup week (not just today)
-      // This fixes the TBD bug where future-date games showed no projections
+      // Fetch daily projections for TODAY only (initial roster load)
+      // Per-date projections are loaded on-demand when user selects a date in Matchup.tsx
+      // This reduces API calls from 7 (one per weekday) to 1 per load
       const todayMST = getTodayMST();
       let dailyProjectionsMap = new Map<number, DailyProjectionRow>();
       try {
-        // Collect all unique game dates from the schedule
-        const allGameDates = new Set<string>();
-        gamesByTeam.forEach(games => {
-          games.forEach(g => {
-            const gameDate = g.game_date?.split('T')[0];
-            if (gameDate) allGameDates.add(gameDate);
-          });
-        });
-
-        // Fetch projections for each game date in parallel
-        const dateProjectionPromises = Array.from(allGameDates).map(async (gameDate) => {
-          return { gameDate, projections: await this.getDailyProjectionsForMatchup(allPlayerIds, gameDate) };
-        });
-        const dateProjectionResults = await Promise.all(dateProjectionPromises);
-
-        // Merge: each player gets their most relevant projection
-        // Priority: today's projection > nearest future date > any other date
-        const playerDateTracker = new Map<number, string>(); // Track which date each player's projection is from
-        for (const { gameDate, projections } of dateProjectionResults) {
-          projections.forEach((proj, playerId) => {
-            const existingDate = playerDateTracker.get(playerId);
-            let shouldReplace = false;
-
-            if (!existingDate) {
-              shouldReplace = true;
-            } else if (gameDate === todayMST) {
-              // Today always wins
-              shouldReplace = true;
-            } else if (existingDate !== todayMST) {
-              // Both are non-today dates: prefer nearest future date
-              const existingIsFuture = existingDate >= todayMST;
-              const newIsFuture = gameDate >= todayMST;
-              if (newIsFuture && !existingIsFuture) {
-                shouldReplace = true; // Future beats past
-              } else if (newIsFuture && existingIsFuture && gameDate < existingDate) {
-                shouldReplace = true; // Nearer future date wins
-              }
-            }
-
-            if (shouldReplace) {
-              dailyProjectionsMap.set(playerId, proj);
-              playerDateTracker.set(playerId, gameDate);
-            }
-          });
-        }
+        dailyProjectionsMap = await this.getDailyProjectionsForMatchup(allPlayerIds, todayMST);
       } catch (error: unknown) {
         logger.warn('[MatchupService] Failed to fetch daily projections, continuing without them:', error);
       }
