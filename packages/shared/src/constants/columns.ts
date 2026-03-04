@@ -119,7 +119,7 @@ export const DRAFT_ORDER_COLUMNS = 'id, league_id, round_number, team_order, cre
 // ============================================================================
 // PLAYER PROJECTED STATS COLUMNS
 // ============================================================================
-export const PLAYER_PROJECTED_STATS_COLUMNS = 'id, player_id, projection_date, calculation_method, total_projected_points, projected_goals, projected_assists, projected_sog, projected_blocks, projected_ppp, projected_shp, projected_hits, projected_pim, projected_wins, projected_saves, projected_shutouts, projected_goals_against, projected_gaa, projected_save_pct, shrinkage_weight, opponent_adjustment, confidence_score, dynamic_confidence, likely_low, likely_high, confidence_label, projection_mean, projection_std_dev, created_at, updated_at';
+export const PLAYER_PROJECTED_STATS_COLUMNS = 'projection_id, player_id, projection_date, calculation_method, total_projected_points, projected_goals, projected_assists, projected_sog, projected_blocks, projected_ppp, projected_shp, projected_hits, projected_pim, projected_wins, projected_saves, projected_shutouts, projected_goals_against, projected_gaa, projected_save_pct, shrinkage_weight, opponent_adjustment, confidence_score, dynamic_confidence, likely_low, likely_high, confidence_label, projection_mean, projection_std_dev, created_at, updated_at';
 
 // ============================================================================
 // KEEPER DESIGNATION COLUMNS

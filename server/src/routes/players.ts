@@ -123,6 +123,7 @@ playerRoutes.get('/:playerId/projections', authMiddleware, async (c) => {
 
   const { projections, error } = await service.getPlayerProjections(playerId, startDate);
   if (error) {
+    console.error(`[players/:id/projections] Error for player ${playerId}:`, error.message);
     return c.json({ error: 'Failed to fetch projections' }, 500);
   }
 
