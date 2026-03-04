@@ -71,37 +71,64 @@ export class WaiverService {
     return { allowed: true, weeklyAdds, seasonAdds };
   }
 
-  /** Get waiver claims for a league */
-  async getLeagueWaivers(leagueId: string, status?: string) {
-    let query = this.supabase
-      .from('waiver_claims')
-      .select(COLUMNS.WAIVER)
-      .eq('league_id', leagueId)
-      .order('created_at', { ascending: false });
+  /**
+   * Run a waiver_claims query with automatic fallback to base columns.
+   * If the full column set fails (e.g., bid_amount doesn't exist yet),
+   * retries with WAIVER_BASE which only includes columns from the initial migration.
+   */
+  private async queryWaiverClaims(
+    buildQuery: (columns: string) => any,
+  ): Promise<{ claims: any[]; error: any }> {
+    const { data, error } = await buildQuery(COLUMNS.WAIVER);
 
-    if (status) {
-      query = query.eq('status', status);
+    if (error && this.isColumnError(error)) {
+      console.warn('[waivers] Column error, retrying with base columns:', error.message);
+      const fallback = await buildQuery(COLUMNS.WAIVER_BASE);
+      return { claims: fallback.data || [], error: fallback.error };
     }
 
-    const { data, error } = await query;
     return { claims: data || [], error };
+  }
+
+  /** Check if a Supabase error is caused by a missing column */
+  private isColumnError(error: { message?: string; code?: string }): boolean {
+    const msg = error.message || '';
+    return msg.includes('column') && (msg.includes('does not exist') || msg.includes('not found'));
+  }
+
+  /** Get waiver claims for a league */
+  async getLeagueWaivers(leagueId: string, status?: string) {
+    return this.queryWaiverClaims((columns) => {
+      let query = this.supabase
+        .from('waiver_claims')
+        .select(columns)
+        .eq('league_id', leagueId)
+        .order('created_at', { ascending: false });
+
+      if (status) {
+        query = query.eq('status', status);
+      }
+
+      return query;
+    });
   }
 
   /** Get waiver claims for a specific team, optionally filtered by status */
   async getTeamWaiverClaims(leagueId: string, teamId: string, status?: string) {
-    let query = this.supabase
-      .from('waiver_claims')
-      .select(COLUMNS.WAIVER)
-      .eq('league_id', leagueId)
-      .eq('team_id', teamId)
-      .order('created_at', { ascending: false });
+    return this.queryWaiverClaims((columns) => {
+      let query = this.supabase
+        .from('waiver_claims')
+        .select(columns)
+        .eq('league_id', leagueId)
+        .eq('team_id', teamId)
+        .order('created_at', { ascending: false });
 
-    if (status) {
-      query = query.eq('status', status);
-    }
+      if (status) {
+        query = query.eq('status', status);
+      }
 
-    const { data, error } = await query;
-    return { claims: data || [], error };
+      return query;
+    });
   }
 
   /** Submit a waiver claim */
@@ -240,12 +267,17 @@ export class WaiverService {
 
     const initialBudget = league?.settings?.faab_budget || 100;
 
-    const { data: claims } = await this.supabase
+    const { data: claims, error: claimsError } = await this.supabase
       .from('waiver_claims')
       .select('bid_amount')
       .eq('league_id', leagueId)
       .eq('team_id', teamId)
       .eq('status', 'successful');
+
+    // If bid_amount column doesn't exist yet, return full budget
+    if (claimsError && this.isColumnError(claimsError)) {
+      return initialBudget;
+    }
 
     const spent = (claims || []).reduce((sum: number, c: any) => sum + (c.bid_amount || 0), 0);
     return initialBudget - spent;
@@ -266,11 +298,22 @@ export class WaiverService {
       .select('id, team_name')
       .eq('league_id', leagueId);
 
-    const { data: claims } = await this.supabase
+    const { data: claims, error: claimsError } = await this.supabase
       .from('waiver_claims')
       .select('team_id, bid_amount')
       .eq('league_id', leagueId)
       .eq('status', 'successful');
+
+    // If bid_amount column doesn't exist, treat all budgets as full
+    if (claimsError && this.isColumnError(claimsError)) {
+      console.warn('[waivers] bid_amount column not ready, returning full budgets');
+      return (teams || []).map((t: any) => ({
+        team_id: t.id,
+        team_name: t.team_name,
+        remaining_budget: initialBudget,
+        total_spent: 0,
+      }));
+    }
 
     const spentByTeam = new Map<string, number>();
     for (const claim of claims || []) {
@@ -306,6 +349,28 @@ export class WaiverService {
       .select('waiver_type, waiver_process_time, waiver_period_hours, waiver_game_lock, allow_trades_during_games, settings')
       .eq('id', leagueId)
       .single();
+
+    // If waiver columns don't exist yet, fall back to just settings JSONB
+    if (error && this.isColumnError(error)) {
+      console.warn('[waivers] Waiver columns missing on leagues table, using defaults');
+      const fallback = await this.supabase
+        .from('leagues')
+        .select('settings')
+        .eq('id', leagueId)
+        .single();
+
+      return {
+        settings: {
+          waiver_type: 'rolling',
+          waiver_process_time: '02:00:00',
+          waiver_period_hours: 48,
+          waiver_game_lock: true,
+          allow_trades_during_games: true,
+          settings: fallback.data?.settings || {},
+        },
+        error: null,
+      };
+    }
 
     return { settings: data, error };
   }

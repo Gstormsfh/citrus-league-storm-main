@@ -19,6 +19,11 @@ waiverRoutes.get('/league/:leagueId', membershipMiddleware, async (c) => {
 
   const { claims, error } = await service.getLeagueWaivers(leagueId, status);
   if (error) {
+    const msg = typeof error === 'object' && error !== null ? (error as any).message || '' : String(error);
+    if (msg.includes('does not exist') || msg.includes('relation') || msg.includes('not found')) {
+      console.warn('[waivers] Table/column not ready, returning empty claims:', msg);
+      return c.json({ data: [] });
+    }
     console.error('[waivers] Failed to fetch league waivers:', JSON.stringify(error));
     return c.json({ error: 'Failed to fetch waivers' }, 500);
   }
@@ -36,6 +41,12 @@ waiverRoutes.get('/league/:leagueId/team/:teamId', membershipMiddleware, async (
 
   const { claims, error } = await service.getTeamWaiverClaims(leagueId, teamId, status);
   if (error) {
+    // If the table or columns don't exist yet, return empty array instead of 500
+    const msg = typeof error === 'object' && error !== null ? (error as any).message || '' : String(error);
+    if (msg.includes('does not exist') || msg.includes('relation') || msg.includes('not found')) {
+      console.warn('[waivers] Table/column not ready, returning empty claims:', msg);
+      return c.json({ data: [] });
+    }
     console.error('[waivers] Failed to fetch team waivers:', JSON.stringify(error));
     return c.json({ error: 'Failed to fetch team waivers' }, 500);
   }
@@ -51,6 +62,11 @@ waiverRoutes.get('/league/:leagueId/priority', membershipMiddleware, async (c) =
 
   const { priority, error } = await service.getWaiverPriority(leagueId);
   if (error) {
+    const msg = typeof error === 'object' && error !== null ? (error as any).message || '' : String(error);
+    if (msg.includes('does not exist') || msg.includes('relation') || msg.includes('not found')) {
+      console.warn('[waivers] Priority table not ready, returning empty:', msg);
+      return c.json({ data: [] });
+    }
     return c.json({ error: 'Failed to fetch waiver priority' }, 500);
   }
 

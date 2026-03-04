@@ -86,6 +86,10 @@ export const PLAYER_STATS_PROJECTIONS = 'player_id, projected_goals, projected_a
 // ============================================================================
 // WAIVER/TRADE COLUMNS
 // ============================================================================
+// Base columns that exist from the initial migration — safe for all waiver types
+export const WAIVER_CLAIM_COLUMNS_BASE = 'id, league_id, team_id, player_id, drop_player_id, priority, status, created_at, processed_at, failure_reason';
+
+// Full columns including FAAB-specific fields (bid_amount, is_conditional_drop)
 export const WAIVER_CLAIM_COLUMNS = 'id, league_id, team_id, player_id, drop_player_id, priority, bid_amount, status, created_at, processed_at, failure_reason, is_conditional_drop';
 
 export const TRADE_OFFER_COLUMNS = 'id, league_id, from_team_id, to_team_id, offered_player_ids, requested_player_ids, status, message, created_at, expires_at, processed_at, counter_offer_id';
@@ -181,6 +185,7 @@ export const COLUMNS = {
   NHL_GAME: NHL_GAME_COLUMNS,
   PLAYER_STATS: PLAYER_STATS_DISPLAY,
   WAIVER: WAIVER_CLAIM_COLUMNS,
+  WAIVER_BASE: WAIVER_CLAIM_COLUMNS_BASE,
   TRADE: TRADE_OFFER_COLUMNS,
   MATCHUP_LINES: MATCHUP_LINES_COLUMNS,
   PROFILE: PROFILE_COLUMNS,
