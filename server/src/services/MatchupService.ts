@@ -263,13 +263,47 @@ export class MatchupService {
     };
   }
 
-  /** Get daily matchup scores via RPC */
+  /** Get daily matchup scores via RPC (calls once per team, returns combined results) */
   async calculateDailyMatchupScores(matchupId: string) {
-    const { data, error } = await this.supabase.rpc('calculate_daily_matchup_scores', {
-      p_matchup_id: matchupId,
-    });
+    // The RPC requires team_id + week dates, so look up the matchup first
+    const { data: matchup, error: matchupError } = await this.supabase
+      .from('matchups')
+      .select('team1_id, team2_id, week_start_date, week_end_date')
+      .eq('id', matchupId)
+      .single();
 
-    return { data, error };
+    if (matchupError || !matchup) {
+      return { data: null, error: matchupError || { message: 'Matchup not found' } };
+    }
+
+    // Call the RPC for each team in parallel
+    const [team1Result, team2Result] = await Promise.all([
+      this.supabase.rpc('calculate_daily_matchup_scores', {
+        p_matchup_id: matchupId,
+        p_team_id: matchup.team1_id,
+        p_week_start: matchup.week_start_date,
+        p_week_end: matchup.week_end_date,
+      }),
+      matchup.team2_id
+        ? this.supabase.rpc('calculate_daily_matchup_scores', {
+            p_matchup_id: matchupId,
+            p_team_id: matchup.team2_id,
+            p_week_start: matchup.week_start_date,
+            p_week_end: matchup.week_end_date,
+          })
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    if (team1Result.error) return { data: null, error: team1Result.error };
+    if (team2Result.error) return { data: null, error: team2Result.error };
+
+    // Combine results with team_id attached (frontend filters by team_id)
+    const combined = [
+      ...(team1Result.data || []).map((row: any) => ({ ...row, team_id: matchup.team1_id })),
+      ...(team2Result.data || []).map((row: any) => ({ ...row, team_id: matchup.team2_id })),
+    ];
+
+    return { data: combined, error: null };
   }
 
   /** Get matchup stats for players via RPC */

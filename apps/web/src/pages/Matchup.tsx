@@ -4479,93 +4479,84 @@ const Matchup = () => {
             oppSlots: Record<string, string>;
           }>();
           
-          // Load frozen lineups in parallel (ONLY for past dates)
-          // For today/future, the current roster from matchupData is used instead
-          const frozenLoadPromises = datesToLoad.map(async (date) => {
-            try {
-              // Query frozen roster via API
-              const [myFrozenResp, oppFrozenResp] = await Promise.all([
-                matchupApi.getFrozenRoster(matchupData.matchup.id, matchupData.userTeam.id, date),
-                matchupData.opponentTeam
-                  ? matchupApi.getFrozenRoster(matchupData.matchup.id, matchupData.opponentTeam.id, date)
-                  : Promise.resolve({ data: null }),
-              ]);
-              const myDailyRoster = myFrozenResp.data as any[] | null;
-              const oppDailyRoster = oppFrozenResp.data as any[] | null;
-              
-              if (!myDailyRoster || myDailyRoster.length === 0) {
-                log(` No frozen roster found for ${date}`);
-                return null;
+          // Build frozen lineups from batch data (no extra API calls needed)
+          // allFrozenEntries already has player_id, team_id, roster_date, slot_type, slot_id
+          const results = datesToLoad.map((date) => {
+            const myTeamId = matchupData.userTeam.id;
+            const oppTeamId = matchupData.opponentTeam?.id;
+
+            // Filter batch entries for this date and team
+            const myDailyRoster = allFrozenEntries
+              ? (allFrozenEntries as any[]).filter((e: any) => e.roster_date === date && String(e.team_id) === myTeamId)
+              : [];
+            const oppDailyRoster = allFrozenEntries && oppTeamId
+              ? (allFrozenEntries as any[]).filter((e: any) => e.roster_date === date && String(e.team_id) === oppTeamId)
+              : [];
+
+            if (myDailyRoster.length === 0) {
+              log(` No frozen roster found for ${date}`);
+              return null;
+            }
+
+            // Build frozen roster using enriched players
+            const myRoster: MatchupPlayer[] = [];
+            const mySlots: Record<string, string> = {};
+
+            myDailyRoster.forEach((entry: any) => {
+              const playerId = String(entry.player_id);
+              const enrichedPlayer = enrichedMyPlayerMap.get(playerId);
+
+              if (enrichedPlayer) {
+                const isStarter = entry.slot_type === 'active';
+                myRoster.push({
+                  ...enrichedPlayer,
+                  isStarter
+                } as MatchupPlayer);
+                if (entry.slot_id) {
+                  mySlots[playerId] = entry.slot_id;
+                }
               }
-              
-              // Build frozen roster using enriched players
-              const myRoster: MatchupPlayer[] = [];
-              const mySlots: Record<string, string> = {};
-              
-              myDailyRoster.forEach((entry: any) => {
+            });
+
+            // Build opponent frozen roster
+            const oppRoster: MatchupPlayer[] = [];
+            const oppSlots: Record<string, string> = {};
+
+            if (oppDailyRoster.length > 0) {
+              oppDailyRoster.forEach((entry: any) => {
                 const playerId = String(entry.player_id);
-                const enrichedPlayer = enrichedMyPlayerMap.get(playerId);
-                
+                const enrichedPlayer = enrichedOppPlayerMap.get(playerId);
+
                 if (enrichedPlayer) {
-                  // Use enriched player with updated isStarter flag
                   const isStarter = entry.slot_type === 'active';
-                  myRoster.push({
+                  oppRoster.push({
                     ...enrichedPlayer,
                     isStarter
                   } as MatchupPlayer);
                   if (entry.slot_id) {
-                    mySlots[playerId] = entry.slot_id;
+                    oppSlots[playerId] = entry.slot_id;
                   }
                 }
               });
-              
-              // Build opponent frozen roster
-              const oppRoster: MatchupPlayer[] = [];
-              const oppSlots: Record<string, string> = {};
-
-              if (oppDailyRoster && oppDailyRoster.length > 0) {
-                oppDailyRoster.forEach((entry: any) => {
-                  const playerId = String(entry.player_id);
-                  const enrichedPlayer = enrichedOppPlayerMap.get(playerId);
-
-                  if (enrichedPlayer) {
-                    const isStarter = entry.slot_type === 'active';
-                    oppRoster.push({
-                      ...enrichedPlayer,
-                      isStarter
-                    } as MatchupPlayer);
-                    if (entry.slot_id) {
-                      oppSlots[playerId] = entry.slot_id;
-                    }
-                  }
-                });
-              } else if (matchupData.opponentTeam) {
-                // FALLBACK: No fantasy_daily_rosters records for opponent on this past date.
-                // This happens when the opponent hasn't updated their lineup during the matchup week
-                // (auto-sync trigger only fires on team_lineups UPDATE).
-                // Use the opponent's current roster as the best approximation of their historical lineup.
-                log(` No frozen roster for opponent on ${date}, using current roster as fallback`);
-                (matchupData.opponentTeam.roster || []).forEach((p: MatchupPlayer) => {
-                  oppRoster.push({ ...p } as MatchupPlayer);
-                  const pid = String(p.id);
-                  const slotId = matchupData.opponentTeam?.slotAssignments?.[pid];
-                  if (slotId) {
-                    oppSlots[pid] = slotId;
-                  }
-                });
-              }
-              
-              return {
-                date,
-                data: { myRoster, oppRoster, mySlots, oppSlots }
-              };
-            } catch (error) {
-              logger.error(`[MATCHUP] Error loading frozen roster for ${date}:`, error);
-              return null;
+            } else if (matchupData.opponentTeam) {
+              // FALLBACK: No fantasy_daily_rosters records for opponent on this past date.
+              // Use the opponent's current roster as the best approximation.
+              log(` No frozen roster for opponent on ${date}, using current roster as fallback`);
+              (matchupData.opponentTeam.roster || []).forEach((p: MatchupPlayer) => {
+                oppRoster.push({ ...p } as MatchupPlayer);
+                const pid = String(p.id);
+                const slotId = matchupData.opponentTeam?.slotAssignments?.[pid];
+                if (slotId) {
+                  oppSlots[pid] = slotId;
+                }
+              });
             }
+
+            return {
+              date,
+              data: { myRoster, oppRoster, mySlots, oppSlots }
+            };
           });
-          
-          const results = await Promise.all(frozenLoadPromises);
           
           results.forEach(result => {
             if (result) {
