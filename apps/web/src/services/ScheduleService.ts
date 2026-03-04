@@ -80,6 +80,41 @@ function getCachedOrFetch<T>(cacheKey: string, fetcher: () => Promise<T>): Promi
   return promise;
 }
 
+/**
+ * Check if a cached team-schedule entry exists for a WIDER date range.
+ * If found, we can filter from that superset instead of making a new API call.
+ * Returns the cached promise or null.
+ */
+function findCachedTeamsSuperset(
+  teamsKey: string,
+  startStr: string,
+  endStr: string,
+): { promise: Promise<any>; key: string } | null {
+  // Only works for bounded ranges (both start and end must be set)
+  if (!startStr || !endStr) return null;
+
+  for (const [key, entry] of requestCache.entries()) {
+    if (Date.now() - entry.timestamp >= CACHE_TTL_MS) continue;
+    if (!key.startsWith('teams:')) continue;
+
+    // Parse cache key format: "teams:TEAM_LIST:START:END"
+    const firstColon = key.indexOf(':');
+    const secondColon = key.indexOf(':', firstColon + 1);
+    const thirdColon = key.indexOf(':', secondColon + 1);
+    if (thirdColon === -1) continue; // No end date in cached entry
+
+    const cachedTeamsKey = key.slice(firstColon + 1, secondColon);
+    const cachedStart = key.slice(secondColon + 1, thirdColon);
+    const cachedEnd = key.slice(thirdColon + 1);
+
+    // Same teams + wider (or equal) date range = superset
+    if (cachedTeamsKey === teamsKey && cachedEnd && cachedStart <= startStr && cachedEnd >= endStr) {
+      return { promise: entry.promise, key };
+    }
+  }
+  return null;
+}
+
 export const ScheduleService = {
   /** Clear the schedule request cache (useful after mutations) */
   clearCache() {
@@ -136,7 +171,25 @@ export const ScheduleService = {
     };
     const startStr = startDate ? formatDateLocal(startDate) : '';
     const endStr = endDate ? formatDateLocal(endDate) : '';
-    const cacheKey = `teams:${normalizedTeams.join(',')}:${startStr}:${endStr}`;
+    const teamsKey = normalizedTeams.join(',');
+    const cacheKey = `teams:${teamsKey}:${startStr}:${endStr}`;
+
+    // Check for a cached superset (same teams, wider date range) — avoids redundant API calls
+    const superset = findCachedTeamsSuperset(teamsKey, startStr, endStr);
+    if (superset && superset.key !== cacheKey) {
+      return superset.promise.then((result: { gamesByTeam: Map<string, NHLGame[]>; error: PostgrestError | null }) => {
+        if (result.error) return result;
+        // Filter cached superset data to the requested date range
+        const filtered = new Map<string, NHLGame[]>();
+        result.gamesByTeam.forEach((games, team) => {
+          filtered.set(team, games.filter(g => {
+            const gameDate = (g.game_date || '').split('T')[0];
+            return gameDate >= startStr && gameDate <= endStr;
+          }));
+        });
+        return { gamesByTeam: filtered, error: null };
+      });
+    }
 
     return getCachedOrFetch(cacheKey, async () => {
       try {
@@ -406,10 +459,15 @@ export const ScheduleService = {
         return new Map();
       }
 
+      // Use a 7-day window instead of unbounded — bounds data transfer and
+      // enables superset cache matching with full-week schedule queries.
       const todayStr = getTodayString();
+      const endDate = new Date(todayStr + 'T00:00:00');
+      endDate.setDate(endDate.getDate() + 7);
       const { gamesByTeam } = await this.getGamesForTeams(
         teamAbbrevs,
         new Date(todayStr + 'T00:00:00'),
+        endDate,
       );
 
       const nextGames = new Map<string, NHLGame | null>();
