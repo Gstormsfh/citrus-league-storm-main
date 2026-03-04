@@ -265,9 +265,11 @@ export class MatchupService {
   }
 
   /**
-   * Backfill fantasy_daily_rosters for a team if no entries exist.
+   * Backfill fantasy_daily_rosters for a team if any dates are missing.
    * This handles AI teams (or any team) whose lineup was INSERTed but the
-   * auto-sync trigger (UPDATE-only) never fired.
+   * auto-sync trigger only populated today+future dates, leaving past dates empty.
+   *
+   * Uses admin client to bypass RLS (AI teams have owner_id = NULL).
    */
   private async backfillDailyRostersIfMissing(
     teamId: string,
@@ -276,17 +278,9 @@ export class MatchupService {
     weekStart: string,
     weekEnd: string,
   ) {
-    // Check if ANY entries exist for this team in this matchup
-    const { count } = await this.supabase
-      .from('fantasy_daily_rosters')
-      .select('*', { count: 'exact', head: true })
-      .eq('team_id', teamId)
-      .eq('matchup_id', matchupId);
-
-    if (count && count > 0) return; // Already has entries
-
-    // No entries — read current lineup from team_lineups and backfill
-    const { data: lineup } = await this.supabase
+    // Read current lineup from team_lineups
+    const admin = getSupabaseAdmin();
+    const { data: lineup } = await admin
       .from('team_lineups')
       .select('starters, bench, ir, slot_assignments')
       .eq('team_id', teamId)
@@ -295,7 +289,7 @@ export class MatchupService {
 
     if (!lineup?.starters || lineup.starters.length === 0) return;
 
-    // Generate date range for the matchup week
+    // Generate all dates in the matchup week
     const dates: string[] = [];
     const start = new Date(weekStart + 'T00:00:00');
     const end = new Date(weekEnd + 'T00:00:00');
@@ -303,56 +297,63 @@ export class MatchupService {
       dates.push(d.toISOString().split('T')[0]);
     }
 
-    // Build rows for all dates × all players (starters, bench, IR)
-    const rows: any[] = [];
-    const slotAssignments = lineup.slot_assignments || {};
+    // Check which (player_id, roster_date) combos already exist
+    const { data: existingRecords } = await admin
+      .from('fantasy_daily_rosters')
+      .select('roster_date, player_id')
+      .eq('team_id', teamId)
+      .eq('matchup_id', matchupId);
 
-    for (const date of dates) {
-      for (const playerId of lineup.starters) {
-        rows.push({
-          league_id: leagueId,
-          team_id: teamId,
-          matchup_id: matchupId,
-          player_id: typeof playerId === 'string' ? parseInt(playerId, 10) : playerId,
-          roster_date: date,
-          slot_type: 'active',
-          slot_id: slotAssignments[String(playerId)] || null,
-          is_locked: false,
-        });
+    const existingKeys = new Set(
+      (existingRecords || []).map((r: { player_id: number; roster_date: string }) =>
+        `${r.player_id}_${r.roster_date}`
+      ),
+    );
+
+    // Build rows only for missing (player, date) combos
+    const rows: Array<{
+      league_id: string;
+      team_id: string;
+      matchup_id: string;
+      player_id: number;
+      roster_date: string;
+      slot_type: string;
+      slot_id: string | null;
+      is_locked: boolean;
+    }> = [];
+    const slotAssignments = lineup.slot_assignments || {};
+    const today = new Date().toISOString().split('T')[0];
+
+    const addRows = (playerIds: number[] | string[], slotType: string, useSlot: boolean) => {
+      for (const pid of playerIds || []) {
+        const playerId = typeof pid === 'string' ? parseInt(pid, 10) : pid;
+        for (const date of dates) {
+          if (existingKeys.has(`${playerId}_${date}`)) continue;
+          rows.push({
+            league_id: leagueId,
+            team_id: teamId,
+            matchup_id: matchupId,
+            player_id: playerId,
+            roster_date: date,
+            slot_type: slotType,
+            slot_id: useSlot ? (slotAssignments[String(playerId)] || null) : null,
+            is_locked: date < today, // Lock past dates
+          });
+        }
       }
-      for (const playerId of (lineup.bench || [])) {
-        rows.push({
-          league_id: leagueId,
-          team_id: teamId,
-          matchup_id: matchupId,
-          player_id: typeof playerId === 'string' ? parseInt(playerId, 10) : playerId,
-          roster_date: date,
-          slot_type: 'bench',
-          slot_id: null,
-          is_locked: false,
-        });
-      }
-      for (const playerId of (lineup.ir || [])) {
-        rows.push({
-          league_id: leagueId,
-          team_id: teamId,
-          matchup_id: matchupId,
-          player_id: typeof playerId === 'string' ? parseInt(playerId, 10) : playerId,
-          roster_date: date,
-          slot_type: 'ir',
-          slot_id: slotAssignments[String(playerId)] || null,
-          is_locked: false,
-        });
-      }
-    }
+    };
+
+    addRows(lineup.starters, 'active', true);
+    addRows(lineup.bench || [], 'bench', false);
+    addRows(lineup.ir || [], 'ir', true);
 
     if (rows.length > 0) {
-      // Use admin client to bypass RLS — user-scoped client can't insert
-      // rows for opponent teams (AI teams have no owner_id)
-      const admin = getSupabaseAdmin();
       await admin
         .from('fantasy_daily_rosters')
-        .upsert(rows, { onConflict: 'team_id,matchup_id,player_id,roster_date' });
+        .upsert(rows, {
+          onConflict: 'team_id,matchup_id,player_id,roster_date',
+          ignoreDuplicates: true,
+        });
     }
   }
 
