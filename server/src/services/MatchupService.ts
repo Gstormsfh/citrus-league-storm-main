@@ -282,16 +282,16 @@ export class MatchupService {
       .eq('league_id', leagueId);
 
     if (assignErr) {
-      logger.error('[buildDefaultLineup] roster_assignments query error:', assignErr);
+      console.error('[buildDefaultLineup] roster_assignments query error:', assignErr);
       return false;
     }
     if (!assignments || assignments.length === 0) {
-      logger.error('[buildDefaultLineup] No roster_assignments for team', teamId);
+      console.error('[buildDefaultLineup] No roster_assignments for team', teamId);
       return false;
     }
 
     const playerIds = assignments.map((a: { player_id: number }) => a.player_id);
-    logger.debug('[buildDefaultLineup] Found', playerIds.length, 'roster players for team', teamId);
+    console.log('[buildDefaultLineup] Found', playerIds.length, 'roster players for team', teamId);
 
     // Get position info from player_directory — MUST filter by current season
     // to avoid duplicate rows (one per season per player)
@@ -303,11 +303,11 @@ export class MatchupService {
       .eq('season', CURRENT_SEASON);
 
     if (pdErr) {
-      logger.error('[buildDefaultLineup] player_directory query error:', pdErr);
+      console.error('[buildDefaultLineup] player_directory query error:', pdErr);
       return false;
     }
     if (!players || players.length === 0) {
-      logger.error('[buildDefaultLineup] No player_directory rows for season', CURRENT_SEASON, '— trying without season filter');
+      console.error('[buildDefaultLineup] No player_directory rows for season', CURRENT_SEASON, '— trying without season filter');
       // Fallback: get latest row per player without season filter
       const { data: fallbackPlayers } = await admin
         .from('player_directory')
@@ -316,7 +316,7 @@ export class MatchupService {
         .order('season', { ascending: false });
 
       if (!fallbackPlayers || fallbackPlayers.length === 0) {
-        logger.error('[buildDefaultLineup] No player_directory rows at all');
+        console.error('[buildDefaultLineup] No player_directory rows at all');
         return false;
       }
       // Deduplicate — keep first row per player_id (latest season)
@@ -379,11 +379,11 @@ export class MatchupService {
     }
 
     if (starters.length === 0) {
-      logger.error('[buildLineupFromPlayers] No starters generated for team', teamId);
+      console.error('[buildLineupFromPlayers] No starters generated for team', teamId);
       return false;
     }
 
-    logger.debug('[buildLineupFromPlayers] Built lineup:', starters.length, 'starters,', bench.length, 'bench for team', teamId);
+    console.log('[buildLineupFromPlayers] Built lineup:', starters.length, 'starters,', bench.length, 'bench for team', teamId);
 
     // Save to team_lineups via admin (bypasses RLS for AI teams)
     const { error: upsertErr } = await admin
@@ -402,11 +402,11 @@ export class MatchupService {
       );
 
     if (upsertErr) {
-      logger.error('[buildLineupFromPlayers] team_lineups upsert error:', upsertErr);
+      console.error('[buildLineupFromPlayers] team_lineups upsert error:', upsertErr);
       return false;
     }
 
-    logger.debug('[buildLineupFromPlayers] Saved team_lineups for team', teamId);
+    console.log('[buildLineupFromPlayers] Saved team_lineups for team', teamId);
     return true;
   }
 
@@ -514,7 +514,7 @@ export class MatchupService {
     addRows(finalLineup.ir || [], 'ir', true);
 
     if (rows.length > 0) {
-      logger.debug('[backfillDailyRosters] Inserting', rows.length, 'rows for team', teamId);
+      console.log('[backfillDailyRosters] Inserting', rows.length, 'rows for team', teamId);
       const { error: upsertErr } = await admin
         .from('fantasy_daily_rosters')
         .upsert(rows, {
@@ -522,10 +522,10 @@ export class MatchupService {
           ignoreDuplicates: true,
         });
       if (upsertErr) {
-        logger.error('[backfillDailyRosters] upsert error:', upsertErr);
+        console.error('[backfillDailyRosters] upsert error:', upsertErr);
       }
     } else {
-      logger.debug('[backfillDailyRosters] No missing rows for team', teamId);
+      console.log('[backfillDailyRosters] No missing rows for team', teamId);
     }
   }
 
@@ -535,7 +535,7 @@ export class MatchupService {
    * Handles AI teams that never had a lineup saved (RLS-blocked on frontend).
    */
   async ensureMatchupRosters(matchupId: string) {
-    logger.debug('[ensureMatchupRosters] START for matchup:', matchupId);
+    console.log('[ensureMatchupRosters] START for matchup:', matchupId);
     const admin = getSupabaseAdmin();
 
     const { data: matchup, error: matchupError } = await admin
@@ -545,7 +545,7 @@ export class MatchupService {
       .single();
 
     if (matchupError || !matchup) {
-      logger.error('[ensureMatchupRosters] Matchup not found:', matchupId, matchupError);
+      console.error('[ensureMatchupRosters] Matchup not found:', matchupId, matchupError);
       return { initialized: 0 };
     }
 
@@ -562,13 +562,13 @@ export class MatchupService {
         .maybeSingle();
 
       if (!lineup?.starters || (Array.isArray(lineup.starters) && lineup.starters.length === 0)) {
-        logger.debug('[ensureMatchupRosters] No lineup for team', teamId, '— building from roster_assignments');
+        console.log('[ensureMatchupRosters] No lineup for team', teamId, '— building from roster_assignments');
         const created = await this.buildAndSaveDefaultLineup(admin, teamId, matchup.league_id);
         if (created) {
           initialized++;
-          logger.debug('[ensureMatchupRosters] Created lineup for team', teamId);
+          console.log('[ensureMatchupRosters] Created lineup for team', teamId);
         } else {
-          logger.error('[ensureMatchupRosters] Failed to create lineup for team', teamId, '— no roster_assignments?');
+          console.error('[ensureMatchupRosters] Failed to create lineup for team', teamId, '— no roster_assignments?');
         }
       }
 

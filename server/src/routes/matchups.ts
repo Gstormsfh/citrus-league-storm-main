@@ -102,15 +102,18 @@ matchupRoutes.get('/:matchupId/scores', async (c) => {
 // GET /api/matchups/:matchupId/daily-scores — Calculate daily matchup scores
 matchupRoutes.get('/:matchupId/daily-scores', async (c) => {
   const matchupId = c.req.param('matchupId');
+  console.log('[DAILY-SCORES] Called for matchup:', matchupId);
   const supabase = createUserClient(c.get('userToken'));
   const service = new MatchupService(supabase);
 
   // Auto-ensure both teams have team_lineups + fantasy_daily_rosters before calculating scores.
   // This is critical for AI teams (owner_id = NULL) that can't be saved via frontend RLS.
   try {
-    await service.ensureMatchupRosters(matchupId);
-  } catch (err) {
-    logger.error('[daily-scores] ensure-rosters pre-step failed (non-fatal):', err);
+    console.log('[DAILY-SCORES] Running ensureMatchupRosters...');
+    const ensureResult = await service.ensureMatchupRosters(matchupId);
+    console.log('[DAILY-SCORES] ensureMatchupRosters result:', JSON.stringify(ensureResult));
+  } catch (err: any) {
+    console.error('[DAILY-SCORES] ensure-rosters FAILED:', err?.message || err);
   }
 
   const { data, error } = await service.calculateDailyMatchupScores(matchupId);
