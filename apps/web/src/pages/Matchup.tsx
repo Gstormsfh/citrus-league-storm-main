@@ -286,10 +286,21 @@ const Matchup = () => {
 
     const runBackfillAndCalculate = async () => {
       log(' Starting data integrity check for matchup:', currentMatchup.id);
-      
+
       // Skip backfill for demo league - guests can't write, and data should already exist from migration
       const isDemoLeague = currentMatchup.league_id === DEMO_LEAGUE_ID_FOR_GUESTS;
-      
+
+      // Step 0: Ensure both teams have team_lineups + fantasy_daily_rosters via server
+      // This handles AI teams (owner_id = NULL) that can't be saved via frontend RLS
+      if (!isDemoLeague) {
+        try {
+          log(' Ensuring rosters exist for matchup:', currentMatchup.id);
+          await matchupApi.ensureRosters(currentMatchup.id);
+        } catch (err) {
+          logger.error('[Matchup] ensure-rosters failed:', err);
+        }
+      }
+
       // Step 1: Backfill missing daily roster records for both teams
       // This ensures fantasy_daily_rosters has complete data
       // SKIP for demo league - guests can't write
@@ -4168,6 +4179,20 @@ const Matchup = () => {
         // If a specific matchup is selected (from dropdown), load that matchup directly
         // Otherwise, use the user's matchup
         const userTimezone = (profile as any)?.timezone || 'America/Denver';
+
+        // CRITICAL: Ensure both teams have team_lineups + fantasy_daily_rosters BEFORE loading roster data
+        // This handles AI teams (owner_id = NULL) whose lineups can't be saved via frontend RLS.
+        // Must run before getMatchupData/getMatchupDataById which reads from these tables.
+        const matchupIdForEnsure = selectedMatchupId || existingMatchup?.id;
+        if (matchupIdForEnsure && currentLeague?.id !== DEMO_LEAGUE_ID_FOR_GUESTS) {
+          try {
+            await matchupApi.ensureRosters(matchupIdForEnsure);
+          } catch (err) {
+            // Non-fatal — roster data may already exist
+            logger.error('[Matchup] ensure-rosters pre-load failed:', err);
+          }
+        }
+
         let matchupDataPromise: Promise<{ data: any; error: any }>;
 
         if (selectedMatchupId) {

@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { COLUMNS } from '@citrus/shared';
+import { COLUMNS, logger } from '@citrus/shared';
 import { getSupabaseAdmin } from '../lib/supabase';
 
 /**
@@ -464,6 +464,58 @@ export class MatchupService {
           ignoreDuplicates: true,
         });
     }
+  }
+
+  /**
+   * Ensure both teams in a matchup have team_lineups and fantasy_daily_rosters.
+   * Called from the Matchup page BEFORE loading any roster data.
+   * Handles AI teams that never had a lineup saved (RLS-blocked on frontend).
+   */
+  async ensureMatchupRosters(matchupId: string) {
+    const admin = getSupabaseAdmin();
+
+    const { data: matchup, error: matchupError } = await admin
+      .from('matchups')
+      .select('team1_id, team2_id, week_start_date, week_end_date, league_id')
+      .eq('id', matchupId)
+      .single();
+
+    if (matchupError || !matchup) {
+      logger.error('[ensureMatchupRosters] Matchup not found:', matchupId, matchupError);
+      return { initialized: 0 };
+    }
+
+    let initialized = 0;
+    const teamIds = [matchup.team1_id, matchup.team2_id].filter(Boolean);
+
+    for (const teamId of teamIds) {
+      // Check if team_lineups exists
+      const { data: lineup } = await admin
+        .from('team_lineups')
+        .select('starters')
+        .eq('team_id', teamId)
+        .eq('league_id', matchup.league_id)
+        .maybeSingle();
+
+      if (!lineup?.starters || (Array.isArray(lineup.starters) && lineup.starters.length === 0)) {
+        logger.debug('[ensureMatchupRosters] No lineup for team', teamId, '— building from roster_assignments');
+        const created = await this.buildAndSaveDefaultLineup(admin, teamId, matchup.league_id);
+        if (created) {
+          initialized++;
+          logger.debug('[ensureMatchupRosters] Created lineup for team', teamId);
+        } else {
+          logger.error('[ensureMatchupRosters] Failed to create lineup for team', teamId, '— no roster_assignments?');
+        }
+      }
+
+      // Backfill fantasy_daily_rosters for any missing dates
+      await this.backfillDailyRostersIfMissing(
+        teamId, matchupId, matchup.league_id,
+        matchup.week_start_date, matchup.week_end_date,
+      );
+    }
+
+    return { initialized };
   }
 
   /** Get daily matchup scores via RPC (calls once per team, returns combined results) */

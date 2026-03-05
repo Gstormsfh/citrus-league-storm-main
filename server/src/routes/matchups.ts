@@ -4,6 +4,7 @@ import { authMiddleware } from '../middleware/auth';
 import { membershipMiddleware } from '../middleware/membership';
 import { createUserClient } from '../lib/supabase';
 import { MatchupService } from '../services/MatchupService';
+import { logger } from '@citrus/shared';
 
 const matchupRoutes = new Hono<Env>();
 
@@ -255,6 +256,22 @@ matchupRoutes.post('/:matchupId/frozen-roster-batch', async (c) => {
   }
 
   return c.json({ data: entries });
+});
+
+// POST /api/matchups/:matchupId/ensure-rosters — Ensure both teams have team_lineups + fantasy_daily_rosters
+// Must be called BEFORE loading roster data to handle AI teams (no owner, RLS-blocked)
+matchupRoutes.post('/:matchupId/ensure-rosters', async (c) => {
+  const matchupId = c.req.param('matchupId');
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new MatchupService(supabase);
+
+  try {
+    const result = await service.ensureMatchupRosters(matchupId);
+    return c.json({ data: result });
+  } catch (err) {
+    logger.error('[ensure-rosters] Error:', err);
+    return c.json({ error: 'Failed to ensure rosters' }, 500);
+  }
 });
 
 // POST /api/matchups/auto-complete — Auto-complete matchups

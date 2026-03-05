@@ -183,6 +183,18 @@ export const matchupApi = {
     );
   },
 
+  // ── Roster initialization ──────────────────────────────────────────────
+
+  /**
+   * Ensure both teams in a matchup have team_lineups + fantasy_daily_rosters.
+   * Must be called BEFORE loading any roster data to handle AI teams.
+   * Uses admin client server-side to bypass RLS for teams with no owner.
+   */
+  ensureRosters(matchupId: string) {
+    // NOT cached — must always run to ensure data exists
+    return apiClient.post(`/api/matchups/${matchupId}/ensure-rosters`);
+  },
+
   // ── Score updates & maintenance ────────────────────────────────────────
 
   /** Update matchup scores */
