@@ -502,29 +502,6 @@ const Matchup = () => {
         scores.set(dateStr, { myScore, oppScore, isLocked: true });
       }
       
-      // DIAGNOSTIC: Log calculated frozen scores
-      console.log('[SCORES-DEBUG] Calculated frozen scores:', Object.fromEntries(
-        Array.from(scores.entries()).map(([k, v]) => [k, v])
-      ));
-      console.log('[SCORES-DEBUG] dailyStatsByDate size:', dailyStatsByDate.size, 'rostersByDateTeam size:', rostersByDateTeam.size);
-      // Show sample player's daily_total_points for first past date
-      if (pastDates.length > 0) {
-        const sampleDate = pastDates[0];
-        const sampleDayStats = dailyStatsByDate.get(sampleDate);
-        const sampleRosters = rostersByDateTeam.get(sampleDate);
-        if (sampleDayStats && sampleRosters) {
-          const sampleTeamPlayerIds = sampleRosters.get(team1Id) || [];
-          const samplePlayerId = sampleTeamPlayerIds[0];
-          const sampleStats = samplePlayerId ? sampleDayStats.get(samplePlayerId) : null;
-          console.log('[SCORES-DEBUG] Sample player stats for', sampleDate, ':', {
-            playerId: samplePlayerId,
-            stats: sampleStats ? { daily_total_points: sampleStats.daily_total_points, goals: sampleStats.goals, assists: sampleStats.assists } : 'NOT FOUND',
-            team1PlayerCount: sampleTeamPlayerIds.length,
-            dayStatsMapSize: sampleDayStats.size,
-          });
-        }
-      }
-
       // Cache the frozen scores (long TTL - past scores don't change)
       DataCacheService.set(cacheKey, scores, TTL.VERY_LONG);
       setCachedDailyScores(scores);
@@ -3175,27 +3152,10 @@ const Matchup = () => {
   // CRITICAL FIX: If we have a frozen roster for the selected date, use it directly
   // This ensures dropped players appear correctly in the Matchup tab
   const myStarters = useMemo(() => {
-    // DIAGNOSTIC: Log what data path is taken
-    const hasFrozen = selectedDate ? frozenRostersByDate.has(selectedDate) : false;
-    console.log('[STARTERS-DEBUG] myStarters computing:', {
-      selectedDate,
-      hasFrozenForDate: hasFrozen,
-      frozenMapSize: frozenRostersByDate.size,
-      frozenMapKeys: Array.from(frozenRostersByDate.keys()),
-      displayMyTeamCount: displayMyTeam.length,
-      displayMyTeamStarters: displayMyTeam.filter(p => p.isStarter).length
-    });
-
     // If date is selected and we have a frozen roster, use that directly (includes dropped players)
-    if (selectedDate && hasFrozen) {
+    if (selectedDate && frozenRostersByDate.has(selectedDate)) {
       const frozenRoster = frozenRostersByDate.get(selectedDate)!;
       const directStarters = frozenRoster.myRoster.filter(p => p.isStarter);
-
-      console.log('[STARTERS-DEBUG] Using frozen roster for', selectedDate, ':', {
-        myRosterTotal: frozenRoster.myRoster.length,
-        directStartersCount: directStarters.length,
-        sampleStarter: directStarters[0] ? { id: directStarters[0].id, name: directStarters[0].name } : null
-      });
 
       // Enrich with stats from dailyStatsByDate
       const dayStatsMap = dailyStatsByDate.get(selectedDate);
@@ -3213,9 +3173,7 @@ const Matchup = () => {
     }
 
     // Otherwise use enriched displayMyTeam
-    const starters = displayMyTeam.filter(p => p.isStarter);
-    console.log('[STARTERS-DEBUG] Using displayMyTeam starters:', starters.length, 'out of', displayMyTeam.length);
-    return starters;
+    return displayMyTeam.filter(p => p.isStarter);
   }, [selectedDate, frozenRostersByDate, dailyStatsByDate, displayMyTeam]);
   
   const myBench = useMemo(() => {
@@ -3342,42 +3300,15 @@ const Matchup = () => {
     if (!currentMatchup) {
       return '0.0';
     }
-    
-    // PRIORITY 1: For demo leagues, ALWAYS use calculatedDailyTotals (same as weekly selector)
-    // The weekly selector shows correct values, so this is the single source of truth
-    // CRITICAL: Check calculatedDailyTotals BEFORE statsLoadingRef to avoid using cached zeros
-    // This ensures demo league scorecard matches the weekly selector exactly
-    if (userLeagueState !== 'active-user' && calculatedDailyTotals && calculatedDailyTotals.size > 0) {
+
+    // PRIORITY 1: Use calculatedDailyTotals (same as weekly selector) - works for ALL users
+    if (calculatedDailyTotals && calculatedDailyTotals.size > 0) {
       let total = 0;
       calculatedDailyTotals.forEach((totals) => {
         total += totals.myTotal;
       });
-      const score = total.toFixed(1);
-      // Always update cache with calculatedDailyTotals value (don't use old cached zeros)
-      if (!lastScoreRef.current) {
-        lastScoreRef.current = { myScore: score, oppScore: '0.0' };
-      } else {
-        lastScoreRef.current.myScore = score;
-      }
-      return score;
-    }
-    
-    // For active users: If stats are currently loading, return last stable score to prevent flashing
-    if (statsLoadingRef.current && lastScoreRef.current) {
-      return lastScoreRef.current.myScore;
-    }
-    
-    // PRIORITY 2: For demo leagues, if daily points arrays exist, sum them up
-    if (userLeagueState !== 'active-user' && myDailyPoints && myDailyPoints.length > 0) {
-      const total = myDailyPoints.reduce((sum, pts) => sum + pts, 0);
-      // If daily points sum is 0 or very small, use fallback to sum player.total_points
-      // This handles cases where RPC returns zeros but matchup lines have data
-      if (total < 0.1) {
-        const fallback = myStarters.reduce((sum, player) => {
-          const pts = player.total_points || player.points || 0;
-          return sum + pts;
-        }, 0);
-        const score = fallback.toFixed(1);
+      if (total > 0.01) {
+        const score = total.toFixed(1);
         if (!lastScoreRef.current) {
           lastScoreRef.current = { myScore: score, oppScore: '0.0' };
         } else {
@@ -3385,25 +3316,34 @@ const Matchup = () => {
         }
         return score;
       }
-      const score = total.toFixed(1);
-      if (!lastScoreRef.current) {
-        lastScoreRef.current = { myScore: score, oppScore: '0.0' };
-      } else {
-        lastScoreRef.current.myScore = score;
-      }
-      return score;
     }
-    
+
+    // For active users: If stats are currently loading, return last stable score to prevent flashing
+    if (statsLoadingRef.current && lastScoreRef.current) {
+      return lastScoreRef.current.myScore;
+    }
+
+    // PRIORITY 2: Use RPC daily points (server-calculated, most reliable)
+    if (myDailyPoints && myDailyPoints.length > 0) {
+      const total = myDailyPoints.reduce((sum, pts) => sum + pts, 0);
+      if (total > 0.01) {
+        const score = total.toFixed(1);
+        if (!lastScoreRef.current) {
+          lastScoreRef.current = { myScore: score, oppScore: '0.0' };
+        } else {
+          lastScoreRef.current.myScore = score;
+        }
+        return score;
+      }
+    }
+
     // PRIORITY 3: If daily stats map is empty, use fallback
     if (dailyStatsByDate.size === 0) {
-      // Fallback: sum starter week totals if no daily breakdown available
-      // Check both total_points and points fields
       const fallback = myStarters.reduce((sum, player) => {
         const pts = player.total_points || player.points || 0;
         return sum + pts;
       }, 0);
       const score = fallback.toFixed(1);
-      
       if (!lastScoreRef.current) {
         lastScoreRef.current = { myScore: score, oppScore: '0.0' };
       } else {
@@ -3412,76 +3352,66 @@ const Matchup = () => {
       return score;
     }
 
-    // PRIORITY 4: Sum calculatedDailyTotals (includes confirmed totals from MatchupComparison)
+    // PRIORITY 4: Sum calculatedDailyTotals even if zero (final fallback)
     let total = 0;
     calculatedDailyTotals.forEach((totals) => {
       total += totals.myTotal;
     });
-    
+
     const score = total.toFixed(1);
-    // Cache the stable score
     if (!lastScoreRef.current) {
       lastScoreRef.current = { myScore: score, oppScore: '0.0' };
     } else {
       lastScoreRef.current.myScore = score;
     }
     return score;
-  }, [currentMatchup, calculatedDailyTotals, dailyStatsByDate, userLeagueState, myDailyPoints, myStarters]);
+  }, [currentMatchup, calculatedDailyTotals, dailyStatsByDate, myDailyPoints, myStarters]);
 
   const opponentTeamPoints = useMemo(() => {
     if (!currentMatchup) {
       return '0.0';
     }
-    
-    // PRIORITY 1: For demo leagues, ALWAYS use calculatedDailyTotals (same as weekly selector)
-    // The weekly selector shows correct values, so this is the single source of truth
-    // Don't use cached score if calculatedDailyTotals is available (it's more reliable)
-    if (userLeagueState !== 'active-user' && calculatedDailyTotals && calculatedDailyTotals.size > 0) {
+
+    // PRIORITY 1: Use calculatedDailyTotals (same as weekly selector) - works for ALL users
+    if (calculatedDailyTotals && calculatedDailyTotals.size > 0) {
       let total = 0;
       calculatedDailyTotals.forEach((totals) => {
         total += totals.oppTotal;
       });
-      const score = total.toFixed(1);
-      // Always update cache with calculatedDailyTotals value (don't use old cached zeros)
-      if (lastScoreRef.current) {
-        lastScoreRef.current.oppScore = score;
-      } else {
-        lastScoreRef.current = { myScore: '0.0', oppScore: score };
+      // Only use if non-zero (avoid overriding good RPC data with 0s from empty frozen rosters)
+      if (total > 0.01) {
+        const score = total.toFixed(1);
+        if (lastScoreRef.current) {
+          lastScoreRef.current.oppScore = score;
+        } else {
+          lastScoreRef.current = { myScore: '0.0', oppScore: score };
+        }
+        return score;
       }
-      return score;
     }
-    
+
     // For active users: If stats are currently loading, return last stable score to prevent flashing
     if (statsLoadingRef.current && lastScoreRef.current) {
       return lastScoreRef.current.oppScore;
     }
-    
-    // PRIORITY 2: For demo leagues, if daily points arrays exist, sum them up
-    if (userLeagueState !== 'active-user' && opponentDailyPoints && opponentDailyPoints.length > 0) {
+
+    // PRIORITY 2: Use RPC daily points (server-calculated, most reliable for opponent scores)
+    // This is critical for AI opponents where frontend enrichment may fail
+    if (opponentDailyPoints && opponentDailyPoints.length > 0) {
       const total = opponentDailyPoints.reduce((sum, pts) => sum + pts, 0);
-      // If daily points sum is 0 or very small, use fallback to sum player.total_points
-      // This handles cases where RPC returns zeros but matchup lines have data
-      if (total < 0.1) {
-        const fallback = opponentStarters.reduce((sum, player) => {
-          const pts = player.total_points || player.points || 0;
-          return sum + pts;
-        }, 0);
-        const score = fallback.toFixed(1);
+      if (total > 0.01) {
+        const score = total.toFixed(1);
         if (lastScoreRef.current) {
           lastScoreRef.current.oppScore = score;
+        } else {
+          lastScoreRef.current = { myScore: '0.0', oppScore: score };
         }
         return score;
       }
-      const score = total.toFixed(1);
-      if (lastScoreRef.current) {
-        lastScoreRef.current.oppScore = score;
-      }
-      return score;
     }
-    
+
     // PRIORITY 3: If daily stats map is empty, use fallback
     if (dailyStatsByDate.size === 0) {
-      // Check both total_points and points fields
       const fallback = opponentStarters.reduce((sum, player) => {
         const pts = player.total_points || player.points || 0;
         return sum + pts;
@@ -3493,19 +3423,18 @@ const Matchup = () => {
       return score;
     }
 
-    // PRIORITY 4: Sum calculatedDailyTotals (includes confirmed totals from MatchupComparison)
+    // PRIORITY 4: Sum calculatedDailyTotals even if zero (final fallback)
     let total = 0;
     calculatedDailyTotals.forEach((totals) => {
       total += totals.oppTotal;
     });
-    
+
     const score = total.toFixed(1);
-    // Cache the stable score
     if (lastScoreRef.current) {
       lastScoreRef.current.oppScore = score;
     }
     return score;
-  }, [currentMatchup, calculatedDailyTotals, dailyStatsByDate, userLeagueState, opponentDailyPoints, opponentStarters]);
+  }, [currentMatchup, calculatedDailyTotals, dailyStatsByDate, opponentDailyPoints, opponentStarters]);
 
   const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   
@@ -4368,9 +4297,43 @@ const Matchup = () => {
         setOpponentTeamRecord(matchupData.opponentTeam?.record || { wins: 0, losses: 0 });
         setMyDailyPoints(matchupData.userTeam.dailyPoints);
         setOpponentDailyPoints(matchupData.opponentTeam?.dailyPoints || []);
-        
-        // Frozen roster loading now handled in MatchupService.getMatchupRosters()
-        // No duplicate logic needed here
+
+        // Populate cachedDailyScores from RPC results (server-calculated, most reliable)
+        // This ensures scores display correctly even if frontend enrichment fails
+        // (e.g., AI team where opponent roster loading may not work)
+        const myDailyPts = matchupData.userTeam.dailyPoints || [];
+        const oppDailyPts = matchupData.opponentTeam?.dailyPoints || [];
+        if (myDailyPts.length > 0 || oppDailyPts.length > 0) {
+          const rpcCachedScores = new Map<string, { myScore: number; oppScore: number; isLocked: boolean }>();
+          const [sYear, sMonth, sDay] = matchupData.matchup.week_start_date.split('-').map(Number);
+          const rpcTodayStr = getTodayMST();
+
+          for (let i = 0; i < 7; i++) {
+            const dayDate = new Date(sYear, sMonth - 1, sDay + i);
+            const dateStr = `${dayDate.getFullYear()}-${String(dayDate.getMonth() + 1).padStart(2, '0')}-${String(dayDate.getDate()).padStart(2, '0')}`;
+            const isPast = dateStr < rpcTodayStr;
+
+            rpcCachedScores.set(dateStr, {
+              myScore: myDailyPts[i] || 0,
+              oppScore: oppDailyPts[i] || 0,
+              isLocked: isPast
+            });
+          }
+          setCachedDailyScores(rpcCachedScores);
+
+          // Also populate calculatedDailyTotals from RPC so scores show immediately
+          const rpcCalculatedTotals = new Map<string, { myTotal: number; oppTotal: number }>();
+          for (let i = 0; i < 7; i++) {
+            const dayDate = new Date(sYear, sMonth - 1, sDay + i);
+            const dateStr = `${dayDate.getFullYear()}-${String(dayDate.getMonth() + 1).padStart(2, '0')}-${String(dayDate.getDate()).padStart(2, '0')}`;
+            rpcCalculatedTotals.set(dateStr, {
+              myTotal: myDailyPts[i] || 0,
+              oppTotal: oppDailyPts[i] || 0
+            });
+          }
+          setCalculatedDailyTotals(rpcCalculatedTotals);
+          log(' Populated scores from RPC daily-scores (server-calculated)');
+        }
         
         // CRITICAL: Set viewing team names from matchup data (not userTeam state)
         // This ensures correct names are shown when viewing other matchups
@@ -4459,21 +4422,11 @@ const Matchup = () => {
             enrichedOppPlayerMap.set(String(p.id), p);
           });
 
-          // DIAGNOSTIC: Log enrichment map sizes and sample IDs
-          console.log('[FROZEN-LINEUP-DEBUG] Enrichment maps built:', {
-            myMapSize: enrichedMyPlayerMap.size,
-            oppMapSize: enrichedOppPlayerMap.size,
-            mySampleIds: Array.from(enrichedMyPlayerMap.keys()).slice(0, 3),
-            oppSampleIds: Array.from(enrichedOppPlayerMap.keys()).slice(0, 3),
-            myRosterCount: matchupData.userTeam.roster.length,
-            oppRosterCount: (matchupData.opponentTeam?.roster || []).length
-          });
-          
           log(' Initial enriched player lookup maps:', {
             myPlayers: enrichedMyPlayerMap.size,
             oppPlayers: enrichedOppPlayerMap.size
           });
-          
+
           // ============================================================
           // HANDLE DROPPED/TRADED PLAYERS (Yahoo/Sleeper behavior)
           // Fetch any players in saved rosters who are no longer on the team
@@ -4481,34 +4434,37 @@ const Matchup = () => {
           // ============================================================
           const frozenBatchResponse = await matchupApi.getFrozenRosterBatch(matchupData.matchup.id, datesToLoad);
           const allFrozenEntries = frozenBatchResponse.data as any[] | null;
-          
+
           if (allFrozenEntries && allFrozenEntries.length > 0) {
-            // Get all current player IDs
-            const currentMyIds = new Set(matchupData.userTeam.roster.map(p => String(p.id)));
-            const currentOppIds = new Set((matchupData.opponentTeam?.roster || []).map(p => String(p.id)));
-            const allCurrentIds = new Set([...currentMyIds, ...currentOppIds]);
-            
-            // Find player IDs that are in frozen rosters but NOT in current rosters
+            // Get all current player IDs from enrichment maps
+            const allCurrentIds = new Set([
+              ...Array.from(enrichedMyPlayerMap.keys()),
+              ...Array.from(enrichedOppPlayerMap.keys())
+            ]);
+
+            // Find player IDs that are in frozen rosters but NOT in enrichment maps
+            // CRITICAL: This catches both dropped players AND cases where opponent roster
+            // was empty (e.g., AI team where frontend failed to load roster)
             const missingIds = [...new Set(
               (allFrozenEntries as any)
                 .map((e: any) => String(e.player_id))
                 .filter((id: string) => !allCurrentIds.has(id))
             )];
-            
+
             if (missingIds.length > 0) {
-              log(' Found dropped/traded players in frozen rosters:', missingIds);
-              
-              // Fetch missing players
+              log(' Found players in frozen rosters missing from enrichment maps:', missingIds.length);
+
+              // Fetch missing players from player directory
               const missingPlayers = await PlayerService.getPlayersByIds(missingIds as string[]);
-              log(' Fetched', missingPlayers.length, 'dropped/traded players');
-              
+              log(' Fetched', missingPlayers.length, 'missing players for enrichment');
+
               // Transform to MatchupPlayer and add to appropriate lookup map
               missingPlayers.forEach(player => {
                 // Determine which team this player was on based on frozen roster entries
                 const playerEntries = (allFrozenEntries as any).filter((e: any) => String(e.player_id) === String(player.id));
                 const wasOnMyTeam = playerEntries.some((e: any) => String(e.team_id) === matchupData.userTeam.id);
                 const wasOnOppTeam = playerEntries.some((e: any) => String(e.team_id) === matchupData.opponentTeam?.id);
-                
+
                 // Create basic MatchupPlayer from Player data
                 const p = player as any;
                 const matchupPlayer: MatchupPlayer = {
@@ -4528,9 +4484,9 @@ const Matchup = () => {
                   gamesRemaining: 0,
                   isGoalie: p.position === 'G',
                   status: (p.status || null) as any,
-                  wasDropped: true
+                  wasDropped: !wasOnMyTeam && !wasOnOppTeam ? false : undefined
                 } as MatchupPlayer;
-                
+
                 if (wasOnMyTeam) {
                   enrichedMyPlayerMap.set(String(player.id), matchupPlayer);
                 }
@@ -4538,8 +4494,8 @@ const Matchup = () => {
                   enrichedOppPlayerMap.set(String(player.id), matchupPlayer);
                 }
               });
-              
-              log(' Updated enriched player lookup maps after adding dropped players:', {
+
+              log(' Updated enriched player lookup maps after adding missing players:', {
                 myPlayers: enrichedMyPlayerMap.size,
                 oppPlayers: enrichedOppPlayerMap.size
               });
@@ -4634,12 +4590,6 @@ const Matchup = () => {
                   oppSlots[pid] = slotId;
                 }
               });
-            }
-
-            // DIAGNOSTIC: Log per-date frozen roster results
-            console.log(`[FROZEN-LINEUP-DEBUG] Date ${date}: myRoster=${myRoster.length} (starters=${myRoster.filter(p=>p.isStarter).length}), oppRoster=${oppRoster.length} (starters=${oppRoster.filter(p=>p.isStarter).length}), myDailyRoster=${myDailyRoster.length}, oppDailyRoster=${oppDailyRoster.length}`);
-            if (myRoster.length === 0 && myDailyRoster.length > 0) {
-              console.log('[FROZEN-LINEUP-DEBUG] ENRICHMENT FAILURE! myDailyRoster entries exist but myRoster is empty. Sample entry:', myDailyRoster[0], 'enrichedMyPlayerMap keys:', Array.from(enrichedMyPlayerMap.keys()).slice(0, 5));
             }
 
             return {

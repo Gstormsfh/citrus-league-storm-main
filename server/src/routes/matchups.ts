@@ -102,92 +102,20 @@ matchupRoutes.get('/:matchupId/scores', async (c) => {
 // GET /api/matchups/:matchupId/daily-scores — Calculate daily matchup scores
 matchupRoutes.get('/:matchupId/daily-scores', async (c) => {
   const matchupId = c.req.param('matchupId');
-  console.log('[DAILY-SCORES] Called for matchup:', matchupId);
   const supabase = createUserClient(c.get('userToken'));
   const service = new MatchupService(supabase);
 
   // Auto-ensure both teams have team_lineups + fantasy_daily_rosters before calculating scores.
   // This is critical for AI teams (owner_id = NULL) that can't be saved via frontend RLS.
   try {
-    console.log('[DAILY-SCORES] Running ensureMatchupRosters...');
-    const ensureResult = await service.ensureMatchupRosters(matchupId);
-    console.log('[DAILY-SCORES] ensureMatchupRosters result:', JSON.stringify(ensureResult));
+    await service.ensureMatchupRosters(matchupId);
   } catch (err: any) {
-    console.error('[DAILY-SCORES] ensure-rosters FAILED:', err?.message || err);
-  }
-
-  // DIAGNOSTIC: Check what's actually in fantasy_daily_rosters for this matchup
-  try {
-    const { getSupabaseAdmin } = await import('../lib/supabase');
-    const admin = getSupabaseAdmin();
-
-    // Count entries per team and slot_type
-    const { data: diagnosticData } = await admin
-      .from('fantasy_daily_rosters')
-      .select('team_id, roster_date, slot_type, player_id')
-      .eq('matchup_id', matchupId);
-
-    if (diagnosticData) {
-      const teamCounts: Record<string, { active: number; bench: number; total: number; dates: Set<string> }> = {};
-      for (const row of diagnosticData) {
-        if (!teamCounts[row.team_id]) {
-          teamCounts[row.team_id] = { active: 0, bench: 0, total: 0, dates: new Set() };
-        }
-        teamCounts[row.team_id].total++;
-        teamCounts[row.team_id].dates.add(row.roster_date);
-        if (row.slot_type === 'active') teamCounts[row.team_id].active++;
-        else if (row.slot_type === 'bench') teamCounts[row.team_id].bench++;
-      }
-      for (const [teamId, counts] of Object.entries(teamCounts)) {
-        console.log(`[DIAGNOSTIC] Team ${teamId}: ${counts.active} active, ${counts.bench} bench, ${counts.total} total, dates: ${Array.from(counts.dates).sort().join(', ')}`);
-      }
-    } else {
-      console.log('[DIAGNOSTIC] No fantasy_daily_rosters entries found for matchup:', matchupId);
-    }
-  } catch (err: any) {
-    console.error('[DIAGNOSTIC] Query failed:', err?.message);
+    // Non-fatal - roster data may already exist
   }
 
   const { data, error } = await service.calculateDailyMatchupScores(matchupId);
   if (error) {
     return c.json({ error: error.message || 'Failed to calculate scores' }, 500);
-  }
-
-  // DIAGNOSTIC: Log the actual daily scores returned
-  console.log('[DAILY-SCORES] RPC result:', JSON.stringify(data));
-
-  // DIAGNOSTIC: Check if player_game_stats has ANY data for this week
-  try {
-    const { getSupabaseAdmin } = await import('../lib/supabase');
-    const admin = getSupabaseAdmin();
-
-    // Get matchup dates
-    const { data: matchup } = await admin
-      .from('matchups')
-      .select('week_start_date, week_end_date')
-      .eq('id', matchupId)
-      .single();
-
-    if (matchup) {
-      const { data: pgsCount } = await admin
-        .from('player_game_stats')
-        .select('game_id', { count: 'exact', head: true })
-        .gte('game_date', matchup.week_start_date)
-        .lte('game_date', matchup.week_end_date);
-
-      // Also check nhl_games
-      const { data: gamesData, count: gamesCount } = await admin
-        .from('nhl_games')
-        .select('game_id, game_date, status', { count: 'exact' })
-        .gte('game_date', matchup.week_start_date)
-        .lte('game_date', matchup.week_end_date)
-        .limit(5);
-
-      console.log(`[DIAGNOSTIC] player_game_stats rows for ${matchup.week_start_date} to ${matchup.week_end_date}: checking...`);
-      console.log(`[DIAGNOSTIC] nhl_games for week: ${gamesCount} games, sample:`, JSON.stringify(gamesData));
-    }
-  } catch (err: any) {
-    console.error('[DIAGNOSTIC] PGS check failed:', err?.message);
   }
 
   return c.json({ data });
@@ -248,11 +176,6 @@ matchupRoutes.post('/daily-game-stats', async (c) => {
     return c.json({ error: error.message || 'Failed to fetch daily game stats' }, 500);
   }
 
-  // DIAGNOSTIC: Log how many stats we got
-  const statsArray = Array.isArray(stats) ? stats : [];
-  const withPoints = statsArray.filter((s: any) => s && (s.daily_total_points > 0 || s.nhl_goals > 0));
-  console.log(`[DAILY-GAME-STATS] date=${body.date}, requested=${body.playerIds.length} players, returned=${statsArray.length} stats, ${withPoints.length} with points`);
-
   return c.json({ data: stats });
 });
 
@@ -270,13 +193,6 @@ matchupRoutes.post('/matchup-stats', async (c) => {
   const { statsMap, error } = await service.getMatchupStats(body.playerIds, body.startDate, body.endDate);
   if (error) {
     return c.json({ error: error.message || 'Failed to fetch matchup stats' }, 500);
-  }
-
-  // DIAGNOSTIC: Log matchup stats summary
-  console.log(`[MATCHUP-STATS] ${body.startDate} to ${body.endDate}: ${statsMap.size} players with stats out of ${body.playerIds.length} requested`);
-  if (statsMap.size > 0) {
-    const sample = Array.from(statsMap.entries())[0];
-    console.log(`[MATCHUP-STATS] Sample player ${sample[0]}:`, JSON.stringify(sample[1]));
   }
 
   // Convert Map to plain object for JSON serialization
@@ -344,19 +260,7 @@ matchupRoutes.post('/:matchupId/frozen-roster-batch', async (c) => {
 
   const { entries, error } = await service.getFrozenRosterBatch(matchupId, body.dates);
   if (error) {
-    console.error('[FROZEN-BATCH] Error:', error);
     return c.json({ error: error.message || 'Failed to fetch frozen roster batch' }, 500);
-  }
-
-  // DIAGNOSTIC: Log what we're returning
-  console.log(`[FROZEN-BATCH] Returning ${(entries || []).length} entries for ${body.dates.length} dates`);
-  if (entries && entries.length > 0) {
-    const byTeam: Record<string, number> = {};
-    entries.forEach((e: any) => {
-      byTeam[e.team_id] = (byTeam[e.team_id] || 0) + 1;
-    });
-    console.log('[FROZEN-BATCH] Entries per team:', JSON.stringify(byTeam));
-    console.log('[FROZEN-BATCH] Sample entry:', JSON.stringify(entries[0]));
   }
 
   return c.json({ data: entries });
