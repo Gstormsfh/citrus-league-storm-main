@@ -116,6 +116,38 @@ matchupRoutes.get('/:matchupId/daily-scores', async (c) => {
     console.error('[DAILY-SCORES] ensure-rosters FAILED:', err?.message || err);
   }
 
+  // DIAGNOSTIC: Check what's actually in fantasy_daily_rosters for this matchup
+  try {
+    const { getSupabaseAdmin } = await import('../lib/supabase');
+    const admin = getSupabaseAdmin();
+
+    // Count entries per team and slot_type
+    const { data: diagnosticData } = await admin
+      .from('fantasy_daily_rosters')
+      .select('team_id, roster_date, slot_type, player_id')
+      .eq('matchup_id', matchupId);
+
+    if (diagnosticData) {
+      const teamCounts: Record<string, { active: number; bench: number; total: number; dates: Set<string> }> = {};
+      for (const row of diagnosticData) {
+        if (!teamCounts[row.team_id]) {
+          teamCounts[row.team_id] = { active: 0, bench: 0, total: 0, dates: new Set() };
+        }
+        teamCounts[row.team_id].total++;
+        teamCounts[row.team_id].dates.add(row.roster_date);
+        if (row.slot_type === 'active') teamCounts[row.team_id].active++;
+        else if (row.slot_type === 'bench') teamCounts[row.team_id].bench++;
+      }
+      for (const [teamId, counts] of Object.entries(teamCounts)) {
+        console.log(`[DIAGNOSTIC] Team ${teamId}: ${counts.active} active, ${counts.bench} bench, ${counts.total} total, dates: ${Array.from(counts.dates).sort().join(', ')}`);
+      }
+    } else {
+      console.log('[DIAGNOSTIC] No fantasy_daily_rosters entries found for matchup:', matchupId);
+    }
+  } catch (err: any) {
+    console.error('[DIAGNOSTIC] Query failed:', err?.message);
+  }
+
   const { data, error } = await service.calculateDailyMatchupScores(matchupId);
   if (error) {
     return c.json({ error: error.message || 'Failed to calculate scores' }, 500);
