@@ -14,6 +14,7 @@ vi.mock('@/integrations/supabase/client', () => ({
     auth: {
       updateUser: (...args: unknown[]) => mockUpdateUser(...args),
       getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }),
+      getSession: vi.fn().mockResolvedValue({ data: { session: { access_token: 'mock-token' } } }),
     },
   },
 }));

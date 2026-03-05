@@ -57,6 +57,7 @@ vi.mock('@/integrations/supabase/client', () => ({
     removeChannel: vi.fn(),
     auth: {
       getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }),
+      getSession: vi.fn().mockResolvedValue({ data: { session: { access_token: 'mock-token' } } }),
     },
   },
 }));
