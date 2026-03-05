@@ -535,6 +535,7 @@ export class MatchupService {
    * Handles AI teams that never had a lineup saved (RLS-blocked on frontend).
    */
   async ensureMatchupRosters(matchupId: string) {
+    logger.debug('[ensureMatchupRosters] START for matchup:', matchupId);
     const admin = getSupabaseAdmin();
 
     const { data: matchup, error: matchupError } = await admin

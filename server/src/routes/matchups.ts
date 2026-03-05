@@ -105,6 +105,14 @@ matchupRoutes.get('/:matchupId/daily-scores', async (c) => {
   const supabase = createUserClient(c.get('userToken'));
   const service = new MatchupService(supabase);
 
+  // Auto-ensure both teams have team_lineups + fantasy_daily_rosters before calculating scores.
+  // This is critical for AI teams (owner_id = NULL) that can't be saved via frontend RLS.
+  try {
+    await service.ensureMatchupRosters(matchupId);
+  } catch (err) {
+    logger.error('[daily-scores] ensure-rosters pre-step failed (non-fatal):', err);
+  }
+
   const { data, error } = await service.calculateDailyMatchupScores(matchupId);
   if (error) {
     return c.json({ error: error.message || 'Failed to calculate scores' }, 500);

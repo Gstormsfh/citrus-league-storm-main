@@ -41,6 +41,10 @@ if (proxyUrl) {
 
 import { serve } from '@hono/node-server';
 import { app } from './app';
+import { logger, createConsoleLogger } from '@citrus/shared';
+
+// Enable real console logging on the server (default logger is silent)
+Object.assign(logger, createConsoleLogger());
 
 const port = parseInt(process.env.PORT || '3001', 10);
 
