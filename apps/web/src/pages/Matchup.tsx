@@ -502,6 +502,29 @@ const Matchup = () => {
         scores.set(dateStr, { myScore, oppScore, isLocked: true });
       }
       
+      // DIAGNOSTIC: Log calculated frozen scores
+      console.log('[SCORES-DEBUG] Calculated frozen scores:', Object.fromEntries(
+        Array.from(scores.entries()).map(([k, v]) => [k, v])
+      ));
+      console.log('[SCORES-DEBUG] dailyStatsByDate size:', dailyStatsByDate.size, 'rostersByDateTeam size:', rostersByDateTeam.size);
+      // Show sample player's daily_total_points for first past date
+      if (pastDates.length > 0) {
+        const sampleDate = pastDates[0];
+        const sampleDayStats = dailyStatsByDate.get(sampleDate);
+        const sampleRosters = rostersByDateTeam.get(sampleDate);
+        if (sampleDayStats && sampleRosters) {
+          const sampleTeamPlayerIds = sampleRosters.get(team1Id) || [];
+          const samplePlayerId = sampleTeamPlayerIds[0];
+          const sampleStats = samplePlayerId ? sampleDayStats.get(samplePlayerId) : null;
+          console.log('[SCORES-DEBUG] Sample player stats for', sampleDate, ':', {
+            playerId: samplePlayerId,
+            stats: sampleStats ? { daily_total_points: sampleStats.daily_total_points, goals: sampleStats.goals, assists: sampleStats.assists } : 'NOT FOUND',
+            team1PlayerCount: sampleTeamPlayerIds.length,
+            dayStatsMapSize: sampleDayStats.size,
+          });
+        }
+      }
+
       // Cache the frozen scores (long TTL - past scores don't change)
       DataCacheService.set(cacheKey, scores, TTL.VERY_LONG);
       setCachedDailyScores(scores);
@@ -3152,11 +3175,28 @@ const Matchup = () => {
   // CRITICAL FIX: If we have a frozen roster for the selected date, use it directly
   // This ensures dropped players appear correctly in the Matchup tab
   const myStarters = useMemo(() => {
+    // DIAGNOSTIC: Log what data path is taken
+    const hasFrozen = selectedDate ? frozenRostersByDate.has(selectedDate) : false;
+    console.log('[STARTERS-DEBUG] myStarters computing:', {
+      selectedDate,
+      hasFrozenForDate: hasFrozen,
+      frozenMapSize: frozenRostersByDate.size,
+      frozenMapKeys: Array.from(frozenRostersByDate.keys()),
+      displayMyTeamCount: displayMyTeam.length,
+      displayMyTeamStarters: displayMyTeam.filter(p => p.isStarter).length
+    });
+
     // If date is selected and we have a frozen roster, use that directly (includes dropped players)
-    if (selectedDate && frozenRostersByDate.has(selectedDate)) {
+    if (selectedDate && hasFrozen) {
       const frozenRoster = frozenRostersByDate.get(selectedDate)!;
       const directStarters = frozenRoster.myRoster.filter(p => p.isStarter);
-      
+
+      console.log('[STARTERS-DEBUG] Using frozen roster for', selectedDate, ':', {
+        myRosterTotal: frozenRoster.myRoster.length,
+        directStartersCount: directStarters.length,
+        sampleStarter: directStarters[0] ? { id: directStarters[0].id, name: directStarters[0].name } : null
+      });
+
       // Enrich with stats from dailyStatsByDate
       const dayStatsMap = dailyStatsByDate.get(selectedDate);
       const enriched = directStarters.map(player => {
@@ -3168,14 +3208,14 @@ const Matchup = () => {
           daily_stats_breakdown: stats?.daily_stats_breakdown
         };
       });
-      
-      // Debug log for Saturday, Friday, and Today
-      const today = getTodayMST();
+
       return enriched;
     }
-    
+
     // Otherwise use enriched displayMyTeam
-    return displayMyTeam.filter(p => p.isStarter);
+    const starters = displayMyTeam.filter(p => p.isStarter);
+    console.log('[STARTERS-DEBUG] Using displayMyTeam starters:', starters.length, 'out of', displayMyTeam.length);
+    return starters;
   }, [selectedDate, frozenRostersByDate, dailyStatsByDate, displayMyTeam]);
   
   const myBench = useMemo(() => {
@@ -4407,16 +4447,26 @@ const Matchup = () => {
 
         if (datesToLoad.length > 0) {
           log(' Pre-loading rosters for PAST dates only:', datesToLoad);
-          
+
           // Create lookup maps from enriched roster players
           const enrichedMyPlayerMap = new Map<string, MatchupPlayer>();
           const enrichedOppPlayerMap = new Map<string, MatchupPlayer>();
-          
+
           matchupData.userTeam.roster.forEach(p => {
             enrichedMyPlayerMap.set(String(p.id), p);
           });
           (matchupData.opponentTeam?.roster || []).forEach(p => {
             enrichedOppPlayerMap.set(String(p.id), p);
+          });
+
+          // DIAGNOSTIC: Log enrichment map sizes and sample IDs
+          console.log('[FROZEN-LINEUP-DEBUG] Enrichment maps built:', {
+            myMapSize: enrichedMyPlayerMap.size,
+            oppMapSize: enrichedOppPlayerMap.size,
+            mySampleIds: Array.from(enrichedMyPlayerMap.keys()).slice(0, 3),
+            oppSampleIds: Array.from(enrichedOppPlayerMap.keys()).slice(0, 3),
+            myRosterCount: matchupData.userTeam.roster.length,
+            oppRosterCount: (matchupData.opponentTeam?.roster || []).length
           });
           
           log(' Initial enriched player lookup maps:', {
@@ -4586,18 +4636,24 @@ const Matchup = () => {
               });
             }
 
+            // DIAGNOSTIC: Log per-date frozen roster results
+            console.log(`[FROZEN-LINEUP-DEBUG] Date ${date}: myRoster=${myRoster.length} (starters=${myRoster.filter(p=>p.isStarter).length}), oppRoster=${oppRoster.length} (starters=${oppRoster.filter(p=>p.isStarter).length}), myDailyRoster=${myDailyRoster.length}, oppDailyRoster=${oppDailyRoster.length}`);
+            if (myRoster.length === 0 && myDailyRoster.length > 0) {
+              console.log('[FROZEN-LINEUP-DEBUG] ENRICHMENT FAILURE! myDailyRoster entries exist but myRoster is empty. Sample entry:', myDailyRoster[0], 'enrichedMyPlayerMap keys:', Array.from(enrichedMyPlayerMap.keys()).slice(0, 5));
+            }
+
             return {
               date,
               data: { myRoster, oppRoster, mySlots, oppSlots }
             };
           });
-          
+
           results.forEach(result => {
             if (result) {
               frozenMap.set(result.date, result.data);
             }
           });
-          
+
           setFrozenRostersByDate(frozenMap);
           log(` Pre-loaded ${frozenMap.size} saved rosters for week (Yahoo/Sleeper style)`);
         } else {
