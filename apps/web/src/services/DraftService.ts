@@ -86,6 +86,11 @@ function getDraftCachedOrFetch<T>(cacheKey: string, fetcher: () => Promise<T>): 
   return promise;
 }
 
+/** Clear the internal request dedup cache (for testing) */
+export function clearDraftCache() {
+  draftRequestCache.clear();
+}
+
 export const DraftService = {
   /**
    * Get or create active draft session for a league

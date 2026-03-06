@@ -2,63 +2,42 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { DraftPick, DraftOrder, DraftState, DraftSnapshotData, DraftSnapshot } from '../DraftService';
 
 // =============================================================================
-// Mock Supabase client
+// Mock API client layer (DraftService now uses draftApi, not supabase)
 // =============================================================================
 
-const mockSingle = vi.fn();
-const mockMaybeSingle = vi.fn();
-const mockSelect = vi.fn();
-const mockInsert = vi.fn();
-const mockUpdate = vi.fn();
-const mockDelete = vi.fn();
-const mockEq = vi.fn();
-const mockIs = vi.fn();
-const mockIn = vi.fn();
-const mockOrder = vi.fn();
-const mockLimit = vi.fn();
-const mockRpc = vi.fn();
-const mockSubscribe = vi.fn();
-const mockChannel = vi.fn();
-const mockOn = vi.fn();
-const mockRemoveChannel = vi.fn();
+const mockGetActiveSession = vi.fn();
+const mockGetDraftPicks = vi.fn();
+const mockGetDraftOrder = vi.fn();
+const mockGetDraftState = vi.fn();
+const mockMakePick = vi.fn();
+const mockInitializeOrder = vi.fn();
+const mockResetDraft = vi.fn();
+const mockUndoLastPick = vi.fn();
+const mockHardDeleteDraft = vi.fn();
+const mockGetSnapshot = vi.fn();
+const mockSaveSnapshot = vi.fn();
+const mockAutopick = vi.fn();
+const mockFullAutopick = vi.fn();
+const mockGetRankings = vi.fn();
+const mockSaveRankings = vi.fn();
 
-// Build a chainable mock: each method returns `this` (the same object)
-// except terminal methods (single, maybeSingle) which return resolved values.
-function createChainableMock() {
-  const chain: Record<string, any> = {};
-  chain.select = vi.fn().mockReturnValue(chain);
-  chain.insert = vi.fn().mockReturnValue(chain);
-  chain.update = vi.fn().mockReturnValue(chain);
-  chain.delete = vi.fn().mockReturnValue(chain);
-  chain.upsert = vi.fn().mockReturnValue(chain);
-  chain.eq = vi.fn().mockReturnValue(chain);
-  chain.is = vi.fn().mockReturnValue(chain);
-  chain.in = vi.fn().mockReturnValue(chain);
-  chain.or = vi.fn().mockReturnValue(chain);
-  chain.order = vi.fn().mockReturnValue(chain);
-  chain.limit = vi.fn().mockReturnValue(chain);
-  chain.single = vi.fn().mockResolvedValue({ data: null, error: null });
-  chain.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
-  // For count queries: select('*', { count: 'exact', head: true })
-  // These resolve to { count: 0 }
-  return chain;
-}
-
-let mockChain = createChainableMock();
-
-vi.mock('@/integrations/supabase/client', () => ({
-  supabase: {
-    from: vi.fn(() => mockChain),
-    rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
-    channel: vi.fn(() => ({
-      on: vi.fn().mockReturnThis(),
-      subscribe: vi.fn(),
-    })),
-    removeChannel: vi.fn(),
-    auth: {
-      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }),
-      getSession: vi.fn().mockResolvedValue({ data: { session: { access_token: 'mock-token' } } }),
-    },
+vi.mock('@/api/draft', () => ({
+  draftApi: {
+    getActiveSession: (...args: unknown[]) => mockGetActiveSession(...args),
+    getDraftPicks: (...args: unknown[]) => mockGetDraftPicks(...args),
+    getDraftOrder: (...args: unknown[]) => mockGetDraftOrder(...args),
+    getDraftState: (...args: unknown[]) => mockGetDraftState(...args),
+    makePick: (...args: unknown[]) => mockMakePick(...args),
+    initializeOrder: (...args: unknown[]) => mockInitializeOrder(...args),
+    resetDraft: (...args: unknown[]) => mockResetDraft(...args),
+    undoLastPick: (...args: unknown[]) => mockUndoLastPick(...args),
+    hardDeleteDraft: (...args: unknown[]) => mockHardDeleteDraft(...args),
+    getSnapshot: (...args: unknown[]) => mockGetSnapshot(...args),
+    saveSnapshot: (...args: unknown[]) => mockSaveSnapshot(...args),
+    autopick: (...args: unknown[]) => mockAutopick(...args),
+    fullAutopick: (...args: unknown[]) => mockFullAutopick(...args),
+    getRankings: (...args: unknown[]) => mockGetRankings(...args),
+    saveRankings: (...args: unknown[]) => mockSaveRankings(...args),
   },
 }));
 
@@ -94,22 +73,59 @@ vi.mock('../LeagueMembershipService', () => ({
   },
 }));
 
+// Supabase mock still needed for module resolution (subscribeToDraftPicks + some post-draft code)
+vi.mock('@/integrations/supabase/client', () => ({
+  supabase: {
+    from: vi.fn(() => ({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: null, error: null }),
+      delete: vi.fn().mockReturnThis(),
+      update: vi.fn().mockReturnThis(),
+      in: vi.fn().mockReturnThis(),
+    })),
+    rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
+    channel: vi.fn(() => ({
+      on: vi.fn().mockReturnThis(),
+      subscribe: vi.fn(),
+    })),
+    removeChannel: vi.fn(),
+    auth: {
+      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }),
+      getSession: vi.fn().mockResolvedValue({ data: { session: { access_token: 'mock-token' } } }),
+    },
+  },
+}));
+
 // =============================================================================
 // Import DraftService AFTER mocks are registered
 // =============================================================================
-// Dynamic import to ensure mocks are in place
-let DraftService: typeof import('../DraftService').DraftService;
 
-beforeEach(async () => {
+import { DraftService, clearDraftCache } from '../DraftService';
+
+// =============================================================================
+// Test setup
+// =============================================================================
+
+beforeEach(() => {
   vi.clearAllMocks();
-  mockChain = createChainableMock();
-  // Re-import to get fresh module with cleared mocks
-  const mod = await import('../DraftService');
-  DraftService = mod.DraftService;
+  clearDraftCache();
 
-  // Re-wire the from mock to return fresh chain
-  const { supabase } = await import('@/integrations/supabase/client');
-  (supabase.from as ReturnType<typeof vi.fn>).mockReturnValue(mockChain);
+  // Set safe defaults for all API mocks
+  mockGetActiveSession.mockResolvedValue({ data: { sessionId: 'default-session' } });
+  mockGetDraftPicks.mockResolvedValue({ data: [] });
+  mockGetDraftOrder.mockResolvedValue({ data: null });
+  mockMakePick.mockResolvedValue({ data: { pick: null, isComplete: false } });
+  mockInitializeOrder.mockResolvedValue({ data: { sessionId: 'new-session' } });
+  mockResetDraft.mockResolvedValue({ data: { newSessionId: 'reset-session' } });
+  mockUndoLastPick.mockResolvedValue({ data: { undone: null } });
+  mockHardDeleteDraft.mockResolvedValue({ data: null });
+  mockGetSnapshot.mockResolvedValue({ data: null });
+  mockSaveSnapshot.mockResolvedValue({ data: { snapshotId: null } });
+  mockAutopick.mockResolvedValue({ data: null });
+  mockFullAutopick.mockResolvedValue({ data: { picks: [] } });
+  mockGetRankings.mockResolvedValue({ data: [] });
+  mockSaveRankings.mockResolvedValue({ data: null });
 });
 
 // =============================================================================
@@ -241,135 +257,35 @@ describe('DraftService Interfaces', () => {
 // =============================================================================
 
 describe('DraftService.getActiveDraftSession', () => {
-  it('creates new session when draft_status is not_started', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-    mockChain.single.mockResolvedValueOnce({
-      data: { draft_status: 'not_started' },
-      error: null,
-    });
+  it('returns session ID from API response', async () => {
+    mockGetActiveSession.mockResolvedValue({ data: { sessionId: 'api-session-123' } });
 
     const { sessionId, error } = await DraftService.getActiveDraftSession('league-1', 'user-1');
 
+    expect(error).toBeNull();
+    expect(sessionId).toBe('api-session-123');
+    expect(mockGetActiveSession).toHaveBeenCalledWith('league-1');
+  });
+
+  it('generates new UUID as fallback when API fails', async () => {
+    mockGetActiveSession.mockRejectedValue(new Error('API error'));
+
+    const { sessionId, error } = await DraftService.getActiveDraftSession('league-1', 'user-1');
+
+    // Should NOT throw — creates a new session as fallback
     expect(error).toBeNull();
     expect(sessionId).toBeDefined();
     expect(typeof sessionId).toBe('string');
     expect(sessionId.length).toBeGreaterThan(0);
   });
 
-  it('creates new session when draft_status is queued', async () => {
-    mockChain.single.mockResolvedValueOnce({
-      data: { draft_status: 'queued' },
-      error: null,
-    });
+  it('works without userId parameter', async () => {
+    mockGetActiveSession.mockResolvedValue({ data: { sessionId: 'no-user-session' } });
 
-    const { sessionId, error } = await DraftService.getActiveDraftSession('league-1', 'user-1');
+    const { sessionId, error } = await DraftService.getActiveDraftSession('league-1');
 
     expect(error).toBeNull();
-    expect(sessionId).toBeDefined();
-  });
-
-  it('reuses existing session from draft_picks when draft is in_progress', async () => {
-    // First call: league status check
-    mockChain.single.mockResolvedValueOnce({
-      data: { draft_status: 'in_progress' },
-      error: null,
-    });
-    // Second call: existing picks query
-    mockChain.maybeSingle.mockResolvedValueOnce({
-      data: { draft_session_id: 'existing-session-123' },
-      error: null,
-    });
-
-    const { sessionId, error } = await DraftService.getActiveDraftSession('league-1', 'user-1');
-
-    expect(error).toBeNull();
-    expect(sessionId).toBe('existing-session-123');
-  });
-
-  it('falls back to draft_order session when no picks exist', async () => {
-    // League status: in_progress
-    mockChain.single.mockResolvedValueOnce({
-      data: { draft_status: 'in_progress' },
-      error: null,
-    });
-    // No existing picks
-    mockChain.maybeSingle
-      .mockResolvedValueOnce({ data: null, error: null })
-      // Existing order
-      .mockResolvedValueOnce({ data: { draft_session_id: 'order-session-456' }, error: null });
-
-    const { sessionId, error } = await DraftService.getActiveDraftSession('league-1', 'user-1');
-
-    expect(error).toBeNull();
-    expect(sessionId).toBe('order-session-456');
-  });
-
-  it('creates new session when no existing session is found for in-progress draft', async () => {
-    // League status: in_progress
-    mockChain.single.mockResolvedValueOnce({
-      data: { draft_status: 'in_progress' },
-      error: null,
-    });
-    // No picks, no orders
-    mockChain.maybeSingle
-      .mockResolvedValueOnce({ data: null, error: null })
-      .mockResolvedValueOnce({ data: null, error: null });
-
-    const { sessionId, error } = await DraftService.getActiveDraftSession('league-1', 'user-1');
-
-    expect(error).toBeNull();
-    expect(sessionId).toBeDefined();
-    expect(typeof sessionId).toBe('string');
-  });
-
-  it('creates new session on error (graceful fallback)', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-    // League status check throws
-    mockChain.single.mockRejectedValueOnce(new Error('DB connection failed'));
-
-    const { sessionId, error } = await DraftService.getActiveDraftSession('league-1', 'user-1');
-
-    // Should NOT throw - creates a new session as fallback
-    expect(error).toBeNull();
-    expect(sessionId).toBeDefined();
-  });
-
-  it('validates league membership when userId is provided', async () => {
-    const { LeagueMembershipService } = await import('../LeagueMembershipService');
-
-    mockChain.single.mockResolvedValueOnce({
-      data: { draft_status: 'not_started' },
-      error: null,
-    });
-
-    await DraftService.getActiveDraftSession('league-1', 'user-1');
-
-    expect(LeagueMembershipService.requireMembership).toHaveBeenCalledWith('league-1', 'user-1');
-  });
-
-  it('skips membership check when no userId is provided', async () => {
-    const { LeagueMembershipService } = await import('../LeagueMembershipService');
-
-    mockChain.single.mockResolvedValueOnce({
-      data: { draft_status: 'not_started' },
-      error: null,
-    });
-
-    await DraftService.getActiveDraftSession('league-1');
-
-    expect(LeagueMembershipService.requireMembership).not.toHaveBeenCalled();
-  });
-
-  it('handles null league data by creating new session', async () => {
-    mockChain.single.mockResolvedValueOnce({
-      data: null,
-      error: null,
-    });
-
-    const { sessionId, error } = await DraftService.getActiveDraftSession('league-1', 'user-1');
-
-    expect(error).toBeNull();
-    expect(sessionId).toBeDefined();
+    expect(sessionId).toBe('no-user-session');
   });
 });
 
@@ -387,33 +303,17 @@ describe('DraftService.getDraftState', () => {
   const totalRounds = 3;
 
   it('computes round 1 pick 1 when no picks exist', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    // getDraftPicks: returns empty array (chained query resolves with no picks)
-    // We need `from('draft_picks').select(...).eq(...).is(...).order(...)` to resolve
-    // Since getDraftPicks uses direct query (not single/maybeSingle), mock the chain resolution
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'draft_picks') {
-        // getDraftPicks calls: select().eq().is().order() -> resolves { data: [], error: null }
-        chain.order.mockResolvedValue({ data: [], error: null });
-      }
-      if (table === 'draft_order') {
-        // getDraftOrder calls: ... .maybeSingle()
-        chain.maybeSingle.mockResolvedValue({
-          data: {
-            id: 'order-1',
-            league_id: 'league-1',
-            round_number: 1,
-            team_order: ['team-a', 'team-b', 'team-c', 'team-d'],
-            created_at: '',
-            draft_session_id: 'session-1',
-            deleted_at: null,
-          },
-          error: null,
-        });
-      }
-      return chain;
+    mockGetDraftPicks.mockResolvedValue({ data: [] });
+    mockGetDraftOrder.mockResolvedValue({
+      data: {
+        id: 'order-1',
+        league_id: 'league-1',
+        round_number: 1,
+        team_order: ['team-a', 'team-b', 'team-c', 'team-d'],
+        created_at: '',
+        draft_session_id: 'session-1',
+        deleted_at: null,
+      },
     });
 
     const { state, error } = await DraftService.getDraftState('league-1', teams, totalRounds, 'user-1');
@@ -428,8 +328,6 @@ describe('DraftService.getDraftState', () => {
   });
 
   it('computes correct state mid-draft (4 picks made = start of round 2)', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
     const existingPicks: DraftPick[] = [
       { id: 'p1', league_id: 'league-1', round_number: 1, pick_number: 1, team_id: 'team-a', player_id: 'pl-1', picked_at: '', draft_session_id: 'session-1' },
       { id: 'p2', league_id: 'league-1', round_number: 1, pick_number: 2, team_id: 'team-b', player_id: 'pl-2', picked_at: '', draft_session_id: 'session-1' },
@@ -437,45 +335,31 @@ describe('DraftService.getDraftState', () => {
       { id: 'p4', league_id: 'league-1', round_number: 1, pick_number: 4, team_id: 'team-d', player_id: 'pl-4', picked_at: '', draft_session_id: 'session-1' },
     ];
 
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'draft_picks') {
-        chain.order.mockResolvedValue({ data: existingPicks, error: null });
-      }
-      if (table === 'draft_order') {
-        // Round 2 in snake: reversed order
-        chain.maybeSingle.mockResolvedValue({
-          data: {
-            id: 'order-2',
-            league_id: 'league-1',
-            round_number: 2,
-            team_order: ['team-d', 'team-c', 'team-b', 'team-a'],
-            created_at: '',
-            draft_session_id: 'session-1',
-            deleted_at: null,
-          },
-          error: null,
-        });
-      }
-      return chain;
+    mockGetDraftPicks.mockResolvedValue({ data: existingPicks });
+    mockGetDraftOrder.mockResolvedValue({
+      data: {
+        id: 'order-2',
+        league_id: 'league-1',
+        round_number: 2,
+        team_order: ['team-d', 'team-c', 'team-b', 'team-a'],
+        created_at: '',
+        draft_session_id: 'session-1',
+        deleted_at: null,
+      },
     });
 
     const { state, error } = await DraftService.getDraftState('league-1', teams, totalRounds, 'user-1');
 
     expect(error).toBeNull();
     expect(state).not.toBeNull();
-    // 4 picks / 4 teams = floor(1) + 1 = round 2
     expect(state!.currentRound).toBe(2);
     expect(state!.currentPick).toBe(5);
     expect(state!.totalPicks).toBe(4);
     expect(state!.isComplete).toBe(false);
-    // First pick in round 2 (snake): team-d
     expect(state!.nextTeamId).toBe('team-d');
   });
 
   it('marks draft as complete when all picks made', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
     // 4 teams * 3 rounds = 12 total picks
     const allPicks: DraftPick[] = Array.from({ length: 12 }, (_, i) => ({
       id: `p${i + 1}`,
@@ -488,13 +372,7 @@ describe('DraftService.getDraftState', () => {
       draft_session_id: 'session-1',
     }));
 
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'draft_picks') {
-        chain.order.mockResolvedValue({ data: allPicks, error: null });
-      }
-      return chain;
-    });
+    mockGetDraftPicks.mockResolvedValue({ data: allPicks });
 
     const { state, error } = await DraftService.getDraftState('league-1', teams, totalRounds, 'user-1');
 
@@ -507,19 +385,8 @@ describe('DraftService.getDraftState', () => {
   });
 
   it('returns error when draft order is not initialized', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'draft_picks') {
-        chain.order.mockResolvedValue({ data: [], error: null });
-      }
-      if (table === 'draft_order') {
-        // No order found
-        chain.maybeSingle.mockResolvedValue({ data: null, error: null });
-      }
-      return chain;
-    });
+    mockGetDraftPicks.mockResolvedValue({ data: [] });
+    mockGetDraftOrder.mockResolvedValue({ data: null });
 
     const { state, error } = await DraftService.getDraftState('league-1', teams, totalRounds, 'user-1');
 
@@ -529,24 +396,17 @@ describe('DraftService.getDraftState', () => {
   });
 
   it('derives sessionId from existing picks', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
     const picks: DraftPick[] = [
       { id: 'p1', league_id: 'league-1', round_number: 1, pick_number: 1, team_id: 'team-a', player_id: 'pl-1', picked_at: '', draft_session_id: 'derived-session' },
     ];
 
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'draft_picks') {
-        chain.order.mockResolvedValue({ data: picks, error: null });
-      }
-      if (table === 'draft_order') {
-        chain.maybeSingle.mockResolvedValue({
-          data: { id: 'o1', league_id: 'league-1', round_number: 1, team_order: ['team-a', 'team-b', 'team-c', 'team-d'], created_at: '', draft_session_id: 'derived-session', deleted_at: null },
-          error: null,
-        });
-      }
-      return chain;
+    mockGetDraftPicks.mockResolvedValue({ data: picks });
+    mockGetDraftOrder.mockResolvedValue({
+      data: {
+        id: 'o1', league_id: 'league-1', round_number: 1,
+        team_order: ['team-a', 'team-b', 'team-c', 'team-d'],
+        created_at: '', draft_session_id: 'derived-session', deleted_at: null,
+      },
     });
 
     const { state } = await DraftService.getDraftState('league-1', teams, totalRounds, 'user-1');
@@ -556,7 +416,7 @@ describe('DraftService.getDraftState', () => {
 });
 
 // =============================================================================
-// initializeDraftOrder — Snake Draft Logic
+// initializeDraftOrder
 // =============================================================================
 
 describe('DraftService.initializeDraftOrder', () => {
@@ -566,169 +426,72 @@ describe('DraftService.initializeDraftOrder', () => {
     { id: 'team-3', league_id: 'league-1', owner_id: 'user-3', team_name: 'Team 3', created_at: '', updated_at: '' },
   ];
 
-  it('creates snake draft orders (even rounds reversed)', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
+  it('calls API with correct params for snake draft', async () => {
+    mockInitializeOrder.mockResolvedValue({ data: { sessionId: 'new-session-1' } });
 
-    let insertedOrders: any[] = [];
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'draft_order') {
-        chain.insert.mockImplementation((data: any) => {
-          insertedOrders = data;
-          return { error: null };
-        });
-        chain.delete.mockReturnValue(chain);
-        chain.maybeSingle.mockResolvedValue({ data: null, error: null });
-      }
-      if (table === 'draft_picks') {
-        chain.order.mockResolvedValue({ data: [], error: null });
-        chain.maybeSingle.mockResolvedValue({ data: null, error: null });
-      }
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({ data: { draft_status: 'not_started' }, error: null });
-      }
-      return chain;
+    const result = await DraftService.initializeDraftOrder('league-1', 'user-1', teams, 4, true);
+
+    expect(result.error).toBeNull();
+    expect(result.sessionId).toBe('new-session-1');
+    expect(mockInitializeOrder).toHaveBeenCalledWith('league-1', {
+      teams: [{ id: 'team-1' }, { id: 'team-2' }, { id: 'team-3' }],
+      totalRounds: 4,
+      customTeamOrder: undefined,
+      draftType: undefined,
     });
-
-    await DraftService.initializeDraftOrder('league-1', 'user-1', teams, 4, true);
-
-    // Verify snake order
-    expect(insertedOrders).toHaveLength(4);
-    // Round 1: normal order
-    expect(insertedOrders[0].team_order).toEqual(['team-1', 'team-2', 'team-3']);
-    // Round 2: reversed (snake)
-    expect(insertedOrders[1].team_order).toEqual(['team-3', 'team-2', 'team-1']);
-    // Round 3: normal again
-    expect(insertedOrders[2].team_order).toEqual(['team-1', 'team-2', 'team-3']);
-    // Round 4: reversed
-    expect(insertedOrders[3].team_order).toEqual(['team-3', 'team-2', 'team-1']);
   });
 
-  it('creates linear draft orders (same order every round)', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    let insertedOrders: any[] = [];
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'draft_order') {
-        chain.insert.mockImplementation((data: any) => {
-          insertedOrders = data;
-          return { error: null };
-        });
-        chain.delete.mockReturnValue(chain);
-        chain.maybeSingle.mockResolvedValue({ data: null, error: null });
-      }
-      if (table === 'draft_picks') {
-        chain.order.mockResolvedValue({ data: [], error: null });
-        chain.maybeSingle.mockResolvedValue({ data: null, error: null });
-      }
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({ data: { draft_status: 'not_started' }, error: null });
-      }
-      return chain;
-    });
+  it('passes linear draft type to API', async () => {
+    mockInitializeOrder.mockResolvedValue({ data: { sessionId: 'linear-session' } });
 
     await DraftService.initializeDraftOrder('league-1', 'user-1', teams, 3, true, undefined, 'linear');
 
-    // Linear: same order every round
-    expect(insertedOrders[0].team_order).toEqual(['team-1', 'team-2', 'team-3']);
-    expect(insertedOrders[1].team_order).toEqual(['team-1', 'team-2', 'team-3']);
-    expect(insertedOrders[2].team_order).toEqual(['team-1', 'team-2', 'team-3']);
+    expect(mockInitializeOrder).toHaveBeenCalledWith('league-1', {
+      teams: [{ id: 'team-1' }, { id: 'team-2' }, { id: 'team-3' }],
+      totalRounds: 3,
+      customTeamOrder: undefined,
+      draftType: 'linear',
+    });
   });
 
-  it('uses custom team order when provided', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    let insertedOrders: any[] = [];
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'draft_order') {
-        chain.insert.mockImplementation((data: any) => {
-          insertedOrders = data;
-          return { error: null };
-        });
-        chain.delete.mockReturnValue(chain);
-        chain.maybeSingle.mockResolvedValue({ data: null, error: null });
-      }
-      if (table === 'draft_picks') {
-        chain.order.mockResolvedValue({ data: [], error: null });
-        chain.maybeSingle.mockResolvedValue({ data: null, error: null });
-      }
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({ data: { draft_status: 'not_started' }, error: null });
-      }
-      return chain;
-    });
+  it('passes custom team order to API', async () => {
+    mockInitializeOrder.mockResolvedValue({ data: { sessionId: 'custom-session' } });
 
     const customOrder = ['team-3', 'team-1', 'team-2'];
     await DraftService.initializeDraftOrder('league-1', 'user-1', teams, 2, true, customOrder);
 
-    // Round 1: custom order
-    expect(insertedOrders[0].team_order).toEqual(['team-3', 'team-1', 'team-2']);
-    // Round 2: reversed custom order (snake)
-    expect(insertedOrders[1].team_order).toEqual(['team-2', 'team-1', 'team-3']);
+    expect(mockInitializeOrder).toHaveBeenCalledWith('league-1', {
+      teams: [{ id: 'team-1' }, { id: 'team-2' }, { id: 'team-3' }],
+      totalRounds: 2,
+      customTeamOrder: customOrder,
+      draftType: undefined,
+    });
   });
 
-  it('rejects custom order with invalid team IDs', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
+  it('returns error when API rejects (e.g., invalid team IDs)', async () => {
+    mockInitializeOrder.mockRejectedValue(new Error('Invalid team IDs in custom order'));
 
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'draft_order') {
-        chain.delete.mockReturnValue(chain);
-      }
-      return chain;
-    });
-
-    const customOrder = ['team-1', 'team-INVALID', 'team-3'];
-    const result = await DraftService.initializeDraftOrder('league-1', 'user-1', teams, 2, true, customOrder);
+    const result = await DraftService.initializeDraftOrder('league-1', 'user-1', teams, 2, true, ['team-INVALID']);
 
     expect(result.error).toBeDefined();
     expect((result.error as Error).message).toContain('Invalid team IDs');
   });
 
-  it('rejects custom order with wrong number of teams', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
+  it('returns error when API rejects (e.g., wrong team count)', async () => {
+    mockInitializeOrder.mockRejectedValue(new Error('Custom order must include all teams'));
 
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'draft_order') {
-        chain.delete.mockReturnValue(chain);
-      }
-      return chain;
-    });
-
-    // Only 2 of 3 teams
-    const customOrder = ['team-1', 'team-2'];
-    const result = await DraftService.initializeDraftOrder('league-1', 'user-1', teams, 2, true, customOrder);
+    const result = await DraftService.initializeDraftOrder('league-1', 'user-1', teams, 2, true, ['team-1']);
 
     expect(result.error).toBeDefined();
     expect((result.error as Error).message).toContain('must include all teams');
   });
 
-  it('assigns session ID to all draft order rows', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    let insertedOrders: any[] = [];
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'draft_order') {
-        chain.insert.mockImplementation((data: any) => {
-          insertedOrders = data;
-          return { error: null };
-        });
-        chain.delete.mockReturnValue(chain);
-      }
-      return chain;
-    });
+  it('returns session ID from API response', async () => {
+    mockInitializeOrder.mockResolvedValue({ data: { sessionId: 'session-abc' } });
 
     const result = await DraftService.initializeDraftOrder('league-1', 'user-1', teams, 2, true);
 
-    expect(result.sessionId).toBeDefined();
-    // All orders should have the same session ID
-    const sessionIds = new Set(insertedOrders.map(o => o.draft_session_id));
-    expect(sessionIds.size).toBe(1);
-    expect(insertedOrders[0].draft_session_id).toBe(result.sessionId);
+    expect(result.sessionId).toBe('session-abc');
   });
 });
 
@@ -737,22 +500,8 @@ describe('DraftService.initializeDraftOrder', () => {
 // =============================================================================
 
 describe('DraftService.makePick', () => {
-  it('rejects duplicate player pick in same session', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({ data: { draft_status: 'in_progress' }, error: null });
-      }
-      if (table === 'draft_picks') {
-        // getActiveDraftSession picks check
-        chain.maybeSingle.mockResolvedValueOnce({ data: { draft_session_id: 'session-1' }, error: null })
-          // Player already drafted check
-          .mockResolvedValueOnce({ data: { id: 'existing-pick' }, error: null });
-      }
-      return chain;
-    });
+  it('returns error from API when player already drafted', async () => {
+    mockMakePick.mockRejectedValue(new Error('Player already drafted in this session'));
 
     const result = await DraftService.makePick('league-1', 'team-1', 'player-1', 1, 1, 'session-1');
 
@@ -761,30 +510,8 @@ describe('DraftService.makePick', () => {
     expect((result.error as Error).message).toContain('Player already drafted');
   });
 
-  it('rejects duplicate pick number in same session', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    let draftPicksCallCount = 0;
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({ data: { draft_status: 'in_progress' }, error: null });
-      }
-      if (table === 'draft_picks') {
-        draftPicksCallCount++;
-        if (draftPicksCallCount === 1) {
-          // getActiveDraftSession: find existing session from picks
-          chain.maybeSingle.mockResolvedValue({ data: { draft_session_id: 'session-1' }, error: null });
-        } else if (draftPicksCallCount === 2) {
-          // Player not drafted check
-          chain.maybeSingle.mockResolvedValue({ data: null, error: null });
-        } else if (draftPicksCallCount === 3) {
-          // Pick number already taken check
-          chain.maybeSingle.mockResolvedValue({ data: { id: 'existing-pick-at-slot' }, error: null });
-        }
-      }
-      return chain;
-    });
+  it('returns error from API when pick number is taken', async () => {
+    mockMakePick.mockRejectedValue(new Error('This pick number is already taken in this session'));
 
     const result = await DraftService.makePick('league-1', 'team-1', 'player-2', 1, 1, 'session-1');
 
@@ -793,33 +520,55 @@ describe('DraftService.makePick', () => {
     expect((result.error as Error).message).toContain('This pick number is already taken in this session');
   });
 
-  it('blocks user-initiated picks for demo league when picks exist', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-    const demoLeagueId = '00000000-0000-0000-0000-000000000001';
+  it('returns pick data on successful draft pick', async () => {
+    const pickData: DraftPick = {
+      id: 'pick-new',
+      league_id: 'league-1',
+      round_number: 1,
+      pick_number: 1,
+      team_id: 'team-1',
+      player_id: 'player-1',
+      picked_at: '2025-01-01T00:00:00Z',
+      draft_session_id: 'session-1',
+    };
+    mockMakePick.mockResolvedValue({ data: { pick: pickData, isComplete: false } });
 
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'draft_picks') {
-        // Count of existing picks: > 0 (demo guard)
-        chain.select.mockReturnValue(chain);
-        chain.eq.mockReturnValue(chain);
-        chain.is.mockReturnValue(chain);
-        // Return count > 0 for the demo guard check
-        chain.select.mockReturnValueOnce({ ...chain, count: 5, error: null, data: null });
-      }
-      return chain;
+    const result = await DraftService.makePick('league-1', 'team-1', 'player-1', 1, 1, 'session-1');
+
+    expect(result.pick).toEqual(pickData);
+    expect(result.error).toBeNull();
+    expect(result.isComplete).toBe(false);
+  });
+
+  it('blocks user-initiated picks for demo league when picks exist', async () => {
+    const demoLeagueId = '00000000-0000-0000-0000-000000000001';
+    // getDraftPicks is called internally for the demo guard
+    mockGetDraftPicks.mockResolvedValue({
+      data: [
+        { id: 'p1', league_id: demoLeagueId, round_number: 1, pick_number: 1, team_id: 't1', player_id: 'pl1', picked_at: '' },
+      ],
     });
 
-    // Use a simpler approach: the demo guard directly checks count
-    // The code uses supabase.from('draft_picks').select('*', { count: 'exact', head: true })
-    // which resolves to { count: N }
-    mockChain.select.mockReturnValue(mockChain);
-    // Make the count query resolve with count > 0
-    Object.defineProperty(mockChain, 'count', { value: 5, configurable: true });
+    const result = await DraftService.makePick(demoLeagueId, 'team-1', 'player-1', 1, 2, 'session-1');
 
-    // This is tricky because the demo guard uses a pattern that resolves differently.
-    // Let's just verify the demo league ID check exists by testing with a non-demo league.
-    // The demo guard is a simple ID check, so we trust the branch coverage from other tests.
+    expect(result.pick).toBeNull();
+    expect(result.error).toBeDefined();
+    expect((result.error as Error).message).toContain('Demo league is read-only');
+  });
+
+  it('passes correct params to API', async () => {
+    mockMakePick.mockResolvedValue({ data: { pick: null, isComplete: false } });
+
+    await DraftService.makePick('league-1', 'team-1', 'player-5', 2, 7, 'session-1', 4);
+
+    expect(mockMakePick).toHaveBeenCalledWith('league-1', {
+      playerId: 'player-5',
+      teamId: 'team-1',
+      pickNumber: 7,
+      roundNumber: 2,
+      draftSessionId: 'session-1',
+      teamsCount: 4,
+    });
   });
 });
 
@@ -829,8 +578,16 @@ describe('DraftService.makePick', () => {
 
 describe('DraftService.resetDraft', () => {
   it('returns a new session ID after reset', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-    (supabase.rpc as ReturnType<typeof vi.fn>).mockResolvedValue({ data: null, error: null });
+    mockResetDraft.mockResolvedValue({ data: { newSessionId: 'reset-session-123' } });
+
+    const result = await DraftService.resetDraft('league-1');
+
+    expect(result.error).toBeNull();
+    expect(result.newSessionId).toBe('reset-session-123');
+  });
+
+  it('generates UUID fallback when API returns no newSessionId', async () => {
+    mockResetDraft.mockResolvedValue({ data: {} });
 
     const result = await DraftService.resetDraft('league-1');
 
@@ -839,44 +596,13 @@ describe('DraftService.resetDraft', () => {
     expect(typeof result.newSessionId).toBe('string');
   });
 
-  it('falls back to direct deletes when RPC fails', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    // RPC fails
-    (supabase.rpc as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: null,
-      error: { message: 'RPC not found' },
-    });
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      // Keep all chainable methods returning chain by default
-      chain.delete.mockReturnValue(chain);
-      chain.eq.mockReturnValue(chain);
-      chain.in.mockReturnValue(chain);
-      chain.select.mockReturnValue(chain);
-      chain.update.mockReturnValue(chain);
-      // For teams query: .select('id').eq('league_id', ...) resolves via await
-      if (table === 'teams') {
-        // The chain is awaited directly (no terminal), so make it thenable
-        chain.eq.mockImplementation(() => {
-          const thenableChain = { ...chain, then: (resolve: (value: unknown) => void) => resolve({ data: [{ id: 'team-1' }], error: null }) };
-          return thenableChain;
-        });
-      }
-      // For leagues: first call is .select('settings').eq(...).single(), second is .update(...).eq(...)
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({ data: { settings: {} }, error: null });
-        // update(...).eq(...) is awaited directly
-        chain.update.mockReturnValue(chain);
-      }
-      return chain;
-    });
+  it('returns error when API fails', async () => {
+    mockResetDraft.mockRejectedValue(new Error('Reset failed'));
 
     const result = await DraftService.resetDraft('league-1');
 
-    expect(result.error).toBeNull();
-    expect(result.newSessionId).toBeDefined();
+    expect(result.error).toBeDefined();
+    expect((result.error as Error).message).toBe('Reset failed');
   });
 });
 
@@ -885,9 +611,7 @@ describe('DraftService.resetDraft', () => {
 // =============================================================================
 
 describe('DraftService.undoLastPick', () => {
-  it('soft-deletes the most recent pick', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
+  it('returns the undone pick from API', async () => {
     const lastPick: DraftPick = {
       id: 'pick-10',
       league_id: 'league-1',
@@ -900,24 +624,7 @@ describe('DraftService.undoLastPick', () => {
       deleted_at: null,
     };
 
-    let callCount = 0;
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      callCount++;
-      const chain = createChainableMock();
-      if (table === 'draft_picks') {
-        if (callCount === 1) {
-          // First call: fetch last pick via .select(...).eq(...).is(...).order(...).limit(1).single()
-          chain.single.mockResolvedValue({ data: lastPick, error: null });
-        } else {
-          // Second call: soft-delete via .update({ deleted_at: ... }).eq('id', ...)
-          // .update() returns chain, .eq() is awaited directly
-          chain.update.mockReturnValue(chain);
-          chain.eq.mockReturnValue({ then: (resolve: (value: unknown) => void) => resolve({ data: null, error: null }) });
-        }
-      }
-      return chain;
-    });
+    mockUndoLastPick.mockResolvedValue({ data: { undone: lastPick } });
 
     const { undone, error } = await DraftService.undoLastPick('league-1', 'user-1');
 
@@ -927,19 +634,17 @@ describe('DraftService.undoLastPick', () => {
     expect(undone!.player_id).toBe('player-10');
   });
 
-  it('returns error when no picks exist to undo', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
+  it('returns null when no picks exist to undo', async () => {
+    mockUndoLastPick.mockResolvedValue({ data: { undone: null } });
 
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'draft_picks') {
-        chain.single.mockResolvedValue({
-          data: null,
-          error: { code: 'PGRST116', message: 'No rows found' },
-        });
-      }
-      return chain;
-    });
+    const { undone, error } = await DraftService.undoLastPick('league-1', 'user-1');
+
+    expect(undone).toBeNull();
+    expect(error).toBeNull();
+  });
+
+  it('returns error on API failure', async () => {
+    mockUndoLastPick.mockRejectedValue(new Error('No picks to undo'));
 
     const { undone, error } = await DraftService.undoLastPick('league-1', 'user-1');
 
@@ -954,13 +659,7 @@ describe('DraftService.undoLastPick', () => {
 
 describe('DraftService.getDraftPicks', () => {
   it('returns empty array when no picks exist', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
-      const chain = createChainableMock();
-      chain.order.mockResolvedValue({ data: [], error: null });
-      return chain;
-    });
+    mockGetDraftPicks.mockResolvedValue({ data: [] });
 
     const { picks, error } = await DraftService.getDraftPicks('league-1', 'user-1');
 
@@ -968,43 +667,22 @@ describe('DraftService.getDraftPicks', () => {
     expect(picks).toEqual([]);
   });
 
-  it('returns picks filtered by session when provided', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
+  it('returns picks from API', async () => {
     const mockPicks: DraftPick[] = [
       { id: 'p1', league_id: 'league-1', round_number: 1, pick_number: 1, team_id: 'team-1', player_id: 'pl-1', picked_at: '', draft_session_id: 'session-X' },
     ];
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
-      const chain = createChainableMock();
-      // order() must return a chainable object (not a Promise) because
-      // the code does `query = query.eq(...)` after order() when sessionId is provided.
-      // The final `await query` will resolve via the chain's then-ability.
-      chain.order.mockReturnValue(chain);
-      // When the chain is awaited after the extra .eq(), resolve with data
-      chain.eq.mockImplementation(() => {
-        return { ...chain, then: (resolve: (value: unknown) => void) => resolve({ data: mockPicks, error: null }) };
-      });
-      return chain;
-    });
+    mockGetDraftPicks.mockResolvedValue({ data: mockPicks });
 
     const { picks, error } = await DraftService.getDraftPicks('league-1', 'user-1', 'session-X');
 
     expect(error).toBeNull();
     expect(picks).toHaveLength(1);
     expect(picks[0].draft_session_id).toBe('session-X');
+    expect(mockGetDraftPicks).toHaveBeenCalledWith('league-1', 'session-X');
   });
 
-  it('returns error on DB failure', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
-      const chain = createChainableMock();
-      chain.order.mockResolvedValue({ data: null, error: { message: 'DB error' } });
-      // The code does `if (error) throw error`
-      chain.order.mockRejectedValue({ message: 'DB error' });
-      return chain;
-    });
+  it('returns error on API failure', async () => {
+    mockGetDraftPicks.mockRejectedValue(new Error('API error'));
 
     const { picks, error } = await DraftService.getDraftPicks('league-1', 'user-1');
 
@@ -1018,25 +696,16 @@ describe('DraftService.getDraftPicks', () => {
 // =============================================================================
 
 describe('DraftService.getDraftOrder', () => {
-  it('returns null order when none exists (PGRST116)', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
-      const chain = createChainableMock();
-      chain.maybeSingle.mockResolvedValue({ data: null, error: { code: 'PGRST116', message: 'No rows' } });
-      return chain;
-    });
+  it('returns null order when none exists', async () => {
+    mockGetDraftOrder.mockResolvedValue({ data: null });
 
     const { order, error } = await DraftService.getDraftOrder('league-1', 'user-1', 1);
 
-    // PGRST116 is handled gracefully
     expect(error).toBeNull();
     expect(order).toBeNull();
   });
 
   it('returns order for specified round', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
     const mockOrder: DraftOrder = {
       id: 'order-3',
       league_id: 'league-1',
@@ -1047,11 +716,7 @@ describe('DraftService.getDraftOrder', () => {
       deleted_at: null,
     };
 
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
-      const chain = createChainableMock();
-      chain.maybeSingle.mockResolvedValue({ data: mockOrder, error: null });
-      return chain;
-    });
+    mockGetDraftOrder.mockResolvedValue({ data: mockOrder });
 
     const { order, error } = await DraftService.getDraftOrder('league-1', 'user-1', 3);
 
@@ -1059,6 +724,15 @@ describe('DraftService.getDraftOrder', () => {
     expect(order).not.toBeNull();
     expect(order!.round_number).toBe(3);
     expect(order!.team_order).toEqual(['team-c', 'team-b', 'team-a']);
+  });
+
+  it('returns error on API failure', async () => {
+    mockGetDraftOrder.mockRejectedValue(new Error('API error'));
+
+    const { order, error } = await DraftService.getDraftOrder('league-1', 'user-1', 1);
+
+    expect(order).toBeNull();
+    expect(error).toBeDefined();
   });
 });
 
@@ -1068,13 +742,7 @@ describe('DraftService.getDraftOrder', () => {
 
 describe('DraftService.getDraftSnapshot', () => {
   it('returns null when no snapshot exists', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
-      const chain = createChainableMock();
-      chain.maybeSingle.mockResolvedValue({ data: null, error: null });
-      return chain;
-    });
+    mockGetSnapshot.mockResolvedValue({ data: null });
 
     const { snapshot, error } = await DraftService.getDraftSnapshot('league-1');
 
@@ -1083,8 +751,6 @@ describe('DraftService.getDraftSnapshot', () => {
   });
 
   it('returns most recent snapshot for league', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
     const mockSnapshot = {
       id: 'snap-1',
       league_id: 'league-1',
@@ -1098,11 +764,7 @@ describe('DraftService.getDraftSnapshot', () => {
       created_by: 'user-1',
     };
 
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
-      const chain = createChainableMock();
-      chain.maybeSingle.mockResolvedValue({ data: mockSnapshot, error: null });
-      return chain;
-    });
+    mockGetSnapshot.mockResolvedValue({ data: mockSnapshot });
 
     const { snapshot, error } = await DraftService.getDraftSnapshot('league-1');
 
@@ -1118,14 +780,8 @@ describe('DraftService.getDraftSnapshot', () => {
 // =============================================================================
 
 describe('DraftService.saveDraftSnapshot', () => {
-  it('returns existing snapshot ID if one already exists for session', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
-      const chain = createChainableMock();
-      chain.maybeSingle.mockResolvedValue({ data: { id: 'existing-snap' }, error: null });
-      return chain;
-    });
+  it('returns snapshot ID from API', async () => {
+    mockSaveSnapshot.mockResolvedValue({ data: { snapshotId: 'new-snap-id' } });
 
     const result = await DraftService.saveDraftSnapshot(
       'league-1',
@@ -1135,16 +791,20 @@ describe('DraftService.saveDraftSnapshot', () => {
       { rounds: 10, draftOrder: 'snake', completedAt: '' }
     );
 
-    expect(result.snapshotId).toBe('existing-snap');
+    expect(result.snapshotId).toBe('new-snap-id');
     expect(result.error).toBeNull();
+    expect(mockSaveSnapshot).toHaveBeenCalledWith('league-1', {
+      draftSessionId: 'session-1',
+      snapshotData: {
+        teams: [],
+        picks: [],
+        leagueSettings: { rounds: 10, draftOrder: 'snake', completedAt: '' },
+      },
+    });
   });
 
-  it('returns error when user is not authenticated', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.auth.getUser as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      data: { user: null },
-    });
+  it('returns null snapshotId on API failure', async () => {
+    mockSaveSnapshot.mockRejectedValue(new Error('Save failed'));
 
     const result = await DraftService.saveDraftSnapshot(
       'league-1',
@@ -1155,42 +815,28 @@ describe('DraftService.saveDraftSnapshot', () => {
     );
 
     expect(result.snapshotId).toBeNull();
-    expect(result.error).toBe('User not authenticated');
+    expect(result.error).toBeDefined();
   });
 });
 
 // =============================================================================
-// Edge Cases
+// Edge Cases — Autopick & Rankings
 // =============================================================================
 
 describe('DraftService Edge Cases', () => {
   it('handles empty league (no teams) in getDraftState', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
+    mockGetDraftPicks.mockResolvedValue({ data: [] });
+    mockGetDraftOrder.mockResolvedValue({ data: null });
 
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
-      const chain = createChainableMock();
-      chain.order.mockResolvedValue({ data: [], error: null });
-      return chain;
-    });
-
-    // Empty teams array — currentRound calculation: floor(0/0) would be NaN
-    // The function should handle this without crashing
     const emptyTeams: any[] = [];
     const { state, error } = await DraftService.getDraftState('league-1', emptyTeams, 10, 'user-1');
 
-    // With 0 teams, floor(0/0) = NaN, NaN + 1 = NaN, NaN > 10 is false
-    // So it will try to getDraftOrder, which returns null → error
     expect(state).toBeNull();
     expect(error).toBeDefined();
   });
 
-  it('autopickForTeam returns error when RPC returns no players', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.rpc as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: [],
-      error: null,
-    });
+  it('autopickForTeam returns error when API returns no player data', async () => {
+    mockAutopick.mockRejectedValue(new Error('No available players for autopick'));
 
     const result = await DraftService.autopickForTeam('league-1', 'team-1', 'session-1', 1, 1);
 
@@ -1200,11 +846,8 @@ describe('DraftService Edge Cases', () => {
   });
 
   it('autopickForTeam returns player data on success', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.rpc as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: [{ picked_player_id: 42, player_name: 'Connor McDavid', position: 'C', pick_id: 'pick-uuid' }],
-      error: null,
+    mockAutopick.mockResolvedValue({
+      data: { playerId: 42, playerName: 'Connor McDavid', position: 'C', pickId: 'pick-uuid' },
     });
 
     const result = await DraftService.autopickForTeam('league-1', 'team-1', 'session-1', 1, 1);
@@ -1216,15 +859,14 @@ describe('DraftService Edge Cases', () => {
     expect(result.error).toBeNull();
   });
 
-  it('runFullAutopickDraft maps RPC response correctly', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.rpc as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: [
-        { round_number: 1, pick_number: 1, team_id: 'team-1', player_id: 101, player_name: 'Player A' },
-        { round_number: 1, pick_number: 2, team_id: 'team-2', player_id: 102, player_name: 'Player B' },
-      ],
-      error: null,
+  it('runFullAutopickDraft returns picks from API', async () => {
+    mockFullAutopick.mockResolvedValue({
+      data: {
+        picks: [
+          { round: 1, pick: 1, teamId: 'team-1', playerId: 101, playerName: 'Player A' },
+          { round: 1, pick: 2, teamId: 'team-2', playerId: 102, playerName: 'Player B' },
+        ],
+      },
     });
 
     const result = await DraftService.runFullAutopickDraft('league-1');
@@ -1240,13 +882,8 @@ describe('DraftService Edge Cases', () => {
     });
   });
 
-  it('runFullAutopickDraft returns empty array on RPC failure', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.rpc as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: null,
-      error: { message: 'RPC failed' },
-    });
+  it('runFullAutopickDraft returns empty array on API failure', async () => {
+    mockFullAutopick.mockRejectedValue(new Error('RPC failed'));
 
     const result = await DraftService.runFullAutopickDraft('league-1');
 
@@ -1254,18 +891,8 @@ describe('DraftService Edge Cases', () => {
     expect(result.error).toBeDefined();
   });
 
-  it('saveAutopickRankings upserts rows correctly', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    let upsertedData: any = null;
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
-      const chain = createChainableMock();
-      chain.upsert.mockImplementation((data: any) => {
-        upsertedData = data;
-        return { error: null };
-      });
-      return chain;
-    });
+  it('saveAutopickRankings calls API with correct params', async () => {
+    mockSaveRankings.mockResolvedValue({ data: null });
 
     const rankings = [
       { playerId: 1, rank: 1, positionCode: 'C' },
@@ -1275,29 +902,41 @@ describe('DraftService Edge Cases', () => {
     const result = await DraftService.saveAutopickRankings('league-1', 'team-1', rankings);
 
     expect(result.error).toBeNull();
-    expect(upsertedData).toHaveLength(2);
-    expect(upsertedData[0].player_id).toBe(1);
-    expect(upsertedData[0].rank_position).toBe(1);
-    expect(upsertedData[0].league_id).toBe('league-1');
-    expect(upsertedData[0].team_id).toBe('team-1');
+    expect(mockSaveRankings).toHaveBeenCalledWith('league-1', {
+      teamId: 'team-1',
+      rankings,
+    });
+  });
+
+  it('saveAutopickRankings returns error when leagueId is null', async () => {
+    const result = await DraftService.saveAutopickRankings(null, 'team-1', []);
+
+    expect(result.error).toBeDefined();
+    expect((result.error as Error).message).toContain('leagueId is required');
+    expect(mockSaveRankings).not.toHaveBeenCalled();
   });
 
   it('getAutopickRankings returns empty array on error', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
-      const chain = createChainableMock();
-      // Simulate a thrown error from the query
-      chain.order.mockImplementation(() => {
-        throw new Error('Query failed');
-      });
-      return chain;
-    });
+    mockGetRankings.mockRejectedValue(new Error('Query failed'));
 
     const result = await DraftService.getAutopickRankings('league-1', 'team-1');
 
     expect(result.rankings).toEqual([]);
     expect(result.error).toBeDefined();
+  });
+
+  it('getAutopickRankings returns rankings from API', async () => {
+    mockGetRankings.mockResolvedValue({
+      data: [
+        { playerId: 1, rank: 1, positionCode: 'C', tier: 1 },
+        { playerId: 2, rank: 2, positionCode: 'LW', tier: 1 },
+      ],
+    });
+
+    const result = await DraftService.getAutopickRankings('league-1', 'team-1');
+
+    expect(result.rankings).toHaveLength(2);
+    expect(result.error).toBeNull();
   });
 });
 
@@ -1306,36 +945,27 @@ describe('DraftService Edge Cases', () => {
 // =============================================================================
 
 describe('DraftService.hardDeleteDraft', () => {
-  it('deletes picks, orders, and resets league status', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    const deletedTables: string[] = [];
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      chain.delete.mockImplementation(() => {
-        deletedTables.push(table);
-        return chain;
-      });
-      chain.eq.mockReturnValue(chain);
-      // For count verification queries
-      chain.select.mockReturnValue(chain);
-      // Resolve the delete/update calls
-      chain.eq.mockResolvedValue({ data: null, error: null, count: 0 });
-      chain.update.mockReturnValue(chain);
-      return chain;
-    });
+  it('returns no error on successful delete', async () => {
+    mockHardDeleteDraft.mockResolvedValue({ data: null });
 
     const result = await DraftService.hardDeleteDraft('league-1');
 
     expect(result.error).toBeNull();
-    expect(deletedTables).toContain('draft_picks');
-    expect(deletedTables).toContain('draft_order');
+    expect(mockHardDeleteDraft).toHaveBeenCalledWith('league-1');
+  });
+
+  it('returns error on API failure', async () => {
+    mockHardDeleteDraft.mockRejectedValue(new Error('Delete failed'));
+
+    const result = await DraftService.hardDeleteDraft('league-1');
+
+    expect(result.error).toBeDefined();
+    expect((result.error as Error).message).toBe('Delete failed');
   });
 });
 
 // =============================================================================
-// subscribeToDraftPicks
+// subscribeToDraftPicks (still uses supabase realtime — keeps supabase mock)
 // =============================================================================
 
 describe('DraftService.subscribeToDraftPicks', () => {
@@ -1364,8 +994,6 @@ describe('DraftService.subscribeToDraftPicks', () => {
       on: vi.fn().mockReturnThis(),
       subscribe: vi.fn(),
     };
-    // subscribe() must return the channel object itself, because the service assigns:
-    // const channel = supabase.channel(...).on(...).on(...).subscribe(...)
     mockChannelObj.subscribe.mockReturnValue(mockChannelObj);
     (supabase.channel as ReturnType<typeof vi.fn>).mockReturnValue(mockChannelObj);
 
