@@ -502,9 +502,23 @@ const Matchup = () => {
         scores.set(dateStr, { myScore, oppScore, isLocked: true });
       }
       
-      // Cache the frozen scores (long TTL - past scores don't change)
-      DataCacheService.set(cacheKey, scores, TTL.VERY_LONG);
-      setCachedDailyScores(scores);
+      // Merge with existing cachedDailyScores to preserve RPC-provided values.
+      // If this recalculation yields 0 for a team but RPC already set a non-zero score,
+      // keep the RPC value (prevents AI team scores from being clobbered).
+      setCachedDailyScores(prev => {
+        const merged = new Map(prev);
+        scores.forEach((newVal, dateStr) => {
+          const existing = prev.get(dateStr);
+          const finalMyScore = (newVal.myScore === 0 && existing && existing.myScore > 0)
+            ? existing.myScore : newVal.myScore;
+          const finalOppScore = (newVal.oppScore === 0 && existing && existing.oppScore > 0)
+            ? existing.oppScore : newVal.oppScore;
+          merged.set(dateStr, { myScore: finalMyScore, oppScore: finalOppScore, isLocked: newVal.isLocked });
+        });
+        // Cache merged result
+        DataCacheService.set(cacheKey, merged, TTL.VERY_LONG);
+        return merged;
+      });
       log(` Cached ${scores.size} frozen scores for matchup ${currentMatchup.id} (team1: ${team1Id}, team2: ${team2Id})`);
     };
     
@@ -1991,13 +2005,27 @@ const Matchup = () => {
   // Both initial load and date clicks use identical calculation logic
 
   // Callback to update calculated totals from MatchupComparison (works for selected date or any date)
+  // GUARD: Don't overwrite non-zero RPC-provided scores with 0.
+  // This prevents the initial-calc useEffect from clobbering server-calculated daily scores
+  // when frozen roster enrichment fails (e.g., AI teams where opponent roster is empty).
   const handleTotalsCalculated = useCallback((userTotal: number, opponentTotal: number, date?: string) => {
     const targetDate = date || selectedDate;
     if (!targetDate) return;
-    
+
     setCalculatedDailyTotals(prev => {
       const next = new Map(prev);
-      next.set(targetDate, { myTotal: userTotal, oppTotal: opponentTotal });
+      const existing = prev.get(targetDate);
+
+      // Preserve existing non-zero values when new calculation yields 0.
+      // The RPC daily-scores endpoint is the source of truth; if it already
+      // provided a non-zero score for a team, a later frontend recalculation
+      // that produces 0 (due to empty frozen roster) should not replace it.
+      const finalMyTotal = (userTotal === 0 && existing && existing.myTotal > 0)
+        ? existing.myTotal : userTotal;
+      const finalOppTotal = (opponentTotal === 0 && existing && existing.oppTotal > 0)
+        ? existing.oppTotal : opponentTotal;
+
+      next.set(targetDate, { myTotal: finalMyTotal, oppTotal: finalOppTotal });
       return next;
     });
   }, [selectedDate]);
@@ -4436,6 +4464,15 @@ const Matchup = () => {
           const allFrozenEntries = frozenBatchResponse.data as any[] | null;
 
           if (allFrozenEntries && allFrozenEntries.length > 0) {
+            // Diagnostic: show unique team_ids in frozen entries vs expected team IDs
+            const frozenTeamIds = [...new Set((allFrozenEntries as any[]).map((e: any) => String(e.team_id)))];
+            const myTeamId = matchupData.userTeam.id;
+            const oppTeamId = matchupData.opponentTeam?.id;
+            log(' [frozen-roster-diag] frozenEntries:', allFrozenEntries.length,
+              'frozenTeamIds:', frozenTeamIds,
+              'myTeamId:', myTeamId,
+              'oppTeamId:', oppTeamId);
+
             // Get all current player IDs from enrichment maps
             const allCurrentIds = new Set([
               ...Array.from(enrichedMyPlayerMap.keys()),
@@ -4451,6 +4488,9 @@ const Matchup = () => {
                 .filter((id: string) => !allCurrentIds.has(id))
             )];
 
+            log(' [frozen-roster-diag] allCurrentIds:', allCurrentIds.size,
+              'missingIds:', missingIds.length);
+
             if (missingIds.length > 0) {
               log(' Found players in frozen rosters missing from enrichment maps:', missingIds.length);
 
@@ -4462,8 +4502,8 @@ const Matchup = () => {
               missingPlayers.forEach(player => {
                 // Determine which team this player was on based on frozen roster entries
                 const playerEntries = (allFrozenEntries as any).filter((e: any) => String(e.player_id) === String(player.id));
-                const wasOnMyTeam = playerEntries.some((e: any) => String(e.team_id) === matchupData.userTeam.id);
-                const wasOnOppTeam = playerEntries.some((e: any) => String(e.team_id) === matchupData.opponentTeam?.id);
+                const wasOnMyTeam = playerEntries.some((e: any) => String(e.team_id) === myTeamId);
+                const wasOnOppTeam = playerEntries.some((e: any) => String(e.team_id) === oppTeamId);
 
                 // Create basic MatchupPlayer from Player data
                 const p = player as any;
@@ -4563,6 +4603,7 @@ const Matchup = () => {
             const oppSlots: Record<string, string> = {};
 
             if (oppDailyRoster.length > 0) {
+              const unmatchedOppIds: string[] = [];
               oppDailyRoster.forEach((entry: any) => {
                 const playerId = String(entry.player_id);
                 const enrichedPlayer = enrichedOppPlayerMap.get(playerId);
@@ -4576,8 +4617,14 @@ const Matchup = () => {
                   if (entry.slot_id) {
                     oppSlots[playerId] = entry.slot_id;
                   }
+                } else {
+                  unmatchedOppIds.push(playerId);
                 }
               });
+              if (unmatchedOppIds.length > 0) {
+                log(` [frozen-roster-diag] ${date}: ${unmatchedOppIds.length} opp entries unmatched in enrichment map. IDs:`, unmatchedOppIds.slice(0, 5),
+                  'enrichedOppPlayerMap keys:', Array.from(enrichedOppPlayerMap.keys()).slice(0, 5));
+              }
             } else if (matchupData.opponentTeam) {
               // FALLBACK: No fantasy_daily_rosters records for opponent on this past date.
               // Use the opponent's current roster as the best approximation.
