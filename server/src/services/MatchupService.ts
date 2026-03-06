@@ -584,8 +584,14 @@ export class MatchupService {
 
   /** Get daily matchup scores via RPC (calls once per team, returns combined results) */
   async calculateDailyMatchupScores(matchupId: string) {
+    // Use admin client for RPC calls — ensures SECURITY DEFINER functions
+    // work correctly regardless of user JWT context. Critical for AI teams
+    // (owner_id = NULL) whose fantasy_daily_rosters may not be visible
+    // through user-scoped PostgREST connections.
+    const admin = getSupabaseAdmin();
+
     // The RPC requires team_id + week dates, so look up the matchup first
-    const { data: matchup, error: matchupError } = await this.supabase
+    const { data: matchup, error: matchupError } = await admin
       .from('matchups')
       .select('team1_id, team2_id, week_start_date, week_end_date, league_id')
       .eq('id', matchupId)
@@ -609,16 +615,16 @@ export class MatchupService {
         : Promise.resolve(),
     ]);
 
-    // Call the RPC for each team in parallel
+    // Call the RPC for each team in parallel using admin client
     const [team1Result, team2Result] = await Promise.all([
-      this.supabase.rpc('calculate_daily_matchup_scores', {
+      admin.rpc('calculate_daily_matchup_scores', {
         p_matchup_id: matchupId,
         p_team_id: matchup.team1_id,
         p_week_start: matchup.week_start_date,
         p_week_end: matchup.week_end_date,
       }),
       matchup.team2_id
-        ? this.supabase.rpc('calculate_daily_matchup_scores', {
+        ? admin.rpc('calculate_daily_matchup_scores', {
             p_matchup_id: matchupId,
             p_team_id: matchup.team2_id,
             p_week_start: matchup.week_start_date,
@@ -627,8 +633,19 @@ export class MatchupService {
         : Promise.resolve({ data: [], error: null }),
     ]);
 
-    if (team1Result.error) return { data: null, error: team1Result.error };
-    if (team2Result.error) return { data: null, error: team2Result.error };
+    if (team1Result.error) {
+      console.error('[calculateDailyMatchupScores] team1 RPC error:', team1Result.error);
+      return { data: null, error: team1Result.error };
+    }
+    if (team2Result.error) {
+      console.error('[calculateDailyMatchupScores] team2 RPC error:', team2Result.error);
+      return { data: null, error: team2Result.error };
+    }
+
+    // Log RPC results for debugging AI team scoring issues
+    const team1Sum = (team1Result.data || []).reduce((s: number, r: any) => s + parseFloat(r.daily_score || 0), 0);
+    const team2Sum = (team2Result.data || []).reduce((s: number, r: any) => s + parseFloat(r.daily_score || 0), 0);
+    console.log(`[calculateDailyMatchupScores] matchup=${matchupId} team1=${matchup.team1_id} sum=${team1Sum.toFixed(1)} team2=${matchup.team2_id} sum=${team2Sum.toFixed(1)}`);
 
     // Combine results with team_id attached (frontend filters by team_id)
     const combined = [
@@ -672,7 +689,9 @@ export class MatchupService {
 
   /** Get daily lineup via RPC */
   async getDailyLineup(teamId: string, matchupId: string, date: string) {
-    const { data, error } = await this.supabase.rpc('get_daily_lineup', {
+    // Use admin client to bypass RLS — ensures AI team lineups are visible
+    const admin = getSupabaseAdmin();
+    const { data, error } = await admin.rpc('get_daily_lineup', {
       p_team_id: teamId,
       p_matchup_id: matchupId,
       p_date: date,
@@ -743,7 +762,9 @@ export class MatchupService {
 
   /** Get frozen daily roster entries for a team/matchup/date */
   async getFrozenRoster(teamId: string, matchupId: string, date: string) {
-    const { data, error } = await this.supabase
+    // Use admin client to bypass RLS — ensures AI team rosters are visible
+    const admin = getSupabaseAdmin();
+    const { data, error } = await admin
       .from('fantasy_daily_rosters')
       .select('player_id, slot_type, slot_id')
       .eq('team_id', teamId)
@@ -755,8 +776,10 @@ export class MatchupService {
 
   /** Get all frozen roster entries for a matchup (multiple dates) */
   async getFrozenRosterBatch(matchupId: string, dates: string[]) {
+    const admin = getSupabaseAdmin();
+
     // First, try to backfill any teams missing entries (e.g. AI teams)
-    const { data: matchup } = await this.supabase
+    const { data: matchup } = await admin
       .from('matchups')
       .select('team1_id, team2_id, week_start_date, week_end_date, league_id')
       .eq('id', matchupId)
@@ -777,7 +800,7 @@ export class MatchupService {
       ]);
     }
 
-    const { data, error } = await this.supabase
+    const { data, error } = await admin
       .from('fantasy_daily_rosters')
       .select('player_id, team_id, roster_date, slot_type, slot_id')
       .eq('matchup_id', matchupId)
