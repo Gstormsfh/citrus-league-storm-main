@@ -994,25 +994,17 @@ export const MatchupService = {
 
   /**
    * Get roster player IDs for a team (optimized helper)
+   * Routes through the API server which uses admin client — bypasses RLS.
+   * Critical for AI teams (owner_id = NULL) whose roster_assignments
+   * are not visible through user-scoped Supabase clients.
    */
   async getRosterPlayerIds(teamId: string, leagueId: string): Promise<string[]> {
     try {
-      // CRITICAL FIX: Use roster_assignments (source of truth) instead of draft_picks.
-      // draft_picks misses players acquired via trades (TradeService only updates roster_assignments).
-      const { data: assignments, error: assignError } = await supabase
-        .from('roster_assignments')
-        .select('player_id')
-        .eq('league_id', leagueId)
-        .eq('team_id', teamId);
-
-      if (assignError) {
-        logger.error('Error fetching roster player IDs:', assignError);
-        return [];
-      }
-
-      return (assignments || []).map((a: { player_id: string }) => String(a.player_id));
+      const { rosterApi } = await import('@/api/rosters');
+      const response = await rosterApi.getPlayerIds(leagueId, teamId);
+      return (response.data as string[]) || [];
     } catch (error: unknown) {
-      logger.error('Error getting roster player IDs:', error);
+      logger.error('Error getting roster player IDs via API:', error);
       return [];
     }
   },
@@ -1032,34 +1024,18 @@ export const MatchupService = {
         return cached.roster;
       }
 
-      // CRITICAL FIX: Use roster_assignments (source of truth) instead of draft_picks.
-      // draft_picks misses players acquired via trades (TradeService only updates roster_assignments).
-      const { data: teamDraftPicks, error: picksError } = await supabase
-        .from('roster_assignments')
-        .select('player_id, team_id, league_id')
-        .eq('league_id', leagueId)
-        .eq('team_id', teamId);
-      
-      if (picksError) {
-        logger.error('Error fetching draft picks for team:', picksError);
-        // Fallback to old method if direct query fails
-        const { picks: draftPicks } = await DraftService.getDraftPicks(leagueId, userId || '');
-        const teamPicks = draftPicks.filter(p => p.team_id === teamId);
-        const playerIds = teamPicks.map(p => p.player_id);
-        // Convert string IDs to numbers for matching
-        const playerIdsAsNumbers = playerIds.map((id: string | number) => typeof id === 'string' ? parseInt(id) || 0 : id || 0).filter(id => id > 0);
-        const teamPlayers = allPlayers.filter(p => playerIdsAsNumbers.includes(Number(p.id)));
-        
-        const roster = teamPlayers.map((p) => this.transformToHockeyPlayer(p));
-        
-        // Cache the result
-        rosterCache.set(cacheKey, { roster, timestamp: now });
-        return roster;
+      // Route through API server which uses admin client — bypasses RLS.
+      // Critical for AI teams (owner_id = NULL) whose roster_assignments
+      // are not visible through user-scoped Supabase clients.
+      const { rosterApi } = await import('@/api/rosters');
+      let playerIds: string[];
+      try {
+        const response = await rosterApi.getPlayerIds(leagueId, teamId);
+        playerIds = (response.data as string[]) || [];
+      } catch (apiErr: unknown) {
+        logger.error('Error fetching roster player IDs via API:', apiErr);
+        playerIds = [];
       }
-      
-      // Map roster assignments to players
-      // player_id might be UUID (from old migrations) or numeric NHL ID (from new migrations)
-      let playerIds = (teamDraftPicks || []).map(p => p.player_id);
 
       // FALLBACK: If roster_assignments is empty, try draft_picks (original source of truth).
       // This handles demo leagues and cases where roster_assignments wasn't seeded properly.

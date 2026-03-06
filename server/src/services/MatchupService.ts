@@ -106,7 +106,10 @@ export class MatchupService {
 
   /** Get roster player IDs for a team (source of truth: roster_assignments) */
   async getRosterPlayerIds(teamId: string, leagueId: string) {
-    const { data } = await this.supabase
+    // Use admin client to bypass RLS — critical for AI teams (owner_id = NULL)
+    // whose roster_assignments are not visible through user-scoped clients.
+    const admin = getSupabaseAdmin();
+    const { data } = await admin
       .from('roster_assignments')
       .select('player_id')
       .eq('team_id', teamId)

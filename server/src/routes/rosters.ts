@@ -30,6 +30,7 @@ rosterRoutes.get('/league/:leagueId/team/:teamId', membershipMiddleware, async (
 });
 
 // GET /api/rosters/league/:leagueId/team/:teamId/player-ids — Get roster player IDs
+// Uses admin client internally to bypass RLS (AI teams have owner_id = NULL)
 rosterRoutes.get('/league/:leagueId/team/:teamId/player-ids', membershipMiddleware, async (c) => {
   const leagueId = c.req.param('leagueId');
   const teamId = c.req.param('teamId');
