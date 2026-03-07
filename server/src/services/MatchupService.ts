@@ -109,13 +109,15 @@ export class MatchupService {
     // Use admin client to bypass RLS — critical for AI teams (owner_id = NULL)
     // whose roster_assignments are not visible through user-scoped clients.
     const admin = getSupabaseAdmin();
-    const { data } = await admin
+    const { data, error } = await admin
       .from('roster_assignments')
       .select('player_id')
       .eq('team_id', teamId)
       .eq('league_id', leagueId);
 
-    return (data || []).map((r: any) => String(r.player_id));
+    const ids = (data || []).map((r: any) => String(r.player_id));
+    console.log(`[getRosterPlayerIds] team=${teamId.slice(0,8)} count=${ids.length}${error ? ' ERROR: ' + error.message : ''}`);
+    return ids;
   }
 
   /** Get matchup history between two teams */
@@ -844,6 +846,8 @@ export class MatchupService {
       };
     });
 
+    const withNames = enrichedEntries.filter((e: any) => e.player_name);
+    console.log(`[getFrozenRosterBatch] entries=${entries.length} playerDir=${players?.length || 0} enriched=${withNames.length}`);
     return { entries: enrichedEntries, error };
   }
 
