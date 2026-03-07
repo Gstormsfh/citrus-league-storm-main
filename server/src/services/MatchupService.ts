@@ -823,7 +823,7 @@ export class MatchupService {
 
     const { data: players } = await admin
       .from('player_directory')
-      .select('player_id, full_name, position, team, team_abbreviation, headshot_url, status')
+      .select('player_id, full_name, position_code, is_goalie, team_abbrev, headshot_url')
       .in('player_id', uniquePlayerIds);
 
     const playerMap = new Map<number, any>();
@@ -838,11 +838,11 @@ export class MatchupService {
         ...entry,
         // Player details (used by frontend to render without enrichment)
         player_name: player?.full_name || '',
-        player_position: player?.position || '',
-        player_team: player?.team || '',
-        player_team_abbreviation: player?.team_abbreviation || '',
+        player_position: player?.position_code || '',
+        player_team: player?.team_abbrev || '',
+        player_team_abbreviation: player?.team_abbrev || '',
         player_headshot_url: player?.headshot_url || '',
-        player_status: player?.status || null,
+        player_is_goalie: player?.is_goalie || false,
       };
     });
 
