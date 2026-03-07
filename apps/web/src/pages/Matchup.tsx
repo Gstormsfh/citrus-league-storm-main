@@ -3140,14 +3140,31 @@ const Matchup = () => {
   // to avoid re-computing when demo team objects change but roster composition hasn't. playerIdsVersion
   // proxies actual player ID changes. previousRosterRef is a stable ref accessed via .current.
   }, [userLeagueState, playerIdsVersion, demoOpponentTeam.length, dailyStatsMap, dailyStatsByDate, selectedDate, projectionsByDate, isSwitchingDate, opponentTeamPlayers]);
-  const displayMyTeamSlotAssignments = useMemo(() =>
-    userLeagueState === 'active-user' ? myTeamSlotAssignments : demoMyTeamSlotAssignments,
-    [userLeagueState, myTeamSlotAssignments, demoMyTeamSlotAssignments]
-  );
-  const displayOpponentTeamSlotAssignments = useMemo(() =>
-    userLeagueState === 'active-user' ? opponentTeamSlotAssignments : demoOpponentTeamSlotAssignments,
-    [userLeagueState, opponentTeamSlotAssignments, demoOpponentTeamSlotAssignments]
-  );
+  const displayMyTeamSlotAssignments = useMemo(() => {
+    // For past dates with frozen rosters, use frozen slot assignments directly
+    // This eliminates the race condition where useMemo updates starters immediately
+    // but the useEffect that updates state slot assignments fires later
+    if (selectedDate && frozenRostersByDate.has(selectedDate)) {
+      const frozenSlots = frozenRostersByDate.get(selectedDate)!.mySlots;
+      if (frozenSlots && Object.keys(frozenSlots).length > 0) {
+        return frozenSlots;
+      }
+    }
+    return userLeagueState === 'active-user' ? myTeamSlotAssignments : demoMyTeamSlotAssignments;
+  }, [selectedDate, frozenRostersByDate, userLeagueState, myTeamSlotAssignments, demoMyTeamSlotAssignments]);
+
+  const displayOpponentTeamSlotAssignments = useMemo(() => {
+    // For past dates with frozen rosters, use frozen slot assignments directly
+    // This eliminates the race condition where useMemo updates starters immediately
+    // but the useEffect that updates state slot assignments fires later
+    if (selectedDate && frozenRostersByDate.has(selectedDate)) {
+      const frozenSlots = frozenRostersByDate.get(selectedDate)!.oppSlots;
+      if (frozenSlots && Object.keys(frozenSlots).length > 0) {
+        return frozenSlots;
+      }
+    }
+    return userLeagueState === 'active-user' ? opponentTeamSlotAssignments : demoOpponentTeamSlotAssignments;
+  }, [selectedDate, frozenRostersByDate, userLeagueState, opponentTeamSlotAssignments, demoOpponentTeamSlotAssignments]);
 
   // Weekly starters for sidebar (always shows full week stats, regardless of selected date)
   // CRITICAL: Use baseCurrentRoster (stable, full week) instead of myTeam/opponentTeamPlayers

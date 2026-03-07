@@ -128,10 +128,31 @@ export const TeamCard = ({ title, starters, bench, gradientClass, slotAssignment
     { slot: 'slot-UTIL', position: 'UTIL' }
   ];
 
+  // Auto-assign starters to slots when slot assignments are missing (e.g., AI teams)
+  const effectiveSlotAssignments = (() => {
+    if (starters.length > 0 && !starters.some(p => slotAssignments[String(p.id)])) {
+      const slotsNeeded: Record<string, number> = { C: 2, LW: 2, RW: 2, D: 4, G: 2, UTIL: 1 };
+      const slotsFilled: Record<string, number> = { C: 0, LW: 0, RW: 0, D: 0, G: 0, UTIL: 0 };
+      const auto: Record<string, string> = {};
+      starters.forEach(player => {
+        const pos = normalizePosition(player.position);
+        if (pos !== 'UTIL' && slotsFilled[pos] < (slotsNeeded[pos] || 0)) {
+          slotsFilled[pos]++;
+          auto[String(player.id)] = `slot-${pos}-${slotsFilled[pos]}`;
+        } else if (pos !== 'G' && slotsFilled['UTIL'] < slotsNeeded['UTIL']) {
+          slotsFilled['UTIL']++;
+          auto[String(player.id)] = 'slot-UTIL';
+        }
+      });
+      return auto;
+    }
+    return slotAssignments;
+  })();
+
   // Create a map of slot -> player for quick lookup
   const slotToPlayerMap = new Map<string, MatchupPlayer>();
   starters.forEach(player => {
-    const slot = slotAssignments[String(player.id)];
+    const slot = effectiveSlotAssignments[String(player.id)];
     if (slot) {
       slotToPlayerMap.set(slot, player);
     }

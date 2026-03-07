@@ -50,6 +50,34 @@ const formatPositionForDisplay = (position: string): string => {
 };
 
 /**
+ * Auto-assign starters to slots by position when slot assignments are missing.
+ * This handles AI teams whose fantasy_daily_rosters entries have null slot_id,
+ * as well as any race condition where slot assignments haven't loaded yet.
+ */
+const autoAssignSlots = (
+  starters: MatchupPlayer[]
+): Record<string, string> => {
+  const slotsNeeded: Record<string, number> = { C: 2, LW: 2, RW: 2, D: 4, G: 2, UTIL: 1 };
+  const slotsFilled: Record<string, number> = { C: 0, LW: 0, RW: 0, D: 0, G: 0, UTIL: 0 };
+  const assignments: Record<string, string> = {};
+
+  starters.forEach(player => {
+    const pos = normalizePosition(player.position);
+    if (pos !== 'UTIL' && slotsFilled[pos] < (slotsNeeded[pos] || 0)) {
+      slotsFilled[pos]++;
+      assignments[String(player.id)] = `slot-${pos}-${slotsFilled[pos]}`;
+    } else if (pos !== 'G' && slotsFilled['UTIL'] < slotsNeeded['UTIL']) {
+      slotsFilled['UTIL']++;
+      assignments[String(player.id)] = 'slot-UTIL';
+    }
+    // If all slots for this position are full, player just won't be assigned
+    // (overflow — shouldn't happen with correct roster sizes)
+  });
+
+  return assignments;
+};
+
+/**
  * Groups players by position and slot, matching user team vs opponent team
  */
 export const organizeMatchupData = (
@@ -58,19 +86,31 @@ export const organizeMatchupData = (
   userSlotAssignments: Record<string, string>,
   opponentSlotAssignments: Record<string, string>
 ): PositionGroup[] => {
+  // Auto-assign slots when assignments are missing/empty but starters exist.
+  // This handles: AI teams with null slot_id in DB, race conditions on date switch, etc.
+  const effectiveUserSlots = (
+    userStarters.length > 0 &&
+    !userStarters.some(p => userSlotAssignments[String(p.id)])
+  ) ? autoAssignSlots(userStarters) : userSlotAssignments;
+
+  const effectiveOpponentSlots = (
+    opponentStarters.length > 0 &&
+    !opponentStarters.some(p => opponentSlotAssignments[String(p.id)])
+  ) ? autoAssignSlots(opponentStarters) : opponentSlotAssignments;
+
   // Create maps of slot -> player for both teams
   const userSlotToPlayer = new Map<string, MatchupPlayer>();
   const opponentSlotToPlayer = new Map<string, MatchupPlayer>();
 
   userStarters.forEach(player => {
-    const slot = userSlotAssignments[String(player.id)];
+    const slot = effectiveUserSlots[String(player.id)];
     if (slot) {
       userSlotToPlayer.set(slot, player);
     }
   });
 
   opponentStarters.forEach(player => {
-    const slot = opponentSlotAssignments[String(player.id)];
+    const slot = effectiveOpponentSlots[String(player.id)];
     if (slot) {
       opponentSlotToPlayer.set(slot, player);
     }
