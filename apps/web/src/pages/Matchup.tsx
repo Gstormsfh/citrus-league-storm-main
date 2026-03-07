@@ -4582,6 +4582,31 @@ const Matchup = () => {
                   if (entry.slot_id) {
                     mySlots[playerId] = entry.slot_id;
                   }
+                } else if (entry.player_name) {
+                  // Server-provided player details fallback
+                  const isStarter = entry.slot_type === 'active';
+                  const isGoalie = entry.player_position === 'G';
+                  myRoster.push({
+                    id: Number(entry.player_id),
+                    name: entry.player_name,
+                    position: entry.player_position || '',
+                    team: entry.player_team || '',
+                    teamAbbreviation: entry.player_team_abbreviation || entry.player_team || '',
+                    points: 0,
+                    total_points: 0,
+                    headshot_url: entry.player_headshot_url || '',
+                    isStarter,
+                    isOnIR: entry.player_status === 'IR' || entry.player_status === 'SUSP',
+                    stats: { goals: 0, assists: 0, sog: 0, blk: 0, xGoals: 0 },
+                    matchupStats: { goals: 0, assists: 0, sog: 0, blk: 0, xGoals: 0 },
+                    games: [],
+                    gamesRemaining: 0,
+                    isGoalie,
+                    status: (entry.player_status || null) as any,
+                  } as MatchupPlayer);
+                  if (entry.slot_id) {
+                    mySlots[playerId] = entry.slot_id;
+                  }
                 }
               });
             } else {
@@ -4603,7 +4628,6 @@ const Matchup = () => {
             const oppSlots: Record<string, string> = {};
 
             if (oppDailyRoster.length > 0) {
-              const unmatchedOppIds: string[] = [];
               oppDailyRoster.forEach((entry: any) => {
                 const playerId = String(entry.player_id);
                 const enrichedPlayer = enrichedOppPlayerMap.get(playerId);
@@ -4617,14 +4641,35 @@ const Matchup = () => {
                   if (entry.slot_id) {
                     oppSlots[playerId] = entry.slot_id;
                   }
-                } else {
-                  unmatchedOppIds.push(playerId);
+                } else if (entry.player_name) {
+                  // Server-provided player details (joined from player_directory).
+                  // This fallback is critical for AI teams whose roster_assignments
+                  // are blocked by RLS, causing enrichedOppPlayerMap to be empty.
+                  const isStarter = entry.slot_type === 'active';
+                  const isGoalie = entry.player_position === 'G';
+                  oppRoster.push({
+                    id: Number(entry.player_id),
+                    name: entry.player_name,
+                    position: entry.player_position || '',
+                    team: entry.player_team || '',
+                    teamAbbreviation: entry.player_team_abbreviation || entry.player_team || '',
+                    points: 0,
+                    total_points: 0,
+                    headshot_url: entry.player_headshot_url || '',
+                    isStarter,
+                    isOnIR: entry.player_status === 'IR' || entry.player_status === 'SUSP',
+                    stats: { goals: 0, assists: 0, sog: 0, blk: 0, xGoals: 0 },
+                    matchupStats: { goals: 0, assists: 0, sog: 0, blk: 0, xGoals: 0 },
+                    games: [],
+                    gamesRemaining: 0,
+                    isGoalie,
+                    status: (entry.player_status || null) as any,
+                  } as MatchupPlayer);
+                  if (entry.slot_id) {
+                    oppSlots[playerId] = entry.slot_id;
+                  }
                 }
               });
-              if (unmatchedOppIds.length > 0) {
-                log(` [frozen-roster-diag] ${date}: ${unmatchedOppIds.length} opp entries unmatched in enrichment map. IDs:`, unmatchedOppIds.slice(0, 5),
-                  'enrichedOppPlayerMap keys:', Array.from(enrichedOppPlayerMap.keys()).slice(0, 5));
-              }
             } else if (matchupData.opponentTeam) {
               // FALLBACK: No fantasy_daily_rosters records for opponent on this past date.
               // Use the opponent's current roster as the best approximation.

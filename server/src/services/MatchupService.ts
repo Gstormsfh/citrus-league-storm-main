@@ -803,13 +803,48 @@ export class MatchupService {
       ]);
     }
 
-    const { data, error } = await admin
+    // Fetch frozen roster entries
+    const { data: entries, error } = await admin
       .from('fantasy_daily_rosters')
       .select('player_id, team_id, roster_date, slot_type, slot_id')
       .eq('matchup_id', matchupId)
       .in('roster_date', dates);
 
-    return { entries: data || [], error };
+    if (error || !entries || entries.length === 0) {
+      return { entries: entries || [], error };
+    }
+
+    // Join with player_directory to return player details.
+    // This eliminates the need for frontend enrichment, which fails for
+    // AI teams whose roster_assignments are blocked by RLS.
+    const uniquePlayerIds = [...new Set(entries.map((e: any) => Number(e.player_id)))];
+
+    const { data: players } = await admin
+      .from('player_directory')
+      .select('player_id, full_name, position, team, team_abbreviation, headshot_url, status')
+      .in('player_id', uniquePlayerIds);
+
+    const playerMap = new Map<number, any>();
+    (players || []).forEach((p: any) => {
+      playerMap.set(Number(p.player_id), p);
+    });
+
+    // Enrich entries with player details
+    const enrichedEntries = entries.map((entry: any) => {
+      const player = playerMap.get(Number(entry.player_id));
+      return {
+        ...entry,
+        // Player details (used by frontend to render without enrichment)
+        player_name: player?.full_name || '',
+        player_position: player?.position || '',
+        player_team: player?.team || '',
+        player_team_abbreviation: player?.team_abbreviation || '',
+        player_headshot_url: player?.headshot_url || '',
+        player_status: player?.status || null,
+      };
+    });
+
+    return { entries: enrichedEntries, error };
   }
 
   /** Lock completed days in fantasy_daily_rosters */
