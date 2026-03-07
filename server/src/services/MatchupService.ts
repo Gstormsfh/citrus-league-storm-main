@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { COLUMNS, logger } from '@citrus/shared';
+import { COLUMNS, CURRENT_SEASON, logger } from '@citrus/shared';
 import { getSupabaseAdmin } from '../lib/supabase';
 
 /**
@@ -118,7 +118,7 @@ export class MatchupService {
       .eq('league_id', leagueId);
 
     const ids = (data || []).map((r: any) => String(r.player_id));
-    console.log(`[getRosterPlayerIds] team=${teamId.slice(0,8)} count=${ids.length}${error ? ' ERROR: ' + error.message : ''}`);
+    logger.info(`[getRosterPlayerIds] team=${teamId.slice(0,8)} count=${ids.length}${error ? ' ERROR: ' + error.message : ''}`);
     return ids;
   }
 
@@ -289,20 +289,20 @@ export class MatchupService {
       .eq('league_id', leagueId);
 
     if (assignErr) {
-      console.error('[buildDefaultLineup] roster_assignments query error:', assignErr);
+      logger.error('[buildDefaultLineup] roster_assignments query error:', assignErr);
       return false;
     }
     if (!assignments || assignments.length === 0) {
-      console.error('[buildDefaultLineup] No roster_assignments for team', teamId);
+      logger.error('[buildDefaultLineup] No roster_assignments for team', teamId);
       return false;
     }
 
     const playerIds = assignments.map((a: { player_id: number }) => a.player_id);
-    console.log('[buildDefaultLineup] Found', playerIds.length, 'roster players for team', teamId);
+    logger.info('[buildDefaultLineup] Found', playerIds.length, 'roster players for team', teamId);
 
     // Get position info from player_directory — MUST filter by current season
     // to avoid duplicate rows (one per season per player)
-    const CURRENT_SEASON = 2025;
+    // Uses CURRENT_SEASON from @citrus/shared/constants
     const { data: players, error: pdErr } = await admin
       .from('player_directory')
       .select('player_id, position_code, is_goalie')
@@ -310,11 +310,11 @@ export class MatchupService {
       .eq('season', CURRENT_SEASON);
 
     if (pdErr) {
-      console.error('[buildDefaultLineup] player_directory query error:', pdErr);
+      logger.error('[buildDefaultLineup] player_directory query error:', pdErr);
       return false;
     }
     if (!players || players.length === 0) {
-      console.error('[buildDefaultLineup] No player_directory rows for season', CURRENT_SEASON, '— trying without season filter');
+      logger.error('[buildDefaultLineup] No player_directory rows for season', CURRENT_SEASON, '— trying without season filter');
       // Fallback: get latest row per player without season filter
       const { data: fallbackPlayers } = await admin
         .from('player_directory')
@@ -323,7 +323,7 @@ export class MatchupService {
         .order('season', { ascending: false });
 
       if (!fallbackPlayers || fallbackPlayers.length === 0) {
-        console.error('[buildDefaultLineup] No player_directory rows at all');
+        logger.error('[buildDefaultLineup] No player_directory rows at all');
         return false;
       }
       // Deduplicate — keep first row per player_id (latest season)
@@ -386,11 +386,11 @@ export class MatchupService {
     }
 
     if (starters.length === 0) {
-      console.error('[buildLineupFromPlayers] No starters generated for team', teamId);
+      logger.error('[buildLineupFromPlayers] No starters generated for team', teamId);
       return false;
     }
 
-    console.log('[buildLineupFromPlayers] Built lineup:', starters.length, 'starters,', bench.length, 'bench for team', teamId);
+    logger.info('[buildLineupFromPlayers] Built lineup:', starters.length, 'starters,', bench.length, 'bench for team', teamId);
 
     // Save to team_lineups via admin (bypasses RLS for AI teams)
     const { error: upsertErr } = await admin
@@ -409,11 +409,11 @@ export class MatchupService {
       );
 
     if (upsertErr) {
-      console.error('[buildLineupFromPlayers] team_lineups upsert error:', upsertErr);
+      logger.error('[buildLineupFromPlayers] team_lineups upsert error:', upsertErr);
       return false;
     }
 
-    console.log('[buildLineupFromPlayers] Saved team_lineups for team', teamId);
+    logger.info('[buildLineupFromPlayers] Saved team_lineups for team', teamId);
     return true;
   }
 
@@ -521,7 +521,7 @@ export class MatchupService {
     addRows(finalLineup.ir || [], 'ir', true);
 
     if (rows.length > 0) {
-      console.log('[backfillDailyRosters] Inserting', rows.length, 'rows for team', teamId);
+      logger.info('[backfillDailyRosters] Inserting', rows.length, 'rows for team', teamId);
       const { error: upsertErr } = await admin
         .from('fantasy_daily_rosters')
         .upsert(rows, {
@@ -529,10 +529,10 @@ export class MatchupService {
           ignoreDuplicates: true,
         });
       if (upsertErr) {
-        console.error('[backfillDailyRosters] upsert error:', upsertErr);
+        logger.error('[backfillDailyRosters] upsert error:', upsertErr);
       }
     } else {
-      console.log('[backfillDailyRosters] No missing rows for team', teamId);
+      logger.info('[backfillDailyRosters] No missing rows for team', teamId);
     }
   }
 
@@ -542,7 +542,7 @@ export class MatchupService {
    * Handles AI teams that never had a lineup saved (RLS-blocked on frontend).
    */
   async ensureMatchupRosters(matchupId: string) {
-    console.log('[ensureMatchupRosters] START for matchup:', matchupId);
+    logger.info('[ensureMatchupRosters] START for matchup:', matchupId);
     const admin = getSupabaseAdmin();
 
     const { data: matchup, error: matchupError } = await admin
@@ -552,7 +552,7 @@ export class MatchupService {
       .single();
 
     if (matchupError || !matchup) {
-      console.error('[ensureMatchupRosters] Matchup not found:', matchupId, matchupError);
+      logger.error('[ensureMatchupRosters] Matchup not found:', matchupId, matchupError);
       return { initialized: 0 };
     }
 
@@ -569,13 +569,13 @@ export class MatchupService {
         .maybeSingle();
 
       if (!lineup?.starters || (Array.isArray(lineup.starters) && lineup.starters.length === 0)) {
-        console.log('[ensureMatchupRosters] No lineup for team', teamId, '— building from roster_assignments');
+        logger.info('[ensureMatchupRosters] No lineup for team', teamId, '— building from roster_assignments');
         const created = await this.buildAndSaveDefaultLineup(admin, teamId, matchup.league_id);
         if (created) {
           initialized++;
-          console.log('[ensureMatchupRosters] Created lineup for team', teamId);
+          logger.info('[ensureMatchupRosters] Created lineup for team', teamId);
         } else {
-          console.error('[ensureMatchupRosters] Failed to create lineup for team', teamId, '— no roster_assignments?');
+          logger.error('[ensureMatchupRosters] Failed to create lineup for team', teamId, '— no roster_assignments?');
         }
       }
 
@@ -641,18 +641,18 @@ export class MatchupService {
     ]);
 
     if (team1Result.error) {
-      console.error('[calculateDailyMatchupScores] team1 RPC error:', team1Result.error);
+      logger.error('[calculateDailyMatchupScores] team1 RPC error:', team1Result.error);
       return { data: null, error: team1Result.error };
     }
     if (team2Result.error) {
-      console.error('[calculateDailyMatchupScores] team2 RPC error:', team2Result.error);
+      logger.error('[calculateDailyMatchupScores] team2 RPC error:', team2Result.error);
       return { data: null, error: team2Result.error };
     }
 
     // Log RPC results for debugging AI team scoring issues
     const team1Sum = (team1Result.data || []).reduce((s: number, r: any) => s + parseFloat(r.daily_score || 0), 0);
     const team2Sum = (team2Result.data || []).reduce((s: number, r: any) => s + parseFloat(r.daily_score || 0), 0);
-    console.log(`[calculateDailyMatchupScores] matchup=${matchupId} team1=${matchup.team1_id} sum=${team1Sum.toFixed(1)} team2=${matchup.team2_id} sum=${team2Sum.toFixed(1)}`);
+    logger.info(`[calculateDailyMatchupScores] matchup=${matchupId} team1=${matchup.team1_id} sum=${team1Sum.toFixed(1)} team2=${matchup.team2_id} sum=${team2Sum.toFixed(1)}`);
 
     // Combine results with team_id attached (frontend filters by team_id)
     const combined = [
@@ -849,7 +849,7 @@ export class MatchupService {
     });
 
     const withNames = enrichedEntries.filter((e: any) => e.player_name);
-    console.log(`[getFrozenRosterBatch] entries=${entries.length} playerDir=${players?.length || 0} enriched=${withNames.length}`);
+    logger.info(`[getFrozenRosterBatch] entries=${entries.length} playerDir=${players?.length || 0} enriched=${withNames.length}`);
     return { entries: enrichedEntries, error };
   }
 

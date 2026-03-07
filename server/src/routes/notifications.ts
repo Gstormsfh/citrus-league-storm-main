@@ -3,6 +3,8 @@ import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { createUserClient } from '../lib/supabase';
 import { NotificationService } from '../services/NotificationService';
+import { AppError } from '../lib/errors';
+import { ok, fail, handleError } from '../lib/responses';
 
 const notificationRoutes = new Hono<Env>();
 
@@ -16,13 +18,13 @@ notificationRoutes.put('/read-all', async (c) => {
   const service = new NotificationService(supabase);
 
   const leagueId = c.req.query('leagueId');
-  const { success, error } = await service.markAllAsRead(userId, leagueId);
+  const { success } = await service.markAllAsRead(userId, leagueId);
 
   if (!success) {
-    return c.json({ error: 'Failed to mark all as read' }, 400);
+    return fail(c, AppError.badRequest('Failed to mark all as read'));
   }
 
-  return c.json({ success: true });
+  return ok(c, { success: true });
 });
 
 // GET /api/notifications — Get notifications for the authenticated user
@@ -31,15 +33,15 @@ notificationRoutes.get('/', async (c) => {
   const supabase = createUserClient(c.get('userToken'));
   const service = new NotificationService(supabase);
 
-  const limit = parseInt(c.req.query('limit') || '50', 10);
+  const limit = Math.min(parseInt(c.req.query('limit') || '50', 10), 200);
   const unreadOnly = c.req.query('unread') === 'true';
 
   const { notifications, error } = await service.getNotifications(userId, { limit, unreadOnly });
   if (error) {
-    return c.json({ error: 'Failed to fetch notifications' }, 500);
+    return handleError(c, error, 'Failed to fetch notifications');
   }
 
-  return c.json({ data: notifications });
+  return ok(c, notifications);
 });
 
 // GET /api/notifications/unread-count — Get unread notification count
@@ -52,10 +54,10 @@ notificationRoutes.get('/unread-count', async (c) => {
   const { count, error } = await service.getUnreadCount(userId, leagueId);
 
   if (error) {
-    return c.json({ error: 'Failed to fetch count' }, 500);
+    return handleError(c, error, 'Failed to fetch count');
   }
 
-  return c.json({ data: { count } });
+  return ok(c, { count });
 });
 
 // PUT /api/notifications/:id/read — Mark a notification as read
@@ -65,21 +67,20 @@ notificationRoutes.put('/:id/read', async (c) => {
   const supabase = createUserClient(c.get('userToken'));
   const service = new NotificationService(supabase);
 
-  const { success, error } = await service.markAsRead(id, userId);
+  const { success } = await service.markAsRead(id, userId);
   if (!success) {
-    return c.json({ error: 'Failed to mark as read' }, 400);
+    return fail(c, AppError.badRequest('Failed to mark as read'));
   }
 
-  return c.json({ success: true });
+  return ok(c, { success: true });
 });
 
 // POST /api/notifications/chat — Send a chat message in a league
 notificationRoutes.post('/chat', async (c) => {
-  const userId = c.get('userId');
   const body = await c.req.json<{ leagueId: string; message: string; senderName?: string | null }>();
 
   if (!body.leagueId || !body.message?.trim()) {
-    return c.json({ error: 'leagueId and message are required' }, 400);
+    return fail(c, AppError.badRequest('leagueId and message are required'));
   }
 
   const supabase = createUserClient(c.get('userToken'));
@@ -91,14 +92,14 @@ notificationRoutes.post('/chat', async (c) => {
   });
 
   if (error) {
-    return c.json({ error: error.message || 'Failed to send message' }, 500);
+    return handleError(c, error, 'Failed to send message');
   }
 
   if (data && !data.success) {
-    return c.json({ error: data.error || 'Failed to send message' }, 400);
+    return fail(c, AppError.badRequest(data.error || 'Failed to send message'));
   }
 
-  return c.json({ data: { success: true } });
+  return ok(c, { success: true });
 });
 
 export { notificationRoutes };

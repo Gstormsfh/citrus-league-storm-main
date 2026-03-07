@@ -15,6 +15,7 @@ import { notificationRoutes } from './routes/notifications';
 import { stormyRoutes } from './routes/stormy';
 import { adminRoutes } from './routes/admin';
 import { standardRateLimit, strictRateLimit } from './middleware/rateLimit';
+import { AppError } from './lib/errors';
 
 export type Env = {
   Variables: {
@@ -111,14 +112,32 @@ app.notFound((c) => {
 // ── Global error handler ─────────────────────────────────────────────
 app.onError((err, c) => {
   const reqId = c.get('requestId');
+  // Note: console.error is acceptable here since this is the last-resort global
+  // error handler. The logger from @citrus/shared may not be initialized yet
+  // if the error occurs during startup.
   console.error(`[API Error] [${reqId}] ${c.req.method} ${c.req.path}:`, err.message);
   if (process.env.NODE_ENV === 'development') {
     console.error(err.stack);
   }
+
+  // If it's an AppError, use its status and code
+  if (err instanceof AppError) {
+    return c.json({
+      error: {
+        code: err.code,
+        message: err.message,
+        ...(err.details ? { details: err.details } : {}),
+      },
+      requestId: reqId,
+    }, err.status as any);
+  }
+
   return c.json({
-    error: 'Internal server error',
+    error: {
+      code: 'INTERNAL_ERROR',
+      message: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error',
+    },
     requestId: reqId,
-    message: process.env.NODE_ENV === 'development' ? err.message : undefined,
   }, 500);
 });
 

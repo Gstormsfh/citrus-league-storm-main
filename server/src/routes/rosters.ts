@@ -4,6 +4,8 @@ import { authMiddleware } from '../middleware/auth';
 import { membershipMiddleware } from '../middleware/membership';
 import { createUserClient } from '../lib/supabase';
 import { MatchupService } from '../services/MatchupService';
+import { AppError } from '../lib/errors';
+import { ok, fail, handleError } from '../lib/responses';
 import { COLUMNS } from '@citrus/shared';
 
 const rosterRoutes = new Hono<Env>();
@@ -23,14 +25,13 @@ rosterRoutes.get('/league/:leagueId/team/:teamId', membershipMiddleware, async (
     .eq('team_id', teamId);
 
   if (error) {
-    return c.json({ error: error.message }, 500);
+    return handleError(c, error, 'Failed to fetch roster');
   }
 
-  return c.json({ data: data || [] });
+  return ok(c, data || []);
 });
 
 // GET /api/rosters/league/:leagueId/team/:teamId/player-ids — Get roster player IDs
-// Uses admin client internally to bypass RLS (AI teams have owner_id = NULL)
 rosterRoutes.get('/league/:leagueId/team/:teamId/player-ids', membershipMiddleware, async (c) => {
   const leagueId = c.req.param('leagueId');
   const teamId = c.req.param('teamId');
@@ -38,7 +39,7 @@ rosterRoutes.get('/league/:leagueId/team/:teamId/player-ids', membershipMiddlewa
   const matchupService = new MatchupService(supabase);
 
   const playerIds = await matchupService.getRosterPlayerIds(teamId, leagueId);
-  return c.json({ data: playerIds });
+  return ok(c, playerIds);
 });
 
 // GET /api/rosters/league/:leagueId — Get all rosters in a league
@@ -52,10 +53,10 @@ rosterRoutes.get('/league/:leagueId', membershipMiddleware, async (c) => {
     .eq('league_id', leagueId);
 
   if (error) {
-    return c.json({ error: error.message }, 500);
+    return handleError(c, error, 'Failed to fetch rosters');
   }
 
-  return c.json({ data: data || [] });
+  return ok(c, data || []);
 });
 
 // PUT /api/rosters/league/:leagueId/team/:teamId/lineup — Update lineup
@@ -75,7 +76,7 @@ rosterRoutes.put('/league/:leagueId/team/:teamId/lineup', membershipMiddleware, 
     .single();
 
   if (!team || team.owner_id !== userId) {
-    return c.json({ error: 'You can only edit your own lineup' }, 403);
+    return fail(c, AppError.forbidden('You can only edit your own lineup'));
   }
 
   const { data, error } = await supabase
@@ -93,10 +94,10 @@ rosterRoutes.put('/league/:leagueId/team/:teamId/lineup', membershipMiddleware, 
     .single();
 
   if (error) {
-    return c.json({ error: error.message }, 400);
+    return handleError(c, error, 'Failed to update lineup');
   }
 
-  return c.json({ data });
+  return ok(c, data);
 });
 
 // GET /api/rosters/league/:leagueId/team/:teamId/lineup — Get team lineup
@@ -115,10 +116,10 @@ rosterRoutes.get('/league/:leagueId/team/:teamId/lineup', membershipMiddleware, 
     .maybeSingle();
 
   if (error) {
-    return c.json({ error: error.message }, 500);
+    return handleError(c, error, 'Failed to fetch lineup');
   }
 
-  return c.json({ data });
+  return ok(c, data);
 });
 
 export { rosterRoutes };

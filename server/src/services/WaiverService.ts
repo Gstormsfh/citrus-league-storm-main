@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { COLUMNS } from '@citrus/shared';
+import { COLUMNS, logger } from '@citrus/shared';
 import { LeagueMembershipService } from './LeagueMembershipService';
 
 /**
@@ -82,7 +82,7 @@ export class WaiverService {
     const { data, error } = await buildQuery(COLUMNS.WAIVER);
 
     if (error && this.isColumnError(error)) {
-      console.warn('[waivers] Column error, retrying with base columns:', error.message);
+      logger.warn('[waivers] Column error, retrying with base columns:', error.message);
       const fallback = await buildQuery(COLUMNS.WAIVER_BASE);
       return { claims: fallback.data || [], error: fallback.error };
     }
@@ -306,7 +306,7 @@ export class WaiverService {
 
     // If bid_amount column doesn't exist, treat all budgets as full
     if (claimsError && this.isColumnError(claimsError)) {
-      console.warn('[waivers] bid_amount column not ready, returning full budgets');
+      logger.warn('[waivers] bid_amount column not ready, returning full budgets');
       return (teams || []).map((t: any) => ({
         team_id: t.id,
         team_name: t.team_name,
@@ -352,7 +352,7 @@ export class WaiverService {
 
     // If waiver columns don't exist yet, fall back to just settings JSONB
     if (error && this.isColumnError(error)) {
-      console.warn('[waivers] Waiver columns missing on leagues table, using defaults');
+      logger.warn('[waivers] Waiver columns missing on leagues table, using defaults');
       const fallback = await this.supabase
         .from('leagues')
         .select('settings')

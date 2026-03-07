@@ -5,6 +5,9 @@ import { membershipMiddleware } from '../middleware/membership';
 import { validateBody, schemas } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { WaiverService } from '../services/WaiverService';
+import { AppError } from '../lib/errors';
+import { ok, created, fail, handleError } from '../lib/responses';
+import { logger } from '@citrus/shared';
 
 const waiverRoutes = new Hono<Env>();
 
@@ -21,14 +24,14 @@ waiverRoutes.get('/league/:leagueId', membershipMiddleware, async (c) => {
   if (error) {
     const msg = typeof error === 'object' && error !== null ? (error as any).message || '' : String(error);
     if (msg.includes('does not exist') || msg.includes('relation') || msg.includes('not found')) {
-      console.warn('[waivers] Table/column not ready, returning empty claims:', msg);
-      return c.json({ data: [] });
+      logger.warn('[waivers] Table/column not ready, returning empty claims:', msg);
+      return ok(c, []);
     }
-    console.error('[waivers] Failed to fetch league waivers:', JSON.stringify(error));
-    return c.json({ error: 'Failed to fetch waivers' }, 500);
+    logger.error('[waivers] Failed to fetch league waivers:', JSON.stringify(error));
+    return handleError(c, error, 'Failed to fetch waivers');
   }
 
-  return c.json({ data: claims });
+  return ok(c, claims);
 });
 
 // GET /api/waivers/league/:leagueId/team/:teamId — Get team waiver claims
@@ -41,17 +44,16 @@ waiverRoutes.get('/league/:leagueId/team/:teamId', membershipMiddleware, async (
 
   const { claims, error } = await service.getTeamWaiverClaims(leagueId, teamId, status);
   if (error) {
-    // If the table or columns don't exist yet, return empty array instead of 500
     const msg = typeof error === 'object' && error !== null ? (error as any).message || '' : String(error);
     if (msg.includes('does not exist') || msg.includes('relation') || msg.includes('not found')) {
-      console.warn('[waivers] Table/column not ready, returning empty claims:', msg);
-      return c.json({ data: [] });
+      logger.warn('[waivers] Table/column not ready, returning empty claims:', msg);
+      return ok(c, []);
     }
-    console.error('[waivers] Failed to fetch team waivers:', JSON.stringify(error));
-    return c.json({ error: 'Failed to fetch team waivers' }, 500);
+    logger.error('[waivers] Failed to fetch team waivers:', JSON.stringify(error));
+    return handleError(c, error, 'Failed to fetch team waivers');
   }
 
-  return c.json({ data: claims });
+  return ok(c, claims);
 });
 
 // GET /api/waivers/league/:leagueId/priority — Get waiver priority
@@ -64,13 +66,13 @@ waiverRoutes.get('/league/:leagueId/priority', membershipMiddleware, async (c) =
   if (error) {
     const msg = typeof error === 'object' && error !== null ? (error as any).message || '' : String(error);
     if (msg.includes('does not exist') || msg.includes('relation') || msg.includes('not found')) {
-      console.warn('[waivers] Priority table not ready, returning empty:', msg);
-      return c.json({ data: [] });
+      logger.warn('[waivers] Priority table not ready, returning empty:', msg);
+      return ok(c, []);
     }
-    return c.json({ error: 'Failed to fetch waiver priority' }, 500);
+    return handleError(c, error, 'Failed to fetch waiver priority');
   }
 
-  return c.json({ data: priority });
+  return ok(c, priority);
 });
 
 // GET /api/waivers/league/:leagueId/faab — Get all FAAB budgets
@@ -80,7 +82,7 @@ waiverRoutes.get('/league/:leagueId/faab', membershipMiddleware, async (c) => {
   const service = new WaiverService(supabase);
 
   const budgets = await service.getAllFAABBudgets(leagueId);
-  return c.json({ data: budgets });
+  return ok(c, budgets);
 });
 
 // GET /api/waivers/league/:leagueId/settings — Get waiver settings
@@ -93,11 +95,11 @@ waiverRoutes.get('/league/:leagueId/settings', membershipMiddleware, async (c) =
   try {
     const { settings, error } = await service.getLeagueWaiverSettings(leagueId, userId);
     if (error) {
-      return c.json({ error: 'Failed to fetch settings' }, 500);
+      return handleError(c, error, 'Failed to fetch settings');
     }
-    return c.json({ data: settings });
-  } catch (err: any) {
-    return c.json({ error: err.message }, 403);
+    return ok(c, settings);
+  } catch (err) {
+    return handleError(c, err, 'Failed to fetch waiver settings');
   }
 });
 
@@ -116,10 +118,10 @@ waiverRoutes.post('/league/:leagueId', membershipMiddleware, validateBody(schema
   );
 
   if (!success) {
-    return c.json({ error: error || 'Failed to submit waiver claim' }, 400);
+    return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to submit waiver claim'));
   }
 
-  return c.json({ data: { claimId } }, 201);
+  return created(c, { claimId });
 });
 
 // POST /api/waivers/league/:leagueId/faab-bid — Submit a FAAB bid
@@ -139,10 +141,10 @@ waiverRoutes.post('/league/:leagueId/faab-bid', membershipMiddleware, validateBo
   );
 
   if (!success) {
-    return c.json({ error: error || 'Failed to submit FAAB bid' }, 400);
+    return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to submit FAAB bid'));
   }
 
-  return c.json({ data: { claimId } }, 201);
+  return created(c, { claimId });
 });
 
 // POST /api/waivers/league/:leagueId/add-free-agent — Add free agent (instant)
@@ -162,10 +164,10 @@ waiverRoutes.post('/league/:leagueId/add-free-agent', membershipMiddleware, vali
   );
 
   if (!success) {
-    return c.json({ error: error || 'Failed to add free agent' }, 400);
+    return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to add free agent'));
   }
 
-  return c.json({ success: true });
+  return ok(c, { success: true });
 });
 
 // POST /api/waivers/league/:leagueId/drop-player — Drop player from roster
@@ -175,12 +177,16 @@ waiverRoutes.post('/league/:leagueId/drop-player', membershipMiddleware, async (
   const supabase = createUserClient(c.get('userToken'));
   const service = new WaiverService(supabase);
 
-  const { success, error } = await service.dropPlayer(leagueId, body.teamId, body.playerId);
-  if (!success) {
-    return c.json({ error: error || 'Failed to drop player' }, 400);
+  if (!body.teamId || !body.playerId) {
+    return fail(c, AppError.badRequest('teamId and playerId are required'));
   }
 
-  return c.json({ success: true });
+  const { success, error } = await service.dropPlayer(leagueId, body.teamId, body.playerId);
+  if (!success) {
+    return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to drop player'));
+  }
+
+  return ok(c, { success: true });
 });
 
 // DELETE /api/waivers/:claimId — Cancel a waiver claim
@@ -191,10 +197,10 @@ waiverRoutes.delete('/:claimId', async (c) => {
 
   const { success, error } = await service.cancelClaim(claimId);
   if (!success) {
-    return c.json({ error: error || 'Failed to cancel claim' }, 400);
+    return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to cancel claim'));
   }
 
-  return c.json({ success: true });
+  return ok(c, { success: true });
 });
 
 export { waiverRoutes };

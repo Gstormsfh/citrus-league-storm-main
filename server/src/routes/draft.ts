@@ -5,6 +5,8 @@ import { membershipMiddleware, commissionerMiddleware } from '../middleware/memb
 import { validateBody, schemas } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { DraftService } from '../services/DraftService';
+import { AppError } from '../lib/errors';
+import { ok, created, fail, handleError } from '../lib/responses';
 
 const draftRoutes = new Hono<Env>();
 
@@ -18,10 +20,10 @@ draftRoutes.get('/league/:leagueId/session', membershipMiddleware, async (c) => 
 
   const { sessionId, error } = await service.getActiveDraftSession(leagueId);
   if (error) {
-    return c.json({ error: 'Failed to get draft session' }, 500);
+    return handleError(c, error, 'Failed to get draft session');
   }
 
-  return c.json({ data: { sessionId } });
+  return ok(c, { sessionId });
 });
 
 // GET /api/draft/league/:leagueId/picks — Get draft picks
@@ -33,10 +35,10 @@ draftRoutes.get('/league/:leagueId/picks', membershipMiddleware, async (c) => {
 
   const { picks, error } = await service.getDraftPicks(leagueId, sessionId);
   if (error) {
-    return c.json({ error: 'Failed to fetch draft picks' }, 500);
+    return handleError(c, error, 'Failed to fetch draft picks');
   }
 
-  return c.json({ data: picks });
+  return ok(c, picks);
 });
 
 // GET /api/draft/league/:leagueId/order/:roundNumber — Get draft order for a round
@@ -44,15 +46,20 @@ draftRoutes.get('/league/:leagueId/order/:roundNumber', membershipMiddleware, as
   const leagueId = c.req.param('leagueId');
   const roundNumber = parseInt(c.req.param('roundNumber'), 10);
   const sessionId = c.req.query('sessionId');
+
+  if (isNaN(roundNumber) || roundNumber < 1) {
+    return fail(c, AppError.badRequest('Invalid round number'));
+  }
+
   const supabase = createUserClient(c.get('userToken'));
   const service = new DraftService(supabase);
 
   const { order, error } = await service.getDraftOrder(leagueId, roundNumber, sessionId);
   if (error) {
-    return c.json({ error: 'Failed to fetch draft order' }, 500);
+    return handleError(c, error, 'Failed to fetch draft order');
   }
 
-  return c.json({ data: order });
+  return ok(c, order);
 });
 
 // DELETE /api/draft/league/:leagueId — Hard delete draft data (commissioner only)
@@ -63,10 +70,10 @@ draftRoutes.delete('/league/:leagueId', commissionerMiddleware, async (c) => {
 
   const { error } = await service.hardDeleteDraft(leagueId);
   if (error) {
-    return c.json({ error: 'Failed to delete draft data' }, 500);
+    return handleError(c, error, 'Failed to delete draft data');
   }
 
-  return c.json({ data: { success: true } });
+  return ok(c, { success: true });
 });
 
 // GET /api/draft/league/:leagueId — Get draft state for a league
@@ -77,10 +84,10 @@ draftRoutes.get('/league/:leagueId', membershipMiddleware, async (c) => {
 
   const { league, picks, order, error } = await service.getDraftState(leagueId);
   if (error) {
-    return c.json({ error: 'Failed to fetch draft state' }, 500);
+    return handleError(c, error, 'Failed to fetch draft state');
   }
 
-  return c.json({ data: { league, picks, order } });
+  return ok(c, { league, picks, order });
 });
 
 // POST /api/draft/league/:leagueId/pick — Make a draft pick
@@ -103,10 +110,10 @@ draftRoutes.post('/league/:leagueId/pick', membershipMiddleware, validateBody(sc
   );
 
   if (error) {
-    return c.json({ error }, 400);
+    return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Draft pick failed'));
   }
 
-  return c.json({ data: { pick, isComplete } }, 201);
+  return created(c, { pick, isComplete });
 });
 
 // POST /api/draft/league/:leagueId/start — Start the draft (commissioner only)
@@ -119,11 +126,11 @@ draftRoutes.post('/league/:leagueId/start', commissionerMiddleware, async (c) =>
   try {
     const { league, error } = await service.startDraft(leagueId, userId);
     if (error) {
-      return c.json({ error: 'Failed to start draft' }, 400);
+      return fail(c, AppError.badRequest('Failed to start draft'));
     }
-    return c.json({ data: league });
-  } catch (err: any) {
-    return c.json({ error: err.message }, 403);
+    return ok(c, league);
+  } catch (err) {
+    return handleError(c, err, 'Failed to start draft');
   }
 });
 
@@ -143,10 +150,10 @@ draftRoutes.post('/league/:leagueId/initialize-order', commissionerMiddleware, a
   );
 
   if (error) {
-    return c.json({ error: 'Failed to initialize draft order' }, 400);
+    return fail(c, AppError.badRequest('Failed to initialize draft order'));
   }
 
-  return c.json({ data: { sessionId } });
+  return ok(c, { sessionId });
 });
 
 // POST /api/draft/league/:leagueId/reset — Reset draft (commissioner only)
@@ -157,10 +164,10 @@ draftRoutes.post('/league/:leagueId/reset', commissionerMiddleware, async (c) =>
 
   const { error, newSessionId } = await service.resetDraft(leagueId);
   if (error) {
-    return c.json({ error: 'Failed to reset draft' }, 400);
+    return fail(c, AppError.badRequest('Failed to reset draft'));
   }
 
-  return c.json({ data: { newSessionId } });
+  return ok(c, { newSessionId });
 });
 
 // POST /api/draft/league/:leagueId/undo — Undo last pick
@@ -171,10 +178,10 @@ draftRoutes.post('/league/:leagueId/undo', commissionerMiddleware, async (c) => 
 
   const { undone, error } = await service.undoLastPick(leagueId);
   if (error) {
-    return c.json({ error }, 400);
+    return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Undo failed'));
   }
 
-  return c.json({ data: { undone } });
+  return ok(c, { undone });
 });
 
 // POST /api/draft/league/:leagueId/autopick — Autopick for a team
@@ -193,10 +200,10 @@ draftRoutes.post('/league/:leagueId/autopick', membershipMiddleware, async (c) =
   );
 
   if (result.error) {
-    return c.json({ error: result.error }, 400);
+    return fail(c, AppError.badRequest(typeof result.error === 'string' ? result.error : 'Autopick failed'));
   }
 
-  return c.json({ data: result });
+  return ok(c, result);
 });
 
 // POST /api/draft/league/:leagueId/full-autopick — Run full autopick draft
@@ -207,10 +214,10 @@ draftRoutes.post('/league/:leagueId/full-autopick', commissionerMiddleware, asyn
 
   const { picks, error } = await service.runFullAutopickDraft(leagueId);
   if (error) {
-    return c.json({ error }, 400);
+    return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Full autopick failed'));
   }
 
-  return c.json({ data: { picks } });
+  return ok(c, { picks });
 });
 
 // GET /api/draft/league/:leagueId/snapshot — Get draft snapshot
@@ -221,10 +228,10 @@ draftRoutes.get('/league/:leagueId/snapshot', membershipMiddleware, async (c) =>
 
   const { snapshot, error } = await service.getDraftSnapshot(leagueId);
   if (error) {
-    return c.json({ error: 'Failed to fetch snapshot' }, 500);
+    return handleError(c, error, 'Failed to fetch snapshot');
   }
 
-  return c.json({ data: snapshot });
+  return ok(c, snapshot);
 });
 
 // POST /api/draft/league/:leagueId/snapshot — Save draft snapshot
@@ -243,10 +250,10 @@ draftRoutes.post('/league/:leagueId/snapshot', membershipMiddleware, async (c) =
   );
 
   if (error) {
-    return c.json({ error: 'Failed to save snapshot' }, 400);
+    return fail(c, AppError.badRequest('Failed to save snapshot'));
   }
 
-  return c.json({ data: { snapshotId } }, 201);
+  return created(c, { snapshotId });
 });
 
 // GET /api/draft/league/:leagueId/rankings — Get autopick rankings
@@ -258,10 +265,10 @@ draftRoutes.get('/league/:leagueId/rankings', membershipMiddleware, async (c) =>
 
   const { rankings, error } = await service.getAutopickRankings(leagueId, teamId);
   if (error) {
-    return c.json({ error: 'Failed to fetch rankings' }, 500);
+    return handleError(c, error, 'Failed to fetch rankings');
   }
 
-  return c.json({ data: rankings });
+  return ok(c, rankings);
 });
 
 // POST /api/draft/league/:leagueId/rankings — Save autopick rankings
@@ -273,10 +280,10 @@ draftRoutes.post('/league/:leagueId/rankings', membershipMiddleware, async (c) =
 
   const { error } = await service.saveAutopickRankings(leagueId, body.teamId, body.rankings);
   if (error) {
-    return c.json({ error: 'Failed to save rankings' }, 400);
+    return fail(c, AppError.badRequest('Failed to save rankings'));
   }
 
-  return c.json({ success: true });
+  return ok(c, { success: true });
 });
 
 export { draftRoutes };

@@ -5,10 +5,11 @@ import { membershipMiddleware, commissionerMiddleware } from '../middleware/memb
 import { validateBody, schemas } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { LeagueService } from '../services/LeagueService';
+import { AppError } from '../lib/errors';
+import { ok, created, fail, handleError } from '../lib/responses';
 
 const leagueRoutes = new Hono<Env>();
 
-// All league routes require authentication
 leagueRoutes.use('*', authMiddleware);
 
 // GET /api/leagues — Get all leagues for the authenticated user
@@ -19,10 +20,10 @@ leagueRoutes.get('/', async (c) => {
 
   const { leagues, error } = await service.getUserLeagues(userId);
   if (error) {
-    return c.json({ error: 'Failed to fetch leagues' }, 500);
+    return handleError(c, error, 'Failed to fetch leagues');
   }
 
-  return c.json({ data: leagues });
+  return ok(c, leagues);
 });
 
 // GET /api/leagues/:leagueId — Get a specific league
@@ -35,11 +36,11 @@ leagueRoutes.get('/:leagueId', membershipMiddleware, async (c) => {
   try {
     const { league, error } = await service.getLeague(leagueId, userId);
     if (error || !league) {
-      return c.json({ error: 'League not found' }, 404);
+      return fail(c, AppError.notFound('League'));
     }
-    return c.json({ data: league });
-  } catch (err: any) {
-    return c.json({ error: err.message }, 403);
+    return ok(c, league);
+  } catch (err) {
+    return handleError(c, err, 'Failed to fetch league');
   }
 });
 
@@ -61,10 +62,10 @@ leagueRoutes.post('/', validateBody(schemas.createLeague), async (c) => {
   );
 
   if (error || !league) {
-    return c.json({ error: error || 'Failed to create league' }, 400);
+    return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to create league'));
   }
 
-  return c.json({ data: { league, team } }, 201);
+  return created(c, { league, team });
 });
 
 // POST /api/leagues/join — Join a league by invite code
@@ -81,10 +82,10 @@ leagueRoutes.post('/join', validateBody(schemas.joinLeague), async (c) => {
   );
 
   if (error) {
-    return c.json({ error }, 400);
+    return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to join league'));
   }
 
-  return c.json({ data: { league, team } }, 201);
+  return created(c, { league, team });
 });
 
 // PUT /api/leagues/:leagueId/settings — Update league settings (commissioner only)
@@ -104,11 +105,11 @@ leagueRoutes.put('/:leagueId/settings', commissionerMiddleware, async (c) => {
     );
 
     if (error) {
-      return c.json({ error: error.message || error }, 400);
+      return handleError(c, error, 'Failed to update settings');
     }
-    return c.json({ data: league });
-  } catch (err: any) {
-    return c.json({ error: err.message }, 403);
+    return ok(c, league);
+  } catch (err) {
+    return handleError(c, err, 'Failed to update settings');
   }
 });
 
@@ -123,11 +124,11 @@ leagueRoutes.put('/:leagueId/waiver-settings', commissionerMiddleware, async (c)
   try {
     const { success, error } = await service.updateWaiverSettings(leagueId, userId, body);
     if (!success) {
-      return c.json({ error: error || 'Failed to update waiver settings' }, 400);
+      return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to update waiver settings'));
     }
-    return c.json({ success: true });
-  } catch (err: any) {
-    return c.json({ error: err.message }, 403);
+    return ok(c, { success: true });
+  } catch (err) {
+    return handleError(c, err, 'Failed to update waiver settings');
   }
 });
 
@@ -142,11 +143,11 @@ leagueRoutes.put('/:leagueId/scoring-settings', commissionerMiddleware, async (c
   try {
     const { success, error } = await service.updateScoringSettings(leagueId, userId, body);
     if (!success) {
-      return c.json({ error: error || 'Failed to update scoring settings' }, 400);
+      return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to update scoring settings'));
     }
-    return c.json({ success: true });
-  } catch (err: any) {
-    return c.json({ error: err.message }, 403);
+    return ok(c, { success: true });
+  } catch (err) {
+    return handleError(c, err, 'Failed to update scoring settings');
   }
 });
 
@@ -161,11 +162,11 @@ leagueRoutes.put('/:leagueId/draft-settings', commissionerMiddleware, async (c) 
   try {
     const { success, error } = await service.updateDraftSettings(leagueId, userId, body);
     if (!success) {
-      return c.json({ error: error || 'Failed to update draft settings' }, 400);
+      return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to update draft settings'));
     }
-    return c.json({ success: true });
-  } catch (err: any) {
-    return c.json({ error: err.message }, 403);
+    return ok(c, { success: true });
+  } catch (err) {
+    return handleError(c, err, 'Failed to update draft settings');
   }
 });
 
@@ -180,11 +181,11 @@ leagueRoutes.put('/:leagueId/roster-slots', commissionerMiddleware, async (c) =>
   try {
     const { success, error } = await service.updateRosterSlotSettings(leagueId, userId, body.rosterSlots);
     if (!success) {
-      return c.json({ error: error || 'Failed to update roster slots' }, 400);
+      return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to update roster slots'));
     }
-    return c.json({ success: true });
-  } catch (err: any) {
-    return c.json({ error: err.message }, 403);
+    return ok(c, { success: true });
+  } catch (err) {
+    return handleError(c, err, 'Failed to update roster slots');
   }
 });
 
@@ -197,13 +198,13 @@ leagueRoutes.get('/:leagueId/teams', membershipMiddleware, async (c) => {
 
   if (withOwners) {
     const { teams, error } = await service.getLeagueTeamsWithOwners(leagueId);
-    if (error) return c.json({ error }, 500);
-    return c.json({ data: teams });
+    if (error) return handleError(c, error, 'Failed to fetch teams');
+    return ok(c, teams);
   }
 
   const { teams, error } = await service.getLeagueTeams(leagueId);
-  if (error) return c.json({ error }, 500);
-  return c.json({ data: teams });
+  if (error) return handleError(c, error, 'Failed to fetch teams');
+  return ok(c, teams);
 });
 
 // GET /api/leagues/:leagueId/standings — Get league standings
@@ -213,8 +214,8 @@ leagueRoutes.get('/:leagueId/standings', membershipMiddleware, async (c) => {
   const service = new LeagueService(supabase);
 
   const { standings, error } = await service.getStandings(leagueId);
-  if (error) return c.json({ error }, 500);
-  return c.json({ data: standings });
+  if (error) return handleError(c, error, 'Failed to fetch standings');
+  return ok(c, standings);
 });
 
 // GET /api/leagues/:leagueId/my-team — Get user's team in a league
@@ -225,8 +226,8 @@ leagueRoutes.get('/:leagueId/my-team', membershipMiddleware, async (c) => {
   const service = new LeagueService(supabase);
 
   const { team, error } = await service.getUserTeam(leagueId, userId);
-  if (error) return c.json({ error }, 500);
-  return c.json({ data: team });
+  if (error) return handleError(c, error, 'Failed to fetch team');
+  return ok(c, team);
 });
 
 // DELETE /api/leagues/:leagueId/teams/:teamId — Delete a team (commissioner only)
@@ -239,10 +240,12 @@ leagueRoutes.delete('/:leagueId/teams/:teamId', commissionerMiddleware, async (c
 
   try {
     const { success, error } = await service.deleteTeam(teamId, leagueId, userId);
-    if (!success) return c.json({ error: error || 'Failed to delete team' }, 400);
-    return c.json({ success: true });
-  } catch (err: any) {
-    return c.json({ error: err.message }, 403);
+    if (!success) {
+      return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to delete team'));
+    }
+    return ok(c, { success: true });
+  } catch (err) {
+    return handleError(c, err, 'Failed to delete team');
   }
 });
 
@@ -253,8 +256,8 @@ leagueRoutes.get('/:leagueId/transactions', membershipMiddleware, async (c) => {
   const service = new LeagueService(supabase);
 
   const { transactions, error } = await service.fetchTransactions(leagueId);
-  if (error) return c.json({ error }, 500);
-  return c.json({ data: transactions });
+  if (error) return handleError(c, error, 'Failed to fetch transactions');
+  return ok(c, transactions);
 });
 
 export { leagueRoutes };

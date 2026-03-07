@@ -1,14 +1,18 @@
 import { Hono } from 'hono';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
-import { membershipMiddleware } from '../middleware/membership';
+import { membershipMiddleware, commissionerMiddleware } from '../middleware/membership';
 import { createUserClient } from '../lib/supabase';
 import { MatchupService } from '../services/MatchupService';
+import { AppError } from '../lib/errors';
+import { ok, fail, handleError } from '../lib/responses';
 import { logger } from '@citrus/shared';
 
 const matchupRoutes = new Hono<Env>();
 
 matchupRoutes.use('*', authMiddleware);
+
+// ── League-scoped routes (membership verified via :leagueId) ─────────
 
 // GET /api/matchups/league/:leagueId — Get all matchups for a league
 matchupRoutes.get('/league/:leagueId', membershipMiddleware, async (c) => {
@@ -23,10 +27,10 @@ matchupRoutes.get('/league/:leagueId', membershipMiddleware, async (c) => {
   );
 
   if (error) {
-    return c.json({ error: error.message || 'Failed to fetch matchups' }, 500);
+    return handleError(c, error, 'Failed to fetch matchups');
   }
 
-  return c.json({ data: matchups });
+  return ok(c, matchups);
 });
 
 // GET /api/matchups/league/:leagueId/user — Get user's matchup for a week
@@ -39,10 +43,10 @@ matchupRoutes.get('/league/:leagueId/user', membershipMiddleware, async (c) => {
 
   const { matchup, error } = await service.getUserMatchup(leagueId, userId, week);
   if (error) {
-    return c.json({ error: typeof error === 'string' ? error : error.message }, 500);
+    return handleError(c, error, 'Failed to fetch user matchup');
   }
 
-  return c.json({ data: matchup });
+  return ok(c, matchup);
 });
 
 // GET /api/matchups/league/:leagueId/history — Get matchup history between two teams
@@ -54,11 +58,11 @@ matchupRoutes.get('/league/:leagueId/history', membershipMiddleware, async (c) =
   const service = new MatchupService(supabase);
 
   if (!team1Id) {
-    return c.json({ error: 'team1 query parameter required' }, 400);
+    return fail(c, AppError.badRequest('team1 query parameter required'));
   }
 
   const { matchups } = await service.getMatchupHistory(leagueId, team1Id, team2Id);
-  return c.json({ data: matchups });
+  return ok(c, matchups);
 });
 
 // GET /api/matchups/league/:leagueId/playoffs — Get playoff bracket
@@ -68,8 +72,131 @@ matchupRoutes.get('/league/:leagueId/playoffs', membershipMiddleware, async (c) 
   const service = new MatchupService(supabase);
 
   const result = await service.getPlayoffBracket(leagueId);
-  return c.json({ data: result });
+  return ok(c, result);
 });
+
+// GET /api/matchups/league/:leagueId/team-record/:teamId — Get team W-L record
+matchupRoutes.get('/league/:leagueId/team-record/:teamId', membershipMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const teamId = c.req.param('teamId');
+  const supabase = createUserClient(c.get('userToken'));
+
+  const { data: matchups, error } = await supabase
+    .from('matchups')
+    .select('team1_id, team2_id, team1_score, team2_score, status')
+    .eq('league_id', leagueId)
+    .in('status', ['completed', 'in_progress'])
+    .or(`team1_id.eq.${teamId},team2_id.eq.${teamId}`);
+
+  if (error) {
+    return handleError(c, error, 'Failed to fetch team record');
+  }
+
+  let wins = 0;
+  let losses = 0;
+
+  (matchups || []).forEach((m: any) => {
+    if (m.status !== 'completed') return;
+    const isTeam1 = m.team1_id === teamId;
+    const myScore = parseFloat(isTeam1 ? m.team1_score : m.team2_score) || 0;
+    const oppScore = parseFloat(isTeam1 ? m.team2_score : m.team1_score) || 0;
+    if (myScore > oppScore) wins++;
+    else if (oppScore > myScore) losses++;
+  });
+
+  return ok(c, { wins, losses });
+});
+
+// GET /api/matchups/league/:leagueId/simulations — Get simulation data for a league week
+matchupRoutes.get('/league/:leagueId/simulations', membershipMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const weekNumber = c.req.query('week');
+  const supabase = createUserClient(c.get('userToken'));
+
+  let query = supabase
+    .from('matchup_simulations')
+    .select('*')
+    .eq('league_id', leagueId)
+    .order('simulated_at', { ascending: false });
+
+  if (weekNumber) {
+    query = query.eq('week_number', parseInt(weekNumber, 10));
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    return handleError(c, error, 'Failed to fetch simulations');
+  }
+
+  return ok(c, data || []);
+});
+
+// GET /api/matchups/league/:leagueId/brier-score — Get Brier score for a league
+matchupRoutes.get('/league/:leagueId/brier-score', membershipMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const season = parseInt(c.req.query('season') || '2025', 10);
+  const supabase = createUserClient(c.get('userToken'));
+
+  const { data, error } = await supabase
+    .rpc('get_league_brier_score', {
+      p_league_id: leagueId,
+      p_season: season,
+    });
+
+  if (error) {
+    return handleError(c, error, 'Failed to fetch Brier score');
+  }
+
+  return ok(c, data || []);
+});
+
+// DELETE /api/matchups/league/:leagueId — Delete all matchups (commissioner only)
+matchupRoutes.delete('/league/:leagueId', commissionerMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new MatchupService(supabase);
+
+  const { error } = await service.deleteAllMatchupsForLeague(leagueId);
+  if (error) {
+    return handleError(c, error, 'Failed to delete matchups');
+  }
+
+  return ok(c, { success: true });
+});
+
+// POST /api/matchups/league/:leagueId/generate — Generate matchups (commissioner only)
+matchupRoutes.post('/league/:leagueId/generate', commissionerMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const body = await c.req.json<{
+    teams: Array<{ id: string }>;
+    fantasyWeeks: Array<{ week_number: number; start_date: string; end_date: string }>;
+    forceRegenerate?: boolean;
+  }>();
+
+  if (!body.teams?.length || !body.fantasyWeeks?.length) {
+    return fail(c, AppError.badRequest('teams and fantasyWeeks are required'));
+  }
+
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new MatchupService(supabase);
+
+  const { error } = await service.generateMatchupsForLeague(
+    leagueId,
+    body.teams,
+    body.fantasyWeeks,
+    body.forceRegenerate,
+  );
+
+  if (error) {
+    return handleError(c, error, 'Failed to generate matchups');
+  }
+
+  return ok(c, { success: true });
+});
+
+// ── Matchup-by-ID routes ─────────────────────────────────────────────
+// RLS on the matchups table ensures users can only access matchups from
+// leagues they belong to. Auth middleware validates the JWT.
 
 // GET /api/matchups/:matchupId — Get a specific matchup with lines
 matchupRoutes.get('/:matchupId', async (c) => {
@@ -79,10 +206,10 @@ matchupRoutes.get('/:matchupId', async (c) => {
 
   const { matchup, lines, error } = await service.getMatchupWithLines(matchupId);
   if (error || !matchup) {
-    return c.json({ error: 'Matchup not found' }, 404);
+    return fail(c, AppError.notFound('Matchup'));
   }
 
-  return c.json({ data: { ...matchup, lines } });
+  return ok(c, { ...matchup, lines });
 });
 
 // GET /api/matchups/:matchupId/scores — Get matchup scores
@@ -93,10 +220,10 @@ matchupRoutes.get('/:matchupId/scores', async (c) => {
 
   const { scores, error } = await service.getMatchupScores(matchupId);
   if (error) {
-    return c.json({ error: error.message || 'Failed to fetch scores' }, 500);
+    return handleError(c, error, 'Failed to fetch scores');
   }
 
-  return c.json({ data: scores });
+  return ok(c, scores);
 });
 
 // GET /api/matchups/:matchupId/daily-scores — Calculate daily matchup scores
@@ -105,28 +232,135 @@ matchupRoutes.get('/:matchupId/daily-scores', async (c) => {
   const supabase = createUserClient(c.get('userToken'));
   const service = new MatchupService(supabase);
 
-  // Auto-ensure both teams have team_lineups + fantasy_daily_rosters before calculating scores.
-  // This is critical for AI teams (owner_id = NULL) that can't be saved via frontend RLS.
+  // Auto-ensure rosters for AI teams (owner_id = NULL, RLS-blocked)
   try {
     await service.ensureMatchupRosters(matchupId);
-  } catch (err: any) {
-    // Non-fatal - roster data may already exist
+  } catch (err) {
+    logger.debug('[matchups] ensureMatchupRosters non-fatal error:', err);
   }
 
   const { data, error } = await service.calculateDailyMatchupScores(matchupId);
   if (error) {
-    return c.json({ error: error.message || 'Failed to calculate scores' }, 500);
+    return handleError(c, error, 'Failed to calculate scores');
   }
 
-  return c.json({ data });
+  return ok(c, data);
 });
 
-// POST /api/matchups/projections/daily — Get daily projections for a batch of players
+// GET /api/matchups/:matchupId/lines — Get matchup lines (player stats)
+matchupRoutes.get('/:matchupId/lines', async (c) => {
+  const matchupId = c.req.param('matchupId');
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new MatchupService(supabase);
+
+  const { lines, error } = await service.getMatchupWithLines(matchupId);
+  if (error) {
+    return handleError(c, error, 'Failed to fetch matchup lines');
+  }
+
+  return ok(c, lines);
+});
+
+// GET /api/matchups/:matchupId/daily-lineup — Get frozen daily lineup
+matchupRoutes.get('/:matchupId/daily-lineup', async (c) => {
+  const matchupId = c.req.param('matchupId');
+  const teamId = c.req.query('teamId');
+  const date = c.req.query('date');
+
+  if (!teamId || !date) {
+    return fail(c, AppError.badRequest('teamId and date query parameters required'));
+  }
+
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new MatchupService(supabase);
+
+  const { lineup, error } = await service.getDailyLineup(teamId, matchupId, date);
+  if (error) {
+    return handleError(c, error, 'Failed to fetch daily lineup');
+  }
+
+  return ok(c, lineup);
+});
+
+// GET /api/matchups/:matchupId/frozen-roster — Get frozen roster entries
+matchupRoutes.get('/:matchupId/frozen-roster', async (c) => {
+  const matchupId = c.req.param('matchupId');
+  const teamId = c.req.query('teamId');
+  const date = c.req.query('date');
+
+  if (!teamId || !date) {
+    return fail(c, AppError.badRequest('teamId and date query parameters required'));
+  }
+
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new MatchupService(supabase);
+
+  const { roster, error } = await service.getFrozenRoster(teamId, matchupId, date);
+  if (error) {
+    return handleError(c, error, 'Failed to fetch frozen roster');
+  }
+
+  return ok(c, roster);
+});
+
+// POST /api/matchups/:matchupId/frozen-roster-batch — Get frozen roster entries for multiple dates
+matchupRoutes.post('/:matchupId/frozen-roster-batch', async (c) => {
+  const matchupId = c.req.param('matchupId');
+  const body = await c.req.json<{ dates: string[] }>();
+
+  if (!body.dates?.length) {
+    return fail(c, AppError.badRequest('dates (string[]) required'));
+  }
+
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new MatchupService(supabase);
+
+  const { entries, error } = await service.getFrozenRosterBatch(matchupId, body.dates);
+  if (error) {
+    return handleError(c, error, 'Failed to fetch frozen roster batch');
+  }
+
+  return ok(c, entries);
+});
+
+// POST /api/matchups/:matchupId/ensure-rosters — Ensure both teams have rosters
+matchupRoutes.post('/:matchupId/ensure-rosters', async (c) => {
+  const matchupId = c.req.param('matchupId');
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new MatchupService(supabase);
+
+  try {
+    const result = await service.ensureMatchupRosters(matchupId);
+    return ok(c, result);
+  } catch (err) {
+    logger.error('[ensure-rosters] Error:', err);
+    return handleError(c, err, 'Failed to ensure rosters');
+  }
+});
+
+// GET /api/matchups/:matchupId/simulation — Get simulation for a single matchup
+matchupRoutes.get('/:matchupId/simulation', async (c) => {
+  const matchupId = c.req.param('matchupId');
+  const supabase = createUserClient(c.get('userToken'));
+
+  const { data, error } = await supabase
+    .rpc('get_matchup_simulation', { p_matchup_id: matchupId });
+
+  if (error) {
+    return handleError(c, error, 'Failed to fetch simulation');
+  }
+
+  return ok(c, data || []);
+});
+
+// ── Batch / global operations ────────────────────────────────────────
+
+// POST /api/matchups/projections/daily — Get daily projections for players
 matchupRoutes.post('/projections/daily', async (c) => {
   const body = await c.req.json<{ playerIds: number[]; date: string }>();
 
   if (!body.playerIds?.length || !body.date) {
-    return c.json({ error: 'playerIds (number[]) and date (YYYY-MM-DD) are required' }, 400);
+    return fail(c, AppError.badRequest('playerIds (number[]) and date (YYYY-MM-DD) are required'));
   }
 
   const supabase = createUserClient(c.get('userToken'));
@@ -134,16 +368,15 @@ matchupRoutes.post('/projections/daily', async (c) => {
 
   const { projMap, error } = await service.getDailyProjections(body.playerIds, body.date);
   if (error) {
-    return c.json({ error: error.message || 'Failed to fetch projections' }, 500);
+    return handleError(c, error, 'Failed to fetch projections');
   }
 
-  // Convert Map to plain object for JSON serialization
   const projections: Record<string, any> = {};
   projMap.forEach((value, key) => {
     projections[String(key)] = value;
   });
 
-  return c.json({ data: projections });
+  return ok(c, projections);
 });
 
 // POST /api/matchups/update-scores — Update all matchup scores
@@ -154,10 +387,10 @@ matchupRoutes.post('/update-scores', async (c) => {
 
   const { data, error } = await service.updateMatchupScores(body.leagueId);
   if (error) {
-    return c.json({ error: error.message || 'Failed to update scores' }, 500);
+    return handleError(c, error, 'Failed to update scores');
   }
 
-  return c.json({ data });
+  return ok(c, data);
 });
 
 // POST /api/matchups/daily-game-stats — Get daily game stats for players
@@ -165,7 +398,7 @@ matchupRoutes.post('/daily-game-stats', async (c) => {
   const body = await c.req.json<{ playerIds: number[]; date: string }>();
 
   if (!body.playerIds?.length || !body.date) {
-    return c.json({ error: 'playerIds (number[]) and date (YYYY-MM-DD) are required' }, 400);
+    return fail(c, AppError.badRequest('playerIds (number[]) and date (YYYY-MM-DD) are required'));
   }
 
   const supabase = createUserClient(c.get('userToken'));
@@ -173,10 +406,10 @@ matchupRoutes.post('/daily-game-stats', async (c) => {
 
   const { stats, error } = await service.getDailyGameStats(body.playerIds, body.date);
   if (error) {
-    return c.json({ error: error.message || 'Failed to fetch daily game stats' }, 500);
+    return handleError(c, error, 'Failed to fetch daily game stats');
   }
 
-  return c.json({ data: stats });
+  return ok(c, stats);
 });
 
 // POST /api/matchups/matchup-stats — Get weekly matchup stats for players
@@ -184,7 +417,7 @@ matchupRoutes.post('/matchup-stats', async (c) => {
   const body = await c.req.json<{ playerIds: number[]; startDate: string; endDate: string }>();
 
   if (!body.playerIds?.length || !body.startDate || !body.endDate) {
-    return c.json({ error: 'playerIds, startDate, endDate required' }, 400);
+    return fail(c, AppError.badRequest('playerIds, startDate, endDate required'));
   }
 
   const supabase = createUserClient(c.get('userToken'));
@@ -192,94 +425,15 @@ matchupRoutes.post('/matchup-stats', async (c) => {
 
   const { statsMap, error } = await service.getMatchupStats(body.playerIds, body.startDate, body.endDate);
   if (error) {
-    return c.json({ error: error.message || 'Failed to fetch matchup stats' }, 500);
+    return handleError(c, error, 'Failed to fetch matchup stats');
   }
 
-  // Convert Map to plain object for JSON serialization
   const stats: Record<string, any> = {};
   statsMap.forEach((value, key) => {
     stats[String(key)] = value;
   });
 
-  return c.json({ data: stats });
-});
-
-// GET /api/matchups/:matchupId/daily-lineup — Get frozen daily lineup
-matchupRoutes.get('/:matchupId/daily-lineup', async (c) => {
-  const matchupId = c.req.param('matchupId');
-  const teamId = c.req.query('teamId');
-  const date = c.req.query('date');
-
-  if (!teamId || !date) {
-    return c.json({ error: 'teamId and date query parameters required' }, 400);
-  }
-
-  const supabase = createUserClient(c.get('userToken'));
-  const service = new MatchupService(supabase);
-
-  const { lineup, error } = await service.getDailyLineup(teamId, matchupId, date);
-  if (error) {
-    return c.json({ error: error.message || 'Failed to fetch daily lineup' }, 500);
-  }
-
-  return c.json({ data: lineup });
-});
-
-// GET /api/matchups/:matchupId/frozen-roster — Get frozen roster entries for a team/date
-matchupRoutes.get('/:matchupId/frozen-roster', async (c) => {
-  const matchupId = c.req.param('matchupId');
-  const teamId = c.req.query('teamId');
-  const date = c.req.query('date');
-
-  if (!teamId || !date) {
-    return c.json({ error: 'teamId and date query parameters required' }, 400);
-  }
-
-  const supabase = createUserClient(c.get('userToken'));
-  const service = new MatchupService(supabase);
-
-  const { roster, error } = await service.getFrozenRoster(teamId, matchupId, date);
-  if (error) {
-    return c.json({ error: error.message || 'Failed to fetch frozen roster' }, 500);
-  }
-
-  return c.json({ data: roster });
-});
-
-// POST /api/matchups/:matchupId/frozen-roster-batch — Get all frozen roster entries for multiple dates
-matchupRoutes.post('/:matchupId/frozen-roster-batch', async (c) => {
-  const matchupId = c.req.param('matchupId');
-  const body = await c.req.json<{ dates: string[] }>();
-
-  if (!body.dates?.length) {
-    return c.json({ error: 'dates (string[]) required' }, 400);
-  }
-
-  const supabase = createUserClient(c.get('userToken'));
-  const service = new MatchupService(supabase);
-
-  const { entries, error } = await service.getFrozenRosterBatch(matchupId, body.dates);
-  if (error) {
-    return c.json({ error: error.message || 'Failed to fetch frozen roster batch' }, 500);
-  }
-
-  return c.json({ data: entries });
-});
-
-// POST /api/matchups/:matchupId/ensure-rosters — Ensure both teams have team_lineups + fantasy_daily_rosters
-// Must be called BEFORE loading roster data to handle AI teams (no owner, RLS-blocked)
-matchupRoutes.post('/:matchupId/ensure-rosters', async (c) => {
-  const matchupId = c.req.param('matchupId');
-  const supabase = createUserClient(c.get('userToken'));
-  const service = new MatchupService(supabase);
-
-  try {
-    const result = await service.ensureMatchupRosters(matchupId);
-    return c.json({ data: result });
-  } catch (err) {
-    logger.error('[ensure-rosters] Error:', err);
-    return c.json({ error: 'Failed to ensure rosters' }, 500);
-  }
+  return ok(c, stats);
 });
 
 // POST /api/matchups/auto-complete — Auto-complete matchups
@@ -289,10 +443,10 @@ matchupRoutes.post('/auto-complete', async (c) => {
 
   const { success, error } = await service.autoCompleteMatchups();
   if (error) {
-    return c.json({ error }, 500);
+    return handleError(c, error, 'Failed to auto-complete matchups');
   }
 
-  return c.json({ data: { success } });
+  return ok(c, { success });
 });
 
 // POST /api/matchups/h2h-category-results — Calculate H2H category matchup
@@ -315,10 +469,10 @@ matchupRoutes.post('/h2h-category-results', async (c) => {
   );
 
   if (error) {
-    return c.json({ error: error.message || 'Failed to calculate H2H results' }, 500);
+    return handleError(c, error, 'Failed to calculate H2H results');
   }
 
-  return c.json({ data: results });
+  return ok(c, results);
 });
 
 // POST /api/matchups/roto-standings — Calculate Roto standings
@@ -332,10 +486,10 @@ matchupRoutes.post('/roto-standings', async (c) => {
   );
 
   if (error) {
-    return c.json({ error: error.message || 'Failed to calculate Roto standings' }, 500);
+    return handleError(c, error, 'Failed to calculate Roto standings');
   }
 
-  return c.json({ data: standings });
+  return ok(c, standings);
 });
 
 // POST /api/matchups/ppg-standings — Calculate PPG standings
@@ -349,10 +503,10 @@ matchupRoutes.post('/ppg-standings', async (c) => {
   );
 
   if (error) {
-    return c.json({ error: error.message || 'Failed to calculate PPG standings' }, 500);
+    return handleError(c, error, 'Failed to calculate PPG standings');
   }
 
-  return c.json({ data: standings });
+  return ok(c, standings);
 });
 
 // POST /api/matchups/lock-completed-days — Lock completed roster days
@@ -362,10 +516,10 @@ matchupRoutes.post('/lock-completed-days', async (c) => {
 
   const { lockedCount, error } = await service.lockCompletedDays();
   if (error) {
-    return c.json({ error: error.message || 'Failed to lock completed days' }, 500);
+    return handleError(c, error, 'Failed to lock completed days');
   }
 
-  return c.json({ data: { lockedCount } });
+  return ok(c, { lockedCount });
 });
 
 // GET /api/matchups/job-status — Get matchup score job status
@@ -374,156 +528,7 @@ matchupRoutes.get('/job-status', async (c) => {
   const service = new MatchupService(supabase);
 
   const status = await service.getJobStatus();
-  return c.json({ data: status });
-});
-
-// DELETE /api/matchups/league/:leagueId — Delete all matchups for a league
-matchupRoutes.delete('/league/:leagueId', membershipMiddleware, async (c) => {
-  const leagueId = c.req.param('leagueId');
-  const supabase = createUserClient(c.get('userToken'));
-  const service = new MatchupService(supabase);
-
-  const { error } = await service.deleteAllMatchupsForLeague(leagueId);
-  if (error) {
-    return c.json({ error: error.message || 'Failed to delete matchups' }, 500);
-  }
-
-  return c.json({ data: { success: true } });
-});
-
-// POST /api/matchups/league/:leagueId/generate — Generate matchups for a league
-matchupRoutes.post('/league/:leagueId/generate', membershipMiddleware, async (c) => {
-  const leagueId = c.req.param('leagueId');
-  const body = await c.req.json<{
-    teams: Array<{ id: string }>;
-    fantasyWeeks: Array<{ week_number: number; start_date: string; end_date: string }>;
-    forceRegenerate?: boolean;
-  }>();
-
-  if (!body.teams?.length || !body.fantasyWeeks?.length) {
-    return c.json({ error: 'teams and fantasyWeeks are required' }, 400);
-  }
-
-  const supabase = createUserClient(c.get('userToken'));
-  const service = new MatchupService(supabase);
-
-  const { error } = await service.generateMatchupsForLeague(
-    leagueId,
-    body.teams,
-    body.fantasyWeeks,
-    body.forceRegenerate,
-  );
-
-  if (error) {
-    return c.json({ error: error.message || 'Failed to generate matchups' }, 500);
-  }
-
-  return c.json({ data: { success: true } });
-});
-
-// GET /api/matchups/:matchupId/lines — Get matchup lines (player stats)
-matchupRoutes.get('/:matchupId/lines', async (c) => {
-  const matchupId = c.req.param('matchupId');
-  const supabase = createUserClient(c.get('userToken'));
-  const service = new MatchupService(supabase);
-
-  const { lines, error } = await service.getMatchupWithLines(matchupId);
-  if (error) {
-    return c.json({ error: error.message || 'Failed to fetch matchup lines' }, 500);
-  }
-
-  return c.json({ data: lines });
-});
-
-// GET /api/matchups/league/:leagueId/team-record/:teamId — Get team W-L record
-matchupRoutes.get('/league/:leagueId/team-record/:teamId', membershipMiddleware, async (c) => {
-  const leagueId = c.req.param('leagueId');
-  const teamId = c.req.param('teamId');
-  const supabase = createUserClient(c.get('userToken'));
-
-  // Calculate record from completed matchups
-  const { data: matchups, error } = await supabase
-    .from('matchups')
-    .select('team1_id, team2_id, team1_score, team2_score, status')
-    .eq('league_id', leagueId)
-    .in('status', ['completed', 'in_progress'])
-    .or(`team1_id.eq.${teamId},team2_id.eq.${teamId}`);
-
-  if (error) {
-    return c.json({ error: error.message || 'Failed to fetch team record' }, 500);
-  }
-
-  let wins = 0;
-  let losses = 0;
-
-  (matchups || []).forEach((m: any) => {
-    if (m.status !== 'completed') return;
-    const isTeam1 = m.team1_id === teamId;
-    const myScore = parseFloat(isTeam1 ? m.team1_score : m.team2_score) || 0;
-    const oppScore = parseFloat(isTeam1 ? m.team2_score : m.team1_score) || 0;
-    if (myScore > oppScore) wins++;
-    else if (oppScore > myScore) losses++;
-  });
-
-  return c.json({ data: { wins, losses } });
-});
-
-// GET /api/matchups/league/:leagueId/simulations — Get simulation data for a league week
-matchupRoutes.get('/league/:leagueId/simulations', membershipMiddleware, async (c) => {
-  const leagueId = c.req.param('leagueId');
-  const weekNumber = c.req.query('week');
-  const supabase = createUserClient(c.get('userToken'));
-
-  let query = supabase
-    .from('matchup_simulations')
-    .select('*')
-    .eq('league_id', leagueId)
-    .order('simulated_at', { ascending: false });
-
-  if (weekNumber) {
-    query = query.eq('week_number', parseInt(weekNumber, 10));
-  }
-
-  const { data, error } = await query;
-  if (error) {
-    return c.json({ error: error.message || 'Failed to fetch simulations' }, 500);
-  }
-
-  return c.json({ data: data || [] });
-});
-
-// GET /api/matchups/:matchupId/simulation — Get simulation for a single matchup
-matchupRoutes.get('/:matchupId/simulation', async (c) => {
-  const matchupId = c.req.param('matchupId');
-  const supabase = createUserClient(c.get('userToken'));
-
-  const { data, error } = await supabase
-    .rpc('get_matchup_simulation', { p_matchup_id: matchupId });
-
-  if (error) {
-    return c.json({ error: error.message || 'Failed to fetch simulation' }, 500);
-  }
-
-  return c.json({ data: data || [] });
-});
-
-// GET /api/matchups/league/:leagueId/brier-score — Get Brier score for a league
-matchupRoutes.get('/league/:leagueId/brier-score', membershipMiddleware, async (c) => {
-  const leagueId = c.req.param('leagueId');
-  const season = parseInt(c.req.query('season') || '2025', 10);
-  const supabase = createUserClient(c.get('userToken'));
-
-  const { data, error } = await supabase
-    .rpc('get_league_brier_score', {
-      p_league_id: leagueId,
-      p_season: season,
-    });
-
-  if (error) {
-    return c.json({ error: error.message || 'Failed to fetch Brier score' }, 500);
-  }
-
-  return c.json({ data: data || [] });
+  return ok(c, status);
 });
 
 export { matchupRoutes };

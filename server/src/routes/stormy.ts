@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { validateBody, schemas } from '../middleware/validate';
+import { AppError } from '../lib/errors';
+import { ok, fail } from '../lib/responses';
 
 const stormyRoutes = new Hono<Env>();
 
@@ -14,13 +16,11 @@ stormyRoutes.post('/chat', validateBody(schemas.stormyChat), async (c) => {
 
   const { message, leagueId, context } = body;
 
-  // TODO: Migrate stormy-chat edge function logic here
-  // For now, proxy to the existing edge function
   const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    return c.json({ error: 'Server configuration error' }, 500);
+    return fail(c, AppError.serviceUnavailable('Server configuration error'));
   }
 
   try {
@@ -35,9 +35,18 @@ stormyRoutes.post('/chat', validateBody(schemas.stormyChat), async (c) => {
     });
 
     const data = await response.json();
-    return c.json(data, response.status as any);
-  } catch (error) {
-    return c.json({ error: 'Failed to reach Stormy' }, 502);
+
+    if (!response.ok) {
+      return fail(c, new AppError(
+        data.error || 'Stormy request failed',
+        response.status as number,
+        response.status === 429 ? 'RATE_LIMITED' : 'BAD_GATEWAY',
+      ));
+    }
+
+    return ok(c, data);
+  } catch {
+    return fail(c, AppError.badGateway('Failed to reach Stormy'));
   }
 });
 

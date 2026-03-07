@@ -3,6 +3,9 @@ import type { Env } from '../app';
 import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth';
 import { createUserClient } from '../lib/supabase';
 import { PlayerService } from '../services/PlayerService';
+import { AppError } from '../lib/errors';
+import { ok, fail, handleError } from '../lib/responses';
+import { logger } from '@citrus/shared';
 
 const playerRoutes = new Hono<Env>();
 
@@ -10,7 +13,7 @@ const playerRoutes = new Hono<Env>();
 playerRoutes.get('/', optionalAuthMiddleware, async (c) => {
   const token = c.get('userToken');
   if (!token) {
-    return c.json({ error: 'Authentication required' }, 401);
+    return fail(c, AppError.unauthorized());
   }
   const supabase = createUserClient(token);
   const service = new PlayerService(supabase);
@@ -21,12 +24,12 @@ playerRoutes.get('/', optionalAuthMiddleware, async (c) => {
 
   if (search) {
     const { players } = await service.searchPlayers(search);
-    return c.json({ data: limit ? players.slice(0, limit) : players });
+    return ok(c, limit ? players.slice(0, limit) : players);
   }
 
   const { players, error } = await service.getAllPlayers();
   if (error) {
-    return c.json({ error: 'Failed to fetch players' }, 500);
+    return handleError(c, error, 'Failed to fetch players');
   }
 
   let filtered = players;
@@ -39,7 +42,7 @@ playerRoutes.get('/', optionalAuthMiddleware, async (c) => {
     filtered = filtered.slice(0, limit);
   }
 
-  return c.json({ data: filtered });
+  return ok(c, filtered);
 });
 
 // GET /api/players/trending — Get trending players (platform-wide)
@@ -50,7 +53,7 @@ playerRoutes.get('/trending', authMiddleware, async (c) => {
 
   const { trending, error } = await service.getTrendingPlayers(daysBack);
   if (error) {
-    return c.json({ error: 'Failed to fetch trending' }, 500);
+    return handleError(c, error, 'Failed to fetch trending');
   }
 
   const data = Array.from(trending.entries()).map(([playerId, stats]) => ({
@@ -58,14 +61,14 @@ playerRoutes.get('/trending', authMiddleware, async (c) => {
     ...stats,
   }));
 
-  return c.json({ data });
+  return ok(c, data);
 });
 
 // GET /api/players/by-ids — Get players by IDs (batch)
 playerRoutes.get('/by-ids', authMiddleware, async (c) => {
   const ids = c.req.query('ids');
   if (!ids) {
-    return c.json({ error: 'ids query parameter required' }, 400);
+    return fail(c, AppError.badRequest('ids query parameter required'));
   }
 
   const supabase = createUserClient(c.get('userToken'));
@@ -74,10 +77,10 @@ playerRoutes.get('/by-ids', authMiddleware, async (c) => {
 
   const { players, error } = await service.getPlayersByIds(playerIds);
   if (error) {
-    return c.json({ error: 'Failed to fetch players' }, 500);
+    return handleError(c, error, 'Failed to fetch players');
   }
 
-  return c.json({ data: players });
+  return ok(c, players);
 });
 
 // GET /api/players/:playerId — Get a single player
@@ -88,10 +91,10 @@ playerRoutes.get('/:playerId', authMiddleware, async (c) => {
 
   const { player, error } = await service.getPlayer(playerId);
   if (error || !player) {
-    return c.json({ error: 'Player not found' }, 404);
+    return fail(c, AppError.notFound('Player'));
   }
 
-  return c.json({ data: player });
+  return ok(c, player);
 });
 
 // GET /api/players/:playerId/stats — Get player season stats
@@ -107,21 +110,19 @@ playerRoutes.get('/:playerId/stats', authMiddleware, async (c) => {
   );
 
   if (error) {
-    return c.json({ error: 'Failed to fetch stats' }, 500);
+    return handleError(c, error, 'Failed to fetch stats');
   }
 
-  return c.json({ data: stats });
+  return ok(c, stats);
 });
 
 // GET /api/players/:playerId/projections — Get player projections
-// ?startDate=YYYY-MM-DD returns all projections from that date onward
 playerRoutes.get('/:playerId/projections', authMiddleware, async (c) => {
   const playerId = c.req.param('playerId');
   const startDate = c.req.query('startDate');
   const supabase = createUserClient(c.get('userToken'));
 
   try {
-    // Core columns only — guaranteed to exist from base + goalie + expanded migrations
     const coreColumns = [
       'projection_id', 'player_id', 'game_id', 'projection_date', 'season',
       'projected_goals', 'projected_assists', 'projected_sog', 'projected_blocks',
@@ -150,19 +151,19 @@ playerRoutes.get('/:playerId/projections', authMiddleware, async (c) => {
     const { data, error } = await query;
 
     if (error) {
-      console.error(`[players/:id/projections] Supabase error for player ${playerId}:`, JSON.stringify({
+      logger.error(`[players/:id/projections] Supabase error for player ${playerId}:`, JSON.stringify({
         message: error.message,
         details: (error as any).details,
         hint: (error as any).hint,
         code: (error as any).code,
       }));
-      return c.json({ error: 'Failed to fetch projections', details: error.message }, 500);
+      return handleError(c, error, 'Failed to fetch projections');
     }
 
-    return c.json({ data: data || [] });
-  } catch (err: any) {
-    console.error(`[players/:id/projections] Unexpected error for player ${playerId}:`, err.message, err.stack);
-    return c.json({ error: 'Failed to fetch projections', details: err.message }, 500);
+    return ok(c, data || []);
+  } catch (err) {
+    logger.error(`[players/:id/projections] Unexpected error for player ${playerId}:`, err);
+    return handleError(c, err, 'Failed to fetch projections');
   }
 });
 
