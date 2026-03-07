@@ -90,7 +90,7 @@ export function rateLimitMiddleware(options: RateLimitOptions = {}) {
     c.header('X-RateLimit-Reset', String(Math.ceil(ipResult.resetAt / 1000)));
 
     if (!ipResult.allowed) {
-      return c.json({ error: 'Too many requests. Please try again later.' }, 429);
+      return c.json({ error: { code: 'RATE_LIMITED', message: 'Too many requests. Please try again later.' } }, 429);
     }
 
     if (perUser) {
@@ -98,7 +98,7 @@ export function rateLimitMiddleware(options: RateLimitOptions = {}) {
       if (userId) {
         const userResult = checkLimit(userBuckets, userId, maxUserRequests, windowMs);
         if (!userResult.allowed) {
-          return c.json({ error: 'Too many requests. Please try again later.' }, 429);
+          return c.json({ error: { code: 'RATE_LIMITED', message: 'Too many requests. Please try again later.' } }, 429);
         }
       }
     }

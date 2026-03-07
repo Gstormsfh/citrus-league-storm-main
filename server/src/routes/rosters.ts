@@ -64,7 +64,18 @@ rosterRoutes.put('/league/:leagueId/team/:teamId/lineup', membershipMiddleware, 
   const leagueId = c.req.param('leagueId');
   const teamId = c.req.param('teamId');
   const userId = c.get('userId');
-  const body = await c.req.json();
+  let body: Record<string, unknown>;
+  try {
+    body = await c.req.json();
+  } catch {
+    return fail(c, AppError.badRequest('Invalid JSON body'));
+  }
+
+  const parsedTeamId = parseInt(teamId, 10);
+  if (isNaN(parsedTeamId)) {
+    return fail(c, AppError.badRequest('Invalid team ID'));
+  }
+
   const supabase = createUserClient(c.get('userToken'));
 
   // Verify user owns this team
@@ -82,7 +93,7 @@ rosterRoutes.put('/league/:leagueId/team/:teamId/lineup', membershipMiddleware, 
   const { data, error } = await supabase
     .from('team_lineups')
     .upsert({
-      team_id: parseInt(teamId, 10),
+      team_id: parsedTeamId,
       league_id: leagueId,
       starters: body.starters,
       bench: body.bench,
@@ -109,7 +120,7 @@ rosterRoutes.get('/league/:leagueId/team/:teamId/lineup', membershipMiddleware, 
   const { data, error } = await supabase
     .from('team_lineups')
     .select('*')
-    .eq('team_id', parseInt(teamId, 10))
+    .eq('team_id', teamId)
     .eq('league_id', leagueId)
     .order('updated_at', { ascending: false })
     .limit(1)

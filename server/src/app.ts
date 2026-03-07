@@ -106,7 +106,7 @@ app.route('/api/admin', adminRoutes);
 
 // ── 404 handler ──────────────────────────────────────────────────────
 app.notFound((c) => {
-  return c.json({ error: 'Not found', path: c.req.path }, 404);
+  return c.json({ error: { code: 'NOT_FOUND', message: 'Not found' }, path: c.req.path }, 404);
 });
 
 // ── Global error handler ─────────────────────────────────────────────

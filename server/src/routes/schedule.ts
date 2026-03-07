@@ -68,7 +68,7 @@ scheduleRoutes.get('/games/teams', async (c) => {
   const { gamesByTeam, error } = await service.getGamesForTeams(teamAbbrevs, startDate, endDate);
   if (error) return handleError(c, error, 'Failed to fetch games');
 
-  const result: Record<string, any[]> = {};
+  const result: Record<string, unknown[]> = {};
   gamesByTeam.forEach((games, team) => {
     result[team] = games;
   });

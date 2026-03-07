@@ -2,7 +2,8 @@ import { Hono } from 'hono';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { membershipMiddleware, commissionerMiddleware } from '../middleware/membership';
-import { validateBody, schemas } from '../middleware/validate';
+import { z } from 'zod';
+import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { LeagueService } from '../services/LeagueService';
 import { AppError } from '../lib/errors';
@@ -47,7 +48,7 @@ leagueRoutes.get('/:leagueId', membershipMiddleware, async (c) => {
 // POST /api/leagues — Create a new league
 leagueRoutes.post('/', validateBody(schemas.createLeague), async (c) => {
   const userId = c.get('userId');
-  const body = (c as any).get('validatedBody');
+  const body = getValidatedBody<z.infer<typeof schemas.createLeague>>(c);
   const supabase = createUserClient(c.get('userToken'));
   const service = new LeagueService(supabase);
 
@@ -56,9 +57,9 @@ leagueRoutes.post('/', validateBody(schemas.createLeague), async (c) => {
     userId,
     body.roster_size,
     body.draft_rounds,
-    body.settings,
-    body.scoring_settings,
-    body.waiver_settings,
+    body.settings as Record<string, unknown> | undefined,
+    body.scoring_settings as Record<string, number> | undefined,
+    body.waiver_settings as Record<string, unknown> | undefined,
   );
 
   if (error || !league) {
@@ -71,7 +72,7 @@ leagueRoutes.post('/', validateBody(schemas.createLeague), async (c) => {
 // POST /api/leagues/join — Join a league by invite code
 leagueRoutes.post('/join', validateBody(schemas.joinLeague), async (c) => {
   const userId = c.get('userId');
-  const body = (c as any).get('validatedBody');
+  const body = getValidatedBody<z.infer<typeof schemas.joinLeague>>(c);
   const supabase = createUserClient(c.get('userToken'));
   const service = new LeagueService(supabase);
 
@@ -92,7 +93,13 @@ leagueRoutes.post('/join', validateBody(schemas.joinLeague), async (c) => {
 leagueRoutes.put('/:leagueId/settings', commissionerMiddleware, async (c) => {
   const leagueId = c.req.param('leagueId');
   const userId = c.get('userId');
-  const body = await c.req.json();
+  let body: Record<string, unknown>;
+  try {
+    body = await c.req.json();
+  } catch {
+    return fail(c, AppError.badRequest('Invalid JSON body'));
+  }
+
   const supabase = createUserClient(c.get('userToken'));
   const service = new LeagueService(supabase);
 
@@ -117,7 +124,14 @@ leagueRoutes.put('/:leagueId/settings', commissionerMiddleware, async (c) => {
 leagueRoutes.put('/:leagueId/waiver-settings', commissionerMiddleware, async (c) => {
   const leagueId = c.req.param('leagueId');
   const userId = c.get('userId');
-  const body = await c.req.json();
+
+  let body: Record<string, unknown>;
+  try {
+    body = await c.req.json();
+  } catch {
+    return fail(c, AppError.badRequest('Invalid JSON body'));
+  }
+
   const supabase = createUserClient(c.get('userToken'));
   const service = new LeagueService(supabase);
 
@@ -136,7 +150,14 @@ leagueRoutes.put('/:leagueId/waiver-settings', commissionerMiddleware, async (c)
 leagueRoutes.put('/:leagueId/scoring-settings', commissionerMiddleware, async (c) => {
   const leagueId = c.req.param('leagueId');
   const userId = c.get('userId');
-  const body = await c.req.json();
+
+  let body: Record<string, unknown>;
+  try {
+    body = await c.req.json();
+  } catch {
+    return fail(c, AppError.badRequest('Invalid JSON body'));
+  }
+
   const supabase = createUserClient(c.get('userToken'));
   const service = new LeagueService(supabase);
 
@@ -155,7 +176,14 @@ leagueRoutes.put('/:leagueId/scoring-settings', commissionerMiddleware, async (c
 leagueRoutes.put('/:leagueId/draft-settings', commissionerMiddleware, async (c) => {
   const leagueId = c.req.param('leagueId');
   const userId = c.get('userId');
-  const body = await c.req.json();
+
+  let body: Record<string, unknown>;
+  try {
+    body = await c.req.json();
+  } catch {
+    return fail(c, AppError.badRequest('Invalid JSON body'));
+  }
+
   const supabase = createUserClient(c.get('userToken'));
   const service = new LeagueService(supabase);
 
@@ -174,12 +202,19 @@ leagueRoutes.put('/:leagueId/draft-settings', commissionerMiddleware, async (c) 
 leagueRoutes.put('/:leagueId/roster-slots', commissionerMiddleware, async (c) => {
   const leagueId = c.req.param('leagueId');
   const userId = c.get('userId');
-  const body = await c.req.json();
+
+  let body: Record<string, unknown>;
+  try {
+    body = await c.req.json();
+  } catch {
+    return fail(c, AppError.badRequest('Invalid JSON body'));
+  }
+
   const supabase = createUserClient(c.get('userToken'));
   const service = new LeagueService(supabase);
 
   try {
-    const { success, error } = await service.updateRosterSlotSettings(leagueId, userId, body.rosterSlots);
+    const { success, error } = await service.updateRosterSlotSettings(leagueId, userId, body.rosterSlots as unknown as Record<string, number>);
     if (!success) {
       return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to update roster slots'));
     }

@@ -81,12 +81,14 @@ matchupRoutes.get('/league/:leagueId/team-record/:teamId', membershipMiddleware,
   const teamId = c.req.param('teamId');
   const supabase = createUserClient(c.get('userToken'));
 
+  // Sanitize teamId for use in .or() filter string
+  const safeTeamId = teamId.replace(/[^a-zA-Z0-9\-_]/g, '');
   const { data: matchups, error } = await supabase
     .from('matchups')
     .select('team1_id, team2_id, team1_score, team2_score, status')
     .eq('league_id', leagueId)
     .in('status', ['completed', 'in_progress'])
-    .or(`team1_id.eq.${teamId},team2_id.eq.${teamId}`);
+    .or(`team1_id.eq.${safeTeamId},team2_id.eq.${safeTeamId}`);
 
   if (error) {
     return handleError(c, error, 'Failed to fetch team record');
@@ -95,11 +97,19 @@ matchupRoutes.get('/league/:leagueId/team-record/:teamId', membershipMiddleware,
   let wins = 0;
   let losses = 0;
 
-  (matchups || []).forEach((m: any) => {
+  interface MatchupRecord {
+    team1_id: string;
+    team2_id: string;
+    team1_score: number | string | null;
+    team2_score: number | string | null;
+    status: string;
+  }
+
+  (matchups || []).forEach((m: MatchupRecord) => {
     if (m.status !== 'completed') return;
     const isTeam1 = m.team1_id === teamId;
-    const myScore = parseFloat(isTeam1 ? m.team1_score : m.team2_score) || 0;
-    const oppScore = parseFloat(isTeam1 ? m.team2_score : m.team1_score) || 0;
+    const myScore = parseFloat(String(isTeam1 ? m.team1_score : m.team2_score)) || 0;
+    const oppScore = parseFloat(String(isTeam1 ? m.team2_score : m.team1_score)) || 0;
     if (myScore > oppScore) wins++;
     else if (oppScore > myScore) losses++;
   });
@@ -120,7 +130,10 @@ matchupRoutes.get('/league/:leagueId/simulations', membershipMiddleware, async (
     .order('simulated_at', { ascending: false });
 
   if (weekNumber) {
-    query = query.eq('week_number', parseInt(weekNumber, 10));
+    const parsedWeek = parseInt(weekNumber, 10);
+    if (!isNaN(parsedWeek)) {
+      query = query.eq('week_number', parsedWeek);
+    }
   }
 
   const { data, error } = await query;
@@ -371,7 +384,7 @@ matchupRoutes.post('/projections/daily', async (c) => {
     return handleError(c, error, 'Failed to fetch projections');
   }
 
-  const projections: Record<string, any> = {};
+  const projections: Record<string, unknown> = {};
   projMap.forEach((value, key) => {
     projections[String(key)] = value;
   });
@@ -381,11 +394,17 @@ matchupRoutes.post('/projections/daily', async (c) => {
 
 // POST /api/matchups/update-scores — Update all matchup scores
 matchupRoutes.post('/update-scores', async (c) => {
-  const body = await c.req.json().catch(() => ({}));
+  let body: Record<string, unknown>;
+  try {
+    body = await c.req.json();
+  } catch {
+    body = {};
+  }
+
   const supabase = createUserClient(c.get('userToken'));
   const service = new MatchupService(supabase);
 
-  const { data, error } = await service.updateMatchupScores(body.leagueId);
+  const { data, error } = await service.updateMatchupScores(body.leagueId as string | undefined);
   if (error) {
     return handleError(c, error, 'Failed to update scores');
   }
@@ -428,7 +447,7 @@ matchupRoutes.post('/matchup-stats', async (c) => {
     return handleError(c, error, 'Failed to fetch matchup stats');
   }
 
-  const stats: Record<string, any> = {};
+  const stats: Record<string, unknown> = {};
   statsMap.forEach((value, key) => {
     stats[String(key)] = value;
   });

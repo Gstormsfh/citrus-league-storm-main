@@ -2,10 +2,11 @@ import { Hono } from 'hono';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { membershipMiddleware } from '../middleware/membership';
-import { validateBody, schemas } from '../middleware/validate';
+import { z } from 'zod';
+import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { WaiverService } from '../services/WaiverService';
-import { AppError } from '../lib/errors';
+import { AppError, getErrorMessage } from '../lib/errors';
 import { ok, created, fail, handleError } from '../lib/responses';
 import { logger } from '@citrus/shared';
 
@@ -22,7 +23,7 @@ waiverRoutes.get('/league/:leagueId', membershipMiddleware, async (c) => {
 
   const { claims, error } = await service.getLeagueWaivers(leagueId, status);
   if (error) {
-    const msg = typeof error === 'object' && error !== null ? (error as any).message || '' : String(error);
+    const msg = getErrorMessage(error);
     if (msg.includes('does not exist') || msg.includes('relation') || msg.includes('not found')) {
       logger.warn('[waivers] Table/column not ready, returning empty claims:', msg);
       return ok(c, []);
@@ -44,7 +45,7 @@ waiverRoutes.get('/league/:leagueId/team/:teamId', membershipMiddleware, async (
 
   const { claims, error } = await service.getTeamWaiverClaims(leagueId, teamId, status);
   if (error) {
-    const msg = typeof error === 'object' && error !== null ? (error as any).message || '' : String(error);
+    const msg = getErrorMessage(error);
     if (msg.includes('does not exist') || msg.includes('relation') || msg.includes('not found')) {
       logger.warn('[waivers] Table/column not ready, returning empty claims:', msg);
       return ok(c, []);
@@ -64,7 +65,7 @@ waiverRoutes.get('/league/:leagueId/priority', membershipMiddleware, async (c) =
 
   const { priority, error } = await service.getWaiverPriority(leagueId);
   if (error) {
-    const msg = typeof error === 'object' && error !== null ? (error as any).message || '' : String(error);
+    const msg = getErrorMessage(error);
     if (msg.includes('does not exist') || msg.includes('relation') || msg.includes('not found')) {
       logger.warn('[waivers] Priority table not ready, returning empty:', msg);
       return ok(c, []);
@@ -106,15 +107,15 @@ waiverRoutes.get('/league/:leagueId/settings', membershipMiddleware, async (c) =
 // POST /api/waivers/league/:leagueId — Submit a waiver claim
 waiverRoutes.post('/league/:leagueId', membershipMiddleware, validateBody(schemas.submitWaiverClaim), async (c) => {
   const leagueId = c.req.param('leagueId');
-  const body = (c as any).get('validatedBody');
+  const body = getValidatedBody<z.infer<typeof schemas.submitWaiverClaim>>(c);
   const supabase = createUserClient(c.get('userToken'));
   const service = new WaiverService(supabase);
 
   const { success, error, claimId } = await service.submitWaiverClaim(
     leagueId,
-    body.teamId,
-    body.playerId,
-    body.dropPlayerId || null,
+    String(body.teamId),
+    Number(body.playerId),
+    body.dropPlayerId ? Number(body.dropPlayerId) : null,
   );
 
   if (!success) {
@@ -127,16 +128,16 @@ waiverRoutes.post('/league/:leagueId', membershipMiddleware, validateBody(schema
 // POST /api/waivers/league/:leagueId/faab-bid — Submit a FAAB bid
 waiverRoutes.post('/league/:leagueId/faab-bid', membershipMiddleware, validateBody(schemas.submitFAABBid), async (c) => {
   const leagueId = c.req.param('leagueId');
-  const body = (c as any).get('validatedBody');
+  const body = getValidatedBody<z.infer<typeof schemas.submitFAABBid>>(c);
   const supabase = createUserClient(c.get('userToken'));
   const service = new WaiverService(supabase);
 
   const { success, error, claimId } = await service.submitFAABBid(
     leagueId,
-    body.teamId,
-    body.playerId,
+    String(body.teamId),
+    Number(body.playerId),
     body.bidAmount,
-    body.dropPlayerId || null,
+    body.dropPlayerId ? Number(body.dropPlayerId) : null,
     body.isConditionalDrop || false,
   );
 
@@ -151,15 +152,15 @@ waiverRoutes.post('/league/:leagueId/faab-bid', membershipMiddleware, validateBo
 waiverRoutes.post('/league/:leagueId/add-free-agent', membershipMiddleware, validateBody(schemas.addFreeAgent), async (c) => {
   const leagueId = c.req.param('leagueId');
   const userId = c.get('userId');
-  const body = (c as any).get('validatedBody');
+  const body = getValidatedBody<z.infer<typeof schemas.addFreeAgent>>(c);
   const supabase = createUserClient(c.get('userToken'));
   const service = new WaiverService(supabase);
 
   const { success, error } = await service.addFreeAgent(
     leagueId,
-    body.teamId,
-    body.playerId,
-    body.dropPlayerId || null,
+    String(body.teamId),
+    Number(body.playerId),
+    body.dropPlayerId ? Number(body.dropPlayerId) : null,
     userId,
   );
 
@@ -173,7 +174,14 @@ waiverRoutes.post('/league/:leagueId/add-free-agent', membershipMiddleware, vali
 // POST /api/waivers/league/:leagueId/drop-player — Drop player from roster
 waiverRoutes.post('/league/:leagueId/drop-player', membershipMiddleware, async (c) => {
   const leagueId = c.req.param('leagueId');
-  const body = await c.req.json();
+
+  let body: Record<string, unknown>;
+  try {
+    body = await c.req.json();
+  } catch {
+    return fail(c, AppError.badRequest('Invalid JSON body'));
+  }
+
   const supabase = createUserClient(c.get('userToken'));
   const service = new WaiverService(supabase);
 
@@ -181,7 +189,7 @@ waiverRoutes.post('/league/:leagueId/drop-player', membershipMiddleware, async (
     return fail(c, AppError.badRequest('teamId and playerId are required'));
   }
 
-  const { success, error } = await service.dropPlayer(leagueId, body.teamId, body.playerId);
+  const { success, error } = await service.dropPlayer(leagueId, body.teamId as string, Number(body.playerId));
   if (!success) {
     return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to drop player'));
   }

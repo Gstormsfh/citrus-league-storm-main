@@ -25,7 +25,8 @@ describe('API App — Global Middleware & Health Check', () => {
     expect(res.status).toBe(404);
 
     const body = await res.json();
-    expect(body.error).toBe('Not found');
+    expect(body.error.code).toBe('NOT_FOUND');
+    expect(body.error.message).toBe('Not found');
     expect(body.path).toBe('/api/nonexistent');
   });
 

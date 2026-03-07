@@ -68,7 +68,7 @@ export function fail(c: Context<Env>, error: AppError) {
     },
     ...(requestId ? { requestId } : {}),
   };
-  return c.json(body, error.status as any);
+  return c.json(body, error.status as 400);
 }
 
 /**

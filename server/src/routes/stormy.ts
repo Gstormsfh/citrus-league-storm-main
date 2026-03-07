@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
-import { validateBody, schemas } from '../middleware/validate';
+import { z } from 'zod';
+import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
 import { AppError } from '../lib/errors';
 import { ok, fail } from '../lib/responses';
 
@@ -12,7 +13,7 @@ stormyRoutes.use('*', authMiddleware);
 // POST /api/stormy/chat — Send a message to Stormy AI assistant
 stormyRoutes.post('/chat', validateBody(schemas.stormyChat), async (c) => {
   const userId = c.get('userId');
-  const body = (c as any).get('validatedBody');
+  const body = getValidatedBody<z.infer<typeof schemas.stormyChat>>(c);
 
   const { message, leagueId, context } = body;
 
@@ -39,7 +40,7 @@ stormyRoutes.post('/chat', validateBody(schemas.stormyChat), async (c) => {
     if (!response.ok) {
       return fail(c, new AppError(
         data.error || 'Stormy request failed',
-        response.status as number,
+        response.status,
         response.status === 429 ? 'RATE_LIMITED' : 'BAD_GATEWAY',
       ));
     }

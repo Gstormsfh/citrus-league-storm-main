@@ -5,6 +5,11 @@ import { z, ZodSchema, ZodError } from 'zod';
  * Request validation middleware using Zod schemas.
  */
 
+/** Type-safe accessor for validated body set by validateBody middleware */
+export function getValidatedBody<T>(c: Context): T {
+  return (c as unknown as { get(key: 'validatedBody'): T }).get('validatedBody');
+}
+
 function formatZodError(error: ZodError): string {
   return error.issues
     .map((issue) => {
@@ -21,15 +26,16 @@ export function validateBody<T extends ZodSchema>(schema: T) {
     try {
       body = await c.req.json();
     } catch {
-      return c.json({ error: 'Invalid JSON body' }, 400);
+      return c.json({ error: { code: 'BAD_REQUEST', message: 'Invalid JSON body' } }, 400);
     }
 
     const result = schema.safeParse(body);
     if (!result.success) {
-      return c.json({ error: 'Validation failed', details: formatZodError(result.error) }, 400);
+      return c.json({ error: { code: 'VALIDATION_ERROR', message: 'Validation failed', details: formatZodError(result.error) } }, 400);
     }
 
-    c.set('validatedBody' as any, result.data);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Hono context doesn't support custom keys natively
+    (c as any).set('validatedBody', result.data);
     await next();
   };
 }
@@ -43,10 +49,11 @@ export function validateQuery<T extends ZodSchema>(schema: T) {
 
     const result = schema.safeParse(query);
     if (!result.success) {
-      return c.json({ error: 'Invalid query parameters', details: formatZodError(result.error) }, 400);
+      return c.json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid query parameters', details: formatZodError(result.error) } }, 400);
     }
 
-    c.set('validatedQuery' as any, result.data);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Hono context doesn't support custom keys natively
+    (c as any).set('validatedQuery', result.data);
     await next();
   };
 }

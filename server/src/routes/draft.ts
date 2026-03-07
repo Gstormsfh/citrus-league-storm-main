@@ -2,7 +2,8 @@ import { Hono } from 'hono';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { membershipMiddleware, commissionerMiddleware } from '../middleware/membership';
-import { validateBody, schemas } from '../middleware/validate';
+import { z } from 'zod';
+import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { DraftService } from '../services/DraftService';
 import { AppError } from '../lib/errors';
@@ -93,7 +94,7 @@ draftRoutes.get('/league/:leagueId', membershipMiddleware, async (c) => {
 // POST /api/draft/league/:leagueId/pick — Make a draft pick
 draftRoutes.post('/league/:leagueId/pick', membershipMiddleware, validateBody(schemas.makeDraftPick), async (c) => {
   const leagueId = c.req.param('leagueId');
-  const body = (c as any).get('validatedBody');
+  const body = getValidatedBody<z.infer<typeof schemas.makeDraftPick>>(c);
   const supabase = createUserClient(c.get('userToken'));
   const service = new DraftService(supabase);
 
@@ -101,7 +102,7 @@ draftRoutes.post('/league/:leagueId/pick', membershipMiddleware, validateBody(sc
 
   const { pick, error, isComplete } = await service.makePick(
     leagueId,
-    teamId,
+    String(teamId),
     playerId,
     roundNumber,
     pickNumber,
@@ -137,16 +138,23 @@ draftRoutes.post('/league/:leagueId/start', commissionerMiddleware, async (c) =>
 // POST /api/draft/league/:leagueId/initialize-order — Initialize draft order
 draftRoutes.post('/league/:leagueId/initialize-order', commissionerMiddleware, async (c) => {
   const leagueId = c.req.param('leagueId');
-  const body = await c.req.json();
+
+  let body: Record<string, unknown>;
+  try {
+    body = await c.req.json();
+  } catch {
+    return fail(c, AppError.badRequest('Invalid JSON body'));
+  }
+
   const supabase = createUserClient(c.get('userToken'));
   const service = new DraftService(supabase);
 
   const { error, sessionId } = await service.initializeDraftOrder(
     leagueId,
-    body.teams,
-    body.totalRounds,
-    body.customTeamOrder,
-    body.draftType,
+    body.teams as Array<{ id: string }>,
+    body.totalRounds as number,
+    body.customTeamOrder as string[] | undefined,
+    body.draftType as string,
   );
 
   if (error) {
@@ -187,16 +195,23 @@ draftRoutes.post('/league/:leagueId/undo', commissionerMiddleware, async (c) => 
 // POST /api/draft/league/:leagueId/autopick — Autopick for a team
 draftRoutes.post('/league/:leagueId/autopick', membershipMiddleware, async (c) => {
   const leagueId = c.req.param('leagueId');
-  const body = await c.req.json();
+
+  let body: Record<string, unknown>;
+  try {
+    body = await c.req.json();
+  } catch {
+    return fail(c, AppError.badRequest('Invalid JSON body'));
+  }
+
   const supabase = createUserClient(c.get('userToken'));
   const service = new DraftService(supabase);
 
   const result = await service.autopickForTeam(
     leagueId,
-    body.teamId,
-    body.sessionId,
-    body.roundNumber,
-    body.pickNumber,
+    body.teamId as string,
+    body.sessionId as string,
+    body.roundNumber as number,
+    body.pickNumber as number,
   );
 
   if (result.error) {
@@ -238,14 +253,21 @@ draftRoutes.get('/league/:leagueId/snapshot', membershipMiddleware, async (c) =>
 draftRoutes.post('/league/:leagueId/snapshot', membershipMiddleware, async (c) => {
   const leagueId = c.req.param('leagueId');
   const userId = c.get('userId');
-  const body = await c.req.json();
+
+  let body: Record<string, unknown>;
+  try {
+    body = await c.req.json();
+  } catch {
+    return fail(c, AppError.badRequest('Invalid JSON body'));
+  }
+
   const supabase = createUserClient(c.get('userToken'));
   const service = new DraftService(supabase);
 
   const { snapshotId, error } = await service.saveDraftSnapshot(
     leagueId,
-    body.draftSessionId,
-    body.snapshotData,
+    body.draftSessionId as string,
+    body.snapshotData as unknown,
     userId,
   );
 
@@ -274,11 +296,18 @@ draftRoutes.get('/league/:leagueId/rankings', membershipMiddleware, async (c) =>
 // POST /api/draft/league/:leagueId/rankings — Save autopick rankings
 draftRoutes.post('/league/:leagueId/rankings', membershipMiddleware, async (c) => {
   const leagueId = c.req.param('leagueId');
-  const body = await c.req.json();
+
+  let body: Record<string, unknown>;
+  try {
+    body = await c.req.json();
+  } catch {
+    return fail(c, AppError.badRequest('Invalid JSON body'));
+  }
+
   const supabase = createUserClient(c.get('userToken'));
   const service = new DraftService(supabase);
 
-  const { error } = await service.saveAutopickRankings(leagueId, body.teamId, body.rankings);
+  const { error } = await service.saveAutopickRankings(leagueId, body.teamId as string, body.rankings as Array<{ playerId: number; rank: number; positionCode: string }>);
   if (error) {
     return fail(c, AppError.badRequest('Failed to save rankings'));
   }

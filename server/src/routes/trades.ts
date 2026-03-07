@@ -2,7 +2,8 @@ import { Hono } from 'hono';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { membershipMiddleware } from '../middleware/membership';
-import { validateBody, schemas } from '../middleware/validate';
+import { z } from 'zod';
+import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { TradeService } from '../services/TradeService';
 import { AppError } from '../lib/errors';
@@ -41,16 +42,16 @@ tradeRoutes.get('/league/:leagueId/review-settings', membershipMiddleware, async
 tradeRoutes.post('/league/:leagueId', membershipMiddleware, validateBody(schemas.createTrade), async (c) => {
   const leagueId = c.req.param('leagueId');
   const userId = c.get('userId');
-  const body = (c as any).get('validatedBody');
+  const body = getValidatedBody<z.infer<typeof schemas.createTrade>>(c);
   const supabase = createUserClient(c.get('userToken'));
   const service = new TradeService(supabase);
 
   const { success, error, tradeId } = await service.createTradeOffer(
     leagueId,
-    body.fromTeamId,
-    body.toTeamId,
-    body.offeredPlayerIds,
-    body.requestedPlayerIds,
+    String(body.fromTeamId),
+    String(body.toTeamId),
+    body.offeredPlayerIds.map(Number),
+    body.requestedPlayerIds.map(Number),
     userId,
     body.message,
   );
@@ -111,13 +112,20 @@ tradeRoutes.put('/:tradeId/cancel', async (c) => {
 tradeRoutes.put('/:tradeId/respond', async (c) => {
   const tradeId = c.req.param('tradeId');
   const userId = c.get('userId');
-  const body = await c.req.json();
+
+  let body: Record<string, unknown>;
+  try {
+    body = await c.req.json();
+  } catch {
+    return fail(c, AppError.badRequest('Invalid JSON body'));
+  }
+
   const supabase = createUserClient(c.get('userToken'));
   const service = new TradeService(supabase);
 
-  const { action } = body;
+  const action = body.action as string;
 
-  if (!['accept', 'reject', 'counter'].includes(action)) {
+  if (!action || !['accept', 'reject', 'counter'].includes(action)) {
     return fail(c, AppError.badRequest('Invalid action. Must be accept, reject, or counter'));
   }
 
@@ -140,11 +148,11 @@ tradeRoutes.put('/:tradeId/respond', async (c) => {
 // POST /api/trades/:tradeId/vote — Submit a trade vote
 tradeRoutes.post('/:tradeId/vote', validateBody(schemas.tradeVote), async (c) => {
   const tradeId = c.req.param('tradeId');
-  const body = (c as any).get('validatedBody');
+  const body = getValidatedBody<z.infer<typeof schemas.tradeVote>>(c);
   const supabase = createUserClient(c.get('userToken'));
   const service = new TradeService(supabase);
 
-  const result = await service.submitTradeVote(tradeId, body.voterTeamId, body.vote);
+  const result = await service.submitTradeVote(tradeId, String(body.voterTeamId), body.vote);
   if (!result.success) {
     return fail(c, AppError.badRequest(typeof result.error === 'string' ? result.error : 'Vote failed'));
   }
@@ -170,7 +178,7 @@ tradeRoutes.get('/:tradeId/votes', async (c) => {
 tradeRoutes.put('/:tradeId/commissioner-decision', validateBody(schemas.commissionerDecision), async (c) => {
   const tradeId = c.req.param('tradeId');
   const userId = c.get('userId');
-  const body = (c as any).get('validatedBody');
+  const body = getValidatedBody<z.infer<typeof schemas.commissionerDecision>>(c);
   const supabase = createUserClient(c.get('userToken'));
   const service = new TradeService(supabase);
 

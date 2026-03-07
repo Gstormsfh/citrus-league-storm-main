@@ -67,7 +67,11 @@ adminRoutes.get('/users', async (c) => {
     .range(offset, offset + limit - 1);
 
   if (search) {
-    query = query.or(`username.ilike.%${search}%,first_name.ilike.%${search}%,last_name.ilike.%${search}%`);
+    // Sanitize search: strip characters that could manipulate PostgREST filters
+    const sanitized = search.replace(/[%,.()\\"']/g, '');
+    if (sanitized) {
+      query = query.or(`username.ilike.%${sanitized}%,first_name.ilike.%${sanitized}%,last_name.ilike.%${sanitized}%`);
+    }
   }
 
   const { data, count, error } = await query;
@@ -93,7 +97,10 @@ adminRoutes.get('/leagues', async (c) => {
     .range(offset, offset + limit - 1);
 
   if (search) {
-    query = query.ilike('name', `%${search}%`);
+    const sanitized = search.replace(/[%,.()\\"']/g, '');
+    if (sanitized) {
+      query = query.ilike('name', `%${sanitized}%`);
+    }
   }
 
   const { data, count, error } = await query;
@@ -124,7 +131,13 @@ adminRoutes.get('/audit-log', async (c) => {
 
 // POST /api/admin/recalculate-scores — Trigger score recalculation
 adminRoutes.post('/recalculate-scores', async (c) => {
-  const body = await c.req.json();
+  let body: Record<string, unknown>;
+  try {
+    body = await c.req.json();
+  } catch {
+    return fail(c, AppError.badRequest('Invalid JSON body'));
+  }
+
   const { leagueId, week } = body;
 
   if (!leagueId) {

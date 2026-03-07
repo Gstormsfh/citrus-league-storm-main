@@ -20,7 +20,8 @@ playerRoutes.get('/', optionalAuthMiddleware, async (c) => {
 
   const search = c.req.query('search');
   const position = c.req.query('position');
-  const limit = parseInt(c.req.query('limit') || '0', 10);
+  const rawLimit = parseInt(c.req.query('limit') || '0', 10);
+  const limit = isNaN(rawLimit) ? 0 : Math.min(rawLimit, 1000);
 
   if (search) {
     const { players } = await service.searchPlayers(search);
@@ -34,7 +35,7 @@ playerRoutes.get('/', optionalAuthMiddleware, async (c) => {
 
   let filtered = players;
   if (position) {
-    filtered = filtered.filter((p: any) =>
+    filtered = filtered.filter((p: { position?: string; eligible_positions?: string[] }) =>
       p.position === position || p.eligible_positions?.includes(position)
     );
   }
@@ -151,11 +152,12 @@ playerRoutes.get('/:playerId/projections', authMiddleware, async (c) => {
     const { data, error } = await query;
 
     if (error) {
+      const errObj = error as { message: string; details?: string; hint?: string; code?: string };
       logger.error(`[players/:id/projections] Supabase error for player ${playerId}:`, JSON.stringify({
-        message: error.message,
-        details: (error as any).details,
-        hint: (error as any).hint,
-        code: (error as any).code,
+        message: errObj.message,
+        details: errObj.details,
+        hint: errObj.hint,
+        code: errObj.code,
       }));
       return handleError(c, error, 'Failed to fetch projections');
     }

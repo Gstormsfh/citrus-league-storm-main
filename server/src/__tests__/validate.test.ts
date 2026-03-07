@@ -41,9 +41,10 @@ describe('validateBody middleware', () => {
 
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toBe('Validation failed');
-    expect(body.details).toBeDefined();
-    expect(typeof body.details).toBe('string');
+    expect(body.error.code).toBe('VALIDATION_ERROR');
+    expect(body.error.message).toBe('Validation failed');
+    expect(body.error.details).toBeDefined();
+    expect(typeof body.error.details).toBe('string');
   });
 
   it('rejects invalid JSON', async () => {
@@ -55,7 +56,8 @@ describe('validateBody middleware', () => {
 
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toBe('Invalid JSON body');
+    expect(body.error.code).toBe('BAD_REQUEST');
+    expect(body.error.message).toBe('Invalid JSON body');
   });
 
   it('rejects missing fields', async () => {
@@ -67,7 +69,8 @@ describe('validateBody middleware', () => {
 
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toBe('Validation failed');
+    expect(body.error.code).toBe('VALIDATION_ERROR');
+    expect(body.error.message).toBe('Validation failed');
   });
 });
 
@@ -94,7 +97,8 @@ describe('validateQuery middleware', () => {
     const res = await app.request('/test?page=abc');
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toBe('Invalid query parameters');
+    expect(body.error.code).toBe('VALIDATION_ERROR');
+    expect(body.error.message).toBe('Invalid query parameters');
   });
 });
 
