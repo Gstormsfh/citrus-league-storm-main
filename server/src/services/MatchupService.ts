@@ -18,9 +18,11 @@ export class MatchupService {
 
   /** Get all matchups for a league (optionally filtered by week) */
   async getLeagueMatchups(leagueId: string, weekNumber?: number) {
+    // Join team names so the matchup dropdown can show "Team A vs Team B"
+    // instead of "Unknown vs Unknown"
     let query = this.supabase
       .from('matchups')
-      .select(COLUMNS.MATCHUP)
+      .select(`${COLUMNS.MATCHUP}, team1:teams!team1_id(id, team_name), team2:teams!team2_id(id, team_name)`)
       .eq('league_id', leagueId)
       .order('week_number', { ascending: true });
 
