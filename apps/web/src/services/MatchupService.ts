@@ -618,9 +618,9 @@ export const MatchupService = {
         : [];
 
       // Get matchup rosters using existing function
-      // Pass targetDate to load frozen roster for past dates (if provided)
-      const { team1Roster, team2Roster, team1SlotAssignments, team2SlotAssignments, error: rostersError } = 
-        await this.getMatchupRosters(matchup, allPlayers, timezone, userId, targetDate || undefined);
+      // getMatchupDataById always loads current rosters (no targetDate parameter)
+      const { team1Roster, team2Roster, team1SlotAssignments, team2SlotAssignments, error: rostersError } =
+        await this.getMatchupRosters(matchup, allPlayers, timezone, userId);
 
       if (rostersError) {
         return { data: null, error: rostersError };
