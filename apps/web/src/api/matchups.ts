@@ -249,6 +249,65 @@ export const matchupApi = {
     );
   },
 
+  // ── Matchup admin operations ─────────────────────────────────────────
+
+  /** Delete all matchups for a league */
+  deleteAllMatchups(leagueId: string) {
+    return apiClient.delete(`/api/matchups/league/${leagueId}`);
+  },
+
+  /** Generate matchups for a league */
+  generateMatchups(
+    leagueId: string,
+    teams: Array<{ id: string }>,
+    fantasyWeeks: Array<{ week_number: number; start_date: string; end_date: string }>,
+    forceRegenerate?: boolean,
+  ) {
+    return apiClient.post(`/api/matchups/league/${leagueId}/generate`, {
+      teams,
+      fantasyWeeks,
+      forceRegenerate,
+    });
+  },
+
+  // ── Matchup lines ──────────────────────────────────────────────────────
+
+  /** Get matchup lines (player stats) */
+  getMatchupLines(matchupId: string) {
+    const key = `matchups:lines:${matchupId}`;
+    return cached(key, () => apiClient.get(`/api/matchups/${matchupId}/lines`), CACHE_TTL.MEDIUM);
+  },
+
+  // ── Team record ────────────────────────────────────────────────────────
+
+  /** Get team W-L record */
+  getTeamRecord(leagueId: string, teamId: string) {
+    const key = `matchups:record:${leagueId}:${teamId}`;
+    return cached(key, () => apiClient.get(`/api/matchups/league/${leagueId}/team-record/${teamId}`), CACHE_TTL.LONG);
+  },
+
+  // ── Simulations ────────────────────────────────────────────────────────
+
+  /** Get simulation results for a specific matchup */
+  getSimulation(matchupId: string) {
+    const key = `matchups:sim:${matchupId}`;
+    return cached(key, () => apiClient.get(`/api/matchups/${matchupId}/simulation`), CACHE_TTL.MEDIUM);
+  },
+
+  /** Get simulation results for all matchups in a league week */
+  getLeagueSimulations(leagueId: string, weekNumber?: number) {
+    const qs = weekNumber ? `?week=${weekNumber}` : '';
+    const key = `matchups:sims:${leagueId}:w${weekNumber ?? 'all'}`;
+    return cached(key, () => apiClient.get(`/api/matchups/league/${leagueId}/simulations${qs}`), CACHE_TTL.MEDIUM);
+  },
+
+  /** Get Brier score calibration for a league */
+  getBrierScore(leagueId: string, season?: number) {
+    const qs = season ? `?season=${season}` : '';
+    const key = `matchups:brier:${leagueId}:s${season ?? 'default'}`;
+    return cached(key, () => apiClient.get(`/api/matchups/league/${leagueId}/brier-score${qs}`), CACHE_TTL.LONG);
+  },
+
   // ── Cache management ───────────────────────────────────────────────────
 
   /** Clear all matchup caches (call on league switch, etc.) */

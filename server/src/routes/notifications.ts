@@ -73,4 +73,32 @@ notificationRoutes.put('/:id/read', async (c) => {
   return c.json({ success: true });
 });
 
+// POST /api/notifications/chat — Send a chat message in a league
+notificationRoutes.post('/chat', async (c) => {
+  const userId = c.get('userId');
+  const body = await c.req.json<{ leagueId: string; message: string; senderName?: string | null }>();
+
+  if (!body.leagueId || !body.message?.trim()) {
+    return c.json({ error: 'leagueId and message are required' }, 400);
+  }
+
+  const supabase = createUserClient(c.get('userToken'));
+
+  const { data, error } = await supabase.rpc('send_league_chat_message', {
+    p_league_id: body.leagueId,
+    p_message: body.message.trim(),
+    p_sender_name: body.senderName || null,
+  });
+
+  if (error) {
+    return c.json({ error: error.message || 'Failed to send message' }, 500);
+  }
+
+  if (data && !data.success) {
+    return c.json({ error: data.error || 'Failed to send message' }, 400);
+  }
+
+  return c.json({ data: { success: true } });
+});
+
 export { notificationRoutes };

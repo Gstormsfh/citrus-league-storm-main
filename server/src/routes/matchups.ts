@@ -377,4 +377,153 @@ matchupRoutes.get('/job-status', async (c) => {
   return c.json({ data: status });
 });
 
+// DELETE /api/matchups/league/:leagueId — Delete all matchups for a league
+matchupRoutes.delete('/league/:leagueId', membershipMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new MatchupService(supabase);
+
+  const { error } = await service.deleteAllMatchupsForLeague(leagueId);
+  if (error) {
+    return c.json({ error: error.message || 'Failed to delete matchups' }, 500);
+  }
+
+  return c.json({ data: { success: true } });
+});
+
+// POST /api/matchups/league/:leagueId/generate — Generate matchups for a league
+matchupRoutes.post('/league/:leagueId/generate', membershipMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const body = await c.req.json<{
+    teams: Array<{ id: string }>;
+    fantasyWeeks: Array<{ week_number: number; start_date: string; end_date: string }>;
+    forceRegenerate?: boolean;
+  }>();
+
+  if (!body.teams?.length || !body.fantasyWeeks?.length) {
+    return c.json({ error: 'teams and fantasyWeeks are required' }, 400);
+  }
+
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new MatchupService(supabase);
+
+  const { error } = await service.generateMatchupsForLeague(
+    leagueId,
+    body.teams,
+    body.fantasyWeeks,
+    body.forceRegenerate,
+  );
+
+  if (error) {
+    return c.json({ error: error.message || 'Failed to generate matchups' }, 500);
+  }
+
+  return c.json({ data: { success: true } });
+});
+
+// GET /api/matchups/:matchupId/lines — Get matchup lines (player stats)
+matchupRoutes.get('/:matchupId/lines', async (c) => {
+  const matchupId = c.req.param('matchupId');
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new MatchupService(supabase);
+
+  const { lines, error } = await service.getMatchupWithLines(matchupId);
+  if (error) {
+    return c.json({ error: error.message || 'Failed to fetch matchup lines' }, 500);
+  }
+
+  return c.json({ data: lines });
+});
+
+// GET /api/matchups/league/:leagueId/team-record/:teamId — Get team W-L record
+matchupRoutes.get('/league/:leagueId/team-record/:teamId', membershipMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const teamId = c.req.param('teamId');
+  const supabase = createUserClient(c.get('userToken'));
+
+  // Calculate record from completed matchups
+  const { data: matchups, error } = await supabase
+    .from('matchups')
+    .select('team1_id, team2_id, team1_score, team2_score, status')
+    .eq('league_id', leagueId)
+    .in('status', ['completed', 'in_progress'])
+    .or(`team1_id.eq.${teamId},team2_id.eq.${teamId}`);
+
+  if (error) {
+    return c.json({ error: error.message || 'Failed to fetch team record' }, 500);
+  }
+
+  let wins = 0;
+  let losses = 0;
+
+  (matchups || []).forEach((m: any) => {
+    if (m.status !== 'completed') return;
+    const isTeam1 = m.team1_id === teamId;
+    const myScore = parseFloat(isTeam1 ? m.team1_score : m.team2_score) || 0;
+    const oppScore = parseFloat(isTeam1 ? m.team2_score : m.team1_score) || 0;
+    if (myScore > oppScore) wins++;
+    else if (oppScore > myScore) losses++;
+  });
+
+  return c.json({ data: { wins, losses } });
+});
+
+// GET /api/matchups/league/:leagueId/simulations — Get simulation data for a league week
+matchupRoutes.get('/league/:leagueId/simulations', membershipMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const weekNumber = c.req.query('week');
+  const supabase = createUserClient(c.get('userToken'));
+
+  let query = supabase
+    .from('matchup_simulations')
+    .select('*')
+    .eq('league_id', leagueId)
+    .order('simulated_at', { ascending: false });
+
+  if (weekNumber) {
+    query = query.eq('week_number', parseInt(weekNumber, 10));
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    return c.json({ error: error.message || 'Failed to fetch simulations' }, 500);
+  }
+
+  return c.json({ data: data || [] });
+});
+
+// GET /api/matchups/:matchupId/simulation — Get simulation for a single matchup
+matchupRoutes.get('/:matchupId/simulation', async (c) => {
+  const matchupId = c.req.param('matchupId');
+  const supabase = createUserClient(c.get('userToken'));
+
+  const { data, error } = await supabase
+    .rpc('get_matchup_simulation', { p_matchup_id: matchupId });
+
+  if (error) {
+    return c.json({ error: error.message || 'Failed to fetch simulation' }, 500);
+  }
+
+  return c.json({ data: data || [] });
+});
+
+// GET /api/matchups/league/:leagueId/brier-score — Get Brier score for a league
+matchupRoutes.get('/league/:leagueId/brier-score', membershipMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const season = parseInt(c.req.query('season') || '2025', 10);
+  const supabase = createUserClient(c.get('userToken'));
+
+  const { data, error } = await supabase
+    .rpc('get_league_brier_score', {
+      p_league_id: leagueId,
+      p_season: season,
+    });
+
+  if (error) {
+    return c.json({ error: error.message || 'Failed to fetch Brier score' }, 500);
+  }
+
+  return c.json({ data: data || [] });
+});
+
 export { matchupRoutes };
