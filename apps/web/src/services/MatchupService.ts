@@ -815,12 +815,14 @@ export const MatchupService = {
             rosterPlayers = []; // Return empty array instead of loading all players
           } else {
             // Load only roster players (much faster than loading all players)
+            console.log('[getMatchupData] Loading players for IDs:', allRosterPlayerIds.length, 'sample:', allRosterPlayerIds.slice(0, 3));
             rosterPlayers = await withTimeout(
               PlayerService.getPlayersByIds(allRosterPlayerIds.map(String)),
               10000,
               'getPlayersByIds timeout'
             );
-            
+            console.log('[getMatchupData] PlayerService returned:', rosterPlayers.length, 'players');
+
             // If optimized loading returned fewer players than expected, log warning but don't fallback
             if (rosterPlayers.length < allRosterPlayerIds.length * 0.8) {
               logger.warn('[MatchupService] Optimized loading returned fewer players than expected:', {
@@ -846,6 +848,12 @@ export const MatchupService = {
         team2SlotAssignments,
         error: rostersError
       } = await this.getMatchupRosters(matchup, rosterPlayers, timezone, userId, targetDate);
+
+      console.log('[getMatchupData] getMatchupRosters returned:', {
+        team1Roster: team1Roster.length,
+        team2Roster: team2Roster.length,
+        hasError: !!rostersError
+      });
 
       if (rostersError) {
         return { data: null, error: rostersError };
@@ -1075,6 +1083,7 @@ export const MatchupService = {
 
       // Match numeric IDs directly
       const teamPlayers = allPlayers.filter(p => numericIds.includes(Number(p.id)));
+      console.log(`[getTeamRoster] team=${teamId.slice(0,8)} playerIds=${playerIds.length} numericIds=${numericIds.length} allPlayers=${allPlayers.length} matched=${teamPlayers.length}`);
 
       // If we have UUIDs, look them up in players table and match by name/team
       if (uuidIds.length > 0) {
