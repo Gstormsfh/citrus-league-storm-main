@@ -1,37 +1,37 @@
 import { Hono } from 'hono';
 import type { Env } from '../app';
-import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth';
+import { authMiddleware } from '../middleware/auth';
 import { createUserClient } from '../lib/supabase';
 import { PlayerService } from '../services/PlayerService';
+import { AppError } from '../lib/errors';
+import { ok, fail, handleError } from '../lib/responses';
+import { logger } from '@citrus/shared';
 
 const playerRoutes = new Hono<Env>();
 
 // GET /api/players — Get all players with stats (primary endpoint)
-playerRoutes.get('/', optionalAuthMiddleware, async (c) => {
-  const token = c.get('userToken');
-  if (!token) {
-    return c.json({ error: 'Authentication required' }, 401);
-  }
-  const supabase = createUserClient(token);
+playerRoutes.get('/', authMiddleware, async (c) => {
+  const supabase = createUserClient(c.get('userToken'));
   const service = new PlayerService(supabase);
 
   const search = c.req.query('search');
   const position = c.req.query('position');
-  const limit = parseInt(c.req.query('limit') || '0', 10);
+  const rawLimit = parseInt(c.req.query('limit') || '0', 10);
+  const limit = isNaN(rawLimit) ? 0 : Math.min(rawLimit, 1000);
 
   if (search) {
     const { players } = await service.searchPlayers(search);
-    return c.json({ data: limit ? players.slice(0, limit) : players });
+    return ok(c, limit ? players.slice(0, limit) : players);
   }
 
   const { players, error } = await service.getAllPlayers();
   if (error) {
-    return c.json({ error: 'Failed to fetch players' }, 500);
+    return handleError(c, error, 'Failed to fetch players');
   }
 
   let filtered = players;
   if (position) {
-    filtered = filtered.filter((p: any) =>
+    filtered = filtered.filter((p: { position?: string; eligible_positions?: string[] }) =>
       p.position === position || p.eligible_positions?.includes(position)
     );
   }
@@ -39,7 +39,7 @@ playerRoutes.get('/', optionalAuthMiddleware, async (c) => {
     filtered = filtered.slice(0, limit);
   }
 
-  return c.json({ data: filtered });
+  return ok(c, filtered);
 });
 
 // GET /api/players/trending — Get trending players (platform-wide)
@@ -50,7 +50,7 @@ playerRoutes.get('/trending', authMiddleware, async (c) => {
 
   const { trending, error } = await service.getTrendingPlayers(daysBack);
   if (error) {
-    return c.json({ error: 'Failed to fetch trending' }, 500);
+    return handleError(c, error, 'Failed to fetch trending');
   }
 
   const data = Array.from(trending.entries()).map(([playerId, stats]) => ({
@@ -58,14 +58,14 @@ playerRoutes.get('/trending', authMiddleware, async (c) => {
     ...stats,
   }));
 
-  return c.json({ data });
+  return ok(c, data);
 });
 
 // GET /api/players/by-ids — Get players by IDs (batch)
 playerRoutes.get('/by-ids', authMiddleware, async (c) => {
   const ids = c.req.query('ids');
   if (!ids) {
-    return c.json({ error: 'ids query parameter required' }, 400);
+    return fail(c, AppError.badRequest('ids query parameter required'));
   }
 
   const supabase = createUserClient(c.get('userToken'));
@@ -74,10 +74,10 @@ playerRoutes.get('/by-ids', authMiddleware, async (c) => {
 
   const { players, error } = await service.getPlayersByIds(playerIds);
   if (error) {
-    return c.json({ error: 'Failed to fetch players' }, 500);
+    return handleError(c, error, 'Failed to fetch players');
   }
 
-  return c.json({ data: players });
+  return ok(c, players);
 });
 
 // GET /api/players/:playerId — Get a single player
@@ -88,10 +88,10 @@ playerRoutes.get('/:playerId', authMiddleware, async (c) => {
 
   const { player, error } = await service.getPlayer(playerId);
   if (error || !player) {
-    return c.json({ error: 'Player not found' }, 404);
+    return fail(c, AppError.notFound('Player'));
   }
 
-  return c.json({ data: player });
+  return ok(c, player);
 });
 
 // GET /api/players/:playerId/stats — Get player season stats
@@ -107,24 +107,62 @@ playerRoutes.get('/:playerId/stats', authMiddleware, async (c) => {
   );
 
   if (error) {
-    return c.json({ error: 'Failed to fetch stats' }, 500);
+    return handleError(c, error, 'Failed to fetch stats');
   }
 
-  return c.json({ data: stats });
+  return ok(c, stats);
 });
 
 // GET /api/players/:playerId/projections — Get player projections
 playerRoutes.get('/:playerId/projections', authMiddleware, async (c) => {
   const playerId = c.req.param('playerId');
+  const startDate = c.req.query('startDate');
   const supabase = createUserClient(c.get('userToken'));
-  const service = new PlayerService(supabase);
 
-  const { projection, error } = await service.getPlayerProjections(playerId);
-  if (error) {
-    return c.json({ error: 'Failed to fetch projections' }, 500);
+  try {
+    const coreColumns = [
+      'projection_id', 'player_id', 'game_id', 'projection_date', 'season',
+      'projected_goals', 'projected_assists', 'projected_sog', 'projected_blocks',
+      'projected_ppp', 'projected_shp', 'projected_hits', 'projected_pim',
+      'projected_xg', 'total_projected_points',
+      'base_ppg', 'shrinkage_weight', 'finishing_multiplier',
+      'opponent_adjustment', 'b2b_penalty', 'home_away_adjustment',
+      'calculation_method', 'confidence_score',
+      'projected_wins', 'projected_saves', 'projected_shutouts',
+      'projected_goals_against', 'projected_gaa', 'projected_save_pct',
+      'is_goalie', 'starter_confirmed',
+      'opponent_abbrev', 'is_home_game', 'matchup_difficulty',
+      'created_at', 'updated_at',
+    ].join(', ');
+
+    let query = supabase
+      .from('player_projected_stats')
+      .select(coreColumns)
+      .eq('player_id', parseInt(String(playerId), 10))
+      .order('projection_date', { ascending: true });
+
+    if (startDate) {
+      query = query.gte('projection_date', startDate);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      const errObj = error as { message: string; details?: string; hint?: string; code?: string };
+      logger.error(`[players/:id/projections] Supabase error for player ${playerId}:`, JSON.stringify({
+        message: errObj.message,
+        details: errObj.details,
+        hint: errObj.hint,
+        code: errObj.code,
+      }));
+      return handleError(c, error, 'Failed to fetch projections');
+    }
+
+    return ok(c, data || []);
+  } catch (err) {
+    logger.error(`[players/:id/projections] Unexpected error for player ${playerId}:`, err);
+    return handleError(c, err, 'Failed to fetch projections');
   }
-
-  return c.json({ data: projection });
 });
 
 export { playerRoutes };

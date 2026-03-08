@@ -1400,23 +1400,8 @@ const Roster = () => {
       // If viewing today or future date, check lock status for selected date
       const targetDate = selectedDate ? new Date(selectedDate + 'T00:00:00') : undefined;
       
-      // Get locked IDs for the target date (or today if no date selected)
-      const lockedIds = new Set<string>();
-      for (const player of allPlayers) {
-        const teamAbbrev = player.teamAbbreviation || player.team || '';
-        if (!teamAbbrev) continue;
-        
-        const lockInfo = await GameLockService.isPlayerLocked(
-          player.id,
-          teamAbbrev,
-          targetDate
-        );
-        
-        if (lockInfo.isLocked) {
-          lockedIds.add(String(player.id));
-        }
-      }
-      
+      // Get locked IDs for the target date (or today if no date selected) — single batch query
+      const lockedIds = await GameLockService.getLockedPlayerIds(allPlayers, targetDate);
       setLockedPlayerIds(lockedIds);
     } catch (error) {
       logger.error('[Roster] Error fetching locked player IDs:', error);

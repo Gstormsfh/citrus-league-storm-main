@@ -16,7 +16,7 @@
  * - Uses RPC functions for optimized queries with RLS
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import { matchupApi } from '@/api/matchups';
 import { logger } from '@/utils/logger';
 
 // ============================================================================
@@ -91,20 +91,15 @@ export class MatchupSimulationService {
    */
   static async getSimulation(matchupId: string): Promise<MatchupSimulation | null> {
     try {
-      const { data, error } = await supabase
-        .rpc('get_matchup_simulation', { p_matchup_id: matchupId });
-
-      if (error) {
-        logger.error('[MatchupSimulationService] RPC error:', error.message);
-        return null;
-      }
+      const response = await matchupApi.getSimulation(matchupId);
+      const data = response.data as Array<Record<string, unknown>> | null;
 
       if (!data || data.length === 0) {
         return null;
       }
 
       const row = data[0];
-      const details = row.simulation_details || {};
+      const details = (row.simulation_details || {}) as Record<string, unknown>;
 
       return {
         winProbability: Number(row.win_probability),
@@ -119,9 +114,9 @@ export class MatchupSimulationService {
         pBlowoutWin: Number(row.p_blowout_win),
         pBlowoutLoss: Number(row.p_blowout_loss),
         nSims: Number(row.n_sims),
-        simulatedAt: row.simulated_at,
-        ci95: details.ci_95 || [0, 1],
-        percentiles: details.percentiles || { p5: 0, p25: 0, p50: 0, p75: 0, p95: 0 },
+        simulatedAt: row.simulated_at as string,
+        ci95: (details.ci_95 || [0, 1]) as [number, number],
+        percentiles: (details.percentiles || { p5: 0, p25: 0, p50: 0, p75: 0, p95: 0 }) as MatchupSimulation['percentiles'],
       };
     } catch (err) {
       logger.error('[MatchupSimulationService] Error fetching simulation:', err);
@@ -141,19 +136,10 @@ export class MatchupSimulationService {
     weekNumber: number
   ): Promise<MatchupSimulation[]> {
     try {
-      const { data, error } = await supabase
-        .from('matchup_simulations')
-        .select('*')
-        .eq('league_id', leagueId)
-        .eq('week_number', weekNumber)
-        .order('simulated_at', { ascending: false });
+      const response = await matchupApi.getLeagueSimulations(leagueId, weekNumber);
+      const data = (response.data as Array<Record<string, unknown>>) || [];
 
-      if (error) {
-        logger.error('[MatchupSimulationService] Query error:', error.message);
-        return [];
-      }
-
-      return (data || []).map((row: Record<string, unknown>) => {
+      return data.map((row) => {
         const details = (row.simulation_details || {}) as Record<string, unknown>;
         return {
           winProbability: Number(row.win_probability),
@@ -190,18 +176,10 @@ export class MatchupSimulationService {
     season: number = 2025
   ): Promise<BrierScore | null> {
     try {
-      const { data, error } = await supabase
-        .rpc('get_league_brier_score', {
-          p_league_id: leagueId,
-          p_season: season,
-        });
+      const response = await matchupApi.getBrierScore(leagueId, season);
+      const data = (response.data as Array<Record<string, unknown>>) || [];
 
-      if (error) {
-        logger.error('[MatchupSimulationService] Brier RPC error:', error.message);
-        return null;
-      }
-
-      if (!data || data.length === 0) {
+      if (data.length === 0) {
         return null;
       }
 
@@ -209,8 +187,8 @@ export class MatchupSimulationService {
       return {
         overallBrier: row.overall_brier ? Number(row.overall_brier) : null,
         totalPredictions: Number(row.total_predictions),
-        rating: row.rating || 'pending',
-        weeklyScores: (row.weekly_scores || []).map((w: Record<string, unknown>) => ({
+        rating: (row.rating as string) || 'pending',
+        weeklyScores: ((row.weekly_scores || []) as Array<Record<string, unknown>>).map((w) => ({
           week: Number(w.week),
           brierScore: Number(w.brier_score),
           nMatchups: Number(w.n_matchups),

@@ -16,6 +16,7 @@ import { ScheduleService } from '@/services/ScheduleService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
+import { leagueApi } from '@/api/leagues';
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { logger } from '@/utils/logger';
@@ -163,13 +164,21 @@ const OtherTeam = () => {
             projectedPoints: 0 // Will be set by daily projections system
           }));
           
-          // Load schedule data for demo players
+          // Load schedule data for demo players (batch)
           const userTimezone = 'America/Denver';
+          const uniqueTeams = Array.from(new Set(
+            transformedPlayers.map(p => p.teamAbbreviation || p.team || '').filter(t => t)
+          ));
+          const [hasGamesTodayMap, nextGamesMap] = await Promise.all([
+            ScheduleService.hasGamesTodayBatch(uniqueTeams),
+            ScheduleService.getNextGamesForTeams(uniqueTeams)
+          ]);
           for (const player of transformedPlayers) {
-            const { game: nextGame } = await ScheduleService.getNextGameForTeam(player.teamAbbreviation || player.team || '');
-            const hasGameToday = await ScheduleService.hasGameToday(player.teamAbbreviation || player.team || '');
-            const gameInfo = ScheduleService.getGameInfo(nextGame, player.teamAbbreviation || player.team || '', userTimezone);
-            
+            const team = player.teamAbbreviation || player.team || '';
+            const nextGame = nextGamesMap.get(team) || null;
+            const hasGameToday = hasGamesTodayMap.get(team) || false;
+            const gameInfo = ScheduleService.getGameInfo(nextGame, team, userTimezone);
+
             if (gameInfo) {
               player.nextGame = {
                 opponent: gameInfo.opponent,
@@ -269,41 +278,40 @@ const OtherTeam = () => {
         // ═══════════════════════════════════════════════════════════════════
         // ACTIVE USER STATE: Load real team from database
         // ═══════════════════════════════════════════════════════════════════
-        // Get team from Supabase (handles UUID team IDs)
-        const { data: teamData, error: teamError } = await supabase
-          .from('teams')
-          .select('id, league_id, team_name, owner_id')
-          .eq('id', teamId)
-          .maybeSingle();
+        // Get team via API client (fetches all teams with owner profiles)
+        if (!activeLeagueId) {
+          logger.error(`[OtherTeam] No active league ID available`);
+          setLoading(false);
+          return;
+        }
 
-        if (teamError || !teamData) {
-          logger.error(`Team ${teamId} not found:`, teamError);
+        const { data: allTeams } = await leagueApi.getTeams(activeLeagueId, true);
+
+        if (!allTeams || !Array.isArray(allTeams)) {
+          logger.error(`[OtherTeam] Failed to fetch teams for league ${activeLeagueId}`);
+          setLoading(false);
+          return;
+        }
+
+        const teamData = allTeams.find((t: any) => t.id === teamId);
+
+        if (!teamData) {
+          logger.error(`Team ${teamId} not found in league ${activeLeagueId}`);
           setLoading(false);
           return;
         }
 
         setTeam(teamData);
 
-        // Get owner profile information
-        if (teamData.owner_id) {
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('first_name, last_name, username')
-            .eq('id', teamData.owner_id)
-            .maybeSingle();
-          
-          if (!profileError && profile) {
-            const name = profile.first_name && profile.last_name
-              ? `${profile.first_name} ${profile.last_name}`
-              : profile.username || 'User';
-            setOwnerName(name);
-          }
-        } else {
+        // Set owner name from the team data returned by the API (includes owner profile)
+        if (teamData.owner_name && teamData.owner_name !== 'Unknown') {
+          setOwnerName(teamData.owner_name);
+        } else if (!teamData.owner_id) {
           setOwnerName('AI Team');
         }
 
         // Check if draft is completed
-        const { league: leagueData, error: leagueError } = await LeagueService.getLeague(teamData.league_id, user.id);
+        const { league: leagueData, error: leagueError } = await LeagueService.getLeague(activeLeagueId, user.id);
         if (leagueError || !leagueData || leagueData.draft_status !== 'completed') {
           setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
           setLoading(false);
@@ -314,7 +322,7 @@ const OtherTeam = () => {
         const allPlayers = await PlayerService.getAllPlayers();
         
         // Get draft picks for this team
-        const { picks: draftPicks } = await DraftService.getDraftPicks(teamData.league_id, user.id);
+        const { picks: draftPicks } = await DraftService.getDraftPicks(activeLeagueId, user.id);
         const teamPicks = draftPicks.filter(p => p.team_id === teamId);
         
         if (teamPicks.length === 0) {
@@ -369,14 +377,21 @@ const OtherTeam = () => {
           projectedPoints: 0 // Will be set by daily projections system
         }));
 
-        // Load real NHL schedule data for each player
-        // Get user timezone from profile (default to Mountain Time)
+        // Load real NHL schedule data for players (batch instead of per-team)
         const userTimezone = profile?.timezone || 'America/Denver';
+        const uniqueTeams = Array.from(new Set(
+          transformedPlayers.map(p => p.teamAbbreviation || p.team || '').filter(t => t)
+        ));
+        const [hasGamesTodayMap, nextGamesMap] = await Promise.all([
+          ScheduleService.hasGamesTodayBatch(uniqueTeams),
+          ScheduleService.getNextGamesForTeams(uniqueTeams)
+        ]);
         for (const player of transformedPlayers) {
-          const { game: nextGame } = await ScheduleService.getNextGameForTeam(player.teamAbbreviation || player.team || '');
-          const hasGameToday = await ScheduleService.hasGameToday(player.teamAbbreviation || player.team || '');
-          const gameInfo = ScheduleService.getGameInfo(nextGame, player.teamAbbreviation || player.team || '', userTimezone);
-          
+          const team = player.teamAbbreviation || player.team || '';
+          const nextGame = nextGamesMap.get(team) || null;
+          const hasGameToday = hasGamesTodayMap.get(team) || false;
+          const gameInfo = ScheduleService.getGameInfo(nextGame, team, userTimezone);
+
           if (gameInfo) {
             player.nextGame = {
               opponent: gameInfo.opponent,
@@ -395,7 +410,7 @@ const OtherTeam = () => {
         });
 
         // Check for saved lineup first (for this team - handles UUID, with league_id for isolation)
-        const savedLineup = await LeagueService.getLineup(teamId, teamData.league_id);
+        const savedLineup = await LeagueService.getLineup(teamId, activeLeagueId);
         
         // Validate lineup: must have at least 10 starters AND bench players to be considered valid
         // CRITICAL: If all players are on bench with no starters, lineup is invalid
@@ -509,7 +524,7 @@ const OtherTeam = () => {
           // This ensures the lineup is persisted even if initialization missed it
           if (starters.length >= 10 && bench.length > 0) {
             try {
-              await LeagueService.saveLineup(teamId, teamData.league_id, {
+              await LeagueService.saveLineup(teamId, activeLeagueId, {
                 starters: starters.map(p => String(p.id)),
                 bench: bench.map(p => String(p.id)),
                 ir: ir.map(p => String(p.id)),

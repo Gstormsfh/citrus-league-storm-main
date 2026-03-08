@@ -22,9 +22,26 @@ export const playerApi = {
   },
 
   /** Get trending players */
-  getTrendingPlayers(days?: number) {
-    const qs = days ? `?days=${days}` : '';
-    return apiClient.get(`/api/players/trending${qs}`);
+  getTrendingPlayers(daysBack?: number, limitCount?: number) {
+    const params = new URLSearchParams();
+    if (daysBack) params.set('days', String(daysBack));
+    if (limitCount) params.set('limit', String(limitCount));
+    const qs = params.toString();
+    return apiClient.get(`/api/players/trending${qs ? `?${qs}` : ''}`);
+  },
+
+  /** Record a player transaction (add/drop) for trending analytics */
+  recordPlayerTransaction(params: {
+    playerId: number;
+    leagueId: string;
+    teamId: string;
+    transactionType: 'add' | 'drop';
+    source: string;
+    playerName: string;
+    playerTeam: string;
+    playerPosition: string;
+  }) {
+    return apiClient.post('/api/players/transaction', params);
   },
 
   /** Get players by IDs (batch) */
@@ -43,8 +60,9 @@ export const playerApi = {
     return apiClient.get(`/api/players/${playerId}/stats${qs}`);
   },
 
-  /** Get player projections */
-  getPlayerProjections(playerId: string) {
-    return apiClient.get(`/api/players/${playerId}/projections`);
+  /** Get player projections — pass startDate to get all from that date onward */
+  getPlayerProjections(playerId: string, startDate?: string) {
+    const qs = startDate ? `?startDate=${startDate}` : '';
+    return apiClient.get(`/api/players/${playerId}/projections${qs}`);
   },
 };

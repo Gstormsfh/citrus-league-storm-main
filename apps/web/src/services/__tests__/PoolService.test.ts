@@ -24,6 +24,15 @@ vi.mock('@/integrations/supabase/client', () => ({
   },
 }));
 
+// Mock API client modules used transitively
+vi.mock('@/api/client', () => ({
+  apiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
+}));
+vi.mock('@/api/leagues', () => ({ leagueApi: {} }));
+vi.mock('@/api/matchups', () => ({ matchupApi: {} }));
+vi.mock('@/api/players', () => ({ playerApi: {} }));
+vi.mock('@/api/rosters', () => ({ rosterApi: {} }));
+
 vi.mock('../ScheduleService', () => ({
   ScheduleService: {
     getGamesForDateRange: vi.fn().mockResolvedValue({ games: [] }),

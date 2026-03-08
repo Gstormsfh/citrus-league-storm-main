@@ -9,10 +9,8 @@
  * - Score syncing between matchups table and playoff_series
  */
 
-import { supabase } from '@/integrations/supabase/client';
-import { CURRENT_SEASON } from '@/utils/seasonConstants';
+import { playoffApi } from '@/api/playoffs';
 import { logger } from '@/utils/logger';
-import { COLUMNS } from '@/utils/queryColumns';
 
 // ============================================================================
 // TYPES
@@ -128,43 +126,21 @@ export const PlayoffService = {
     error: Error | null;
   }> {
     try {
-      // Get bracket
-      const { data: bracketData, error: bracketError } = await supabase
-        .from('playoff_brackets')
-        .select(COLUMNS.PLAYOFF_BRACKET)
-        .eq('league_id', leagueId)
-        .eq('season', CURRENT_SEASON)
-        .maybeSingle();
+      const response = await playoffApi.getBracket(leagueId);
 
-      if (bracketError) throw bracketError;
-      if (!bracketData) {
+      if (response.error) {
+        throw new Error(response.error);
+      }
+
+      const data = response.data;
+      if (!data || !data.bracket) {
         return { bracket: null, seeds: [], series: [], error: null };
       }
 
-      const bracket = bracketData as unknown as PlayoffBracket;
-
-      // Get seeds and series in parallel
-      const [seedsResult, seriesResult] = await Promise.all([
-        supabase
-          .from('playoff_seeds')
-          .select(COLUMNS.PLAYOFF_SEED)
-          .eq('bracket_id', bracket.id)
-          .order('seed_number', { ascending: true }),
-        supabase
-          .from('playoff_series')
-          .select(COLUMNS.PLAYOFF_SERIES)
-          .eq('bracket_id', bracket.id)
-          .order('round_number', { ascending: true })
-          .order('match_number', { ascending: true }),
-      ]);
-
-      if (seedsResult.error) throw seedsResult.error;
-      if (seriesResult.error) throw seriesResult.error;
-
       return {
-        bracket,
-        seeds: (seedsResult.data || []) as unknown as PlayoffSeed[],
-        series: (seriesResult.data || []) as unknown as PlayoffSeries[],
+        bracket: data.bracket as PlayoffBracket,
+        seeds: (data.seeds || []) as PlayoffSeed[],
+        series: (data.series || []) as PlayoffSeries[],
         error: null,
       };
     } catch (error) {
@@ -186,22 +162,13 @@ export const PlayoffService = {
     options: BracketGenerationOptions = {}
   ): Promise<{ result: any; error: Error | null }> {
     try {
-      const { data, error } = await supabase.rpc('generate_playoff_bracket', {
-        p_league_id: leagueId,
-        p_consolation_enabled: options.consolationEnabled ?? false,
-        p_two_week_matchups: options.twoWeekMatchups ?? false,
-        p_reseed_each_round: options.reseedEachRound ?? false,
-        p_seeding_method: options.seedingMethod ?? 'standings',
-      });
+      const response = await playoffApi.generateBracket(leagueId, options);
 
-      if (error) throw error;
-
-      const result = typeof data === 'string' ? JSON.parse(data) : data;
-      if (result?.error) {
-        return { result: null, error: new Error(result.error) };
+      if (response.error) {
+        return { result: null, error: new Error(response.error) };
       }
 
-      return { result, error: null };
+      return { result: response.data, error: null };
     } catch (error) {
       logger.error('[PlayoffService] Error generating bracket:', error);
       return {
@@ -216,18 +183,13 @@ export const PlayoffService = {
    */
   async advanceRound(bracketId: string): Promise<{ result: any; error: Error | null }> {
     try {
-      const { data, error } = await supabase.rpc('advance_playoff_round', {
-        p_bracket_id: bracketId,
-      });
+      const response = await playoffApi.advanceRound(bracketId);
 
-      if (error) throw error;
-
-      const result = typeof data === 'string' ? JSON.parse(data) : data;
-      if (result?.error) {
-        return { result: null, error: new Error(result.error) };
+      if (response.error) {
+        return { result: null, error: new Error(response.error) };
       }
 
-      return { result, error: null };
+      return { result: response.data, error: null };
     } catch (error) {
       logger.error('[PlayoffService] Error advancing round:', error);
       return {
@@ -242,15 +204,10 @@ export const PlayoffService = {
    */
   async resetBracket(leagueId: string): Promise<{ error: Error | null }> {
     try {
-      const { data, error } = await supabase.rpc('reset_playoff_bracket', {
-        p_league_id: leagueId,
-      });
+      const response = await playoffApi.resetBracket(leagueId);
 
-      if (error) throw error;
-
-      const result = typeof data === 'string' ? JSON.parse(data) : data;
-      if (result?.error) {
-        return { error: new Error(result.error) };
+      if (response.error) {
+        return { error: new Error(response.error) };
       }
 
       return { error: null };
@@ -270,18 +227,13 @@ export const PlayoffService = {
     error: Error | null;
   }> {
     try {
-      const { data, error } = await supabase.rpc('get_playoff_picture', {
-        p_league_id: leagueId,
-      });
+      const response = await playoffApi.getPlayoffPicture(leagueId);
 
-      if (error) throw error;
-
-      const result = typeof data === 'string' ? JSON.parse(data) : data;
-      if (result?.error) {
-        return { picture: null, error: new Error(result.error) };
+      if (response.error) {
+        return { picture: null, error: new Error(response.error) };
       }
 
-      return { picture: result as PlayoffPicture, error: null };
+      return { picture: response.data as PlayoffPicture, error: null };
     } catch (error) {
       logger.error('[PlayoffService] Error getting playoff picture:', error);
       return {
@@ -296,23 +248,6 @@ export const PlayoffService = {
    */
   getRoundName(bracketSize: number, roundNumber: number): string {
     return ROUND_NAMES[bracketSize]?.[roundNumber] || `Round ${roundNumber}`;
-  },
-
-  /**
-   * Check if the user is the commissioner of a league
-   */
-  async isCommissioner(leagueId: string, userId: string): Promise<boolean> {
-    try {
-      const { data } = await supabase
-        .from('leagues')
-        .select('commissioner_id')
-        .eq('id', leagueId)
-        .maybeSingle();
-
-      return data?.commissioner_id === userId;
-    } catch {
-      return false;
-    }
   },
 
   /**

@@ -19,11 +19,11 @@ export async function membershipMiddleware(c: Context<Env>, next: Next) {
   const leagueId = c.req.param('leagueId');
 
   if (!userId || !userToken) {
-    return c.json({ error: 'Authentication required' }, 401);
+    return c.json({ error: { code: 'AUTHENTICATION_REQUIRED', message: 'Authentication required' } }, 401);
   }
 
   if (!leagueId) {
-    return c.json({ error: 'League ID is required' }, 400);
+    return c.json({ error: { code: 'BAD_REQUEST', message: 'League ID is required' } }, 400);
   }
 
   const supabase = createUserClient(userToken);
@@ -31,7 +31,7 @@ export async function membershipMiddleware(c: Context<Env>, next: Next) {
   const result = await membership.checkMembership(leagueId, userId);
 
   if (!result.isMember) {
-    return c.json({ error: 'Access denied: You are not a member of this league' }, 403);
+    return c.json({ error: { code: 'FORBIDDEN', message: 'Access denied: You are not a member of this league' } }, 403);
   }
 
   await next();
@@ -47,11 +47,11 @@ export async function commissionerMiddleware(c: Context<Env>, next: Next) {
   const leagueId = c.req.param('leagueId');
 
   if (!userId || !userToken) {
-    return c.json({ error: 'Authentication required' }, 401);
+    return c.json({ error: { code: 'AUTHENTICATION_REQUIRED', message: 'Authentication required' } }, 401);
   }
 
   if (!leagueId) {
-    return c.json({ error: 'League ID is required' }, 400);
+    return c.json({ error: { code: 'BAD_REQUEST', message: 'League ID is required' } }, 400);
   }
 
   const supabase = createUserClient(userToken);
@@ -59,7 +59,7 @@ export async function commissionerMiddleware(c: Context<Env>, next: Next) {
   const result = await membership.checkMembership(leagueId, userId);
 
   if (!result.isCommissioner) {
-    return c.json({ error: 'Access denied: Commissioner privileges required' }, 403);
+    return c.json({ error: { code: 'FORBIDDEN', message: 'Access denied: Commissioner privileges required' } }, 403);
   }
 
   await next();

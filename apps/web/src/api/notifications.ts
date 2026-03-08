@@ -30,4 +30,9 @@ export const notificationApi = {
     const qs = leagueId ? `?leagueId=${leagueId}` : '';
     return apiClient.put(`/api/notifications/read-all${qs}`);
   },
+
+  /** Send a chat message in a league */
+  sendChatMessage(leagueId: string, message: string, senderName?: string | null) {
+    return apiClient.post('/api/notifications/chat', { leagueId, message, senderName });
+  },
 };

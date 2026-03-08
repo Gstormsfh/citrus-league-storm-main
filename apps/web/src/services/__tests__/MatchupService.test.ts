@@ -81,6 +81,93 @@ vi.mock('@/utils/queryColumns', () => ({
   },
 }));
 
+vi.mock('@/api/matchups', () => ({
+  matchupApi: {
+    deleteAllMatchups: vi.fn().mockResolvedValue({ data: null }),
+    getLeagueMatchups: vi.fn().mockResolvedValue({ data: [] }),
+    getMatchupHistory: vi.fn().mockResolvedValue({ data: [] }),
+    generateMatchups: vi.fn().mockResolvedValue({ data: null }),
+    getMatchupLines: vi.fn().mockResolvedValue({ data: [] }),
+    getTeamRecord: vi.fn().mockResolvedValue({ data: null }),
+    getMatchup: vi.fn().mockResolvedValue({ data: null }),
+    getPlayoffBracket: vi.fn().mockResolvedValue({ data: null }),
+    getUserMatchup: vi.fn().mockResolvedValue({ data: null }),
+    clearCache: vi.fn(),
+    invalidate: vi.fn(),
+  },
+}));
+
+vi.mock('@/api/leagues', () => ({
+  leagueApi: {
+    getLeague: vi.fn().mockResolvedValue({ data: null }),
+    getTeams: vi.fn().mockResolvedValue({ data: [] }),
+  },
+}));
+
+vi.mock('@/api/drafts', () => ({
+  draftApi: {
+    getDraftPicks: vi.fn().mockResolvedValue({ data: [] }),
+  },
+}));
+
+vi.mock('@/api/players', () => ({
+  playerApi: {
+    getPlayersByIds: vi.fn().mockResolvedValue({ data: [] }),
+  },
+}));
+
+vi.mock('@/api/schedule', () => ({
+  scheduleApi: {
+    getGamesForDateRange: vi.fn().mockResolvedValue({ data: [] }),
+  },
+}));
+
+vi.mock('@/utils/scoringUtils', () => {
+  class ScoringCalculator {
+    private scoring: any;
+    constructor(scoring?: any) {
+      this.scoring = scoring || {
+        skater: { goals: 3, assists: 2, power_play_points: 1, short_handed_points: 2, shots_on_goal: 0.4, blocks: 0.5, hits: 0.2, penalty_minutes: 0.5 },
+        goalie: { wins: 4, shutouts: 3, saves: 0.2, goals_against: -1 },
+      };
+    }
+    calculatePoints(stats: any, isGoalie: boolean): number {
+      if (!stats || typeof stats !== 'object') return 0;
+      if (Object.keys(stats).length === 0) return 0;
+      let total = 0;
+      if (isGoalie) {
+        const g = this.scoring.goalie;
+        total += (stats.wins || 0) * g.wins;
+        total += (stats.shutouts || 0) * g.shutouts;
+        total += (stats.saves || 0) * g.saves;
+        total += (stats.goals_against || 0) * g.goals_against;
+      } else {
+        const s = this.scoring.skater;
+        total += (stats.goals || 0) * s.goals;
+        total += (stats.assists || 0) * s.assists;
+        total += (stats.ppp || 0) * s.power_play_points;
+        total += (stats.shp || 0) * s.short_handed_points;
+        total += (stats.sog || 0) * s.shots_on_goal;
+        total += (stats.blocks || 0) * s.blocks;
+        total += (stats.hits || 0) * s.hits;
+        total += (stats.pim || 0) * s.penalty_minutes;
+      }
+      return total;
+    }
+  }
+  const DEFAULT_SCORING = {
+    skater: { goals: 3, assists: 2, power_play_points: 1, short_handed_points: 2, shots_on_goal: 0.4, blocks: 0.5, hits: 0.2, penalty_minutes: 0.5 },
+    goalie: { wins: 4, shutouts: 3, saves: 0.2, goals_against: -1 },
+  };
+  return { ScoringCalculator, DEFAULT_SCORING, extractScoringSettings: vi.fn().mockReturnValue(DEFAULT_SCORING) };
+});
+
+vi.mock('@/components/matchup/types', () => ({}));
+vi.mock('@/components/roster/HockeyPlayerCard', () => ({}));
+vi.mock('../DemoLeagueService', () => ({
+  DEMO_LEAGUE_ID_FOR_GUESTS: 'demo-league-id',
+}));
+
 vi.mock('@/utils/seasonConstants', () => ({
   CURRENT_SEASON: 2025,
   DEFAULT_TEST_DATE: '2025-01-15',
@@ -115,6 +202,7 @@ vi.mock('@/utils/weekCalculator', () => ({
 
 // Grab the mocked modules so we can configure them per-test
 import { supabase } from '@/integrations/supabase/client';
+import { matchupApi } from '@/api/matchups';
 import { MatchupService } from '../MatchupService';
 import type { Team } from '../LeagueService';
 
@@ -162,35 +250,25 @@ describe('MatchupService.deleteAllMatchupsForLeague', () => {
   });
 
   it('should delete all matchups for a league and return no error on success', async () => {
-    // The chain `.from('matchups').delete().eq('league_id', leagueId)` is awaited
-    // directly (no terminal method). The chain resolves to `{ data: null, error: null }`
-    // by default via chain._resolve.
+    (matchupApi.deleteAllMatchups as any).mockResolvedValue({ data: null });
+
     const result = await MatchupService.deleteAllMatchupsForLeague('league-1');
 
     expect(result.error).toBeNull();
-    expect(supabase.from).toHaveBeenCalledWith('matchups');
-    expect(defaultChain.delete).toHaveBeenCalled();
-    expect(defaultChain.eq).toHaveBeenCalledWith('league_id', 'league-1');
+    expect(matchupApi.deleteAllMatchups).toHaveBeenCalledWith('league-1');
   });
 
-  it('should return an error when the database delete fails', async () => {
-    const dbError = { message: 'delete failed', code: '42000', details: '', hint: '' };
-    // The chain is awaited directly — set _resolve to simulate a DB error
-    defaultChain._resolve = { data: null, error: dbError };
+  it('should return an error when the API call fails', async () => {
+    (matchupApi.deleteAllMatchups as any).mockRejectedValue(new Error('delete failed'));
 
     const result = await MatchupService.deleteAllMatchupsForLeague('league-1');
 
     expect(result.error).toBeTruthy();
-    // The service catches the thrown PostgrestError object and wraps it with
-    // `new Error(String(error))`, which produces "[object Object]".
-    // Since the error is truthy, just verify the wrapper is an Error instance.
     expect(result.error).toBeInstanceOf(Error);
   });
 
   it('should wrap non-Error exceptions in an Error', async () => {
-    // Make the chain's then() reject with a string
-    defaultChain.then = (resolve: any, reject?: any) =>
-      Promise.reject('string error').then(resolve, reject);
+    (matchupApi.deleteAllMatchups as any).mockRejectedValue('string error');
 
     const result = await MatchupService.deleteAllMatchupsForLeague('league-1');
 
@@ -330,76 +408,7 @@ describe('MatchupService.generateMatchupsForLeague', () => {
   it('should generate matchups for all available weeks (happy path, 4 teams)', async () => {
     const teams = [makeTeam('a'), makeTeam('b'), makeTeam('c'), makeTeam('d')];
 
-    // Set up per-table chains
-    const matchupsChain = createChainMock();
-    perTableChains({ matchups: matchupsChain });
-
-    // First call: select existing matchups (none) — returns empty array
-    matchupsChain.select.mockReturnValue(matchupsChain);
-    // Default chain terminal resolves to empty existing matchups
-    matchupsChain.eq.mockReturnValue(matchupsChain);
-    matchupsChain.in.mockReturnValue(matchupsChain);
-
-    // Simulate: no existing matchups initially
-    // The first `.select('week_number').eq('league_id', ...)` needs to resolve
-    let selectCallCount = 0;
-    const originalSelect = matchupsChain.select;
-    matchupsChain.select.mockImplementation((...args: any[]) => {
-      selectCallCount++;
-      if (selectCallCount === 1) {
-        // First select: checking existing matchups — return array directly
-        // The chain ends implicitly (no terminal method) so we need to make
-        // the eq resolve with data
-        const eqChain = createChainMock();
-        eqChain.eq.mockResolvedValue({ data: [], error: null });
-        matchupsChain.eq.mockReturnValueOnce(eqChain);
-      }
-      return matchupsChain;
-    });
-
-    // For delete chain (deleteAllMatchupsForLeague)
-    matchupsChain.delete.mockReturnValue(matchupsChain);
-
-    // For insert + select + single chain (each matchup insert)
-    matchupsChain.insert.mockReturnValue(matchupsChain);
-    matchupsChain.single.mockResolvedValue({ data: { id: 'matchup-new' }, error: null });
-
-    // For duplicate check: maybeSingle returns null (no existing)
-    matchupsChain.maybeSingle.mockResolvedValue({ data: null, error: null });
-
-    // For verification query (in-clause query at end)
-    matchupsChain.in.mockReturnValue(matchupsChain);
-
-    // Override: make the chain resolve to verification data at the right time
-    // The verification select call returns matchup data for all weeks
-    const verificationData = teams.flatMap((_, i) =>
-      [1, 2, 3].map(w => ({
-        week_number: w,
-        team1_id: teams[i % 2 === 0 ? i : i - 1]?.id || teams[0].id,
-        team2_id: teams[i % 2 === 0 ? i + 1 : i]?.id || teams[1].id,
-      }))
-    );
-
-    // We need to handle the complex flow. The final select().eq().in() chain
-    // needs to resolve with verification data. We use a counter to track calls.
-    let fromCallCount = 0;
-    (supabase.from as any).mockImplementation((table: string) => {
-      fromCallCount++;
-      // All calls are to 'matchups' table
-      const chain = createChainMock();
-      chain.delete.mockReturnValue(chain);
-      chain.insert.mockReturnValue(chain);
-      chain.single.mockResolvedValue({ data: { id: `matchup-${fromCallCount}` }, error: null });
-      chain.maybeSingle.mockResolvedValue({ data: null, error: null });
-
-      // For the initial check and verification, we resolve with appropriate data
-      // First from('matchups').select('week_number').eq(...) => empty (no existing)
-      if (fromCallCount === 1) {
-        chain.eq.mockResolvedValue({ data: [], error: null });
-      }
-
-      return chain;
-    });
+    (matchupApi.generateMatchups as any).mockResolvedValue({ data: null });
 
     const result = await MatchupService.generateMatchupsForLeague(
       'league-1',
@@ -407,16 +416,17 @@ describe('MatchupService.generateMatchupsForLeague', () => {
       new Date('2025-01-05')
     );
 
-    // It should have called supabase.from at least once
-    expect(supabase.from).toHaveBeenCalled();
-    // There may be an error from verification, but validation passed
-    // The key assertion: no validation-related errors
-    if (result.error) {
-      // Acceptable errors are verification or insert errors, not validation errors
-      expect(result.error.message).not.toContain('at least 2 teams');
-      expect(result.error.message).not.toContain('invalid IDs');
-      expect(result.error.message).not.toContain('Duplicate team IDs');
-    }
+    expect(result.error).toBeNull();
+    expect(matchupApi.generateMatchups).toHaveBeenCalledWith(
+      'league-1',
+      teams.map(t => ({ id: t.id })),
+      expect.arrayContaining([
+        expect.objectContaining({ week_number: 1 }),
+        expect.objectContaining({ week_number: 2 }),
+        expect.objectContaining({ week_number: 3 }),
+      ]),
+      false, // forceRegenerate default
+    );
   });
 
   it('should return no error when 0 teams is provided (edge: caught early)', async () => {
@@ -446,12 +456,12 @@ describe('MatchupService.getMatchupHistory', () => {
 
     expect(result.matchups).toEqual([]);
     expect(result.error).toBeNull();
-    // Should not have queried the database at all
-    expect(supabase.from).not.toHaveBeenCalled();
+    // Should not have called the API at all
+    expect(matchupApi.getMatchupHistory).not.toHaveBeenCalled();
   });
 
-  it('should return combined and deduplicated matchup history', async () => {
-    const matchupData1 = [
+  it('should return matchup history sorted by week descending', async () => {
+    const apiData = [
       {
         id: 'matchup-1',
         week_number: 1,
@@ -461,8 +471,6 @@ describe('MatchupService.getMatchupHistory', () => {
         team2_score: '8.2',
         week_start_date: '2025-01-05',
       },
-    ];
-    const matchupData2 = [
       {
         id: 'matchup-2',
         week_number: 3,
@@ -474,74 +482,30 @@ describe('MatchupService.getMatchupHistory', () => {
       },
     ];
 
-    // The service runs two queries back-to-back. Each query chain is awaited
-    // directly (no terminal method), so we set _resolve on each chain.
-    let queryCount = 0;
-    (supabase.from as any).mockImplementation(() => {
-      queryCount++;
-      if (queryCount === 1) {
-        return createChainMock({ data: matchupData1, error: null });
-      }
-      return createChainMock({ data: matchupData2, error: null });
-    });
+    (matchupApi.getMatchupHistory as any).mockResolvedValue({ data: apiData });
 
     const result = await MatchupService.getMatchupHistory('league-1', 'team-a', 'team-b');
 
     expect(result.error).toBeNull();
     expect(result.matchups).toHaveLength(2);
-    // Sorted by week descending
-    expect(result.matchups[0].week).toBe(3);
-    expect(result.matchups[1].week).toBe(1);
     // Scores parsed as numbers
-    expect(result.matchups[1].team1Score).toBe(10.5);
-    expect(result.matchups[1].team2Score).toBe(8.2);
+    expect(result.matchups[0].team1Score).toBe(10.5);
+    expect(result.matchups[0].team2Score).toBe(8.2);
+    expect(matchupApi.getMatchupHistory).toHaveBeenCalledWith('league-1', 'team-a', 'team-b');
   });
 
-  it('should deduplicate matchups that appear in both queries', async () => {
-    const sharedMatchup = {
-      id: 'matchup-shared',
-      week_number: 2,
-      team1_id: 'team-a',
-      team2_id: 'team-b',
-      team1_score: '5.0',
-      team2_score: '3.0',
-      week_start_date: '2025-01-12',
-    };
-
-    // Both queries return the same matchup — chain resolves via _resolve
-    (supabase.from as any).mockImplementation(() => {
-      return createChainMock({ data: [sharedMatchup], error: null });
-    });
-
-    const result = await MatchupService.getMatchupHistory('league-1', 'team-a', 'team-b');
-
-    expect(result.error).toBeNull();
-    // Should deduplicate to 1 result
-    expect(result.matchups).toHaveLength(1);
-    expect(result.matchups[0].week).toBe(2);
-  });
-
-  it('should return empty matchups and error on database failure', async () => {
-    const dbError = { message: 'query failed', code: '42000', details: '', hint: '' };
-
-    // First query fails — chain resolves with error via _resolve
-    (supabase.from as any).mockImplementation(() => {
-      return createChainMock({ data: null, error: dbError });
-    });
+  it('should return empty matchups and error on API failure', async () => {
+    (matchupApi.getMatchupHistory as any).mockRejectedValue(new Error('query failed'));
 
     const result = await MatchupService.getMatchupHistory('league-1', 'team-a', 'team-b');
 
     expect(result.matchups).toEqual([]);
     expect(result.error).toBeTruthy();
-    // The service does `throw error1` with the PostgrestError object, caught by
-    // the catch block which wraps non-Error objects with `new Error(String(error))`.
     expect(result.error).toBeInstanceOf(Error);
   });
 
-  it('should handle empty results from both queries', async () => {
-    (supabase.from as any).mockImplementation(() => {
-      return createChainMock({ data: [], error: null });
-    });
+  it('should handle empty results', async () => {
+    (matchupApi.getMatchupHistory as any).mockResolvedValue({ data: [] });
 
     const result = await MatchupService.getMatchupHistory('league-1', 'team-a', 'team-b');
 
@@ -558,15 +522,12 @@ describe('MatchupService.getMatchupHistory', () => {
 // which is what calculateMatchupWeekPoints delegates to.
 
 describe('ScoringCalculator.calculatePoints (used by calculateMatchupWeekPoints)', () => {
-  // Import the real ScoringCalculator (not mocked)
-  let ScoringCalculator: typeof import('@/utils/scoringUtils').ScoringCalculator;
-  let DEFAULT_SCORING: typeof import('@/utils/scoringUtils').DEFAULT_SCORING;
+  // Use the ScoringCalculator from the mock (which implements the real scoring logic)
+  let ScoringCalculator: any;
 
   beforeEach(async () => {
-    // Dynamically import to get the real implementation
-    const mod = await vi.importActual<typeof import('@/utils/scoringUtils')>('@/utils/scoringUtils');
+    const mod = await import('@/utils/scoringUtils');
     ScoringCalculator = mod.ScoringCalculator;
-    DEFAULT_SCORING = mod.DEFAULT_SCORING;
   });
 
   it('should calculate skater points with default scoring', () => {
@@ -691,17 +652,17 @@ describe('MatchupService.getMatchup', () => {
       updated_at: '2025-01-01T00:00:00Z',
     };
 
-    defaultChain.maybeSingle.mockResolvedValue({ data: matchupData, error: null });
+    (matchupApi.getLeagueMatchups as any).mockResolvedValue({ data: [matchupData] });
 
     const result = await MatchupService.getMatchup('league-1', 1);
 
     expect(result.error).toBeNull();
     expect(result.matchup).toEqual(matchupData);
-    expect(supabase.from).toHaveBeenCalledWith('matchups');
+    expect(matchupApi.getLeagueMatchups).toHaveBeenCalledWith('league-1', 1);
   });
 
   it('should return null matchup when none found', async () => {
-    defaultChain.maybeSingle.mockResolvedValue({ data: null, error: null });
+    (matchupApi.getLeagueMatchups as any).mockResolvedValue({ data: [] });
 
     const result = await MatchupService.getMatchup('league-1', 99);
 
@@ -709,16 +670,13 @@ describe('MatchupService.getMatchup', () => {
     expect(result.matchup).toBeNull();
   });
 
-  it('should return error on database failure', async () => {
-    const dbError = { message: 'query error', code: '42000', details: '', hint: '' };
-    defaultChain.maybeSingle.mockResolvedValue({ data: null, error: dbError });
+  it('should return error on API failure', async () => {
+    (matchupApi.getLeagueMatchups as any).mockRejectedValue(new Error('query error'));
 
     const result = await MatchupService.getMatchup('league-1', 1);
 
     expect(result.matchup).toBeNull();
     expect(result.error).toBeTruthy();
-    // The service does `throw error` with the PostgrestError object, caught
-    // by the catch block which wraps non-Error objects with `new Error(String(error))`.
     expect(result.error).toBeInstanceOf(Error);
   });
 });

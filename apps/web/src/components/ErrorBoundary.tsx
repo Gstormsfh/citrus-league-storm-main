@@ -1,10 +1,13 @@
 import React, { Component, ErrorInfo, ReactNode } from "react";
 import { AlertCircle } from "lucide-react";
 import { logger } from '@/utils/logger';
+import { captureException } from '@/utils/sentry';
 
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
+  /** Optional name for identifying which boundary caught the error */
+  name?: string;
 }
 
 interface State {
@@ -23,6 +26,10 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     logger.error("Uncaught error:", error, errorInfo);
+    captureException(error, {
+      componentStack: errorInfo.componentStack ?? undefined,
+      boundary: this.props.name ?? 'unknown',
+    });
   }
 
   private handleRetry = () => {

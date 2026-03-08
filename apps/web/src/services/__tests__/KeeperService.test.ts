@@ -1,40 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { supabase } from '@/integrations/supabase/client';
 
 // =============================================================================
-// Mock Supabase client
+// Mock API client
 // =============================================================================
 
-function createChainableMock() {
-  const chain: Record<string, any> = {};
-  chain.select = vi.fn().mockReturnValue(chain);
-  chain.insert = vi.fn().mockReturnValue(chain);
-  chain.update = vi.fn().mockReturnValue(chain);
-  chain.delete = vi.fn().mockReturnValue(chain);
-  chain.upsert = vi.fn().mockReturnValue(chain);
-  chain.eq = vi.fn().mockReturnValue(chain);
-  chain.is = vi.fn().mockReturnValue(chain);
-  chain.in = vi.fn().mockReturnValue(chain);
-  chain.or = vi.fn().mockReturnValue(chain);
-  chain.order = vi.fn().mockReturnValue(chain);
-  chain.limit = vi.fn().mockReturnValue(chain);
-  chain.gte = vi.fn().mockReturnValue(chain);
-  chain.lte = vi.fn().mockReturnValue(chain);
-  chain.single = vi.fn().mockResolvedValue({ data: null, error: null });
-  chain.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
-  return chain;
-}
-
-let mockChain = createChainableMock();
-const mockRpc = vi.fn();
-
-vi.mock('@/integrations/supabase/client', () => ({
-  supabase: {
-    from: vi.fn(() => mockChain),
-    rpc: (...args: any[]) => mockRpc(...args),
-    auth: {
-      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }),
-    },
+vi.mock('@/api/keepers', () => ({
+  keeperApi: {
+    getTeamKeepers: vi.fn(),
+    getLeagueKeepers: vi.fn(),
+    designateKeeper: vi.fn(),
+    releaseKeeper: vi.fn(),
+    validateKeepers: vi.fn(),
+    getKeeperDraftCosts: vi.fn(),
+    lockKeepers: vi.fn(),
+    updateKeeperSettings: vi.fn(),
   },
 }));
 
@@ -50,17 +29,15 @@ vi.mock('@/utils/logger', () => ({
 // Import KeeperService AFTER mocks are registered
 // =============================================================================
 
+import { keeperApi } from '@/api/keepers';
+
 let KeeperService: typeof import('../KeeperService').KeeperService;
 
 beforeEach(async () => {
   vi.clearAllMocks();
-  mockChain = createChainableMock();
-  mockRpc.mockResolvedValue({ data: null, error: null });
 
   const mod = await import('../KeeperService');
   KeeperService = mod.KeeperService;
-
-  (supabase.from as ReturnType<typeof vi.fn>).mockReturnValue(mockChain);
 });
 
 // =============================================================================
@@ -73,10 +50,10 @@ describe('KeeperService', () => {
   // ---------------------------------------------------------------------------
   describe('designateKeeper', () => {
     it('designates a keeper when validation passes', async () => {
-      // Mock validateKeepers RPC — returns valid
-      mockRpc.mockResolvedValueOnce({
-        data: [{ is_valid: true, error_message: null, keepers_count: 1, max_keepers: 3 }],
-        error: null,
+      // Mock validateKeepers API — returns valid
+      (keeperApi.validateKeepers as any).mockResolvedValue({
+        data: { is_valid: true, error_message: null, keepers_count: 1, max_keepers: 3 },
+        error: undefined,
       });
 
       const designation = {
@@ -94,7 +71,10 @@ describe('KeeperService', () => {
         status: 'designated',
       };
 
-      mockChain.single.mockResolvedValue({ data: designation, error: null });
+      (keeperApi.designateKeeper as any).mockResolvedValue({
+        data: designation,
+        error: undefined,
+      });
 
       const result = await KeeperService.designateKeeper(
         'league-1',
@@ -111,9 +91,9 @@ describe('KeeperService', () => {
 
     it('returns error when validation fails', async () => {
       // Mock validateKeepers — returns error
-      mockRpc.mockResolvedValueOnce({
+      (keeperApi.validateKeepers as any).mockResolvedValue({
         data: null,
-        error: { message: 'Validation RPC error' },
+        error: 'Validation RPC error',
       });
 
       const result = await KeeperService.designateKeeper(
@@ -129,15 +109,15 @@ describe('KeeperService', () => {
 
     it('returns duplicate error on unique constraint violation', async () => {
       // Mock validateKeepers — passes
-      mockRpc.mockResolvedValueOnce({
-        data: [{ is_valid: true, error_message: null, keepers_count: 1, max_keepers: 3 }],
-        error: null,
+      (keeperApi.validateKeepers as any).mockResolvedValue({
+        data: { is_valid: true, error_message: null, keepers_count: 1, max_keepers: 3 },
+        error: undefined,
       });
 
-      // Mock insert — returns duplicate key error
-      mockChain.single.mockResolvedValue({
+      // Mock designateKeeper — returns duplicate key error
+      (keeperApi.designateKeeper as any).mockResolvedValue({
         data: null,
-        error: { code: '23505', message: 'duplicate key value violates unique constraint' },
+        error: 'Player is already designated as a keeper',
       });
 
       const result = await KeeperService.designateKeeper(
@@ -157,7 +137,7 @@ describe('KeeperService', () => {
   // ---------------------------------------------------------------------------
   describe('releaseKeeper', () => {
     it('releases a keeper designation successfully', async () => {
-      mockChain.in.mockResolvedValue({ data: null, error: null });
+      (keeperApi.releaseKeeper as any).mockResolvedValue({ data: null, error: undefined });
 
       const result = await KeeperService.releaseKeeper('kd-1', 'team-1');
 
@@ -166,9 +146,9 @@ describe('KeeperService', () => {
     });
 
     it('returns error on database failure', async () => {
-      mockChain.in.mockResolvedValue({
+      (keeperApi.releaseKeeper as any).mockResolvedValue({
         data: null,
-        error: { message: 'Database error' },
+        error: 'Database error',
       });
 
       const result = await KeeperService.releaseKeeper('kd-1', 'team-1');
@@ -200,7 +180,7 @@ describe('KeeperService', () => {
         },
       ];
 
-      mockChain.order.mockResolvedValue({ data: keepers, error: null });
+      (keeperApi.getTeamKeepers as any).mockResolvedValue({ data: keepers, error: undefined });
 
       const result = await KeeperService.getTeamKeepers('league-1', 'team-1', 2026);
 
@@ -210,9 +190,9 @@ describe('KeeperService', () => {
     });
 
     it('returns empty array on error', async () => {
-      mockChain.order.mockResolvedValue({
+      (keeperApi.getTeamKeepers as any).mockResolvedValue({
         data: null,
-        error: { message: 'Database error' },
+        error: 'Database error',
       });
 
       const result = await KeeperService.getTeamKeepers('league-1', 'team-1', 2026);
@@ -222,7 +202,7 @@ describe('KeeperService', () => {
     });
 
     it('returns empty array when no keepers exist', async () => {
-      mockChain.order.mockResolvedValue({ data: [], error: null });
+      (keeperApi.getTeamKeepers as any).mockResolvedValue({ data: [], error: undefined });
 
       const result = await KeeperService.getTeamKeepers('league-1', 'team-1', 2026);
 
@@ -241,7 +221,7 @@ describe('KeeperService', () => {
         { id: 'kd-2', team_id: 'team-2', player_id: 'player-2' },
       ];
 
-      mockChain.order.mockResolvedValue({ data: keepers, error: null });
+      (keeperApi.getLeagueKeepers as any).mockResolvedValue({ data: keepers, error: undefined });
 
       const result = await KeeperService.getLeagueKeepers('league-1', 2026);
 
@@ -254,15 +234,15 @@ describe('KeeperService', () => {
   // validateKeepers
   // ---------------------------------------------------------------------------
   describe('validateKeepers', () => {
-    it('returns valid result from RPC', async () => {
-      mockRpc.mockResolvedValue({
-        data: [{
+    it('returns valid result from API', async () => {
+      (keeperApi.validateKeepers as any).mockResolvedValue({
+        data: {
           is_valid: true,
           error_message: null,
           keepers_count: 2,
           max_keepers: 3,
-        }],
-        error: null,
+        },
+        error: undefined,
       });
 
       const result = await KeeperService.validateKeepers('league-1', 'team-1', 2026);
@@ -274,14 +254,14 @@ describe('KeeperService', () => {
     });
 
     it('returns invalid result with error message', async () => {
-      mockRpc.mockResolvedValue({
-        data: [{
+      (keeperApi.validateKeepers as any).mockResolvedValue({
+        data: {
           is_valid: false,
           error_message: 'Maximum keepers exceeded',
           keepers_count: 4,
           max_keepers: 3,
-        }],
-        error: null,
+        },
+        error: undefined,
       });
 
       const result = await KeeperService.validateKeepers('league-1', 'team-1', 2026);
@@ -290,16 +270,16 @@ describe('KeeperService', () => {
       expect(result.error_message).toBe('Maximum keepers exceeded');
     });
 
-    it('returns fallback values on RPC error', async () => {
-      mockRpc.mockResolvedValue({
+    it('returns fallback values on API error', async () => {
+      (keeperApi.validateKeepers as any).mockResolvedValue({
         data: null,
-        error: { message: 'RPC failed' },
+        error: 'RPC failed',
       });
 
       const result = await KeeperService.validateKeepers('league-1', 'team-1', 2026);
 
       expect(result.is_valid).toBe(false);
-      expect(result.error_message).toBe('Validation failed');
+      expect(result.error_message).toBe('RPC failed');
       expect(result.error).toBeDefined();
     });
   });
@@ -308,7 +288,7 @@ describe('KeeperService', () => {
   // getKeeperDraftCosts
   // ---------------------------------------------------------------------------
   describe('getKeeperDraftCosts', () => {
-    it('returns draft costs from RPC', async () => {
+    it('returns draft costs from API', async () => {
       const costs = [
         {
           player_id: 'player-1',
@@ -320,7 +300,7 @@ describe('KeeperService', () => {
         },
       ];
 
-      mockRpc.mockResolvedValue({ data: costs, error: null });
+      (keeperApi.getKeeperDraftCosts as any).mockResolvedValue({ data: costs, error: undefined });
 
       const result = await KeeperService.getKeeperDraftCosts('league-1', 'team-1', 2026);
 
@@ -329,10 +309,10 @@ describe('KeeperService', () => {
       expect(result.error).toBeUndefined();
     });
 
-    it('returns empty costs on RPC error', async () => {
-      mockRpc.mockResolvedValue({
+    it('returns empty costs on API error', async () => {
+      (keeperApi.getKeeperDraftCosts as any).mockResolvedValue({
         data: null,
-        error: { message: 'RPC failed' },
+        error: 'RPC failed',
       });
 
       const result = await KeeperService.getKeeperDraftCosts('league-1', 'team-1', 2026);
@@ -346,18 +326,14 @@ describe('KeeperService', () => {
   // lockKeepersForSeason
   // ---------------------------------------------------------------------------
   describe('lockKeepersForSeason', () => {
-    it('locks keepers and notifies league members', async () => {
-      // First RPC call: lock_keepers_for_season
-      // Second RPC call: notify_league_members
-      mockRpc
-        .mockResolvedValueOnce({
-          data: [
-            { team_id: 'team-1', keepers_locked: 2, rounds_consumed: [3, 5] },
-            { team_id: 'team-2', keepers_locked: 1, rounds_consumed: [2] },
-          ],
-          error: null,
-        })
-        .mockResolvedValueOnce({ data: null, error: null }); // Notification RPC
+    it('locks keepers successfully', async () => {
+      (keeperApi.lockKeepers as any).mockResolvedValue({
+        data: [
+          { team_id: 'team-1', keepers_locked: 2, rounds_consumed: [3, 5] },
+          { team_id: 'team-2', keepers_locked: 1, rounds_consumed: [2] },
+        ],
+        error: undefined,
+      });
 
       const result = await KeeperService.lockKeepersForSeason('league-1', 2026);
 
@@ -365,18 +341,12 @@ describe('KeeperService', () => {
       expect(result.results[0].keepersLocked).toBe(2);
       expect(result.results[0].roundsConsumed).toEqual([3, 5]);
       expect(result.error).toBeUndefined();
-
-      // Verify notify_league_members was called
-      expect(mockRpc).toHaveBeenCalledWith('notify_league_members', expect.objectContaining({
-        p_league_id: 'league-1',
-        p_notification_type: 'SYSTEM',
-      }));
     });
 
-    it('returns empty results on RPC error', async () => {
-      mockRpc.mockResolvedValue({
+    it('returns empty results on API error', async () => {
+      (keeperApi.lockKeepers as any).mockResolvedValue({
         data: null,
-        error: { message: 'Lock RPC failed' },
+        error: 'Lock RPC failed',
       });
 
       const result = await KeeperService.lockKeepersForSeason('league-1', 2026);
@@ -390,28 +360,8 @@ describe('KeeperService', () => {
   // updateKeeperSettings
   // ---------------------------------------------------------------------------
   describe('updateKeeperSettings', () => {
-    it('updates keeper settings when user is commissioner', async () => {
-      // supabase is imported at module level (mocked via vi.mock)
-      let callIndex = 0;
-
-      (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
-        callIndex++;
-        const chain = createChainableMock();
-        if (callIndex === 1) {
-          // leagues.select for commissioner check
-          chain.single.mockResolvedValue({
-            data: { commissioner_id: 'user-1', settings: {} },
-            error: null,
-          });
-        } else {
-          // leagues.update
-          chain.eq.mockResolvedValue({ data: null, error: null });
-        }
-        return chain;
-      });
-
-      // notify_league_members RPC
-      mockRpc.mockResolvedValue({ data: null, error: null });
+    it('updates keeper settings successfully', async () => {
+      (keeperApi.updateKeeperSettings as any).mockResolvedValue({ data: null, error: undefined });
 
       const result = await KeeperService.updateKeeperSettings('league-1', 'user-1', {
         keeperEnabled: true,
@@ -423,10 +373,10 @@ describe('KeeperService', () => {
       expect(result.success).toBe(true);
     });
 
-    it('rejects update when user is not commissioner', async () => {
-      mockChain.single.mockResolvedValue({
-        data: { commissioner_id: 'other-user', settings: {} },
-        error: null,
+    it('rejects update when API returns error', async () => {
+      (keeperApi.updateKeeperSettings as any).mockResolvedValue({
+        data: null,
+        error: 'Only the commissioner can update keeper settings',
       });
 
       const result = await KeeperService.updateKeeperSettings('league-1', 'user-1', {
@@ -440,27 +390,8 @@ describe('KeeperService', () => {
       expect(result.error).toBe('Only the commissioner can update keeper settings');
     });
 
-    it('sets keeperCount to 999 when dynasty mode is enabled', async () => {
-      // supabase is imported at module level (mocked via vi.mock)
-      let updateChain: Record<string, any> | null = null;
-      let callIndex = 0;
-
-      (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
-        callIndex++;
-        const chain = createChainableMock();
-        if (callIndex === 1) {
-          chain.single.mockResolvedValue({
-            data: { commissioner_id: 'user-1', settings: {} },
-            error: null,
-          });
-        } else {
-          updateChain = chain;
-          chain.eq.mockResolvedValue({ data: null, error: null });
-        }
-        return chain;
-      });
-
-      mockRpc.mockResolvedValue({ data: null, error: null });
+    it('sends dynasty mode settings to the API', async () => {
+      (keeperApi.updateKeeperSettings as any).mockResolvedValue({ data: null, error: undefined });
 
       await KeeperService.updateKeeperSettings('league-1', 'user-1', {
         keeperEnabled: true,
@@ -469,16 +400,12 @@ describe('KeeperService', () => {
         dynastyMode: true,
       });
 
-      // Verify the update call included keeperCount: 999
-      expect(updateChain).toBeTruthy();
-      expect(updateChain!.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          settings: expect.objectContaining({
-            keeperCount: 999,
-            dynastyMode: true,
-          }),
-        })
-      );
+      expect(keeperApi.updateKeeperSettings).toHaveBeenCalledWith('league-1', {
+        keeperEnabled: true,
+        keeperCount: 3,
+        keeperPenalty: 'none',
+        dynastyMode: true,
+      });
     });
   });
 });

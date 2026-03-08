@@ -151,7 +151,7 @@ export class ScheduleService {
   async getFantasyWeeks() {
     const { data, error } = await this.supabase
       .from('fantasy_weeks')
-      .select('*')
+      .select(COLUMNS.FANTASY_WEEK)
       .order('week_number', { ascending: true });
 
     return { weeks: data || [], error };

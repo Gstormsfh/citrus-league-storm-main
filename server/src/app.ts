@@ -14,7 +14,18 @@ import { scheduleRoutes } from './routes/schedule';
 import { notificationRoutes } from './routes/notifications';
 import { stormyRoutes } from './routes/stormy';
 import { adminRoutes } from './routes/admin';
+import { auctionRoutes } from './routes/auction';
+import { keeperRoutes } from './routes/keepers';
+import { playoffRoutes } from './routes/playoffs';
+import { bestballRoutes } from './routes/bestball';
+import { accountRoutes } from './routes/account';
 import { standardRateLimit, strictRateLimit } from './middleware/rateLimit';
+import { requestContextMiddleware } from './middleware/requestContext';
+import { metricsMiddleware, metrics } from './middleware/metrics';
+import { cacheControlMiddleware } from './middleware/cacheControl';
+import { AppError } from './lib/errors';
+import { supabaseBreaker } from './lib/circuitBreaker';
+import { logger } from '@citrus/shared';
 
 export type Env = {
   Variables: {
@@ -47,7 +58,13 @@ app.use('*', cors({
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 }));
 
-// Rate limiting — 100 req/min per IP for standard routes
+// Structured request logging + metrics collection for observability
+app.use('/api/*', requestContextMiddleware);
+app.use('/api/*', metricsMiddleware);
+// Cache-Control headers + ETag support for GET responses
+app.use('/api/*', cacheControlMiddleware);
+
+// Rate limiting — 300 req/min per IP for standard routes (LRU-bounded)
 app.use('/api/*', standardRateLimit);
 // Stricter limit on AI chat — 10 req/min per IP
 app.use('/api/stormy/*', strictRateLimit);
@@ -79,6 +96,8 @@ app.get('/api/health', async (c) => {
   }
 
   checks.server = 'ok';
+  checks.circuitBreaker = supabaseBreaker.currentState === 'CLOSED' ? 'ok' : supabaseBreaker.currentState.toLowerCase();
+  if (supabaseBreaker.currentState !== 'CLOSED') healthy = false;
 
   return c.json({
     status: healthy ? 'ok' : 'degraded',
@@ -88,6 +107,46 @@ app.get('/api/health', async (c) => {
     checks,
     timestamp: new Date().toISOString(),
   }, healthy ? 200 : 503);
+});
+
+// ── Metrics endpoint — supports JSON and Prometheus text format ──────
+app.get('/api/metrics', (c) => {
+  const accept = c.req.header('Accept') || '';
+
+  // Prometheus scraping sends Accept: text/plain or application/openmetrics-text
+  if (accept.includes('text/plain') || accept.includes('openmetrics-text')) {
+    return c.text(metrics.toPrometheusText(), 200, { 'Content-Type': 'text/plain; version=0.0.4; charset=utf-8' });
+  }
+
+  // Default: JSON for dashboards and health checks
+  const snapshot = metrics.getSnapshot();
+  return c.json({ ...snapshot, circuitBreaker: supabaseBreaker.stats, alerts: metrics.getAlerts() });
+});
+
+// ── Web Vitals receiver — fire-and-forget from frontend ─────────────
+app.post('/api/vitals', async (c) => {
+  // Accept vitals data silently — forward to logging/analytics pipeline
+  try {
+    const body = await c.req.json();
+    if (body?.vitals && Array.isArray(body.vitals)) {
+      for (const vital of body.vitals) {
+        // Structured log line for vitals — parseable by Cloud Logging / Datadog
+        if (process.env.NODE_ENV === 'production') {
+          console.log(JSON.stringify({
+            level: 'info',
+            type: 'web_vital',
+            name: vital.name,
+            value: vital.value,
+            rating: vital.rating,
+            timestamp: vital.timestamp,
+          }));
+        }
+      }
+    }
+  } catch {
+    // Silent fail — vitals ingestion should never error
+  }
+  return c.json({ ok: true });
 });
 
 // ── API routes ───────────────────────────────────────────────────────
@@ -102,23 +161,43 @@ app.route('/api/schedule', scheduleRoutes);
 app.route('/api/notifications', notificationRoutes);
 app.route('/api/stormy', stormyRoutes);
 app.route('/api/admin', adminRoutes);
+app.route('/api/auction', auctionRoutes);
+app.route('/api/keepers', keeperRoutes);
+app.route('/api/playoffs', playoffRoutes);
+app.route('/api/bestball', bestballRoutes);
+app.route('/api/account', accountRoutes);
 
 // ── 404 handler ──────────────────────────────────────────────────────
 app.notFound((c) => {
-  return c.json({ error: 'Not found', path: c.req.path }, 404);
+  return c.json({ error: { code: 'NOT_FOUND', message: 'Not found' }, path: c.req.path }, 404);
 });
 
 // ── Global error handler ─────────────────────────────────────────────
 app.onError((err, c) => {
   const reqId = c.get('requestId');
-  console.error(`[API Error] [${reqId}] ${c.req.method} ${c.req.path}:`, err.message);
+  logger.error(`[API Error] [${reqId}] ${c.req.method} ${c.req.path}:`, err.message);
   if (process.env.NODE_ENV === 'development') {
-    console.error(err.stack);
+    logger.error(err.stack);
   }
+
+  // If it's an AppError, use its status and code
+  if (err instanceof AppError) {
+    return c.json({
+      error: {
+        code: err.code,
+        message: err.message,
+        ...(err.details ? { details: err.details } : {}),
+      },
+      requestId: reqId,
+    }, err.status as any);
+  }
+
   return c.json({
-    error: 'Internal server error',
+    error: {
+      code: 'INTERNAL_ERROR',
+      message: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error',
+    },
     requestId: reqId,
-    message: process.env.NODE_ENV === 'development' ? err.message : undefined,
   }, 500);
 });
 

@@ -16,6 +16,20 @@ export const scheduleApi = {
     return apiClient.get(`/api/schedule/games${qs ? `?${qs}` : ''}`);
   },
 
+  /** Batch get games for multiple teams */
+  getGamesForTeams(teams: string[], startDate?: string, endDate?: string) {
+    const query = new URLSearchParams();
+    query.set('teams', teams.join(','));
+    if (startDate) query.set('startDate', startDate);
+    if (endDate) query.set('endDate', endDate);
+    return apiClient.get<Record<string, any[]>>(`/api/schedule/games/teams?${query.toString()}`);
+  },
+
+  /** Get next game for a team */
+  getNextGame(team: string) {
+    return apiClient.get(`/api/schedule/games/next?team=${team}`);
+  },
+
   /** Get fantasy week definitions */
   getFantasyWeeks() {
     return apiClient.get('/api/schedule/fantasy-weeks');

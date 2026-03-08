@@ -5,7 +5,8 @@ import { Clock, UserPlus, UserMinus, MessageSquare, AlertCircle, Loader2, CheckC
 import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { Notification } from '@/services/NotificationService';
-import { supabase } from '@/integrations/supabase/client';
+import { leagueApi } from '@/api/leagues';
+import { notificationApi } from '@/api/notifications';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { CitrusSparkle, CitrusLeaf } from '@/components/icons/CitrusIcons';
 import { toast } from '@/hooks/use-toast';
@@ -75,20 +76,12 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
       if (senderIds.size === 0) return;
 
       try {
-        const { data: teams, error } = await supabase
-          .from('teams')
-          .select('id, team_name, owner_id')
-          .eq('league_id', leagueId)
-          .in('owner_id', Array.from(senderIds));
-
-        if (error) {
-          logger.error('Error fetching team info:', error);
-          return;
-        }
+        const response = await leagueApi.getTeams(leagueId, true);
+        const teams = (response.data as Array<{ id: string; team_name: string; owner_id: string | null }>) || [];
 
         const newMap = new Map<string, TeamInfo>();
-        teams?.forEach(team => {
-          if (team.owner_id) {
+        teams.forEach(team => {
+          if (team.owner_id && senderIds.has(team.owner_id)) {
             newMap.set(team.owner_id, {
               id: team.id,
               team_name: team.team_name,
@@ -138,21 +131,8 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
     try {
       const senderName = profile?.username || profile?.default_team_name || null;
 
-      // Use the secure database function to send chat messages
-      const { data, error } = await supabase.rpc('send_league_chat_message', {
-        p_league_id: leagueId,
-        p_message: chatMessage.trim(),
-        p_sender_name: senderName,
-      });
-
-      if (error) {
-        logger.error('Error sending chat message:', error);
-        throw new Error(error.message || 'Failed to send message');
-      }
-
-      if (data && !data.success) {
-        throw new Error(data.error || 'Failed to send message');
-      }
+      // Send chat message via API server
+      await notificationApi.sendChatMessage(leagueId, chatMessage.trim(), senderName);
 
       // Clear the input
       setChatMessage('');

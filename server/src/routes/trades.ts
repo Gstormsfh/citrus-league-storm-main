@@ -2,9 +2,13 @@ import { Hono } from 'hono';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { membershipMiddleware } from '../middleware/membership';
-import { validateBody, schemas } from '../middleware/validate';
+import { z } from 'zod';
+import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { TradeService } from '../services/TradeService';
+import { AuditService } from '../services/AuditService';
+import { AppError } from '../lib/errors';
+import { ok, created, fail, handleError } from '../lib/responses';
 
 const tradeRoutes = new Hono<Env>();
 
@@ -19,10 +23,10 @@ tradeRoutes.get('/league/:leagueId', membershipMiddleware, async (c) => {
 
   const { trades, error } = await service.getLeagueTrades(leagueId, status);
   if (error) {
-    return c.json({ error: 'Failed to fetch trades' }, 500);
+    return handleError(c, error, 'Failed to fetch trades');
   }
 
-  return c.json({ data: trades });
+  return ok(c, trades);
 });
 
 // GET /api/trades/league/:leagueId/review-settings — Get trade review settings
@@ -32,32 +36,35 @@ tradeRoutes.get('/league/:leagueId/review-settings', membershipMiddleware, async
   const service = new TradeService(supabase);
 
   const result = await service.getTradeReviewSettings(leagueId);
-  return c.json({ data: result });
+  return ok(c, result);
 });
 
 // POST /api/trades/league/:leagueId — Create a trade offer
 tradeRoutes.post('/league/:leagueId', membershipMiddleware, validateBody(schemas.createTrade), async (c) => {
   const leagueId = c.req.param('leagueId');
   const userId = c.get('userId');
-  const body = (c as any).get('validatedBody');
+  const body = getValidatedBody<z.infer<typeof schemas.createTrade>>(c);
   const supabase = createUserClient(c.get('userToken'));
   const service = new TradeService(supabase);
 
   const { success, error, tradeId } = await service.createTradeOffer(
     leagueId,
-    body.fromTeamId,
-    body.toTeamId,
-    body.offeredPlayerIds,
-    body.requestedPlayerIds,
+    String(body.fromTeamId),
+    String(body.toTeamId),
+    body.offeredPlayerIds.map(Number),
+    body.requestedPlayerIds.map(Number),
     userId,
     body.message,
   );
 
   if (!success) {
-    return c.json({ error: error || 'Failed to create trade' }, 400);
+    return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to create trade'));
   }
 
-  return c.json({ data: { tradeId } }, 201);
+  const audit = new AuditService(supabase);
+  audit.log('TRADE_OFFER', leagueId, { tradeId, fromTeamId: body.fromTeamId, toTeamId: body.toTeamId });
+
+  return created(c, { tradeId });
 });
 
 // PUT /api/trades/:tradeId/accept — Accept a trade offer
@@ -67,12 +74,18 @@ tradeRoutes.put('/:tradeId/accept', async (c) => {
   const supabase = createUserClient(c.get('userToken'));
   const service = new TradeService(supabase);
 
+  const access = await service.verifyTradeAccess(tradeId, userId);
+  if (access.error) return fail(c, AppError.forbidden(access.error));
+
   const { success, error } = await service.acceptTradeOffer(tradeId, userId);
   if (!success) {
-    return c.json({ error: error || 'Failed to accept trade' }, 400);
+    return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to accept trade'));
   }
 
-  return c.json({ success: true });
+  const audit = new AuditService(supabase);
+  audit.log('TRADE_ACCEPT', null, { tradeId });
+
+  return ok(c, { success: true });
 });
 
 // PUT /api/trades/:tradeId/reject — Reject a trade offer
@@ -82,12 +95,18 @@ tradeRoutes.put('/:tradeId/reject', async (c) => {
   const supabase = createUserClient(c.get('userToken'));
   const service = new TradeService(supabase);
 
+  const access = await service.verifyTradeAccess(tradeId, userId);
+  if (access.error) return fail(c, AppError.forbidden(access.error));
+
   const { success, error } = await service.rejectTradeOffer(tradeId, userId);
   if (!success) {
-    return c.json({ error: error || 'Failed to reject trade' }, 400);
+    return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to reject trade'));
   }
 
-  return c.json({ success: true });
+  const audit = new AuditService(supabase);
+  audit.log('TRADE_REJECT', null, { tradeId });
+
+  return ok(c, { success: true });
 });
 
 // PUT /api/trades/:tradeId/cancel — Cancel a trade offer
@@ -97,80 +116,92 @@ tradeRoutes.put('/:tradeId/cancel', async (c) => {
   const supabase = createUserClient(c.get('userToken'));
   const service = new TradeService(supabase);
 
+  const access = await service.verifyTradeAccess(tradeId, userId);
+  if (access.error) return fail(c, AppError.forbidden(access.error));
+
   const { success, error } = await service.cancelTradeOffer(tradeId, userId);
   if (!success) {
-    return c.json({ error: error || 'Failed to cancel trade' }, 400);
+    return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to cancel trade'));
   }
 
-  return c.json({ success: true });
+  return ok(c, { success: true });
 });
 
 // PUT /api/trades/:tradeId/respond — Legacy respond endpoint (accept/reject/counter)
-tradeRoutes.put('/:tradeId/respond', async (c) => {
+tradeRoutes.put('/:tradeId/respond', validateBody(schemas.tradeRespond), async (c) => {
   const tradeId = c.req.param('tradeId');
   const userId = c.get('userId');
-  const body = await c.req.json();
+  const body = getValidatedBody<z.infer<typeof schemas.tradeRespond>>(c);
+
   const supabase = createUserClient(c.get('userToken'));
   const service = new TradeService(supabase);
 
-  const { action } = body;
-
-  if (!['accept', 'reject', 'counter'].includes(action)) {
-    return c.json({ error: 'Invalid action. Must be accept, reject, or counter' }, 400);
-  }
+  const access = await service.verifyTradeAccess(tradeId, userId);
+  if (access.error) return fail(c, AppError.forbidden(access.error));
 
   let result;
-  if (action === 'accept') {
+  if (body.action === 'accept') {
     result = await service.acceptTradeOffer(tradeId, userId);
-  } else if (action === 'reject') {
+  } else if (body.action === 'reject') {
     result = await service.rejectTradeOffer(tradeId, userId);
   } else {
     result = await service.cancelTradeOffer(tradeId, userId);
   }
 
   if (!result.success) {
-    return c.json({ error: result.error }, 400);
+    return fail(c, AppError.badRequest(typeof result.error === 'string' ? result.error : 'Trade action failed'));
   }
 
-  return c.json({ success: true });
+  return ok(c, { success: true });
 });
 
 // POST /api/trades/:tradeId/vote — Submit a trade vote
 tradeRoutes.post('/:tradeId/vote', validateBody(schemas.tradeVote), async (c) => {
   const tradeId = c.req.param('tradeId');
-  const body = (c as any).get('validatedBody');
+  const userId = c.get('userId');
+  const body = getValidatedBody<z.infer<typeof schemas.tradeVote>>(c);
   const supabase = createUserClient(c.get('userToken'));
   const service = new TradeService(supabase);
 
-  const result = await service.submitTradeVote(tradeId, body.voterTeamId, body.vote);
+  const access = await service.verifyTradeAccess(tradeId, userId);
+  if (access.error) return fail(c, AppError.forbidden(access.error));
+
+  const result = await service.submitTradeVote(tradeId, String(body.voterTeamId), body.vote);
   if (!result.success) {
-    return c.json({ error: result.error }, 400);
+    return fail(c, AppError.badRequest(typeof result.error === 'string' ? result.error : 'Vote failed'));
   }
 
-  return c.json({ data: result });
+  return ok(c, result);
 });
 
 // GET /api/trades/:tradeId/votes — Get trade votes
 tradeRoutes.get('/:tradeId/votes', async (c) => {
   const tradeId = c.req.param('tradeId');
+  const userId = c.get('userId');
   const supabase = createUserClient(c.get('userToken'));
   const service = new TradeService(supabase);
 
+  const access = await service.verifyTradeAccess(tradeId, userId);
+  if (access.error) return fail(c, AppError.forbidden(access.error));
+
   const { votes, error } = await service.getTradeVotes(tradeId);
   if (error) {
-    return c.json({ error: 'Failed to fetch votes' }, 500);
+    return handleError(c, error, 'Failed to fetch votes');
   }
 
-  return c.json({ data: votes });
+  return ok(c, votes);
 });
 
 // PUT /api/trades/:tradeId/commissioner-decision — Commissioner approve/veto
 tradeRoutes.put('/:tradeId/commissioner-decision', validateBody(schemas.commissionerDecision), async (c) => {
   const tradeId = c.req.param('tradeId');
   const userId = c.get('userId');
-  const body = (c as any).get('validatedBody');
+  const body = getValidatedBody<z.infer<typeof schemas.commissionerDecision>>(c);
   const supabase = createUserClient(c.get('userToken'));
   const service = new TradeService(supabase);
+
+  const access = await service.verifyTradeAccess(tradeId, userId);
+  if (access.error) return fail(c, AppError.forbidden(access.error));
 
   try {
     const { success, error } = await service.commissionerDecision(
@@ -181,12 +212,15 @@ tradeRoutes.put('/:tradeId/commissioner-decision', validateBody(schemas.commissi
     );
 
     if (!success) {
-      return c.json({ error: error || 'Commissioner decision failed' }, 400);
+      return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Commissioner decision failed'));
     }
 
-    return c.json({ success: true });
-  } catch (err: any) {
-    return c.json({ error: err.message }, 403);
+    const audit = new AuditService(supabase);
+    audit.log('ADMIN_ACTION', body.leagueId, { action: 'commissioner_trade_decision', tradeId, decision: body.decision });
+
+    return ok(c, { success: true });
+  } catch (err) {
+    return handleError(c, err, 'Commissioner decision failed');
   }
 });
 

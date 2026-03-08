@@ -1,0 +1,44 @@
+# Citrus Data Pipeline — Docker Compose
+#
+# Runs the full data pipeline stack:
+#   - Main scraping service (live + nightly)
+#   - Health check server (HTTP :8888)
+#
+# Usage:
+#   docker-compose up -d
+#   docker-compose logs -f pipeline
+#   curl http://localhost:8888/health
+
+services:
+  pipeline:
+    build: .
+    container_name: citrus-pipeline
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    ports:
+      - "8888:8888"
+    volumes:
+      # Persist model files across container restarts
+      - ./models:/app/models:ro
+      # Health state file
+      - pipeline-health:/tmp
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8888/health')"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+volumes:
+  pipeline-health:

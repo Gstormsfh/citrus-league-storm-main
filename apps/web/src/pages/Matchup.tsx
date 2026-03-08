@@ -26,7 +26,6 @@ import { LeagueService, League, Team } from '@/services/LeagueService';
 import { MatchupService, Matchup as MatchupType } from '@/services/MatchupService';
 import { PlayerService, Player } from '@/services/PlayerService';
 import { ScheduleService } from '@/services/ScheduleService';
-import { supabase } from '@/integrations/supabase/client';
 import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekLabel, getWeekDateLabel, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
 import LoadingScreen from '@/components/LoadingScreen';
 import { DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeagueService';
@@ -38,9 +37,11 @@ import { CitrusSlice, CitrusSparkle, CitrusLeaf, CitrusWedge, CitrusBurst, Citru
 import { CitrusBackground } from '@/components/CitrusBackground';
 import { CitrusSectionDivider } from '@/components/CitrusSectionDivider';
 import { calculateEligibleGamesRemaining } from '@/utils/rosterUtils';
-import { COLUMNS } from '@/utils/queryColumns';
 import { ScoringCalculator } from '@/utils/scoringUtils';
 import { logger } from '@/utils/logger';
+import { matchupApi } from '@/api/matchups';
+import { leagueApi } from '@/api/leagues';
+import { playerApi } from '@/api/players';
 
 // ============================================================
 // Local type definitions for data used throughout this file
@@ -285,10 +286,21 @@ const Matchup = () => {
 
     const runBackfillAndCalculate = async () => {
       log(' Starting data integrity check for matchup:', currentMatchup.id);
-      
+
       // Skip backfill for demo league - guests can't write, and data should already exist from migration
       const isDemoLeague = currentMatchup.league_id === DEMO_LEAGUE_ID_FOR_GUESTS;
-      
+
+      // Step 0: Ensure both teams have team_lineups + fantasy_daily_rosters via server
+      // This handles AI teams (owner_id = NULL) that can't be saved via frontend RLS
+      if (!isDemoLeague) {
+        try {
+          log(' Ensuring rosters exist for matchup:', currentMatchup.id);
+          await matchupApi.ensureRosters(currentMatchup.id);
+        } catch (err) {
+          logger.error('[Matchup] ensure-rosters failed:', err);
+        }
+      }
+
       // Step 1: Backfill missing daily roster records for both teams
       // This ensures fantasy_daily_rosters has complete data
       // SKIP for demo league - guests can't write
@@ -344,12 +356,8 @@ const Matchup = () => {
           // Step 3: Refresh matchup data to get updated scores from DB
           if (result.updatedCount > 0) {
             log(' Refreshing matchup data after score update...');
-            const { data: refreshedMatchup } = await supabase
-              .from('matchups')
-              .select('team1_score, team2_score')
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              .eq('id' as any, currentMatchup.id as any)
-              .single();
+            const matchupResp = await matchupApi.getMatchupScores(currentMatchup.id);
+            const refreshedMatchup = matchupResp.data;
 
             if (refreshedMatchup) {
               const scores = refreshedMatchup as { team1_score: number; team2_score: number };
@@ -425,24 +433,15 @@ const Matchup = () => {
         return;
       }
       
-      // Build team ID list for query (always include both teams from the matchup)
-      const teamIds = team2Id ? [team1Id, team2Id] : [team1Id];
-      
-      // SINGLE BATCHED QUERY: Fetch ALL past days' rosters for BOTH teams at once
-      const { data: allRosters, error } = await supabase
-        .from('fantasy_daily_rosters')
-        .select('player_id, roster_date, team_id')
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .eq('matchup_id' as any, currentMatchup.id as any)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .in('team_id' as any, teamIds as any)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .in('roster_date' as any, pastDates as any)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .eq('slot_type' as any, 'active' as any);
-      
-      if (error) {
-        logger.error('[Matchup] Error fetching cached rosters:', error);
+      // SINGLE BATCHED API CALL: Fetch ALL past days' rosters for BOTH teams at once
+      let allRosters: FrozenRosterEntry[] = [];
+      try {
+        const response = await matchupApi.getFrozenRosterBatch(currentMatchup.id, pastDates);
+        // Filter to active slots only (matching previous query behavior)
+        allRosters = ((response.data || []) as any[])
+          .filter((r: any) => r.slot_type === 'active') as FrozenRosterEntry[];
+      } catch (err) {
+        logger.error('[Matchup] Error fetching cached rosters:', err);
         return;
       }
       
@@ -503,9 +502,23 @@ const Matchup = () => {
         scores.set(dateStr, { myScore, oppScore, isLocked: true });
       }
       
-      // Cache the frozen scores (long TTL - past scores don't change)
-      DataCacheService.set(cacheKey, scores, TTL.VERY_LONG);
-      setCachedDailyScores(scores);
+      // Merge with existing cachedDailyScores to preserve RPC-provided values.
+      // If this recalculation yields 0 for a team but RPC already set a non-zero score,
+      // keep the RPC value (prevents AI team scores from being clobbered).
+      setCachedDailyScores(prev => {
+        const merged = new Map(prev);
+        scores.forEach((newVal, dateStr) => {
+          const existing = prev.get(dateStr);
+          const finalMyScore = (newVal.myScore === 0 && existing && existing.myScore > 0)
+            ? existing.myScore : newVal.myScore;
+          const finalOppScore = (newVal.oppScore === 0 && existing && existing.oppScore > 0)
+            ? existing.oppScore : newVal.oppScore;
+          merged.set(dateStr, { myScore: finalMyScore, oppScore: finalOppScore, isLocked: newVal.isLocked });
+        });
+        // Cache merged result
+        DataCacheService.set(cacheKey, merged, TTL.VERY_LONG);
+        return merged;
+      });
       log(` Cached ${scores.size} frozen scores for matchup ${currentMatchup.id} (team1: ${team1Id}, team2: ${team2Id})`);
     };
     
@@ -691,15 +704,8 @@ const Matchup = () => {
         // ===================================================================
 
         // Get the league data directly (using maybeSingle to avoid single() coercion error)
-        const { data: demoLeagueData, error: leagueError } = await supabase
-          .from('leagues')
-          .select(COLUMNS.LEAGUE)
-          .eq('id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
-          .maybeSingle();
-
-        if (leagueError) {
-          throw new Error(`Failed to load demo league: ${leagueError.message || 'Unknown error'}`);
-        }
+        const demoLeagueResp = await leagueApi.getLeague(DEMO_LEAGUE_ID_FOR_GUESTS);
+        const demoLeagueData = demoLeagueResp.data;
 
         if (!demoLeagueData) {
           throw new Error('Demo league not found');
@@ -756,38 +762,21 @@ const Matchup = () => {
           availableWeeks: weeks
         });
 
-        // Get all matchups for this week (same as logged-in users)
-        const { data: weekMatchupsData, error: matchupsError } = await supabase
-          .from('matchups')
-          .select(COLUMNS.MATCHUP)
-          .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
-          .eq('week_number' as any, weekToShow as any)
-          .order('created_at', { ascending: true });
-
-        if (matchupsError) throw matchupsError;
-
-        let weekMatchups = weekMatchupsData as any[];
+        // Get all matchups for this week via API
+        const weekMatchupsResp = await matchupApi.getLeagueMatchups(DEMO_LEAGUE_ID_FOR_GUESTS, weekToShow);
+        let weekMatchups = (weekMatchupsResp.data || []) as any[];
 
         // If no matchups found for calculated week, try to find ANY matchup
         if (!weekMatchups || weekMatchups.length === 0) {
           log(' No matchups found for week', weekToShow, '- trying to find any matchup in demo league');
 
           // Get ANY matchup from the demo league (fallback)
-          const { data: anyMatchupsData, error: anyMatchupsError } = await supabase
-            .from('matchups')
-            .select(COLUMNS.MATCHUP)
-            .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
-            .order('week_number', { ascending: true })
-            .limit(1);
+          const anyMatchupsResp = await matchupApi.getLeagueMatchups(DEMO_LEAGUE_ID_FOR_GUESTS);
+          const anyMatchupsData = (anyMatchupsResp.data || []) as any[];
 
-          if (anyMatchupsError) {
-            log(' Error fetching any matchups:', anyMatchupsError);
-            throw new Error(`Failed to load matchups: ${anyMatchupsError.message}`);
-          }
-
-          if (anyMatchupsData && anyMatchupsData.length > 0) {
+          if (anyMatchupsData.length > 0) {
             // Use the first available matchup and update weekToShow
-            weekMatchups = anyMatchupsData;
+            weekMatchups = [anyMatchupsData[0]];
             weekToShow = anyMatchupsData[0].week_number;
             setSelectedWeek(weekToShow);
             log(' Using fallback matchup from week', weekToShow);
@@ -863,17 +852,18 @@ const Matchup = () => {
           });
         }
 
-        // Get teams (parallel)
-        const [team1, team2] = await Promise.all([
-          supabase.from('teams').select(COLUMNS.TEAM).eq('id' as any, guestMatchup.team1_id as any).maybeSingle(),
-          guestMatchup.team2_id ? supabase.from('teams').select(COLUMNS.TEAM).eq('id' as any, guestMatchup.team2_id as any).maybeSingle() : Promise.resolve({ data: null, error: null })
+        // Get teams via API (parallel)
+        const [team1Resp, team2Resp] = await Promise.all([
+          leagueApi.getTeams(guestMatchup.league_id),
+          Promise.resolve(null), // Teams come in one call
         ]);
 
-        if (team1.error) throw team1.error;
-        if (team2.error) throw team2.error;
+        const allTeams = (team1Resp.data || []) as Team[];
+        const team1Data = allTeams.find((t: Team) => t.id === guestMatchup.team1_id) || null;
+        const team2Data = guestMatchup.team2_id ? allTeams.find((t: Team) => t.id === guestMatchup.team2_id) || null : null;
 
-        setUserTeam(team1.data as unknown as Team);
-        setOpponentTeam(team2.data as unknown as Team | null);
+        setUserTeam(team1Data);
+        setOpponentTeam(team2Data);
 
         // Get matchup rosters using the same service as logged-in users
         const { PlayerService } = await import('@/services/PlayerService');
@@ -933,67 +923,28 @@ const Matchup = () => {
         const weekStartStr = matchupWithDates.week_start_date;
         const weekEndStr = matchupWithDates.week_end_date;
 
-        // Calculate daily scores for team1 (same logic as logged-in users)
+        // Calculate daily scores via API (single call for both teams)
         let team1DailyPoints: number[] = [];
-        try {
-          const { data: team1DailyScores, error: team1Error } = await supabase.rpc(
-            'calculate_daily_matchup_scores',
-            {
-              p_matchup_id: guestMatchup.id,
-              p_team_id: (team1.data as any).id,
-              p_week_start: weekStartStr,
-              p_week_end: weekEndStr
-            }
-          );
-
-          if (!team1Error && team1DailyScores) {
-            // Sort by date and extract scores (same logic as logged-in users)
-            // Append 'T00:00:00' to force local-time parsing (avoid UTC midnight shift)
-            const sorted = (team1DailyScores as any[]).sort((a, b) =>
-              new Date(a.roster_date + 'T00:00:00').getTime() - new Date(b.roster_date + 'T00:00:00').getTime()
-            );
-            team1DailyPoints = sorted.map(d => parseFloat(d.daily_score) || 0);
-            log(' Team1 daily points calculated:', team1DailyPoints);
-          } else {
-            log('WARN: Error calculating team1 daily scores:', team1Error);
-            team1DailyPoints = Array(7).fill(0);
-          }
-        } catch (error) {
-          logger.error('[Matchup] Exception calculating team1 daily scores:', error);
-          team1DailyPoints = Array(7).fill(0);
-        }
-
-        // Calculate daily scores for team2 (if exists)
         let team2DailyPoints: number[] = [];
-        if (team2.data) {
-          try {
-            const { data: team2DailyScores, error: team2Error } = await supabase.rpc(
-              'calculate_daily_matchup_scores',
-              {
-                p_matchup_id: guestMatchup.id,
-                p_team_id: (team2.data as any).id,
-                p_week_start: weekStartStr,
-                p_week_end: weekEndStr
-              }
-            );
-
-            if (!team2Error && team2DailyScores) {
-              // Sort by date and extract scores (same logic as logged-in users)
-              // Append 'T00:00:00' to force local-time parsing (avoid UTC midnight shift)
-              const sorted = (team2DailyScores as any[]).sort((a, b) =>
-                new Date(a.roster_date + 'T00:00:00').getTime() - new Date(b.roster_date + 'T00:00:00').getTime()
-              );
-              team2DailyPoints = sorted.map(d => parseFloat(d.daily_score) || 0);
-              log(' Team2 daily points calculated:', team2DailyPoints);
-            } else {
-              log('WARN: Error calculating team2 daily scores:', team2Error);
-              team2DailyPoints = Array(7).fill(0);
-            }
-          } catch (error) {
-            logger.error('[Matchup] Exception calculating team2 daily scores:', error);
+        try {
+          const response = await matchupApi.getDailyScores(guestMatchup.id);
+          const dailyScoresData = response.data;
+          if (dailyScoresData && Array.isArray(dailyScoresData)) {
+            const parseDailyScores = (teamId: string) => {
+              const teamEntries = (dailyScoresData as Array<{ team_id: string; roster_date: string; daily_score: string | number }>)
+                .filter((d) => d.team_id === teamId)
+                .sort((a, b) => new Date(a.roster_date + 'T00:00:00').getTime() - new Date(b.roster_date + 'T00:00:00').getTime());
+              return teamEntries.length > 0 ? teamEntries.map(d => parseFloat(String(d.daily_score)) || 0) : Array(7).fill(0);
+            };
+            team1DailyPoints = team1Data ? parseDailyScores(team1Data.id) : Array(7).fill(0);
+            team2DailyPoints = team2Data ? parseDailyScores(team2Data.id) : Array(7).fill(0);
+          } else {
+            team1DailyPoints = Array(7).fill(0);
             team2DailyPoints = Array(7).fill(0);
           }
-        } else {
+        } catch (error) {
+          logger.error('[Matchup] Exception calculating daily scores:', error);
+          team1DailyPoints = Array(7).fill(0);
           team2DailyPoints = Array(7).fill(0);
         }
 
@@ -1166,19 +1117,11 @@ const Matchup = () => {
       }
 
       try {
-        const { data: matchups, error } = await supabase
-          .from('matchups')
-          .select(`
-            *,
-            team1:teams!team1_id(team_name),
-            team2:teams!team2_id(team_name)
-          `)
-          .eq('league_id' as any, league.id as any)
-          .eq('week_number' as any, selectedWeek as any)
-          .order('created_at', { ascending: true });
+        const matchupsResp = await matchupApi.getLeagueMatchups(league.id, selectedWeek);
+        const matchups = matchupsResp.data as any[] | null;
 
-        if (error) {
-          log('WARN: Error fetching all week matchups:', error);
+        if (!matchups) {
+          log('WARN: Error fetching all week matchups');
           return;
         }
 
@@ -1308,41 +1251,13 @@ const Matchup = () => {
         const todayStr = getTodayMST();
         
         await Promise.all(dates.map(async (date) => {
-          const { data, error } = await supabase.rpc('get_daily_game_stats', {
-            p_player_ids: allPlayerIds,
-            p_game_date: date
-          });
-
-          if (error) {
-            log(`WARN: Error fetching stats for ${date}:`, error);
+          let data: any[] | null = null;
+          try {
+            const response = await matchupApi.getDailyGameStats(allPlayerIds, date);
+            data = response.data as any[] | null;
+          } catch (err) {
+            log(`WARN: Error fetching stats for ${date}:`, err);
             return;
-          }
-
-          // DEBUG: Log raw RPC data for today (ALWAYS log for today, even if empty)
-          if (date === todayStr) {
-            logger.debug('[DEBUG fetchAllDailyStats] Raw RPC data for TODAY:', {
-              date,
-              todayMST: todayStr,
-              rowCount: data?.length || 0,
-              isEmpty: !data || data.length === 0,
-              requestedPlayerCount: allPlayerIds.length,
-              requestedPlayerIds: allPlayerIds.slice(0, 10), // First 10 for debugging
-              firstFewRows: (data || []).slice(0, 5).map((r: any) => ({
-                player_id: r.player_id,
-                is_goalie: r.is_goalie,
-                goals: r.goals,
-                assists: r.assists,
-                shots_on_goal: r.shots_on_goal,
-                blocks: r.blocks,
-                ppp: r.ppp,
-                shp: r.shp,
-                hits: r.hits,
-                pim: r.pim,
-                wins: r.wins,
-                saves: r.saves,
-                game_id: r.game_id
-              }))
-            });
           }
 
           // Create map of player_id -> daily stats for this date
@@ -1732,14 +1647,12 @@ const Matchup = () => {
 
         // Fetch comprehensive daily game stats using new RPC
         
-        const { data, error } = await supabase.rpc('get_daily_game_stats', {
-          p_player_ids: allPlayerIds,
-          p_game_date: dateToFetch
-        });
+        const response = await matchupApi.getDailyGameStats(allPlayerIds, dateToFetch);
+        const data = response.data as any[] | null;
 
-        if (error) {
-          logger.error('[Matchup] Error calling get_daily_game_stats:', error);
-          throw error;
+        if (!data) {
+          logger.error('[Matchup] No data returned from getDailyGameStats');
+          throw new Error('No data returned');
         }
         
         const statsDataArr = (data || []) as any[];
@@ -2092,13 +2005,27 @@ const Matchup = () => {
   // Both initial load and date clicks use identical calculation logic
 
   // Callback to update calculated totals from MatchupComparison (works for selected date or any date)
+  // GUARD: Don't overwrite non-zero RPC-provided scores with 0.
+  // This prevents the initial-calc useEffect from clobbering server-calculated daily scores
+  // when frozen roster enrichment fails (e.g., AI teams where opponent roster is empty).
   const handleTotalsCalculated = useCallback((userTotal: number, opponentTotal: number, date?: string) => {
     const targetDate = date || selectedDate;
     if (!targetDate) return;
-    
+
     setCalculatedDailyTotals(prev => {
       const next = new Map(prev);
-      next.set(targetDate, { myTotal: userTotal, oppTotal: opponentTotal });
+      const existing = prev.get(targetDate);
+
+      // Preserve existing non-zero values when new calculation yields 0.
+      // The RPC daily-scores endpoint is the source of truth; if it already
+      // provided a non-zero score for a team, a later frontend recalculation
+      // that produces 0 (due to empty frozen roster) should not replace it.
+      const finalMyTotal = (userTotal === 0 && existing && existing.myTotal > 0)
+        ? existing.myTotal : userTotal;
+      const finalOppTotal = (opponentTotal === 0 && existing && existing.oppTotal > 0)
+        ? existing.oppTotal : opponentTotal;
+
+      next.set(targetDate, { myTotal: finalMyTotal, oppTotal: finalOppTotal });
       return next;
     });
   }, [selectedDate]);
@@ -2177,16 +2104,17 @@ const Matchup = () => {
         dayMySlots = frozenRoster.mySlots;
         dayOppSlots = frozenRoster.oppSlots;
       } else {
-        // For non-frozen dates, use displayMyTeam/displayOpponentTeam logic
-        // CRITICAL: Use the SAME base team source as displayMyTeam uses
-        // displayMyTeam uses: userLeagueState === 'active-user' ? myTeam : demoMyTeam
-        // But we need to replicate displayMyTeam's enrichment for this specific date
-        // Since displayMyTeam depends on selectedDate, we can't use it directly
-        // Instead, we replicate its logic here for each date
-        
-        // Use the EXACT same base team source as displayMyTeam (line 2180)
-        const baseMyTeam = userLeagueState === 'active-user' ? myTeam : demoMyTeam;
-        const baseOppTeam = userLeagueState === 'active-user' ? opponentTeamPlayers : demoOpponentTeam;
+        // For non-frozen dates, use the STABLE base roster (not myTeam which changes on date click).
+        // CRITICAL: baseCurrentRoster is set once during initial load and never changes when
+        // the user clicks different dates. Using myTeam here would cause the initial calc to
+        // re-run with the wrong players when a past date is selected (myTeam gets set to
+        // the frozen roster for that date, corrupting today/future calculations).
+        const baseMyTeam = userLeagueState === 'active-user'
+          ? (baseCurrentRoster?.myRoster || myTeam)
+          : demoMyTeam;
+        const baseOppTeam = userLeagueState === 'active-user'
+          ? (baseCurrentRoster?.oppRoster || opponentTeamPlayers)
+          : demoOpponentTeam;
         
         // Wait for base teams to be populated
         if (baseMyTeam.length === 0 || baseOppTeam.length === 0) {
@@ -2241,9 +2169,15 @@ const Matchup = () => {
                 opponent_adjustment: Number(projection.opponent_adjustment || 1),
                 b2b_penalty: Number(projection.b2b_penalty || 1),
                 home_away_adjustment: Number(projection.home_away_adjustment || 1),
-                confidence_score: Number(projection.confidence_score || 0),
+                confidence_score: Number(projection.dynamic_confidence || projection.confidence_score || 0),
                 calculation_method: projection.calculation_method || 'hybrid_bayesian',
-                is_goalie: false
+                is_goalie: false,
+                likely_low: projection.likely_low != null ? Number(projection.likely_low) : undefined,
+                likely_high: projection.likely_high != null ? Number(projection.likely_high) : undefined,
+                confidence_label: projection.confidence_label || undefined,
+                dynamic_confidence: projection.dynamic_confidence != null ? Number(projection.dynamic_confidence) : undefined,
+                projection_mean: projection.projection_mean != null ? Number(projection.projection_mean) : undefined,
+                projection_std_dev: projection.projection_std_dev != null ? Number(projection.projection_std_dev) : undefined,
               }
             } : {})
           } : {
@@ -2381,9 +2315,15 @@ const Matchup = () => {
                 opponent_adjustment: Number(projection.opponent_adjustment || 1),
                 b2b_penalty: Number(projection.b2b_penalty || 1),
                 home_away_adjustment: Number(projection.home_away_adjustment || 1),
-                confidence_score: Number(projection.confidence_score || 0),
+                confidence_score: Number(projection.dynamic_confidence || projection.confidence_score || 0),
                 calculation_method: projection.calculation_method || 'hybrid_bayesian',
-                is_goalie: false
+                is_goalie: false,
+                likely_low: projection.likely_low != null ? Number(projection.likely_low) : undefined,
+                likely_high: projection.likely_high != null ? Number(projection.likely_high) : undefined,
+                confidence_label: projection.confidence_label || undefined,
+                dynamic_confidence: projection.dynamic_confidence != null ? Number(projection.dynamic_confidence) : undefined,
+                projection_mean: projection.projection_mean != null ? Number(projection.projection_mean) : undefined,
+                projection_std_dev: projection.projection_std_dev != null ? Number(projection.projection_std_dev) : undefined,
               }
             } : {})
           } : {
@@ -2482,8 +2422,12 @@ const Matchup = () => {
         dayMyStarters = enrichedMyTeam.filter(p => p.isStarter);
         dayOppStarters = enrichedOppTeam.filter(p => p.isStarter);
         
-        dayMySlots = userLeagueState === 'active-user' ? myTeamSlotAssignments : demoMyTeamSlotAssignments;
-        dayOppSlots = userLeagueState === 'active-user' ? opponentTeamSlotAssignments : demoOpponentTeamSlotAssignments;
+        dayMySlots = userLeagueState === 'active-user'
+          ? (baseCurrentRoster?.mySlots || myTeamSlotAssignments)
+          : demoMyTeamSlotAssignments;
+        dayOppSlots = userLeagueState === 'active-user'
+          ? (baseCurrentRoster?.oppSlots || opponentTeamSlotAssignments)
+          : demoOpponentTeamSlotAssignments;
       }
       
       // Use organizeMatchupData (same as MatchupComparison line 33-38)
@@ -2557,6 +2501,7 @@ const Matchup = () => {
   // redundant re-calculations since it updates in sync with dailyStatsByDate.
   }, [
     currentMatchup,
+    baseCurrentRoster,
     myTeam,
     demoMyTeam,
     opponentTeamPlayers,
@@ -2605,16 +2550,11 @@ const Matchup = () => {
         };
         setSelectedPlayer(toHockeyPlayer(player, seasonStats));
       } else {
-        // Fallback: try to fetch directly from player_season_stats
-        const DEFAULT_SEASON = CURRENT_SEASON;
-        const { data: seasonStatsData, error } = await supabase
-          .from('player_season_stats')
-          .select(COLUMNS.PLAYER_STATS)
-          .eq('player_id', player.id as any)
-          .eq('season', DEFAULT_SEASON as any)
-          .single();
-        
-        if (!error && seasonStatsData) {
+        // Fallback: try to fetch directly via API
+        const statsRes = await playerApi.getPlayerStats(String(player.id), CURRENT_SEASON);
+        const seasonStatsData = statsRes?.data;
+
+        if (seasonStatsData) {
           const statsData = seasonStatsData as any;
           const calculatedGoals = Number(statsData.nhl_goals ?? 0);
           const calculatedAssists = Number(statsData.nhl_assists ?? 0);
@@ -2654,7 +2594,7 @@ const Matchup = () => {
     }
     
     setIsPlayerDialogOpen(true);
-  }, []); // All dependencies are stable: setSelectedPlayer, setIsPlayerDialogOpen (React state setters), PlayerService, supabase (module-level imports)
+  }, []); // All dependencies are stable: setSelectedPlayer, setIsPlayerDialogOpen (React state setters), PlayerService, playerApi (module-level imports)
 
   // Use real data if active user, otherwise demo data
   // CRITICAL: Ensure myTeam is always the user's team (left side)
@@ -2810,9 +2750,15 @@ const Matchup = () => {
             opponent_adjustment: Number(projection.opponent_adjustment || 1),
             b2b_penalty: Number(projection.b2b_penalty || 1),
             home_away_adjustment: Number(projection.home_away_adjustment || 1),
-            confidence_score: Number(projection.confidence_score || 0),
+            confidence_score: Number(projection.dynamic_confidence || projection.confidence_score || 0),
             calculation_method: projection.calculation_method || 'hybrid_bayesian',
-            is_goalie: false
+            is_goalie: false,
+            likely_low: projection.likely_low != null ? Number(projection.likely_low) : undefined,
+            likely_high: projection.likely_high != null ? Number(projection.likely_high) : undefined,
+            confidence_label: projection.confidence_label || undefined,
+            dynamic_confidence: projection.dynamic_confidence != null ? Number(projection.dynamic_confidence) : undefined,
+            projection_mean: projection.projection_mean != null ? Number(projection.projection_mean) : undefined,
+            projection_std_dev: projection.projection_std_dev != null ? Number(projection.projection_std_dev) : undefined,
           }
         } : {})
       } : {
@@ -3046,9 +2992,15 @@ const Matchup = () => {
             opponent_adjustment: Number(projection.opponent_adjustment || 1),
             b2b_penalty: Number(projection.b2b_penalty || 1),
             home_away_adjustment: Number(projection.home_away_adjustment || 1),
-            confidence_score: Number(projection.confidence_score || 0),
+            confidence_score: Number(projection.dynamic_confidence || projection.confidence_score || 0),
             calculation_method: projection.calculation_method || 'hybrid_bayesian',
-            is_goalie: false
+            is_goalie: false,
+            likely_low: projection.likely_low != null ? Number(projection.likely_low) : undefined,
+            likely_high: projection.likely_high != null ? Number(projection.likely_high) : undefined,
+            confidence_label: projection.confidence_label || undefined,
+            dynamic_confidence: projection.dynamic_confidence != null ? Number(projection.dynamic_confidence) : undefined,
+            projection_mean: projection.projection_mean != null ? Number(projection.projection_mean) : undefined,
+            projection_std_dev: projection.projection_std_dev != null ? Number(projection.projection_std_dev) : undefined,
           }
         } : {})
       } : {
@@ -3188,14 +3140,31 @@ const Matchup = () => {
   // to avoid re-computing when demo team objects change but roster composition hasn't. playerIdsVersion
   // proxies actual player ID changes. previousRosterRef is a stable ref accessed via .current.
   }, [userLeagueState, playerIdsVersion, demoOpponentTeam.length, dailyStatsMap, dailyStatsByDate, selectedDate, projectionsByDate, isSwitchingDate, opponentTeamPlayers]);
-  const displayMyTeamSlotAssignments = useMemo(() =>
-    userLeagueState === 'active-user' ? myTeamSlotAssignments : demoMyTeamSlotAssignments,
-    [userLeagueState, myTeamSlotAssignments, demoMyTeamSlotAssignments]
-  );
-  const displayOpponentTeamSlotAssignments = useMemo(() =>
-    userLeagueState === 'active-user' ? opponentTeamSlotAssignments : demoOpponentTeamSlotAssignments,
-    [userLeagueState, opponentTeamSlotAssignments, demoOpponentTeamSlotAssignments]
-  );
+  const displayMyTeamSlotAssignments = useMemo(() => {
+    // For past dates with frozen rosters, use frozen slot assignments directly
+    // This eliminates the race condition where useMemo updates starters immediately
+    // but the useEffect that updates state slot assignments fires later
+    if (selectedDate && frozenRostersByDate.has(selectedDate)) {
+      const frozenSlots = frozenRostersByDate.get(selectedDate)!.mySlots;
+      if (frozenSlots && Object.keys(frozenSlots).length > 0) {
+        return frozenSlots;
+      }
+    }
+    return userLeagueState === 'active-user' ? myTeamSlotAssignments : demoMyTeamSlotAssignments;
+  }, [selectedDate, frozenRostersByDate, userLeagueState, myTeamSlotAssignments, demoMyTeamSlotAssignments]);
+
+  const displayOpponentTeamSlotAssignments = useMemo(() => {
+    // For past dates with frozen rosters, use frozen slot assignments directly
+    // This eliminates the race condition where useMemo updates starters immediately
+    // but the useEffect that updates state slot assignments fires later
+    if (selectedDate && frozenRostersByDate.has(selectedDate)) {
+      const frozenSlots = frozenRostersByDate.get(selectedDate)!.oppSlots;
+      if (frozenSlots && Object.keys(frozenSlots).length > 0) {
+        return frozenSlots;
+      }
+    }
+    return userLeagueState === 'active-user' ? opponentTeamSlotAssignments : demoOpponentTeamSlotAssignments;
+  }, [selectedDate, frozenRostersByDate, userLeagueState, opponentTeamSlotAssignments, demoOpponentTeamSlotAssignments]);
 
   // Weekly starters for sidebar (always shows full week stats, regardless of selected date)
   // CRITICAL: Use baseCurrentRoster (stable, full week) instead of myTeam/opponentTeamPlayers
@@ -3232,7 +3201,7 @@ const Matchup = () => {
     if (selectedDate && frozenRostersByDate.has(selectedDate)) {
       const frozenRoster = frozenRostersByDate.get(selectedDate)!;
       const directStarters = frozenRoster.myRoster.filter(p => p.isStarter);
-      
+
       // Enrich with stats from dailyStatsByDate
       const dayStatsMap = dailyStatsByDate.get(selectedDate);
       const enriched = directStarters.map(player => {
@@ -3244,12 +3213,10 @@ const Matchup = () => {
           daily_stats_breakdown: stats?.daily_stats_breakdown
         };
       });
-      
-      // Debug log for Saturday, Friday, and Today
-      const today = getTodayMST();
+
       return enriched;
     }
-    
+
     // Otherwise use enriched displayMyTeam
     return displayMyTeam.filter(p => p.isStarter);
   }, [selectedDate, frozenRostersByDate, dailyStatsByDate, displayMyTeam]);
@@ -3378,42 +3345,15 @@ const Matchup = () => {
     if (!currentMatchup) {
       return '0.0';
     }
-    
-    // PRIORITY 1: For demo leagues, ALWAYS use calculatedDailyTotals (same as weekly selector)
-    // The weekly selector shows correct values, so this is the single source of truth
-    // CRITICAL: Check calculatedDailyTotals BEFORE statsLoadingRef to avoid using cached zeros
-    // This ensures demo league scorecard matches the weekly selector exactly
-    if (userLeagueState !== 'active-user' && calculatedDailyTotals && calculatedDailyTotals.size > 0) {
+
+    // PRIORITY 1: Use calculatedDailyTotals (same as weekly selector) - works for ALL users
+    if (calculatedDailyTotals && calculatedDailyTotals.size > 0) {
       let total = 0;
       calculatedDailyTotals.forEach((totals) => {
         total += totals.myTotal;
       });
-      const score = total.toFixed(1);
-      // Always update cache with calculatedDailyTotals value (don't use old cached zeros)
-      if (!lastScoreRef.current) {
-        lastScoreRef.current = { myScore: score, oppScore: '0.0' };
-      } else {
-        lastScoreRef.current.myScore = score;
-      }
-      return score;
-    }
-    
-    // For active users: If stats are currently loading, return last stable score to prevent flashing
-    if (statsLoadingRef.current && lastScoreRef.current) {
-      return lastScoreRef.current.myScore;
-    }
-    
-    // PRIORITY 2: For demo leagues, if daily points arrays exist, sum them up
-    if (userLeagueState !== 'active-user' && myDailyPoints && myDailyPoints.length > 0) {
-      const total = myDailyPoints.reduce((sum, pts) => sum + pts, 0);
-      // If daily points sum is 0 or very small, use fallback to sum player.total_points
-      // This handles cases where RPC returns zeros but matchup lines have data
-      if (total < 0.1) {
-        const fallback = myStarters.reduce((sum, player) => {
-          const pts = player.total_points || player.points || 0;
-          return sum + pts;
-        }, 0);
-        const score = fallback.toFixed(1);
+      if (total > 0.01) {
+        const score = total.toFixed(1);
         if (!lastScoreRef.current) {
           lastScoreRef.current = { myScore: score, oppScore: '0.0' };
         } else {
@@ -3421,25 +3361,34 @@ const Matchup = () => {
         }
         return score;
       }
-      const score = total.toFixed(1);
-      if (!lastScoreRef.current) {
-        lastScoreRef.current = { myScore: score, oppScore: '0.0' };
-      } else {
-        lastScoreRef.current.myScore = score;
-      }
-      return score;
     }
-    
+
+    // For active users: If stats are currently loading, return last stable score to prevent flashing
+    if (statsLoadingRef.current && lastScoreRef.current) {
+      return lastScoreRef.current.myScore;
+    }
+
+    // PRIORITY 2: Use RPC daily points (server-calculated, most reliable)
+    if (myDailyPoints && myDailyPoints.length > 0) {
+      const total = myDailyPoints.reduce((sum, pts) => sum + pts, 0);
+      if (total > 0.01) {
+        const score = total.toFixed(1);
+        if (!lastScoreRef.current) {
+          lastScoreRef.current = { myScore: score, oppScore: '0.0' };
+        } else {
+          lastScoreRef.current.myScore = score;
+        }
+        return score;
+      }
+    }
+
     // PRIORITY 3: If daily stats map is empty, use fallback
     if (dailyStatsByDate.size === 0) {
-      // Fallback: sum starter week totals if no daily breakdown available
-      // Check both total_points and points fields
       const fallback = myStarters.reduce((sum, player) => {
         const pts = player.total_points || player.points || 0;
         return sum + pts;
       }, 0);
       const score = fallback.toFixed(1);
-      
       if (!lastScoreRef.current) {
         lastScoreRef.current = { myScore: score, oppScore: '0.0' };
       } else {
@@ -3448,76 +3397,66 @@ const Matchup = () => {
       return score;
     }
 
-    // PRIORITY 4: Sum calculatedDailyTotals (includes confirmed totals from MatchupComparison)
+    // PRIORITY 4: Sum calculatedDailyTotals even if zero (final fallback)
     let total = 0;
     calculatedDailyTotals.forEach((totals) => {
       total += totals.myTotal;
     });
-    
+
     const score = total.toFixed(1);
-    // Cache the stable score
     if (!lastScoreRef.current) {
       lastScoreRef.current = { myScore: score, oppScore: '0.0' };
     } else {
       lastScoreRef.current.myScore = score;
     }
     return score;
-  }, [currentMatchup, calculatedDailyTotals, dailyStatsByDate, userLeagueState, myDailyPoints, myStarters]);
+  }, [currentMatchup, calculatedDailyTotals, dailyStatsByDate, myDailyPoints, myStarters]);
 
   const opponentTeamPoints = useMemo(() => {
     if (!currentMatchup) {
       return '0.0';
     }
-    
-    // PRIORITY 1: For demo leagues, ALWAYS use calculatedDailyTotals (same as weekly selector)
-    // The weekly selector shows correct values, so this is the single source of truth
-    // Don't use cached score if calculatedDailyTotals is available (it's more reliable)
-    if (userLeagueState !== 'active-user' && calculatedDailyTotals && calculatedDailyTotals.size > 0) {
+
+    // PRIORITY 1: Use calculatedDailyTotals (same as weekly selector) - works for ALL users
+    if (calculatedDailyTotals && calculatedDailyTotals.size > 0) {
       let total = 0;
       calculatedDailyTotals.forEach((totals) => {
         total += totals.oppTotal;
       });
-      const score = total.toFixed(1);
-      // Always update cache with calculatedDailyTotals value (don't use old cached zeros)
-      if (lastScoreRef.current) {
-        lastScoreRef.current.oppScore = score;
-      } else {
-        lastScoreRef.current = { myScore: '0.0', oppScore: score };
+      // Only use if non-zero (avoid overriding good RPC data with 0s from empty frozen rosters)
+      if (total > 0.01) {
+        const score = total.toFixed(1);
+        if (lastScoreRef.current) {
+          lastScoreRef.current.oppScore = score;
+        } else {
+          lastScoreRef.current = { myScore: '0.0', oppScore: score };
+        }
+        return score;
       }
-      return score;
     }
-    
+
     // For active users: If stats are currently loading, return last stable score to prevent flashing
     if (statsLoadingRef.current && lastScoreRef.current) {
       return lastScoreRef.current.oppScore;
     }
-    
-    // PRIORITY 2: For demo leagues, if daily points arrays exist, sum them up
-    if (userLeagueState !== 'active-user' && opponentDailyPoints && opponentDailyPoints.length > 0) {
+
+    // PRIORITY 2: Use RPC daily points (server-calculated, most reliable for opponent scores)
+    // This is critical for AI opponents where frontend enrichment may fail
+    if (opponentDailyPoints && opponentDailyPoints.length > 0) {
       const total = opponentDailyPoints.reduce((sum, pts) => sum + pts, 0);
-      // If daily points sum is 0 or very small, use fallback to sum player.total_points
-      // This handles cases where RPC returns zeros but matchup lines have data
-      if (total < 0.1) {
-        const fallback = opponentStarters.reduce((sum, player) => {
-          const pts = player.total_points || player.points || 0;
-          return sum + pts;
-        }, 0);
-        const score = fallback.toFixed(1);
+      if (total > 0.01) {
+        const score = total.toFixed(1);
         if (lastScoreRef.current) {
           lastScoreRef.current.oppScore = score;
+        } else {
+          lastScoreRef.current = { myScore: '0.0', oppScore: score };
         }
         return score;
       }
-      const score = total.toFixed(1);
-      if (lastScoreRef.current) {
-        lastScoreRef.current.oppScore = score;
-      }
-      return score;
     }
-    
+
     // PRIORITY 3: If daily stats map is empty, use fallback
     if (dailyStatsByDate.size === 0) {
-      // Check both total_points and points fields
       const fallback = opponentStarters.reduce((sum, player) => {
         const pts = player.total_points || player.points || 0;
         return sum + pts;
@@ -3529,19 +3468,18 @@ const Matchup = () => {
       return score;
     }
 
-    // PRIORITY 4: Sum calculatedDailyTotals (includes confirmed totals from MatchupComparison)
+    // PRIORITY 4: Sum calculatedDailyTotals even if zero (final fallback)
     let total = 0;
     calculatedDailyTotals.forEach((totals) => {
       total += totals.oppTotal;
     });
-    
+
     const score = total.toFixed(1);
-    // Cache the stable score
     if (lastScoreRef.current) {
       lastScoreRef.current.oppScore = score;
     }
     return score;
-  }, [currentMatchup, calculatedDailyTotals, dailyStatsByDate, userLeagueState, opponentDailyPoints, opponentStarters]);
+  }, [currentMatchup, calculatedDailyTotals, dailyStatsByDate, opponentDailyPoints, opponentStarters]);
 
   const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   
@@ -3771,6 +3709,7 @@ const Matchup = () => {
         // This ensures that when user switches leagues, we use the selected league, not the URL
         let targetLeagueId: string | null = null;
         let cachedUserLeagues: League[] | null = null;
+        let cachedLeagueTeams: Team[] | null = null;
         
         // Step 1: Always prioritize activeLeagueId from LeagueContext (source of truth)
         // CRITICAL: If activeLeagueId differs from URL, redirect IMMEDIATELY before any data loading
@@ -4060,16 +3999,16 @@ const Matchup = () => {
         if (!existingMatchup) {
           // No matchup found for this week - generate all missing weeks
           log(' No matchup found for week', weekToShow, '- generating matchups...');
-          const { teams: leagueTeams } = await LeagueService.getLeagueTeams(currentLeague.id);
-          
-          // Check if ANY matchups exist for this league
-          const { data: anyMatchups } = await supabase
-            .from('matchups')
-            .select('week_number')
-            .eq('league_id' as any, currentLeague.id as any)
-            .limit(1);
-          
-          const hasAnyMatchups = anyMatchups && anyMatchups.length > 0;
+          if (!cachedLeagueTeams) {
+            const { teams } = await LeagueService.getLeagueTeams(currentLeague.id);
+            cachedLeagueTeams = teams;
+          }
+          const leagueTeams = cachedLeagueTeams;
+
+          // Check if ANY matchups exist for this league (via API)
+          const anyMatchupsRes = await matchupApi.getLeagueMatchups(currentLeague.id);
+          const anyMatchups = anyMatchupsRes?.data || [];
+          const hasAnyMatchups = anyMatchups.length > 0;
           
           // If no matchups exist at all, force regenerate ALL weeks
           // Otherwise, generate only missing weeks (which will include this one)
@@ -4105,32 +4044,24 @@ const Matchup = () => {
           // Wait longer to ensure database commits complete
           await new Promise(resolve => setTimeout(resolve, 2000));
           
-          // Debug: Check what matchups actually exist in the database BEFORE verification
-          const { data: allMatchups, error: checkError } = await supabase
-            .from('matchups')
-            .select('week_number, team1_id, team2_id, league_id')
-            .eq('league_id' as any, currentLeague.id as any)
-            .eq('week_number' as any, weekToShow as any);
-          
+          // Debug: Check what matchups actually exist via API
+          // Invalidate cache first since we just generated matchups
+          matchupApi.invalidate(`matchups:league:${currentLeague.id}`);
+          const weekMatchupsRes = await matchupApi.getLeagueMatchups(currentLeague.id, weekToShow);
+          const allMatchups = weekMatchupsRes?.data || [];
           log(' Debug - All matchups for week', weekToShow, ':', allMatchups);
-          
-          // Also check ALL weeks in database to see what's actually stored
-          const { data: allWeeksMatchups } = await supabase
-            .from('matchups')
-            .select('week_number')
-            .eq('league_id' as any, currentLeague.id as any);
-          
+
+          // Also check ALL weeks via API
+          const allWeeksRes = await matchupApi.getLeagueMatchups(currentLeague.id);
+          const allWeeksMatchups = allWeeksRes?.data || [];
           const uniqueWeeks = new Set((allWeeksMatchups as any[])?.map((m: any) => m.week_number) || []);
           log(' Debug - All week numbers in database:', Array.from(uniqueWeeks).sort((a, b) => a - b));
           log(' Debug - Requested week', weekToShow, 'exists in database?', uniqueWeeks.has(weekToShow));
-          
-          // Also check user's team
-          const { data: userTeamData } = await supabase
-            .from('teams')
-            .select('id, team_name, owner_id')
-            .eq('league_id' as any, currentLeague.id as any)
-            .eq('owner_id' as any, user.id as any)
-            .maybeSingle();
+
+          // Also check user's team via API
+          const teamsRes = await leagueApi.getTeams(currentLeague.id);
+          const allTeamsData = teamsRes?.data || [];
+          const userTeamData = allTeamsData.find((t: any) => t.owner_id === user.id) || null;
           
           log(' Debug - User team:', userTeamData);
           
@@ -4175,7 +4106,11 @@ const Matchup = () => {
                 await MatchupService.deleteAllMatchupsForLeague(currentLeague.id);
                 
                 // Get all teams again to ensure we have the complete list
-                const { teams: allLeagueTeams } = await LeagueService.getLeagueTeams(currentLeague.id);
+                if (!cachedLeagueTeams) {
+                  const { teams } = await LeagueService.getLeagueTeams(currentLeague.id);
+                  cachedLeagueTeams = teams;
+                }
+                const allLeagueTeams = cachedLeagueTeams;
                 
                 // Verify user's team is in the list
                 const userTeamInList = allLeagueTeams.some(t => t.id === teamData.id);
@@ -4258,6 +4193,20 @@ const Matchup = () => {
         // If a specific matchup is selected (from dropdown), load that matchup directly
         // Otherwise, use the user's matchup
         const userTimezone = (profile as any)?.timezone || 'America/Denver';
+
+        // CRITICAL: Ensure both teams have team_lineups + fantasy_daily_rosters BEFORE loading roster data
+        // This handles AI teams (owner_id = NULL) whose lineups can't be saved via frontend RLS.
+        // Must run before getMatchupData/getMatchupDataById which reads from these tables.
+        const matchupIdForEnsure = selectedMatchupId || existingMatchup?.id;
+        if (matchupIdForEnsure && currentLeague?.id !== DEMO_LEAGUE_ID_FOR_GUESTS) {
+          try {
+            await matchupApi.ensureRosters(matchupIdForEnsure);
+          } catch (err) {
+            // Non-fatal — roster data may already exist
+            logger.error('[Matchup] ensure-rosters pre-load failed:', err);
+          }
+        }
+
         let matchupDataPromise: Promise<{ data: any; error: any }>;
 
         if (selectedMatchupId) {
@@ -4393,9 +4342,43 @@ const Matchup = () => {
         setOpponentTeamRecord(matchupData.opponentTeam?.record || { wins: 0, losses: 0 });
         setMyDailyPoints(matchupData.userTeam.dailyPoints);
         setOpponentDailyPoints(matchupData.opponentTeam?.dailyPoints || []);
-        
-        // Frozen roster loading now handled in MatchupService.getMatchupRosters()
-        // No duplicate logic needed here
+
+        // Populate cachedDailyScores from RPC results (server-calculated, most reliable)
+        // This ensures scores display correctly even if frontend enrichment fails
+        // (e.g., AI team where opponent roster loading may not work)
+        const myDailyPts = matchupData.userTeam.dailyPoints || [];
+        const oppDailyPts = matchupData.opponentTeam?.dailyPoints || [];
+        if (myDailyPts.length > 0 || oppDailyPts.length > 0) {
+          const rpcCachedScores = new Map<string, { myScore: number; oppScore: number; isLocked: boolean }>();
+          const [sYear, sMonth, sDay] = matchupData.matchup.week_start_date.split('-').map(Number);
+          const rpcTodayStr = getTodayMST();
+
+          for (let i = 0; i < 7; i++) {
+            const dayDate = new Date(sYear, sMonth - 1, sDay + i);
+            const dateStr = `${dayDate.getFullYear()}-${String(dayDate.getMonth() + 1).padStart(2, '0')}-${String(dayDate.getDate()).padStart(2, '0')}`;
+            const isPast = dateStr < rpcTodayStr;
+
+            rpcCachedScores.set(dateStr, {
+              myScore: myDailyPts[i] || 0,
+              oppScore: oppDailyPts[i] || 0,
+              isLocked: isPast
+            });
+          }
+          setCachedDailyScores(rpcCachedScores);
+
+          // Also populate calculatedDailyTotals from RPC so scores show immediately
+          const rpcCalculatedTotals = new Map<string, { myTotal: number; oppTotal: number }>();
+          for (let i = 0; i < 7; i++) {
+            const dayDate = new Date(sYear, sMonth - 1, sDay + i);
+            const dateStr = `${dayDate.getFullYear()}-${String(dayDate.getMonth() + 1).padStart(2, '0')}-${String(dayDate.getDate()).padStart(2, '0')}`;
+            rpcCalculatedTotals.set(dateStr, {
+              myTotal: myDailyPts[i] || 0,
+              oppTotal: oppDailyPts[i] || 0
+            });
+          }
+          setCalculatedDailyTotals(rpcCalculatedTotals);
+          log(' Populated scores from RPC daily-scores (server-calculated)');
+        }
         
         // CRITICAL: Set viewing team names from matchup data (not userTeam state)
         // This ensures correct names are shown when viewing other matchups
@@ -4424,8 +4407,11 @@ const Matchup = () => {
 
         // Get opponent team object for display
         if (matchupData.opponentTeam) {
-          const { teams } = await LeagueService.getLeagueTeams(targetLeagueId);
-          const oppTeam = teams.find(t => t.id === matchupData.opponentTeam!.id);
+          if (!cachedLeagueTeams) {
+            const { teams } = await LeagueService.getLeagueTeams(targetLeagueId);
+            cachedLeagueTeams = teams;
+          }
+          const oppTeam = cachedLeagueTeams.find(t => t.id === matchupData.opponentTeam!.id);
           setOpponentTeam(oppTeam || null);
         } else {
           setOpponentTeam(null);
@@ -4469,61 +4455,73 @@ const Matchup = () => {
 
         if (datesToLoad.length > 0) {
           log(' Pre-loading rosters for PAST dates only:', datesToLoad);
-          
+
           // Create lookup maps from enriched roster players
           const enrichedMyPlayerMap = new Map<string, MatchupPlayer>();
           const enrichedOppPlayerMap = new Map<string, MatchupPlayer>();
-          
+
           matchupData.userTeam.roster.forEach(p => {
             enrichedMyPlayerMap.set(String(p.id), p);
           });
           (matchupData.opponentTeam?.roster || []).forEach(p => {
             enrichedOppPlayerMap.set(String(p.id), p);
           });
-          
+
           log(' Initial enriched player lookup maps:', {
             myPlayers: enrichedMyPlayerMap.size,
             oppPlayers: enrichedOppPlayerMap.size
           });
-          
+
           // ============================================================
           // HANDLE DROPPED/TRADED PLAYERS (Yahoo/Sleeper behavior)
           // Fetch any players in saved rosters who are no longer on the team
           // Query ONLY past dates (not today/future)
           // ============================================================
-          const { data: allFrozenEntries } = await supabase
-            .from('fantasy_daily_rosters')
-            .select('player_id, team_id, roster_date')
-            .eq('matchup_id' as any, matchupData.matchup.id)
-            .in('roster_date' as any, datesToLoad as any); // datesToLoad is already filtered to past dates only
-          
+          const frozenBatchResponse = await matchupApi.getFrozenRosterBatch(matchupData.matchup.id, datesToLoad);
+          const allFrozenEntries = frozenBatchResponse.data as any[] | null;
+
           if (allFrozenEntries && allFrozenEntries.length > 0) {
-            // Get all current player IDs
-            const currentMyIds = new Set(matchupData.userTeam.roster.map(p => String(p.id)));
-            const currentOppIds = new Set((matchupData.opponentTeam?.roster || []).map(p => String(p.id)));
-            const allCurrentIds = new Set([...currentMyIds, ...currentOppIds]);
-            
-            // Find player IDs that are in frozen rosters but NOT in current rosters
+            // Diagnostic: show unique team_ids in frozen entries vs expected team IDs
+            const frozenTeamIds = [...new Set((allFrozenEntries as any[]).map((e: any) => String(e.team_id)))];
+            const myTeamId = matchupData.userTeam.id;
+            const oppTeamId = matchupData.opponentTeam?.id;
+            log(' [frozen-roster-diag] frozenEntries:', allFrozenEntries.length,
+              'frozenTeamIds:', frozenTeamIds,
+              'myTeamId:', myTeamId,
+              'oppTeamId:', oppTeamId);
+
+            // Get all current player IDs from enrichment maps
+            const allCurrentIds = new Set([
+              ...Array.from(enrichedMyPlayerMap.keys()),
+              ...Array.from(enrichedOppPlayerMap.keys())
+            ]);
+
+            // Find player IDs that are in frozen rosters but NOT in enrichment maps
+            // CRITICAL: This catches both dropped players AND cases where opponent roster
+            // was empty (e.g., AI team where frontend failed to load roster)
             const missingIds = [...new Set(
               (allFrozenEntries as any)
                 .map((e: any) => String(e.player_id))
                 .filter((id: string) => !allCurrentIds.has(id))
             )];
-            
+
+            log(' [frozen-roster-diag] allCurrentIds:', allCurrentIds.size,
+              'missingIds:', missingIds.length);
+
             if (missingIds.length > 0) {
-              log(' Found dropped/traded players in frozen rosters:', missingIds);
-              
-              // Fetch missing players
+              log(' Found players in frozen rosters missing from enrichment maps:', missingIds.length);
+
+              // Fetch missing players from player directory
               const missingPlayers = await PlayerService.getPlayersByIds(missingIds as string[]);
-              log(' Fetched', missingPlayers.length, 'dropped/traded players');
-              
+              log(' Fetched', missingPlayers.length, 'missing players for enrichment');
+
               // Transform to MatchupPlayer and add to appropriate lookup map
               missingPlayers.forEach(player => {
                 // Determine which team this player was on based on frozen roster entries
                 const playerEntries = (allFrozenEntries as any).filter((e: any) => String(e.player_id) === String(player.id));
-                const wasOnMyTeam = playerEntries.some((e: any) => String(e.team_id) === matchupData.userTeam.id);
-                const wasOnOppTeam = playerEntries.some((e: any) => String(e.team_id) === matchupData.opponentTeam?.id);
-                
+                const wasOnMyTeam = playerEntries.some((e: any) => String(e.team_id) === myTeamId);
+                const wasOnOppTeam = playerEntries.some((e: any) => String(e.team_id) === oppTeamId);
+
                 // Create basic MatchupPlayer from Player data
                 const p = player as any;
                 const matchupPlayer: MatchupPlayer = {
@@ -4543,9 +4541,9 @@ const Matchup = () => {
                   gamesRemaining: 0,
                   isGoalie: p.position === 'G',
                   status: (p.status || null) as any,
-                  wasDropped: true
+                  wasDropped: !wasOnMyTeam && !wasOnOppTeam ? false : undefined
                 } as MatchupPlayer;
-                
+
                 if (wasOnMyTeam) {
                   enrichedMyPlayerMap.set(String(player.id), matchupPlayer);
                 }
@@ -4553,8 +4551,8 @@ const Matchup = () => {
                   enrichedOppPlayerMap.set(String(player.id), matchupPlayer);
                 }
               });
-              
-              log(' Updated enriched player lookup maps after adding dropped players:', {
+
+              log(' Updated enriched player lookup maps after adding missing players:', {
                 myPlayers: enrichedMyPlayerMap.size,
                 oppPlayers: enrichedOppPlayerMap.size
               });
@@ -4569,40 +4567,30 @@ const Matchup = () => {
             oppSlots: Record<string, string>;
           }>();
           
-          // Load frozen lineups in parallel (ONLY for past dates)
-          // For today/future, the current roster from matchupData is used instead
-          const frozenLoadPromises = datesToLoad.map(async (date) => {
-            try {
-              // Query fantasy_daily_rosters directly for lineup info
-              const { data: myDailyRoster } = await supabase
-                .from('fantasy_daily_rosters')
-                .select('player_id, slot_type, slot_id')
-                .eq('team_id' as any, matchupData.userTeam.id as any)
-                .eq('matchup_id' as any, matchupData.matchup.id as any)
-                .eq('roster_date' as any, date as any);
-              
-              const { data: oppDailyRoster } = matchupData.opponentTeam ? await supabase
-                .from('fantasy_daily_rosters')
-                .select('player_id, slot_type, slot_id')
-                .eq('team_id' as any, matchupData.opponentTeam.id as any)
-                .eq('matchup_id' as any, matchupData.matchup.id as any)
-                .eq('roster_date' as any, date as any) : { data: null };
-              
-              if (!myDailyRoster || myDailyRoster.length === 0) {
-                log(` No frozen roster found for ${date}`);
-                return null;
-              }
-              
-              // Build frozen roster using enriched players
-              const myRoster: MatchupPlayer[] = [];
-              const mySlots: Record<string, string> = {};
-              
+          // Build frozen lineups from batch data (no extra API calls needed)
+          // allFrozenEntries already has player_id, team_id, roster_date, slot_type, slot_id
+          const results = datesToLoad.map((date) => {
+            const myTeamId = matchupData.userTeam.id;
+            const oppTeamId = matchupData.opponentTeam?.id;
+
+            // Filter batch entries for this date and team
+            const myDailyRoster = allFrozenEntries
+              ? (allFrozenEntries as any[]).filter((e: any) => e.roster_date === date && String(e.team_id) === myTeamId)
+              : [];
+            const oppDailyRoster = allFrozenEntries && oppTeamId
+              ? (allFrozenEntries as any[]).filter((e: any) => e.roster_date === date && String(e.team_id) === oppTeamId)
+              : [];
+
+            // Build my frozen roster (or fallback to current roster)
+            const myRoster: MatchupPlayer[] = [];
+            const mySlots: Record<string, string> = {};
+
+            if (myDailyRoster.length > 0) {
               myDailyRoster.forEach((entry: any) => {
                 const playerId = String(entry.player_id);
                 const enrichedPlayer = enrichedMyPlayerMap.get(playerId);
-                
+
                 if (enrichedPlayer) {
-                  // Use enriched player with updated isStarter flag
                   const isStarter = entry.slot_type === 'active';
                   myRoster.push({
                     ...enrichedPlayer,
@@ -4611,49 +4599,120 @@ const Matchup = () => {
                   if (entry.slot_id) {
                     mySlots[playerId] = entry.slot_id;
                   }
+                } else if (entry.player_name) {
+                  // Server-provided player details fallback
+                  const isStarter = entry.slot_type === 'active';
+                  const isGoalie = entry.player_position === 'G';
+                  myRoster.push({
+                    id: Number(entry.player_id),
+                    name: entry.player_name,
+                    position: entry.player_position || '',
+                    team: entry.player_team || '',
+                    teamAbbreviation: entry.player_team_abbreviation || entry.player_team || '',
+                    points: 0,
+                    total_points: 0,
+                    headshot_url: entry.player_headshot_url || '',
+                    isStarter,
+                    isOnIR: entry.player_status === 'IR' || entry.player_status === 'SUSP',
+                    stats: { goals: 0, assists: 0, sog: 0, blk: 0, xGoals: 0 },
+                    matchupStats: { goals: 0, assists: 0, sog: 0, blk: 0, xGoals: 0 },
+                    games: [],
+                    gamesRemaining: 0,
+                    isGoalie,
+                    status: (entry.player_status || null) as any,
+                  } as MatchupPlayer);
+                  if (entry.slot_id) {
+                    mySlots[playerId] = entry.slot_id;
+                  }
                 }
               });
-              
-              // Build opponent frozen roster
-              const oppRoster: MatchupPlayer[] = [];
-              const oppSlots: Record<string, string> = {};
-              
-              if (oppDailyRoster) {
-                oppDailyRoster.forEach((entry: any) => {
-                  const playerId = String(entry.player_id);
-                  const enrichedPlayer = enrichedOppPlayerMap.get(playerId);
-                  
-                  if (enrichedPlayer) {
-                    const isStarter = entry.slot_type === 'active';
-                    oppRoster.push({
-                      ...enrichedPlayer,
-                      isStarter
-                    } as MatchupPlayer);
-                    if (entry.slot_id) {
-                      oppSlots[playerId] = entry.slot_id;
-                    }
-                  }
-                });
-              }
-              
-              return {
-                date,
-                data: { myRoster, oppRoster, mySlots, oppSlots }
-              };
-            } catch (error) {
-              logger.error(`[MATCHUP] Error loading frozen roster for ${date}:`, error);
-              return null;
+            } else {
+              // FALLBACK: No frozen roster for my team on this past date.
+              // Use current roster as best approximation.
+              log(` No frozen roster for my team on ${date}, using current roster as fallback`);
+              (matchupData.userTeam.roster || []).forEach((p: MatchupPlayer) => {
+                myRoster.push({ ...p } as MatchupPlayer);
+                const pid = String(p.id);
+                const slotId = matchupData.userTeam.slotAssignments?.[pid];
+                if (slotId) {
+                  mySlots[pid] = slotId;
+                }
+              });
             }
+
+            // Build opponent frozen roster
+            const oppRoster: MatchupPlayer[] = [];
+            const oppSlots: Record<string, string> = {};
+
+            if (oppDailyRoster.length > 0) {
+              oppDailyRoster.forEach((entry: any) => {
+                const playerId = String(entry.player_id);
+                const enrichedPlayer = enrichedOppPlayerMap.get(playerId);
+
+                if (enrichedPlayer) {
+                  const isStarter = entry.slot_type === 'active';
+                  oppRoster.push({
+                    ...enrichedPlayer,
+                    isStarter
+                  } as MatchupPlayer);
+                  if (entry.slot_id) {
+                    oppSlots[playerId] = entry.slot_id;
+                  }
+                } else if (entry.player_name) {
+                  // Server-provided player details (joined from player_directory).
+                  // This fallback is critical for AI teams whose roster_assignments
+                  // are blocked by RLS, causing enrichedOppPlayerMap to be empty.
+                  const isStarter = entry.slot_type === 'active';
+                  const isGoalie = entry.player_position === 'G';
+                  oppRoster.push({
+                    id: Number(entry.player_id),
+                    name: entry.player_name,
+                    position: entry.player_position || '',
+                    team: entry.player_team || '',
+                    teamAbbreviation: entry.player_team_abbreviation || entry.player_team || '',
+                    points: 0,
+                    total_points: 0,
+                    headshot_url: entry.player_headshot_url || '',
+                    isStarter,
+                    isOnIR: entry.player_status === 'IR' || entry.player_status === 'SUSP',
+                    stats: { goals: 0, assists: 0, sog: 0, blk: 0, xGoals: 0 },
+                    matchupStats: { goals: 0, assists: 0, sog: 0, blk: 0, xGoals: 0 },
+                    games: [],
+                    gamesRemaining: 0,
+                    isGoalie,
+                    status: (entry.player_status || null) as any,
+                  } as MatchupPlayer);
+                  if (entry.slot_id) {
+                    oppSlots[playerId] = entry.slot_id;
+                  }
+                }
+              });
+            } else if (matchupData.opponentTeam) {
+              // FALLBACK: No fantasy_daily_rosters records for opponent on this past date.
+              // Use the opponent's current roster as the best approximation.
+              log(` No frozen roster for opponent on ${date}, using current roster as fallback`);
+              (matchupData.opponentTeam.roster || []).forEach((p: MatchupPlayer) => {
+                oppRoster.push({ ...p } as MatchupPlayer);
+                const pid = String(p.id);
+                const slotId = matchupData.opponentTeam?.slotAssignments?.[pid];
+                if (slotId) {
+                  oppSlots[pid] = slotId;
+                }
+              });
+            }
+
+            return {
+              date,
+              data: { myRoster, oppRoster, mySlots, oppSlots }
+            };
           });
-          
-          const results = await Promise.all(frozenLoadPromises);
-          
+
           results.forEach(result => {
             if (result) {
               frozenMap.set(result.date, result.data);
             }
           });
-          
+
           setFrozenRostersByDate(frozenMap);
           log(` Pre-loaded ${frozenMap.size} saved rosters for week (Yahoo/Sleeper style)`);
         } else {

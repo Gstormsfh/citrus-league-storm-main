@@ -1,6 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import { CURRENT_SEASON, getHeadshotUrl } from "@/utils/seasonConstants";
 import { logger } from '@/utils/logger';
+import { playerApi } from '@/api/players';
+import { apiClient } from '@/api/client';
 
 /**
  * Supabase client reference for pipeline tables not yet in the generated Database type.
@@ -713,15 +715,13 @@ export const PlayerService = {
   async getTrendingPlayers(daysBack = 7, limitCount = 50): Promise<Map<number, { addCount: number; netAdds: number }>> {
     const trendingMap = new Map<number, { addCount: number; netAdds: number }>();
     try {
-      const { data, error } = await supabase.rpc('get_trending_players', {
-        days_back: daysBack,
-        limit_count: limitCount,
-      });
-      if (error || !data || !Array.isArray(data)) return trendingMap;
-      for (const row of data) {
-        trendingMap.set(Number(row.player_id), {
-          addCount: Number(row.add_count ?? 0),
-          netAdds: Number(row.net_adds ?? 0),
+      const response = await playerApi.getTrendingPlayers(daysBack, limitCount);
+      const rows = response.data;
+      if (!rows || !Array.isArray(rows)) return trendingMap;
+      for (const row of rows) {
+        trendingMap.set(Number(row.playerId ?? row.player_id), {
+          addCount: Number(row.addCount ?? row.add_count ?? 0),
+          netAdds: Number(row.netAdds ?? row.net_adds ?? 0),
         });
       }
     } catch (err) {
@@ -744,16 +744,7 @@ export const PlayerService = {
     playerPosition: string;
   }): Promise<void> {
     try {
-      await supabase.rpc('record_player_transaction', {
-        p_player_id: params.playerId,
-        p_league_id: params.leagueId,
-        p_team_id: params.teamId,
-        p_transaction_type: params.transactionType,
-        p_source: params.source,
-        p_player_name: params.playerName,
-        p_player_team: params.playerTeam,
-        p_player_position: params.playerPosition,
-      });
+      await playerApi.recordPlayerTransaction(params);
     } catch (err) {
       logger.error('[PlayerService] recordPlayerTransaction error:', err);
     }
@@ -765,12 +756,10 @@ export const PlayerService = {
    */
   async getRosterAssignmentCount(teamId: string, leagueId: string): Promise<{ count: number | null; error: string | null }> {
     try {
-      const { count, error } = await (supabase as unknown as PipelineDb)
-        .from('roster_assignments')
-        .select('id', { count: 'exact', head: true } as Record<string, unknown>)
-        .eq('team_id', teamId)
-        .eq('league_id', leagueId) as unknown as { count: number | null; error: { message: string } | null };
-      return { count, error: error?.message || null };
+      const response = await apiClient.get(`/api/rosters/league/${leagueId}/team/${teamId}/player-ids`);
+      const playerIds = response.data;
+      const count = Array.isArray(playerIds) ? playerIds.length : null;
+      return { count, error: null };
     } catch (err) {
       logger.error('[PlayerService] getRosterAssignmentCount error:', err);
       return { count: null, error: String(err) };

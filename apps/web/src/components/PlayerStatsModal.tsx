@@ -12,9 +12,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useState, useEffect, useRef } from 'react';
 import { CitrusSparkle } from '@/components/icons/CitrusIcons';
 import { getTodayMST } from '@/utils/timezoneUtils';
-import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
-import { COLUMNS } from '@/utils/queryColumns';
+import { playerApi } from '@/api/players';
+import { MatchupService } from '@/services/MatchupService';
 
 // ─── Types for week projections ─────────────────────────────────────
 interface GameProjection {
@@ -147,32 +147,28 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
           return;
         }
 
-        // Batch-fetch ALL projections for this player from today onward (single query)
-        // Filter to only canonical calculation methods to avoid stale test data
+        // Fetch projections using the same proven RPC path as matchup view
+        // (POST /api/matchups/projections/daily → get_daily_projections RPC)
         const projectionMap = new Map<string, any>();
         try {
-          const { data: projRows } = await supabase
-            .from('player_projected_stats')
-            .select(COLUMNS.PLAYER_PROJECTED_STATS)
-            .eq('player_id', playerId)
-            .gte('projection_date', todayStr)
-            .in('calculation_method', ['hybrid_bayesian', 'probability_based_volume'])
-            .order('projection_date', { ascending: true });
+          // Collect unique game dates
+          const gameDates = [...new Set(games.map((g: any) => g.game_date.split('T')[0]))];
 
-          if (projRows) {
-            for (const row of projRows) {
-              const dateKey = (row.projection_date as string).split('T')[0];
-              const existing = projectionMap.get(dateKey);
-              
-              // If duplicate date, prefer row with higher total_projected_points
-              // (more likely to be the correct/proper projection)
-              if (!existing || (Number(row.total_projected_points || 0) > Number(existing.total_projected_points || 0))) {
-                projectionMap.set(dateKey, row);
-              }
+          // Batch-fetch projections for each game date in parallel
+          const results = await Promise.all(
+            gameDates.map(async (date) => {
+              const projMap = await MatchupService.getDailyProjectionsForMatchup([playerId], date);
+              return { date, projection: projMap.get(playerId) || null };
+            })
+          );
+
+          for (const { date, projection } of results) {
+            if (projection) {
+              projectionMap.set(date, projection);
             }
           }
-        } catch {
-          // Projections not available - that's OK, we still show the games
+        } catch (projFetchError) {
+          logger.warn('[PlayerStatsModal] Projections not available:', projFetchError);
         }
 
         const projections: GameProjection[] = [];

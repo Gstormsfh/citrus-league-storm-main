@@ -12,12 +12,11 @@
  * keeper locks are finalized.
  *
  * When settings change mid-season (after the league has started), a
- * notification is sent to all league members via notify_league_members RPC.
+ * notification is sent to all league members via the API server.
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import { keeperApi } from '@/api/keepers';
 import { logger } from '@/utils/logger';
-import { COLUMNS } from '@/utils/queryColumns';
 
 export interface KeeperDesignation {
   id: string;
@@ -69,27 +68,18 @@ export class KeeperService {
         return { success: false, error: validation.error };
       }
 
-      const { data, error } = await supabase
-        .from('keeper_designations')
-        .insert({
-          league_id: leagueId,
-          team_id: teamId,
-          player_id: playerId,
-          season_year: seasonYear,
-          original_draft_round: originalDraftRound || null,
-          status: 'designated',
-        })
-        .select()
-        .single();
+      const response = await keeperApi.designateKeeper(leagueId, {
+        teamId,
+        playerId,
+        seasonYear,
+        originalDraftRound,
+      });
 
-      if (error) {
-        if (error.code === '23505') {
-          return { success: false, error: 'Player is already designated as a keeper' };
-        }
-        throw error;
+      if (response.error) {
+        return { success: false, error: response.error };
       }
 
-      return { success: true, designation: data as KeeperDesignation };
+      return { success: true, designation: response.data as KeeperDesignation };
     } catch (error: unknown) {
       logger.error('Error designating keeper:', error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -104,14 +94,12 @@ export class KeeperService {
     teamId: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await supabase
-        .from('keeper_designations')
-        .update({ status: 'released' })
-        .eq('id', keeperDesignationId)
-        .eq('team_id', teamId)
-        .in('status', ['designated', 'approved']);
+      const response = await keeperApi.releaseKeeper(keeperDesignationId, { teamId });
 
-      if (error) throw error;
+      if (response.error) {
+        return { success: false, error: response.error };
+      }
+
       return { success: true };
     } catch (error: unknown) {
       logger.error('Error releasing keeper:', error);
@@ -128,17 +116,13 @@ export class KeeperService {
     seasonYear: number
   ): Promise<{ keepers: KeeperDesignation[]; error?: string }> {
     try {
-      const { data, error } = await supabase
-        .from('keeper_designations')
-        .select(COLUMNS.KEEPER_DESIGNATION)
-        .eq('league_id', leagueId)
-        .eq('team_id', teamId)
-        .eq('season_year', seasonYear)
-        .in('status', ['designated', 'approved', 'locked'])
-        .order('designated_at', { ascending: true });
+      const response = await keeperApi.getTeamKeepers(leagueId, teamId, seasonYear);
 
-      if (error) throw error;
-      return { keepers: (data || []) as KeeperDesignation[] };
+      if (response.error) {
+        return { keepers: [], error: response.error };
+      }
+
+      return { keepers: (response.data || []) as KeeperDesignation[] };
     } catch (error: unknown) {
       logger.error('Error fetching team keepers:', error);
       return { keepers: [], error: error instanceof Error ? error.message : String(error) };
@@ -153,16 +137,13 @@ export class KeeperService {
     seasonYear: number
   ): Promise<{ keepers: KeeperDesignation[]; error?: string }> {
     try {
-      const { data, error } = await supabase
-        .from('keeper_designations')
-        .select(COLUMNS.KEEPER_DESIGNATION)
-        .eq('league_id', leagueId)
-        .eq('season_year', seasonYear)
-        .in('status', ['designated', 'approved', 'locked'])
-        .order('team_id', { ascending: true });
+      const response = await keeperApi.getLeagueKeepers(leagueId, seasonYear);
 
-      if (error) throw error;
-      return { keepers: (data || []) as KeeperDesignation[] };
+      if (response.error) {
+        return { keepers: [], error: response.error };
+      }
+
+      return { keepers: (response.data || []) as KeeperDesignation[] };
     } catch (error: unknown) {
       logger.error('Error fetching league keepers:', error);
       return { keepers: [], error: error instanceof Error ? error.message : String(error) };
@@ -170,7 +151,7 @@ export class KeeperService {
   }
 
   /**
-   * Validate keeper selections for a team using the RPC.
+   * Validate keeper selections for a team.
    * Reads league settings dynamically (keeperEnabled, keeperCount, dynastyMode).
    */
   static async validateKeepers(
@@ -179,15 +160,19 @@ export class KeeperService {
     seasonYear: number
   ): Promise<KeeperValidation & { error?: string }> {
     try {
-      const { data, error } = await supabase.rpc('validate_keeper_selections', {
-        p_league_id: leagueId,
-        p_team_id: teamId,
-        p_season_year: seasonYear,
-      });
+      const response = await keeperApi.validateKeepers(leagueId, { teamId, seasonYear });
 
-      if (error) throw error;
+      if (response.error) {
+        return {
+          is_valid: false,
+          error_message: response.error,
+          keepers_count: 0,
+          max_keepers: 0,
+          error: response.error,
+        };
+      }
 
-      const result = data?.[0] || data;
+      const result = response.data;
       return {
         is_valid: result?.is_valid ?? false,
         error_message: result?.error_message ?? null,
@@ -216,14 +201,13 @@ export class KeeperService {
     seasonYear: number
   ): Promise<{ costs: KeeperDraftCost[]; error?: string }> {
     try {
-      const { data, error } = await supabase.rpc('get_keeper_draft_costs', {
-        p_league_id: leagueId,
-        p_team_id: teamId,
-        p_season_year: seasonYear,
-      });
+      const response = await keeperApi.getKeeperDraftCosts(leagueId, teamId, seasonYear);
 
-      if (error) throw error;
-      return { costs: (data || []) as KeeperDraftCost[] };
+      if (response.error) {
+        return { costs: [], error: response.error };
+      }
+
+      return { costs: (response.data || []) as KeeperDraftCost[] };
     } catch (error: unknown) {
       logger.error('Error fetching keeper draft costs:', error);
       return { costs: [], error: error instanceof Error ? error.message : String(error) };
@@ -233,7 +217,7 @@ export class KeeperService {
   /**
    * Commissioner: Lock in all keeper designations for the season.
    * This finalizes keepers and makes them unavailable in the draft.
-   * Sends notification to all league members.
+   * Notification is handled server-side.
    */
   static async lockKeepersForSeason(
     leagueId: string,
@@ -243,31 +227,17 @@ export class KeeperService {
     error?: string;
   }> {
     try {
-      const { data, error } = await supabase.rpc('lock_keepers_for_season', {
-        p_league_id: leagueId,
-        p_season_year: seasonYear,
-      });
+      const response = await keeperApi.lockKeepers(leagueId, { seasonYear });
 
-      if (error) throw error;
-
-      const results = (data || []).map((row: any) => ({
-        teamId: row.team_id,
-        keepersLocked: row.keepers_locked,
-        roundsConsumed: row.rounds_consumed || [],
-      }));
-
-      // Notify league members
-      const totalKeepers = results.reduce((sum: number, r: any) => sum + r.keepersLocked, 0);
-      try {
-        await supabase.rpc('notify_league_members', {
-          p_league_id: leagueId,
-          p_title: 'Keepers Locked',
-          p_message: `${totalKeepers} keeper(s) across all teams have been locked for the ${seasonYear}-${seasonYear + 1} season. The draft will exclude kept players.`,
-          p_notification_type: 'SYSTEM',
-        });
-      } catch {
-        // Non-critical
+      if (response.error) {
+        return { results: [], error: response.error };
       }
+
+      const results = (response.data || []).map((row: any) => ({
+        teamId: row.team_id || row.teamId,
+        keepersLocked: row.keepers_locked || row.keepersLocked || 0,
+        roundsConsumed: row.rounds_consumed || row.roundsConsumed || [],
+      }));
 
       return { results };
     } catch (error: unknown) {
@@ -279,11 +249,11 @@ export class KeeperService {
   /**
    * Commissioner: Update keeper/dynasty settings for the league.
    * All settings are dynamic and can be changed before keeper lock.
-   * Sends notification to league members about the change.
+   * Commissioner check and notification are handled server-side.
    */
   static async updateKeeperSettings(
     leagueId: string,
-    commissionerId: string,
+    _commissionerId: string,
     settings: {
       keeperEnabled: boolean;
       keeperCount: number;
@@ -292,50 +262,10 @@ export class KeeperService {
     }
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      // Verify commissioner
-      const { data: league } = await supabase
-        .from('leagues')
-        .select('commissioner_id, settings')
-        .eq('id', leagueId)
-        .single();
+      const response = await keeperApi.updateKeeperSettings(leagueId, settings);
 
-      if (!league || league.commissioner_id !== commissionerId) {
-        return { success: false, error: 'Only the commissioner can update keeper settings' };
-      }
-
-      // Merge into existing settings
-      const existingSettings = (league.settings || {}) as Record<string, unknown>;
-      const updatedSettings = {
-        ...existingSettings,
-        keeperEnabled: settings.keeperEnabled,
-        keeperCount: settings.dynastyMode ? 999 : settings.keeperCount,
-        keeperPenalty: settings.keeperPenalty,
-        dynastyMode: settings.dynastyMode,
-      };
-
-      const { error } = await supabase
-        .from('leagues')
-        .update({ settings: updatedSettings })
-        .eq('id', leagueId);
-
-      if (error) throw error;
-
-      // Notify league
-      const mode = settings.dynastyMode
-        ? 'Dynasty (unlimited keepers)'
-        : settings.keeperEnabled
-          ? `Keeper (${settings.keeperCount} per team, ${settings.keeperPenalty} penalty)`
-          : 'Standard (no keepers)';
-
-      try {
-        await supabase.rpc('notify_league_members', {
-          p_league_id: leagueId,
-          p_title: 'Keeper Settings Updated',
-          p_message: `League format changed to: ${mode}`,
-          p_notification_type: 'SYSTEM',
-        });
-      } catch {
-        // Non-critical
+      if (response.error) {
+        return { success: false, error: response.error };
       }
 
       return { success: true };

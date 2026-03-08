@@ -115,7 +115,7 @@ export const DRAFT_ORDER_COLUMNS = 'id, league_id, round_number, team_order, cre
 // ============================================================================
 // PLAYER PROJECTED STATS COLUMNS
 // ============================================================================
-export const PLAYER_PROJECTED_STATS_COLUMNS = 'id, player_id, projection_date, calculation_method, total_projected_points, projected_goals, projected_assists, projected_sog, projected_blocks, projected_ppp, projected_shp, projected_hits, projected_pim, projected_wins, projected_saves, projected_shutouts, projected_goals_against, projected_gaa, projected_save_pct, shrinkage_weight, opponent_adjustment, confidence_score, dynamic_confidence, likely_low, likely_high, confidence_label, projection_mean, projection_std_dev, created_at, updated_at';
+export const PLAYER_PROJECTED_STATS_COLUMNS = 'projection_id, player_id, projection_date, calculation_method, total_projected_points, projected_goals, projected_assists, projected_sog, projected_blocks, projected_ppp, projected_shp, projected_hits, projected_pim, projected_wins, projected_saves, projected_shutouts, projected_goals_against, projected_gaa, projected_save_pct, shrinkage_weight, opponent_adjustment, confidence_score, dynamic_confidence, likely_low, likely_high, confidence_label, projection_mean, projection_std_dev, created_at, updated_at';
 
 // ============================================================================
 // KEEPER DESIGNATION COLUMNS
@@ -161,6 +161,11 @@ export const PLAYOFF_SEED_COLUMNS = 'id, bracket_id, team_id, seed_number, regul
 export const PLAYOFF_SERIES_COLUMNS = 'id, bracket_id, round_number, match_number, bracket_position, home_seed, away_seed, home_team_id, away_team_id, home_score, away_score, winner_team_id, loser_team_id, status, matchup_week_1, matchup_week_2, winner_advances_to, winner_slot, loser_drops_to, loser_slot, created_at, updated_at';
 
 // ============================================================================
+// TEAM LINEUPS COLUMNS
+// ============================================================================
+export const TEAM_LINEUP_COLUMNS = 'id, team_id, league_id, starters, bench, ir, slot_assignments, updated_at, created_at';
+
+// ============================================================================
 // COUNT-ONLY QUERIES (use with { count: 'exact', head: true })
 // ============================================================================
 // For count queries, we still need a column selection even though data isn't returned
@@ -196,6 +201,7 @@ export const COLUMNS = {
   PLAYOFF_BRACKET: PLAYOFF_BRACKET_COLUMNS,
   PLAYOFF_SEED: PLAYOFF_SEED_COLUMNS,
   PLAYOFF_SERIES: PLAYOFF_SERIES_COLUMNS,
+  TEAM_LINEUP: TEAM_LINEUP_COLUMNS,
 
   // Slim versions
   MATCHUP_SLIM: MATCHUP_COLUMNS_SLIM,

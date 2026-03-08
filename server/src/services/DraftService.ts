@@ -17,6 +17,101 @@ export class DraftService {
     this.membership = new LeagueMembershipService(supabase);
   }
 
+  /** Get or find the active draft session for a league */
+  async getActiveDraftSession(leagueId: string) {
+    // Check league draft status
+    const { data: league } = await this.supabase
+      .from('leagues')
+      .select('draft_status')
+      .eq('id', leagueId)
+      .single();
+
+    // If draft not started, return a new session ID
+    if (!league || league.draft_status === 'not_started' || league.draft_status === 'queued') {
+      return { sessionId: crypto.randomUUID(), error: null };
+    }
+
+    // Look for session from existing picks
+    const { data: existingPick } = await this.supabase
+      .from('draft_picks')
+      .select('draft_session_id')
+      .eq('league_id', leagueId)
+      .is('deleted_at', null)
+      .order('picked_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingPick?.draft_session_id) {
+      return { sessionId: existingPick.draft_session_id, error: null };
+    }
+
+    // Look for session from draft order
+    const { data: existingOrder } = await this.supabase
+      .from('draft_order')
+      .select('draft_session_id')
+      .eq('league_id', leagueId)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingOrder?.draft_session_id) {
+      return { sessionId: existingOrder.draft_session_id, error: null };
+    }
+
+    return { sessionId: crypto.randomUUID(), error: null };
+  }
+
+  /** Get draft picks for a league, optionally filtered by session */
+  async getDraftPicks(leagueId: string, sessionId?: string) {
+    let query = this.supabase
+      .from('draft_picks')
+      .select(COLUMNS.DRAFT_PICK)
+      .eq('league_id', leagueId)
+      .is('deleted_at', null)
+      .order('pick_number', { ascending: true });
+
+    if (sessionId) {
+      query = query.eq('draft_session_id', sessionId);
+    }
+
+    const { data, error } = await query;
+    return { picks: data || [], error };
+  }
+
+  /** Get draft order for a specific round */
+  async getDraftOrder(leagueId: string, roundNumber: number, sessionId?: string) {
+    let query = this.supabase
+      .from('draft_order')
+      .select(COLUMNS.DRAFT_ORDER)
+      .eq('league_id', leagueId)
+      .eq('round_number', roundNumber)
+      .is('deleted_at', null);
+
+    if (sessionId) {
+      query = query.eq('draft_session_id', sessionId);
+    }
+
+    const { data, error } = await query
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    return { order: data || null, error };
+  }
+
+  /** Hard delete all draft data for a league */
+  async hardDeleteDraft(leagueId: string) {
+    await this.supabase.from('draft_picks').delete().eq('league_id', leagueId);
+    await this.supabase.from('draft_order').delete().eq('league_id', leagueId);
+    await this.supabase
+      .from('leagues')
+      .update({ draft_status: 'not_started' })
+      .eq('id', leagueId);
+
+    return { error: null };
+  }
+
   /** Get draft state: league info, picks, and order */
   async getDraftState(leagueId: string) {
     const [leagueResult, picksResult, orderResult] = await Promise.all([
@@ -85,8 +180,8 @@ export class DraftService {
     }
 
     // Try RPC first, fallback to direct insert
-    let pick: any = null;
-    let error: any = null;
+    let pick: Record<string, unknown> | null = null;
+    let error: { message?: string } | null = null;
 
     const { data: rpcResult, error: rpcError } = await this.supabase.rpc('make_draft_pick', {
       p_league_id: leagueId,
@@ -112,7 +207,7 @@ export class DraftService {
         .select(COLUMNS.DRAFT_PICK)
         .single();
 
-      pick = insertResult;
+      pick = insertResult as unknown as Record<string, unknown>;
       error = insertError;
     } else {
       pick = rpcResult;
@@ -194,7 +289,7 @@ export class DraftService {
     const isLinear = draftType === 'linear';
     const teamOrder = customTeamOrder || teams.map((t) => t.id);
 
-    const orders: any[] = [];
+    const orders: { league_id: string; round_number: number; team_order: string[]; draft_session_id: string }[] = [];
     for (let round = 1; round <= totalRounds; round++) {
       const roundOrder = !isLinear && round % 2 === 0
         ? [...teamOrder].reverse()
@@ -317,7 +412,7 @@ export class DraftService {
       p_league_id: leagueId,
     });
 
-    const picks = (data || []).map((row: any) => ({
+    const picks = (data || []).map((row: { round_number: number; pick_number: number; team_id: string; player_id: number; player_name?: string }) => ({
       round: row.round_number,
       pick: row.pick_number,
       teamId: row.team_id,
@@ -383,6 +478,43 @@ export class DraftService {
     return { error };
   }
 
+  /** Delete ALL draft data across all leagues (admin only) */
+  async deleteAllDraftData() {
+    const { count: picksCountBefore } = await this.supabase
+      .from('draft_picks')
+      .select('*', { count: 'exact', head: true });
+
+    const { count: ordersCountBefore } = await this.supabase
+      .from('draft_order')
+      .select('*', { count: 'exact', head: true });
+
+    const { count: leaguesCount } = await this.supabase
+      .from('leagues')
+      .select('*', { count: 'exact', head: true });
+
+    const { data: allLeagues } = await this.supabase
+      .from('leagues')
+      .select('id');
+
+    for (const league of allLeagues || []) {
+      await this.supabase.from('draft_picks').delete().eq('league_id', league.id);
+      await this.supabase.from('draft_order').delete().eq('league_id', league.id);
+    }
+
+    await this.supabase
+      .from('leagues')
+      .update({ draft_status: 'not_started' })
+      .in('draft_status', ['in_progress', 'completed']);
+
+    return {
+      deletedCounts: {
+        picks: picksCountBefore || 0,
+        orders: ordersCountBefore || 0,
+        leagues: leaguesCount || 0,
+      },
+    };
+  }
+
   async getAutopickRankings(leagueId: string, teamId?: string) {
     let query = this.supabase
       .from('player_autopick_rankings')
@@ -398,7 +530,7 @@ export class DraftService {
 
     const { data, error } = await query;
     return {
-      rankings: (data || []).map((r: any) => ({
+      rankings: (data || []).map((r: { player_id: number; rank: number; position_code: string; tier?: number }) => ({
         playerId: r.player_id,
         rank: r.rank,
         positionCode: r.position_code,

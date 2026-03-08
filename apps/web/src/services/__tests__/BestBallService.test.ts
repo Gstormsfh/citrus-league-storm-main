@@ -1,29 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // =============================================================================
-// Mock Supabase client
+// Mock API client
 // =============================================================================
 
-function createChainableMock() {
-  const chain: Record<string, any> = {};
-  chain.select = vi.fn().mockReturnValue(chain);
-  chain.insert = vi.fn().mockReturnValue(chain);
-  chain.update = vi.fn().mockReturnValue(chain);
-  chain.eq = vi.fn().mockReturnValue(chain);
-  chain.in = vi.fn().mockReturnValue(chain);
-  chain.order = vi.fn().mockReturnValue(chain);
-  chain.limit = vi.fn().mockReturnValue(chain);
-  chain.single = vi.fn().mockResolvedValue({ data: null, error: null });
-  chain.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
-  return chain;
-}
-
-let mockChain = createChainableMock();
-
-vi.mock('@/integrations/supabase/client', () => ({
-  supabase: {
-    from: vi.fn(() => mockChain),
-    rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
+vi.mock('@/api/bestball', () => ({
+  bestballApi: {
+    getWeeklyData: vi.fn(),
+    getLeagueTeams: vi.fn(),
+    triggerOptimization: vi.fn(),
+    triggerWeekOptimization: vi.fn(),
   },
 }));
 
@@ -39,20 +25,46 @@ vi.mock('@/utils/seasonConstants', () => ({
   CURRENT_SEASON: '20252026',
 }));
 
+vi.mock('@/types/leagueTypes', () => ({
+  DEFAULT_ROSTER_SLOTS: [
+    { slot: 'C', label: 'Center', count: 2 },
+    { slot: 'LW', label: 'Left Wing', count: 2 },
+    { slot: 'RW', label: 'Right Wing', count: 2 },
+    { slot: 'D', label: 'Defense', count: 4 },
+    { slot: 'G', label: 'Goalie', count: 2 },
+    { slot: 'UTIL', label: 'Utility', count: 1 },
+    { slot: 'BN', label: 'Bench', count: 4 },
+    { slot: 'IR', label: 'IR', count: 1 },
+  ],
+}));
+
+vi.mock('@/utils/scoringUtils', () => {
+  class MockScoringCalculator {
+    calculatePoints(stats: Record<string, number>, isGoalie: boolean) {
+      // Simple mock: just return a sum of common stat values for testing
+      if (isGoalie) {
+        return (stats.wins || 0) * 4 + (stats.saves || 0) * 0.2 + (stats.goals_against || 0) * -1;
+      }
+      return (stats.goals || 0) * 3 + (stats.assists || 0) * 2 + (stats.shots || 0) * 0.4;
+    }
+  }
+  return {
+    ScoringCalculator: MockScoringCalculator,
+  };
+});
+
 // =============================================================================
 // Import AFTER mocks
 // =============================================================================
+
+import { bestballApi } from '@/api/bestball';
 
 let BestBallService: typeof import('../BestBallService').BestBallService;
 
 beforeEach(async () => {
   vi.clearAllMocks();
-  mockChain = createChainableMock();
   const mod = await import('../BestBallService');
   BestBallService = mod.BestBallService;
-
-  const { supabase } = await import('@/integrations/supabase/client');
-  (supabase.from as ReturnType<typeof vi.fn>).mockReturnValue(mockChain);
 });
 
 // =============================================================================
@@ -233,25 +245,18 @@ describe('BestBallService.optimizeLineup', () => {
 });
 
 // =============================================================================
-// calculateWeeklyBestBall — Integration-style tests (mocked DB)
+// calculateWeeklyBestBall — Integration-style tests (mocked API)
 // =============================================================================
 
 describe('BestBallService.calculateWeeklyBestBall', () => {
   it('returns empty result when no roster assignments exist', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'team_lineups') {
-        chain.maybeSingle.mockResolvedValue({ data: null, error: null });
-      }
-      if (table === 'roster_assignments') {
-        // No players on roster
-        chain.eq.mockReturnValue(chain);
-        chain.select.mockReturnValue(chain);
-        chain.eq.mockResolvedValue({ data: [], error: null });
-      }
-      return chain;
+    (bestballApi.getWeeklyData as any).mockResolvedValue({
+      data: {
+        lineup: null,
+        playerIds: [],
+        players: [],
+        weeklyStats: [],
+      },
     });
 
     const result = await BestBallService.calculateWeeklyBestBall('league-1', 'team-1', 5);
@@ -263,38 +268,16 @@ describe('BestBallService.calculateWeeklyBestBall', () => {
   });
 
   it('returns empty result when no weekly stats exist', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    let fromCallCount: Record<string, number> = {};
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      fromCallCount[table] = (fromCallCount[table] || 0) + 1;
-      const chain = createChainableMock();
-      if (table === 'team_lineups') {
-        chain.maybeSingle.mockResolvedValue({
-          data: { starters: ['101'], bench: ['102'], ir: [] },
-          error: null,
-        });
-      }
-      if (table === 'roster_assignments') {
-        // Return the mock data at the end of the chain
-        chain.eq.mockResolvedValue({
-          data: [{ player_id: '101' }, { player_id: '102' }],
-          error: null,
-        });
-      }
-      if (table === 'player_directory') {
-        chain.in.mockResolvedValue({
-          data: [
-            { player_id: 101, position_code: 'C' },
-            { player_id: 102, position_code: 'LW' },
-          ],
-          error: null,
-        });
-      }
-      if (table === 'player_weekly_stats') {
-        chain.in.mockResolvedValue({ data: [], error: null });
-      }
-      return chain;
+    (bestballApi.getWeeklyData as any).mockResolvedValue({
+      data: {
+        lineup: { starters: ['101'], bench: ['102'], ir: [] },
+        playerIds: ['101', '102'],
+        players: [
+          { player_id: 101, position_code: 'C', eligible_positions: null },
+          { player_id: 102, position_code: 'LW', eligible_positions: null },
+        ],
+        weeklyStats: [],
+      },
     });
 
     const result = await BestBallService.calculateWeeklyBestBall('league-1', 'team-1', 5);
@@ -304,11 +287,7 @@ describe('BestBallService.calculateWeeklyBestBall', () => {
   });
 
   it('handles errors gracefully and returns empty result', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
-      throw new Error('Database connection lost');
-    });
+    (bestballApi.getWeeklyData as any).mockRejectedValue(new Error('Database connection lost'));
 
     const result = await BestBallService.calculateWeeklyBestBall('league-1', 'team-1', 5);
 
@@ -323,36 +302,25 @@ describe('BestBallService.calculateWeeklyBestBall', () => {
 // =============================================================================
 
 describe('BestBallService.triggerServerOptimization', () => {
-  it('calls the optimize_best_ball_daily_rosters RPC', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.rpc as ReturnType<typeof vi.fn>).mockResolvedValue({
+  it('calls the triggerOptimization API', async () => {
+    (bestballApi.triggerOptimization as any).mockResolvedValue({
       data: [
         { team_id: 'team-1', players_optimized: 14, total_points: 45.5 },
         { team_id: 'team-2', players_optimized: 14, total_points: 38.2 },
       ],
-      error: null,
     });
 
     const result = await BestBallService.triggerServerOptimization('league-1', '2026-01-15');
 
-    expect(supabase.rpc).toHaveBeenCalledWith('optimize_best_ball_daily_rosters', {
-      p_league_id: 'league-1',
-      p_roster_date: '2026-01-15',
-    });
+    expect(bestballApi.triggerOptimization).toHaveBeenCalledWith('league-1', '2026-01-15');
     expect(result.results).toHaveLength(2);
     expect(result.results[0].teamId).toBe('team-1');
     expect(result.results[0].totalPoints).toBe(45.5);
     expect(result.error).toBeUndefined();
   });
 
-  it('returns error when RPC fails', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.rpc as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: null,
-      error: new Error('Function not found'),
-    });
+  it('returns error when API call fails', async () => {
+    (bestballApi.triggerOptimization as any).mockRejectedValue(new Error('Function not found'));
 
     const result = await BestBallService.triggerServerOptimization('league-1', '2026-01-15');
 

@@ -1,22 +1,23 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { supabase } from '@/integrations/supabase/client';
 import { PlayerService, Player } from '@/services/PlayerService';
-import { LeagueService } from '@/services/LeagueService';
 import { WaiverService, WaiverPriority } from '@/services/WaiverService';
 import { Loader2, Calendar, RefreshCw, TrendingUp, AlertCircle, Clock, Shield, Zap, ArrowRight, Users, Trophy } from 'lucide-react';
 import { usePlayerNews, PlayerNewsItem } from '@/hooks/usePlayerNews';
-import { calculateWeekDates, getGamesPerDay, getRosterGamesPerDay, calculateScheduleMaximizers, PlayerWithSchedule } from '@/utils/scheduleMaximizer';
+import { calculateWeekDates, fetchGamesForTeams, calculatePlayerSchedule, getGamesPerDay, getRosterGamesPerDay, calculateScheduleMaximizers, PlayerWithSchedule } from '@/utils/scheduleMaximizer';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { getPlayerWithSeasonStats } from '@/utils/playerStatsHelper';
 import { getWeeklyProjections, getLeagueAverageProjections } from '@/utils/projectionHelper';
+import { leagueApi } from '@/api/leagues';
+import { rosterApi } from '@/api/rosters';
+import { waiverApi } from '@/api/waivers';
 import { logger } from '@/utils/logger';
 
 interface PositionDepth {
@@ -139,6 +140,12 @@ export const TeamIntelHub = () => {
   // League averages for comparison
   const [leagueAverages, setLeagueAverages] = useState<Map<string, number>>(new Map());
 
+  // Track if we've already loaded data for this league to prevent duplicate calls
+  const loadedLeagueRef = useRef<string | null>(null);
+
+  // Derive draft status as a stable primitive to avoid re-renders from activeLeague object changes
+  const draftCompleted = activeLeague?.draft_status === 'completed';
+
   // Load roster data
   useEffect(() => {
     if (!user || !activeLeagueId || userLeagueState !== 'active-user') {
@@ -146,19 +153,21 @@ export const TeamIntelHub = () => {
       return;
     }
 
+    // Skip if we already loaded for this league+user combo
+    const loadKey = `${activeLeagueId}:${user.id}:${draftCompleted}`;
+    if (loadedLeagueRef.current === loadKey) {
+      return;
+    }
+    loadedLeagueRef.current = loadKey;
+
     const loadRosterData = async () => {
       try {
         setLoading(true);
 
-        // Get user's team
-        const { data: userTeam, error: teamError } = await supabase
-          .from('teams')
-          .select('id, league_id')
-          .eq('league_id', activeLeagueId)
-          .eq('owner_id', user.id)
-          .maybeSingle();
+        // Get user's team via API client
+        const { data: userTeam } = await leagueApi.getMyTeam(activeLeagueId);
 
-        if (teamError || !userTeam) {
+        if (!userTeam) {
           setLoading(false);
           return;
         }
@@ -166,7 +175,7 @@ export const TeamIntelHub = () => {
         setMyTeamId(userTeam.id);
 
         // Check if draft is completed
-        if (!activeLeague || activeLeague.draft_status !== 'completed') {
+        if (!draftCompleted) {
           setLoading(false);
           return;
         }
@@ -174,19 +183,13 @@ export const TeamIntelHub = () => {
         // Get all players
         const allPlayers = await PlayerService.getAllPlayers();
 
-        // Use roster_assignments (source of truth) instead of draft_picks
-        const { data: rosterAssignments, error: rosterError } = await supabase
-          .from('roster_assignments')
-          .select('player_id')
-          .eq('league_id', activeLeagueId)
-          .eq('team_id', userTeam.id);
+        // Use roster API to get player IDs (source of truth)
+        const { data: rosterPlayerIdList } = await rosterApi.getPlayerIds(activeLeagueId, userTeam.id);
 
         let players: Player[] = [];
 
-        if (rosterError) {
-          logger.error('Error fetching roster assignments:', rosterError);
-        } else if (rosterAssignments && rosterAssignments.length > 0) {
-          const playerIds = rosterAssignments.map((r: { player_id: string }) => String(r.player_id));
+        if (rosterPlayerIdList && rosterPlayerIdList.length > 0) {
+          const playerIds = rosterPlayerIdList.map((id: string | number) => String(id));
           players = allPlayers.filter(p => playerIds.includes(String(p.id)));
         }
 
@@ -250,32 +253,36 @@ export const TeamIntelHub = () => {
 
         setDepths(positionDepths);
 
-        // Load waiver priority
-        const priority = await WaiverService.getWaiverPriority(activeLeagueId);
-        setWaiverPriority(priority);
-        const myPrio = priority.find(p => p.team_id === userTeam.id);
-        
-        // Validate priority (fix bug where priority > team count)
-        if (myPrio && myPrio.priority > 0 && myPrio.priority <= priority.length) {
-          setMyPriority(myPrio.priority);
-        } else {
-          logger.warn('Invalid waiver priority:', myPrio?.priority, 'of', priority.length);
-          setMyPriority(null);
-        }
+        // Load waiver data (non-fatal — don't let waiver errors block the page)
+        try {
+          const priority = await WaiverService.getWaiverPriority(activeLeagueId);
+          setWaiverPriority(priority);
+          const myPrio = priority.find(p => p.team_id === userTeam.id);
 
-        // Get last successful claim date
-        const { data: lastClaim } = await supabase
-          .from('waiver_claims')
-          .select('processed_at')
-          .eq('league_id', activeLeagueId)
-          .eq('team_id', userTeam.id)
-          .eq('status', 'successful')
-          .order('processed_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          // Validate priority (fix bug where priority > team count)
+          if (myPrio && myPrio.priority > 0 && myPrio.priority <= priority.length) {
+            setMyPriority(myPrio.priority);
+          } else {
+            if (myPrio) {
+              logger.warn('Invalid waiver priority:', myPrio.priority, 'of', priority.length);
+            }
+            setMyPriority(null);
+          }
 
-        if (lastClaim?.processed_at) {
-          setLastClaimDate(lastClaim.processed_at);
+          // Get last successful claim date via API
+          const { data: teamWaivers } = await waiverApi.getTeamWaivers(activeLeagueId, userTeam.id);
+          if (teamWaivers && Array.isArray(teamWaivers)) {
+            const lastSuccessful = teamWaivers
+              .filter((w: { status: string }) => w.status === 'successful')
+              .sort((a: { processed_at: string }, b: { processed_at: string }) =>
+                (b.processed_at || '').localeCompare(a.processed_at || ''))
+              [0];
+            if (lastSuccessful?.processed_at) {
+              setLastClaimDate(lastSuccessful.processed_at);
+            }
+          }
+        } catch (waiverError) {
+          logger.warn('Failed to load waiver data (non-fatal):', waiverError);
         }
 
         // Note: Next Man Up suggestions will be loaded when news items are available
@@ -288,7 +295,8 @@ export const TeamIntelHub = () => {
     };
 
     loadRosterData();
-  }, [user, activeLeagueId, userLeagueState, activeLeague]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- use draftCompleted primitive instead of activeLeague object to prevent re-triggers
+  }, [user?.id, activeLeagueId, userLeagueState, draftCompleted]);
 
   // Format day label
   const formatDayLabel = (date: Date): string => {
@@ -489,22 +497,31 @@ export const TeamIntelHub = () => {
           })
           .filter((p): p is Player => p !== null);
 
-        // For each injured player, find best replacement by position
+        // Batch: fetch schedule data ONCE for all available players, then filter per position
+        const { weekStart: nmuWeekStart, weekEnd: nmuWeekEnd } = await calculateWeekDates(activeLeagueId, user.id);
+        const uniqueTeams = [...new Set(players.map(p => p.team))];
+        const teamGamesMap = await fetchGamesForTeams(uniqueTeams, nmuWeekStart, nmuWeekEnd);
+
+        // For each injured player, find best replacement by position using the shared schedule data
         const nextManUp = new Map<number, PlayerWithSchedule | null>();
-        
+
         for (const item of injuredItems) {
           const position = item.position;
           const samePositionPlayers = players.filter(p => normalizePosition(p.position) === normalizePosition(position));
-          
+
           if (samePositionPlayers.length > 0) {
-            // Calculate schedule maximizers for same position players
-            const maximizers = await calculateScheduleMaximizers(
-              samePositionPlayers,
-              activeLeagueId,
-              user.id,
-              10 // Top 10
-            );
-            
+            // Calculate schedule for each candidate using the pre-fetched team games
+            const maximizers: PlayerWithSchedule[] = samePositionPlayers
+              .map(player => ({
+                ...player,
+                ...calculatePlayerSchedule(player, teamGamesMap),
+              }))
+              .sort((a, b) => {
+                if (b.gamesThisWeek !== a.gamesThisWeek) return b.gamesThisWeek - a.gamesThisWeek;
+                return (b.points || 0) - (a.points || 0);
+              })
+              .slice(0, 10);
+
             if (maximizers.length > 0) {
               nextManUp.set(item.player_id, maximizers[0]);
             }
@@ -518,7 +535,7 @@ export const TeamIntelHub = () => {
     };
 
     loadNextManUp();
-  }, [newsItems, activeLeagueId, user]);
+  }, [newsItems, activeLeagueId, user?.id]);
 
   if (loading) {
     return (

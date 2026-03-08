@@ -5,7 +5,29 @@
 import { apiClient } from './client';
 
 export const draftApi = {
-  /** Get draft state for a league */
+  /** Get active draft session for a league */
+  getActiveSession(leagueId: string) {
+    return apiClient.get<{ sessionId: string }>(`/api/draft/league/${leagueId}/session`);
+  },
+
+  /** Get draft picks for a league */
+  getDraftPicks(leagueId: string, sessionId?: string) {
+    const qs = sessionId ? `?sessionId=${sessionId}` : '';
+    return apiClient.get(`/api/draft/league/${leagueId}/picks${qs}`);
+  },
+
+  /** Get draft order for a specific round */
+  getDraftOrder(leagueId: string, roundNumber: number, sessionId?: string) {
+    const qs = sessionId ? `?sessionId=${sessionId}` : '';
+    return apiClient.get(`/api/draft/league/${leagueId}/order/${roundNumber}${qs}`);
+  },
+
+  /** Hard delete all draft data for a league (commissioner only) */
+  hardDeleteDraft(leagueId: string) {
+    return apiClient.delete(`/api/draft/league/${leagueId}`);
+  },
+
+  /** Get full draft state (league, picks, order) */
   getDraftState(leagueId: string) {
     return apiClient.get(`/api/draft/league/${leagueId}`);
   },
@@ -87,5 +109,10 @@ export const draftApi = {
     rankings: unknown;
   }) {
     return apiClient.post(`/api/draft/league/${leagueId}/rankings`, params);
+  },
+
+  /** Delete ALL draft data across all leagues (admin only) */
+  deleteAllDraftData() {
+    return apiClient.delete('/api/draft/all');
   },
 };

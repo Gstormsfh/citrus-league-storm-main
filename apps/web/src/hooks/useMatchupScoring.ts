@@ -10,7 +10,7 @@
  */
 
 import { useState, useEffect, useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { matchupApi } from '@/api/matchups';
 import { DataCacheService, TTL } from '@/services/DataCacheService';
 import { getTodayMSTDate } from '@/utils/timezoneUtils';
 import { logger } from '@/utils/logger';
@@ -105,33 +105,33 @@ export function useMatchupScoring({
         ? currentMatchup.team2_id
         : currentMatchup.team1_id;
 
-      // Single batched query for all past days
-      const { data: allRosters, error } = await supabase
-        .from('fantasy_daily_rosters')
-        .select('player_id, roster_date, team_id')
-        .eq('matchup_id', currentMatchup.id)
-        .in('team_id', oppTeamId ? [userTeamId, oppTeamId] : [userTeamId])
-        .in('roster_date', pastDates)
-        .eq('slot_type', 'active');
-
-      if (error) {
-        logger.error('[useMatchupScoring] Error fetching rosters:', error);
+      // Fetch frozen rosters via API (batch query for all past days)
+      let allRosters: Array<{ player_id: string; roster_date: string; team_id: string; slot_type: string }> = [];
+      try {
+        const response = await matchupApi.getFrozenRosterBatch(currentMatchup.id, pastDates);
+        allRosters = (response.data as typeof allRosters) || [];
+      } catch (err) {
+        logger.error('[useMatchupScoring] Error fetching rosters:', err);
         setIsLoading(false);
         return;
       }
 
-      // Group rosters by date and team
+      // Group rosters by date and team (only active slots)
       const rostersByDateTeam = new Map<string, Map<string, number[]>>();
-      allRosters?.forEach(r => {
-        if (!rostersByDateTeam.has(r.roster_date)) {
-          rostersByDateTeam.set(r.roster_date, new Map());
-        }
-        const dateMap = rostersByDateTeam.get(r.roster_date)!;
-        if (!dateMap.has(r.team_id)) {
-          dateMap.set(r.team_id, []);
-        }
-        dateMap.get(r.team_id)!.push(parseInt(r.player_id));
-      });
+      allRosters
+        .filter(r => r.slot_type === 'active')
+        .forEach(r => {
+          // Filter to only our teams
+          if (r.team_id !== userTeamId && r.team_id !== oppTeamId) return;
+          if (!rostersByDateTeam.has(r.roster_date)) {
+            rostersByDateTeam.set(r.roster_date, new Map());
+          }
+          const dateMap = rostersByDateTeam.get(r.roster_date)!;
+          if (!dateMap.has(r.team_id)) {
+            dateMap.set(r.team_id, []);
+          }
+          dateMap.get(r.team_id)!.push(parseInt(r.player_id));
+        });
 
       // Calculate scores
       const scores = new Map<string, DailyScore>();

@@ -1,7 +1,6 @@
-import { supabase } from '@/integrations/supabase/client';
-import type { PostgrestError } from '@supabase/supabase-js';
+// NOTE: Direct Supabase usage removed — all DB queries now go through matchupApi (3-tier architecture)
 import { League, Team, LeagueService } from './LeagueService';
-import { DraftService } from './DraftService';
+
 import { PlayerService, Player } from './PlayerService';
 import { DEMO_LEAGUE_ID_FOR_GUESTS } from './DemoLeagueService';
 import { MatchupPlayer, StatBreakdown } from '@/components/matchup/types';
@@ -10,10 +9,11 @@ import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { ScheduleService, NHLGame, GameInfo } from './ScheduleService';
 import { withTimeout } from '@/utils/promiseUtils';
 import { getTodayMST, getTodayMSTDate, formatDateToString, isDateInRange } from '@/utils/timezoneUtils';
-import { COLUMNS } from '@/utils/queryColumns';
+
 import { ScoringCalculator, DEFAULT_SCORING, extractScoringSettings } from '@/utils/scoringUtils';
 import { DEFAULT_TEST_DATE } from '@/utils/seasonConstants';
 import { logger } from '@/utils/logger';
+import { matchupApi } from '@/api/matchups';
 
 // Shared stat shape used by calculateMatchupWeekPoints and matchup stats
 interface MatchupWeekStats {
@@ -160,14 +160,9 @@ export const MatchupService = {
   /**
    * Delete all matchups for a league (useful for regeneration)
    */
-  async deleteAllMatchupsForLeague(leagueId: string): Promise<{ error: PostgrestError | Error | null }> {
+  async deleteAllMatchupsForLeague(leagueId: string): Promise<{ error: Error | null }> {
     try {
-      const { error } = await supabase
-        .from('matchups')
-        .delete()
-        .eq('league_id', leagueId);
-
-      if (error) throw error;
+      await matchupApi.deleteAllMatchups(leagueId);
       return { error: null };
     } catch (error: unknown) {
       logger.error('[MatchupService] Error deleting matchups:', error);
@@ -274,225 +269,46 @@ export const MatchupService = {
     teams: Team[],
     firstWeekStart: Date,
     forceRegenerate: boolean = false
-  ): Promise<{ error: PostgrestError | Error | null }> {
+  ): Promise<{ error: Error | null }> {
     try {
-      // Get available weeks
-      const availableWeeks = getAvailableWeeks(firstWeekStart);
-
       if (teams.length < 2) {
         return { error: new Error('Need at least 2 teams to generate matchups') };
       }
 
-      const numTeams = teams.length;
-      const numRounds = numTeams % 2 === 0 ? numTeams - 1 : numTeams;
-      
-      // Verify we have at least 2 teams
-      if (numTeams < 2) {
-        logger.error(`[MatchupService] Cannot generate matchups: Need at least 2 teams, got ${numTeams}`);
-        return { error: new Error(`Need at least 2 teams to generate matchups, got ${numTeams}`) };
-      }
-      
-      // CRITICAL: Verify all teams have valid IDs
-      const teamsWithInvalidIds = teams.filter(t => !t.id || t.id === null || t.id === undefined);
+      // Validate teams
+      const teamsWithInvalidIds = teams.filter(t => !t.id);
       if (teamsWithInvalidIds.length > 0) {
-        logger.error(`[MatchupService] CRITICAL: Found ${teamsWithInvalidIds.length} teams with invalid IDs:`, teamsWithInvalidIds);
         return { error: new Error(`Cannot generate matchups: ${teamsWithInvalidIds.length} teams have invalid IDs`) };
       }
-      
-      // Get all unique team IDs to verify no duplicates
+
       const teamIds = teams.map(t => t.id);
       const uniqueTeamIds = new Set(teamIds);
       if (teamIds.length !== uniqueTeamIds.size) {
-        logger.error(`[MatchupService] CRITICAL: Duplicate team IDs found! Total: ${teamIds.length}, Unique: ${uniqueTeamIds.size}`);
-        const duplicates = teamIds.filter((id, index) => teamIds.indexOf(id) !== index);
-        logger.error(`[MatchupService] Duplicate IDs:`, duplicates);
-        return { error: new Error(`Cannot generate matchups: Duplicate team IDs found`) };
+        return { error: new Error('Cannot generate matchups: Duplicate team IDs found') };
       }
-      
-      // Shuffle teams once for randomness (deterministic after that)
-      const shuffledTeams = [...teams].sort(() => Math.random() - 0.5);
-      
-      // Check existing matchups - simple check: does each week have matchups?
-      const { data: existingMatchups } = await supabase
-        .from('matchups')
-        .select('week_number')
-        .eq('league_id', leagueId);
-      
-      const weeksWithMatchups = new Set(existingMatchups?.map(m => m.week_number) || []);
-      
-      // Determine which weeks need matchups
-      let weeksNeedingMatchups: number[] = [];
-      
-      if (forceRegenerate || weeksWithMatchups.size === 0) {
-        // Full regeneration: delete all, generate all weeks
-        await this.deleteAllMatchupsForLeague(leagueId);
-        weeksNeedingMatchups = availableWeeks;
-      } else {
-        // Generate only missing weeks
-        weeksNeedingMatchups = availableWeeks.filter(w => !weeksWithMatchups.has(w));
-        
-        // CRITICAL: If a week has matchups but is incomplete (not all teams have matchups),
-        // we need to regenerate it. For now, if ANY week is missing, regenerate ALL weeks
-        // to ensure consistency. This is safer than trying to patch individual weeks.
-        if (weeksNeedingMatchups.length > 0) {
-          await this.deleteAllMatchupsForLeague(leagueId);
-          weeksNeedingMatchups = availableWeeks;
-        }
-      }
-      
-      if (weeksNeedingMatchups.length === 0) {
-        return { error: null };
-      }
-      
-      let matchupsCreated = 0;
-      let matchupsSkipped = 0;
-      let matchupsErrors = 0;
-      
-      // Generate matchups for each week using simple round-robin
-      for (const weekNumber of weeksNeedingMatchups) {
+
+      // Build fantasy weeks from available weeks
+      const availableWeeks = getAvailableWeeks(firstWeekStart);
+      const formatLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+      const fantasyWeeks = availableWeeks.map(weekNumber => {
         const weekStart = getWeekStartDate(weekNumber, firstWeekStart);
         const weekEnd = getWeekEndDate(weekNumber, firstWeekStart);
-        
-        // Use the helper function to get round-robin pairings
-        // For weeks beyond numRounds, it automatically repeats the cycle
-        const teamPairs = this.getRoundRobinPairings(weekNumber, shuffledTeams, numRounds);
-        
-        // Verify all teams are included in pairs
-        const teamsInPairs = new Set<string>();
-        teamPairs.forEach(p => {
-          if (p.team1) teamsInPairs.add(p.team1.id);
-          if (p.team2) teamsInPairs.add(p.team2.id);
-        });
-        
-        const allTeamIds = new Set(shuffledTeams.map(t => t.id));
-        const missingFromPairs = Array.from(allTeamIds).filter(id => !teamsInPairs.has(id));
-        
-        if (missingFromPairs.length > 0) {
-          logger.error(`[MatchupService] Week ${weekNumber} - CRITICAL: Teams missing from pairs:`, missingFromPairs);
-          logger.error(`[MatchupService] Week ${weekNumber} - Teams in pairs:`, Array.from(teamsInPairs));
-          logger.error(`[MatchupService] Week ${weekNumber} - All team IDs:`, Array.from(allTeamIds));
-          logger.error(`[MatchupService] Week ${weekNumber} - This indicates a bug in the round-robin algorithm!`);
-          logger.error(`[MatchupService] ABORTING matchup generation to prevent incomplete data`);
-          return { error: new Error(`Round-robin algorithm failed: ${missingFromPairs.length} teams missing from week ${weekNumber} pairs. Teams: ${missingFromPairs.join(', ')}`) };
-        }
-        
-        // Insert matchups for this week
-        for (const pair of teamPairs) {
-          // Skip bye weeks (team2 is null) for even number of teams
-          if (!pair.team2 && numTeams % 2 === 0) {
-            continue;
-          }
-          
-          // Check if matchup already exists (check both directions to avoid duplicates)
-          const { data: existing1 } = await supabase
-            .from('matchups')
-            .select('id')
-            .eq('league_id', leagueId)
-            .eq('week_number', weekNumber)
-            .eq('team1_id', pair.team1.id)
-            .eq('team2_id', pair.team2?.id || null)
-            .maybeSingle();
-          
-          const { data: existing2 } = pair.team2 ? await supabase
-            .from('matchups')
-            .select('id')
-            .eq('league_id', leagueId)
-            .eq('week_number', weekNumber)
-            .eq('team1_id', pair.team2.id)
-            .eq('team2_id', pair.team1.id)
-            .maybeSingle() : { data: null };
-          
-          const existing = existing1 || existing2;
+        return {
+          week_number: weekNumber,
+          start_date: formatLocal(weekStart),
+          end_date: formatLocal(weekEnd),
+        };
+      });
 
-          if (existing) {
-            matchupsSkipped++;
-            continue;
-          }
+      // Delegate to server API for generation
+      await matchupApi.generateMatchups(
+        leagueId,
+        teams.map(t => ({ id: t.id })),
+        fantasyWeeks,
+        forceRegenerate,
+      );
 
-          // Use local timezone formatting to avoid UTC shift from toISOString()
-          const formatLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-          const insertData = {
-            league_id: leagueId,
-            week_number: weekNumber,
-            team1_id: pair.team1.id,
-            team2_id: pair.team2?.id || null,
-            week_start_date: formatLocal(weekStart),
-            week_end_date: formatLocal(weekEnd),
-            status: 'scheduled'
-          };
-          
-          const { data: inserted, error } = await supabase
-            .from('matchups')
-            .insert(insertData)
-            .select()
-            .single();
-
-          if (error) {
-            logger.error(`[MatchupService] Week ${weekNumber} - Error creating matchup:`, error);
-            logger.error(`[MatchupService] Failed matchup data:`, insertData);
-            matchupsErrors++;
-          } else {
-            matchupsCreated++;
-          }
-        }
-      }
-
-      // Small delay to ensure all database commits are complete
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Verify matchups were created by checking the database
-      if (weeksNeedingMatchups.length > 0) {
-        const { data: verifyMatchups, error: verifyError } = await supabase
-          .from('matchups')
-          .select('week_number, team1_id, team2_id')
-          .eq('league_id', leagueId)
-          .in('week_number', weeksNeedingMatchups);
-        
-        if (verifyError) {
-          logger.error(`[MatchupService] Verification query error:`, verifyError);
-        } else {
-          if (verifyMatchups && verifyMatchups.length > 0) {
-            // Check if all teams are represented in each week
-            const allTeamIds = new Set(teams.map(t => t.id));
-            let hasIncompleteWeeks = false;
-            
-            for (const weekNum of weeksNeedingMatchups) {
-              const weekMatchups = verifyMatchups.filter(m => m.week_number === weekNum);
-              const teamsInWeek = new Set<string>();
-              weekMatchups.forEach(m => {
-                if (m.team1_id) teamsInWeek.add(m.team1_id);
-                if (m.team2_id) teamsInWeek.add(m.team2_id);
-              });
-              
-              const missingTeams = Array.from(allTeamIds).filter(id => !teamsInWeek.has(id));
-              if (missingTeams.length > 0) {
-                logger.error(`[MatchupService] Week ${weekNum} - CRITICAL: Missing teams:`, missingTeams);
-                hasIncompleteWeeks = true;
-              }
-            }
-            
-            // If any week is incomplete, delete and regenerate ALL weeks
-            if (hasIncompleteWeeks) {
-              logger.error(`[MatchupService] CRITICAL: Some weeks have incomplete matchups. Deleting all and regenerating...`);
-              await this.deleteAllMatchupsForLeague(leagueId);
-              
-              // Regenerate all weeks
-              await new Promise(resolve => setTimeout(resolve, 500));
-              
-              // Recursively call this function to regenerate
-              return this.generateMatchupsForLeague(leagueId, teams, firstWeekStart, true);
-            }
-          } else {
-            logger.error(`[MatchupService] Verification FAILED: No matchups found in database after generation!`);
-            return { error: new Error('Matchup generation completed but no matchups found in database') };
-          }
-        }
-      }
-      
-      if (matchupsErrors > 0) {
-        return { error: new Error(`Failed to create ${matchupsErrors} matchups. Check logs for details.`) };
-      }
-      
       return { error: null };
     } catch (error: unknown) {
       logger.error('[MatchupService] Error generating matchups:', error);
@@ -506,17 +322,11 @@ export const MatchupService = {
   async getMatchup(
     leagueId: string,
     weekNumber: number
-  ): Promise<{ matchup: Matchup | null; error: PostgrestError | Error | null }> {
+  ): Promise<{ matchup: Matchup | null; error: Error | null }> {
     try {
-      const { data, error } = await supabase
-        .from('matchups')
-        .select(COLUMNS.MATCHUP)
-        .eq('league_id', leagueId)
-        .eq('week_number', weekNumber)
-        .maybeSingle();
-
-      if (error) throw error;
-      return { matchup: data || null, error: null };
+      const response = await matchupApi.getLeagueMatchups(leagueId, weekNumber);
+      const matchups = (response.data as Matchup[]) || [];
+      return { matchup: matchups[0] || null, error: null };
     } catch (error: unknown) {
       return { matchup: null, error: error instanceof Error ? error : new Error(String(error)) };
     }
@@ -529,72 +339,11 @@ export const MatchupService = {
     leagueId: string,
     userId: string,
     weekNumber: number
-  ): Promise<{ matchup: Matchup | null; error: PostgrestError | Error | null }> {
+  ): Promise<{ matchup: Matchup | null; error: Error | null }> {
     try {
-      // First, get user's team
-      let userTeam: { id: string } | null = null;
-      let teamError: PostgrestError | Error | null = null;
-      try {
-        const result = await withTimeout(
-          supabase.from('teams').select('id').eq('league_id', leagueId).eq('owner_id', userId).maybeSingle(),
-          5000,
-          'getUserTeam timeout in getUserMatchup'
-        );
-        userTeam = result.data;
-        teamError = result.error;
-      } catch (timeoutError: unknown) {
-        logger.error('[MatchupService.getUserMatchup] User team query timeout:', timeoutError);
-        teamError = timeoutError instanceof Error ? timeoutError : new Error(String(timeoutError));
-      }
-
-      if (teamError) throw teamError;
-      if (!userTeam) {
-        logger.warn('[MatchupService.getUserMatchup] User team not found');
-        return { matchup: null, error: null };
-      }
-
-      // Find matchup where user's team is team1 or team2
-      // Use .limit(1) instead of .maybeSingle() to handle potential duplicates gracefully
-      // Ensure week_number is treated as a number in the query
-      const query = supabase
-        .from('matchups')
-        .select(COLUMNS.MATCHUP)
-        .eq('league_id', leagueId)
-        .eq('week_number', weekNumber)
-        .or(`team1_id.eq.${userTeam.id},team2_id.eq.${userTeam.id}`)
-        .limit(1);
-
-      let matchups: Record<string, unknown>[] | null = null;
-      let error: PostgrestError | Error | null = null;
-      try {
-        const result = await withTimeout(query, 5000, 'getUserMatchup query timeout');
-        matchups = result.data;
-        error = result.error;
-      } catch (timeoutError: unknown) {
-        logger.error('[MatchupService.getUserMatchup] Matchup query timeout:', timeoutError);
-        error = timeoutError instanceof Error ? timeoutError : new Error(String(timeoutError));
-      }
-
-      if (error) {
-        logger.error('[MatchupService.getUserMatchup] Database query error:', error);
-        throw error;
-      }
-
-      // Additional verification: Check if week_number matches what we queried for
-      if (matchups && matchups.length > 0) {
-        const firstMatchup = matchups[0] as Record<string, unknown>;
-        if (firstMatchup.week_number !== weekNumber) {
-          logger.error('[MatchupService.getUserMatchup] WARNING: Week number mismatch!', {
-            requested: weekNumber,
-            received: firstMatchup.week_number,
-            matchup_id: firstMatchup.id
-          });
-        }
-      }
-
-      const data = matchups && matchups.length > 0 ? matchups[0] : null;
-
-      return { matchup: (data as Matchup) || null, error: null };
+      // Use API server which handles team lookup + matchup query in one round-trip
+      const response = await matchupApi.getUserMatchup(leagueId, weekNumber);
+      return { matchup: (response.data as Matchup) || null, error: null };
     } catch (error: unknown) {
       return { matchup: null, error: error instanceof Error ? error : new Error(String(error)) };
     }
@@ -608,24 +357,23 @@ export const MatchupService = {
     matchupId: string,
     userId: string,
     timezone: string = 'America/Denver'
-  ): Promise<{ data: MatchupDataResponse | null; error: PostgrestError | Error | null }> {
+  ): Promise<{ data: MatchupDataResponse | null; error: Error | null }> {
     try {
-      // Get the matchup
-      const { data: matchup, error: matchupError } = await supabase
-        .from('matchups')
-        .select(COLUMNS.MATCHUP)
-        .eq('id', matchupId)
-        .single();
-
-      if (matchupError) throw matchupError;
-      if (!matchup) {
+      // Get the matchup via API
+      const matchupResponse = await matchupApi.getMatchup(matchupId);
+      const matchupRaw = matchupResponse.data;
+      if (!matchupRaw) {
         return { data: null, error: new Error('Matchup not found') };
       }
+      // Extract matchup (API returns { ...matchup, lines })
+      const matchup = matchupRaw as Matchup;
 
-      // Get league (with membership validation)
-      const { league, error: leagueError } = await LeagueService.getLeague(matchup.league_id, userId);
-      if (leagueError || !league) {
-        return { data: null, error: leagueError || new Error('League not found') };
+      // Get league via API
+      const { leagueApi } = await import('@/api/leagues');
+      const leagueResponse = await leagueApi.getLeague(matchup.league_id);
+      const league = leagueResponse.data as Record<string, unknown> | null;
+      if (!league) {
+        return { data: null, error: new Error('League not found') };
       }
 
       // Get first week start date
@@ -678,9 +426,9 @@ export const MatchupService = {
         : [];
 
       // Get matchup rosters using existing function
-      // Pass targetDate to load frozen roster for past dates (if provided)
-      const { team1Roster, team2Roster, team1SlotAssignments, team2SlotAssignments, error: rostersError } = 
-        await this.getMatchupRosters(matchup, allPlayers, timezone, userId, targetDate || undefined);
+      // getMatchupDataById always loads current rosters (no targetDate parameter)
+      const { team1Roster, team2Roster, team1SlotAssignments, team2SlotAssignments, error: rostersError } =
+        await this.getMatchupRosters(matchup, allPlayers, timezone, userId);
 
       if (rostersError) {
         return { data: null, error: rostersError };
@@ -707,51 +455,27 @@ export const MatchupService = {
       let opponentDailyPoints: number[] = [];
 
       try {
-        const { data: viewingDailyScores, error: viewingError } = await supabase.rpc(
-          'calculate_daily_matchup_scores',
-          {
-            p_matchup_id: matchup.id,
-            p_team_id: viewingTeam.id,
-            p_week_start: weekStartStr,
-            p_week_end: weekEndStr
+        const response = await matchupApi.getDailyScores(matchup.id);
+        const dailyScoresData = response.data;
+        if (dailyScoresData && Array.isArray(dailyScoresData)) {
+          // The RPC returns entries per team — split by team_id
+          const parseDailyScores = (teamId: string) => {
+            const teamEntries = (dailyScoresData as Array<{ team_id: string; roster_date: string; daily_score: string | number }>)
+              .filter((d) => d.team_id === teamId)
+              .sort((a, b) => new Date(a.roster_date + 'T00:00:00').getTime() - new Date(b.roster_date + 'T00:00:00').getTime());
+            return teamEntries.length > 0 ? teamEntries.map(d => parseFloat(String(d.daily_score)) || 0) : Array(7).fill(0);
+          };
+          viewingDailyPoints = parseDailyScores(viewingTeam.id);
+          if (opponentTeamObj) {
+            opponentDailyPoints = parseDailyScores(opponentTeamObj.id);
           }
-        );
-
-        if (!viewingError && viewingDailyScores) {
-          const sorted = (viewingDailyScores as Array<{ roster_date: string; daily_score: string | number }>).sort((a, b) =>
-            new Date(a.roster_date + 'T00:00:00').getTime() - new Date(b.roster_date + 'T00:00:00').getTime()
-          );
-          viewingDailyPoints = sorted.map(d => parseFloat(String(d.daily_score)) || 0);
         } else {
           viewingDailyPoints = Array(7).fill(0);
+          opponentDailyPoints = Array(7).fill(0);
         }
       } catch (error: unknown) {
         viewingDailyPoints = Array(7).fill(0);
-      }
-
-      if (opponentTeamObj) {
-        try {
-          const { data: oppDailyScores, error: oppError } = await supabase.rpc(
-            'calculate_daily_matchup_scores',
-            {
-              p_matchup_id: matchup.id,
-              p_team_id: opponentTeamObj.id,
-              p_week_start: weekStartStr,
-              p_week_end: weekEndStr
-            }
-          );
-
-          if (!oppError && oppDailyScores) {
-            const sorted = (oppDailyScores as Array<{ roster_date: string; daily_score: string | number }>).sort((a, b) =>
-              new Date(a.roster_date + 'T00:00:00').getTime() - new Date(b.roster_date + 'T00:00:00').getTime()
-            );
-            opponentDailyPoints = sorted.map(d => parseFloat(String(d.daily_score)) || 0);
-          } else {
-            opponentDailyPoints = Array(7).fill(0);
-          }
-        } catch (error: unknown) {
-          opponentDailyPoints = Array(7).fill(0);
-        }
+        opponentDailyPoints = Array(7).fill(0);
       }
 
       // Build response
@@ -814,25 +538,12 @@ export const MatchupService = {
     timezone: string = 'America/Denver',
     existingMatchup?: Matchup | null,
     targetDate?: string // Optional: if provided and is past date, load frozen roster for that date
-  ): Promise<{ data: MatchupDataResponse | null; error: PostgrestError | Error | null }> {
+  ): Promise<{ data: MatchupDataResponse | null; error: Error | null }> {
     try {
-      // Get league to determine first week start
-      let league: Record<string, unknown> | null = null;
-      let leagueError: PostgrestError | Error | null = null;
-      try {
-        const result = await withTimeout(
-          supabase.from('leagues').select(COLUMNS.LEAGUE).eq('id', leagueId).maybeSingle(),
-          5000,
-          'getLeague timeout in getMatchupData'
-        );
-        league = result.data;
-        leagueError = result.error;
-      } catch (timeoutError: unknown) {
-        logger.error('[MatchupService.getMatchupData] League query timeout:', timeoutError);
-        leagueError = timeoutError instanceof Error ? timeoutError : new Error(String(timeoutError));
-      }
-
-      if (leagueError) throw leagueError;
+      // Get league via API
+      const { leagueApi } = await import('@/api/leagues');
+      const leagueResponse = await leagueApi.getLeague(leagueId);
+      const league = leagueResponse.data as Record<string, unknown> | null;
       if (!league) {
         return { data: null, error: new Error('League not found') };
       }
@@ -843,23 +554,10 @@ export const MatchupService = {
       const scheduleLength = getScheduleLength(firstWeekStart);
       const isPlayoffWeek = weekNumber > scheduleLength;
 
-      // Get user's team
-      let userTeam: Record<string, unknown> | null = null;
-      let teamError: PostgrestError | Error | null = null;
-      try {
-        const result = await withTimeout(
-          supabase.from('teams').select(COLUMNS.TEAM).eq('league_id', leagueId).eq('owner_id', userId).maybeSingle(),
-          5000,
-          'getUserTeam timeout in getMatchupData'
-        );
-        userTeam = result.data;
-        teamError = result.error;
-      } catch (timeoutError: unknown) {
-        logger.error('[MatchupService.getMatchupData] User team query timeout:', timeoutError);
-        teamError = timeoutError instanceof Error ? timeoutError : new Error(String(timeoutError));
-      }
-
-      if (teamError) throw teamError;
+      // Get user's team via API
+      const { leagueApi: leagueApiForTeam } = await import('@/api/leagues');
+      const teamResponse = await leagueApiForTeam.getMyTeam(leagueId);
+      const userTeam = teamResponse.data as Record<string, unknown> | null;
       if (!userTeam) {
         return { data: null, error: new Error('User team not found') };
       }
@@ -925,12 +623,14 @@ export const MatchupService = {
             rosterPlayers = []; // Return empty array instead of loading all players
           } else {
             // Load only roster players (much faster than loading all players)
+            logger.debug('[getMatchupData] Loading players for IDs:', allRosterPlayerIds.length);
             rosterPlayers = await withTimeout(
               PlayerService.getPlayersByIds(allRosterPlayerIds.map(String)),
               10000,
               'getPlayersByIds timeout'
             );
-            
+            logger.debug('[getMatchupData] PlayerService returned:', rosterPlayers.length, 'players');
+
             // If optimized loading returned fewer players than expected, log warning but don't fallback
             if (rosterPlayers.length < allRosterPlayerIds.length * 0.8) {
               logger.warn('[MatchupService] Optimized loading returned fewer players than expected:', {
@@ -956,6 +656,12 @@ export const MatchupService = {
         team2SlotAssignments,
         error: rostersError
       } = await this.getMatchupRosters(matchup, rosterPlayers, timezone, userId, targetDate);
+
+      logger.debug('[getMatchupData] getMatchupRosters returned:', {
+        team1Roster: team1Roster.length,
+        team2Roster: team2Roster.length,
+        hasError: !!rostersError
+      });
 
       if (rostersError) {
         return { data: null, error: rostersError };
@@ -994,62 +700,28 @@ export const MatchupService = {
       const weekStartStr = matchup.week_start_date;
       const weekEndStr = matchup.week_end_date;
 
-      // Calculate daily scores for user team
+      // Calculate daily scores via API (single call for both teams)
       try {
-        const { data: userDailyScores, error: userError } = await supabase.rpc(
-          'calculate_daily_matchup_scores',
-          {
-            p_matchup_id: matchup.id,
-            p_team_id: userTeamData.id,
-            p_week_start: weekStartStr,
-            p_week_end: weekEndStr
+        const response = await matchupApi.getDailyScores(matchup.id);
+        const dailyScoresData = response.data;
+        if (dailyScoresData && Array.isArray(dailyScoresData)) {
+          const parseDailyScores = (teamId: string) => {
+            const teamEntries = (dailyScoresData as Array<{ team_id: string; roster_date: string; daily_score: string | number }>)
+              .filter((d) => d.team_id === teamId)
+              .sort((a, b) => new Date(a.roster_date + 'T00:00:00').getTime() - new Date(b.roster_date + 'T00:00:00').getTime());
+            return teamEntries.length > 0 ? teamEntries.map(d => parseFloat(String(d.daily_score)) || 0) : Array(7).fill(0);
+          };
+          userDailyPoints = parseDailyScores(userTeamData.id);
+          if (opponentTeamObj) {
+            opponentDailyPoints = parseDailyScores(opponentTeamObj.id);
           }
-        );
-
-        if (!userError && userDailyScores) {
-          // Sort by date and extract scores
-          const sorted = (userDailyScores as Array<{ roster_date: string; daily_score: string | number }>).sort((a, b) =>
-            new Date(a.roster_date + 'T00:00:00').getTime() - new Date(b.roster_date + 'T00:00:00').getTime()
-          );
-          userDailyPoints = sorted.map(d => parseFloat(String(d.daily_score)) || 0);
         } else {
-          logger.warn('[getMatchupData] Error calculating user daily scores:', userError);
-          // Fallback: use placeholder if calculation fails
           userDailyPoints = Array(7).fill(0);
-        }
-      } catch (error: unknown) {
-        logger.error('[getMatchupData] Exception calculating user daily scores:', error);
-        userDailyPoints = Array(7).fill(0);
-      }
-
-      // Calculate daily scores for opponent team (if exists)
-      if (opponentTeamObj) {
-        try {
-          const { data: oppDailyScores, error: oppError } = await supabase.rpc(
-            'calculate_daily_matchup_scores',
-            {
-              p_matchup_id: matchup.id,
-              p_team_id: opponentTeamObj.id,
-              p_week_start: weekStartStr,
-              p_week_end: weekEndStr
-            }
-          );
-
-          if (!oppError && oppDailyScores) {
-            // Sort by date and extract scores
-            const sorted = (oppDailyScores as Array<{ roster_date: string; daily_score: string | number }>).sort((a, b) => 
-              new Date(a.roster_date + 'T00:00:00').getTime() - new Date(b.roster_date + 'T00:00:00').getTime()
-            );
-            opponentDailyPoints = sorted.map(d => parseFloat(String(d.daily_score)) || 0);
-          } else {
-            logger.warn('[getMatchupData] Error calculating opponent daily scores:', oppError);
-            opponentDailyPoints = Array(7).fill(0);
-          }
-        } catch (error: unknown) {
-          logger.error('[getMatchupData] Exception calculating opponent daily scores:', error);
           opponentDailyPoints = Array(7).fill(0);
         }
-      } else {
+      } catch (error: unknown) {
+        logger.error('[getMatchupData] Exception calculating daily scores:', error);
+        userDailyPoints = Array(7).fill(0);
         opponentDailyPoints = Array(7).fill(0);
       }
 
@@ -1138,25 +810,17 @@ export const MatchupService = {
 
   /**
    * Get roster player IDs for a team (optimized helper)
+   * Routes through the API server which uses admin client — bypasses RLS.
+   * Critical for AI teams (owner_id = NULL) whose roster_assignments
+   * are not visible through user-scoped Supabase clients.
    */
   async getRosterPlayerIds(teamId: string, leagueId: string): Promise<string[]> {
     try {
-      // CRITICAL FIX: Use roster_assignments (source of truth) instead of draft_picks.
-      // draft_picks misses players acquired via trades (TradeService only updates roster_assignments).
-      const { data: assignments, error: assignError } = await supabase
-        .from('roster_assignments')
-        .select('player_id')
-        .eq('league_id', leagueId)
-        .eq('team_id', teamId);
-
-      if (assignError) {
-        logger.error('Error fetching roster player IDs:', assignError);
-        return [];
-      }
-
-      return (assignments || []).map((a: { player_id: string }) => String(a.player_id));
+      const { rosterApi } = await import('@/api/rosters');
+      const response = await rosterApi.getPlayerIds(leagueId, teamId);
+      return (response.data as string[]) || [];
     } catch (error: unknown) {
-      logger.error('Error getting roster player IDs:', error);
+      logger.error('Error getting roster player IDs via API:', error);
       return [];
     }
   },
@@ -1176,48 +840,32 @@ export const MatchupService = {
         return cached.roster;
       }
 
-      // CRITICAL FIX: Use roster_assignments (source of truth) instead of draft_picks.
-      // draft_picks misses players acquired via trades (TradeService only updates roster_assignments).
-      const { data: teamDraftPicks, error: picksError } = await supabase
-        .from('roster_assignments')
-        .select('player_id, team_id, league_id')
-        .eq('league_id', leagueId)
-        .eq('team_id', teamId);
-      
-      if (picksError) {
-        logger.error('Error fetching draft picks for team:', picksError);
-        // Fallback to old method if direct query fails
-        const { picks: draftPicks } = await DraftService.getDraftPicks(leagueId, userId || '');
-        const teamPicks = draftPicks.filter(p => p.team_id === teamId);
-        const playerIds = teamPicks.map(p => p.player_id);
-        // Convert string IDs to numbers for matching
-        const playerIdsAsNumbers = playerIds.map((id: string | number) => typeof id === 'string' ? parseInt(id) || 0 : id || 0).filter(id => id > 0);
-        const teamPlayers = allPlayers.filter(p => playerIdsAsNumbers.includes(Number(p.id)));
-        
-        const roster = teamPlayers.map((p) => this.transformToHockeyPlayer(p));
-        
-        // Cache the result
-        rosterCache.set(cacheKey, { roster, timestamp: now });
-        return roster;
+      // Route through API server which uses admin client — bypasses RLS.
+      // Critical for AI teams (owner_id = NULL) whose roster_assignments
+      // are not visible through user-scoped Supabase clients.
+      const { rosterApi } = await import('@/api/rosters');
+      let playerIds: string[];
+      try {
+        const response = await rosterApi.getPlayerIds(leagueId, teamId);
+        playerIds = (response.data as string[]) || [];
+      } catch (apiErr: unknown) {
+        logger.error('Error fetching roster player IDs via API:', apiErr);
+        playerIds = [];
       }
-      
-      // Map roster assignments to players
-      // player_id might be UUID (from old migrations) or numeric NHL ID (from new migrations)
-      let playerIds = (teamDraftPicks || []).map(p => p.player_id);
 
-      // FALLBACK: If roster_assignments is empty, try draft_picks (original source of truth).
-      // This handles demo leagues and cases where roster_assignments wasn't seeded properly.
+      // FALLBACK: If roster_assignments is empty, try draft_picks via API
       if (playerIds.length === 0) {
         logger.warn(`[MatchupService.getTeamRoster] roster_assignments empty for team ${teamId} in league ${leagueId}, falling back to draft_picks`);
-        const { data: draftPicksData, error: draftError } = await supabase
-          .from('draft_picks')
-          .select('player_id, team_id, league_id')
-          .eq('league_id', leagueId)
-          .eq('team_id', teamId)
-          .is('deleted_at', null);
-
-        if (!draftError && draftPicksData && draftPicksData.length > 0) {
-          playerIds = draftPicksData.map(p => p.player_id);
+        try {
+          const { draftApi } = await import('@/api/draft');
+          const draftResponse = await draftApi.getDraftPicks(leagueId);
+          const allPicks = (draftResponse.data as Array<{ player_id: string; team_id: string; league_id: string; deleted_at?: string }>) || [];
+          const teamPicks = allPicks.filter(p => p.team_id === teamId && !p.deleted_at);
+          if (teamPicks.length > 0) {
+            playerIds = teamPicks.map(p => p.player_id);
+          }
+        } catch (draftErr) {
+          logger.error('Error fetching draft picks via API:', draftErr);
         }
       }
 
@@ -1243,17 +891,15 @@ export const MatchupService = {
 
       // Match numeric IDs directly
       const teamPlayers = allPlayers.filter(p => numericIds.includes(Number(p.id)));
+      logger.debug(`[getTeamRoster] team=${teamId.slice(0,8)} playerIds=${playerIds.length} numericIds=${numericIds.length} allPlayers=${allPlayers.length} matched=${teamPlayers.length}`);
 
-      // If we have UUIDs, look them up in players table and match by name/team
+      // If we have UUIDs, look them up via player API and match by name/team
       if (uuidIds.length > 0) {
-        const { data: uuidPlayers, error: uuidError } = await supabase
-          .from('players')
-          .select('id, full_name, team')
-          .in('id', uuidIds);
-
-        if (!uuidError && uuidPlayers) {
-          // Match UUID players to allPlayers by name and team
-          uuidPlayers.forEach((uuidPlayer: { id: string; full_name: string; team: string }) => {
+        try {
+          const { playerApi } = await import('@/api/players');
+          const uuidResponse = await playerApi.getPlayersByIds(uuidIds);
+          const uuidPlayers = (uuidResponse.data as Array<{ id: string; full_name: string; team: string }>) || [];
+          uuidPlayers.forEach((uuidPlayer) => {
             const matched = allPlayers.find(p =>
               p.full_name === uuidPlayer.full_name &&
               p.team === uuidPlayer.team
@@ -1262,6 +908,8 @@ export const MatchupService = {
               teamPlayers.push(matched);
             }
           });
+        } catch (uuidErr) {
+          logger.error('Error looking up UUID players via API:', uuidErr);
         }
       }
 
@@ -1332,48 +980,67 @@ export const MatchupService = {
   },
 
 
+  // In-flight request deduplication + result cache for daily projections
+  _projectionInflight: new Map<string, Promise<Map<number, DailyProjectionRow>>>(),
+  _projectionCache: new Map<string, { result: Map<number, DailyProjectionRow>; timestamp: number }>(),
+  _PROJECTION_CACHE_TTL: 30_000,
+
   /**
-   * Fetch daily projections for players from player_projected_stats table
+   * Fetch daily projections for players from player_projected_stats table.
+   * Deduplicates concurrent requests for the same date.
    */
   async getDailyProjectionsForMatchup(
     playerIds: number[],
     targetDate: string
   ): Promise<Map<number, DailyProjectionRow>> {
-    try {
-      if (!playerIds || playerIds.length === 0) {
-        logger.warn('[MatchupService.getDailyProjections] No player IDs provided');
-        return new Map();
-      }
-
-      const { data, error } = await supabase.rpc('get_daily_projections', {
-        p_player_ids: playerIds,
-        p_target_date: targetDate
-      });
-
-      if (error) {
-        logger.error('[MatchupService.getDailyProjections] ❌ RPC error:', error);
-        return new Map(); // Return empty map on error (graceful degradation)
-      }
-
-      if (!data || data.length === 0) {
-        logger.warn('[MatchupService.getDailyProjections] ⚠️ RPC returned empty array - no projections for this date');
-      }
-
-      // Create a map for O(1) lookup during player transformation
-      const projectionMap = new Map<number, DailyProjectionRow>();
-      if (data && Array.isArray(data)) {
-        data.forEach((p: DailyProjectionRow) => {
-          if (p.player_id) {
-            projectionMap.set(Number(p.player_id), p);
-          }
-        });
-      }
-
-      return projectionMap;
-    } catch (error: unknown) {
-      logger.error('[MatchupService.getDailyProjections] ❌ Unexpected error:', error);
-      return new Map(); // Return empty map on error
+    if (!playerIds || playerIds.length === 0) {
+      return new Map();
     }
+
+    // Dedup key: use date + sorted player IDs for exact match
+    const sortedIds = [...playerIds].sort((a, b) => a - b).join(',');
+    const dedupKey = `${targetDate}:${sortedIds}`;
+
+    // Check result cache first (avoids network call entirely)
+    const cached = this._projectionCache.get(dedupKey);
+    if (cached && Date.now() - cached.timestamp < this._PROJECTION_CACHE_TTL) {
+      return cached.result;
+    }
+
+    // Check in-flight dedup
+    const existing = this._projectionInflight.get(dedupKey);
+    if (existing) {
+      return existing;
+    }
+
+    const promise = (async () => {
+      try {
+        const response = await matchupApi.getDailyProjections(playerIds, targetDate);
+
+        if (!response.data) {
+          return new Map<number, DailyProjectionRow>();
+        }
+
+        // API returns Record<string, DailyProjectionRow> — convert to Map
+        const projectionMap = new Map<number, DailyProjectionRow>();
+        const projections = response.data as Record<string, DailyProjectionRow>;
+        for (const [key, value] of Object.entries(projections)) {
+          projectionMap.set(Number(key), value);
+        }
+
+        // Cache the result for subsequent calls
+        this._projectionCache.set(dedupKey, { result: projectionMap, timestamp: Date.now() });
+        return projectionMap;
+      } catch (error: unknown) {
+        logger.error('[MatchupService.getDailyProjections] ❌ API error:', error);
+        return new Map<number, DailyProjectionRow>();
+      } finally {
+        this._projectionInflight.delete(dedupKey);
+      }
+    })();
+
+    this._projectionInflight.set(dedupKey, promise);
+    return promise;
   },
 
   /**
@@ -1791,19 +1458,15 @@ export const MatchupService = {
         };
       }
 
-      // Get league to access scoring settings
-      // For demo league, bypass membership check (guests can view)
+      // Get league to access scoring settings via API
       let league: League | null = null;
       const isDemoLeague = matchup.league_id === DEMO_LEAGUE_ID_FOR_GUESTS;
       if (isDemoLeague && !userId) {
-        // Guest viewing demo league - use public read
-        const { data, error } = await supabase
-          .from('leagues')
-          .select(COLUMNS.LEAGUE)
-          .eq('id', matchup.league_id)
-          .single();
-        if (error) throw error;
-        league = data;
+        // Guest viewing demo league - use public API
+        const { leagueApi } = await import('@/api/leagues');
+        const response = await leagueApi.getLeague(matchup.league_id);
+        league = (response.data as League) || null;
+        if (!league) throw new Error('League not found');
       } else if (userId) {
         // Logged-in user - use membership check
         const result = await LeagueService.getLeague(matchup.league_id, userId);
@@ -2055,58 +1718,41 @@ export const MatchupService = {
           }
         });
         
-        // If we have UUIDs, look them up via draft_picks (more reliable than players table)
-        // draft_picks.player_id is the UUID, and we can match to roster players
+        // If we have UUIDs, look them up via draft API and player API
         if (uuidIds.length > 0) {
-          // Get the full roster's draft picks to match by order
-          // The roster was built from draft_picks in the same order, so we can match UUIDs by index
-          const { data: allTeamDraftPicks } = await supabase
-            .from('draft_picks')
-            .select('player_id, pick_number')
-            .eq('league_id', matchup.league_id)
-            .eq('team_id', teamId)
-            .is('deleted_at', null)
-            .order('pick_number', { ascending: true });
-          
-          if (allTeamDraftPicks) {
-            // Match UUIDs from lineup to draft picks, then get corresponding roster player by index
-            const roster = teamId === matchup.team1_id ? team1Roster : team2Roster;
-            
-            uuidIds.forEach((uuid: string) => {
-              const pickIndex = allTeamDraftPicks.findIndex((p: { player_id: string; pick_number: number }) => p.player_id === uuid);
-              if (pickIndex >= 0 && pickIndex < roster.length) {
-                const rosterPlayer = roster[pickIndex];
-                if (rosterPlayer && rosterPlayer.id) {
-                  const numericId = Number(rosterPlayer.id);
-                  numericIds.add(numericId);
-                } else {
-                  logger.warn(`[MatchupService.convertLineupIdsToNumeric] ⚠️ Roster player at index ${pickIndex} has no ID`);
+          try {
+            const { draftApi } = await import('@/api/draft');
+            const draftResponse = await draftApi.getDraftPicks(matchup.league_id);
+            const allTeamDraftPicks = ((draftResponse.data as Array<{ player_id: string; team_id: string; pick_number: number; deleted_at?: string }>) || [])
+              .filter(p => p.team_id === teamId && !p.deleted_at)
+              .sort((a, b) => a.pick_number - b.pick_number);
+
+            if (allTeamDraftPicks.length > 0) {
+              const roster = teamId === matchup.team1_id ? team1Roster : team2Roster;
+
+              uuidIds.forEach((uuid: string) => {
+                const pickIndex = allTeamDraftPicks.findIndex(p => p.player_id === uuid);
+                if (pickIndex >= 0 && pickIndex < roster.length) {
+                  const rosterPlayer = roster[pickIndex];
+                  if (rosterPlayer && rosterPlayer.id) {
+                    numericIds.add(Number(rosterPlayer.id));
+                  }
                 }
-              } else {
-                logger.warn(`[MatchupService.convertLineupIdsToNumeric] ⚠️ UUID ${uuid} not found in draft picks (index: ${pickIndex})`);
-              }
-            });
-            
-          } else {
-            logger.error(`[MatchupService.convertLineupIdsToNumeric] ❌ Failed to get draft picks for team ${teamId}`);
-          }
-          
-          // If we still have unmatched UUIDs, try fallback to players table
-          if (numericIds.size < uuidIds.length) {
-            const unmatchedUuids = uuidIds.filter(uuid => {
-              const pickIndex = allTeamDraftPicks?.findIndex((p: { player_id: string; pick_number: number }) => p.player_id === uuid) ?? -1;
-              return pickIndex < 0;
-            });
-            
-            if (unmatchedUuids.length > 0) {
-              // Fallback: try players table lookup
-              const { data: uuidPlayers, error: uuidError } = await supabase
-                .from('players')
-                .select('id, full_name, team')
-                .in('id', unmatchedUuids);
-              
-              if (!uuidError && uuidPlayers) {
-                uuidPlayers.forEach((uuidPlayer: { id: string; full_name: string; team: string }) => {
+              });
+            }
+
+            // If we still have unmatched UUIDs, try fallback to players API
+            if (numericIds.size < uuidIds.length + numericIds.size) {
+              const unmatchedUuids = uuidIds.filter(uuid => {
+                const pickIndex = allTeamDraftPicks.findIndex(p => p.player_id === uuid);
+                return pickIndex < 0;
+              });
+
+              if (unmatchedUuids.length > 0) {
+                const { playerApi } = await import('@/api/players');
+                const uuidResponse = await playerApi.getPlayersByIds(unmatchedUuids);
+                const uuidPlayers = (uuidResponse.data as Array<{ id: string; full_name: string; team: string }>) || [];
+                uuidPlayers.forEach((uuidPlayer) => {
                   const matched = allPlayers.find(p =>
                     p.full_name === uuidPlayer.full_name &&
                     p.team === uuidPlayer.team
@@ -2117,6 +1763,8 @@ export const MatchupService = {
                 });
               }
             }
+          } catch (draftErr) {
+            logger.error('[convertLineupIdsToNumeric] Error via API:', draftErr);
           }
         }
 
@@ -2143,13 +1791,11 @@ export const MatchupService = {
       ];
       
       if (allUuidIds.length > 0) {
-        const { data: uuidPlayers } = await supabase
-          .from('players')
-          .select('id, full_name, team')
-          .in('id', allUuidIds);
-        
-        if (uuidPlayers) {
-          uuidPlayers.forEach((uuidPlayer: { id: string; full_name: string; team: string }) => {
+        try {
+          const { playerApi } = await import('@/api/players');
+          const uuidResponse = await playerApi.getPlayersByIds(allUuidIds);
+          const uuidPlayers = (uuidResponse.data as Array<{ id: string; full_name: string; team: string }>) || [];
+          uuidPlayers.forEach((uuidPlayer) => {
             const matched = allPlayers.find(p =>
               p.full_name === uuidPlayer.full_name &&
               p.team === uuidPlayer.team
@@ -2158,6 +1804,8 @@ export const MatchupService = {
               uuidToNumericMap.set(uuidPlayer.id, Number(matched.id));
             }
           });
+        } catch (uuidErr) {
+          logger.error('[MatchupService] Error looking up UUID players for slot assignments:', uuidErr);
         }
       }
 
@@ -2193,13 +1841,11 @@ export const MatchupService = {
         ];
         
         if (allUuidIds2.length > 0) {
-          const { data: uuidPlayers2 } = await supabase
-            .from('players')
-            .select('id, full_name, team')
-            .in('id', allUuidIds2);
-          
-          if (uuidPlayers2) {
-            uuidPlayers2.forEach((uuidPlayer: { id: string; full_name: string; team: string }) => {
+          try {
+            const { playerApi } = await import('@/api/players');
+            const uuidResponse2 = await playerApi.getPlayersByIds(allUuidIds2);
+            const uuidPlayers2 = (uuidResponse2.data as Array<{ id: string; full_name: string; team: string }>) || [];
+            uuidPlayers2.forEach((uuidPlayer) => {
               const matched = allPlayers.find(p =>
                 p.full_name === uuidPlayer.full_name &&
                 p.team === uuidPlayer.team
@@ -2208,6 +1854,8 @@ export const MatchupService = {
                 team2UuidToNumericMap.set(uuidPlayer.id, Number(matched.id));
               }
             });
+          } catch (uuidErr2) {
+            logger.error('[MatchupService] Error looking up UUID players for team2 slot assignments:', uuidErr2);
           }
         }
       }
@@ -2297,56 +1945,13 @@ export const MatchupService = {
         // Continue with empty Map - page should still load
       }
       
-      // Fetch daily projections for ALL game dates in the matchup week (not just today)
-      // This fixes the TBD bug where future-date games showed no projections
+      // Fetch daily projections for TODAY only (initial roster load)
+      // Per-date projections are loaded on-demand when user selects a date in Matchup.tsx
+      // This reduces API calls from 7 (one per weekday) to 1 per load
       const todayMST = getTodayMST();
       let dailyProjectionsMap = new Map<number, DailyProjectionRow>();
       try {
-        // Collect all unique game dates from the schedule
-        const allGameDates = new Set<string>();
-        gamesByTeam.forEach(games => {
-          games.forEach(g => {
-            const gameDate = g.game_date?.split('T')[0];
-            if (gameDate) allGameDates.add(gameDate);
-          });
-        });
-
-        // Fetch projections for each game date in parallel
-        const dateProjectionPromises = Array.from(allGameDates).map(async (gameDate) => {
-          return { gameDate, projections: await this.getDailyProjectionsForMatchup(allPlayerIds, gameDate) };
-        });
-        const dateProjectionResults = await Promise.all(dateProjectionPromises);
-
-        // Merge: each player gets their most relevant projection
-        // Priority: today's projection > nearest future date > any other date
-        const playerDateTracker = new Map<number, string>(); // Track which date each player's projection is from
-        for (const { gameDate, projections } of dateProjectionResults) {
-          projections.forEach((proj, playerId) => {
-            const existingDate = playerDateTracker.get(playerId);
-            let shouldReplace = false;
-
-            if (!existingDate) {
-              shouldReplace = true;
-            } else if (gameDate === todayMST) {
-              // Today always wins
-              shouldReplace = true;
-            } else if (existingDate !== todayMST) {
-              // Both are non-today dates: prefer nearest future date
-              const existingIsFuture = existingDate >= todayMST;
-              const newIsFuture = gameDate >= todayMST;
-              if (newIsFuture && !existingIsFuture) {
-                shouldReplace = true; // Future beats past
-              } else if (newIsFuture && existingIsFuture && gameDate < existingDate) {
-                shouldReplace = true; // Nearer future date wins
-              }
-            }
-
-            if (shouldReplace) {
-              dailyProjectionsMap.set(playerId, proj);
-              playerDateTracker.set(playerId, gameDate);
-            }
-          });
-        }
+        dailyProjectionsMap = await this.getDailyProjectionsForMatchup(allPlayerIds, todayMST);
       } catch (error: unknown) {
         logger.warn('[MatchupService] Failed to fetch daily projections, continuing without them:', error);
       }
@@ -2893,41 +2498,13 @@ export const MatchupService = {
    * Get team record (wins/losses) directly from standings calculation
    * This ensures the matchup tab records always match the standings page
    */
-  async getTeamRecord(teamId: string, leagueId: string, userId: string): Promise<{ wins: number; losses: number }> {
+  async getTeamRecord(teamId: string, leagueId: string, _userId: string): Promise<{ wins: number; losses: number }> {
     try {
-      // Get all required data for standings calculation
-      const [teamsResult, picksResult, playersResult] = await Promise.all([
-        LeagueService.getLeagueTeams(leagueId),
-        DraftService.getDraftPicks(leagueId, userId),
-        PlayerService.getAllPlayers()
-      ]);
-
-      if (!teamsResult.teams || teamsResult.teams.length === 0) {
-        logger.warn('[MatchupService] No teams found for league:', leagueId);
-        return { wins: 0, losses: 0 };
-      }
-
-      // Calculate standings using the official standings logic
-      const standings = await LeagueService.calculateTeamStandings(
-        leagueId,
-        teamsResult.teams,
-        picksResult.picks || [],
-        playersResult
-      );
-
-      // Get the record for this specific team
-      const teamStanding = standings[teamId];
-      if (!teamStanding) {
-        logger.warn('[MatchupService] No standing found for team:', teamId);
-        return { wins: 0, losses: 0 };
-      }
-
-      return { 
-        wins: teamStanding.wins, 
-        losses: teamStanding.losses 
-      };
+      const response = await matchupApi.getTeamRecord(leagueId, teamId);
+      const record = response.data as { wins: number; losses: number } | null;
+      return record || { wins: 0, losses: 0 };
     } catch (error: unknown) {
-      logger.error('Error getting team record from standings:', error);
+      logger.error('Error getting team record:', error);
       return { wins: 0, losses: 0 };
     }
   },
@@ -2948,54 +2525,23 @@ export const MatchupService = {
       team2Score: number; 
       weekStart: Date 
     }>; 
-    error: PostgrestError | Error | null
+    error: Error | null
   }> {
     try {
       if (!team2Id) {
         return { matchups: [], error: null };
       }
 
-      // Query for matchups where team1 is team1Id and team2 is team2Id, OR vice versa
-      // Use two separate queries and combine results
-      const { data: data1, error: error1 } = await supabase
-        .from('matchups')
-        .select(COLUMNS.MATCHUP)
-        .eq('league_id', leagueId)
-        .eq('status', 'completed')
-        .eq('team1_id', team1Id)
-        .eq('team2_id', team2Id);
+      const response = await matchupApi.getMatchupHistory(leagueId, team1Id, team2Id);
+      const data = (response.data as Array<Record<string, unknown>>) || [];
 
-      if (error1) throw error1;
-
-      const { data: data2, error: error2 } = await supabase
-        .from('matchups')
-        .select(COLUMNS.MATCHUP)
-        .eq('league_id', leagueId)
-        .eq('status', 'completed')
-        .eq('team1_id', team2Id)
-        .eq('team2_id', team1Id);
-
-      if (error2) throw error2;
-
-      // Combine and deduplicate results
-      const allMatchups = [...(data1 || []), ...(data2 || [])];
-      const uniqueMatchups = allMatchups.filter((m, index, self) => 
-        index === self.findIndex(t => t.id === m.id)
-      );
-
-      // Sort by week number descending
-      const data = uniqueMatchups.sort((a, b) => b.week_number - a.week_number);
-      const error = null;
-
-      if (error) throw error;
-
-      const matchups = (data || []).map(m => ({
-        week: m.week_number,
-        team1Id: m.team1_id,
-        team2Id: m.team2_id,
-        team1Score: parseFloat(m.team1_score) || 0,
-        team2Score: parseFloat(m.team2_score) || 0,
-        weekStart: new Date(m.week_start_date + 'T00:00:00')
+      const matchups = data.map(m => ({
+        week: m.week_number as number,
+        team1Id: m.team1_id as string,
+        team2Id: m.team2_id as string | null,
+        team1Score: parseFloat(String(m.team1_score)) || 0,
+        team2Score: parseFloat(String(m.team2_score)) || 0,
+        weekStart: new Date((m.week_start_date as string) + 'T00:00:00')
       }));
 
       return { matchups, error: null };
@@ -3015,31 +2561,20 @@ export const MatchupService = {
       matchups: Matchup[];
     }>;
     bracketSize: number; // 4, 6, or 8
-    error: PostgrestError | Error | null;
+    error: Error | null;
   }> {
     try {
-      // Get league to determine schedule length
-      const { data: league, error: leagueError } = await supabase
-        .from('leagues')
-        .select(COLUMNS.LEAGUE)
-        .eq('id', leagueId)
-        .maybeSingle();
+      // Get playoff bracket data via API
+      const response = await matchupApi.getPlayoffBracket(leagueId);
+      const bracketData = response.data as { teams?: Array<Record<string, unknown>>; matchups?: Matchup[]; settings?: Record<string, unknown> } | null;
 
-      if (leagueError) throw leagueError;
-      if (!league) {
-        return { rounds: [], bracketSize: 0, error: new Error('League not found') };
+      if (!bracketData) {
+        return { rounds: [], bracketSize: 0, error: new Error('Failed to fetch playoff bracket') };
       }
 
-      // Get first week start date
-      const draftCompletionDate = league.updated_at ? new Date(league.updated_at) : new Date();
-      const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
-      const scheduleLength = getScheduleLength(firstWeekStart);
+      const numTeams = bracketData.teams?.length || 0;
 
-      // Get all teams to determine bracket size
-      const { teams } = await LeagueService.getLeagueTeams(leagueId);
-      const numTeams = teams.length;
-
-      // Determine bracket size (typically top 4, 6, or 8 teams)
+      // Determine bracket size
       let bracketSize = 0;
       if (numTeams >= 8) bracketSize = 8;
       else if (numTeams >= 6) bracketSize = 6;
@@ -3049,16 +2584,7 @@ export const MatchupService = {
         return { rounds: [], bracketSize: 0, error: new Error('Not enough teams for playoffs') };
       }
 
-      // Get all playoff matchups (weeks after scheduleLength)
-      const { data: playoffMatchups, error: matchupsError } = await supabase
-        .from('matchups')
-        .select(COLUMNS.MATCHUP)
-        .eq('league_id', leagueId)
-        .gt('week_number', scheduleLength)
-        .order('week_number', { ascending: true })
-        .order('created_at', { ascending: true });
-
-      if (matchupsError) throw matchupsError;
+      const playoffMatchups = bracketData.matchups || [];
 
       // Organize matchups by round
       // Round 1 (Quarterfinals): First playoff week
@@ -3125,33 +2651,18 @@ export const MatchupService = {
    */
   async getMatchupLines(matchupId: string): Promise<Map<number, MatchupLineRow>> {
     try {
-      const queryPromise = supabase
-        .from('fantasy_matchup_lines')
-        .select(COLUMNS.MATCHUP_LINES)
-        .eq('matchup_id', matchupId);
-
-      let data: MatchupLineRow[] | null = null;
-      let error: PostgrestError | Error | null = null;
-      try {
-        const result = await withTimeout(queryPromise, 5000, 'getMatchupLines timeout');
-        data = result.data as MatchupLineRow[] | null;
-        error = result.error;
-      } catch (timeoutError: unknown) {
-        logger.error('[MatchupService.getMatchupLines] Query timeout:', timeoutError);
-        error = timeoutError instanceof Error ? timeoutError : new Error(String(timeoutError));
-      }
-
-      if (error) throw error;
+      const response = await matchupApi.getMatchupLines(matchupId);
+      const data = (response.data as MatchupLineRow[]) || [];
 
       // Convert array to Map keyed by player_id for O(1) lookup
       const linesMap = new Map<number, MatchupLineRow>();
-      (data || []).forEach(line => {
+      data.forEach(line => {
         linesMap.set(line.player_id, line);
       });
 
       return linesMap;
     } catch (error: unknown) {
-      logger.warn('[MatchupService] getMatchupLines timeout or error:', error);
+      logger.warn('[MatchupService] getMatchupLines error:', error);
       return new Map(); // Graceful degradation
     }
   },
@@ -3170,24 +2681,8 @@ export const MatchupService = {
       const startDateStr = formatLocal(startDate);
       const endDateStr = formatLocal(endDate);
       
-      const rpcPromise = supabase.rpc('get_matchup_stats', {
-        p_player_ids: playerIds,
-        p_start_date: startDateStr,
-        p_end_date: endDateStr
-      });
-      
-      let data: unknown[] | null = null;
-      let error: PostgrestError | Error | null = null;
-      try {
-        const result = await withTimeout(rpcPromise, 5000, 'fetchMatchupStatsForPlayers timeout');
-        data = result.data as unknown[] | null;
-        error = result.error;
-      } catch (timeoutError: unknown) {
-        logger.error('[MatchupService.fetchMatchupStatsForPlayers] RPC timeout:', timeoutError);
-        error = timeoutError instanceof Error ? timeoutError : new Error(String(timeoutError));
-      }
-
-      if (error) throw error;
+      const response = await matchupApi.getMatchupStats(playerIds, startDateStr, endDateStr);
+      const data = response.data ? Object.values(response.data) : [];
 
       const statsMap = new Map<number, {
         goals: number;
@@ -3376,16 +2871,16 @@ export const MatchupService = {
    */
   async updateMatchupScores(
     leagueId?: string
-  ): Promise<{ error: PostgrestError | Error | null; updatedCount?: number; results?: Array<{ matchup_id: string; team1_score: number; team2_score: number; updated: boolean }> }> {
+  ): Promise<{ error: Error | null; updatedCount?: number; results?: Array<{ matchup_id: string; team1_score: number; team2_score: number; updated: boolean }> }> {
     try {
       // Input validation
       if (leagueId && typeof leagueId !== 'string') {
         throw new Error('leagueId must be a string');
       }
 
-      const { data, error } = await supabase.rpc('update_all_matchup_scores', {
-        p_league_id: leagueId || null
-      });
+      const response = await matchupApi.updateScores(leagueId);
+      const data = response.data;
+      const error = null;
       
       if (error) {
         logger.error('[MatchupService] RPC error updating matchup scores:', error);
@@ -3458,14 +2953,11 @@ export const MatchupService = {
     }
     
     try {
-      const { data, error } = await supabase.rpc('get_daily_lineup', {
-        p_team_id: teamId,
-        p_matchup_id: matchupId,
-        p_date: date
-      });
-      
-      if (error) {
-        logger.error('[MatchupService] getDailyLineup RPC error:', error);
+      const response = await matchupApi.getDailyLineup(matchupId, teamId, date);
+      const data = response.data;
+
+      if (!data) {
+        logger.warn('[MatchupService] getDailyLineup returned no data');
         return [];
       }
       
@@ -3519,12 +3011,8 @@ export const MatchupService = {
    */
   async autoCompleteMatchups(): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await supabase.rpc('auto_complete_matchups');
-      if (error) {
-        logger.error('[MatchupService] auto_complete_matchups RPC error:', error);
-        return { success: false, error: error.message };
-      }
-      return { success: true };
+      const response = await matchupApi.autoComplete();
+      return { success: !!response.data?.success };
     } catch (error: unknown) {
       logger.error('[MatchupService] autoCompleteMatchups exception:', error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -3581,18 +3069,11 @@ export const CategoryScoringService = {
     categories: string[]
   ): Promise<{ results: CategoryMatchupResult[]; error: unknown }> {
     try {
-      const { data, error } = await supabase.rpc('calculate_h2h_category_matchup', {
-        p_league_id: leagueId,
-        p_matchup_id: matchupId,
-        p_team1_id: team1Id,
-        p_team2_id: team2Id,
-        p_week_start: weekStart,
-        p_week_end: weekEnd,
-        p_categories: categories,
+      const response = await matchupApi.getH2HCategoryResults({
+        leagueId, matchupId, team1Id, team2Id, weekStart, weekEnd, categories,
       });
 
-      if (error) throw error;
-      return { results: (data || []) as CategoryMatchupResult[], error: null };
+      return { results: (response.data || []) as CategoryMatchupResult[], error: null };
     } catch (error: unknown) {
       logger.error('[CategoryScoringService] getH2HCategoryResults error:', error);
       return { results: [], error };
@@ -3613,14 +3094,9 @@ export const CategoryScoringService = {
     throughWeek?: number
   ): Promise<{ standings: RotoStandingRow[]; error: unknown }> {
     try {
-      const { data, error } = await supabase.rpc('calculate_roto_standings', {
-        p_league_id: leagueId,
-        p_categories: categories,
-        p_through_week: throughWeek ?? null,
-      });
+      const response = await matchupApi.getRotoStandings(leagueId, categories, throughWeek);
 
-      if (error) throw error;
-      return { standings: (data || []) as RotoStandingRow[], error: null };
+      return { standings: (response.data || []) as RotoStandingRow[], error: null };
     } catch (error: unknown) {
       logger.error('[CategoryScoringService] getRotoStandings error:', error);
       return { standings: [], error };
@@ -3686,13 +3162,9 @@ export const CategoryScoringService = {
     error: unknown;
   }> {
     try {
-      const { data, error } = await supabase.rpc('calculate_ppg_standings', {
-        p_league_id: leagueId,
-        p_through_week: throughWeek ?? null,
-      });
+      const response = await matchupApi.getPPGStandings(leagueId, throughWeek);
 
-      if (error) throw error;
-      return { standings: (data || []) as Array<{ team_id: string; team_name: string; total_points: number; games_played: number; ppg: number; rank: number }>, error: null };
+      return { standings: (response.data || []) as Array<{ team_id: string; team_name: string; total_points: number; games_played: number; ppg: number; rank: number }>, error: null };
     } catch (error: unknown) {
       logger.error('[CategoryScoringService] getPPGStandings error:', error);
       return { standings: [], error };

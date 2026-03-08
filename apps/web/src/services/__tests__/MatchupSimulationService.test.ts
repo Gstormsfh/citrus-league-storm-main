@@ -16,6 +16,21 @@ vi.mock('@/integrations/supabase/client', () => ({
   },
 }));
 
+// Mock API client modules used by MatchupSimulationService
+vi.mock('@/api/matchups', () => ({
+  matchupApi: {
+    getLeagueMatchups: vi.fn().mockResolvedValue({ data: [] }),
+    getMatchup: vi.fn().mockResolvedValue({ data: null }),
+    getMatchupScores: vi.fn().mockResolvedValue({ data: null }),
+  },
+}));
+vi.mock('@/api/client', () => ({
+  apiClient: {
+    get: vi.fn().mockResolvedValue({ data: null }),
+    post: vi.fn().mockResolvedValue({ data: null }),
+  },
+}));
+
 import { MatchupSimulationService } from '../MatchupSimulationService';
 
 describe('MatchupSimulationService', () => {

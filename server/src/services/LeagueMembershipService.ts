@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import { logger } from '@citrus/shared';
 
 /**
  * ============================================================================
@@ -61,7 +62,7 @@ export class LeagueMembershipService {
         .single();
 
       if (leagueError && leagueError.code !== 'PGRST116') {
-        console.error('[LeagueMembershipService] Error checking commissioner:', leagueError);
+        logger.error('[LeagueMembershipService] Error checking commissioner:', leagueError);
       }
 
       const isCommissioner = leagueData?.commissioner_id === userId;
@@ -75,7 +76,7 @@ export class LeagueMembershipService {
         .maybeSingle();
 
       if (teamError && teamError.code !== 'PGRST116') {
-        console.error('[LeagueMembershipService] Error checking team ownership:', teamError);
+        logger.error('[LeagueMembershipService] Error checking team ownership:', teamError);
       }
 
       const isMember = isCommissioner || !!teamData;
@@ -88,7 +89,7 @@ export class LeagueMembershipService {
       membershipCache.set(key, { result, timestamp: Date.now() });
       return result;
     } catch (error) {
-      console.error('[LeagueMembershipService] Unexpected error:', error);
+      logger.error('[LeagueMembershipService] Unexpected error:', error);
       // Fail closed
       return { isMember: false, isCommissioner: false };
     }

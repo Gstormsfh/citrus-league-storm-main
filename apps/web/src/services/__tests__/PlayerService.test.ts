@@ -38,6 +38,22 @@ vi.mock('@/integrations/supabase/client', () => ({
   },
 }));
 
+// Mock API client modules (PlayerService imports playerApi and apiClient for some methods)
+vi.mock('@/api/client', () => ({
+  apiClient: {
+    get: vi.fn().mockResolvedValue({ data: [] }),
+    post: vi.fn().mockResolvedValue({ data: null }),
+  },
+}));
+
+vi.mock('@/api/players', () => ({
+  playerApi: {
+    getTrendingPlayers: vi.fn().mockResolvedValue({ data: [] }),
+    recordPlayerTransaction: vi.fn().mockResolvedValue({ data: null }),
+    searchPlayers: vi.fn().mockResolvedValue({ data: [] }),
+  },
+}));
+
 vi.mock('@/utils/logger', () => ({
   logger: {
     log: vi.fn(),

@@ -1,9 +1,14 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { membershipMiddleware } from '../middleware/membership';
+import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { MatchupService } from '../services/MatchupService';
+import { AuditService } from '../services/AuditService';
+import { AppError } from '../lib/errors';
+import { ok, fail, handleError } from '../lib/responses';
 import { COLUMNS } from '@citrus/shared';
 
 const rosterRoutes = new Hono<Env>();
@@ -23,10 +28,10 @@ rosterRoutes.get('/league/:leagueId/team/:teamId', membershipMiddleware, async (
     .eq('team_id', teamId);
 
   if (error) {
-    return c.json({ error: error.message }, 500);
+    return handleError(c, error, 'Failed to fetch roster');
   }
 
-  return c.json({ data: data || [] });
+  return ok(c, data || []);
 });
 
 // GET /api/rosters/league/:leagueId/team/:teamId/player-ids — Get roster player IDs
@@ -37,7 +42,7 @@ rosterRoutes.get('/league/:leagueId/team/:teamId/player-ids', membershipMiddlewa
   const matchupService = new MatchupService(supabase);
 
   const playerIds = await matchupService.getRosterPlayerIds(teamId, leagueId);
-  return c.json({ data: playerIds });
+  return ok(c, playerIds);
 });
 
 // GET /api/rosters/league/:leagueId — Get all rosters in a league
@@ -51,18 +56,24 @@ rosterRoutes.get('/league/:leagueId', membershipMiddleware, async (c) => {
     .eq('league_id', leagueId);
 
   if (error) {
-    return c.json({ error: error.message }, 500);
+    return handleError(c, error, 'Failed to fetch rosters');
   }
 
-  return c.json({ data: data || [] });
+  return ok(c, data || []);
 });
 
 // PUT /api/rosters/league/:leagueId/team/:teamId/lineup — Update lineup
-rosterRoutes.put('/league/:leagueId/team/:teamId/lineup', membershipMiddleware, async (c) => {
+rosterRoutes.put('/league/:leagueId/team/:teamId/lineup', membershipMiddleware, validateBody(schemas.rosterLineup), async (c) => {
   const leagueId = c.req.param('leagueId');
   const teamId = c.req.param('teamId');
   const userId = c.get('userId');
-  const body = await c.req.json();
+  const body = getValidatedBody<z.infer<typeof schemas.rosterLineup>>(c);
+
+  const parsedTeamId = parseInt(teamId, 10);
+  if (isNaN(parsedTeamId)) {
+    return fail(c, AppError.badRequest('Invalid team ID'));
+  }
+
   const supabase = createUserClient(c.get('userToken'));
 
   // Verify user owns this team
@@ -74,13 +85,13 @@ rosterRoutes.put('/league/:leagueId/team/:teamId/lineup', membershipMiddleware, 
     .single();
 
   if (!team || team.owner_id !== userId) {
-    return c.json({ error: 'You can only edit your own lineup' }, 403);
+    return fail(c, AppError.forbidden('You can only edit your own lineup'));
   }
 
   const { data, error } = await supabase
     .from('team_lineups')
     .upsert({
-      team_id: parseInt(teamId, 10),
+      team_id: parsedTeamId,
       league_id: leagueId,
       starters: body.starters,
       bench: body.bench,
@@ -88,14 +99,17 @@ rosterRoutes.put('/league/:leagueId/team/:teamId/lineup', membershipMiddleware, 
       slot_assignments: body.slot_assignments,
       updated_at: new Date().toISOString(),
     })
-    .select()
+    .select(COLUMNS.TEAM_LINEUP)
     .single();
 
   if (error) {
-    return c.json({ error: error.message }, 400);
+    return handleError(c, error, 'Failed to update lineup');
   }
 
-  return c.json({ data });
+  const audit = new AuditService(supabase);
+  audit.logRosterMove(leagueId, { teamId });
+
+  return ok(c, data);
 });
 
 // GET /api/rosters/league/:leagueId/team/:teamId/lineup — Get team lineup
@@ -106,18 +120,18 @@ rosterRoutes.get('/league/:leagueId/team/:teamId/lineup', membershipMiddleware, 
 
   const { data, error } = await supabase
     .from('team_lineups')
-    .select('*')
-    .eq('team_id', parseInt(teamId, 10))
+    .select(COLUMNS.TEAM_LINEUP)
+    .eq('team_id', teamId)
     .eq('league_id', leagueId)
     .order('updated_at', { ascending: false })
     .limit(1)
     .maybeSingle();
 
   if (error) {
-    return c.json({ error: error.message }, 500);
+    return handleError(c, error, 'Failed to fetch lineup');
   }
 
-  return c.json({ data });
+  return ok(c, data);
 });
 
 export { rosterRoutes };

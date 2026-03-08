@@ -1,40 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // =============================================================================
-// Mock Supabase client
+// Mock API client layer (MatchupScoreJobService now uses matchupApi, not supabase)
 // =============================================================================
 
-function createChainMock(resolveData: any = null, resolveError: any = null) {
-  const result = { data: resolveData, error: resolveError, count: resolveData?.length ?? 0 };
-  const chain: Record<string, any> = {};
-  const chainMethods = ['select', 'insert', 'update', 'delete', 'eq', 'is', 'in', 'order', 'limit', 'filter', 'gt'];
-  chainMethods.forEach(m => {
-    chain[m] = vi.fn().mockReturnValue(chain);
-  });
-  chain.single = vi.fn().mockResolvedValue(result);
-  chain.maybeSingle = vi.fn().mockResolvedValue(result);
-  // Make the chain itself thenable (for queries that don't end with .single())
-  chain.then = (onFulfilled?: (val: any) => any, onRejected?: (err: any) => any) => {
-    return Promise.resolve(result).then(onFulfilled, onRejected);
-  };
-  return chain;
-}
+const mockLockCompletedDays = vi.fn();
+const mockUpdateScores = vi.fn();
+const mockGetJobStatus = vi.fn();
 
-const mockFrom = vi.fn();
-
-vi.mock('@/integrations/supabase/client', () => ({
-  supabase: {
-    from: (...args: unknown[]) => mockFrom(...args),
-    rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
-    auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }) },
-  },
-}));
-
-const mockUpdateMatchupScores = vi.fn();
-
-vi.mock('../MatchupService', () => ({
-  MatchupService: {
-    updateMatchupScores: (...args: unknown[]) => mockUpdateMatchupScores(...args),
+vi.mock('@/api/matchups', () => ({
+  matchupApi: {
+    lockCompletedDays: (...args: unknown[]) => mockLockCompletedDays(...args),
+    updateScores: (...args: unknown[]) => mockUpdateScores(...args),
+    getJobStatus: (...args: unknown[]) => mockGetJobStatus(...args),
   },
 }));
 
@@ -62,39 +40,26 @@ import { logger } from '@/utils/logger';
 describe('MatchupScoreJobService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFrom.mockImplementation(() => createChainMock());
-    mockUpdateMatchupScores.mockResolvedValue({
-      error: null,
-      updatedCount: 5,
-      results: [],
-    });
+    mockLockCompletedDays.mockResolvedValue({ data: { lockedCount: 0 } });
+    mockUpdateScores.mockResolvedValue({ data: [] });
+    mockGetJobStatus.mockResolvedValue({ data: {} });
   });
 
   // ---------------------------------------------------------------------------
   // lockCompletedDays
   // ---------------------------------------------------------------------------
   describe('lockCompletedDays', () => {
-    it('queries final games and batch-locks daily rosters', async () => {
-      mockFrom.mockImplementation((table: string) => {
-        if (table === 'nhl_games') {
-          return createChainMock(
-            [{ game_date: '2025-01-10' }, { game_date: '2025-01-10' }, { game_date: '2025-01-11' }]
-          );
-        }
-        if (table === 'fantasy_daily_rosters') {
-          return createChainMock([{ player_id: 1 }, { player_id: 2 }]);
-        }
-        return createChainMock();
-      });
+    it('returns locked count from API response', async () => {
+      mockLockCompletedDays.mockResolvedValue({ data: { lockedCount: 5 } });
 
       const result = await MatchupScoreJobService.lockCompletedDays();
 
-      expect(result.lockedCount).toBe(2);
+      expect(result.lockedCount).toBe(5);
       expect(result.error).toBeNull();
     });
 
-    it('returns 0 when no final games exist', async () => {
-      mockFrom.mockImplementation(() => createChainMock([]));
+    it('returns 0 when API returns no lockedCount', async () => {
+      mockLockCompletedDays.mockResolvedValue({ data: {} });
 
       const result = await MatchupScoreJobService.lockCompletedDays();
 
@@ -102,8 +67,8 @@ describe('MatchupScoreJobService', () => {
       expect(result.error).toBeNull();
     });
 
-    it('returns 0 when finalGames is null', async () => {
-      mockFrom.mockImplementation(() => createChainMock(null));
+    it('returns 0 when API returns null data', async () => {
+      mockLockCompletedDays.mockResolvedValue({ data: null });
 
       const result = await MatchupScoreJobService.lockCompletedDays();
 
@@ -111,73 +76,24 @@ describe('MatchupScoreJobService', () => {
       expect(result.error).toBeNull();
     });
 
-    it('returns error when games query fails', async () => {
-      const dbError = { message: 'DB error', code: '42P01' };
-      mockFrom.mockImplementation(() => createChainMock(null, dbError));
+    it('returns error when API call fails', async () => {
+      const apiError = new Error('Lock endpoint failed');
+      mockLockCompletedDays.mockRejectedValue(apiError);
 
       const result = await MatchupScoreJobService.lockCompletedDays();
 
       expect(result.lockedCount).toBe(0);
-      expect(result.error).toEqual(dbError);
+      expect(result.error).toBe(apiError);
       expect(logger.error).toHaveBeenCalled();
     });
 
-    it('returns error when batch lock update fails', async () => {
-      const updateError = { message: 'Update failed', code: '42501' };
-      let callCount = 0;
-      mockFrom.mockImplementation((table: string) => {
-        callCount++;
-        if (table === 'nhl_games') {
-          return createChainMock([{ game_date: '2025-01-10' }]);
-        }
-        // fantasy_daily_rosters update fails
-        return createChainMock(null, updateError);
-      });
-
-      const result = await MatchupScoreJobService.lockCompletedDays();
-
-      expect(result.lockedCount).toBe(0);
-      expect(result.error).toEqual(updateError);
-    });
-
-    it('handles exceptions gracefully', async () => {
-      mockFrom.mockImplementation(() => {
-        throw new Error('Connection lost');
-      });
+    it('handles network exceptions gracefully', async () => {
+      mockLockCompletedDays.mockRejectedValue(new Error('Network error'));
 
       const result = await MatchupScoreJobService.lockCompletedDays();
 
       expect(result.lockedCount).toBe(0);
       expect(result.error).toBeDefined();
-    });
-
-    it('deduplicates game dates', async () => {
-      // Track what dates the 'in' filter receives
-      let inFilterDates: string[] = [];
-      mockFrom.mockImplementation((table: string) => {
-        if (table === 'nhl_games') {
-          return createChainMock([
-            { game_date: '2025-01-10' },
-            { game_date: '2025-01-10' },
-            { game_date: '2025-01-10' },
-            { game_date: '2025-01-11' },
-          ]);
-        }
-        const chain = createChainMock([{ player_id: 1 }]);
-        const origIn = chain.in;
-        chain.in = vi.fn().mockImplementation((col: string, vals: string[]) => {
-          if (col === 'roster_date') inFilterDates = vals;
-          return chain;
-        });
-        return chain;
-      });
-
-      await MatchupScoreJobService.lockCompletedDays();
-
-      // Should have 2 unique dates, not 4
-      expect(inFilterDates).toHaveLength(2);
-      expect(inFilterDates).toContain('2025-01-10');
-      expect(inFilterDates).toContain('2025-01-11');
     });
   });
 
@@ -185,48 +101,57 @@ describe('MatchupScoreJobService', () => {
   // calculateAndStoreScores
   // ---------------------------------------------------------------------------
   describe('calculateAndStoreScores', () => {
-    it('calls MatchupService.updateMatchupScores and returns count', async () => {
-      mockUpdateMatchupScores.mockResolvedValue({
-        error: null,
-        updatedCount: 10,
-        results: [],
+    it('calls matchupApi.updateScores with leagueId and returns updated count', async () => {
+      mockUpdateScores.mockResolvedValue({
+        data: [
+          { matchup_id: 'm1', updated: true },
+          { matchup_id: 'm2', updated: true },
+          { matchup_id: 'm3', updated: false },
+        ],
       });
 
       const result = await MatchupScoreJobService.calculateAndStoreScores('league-1');
 
-      expect(mockUpdateMatchupScores).toHaveBeenCalledWith('league-1');
-      expect(result.updatedCount).toBe(10);
+      expect(mockUpdateScores).toHaveBeenCalledWith('league-1');
+      expect(result.updatedCount).toBe(2);
       expect(result.error).toBeNull();
     });
 
     it('calls without leagueId when not provided', async () => {
+      mockUpdateScores.mockResolvedValue({ data: [] });
+
       await MatchupScoreJobService.calculateAndStoreScores();
 
-      expect(mockUpdateMatchupScores).toHaveBeenCalledWith(undefined);
+      expect(mockUpdateScores).toHaveBeenCalledWith(undefined);
     });
 
-    it('returns error when MatchupService fails', async () => {
-      const serviceError = { message: 'Score calculation failed', code: '42000' };
-      mockUpdateMatchupScores.mockResolvedValue({
-        error: serviceError,
-        updatedCount: 0,
-        results: [],
-      });
-
-      const result = await MatchupScoreJobService.calculateAndStoreScores('league-1');
-
-      expect(result.updatedCount).toBe(0);
-      expect(result.error).toEqual(serviceError);
-      expect(logger.error).toHaveBeenCalled();
-    });
-
-    it('handles exceptions gracefully', async () => {
-      mockUpdateMatchupScores.mockRejectedValue(new Error('Network error'));
+    it('returns 0 when API returns empty array', async () => {
+      mockUpdateScores.mockResolvedValue({ data: [] });
 
       const result = await MatchupScoreJobService.calculateAndStoreScores();
 
       expect(result.updatedCount).toBe(0);
-      expect(result.error).toBeDefined();
+      expect(result.error).toBeNull();
+    });
+
+    it('returns 0 when API returns null data', async () => {
+      mockUpdateScores.mockResolvedValue({ data: null });
+
+      const result = await MatchupScoreJobService.calculateAndStoreScores();
+
+      expect(result.updatedCount).toBe(0);
+      expect(result.error).toBeNull();
+    });
+
+    it('returns error when API call fails', async () => {
+      const apiError = new Error('Score calculation failed');
+      mockUpdateScores.mockRejectedValue(apiError);
+
+      const result = await MatchupScoreJobService.calculateAndStoreScores('league-1');
+
+      expect(result.updatedCount).toBe(0);
+      expect(result.error).toBe(apiError);
+      expect(logger.error).toHaveBeenCalled();
     });
   });
 
@@ -235,31 +160,21 @@ describe('MatchupScoreJobService', () => {
   // ---------------------------------------------------------------------------
   describe('runJob', () => {
     it('runs both steps: lock + calculate', async () => {
-      // lockCompletedDays: no final games
-      mockFrom.mockImplementation(() => createChainMock([]));
-      mockUpdateMatchupScores.mockResolvedValue({
-        error: null,
-        updatedCount: 5,
-        results: [],
+      mockLockCompletedDays.mockResolvedValue({ data: { lockedCount: 3 } });
+      mockUpdateScores.mockResolvedValue({
+        data: [{ matchup_id: 'm1', updated: true }],
       });
 
       const result = await MatchupScoreJobService.runJob('league-1');
 
-      expect(result.lockedCount).toBe(0);
-      expect(result.updatedCount).toBe(5);
+      expect(result.lockedCount).toBe(3);
+      expect(result.updatedCount).toBe(1);
       expect(result.errors).toHaveLength(0);
     });
 
     it('collects errors from both steps', async () => {
-      const lockError = { message: 'Lock failed', code: '42000' };
-      const scoreError = { message: 'Score failed', code: '42001' };
-
-      mockFrom.mockImplementation(() => createChainMock(null, lockError));
-      mockUpdateMatchupScores.mockResolvedValue({
-        error: scoreError,
-        updatedCount: 0,
-        results: [],
-      });
+      mockLockCompletedDays.mockRejectedValue(new Error('Lock failed'));
+      mockUpdateScores.mockRejectedValue(new Error('Score failed'));
 
       const result = await MatchupScoreJobService.runJob();
 
@@ -269,11 +184,13 @@ describe('MatchupScoreJobService', () => {
     });
 
     it('continues to step 2 even if step 1 fails', async () => {
-      mockFrom.mockImplementation(() => createChainMock(null, { message: 'Lock failed' }));
-      mockUpdateMatchupScores.mockResolvedValue({
-        error: null,
-        updatedCount: 3,
-        results: [],
+      mockLockCompletedDays.mockRejectedValue(new Error('Lock failed'));
+      mockUpdateScores.mockResolvedValue({
+        data: [
+          { matchup_id: 'm1', updated: true },
+          { matchup_id: 'm2', updated: true },
+          { matchup_id: 'm3', updated: true },
+        ],
       });
 
       const result = await MatchupScoreJobService.runJob();
@@ -284,11 +201,12 @@ describe('MatchupScoreJobService', () => {
     });
 
     it('passes leagueId to calculateAndStoreScores', async () => {
-      mockFrom.mockImplementation(() => createChainMock([]));
+      mockLockCompletedDays.mockResolvedValue({ data: { lockedCount: 0 } });
+      mockUpdateScores.mockResolvedValue({ data: [] });
 
       await MatchupScoreJobService.runJob('league-xyz');
 
-      expect(mockUpdateMatchupScores).toHaveBeenCalledWith('league-xyz');
+      expect(mockUpdateScores).toHaveBeenCalledWith('league-xyz');
     });
   });
 
@@ -296,56 +214,34 @@ describe('MatchupScoreJobService', () => {
   // getJobStatus
   // ---------------------------------------------------------------------------
   describe('getJobStatus', () => {
-    it('returns status with matchup count, locked days, and lastRun', async () => {
-      let callCount = 0;
-      mockFrom.mockImplementation((table: string) => {
-        callCount++;
-        if (table === 'matchups' && callCount <= 1) {
-          // Count active matchups (select with count: 'exact', head: true)
-          const chain = createChainMock(null);
-          // Override to return count
-          const origSelect = chain.select;
-          chain.select = vi.fn().mockImplementation(() => {
-            const inner = createChainMock(null);
-            inner.then = (onFulfilled?: (val: any) => any) =>
-              Promise.resolve({ count: 15, data: null, error: null }).then(onFulfilled);
-            return inner;
-          });
-          return chain;
-        }
-        if (table === 'fantasy_daily_rosters') {
-          const chain = createChainMock(null);
-          chain.select = vi.fn().mockImplementation(() => {
-            const inner = createChainMock(null);
-            inner.then = (onFulfilled?: (val: any) => any) =>
-              Promise.resolve({ count: 100, data: null, error: null }).then(onFulfilled);
-            return inner;
-          });
-          return chain;
-        }
-        if (table === 'matchups') {
-          // Get most recent matchup
-          const chain = createChainMock(null);
-          chain.single.mockResolvedValue({
-            data: { updated_at: '2025-01-15T12:00:00Z' },
-            error: null,
-          });
-          return chain;
-        }
-        return createChainMock();
+    it('returns status from API response', async () => {
+      mockGetJobStatus.mockResolvedValue({
+        data: {
+          lastRun: '2025-01-15T12:00:00Z',
+          totalMatchups: 15,
+          lockedDays: 100,
+        },
       });
 
       const result = await MatchupScoreJobService.getJobStatus();
 
-      expect(result).toHaveProperty('lastRun');
-      expect(result).toHaveProperty('totalMatchups');
-      expect(result).toHaveProperty('lockedDays');
+      expect(result.lastRun).toEqual(new Date('2025-01-15T12:00:00Z'));
+      expect(result.totalMatchups).toBe(15);
+      expect(result.lockedDays).toBe(100);
+    });
+
+    it('returns defaults when API returns empty data', async () => {
+      mockGetJobStatus.mockResolvedValue({ data: {} });
+
+      const result = await MatchupScoreJobService.getJobStatus();
+
+      expect(result.lastRun).toBeNull();
+      expect(result.totalMatchups).toBe(0);
+      expect(result.lockedDays).toBe(0);
     });
 
     it('returns defaults on error', async () => {
-      mockFrom.mockImplementation(() => {
-        throw new Error('DB down');
-      });
+      mockGetJobStatus.mockRejectedValue(new Error('API down'));
 
       const result = await MatchupScoreJobService.getJobStatus();
 

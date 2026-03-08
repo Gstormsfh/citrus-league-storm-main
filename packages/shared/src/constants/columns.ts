@@ -86,6 +86,10 @@ export const PLAYER_STATS_PROJECTIONS = 'player_id, projected_goals, projected_a
 // ============================================================================
 // WAIVER/TRADE COLUMNS
 // ============================================================================
+// Base columns that exist from the initial migration — safe for all waiver types
+export const WAIVER_CLAIM_COLUMNS_BASE = 'id, league_id, team_id, player_id, drop_player_id, priority, status, created_at, processed_at, failure_reason';
+
+// Full columns including FAAB-specific fields (bid_amount, is_conditional_drop)
 export const WAIVER_CLAIM_COLUMNS = 'id, league_id, team_id, player_id, drop_player_id, priority, bid_amount, status, created_at, processed_at, failure_reason, is_conditional_drop';
 
 export const TRADE_OFFER_COLUMNS = 'id, league_id, from_team_id, to_team_id, offered_player_ids, requested_player_ids, status, message, created_at, expires_at, processed_at, counter_offer_id';
@@ -115,7 +119,7 @@ export const DRAFT_ORDER_COLUMNS = 'id, league_id, round_number, team_order, cre
 // ============================================================================
 // PLAYER PROJECTED STATS COLUMNS
 // ============================================================================
-export const PLAYER_PROJECTED_STATS_COLUMNS = 'id, player_id, projection_date, calculation_method, total_projected_points, projected_goals, projected_assists, projected_sog, projected_blocks, projected_ppp, projected_shp, projected_hits, projected_pim, projected_wins, projected_saves, projected_shutouts, projected_goals_against, projected_gaa, projected_save_pct, shrinkage_weight, opponent_adjustment, confidence_score, dynamic_confidence, likely_low, likely_high, confidence_label, projection_mean, projection_std_dev, created_at, updated_at';
+export const PLAYER_PROJECTED_STATS_COLUMNS = 'projection_id, player_id, game_id, projection_date, season, calculation_method, total_projected_points, projected_goals, projected_assists, projected_sog, projected_blocks, projected_ppp, projected_shp, projected_hits, projected_pim, projected_xg, projected_wins, projected_saves, projected_shutouts, projected_goals_against, projected_gaa, projected_save_pct, is_goalie, starter_confirmed, base_ppg, shrinkage_weight, finishing_multiplier, opponent_adjustment, b2b_penalty, home_away_adjustment, confidence_score, opponent_abbrev, is_home_game, matchup_difficulty, created_at, updated_at';
 
 // ============================================================================
 // KEEPER DESIGNATION COLUMNS
@@ -161,6 +165,41 @@ export const PLAYOFF_SEED_COLUMNS = 'id, bracket_id, team_id, seed_number, regul
 export const PLAYOFF_SERIES_COLUMNS = 'id, bracket_id, round_number, match_number, bracket_position, home_seed, away_seed, home_team_id, away_team_id, home_score, away_score, winner_team_id, loser_team_id, status, matchup_week_1, matchup_week_2, winner_advances_to, winner_slot, loser_drops_to, loser_slot, created_at, updated_at';
 
 // ============================================================================
+// PLAYER DIRECTORY COLUMNS
+// ============================================================================
+export const PLAYER_DIRECTORY_COLUMNS = 'player_id, full_name, position_code, current_team_abbrev, sweater_number, headshot_url, roster_status, eligible_positions';
+
+// ============================================================================
+// PLAYER TALENT METRICS COLUMNS
+// ============================================================================
+export const PLAYER_TALENT_METRICS_COLUMNS = 'player_id, xg_per_60, xg_rating';
+
+// ============================================================================
+// GOALIE GSAX COLUMNS
+// ============================================================================
+export const GOALIE_GSAX_COLUMNS = 'player_id, gsax';
+
+// ============================================================================
+// TEAM LINEUPS COLUMNS
+// ============================================================================
+export const TEAM_LINEUP_COLUMNS = 'id, team_id, league_id, starters, bench, ir, slot_assignments, updated_at, created_at';
+
+// ============================================================================
+// MATCHUP SIMULATIONS COLUMNS
+// ============================================================================
+export const MATCHUP_SIMULATION_COLUMNS = 'id, league_id, week_number, team1_id, team2_id, team1_win_pct, team2_win_pct, simulated_at, matchup_id, num_simulations';
+
+// ============================================================================
+// FANTASY WEEKS COLUMNS
+// ============================================================================
+export const FANTASY_WEEK_COLUMNS = 'id, week_number, start_date, end_date, season, label';
+
+// ============================================================================
+// AUDIT LOG COLUMNS
+// ============================================================================
+export const AUDIT_LOG_COLUMNS = 'id, user_id, event_type, league_id, details, severity, ip_address, user_agent, created_at';
+
+// ============================================================================
 // COUNT-ONLY QUERIES (use with { count: 'exact', head: true })
 // ============================================================================
 // For count queries, we still need a column selection even though data isn't returned
@@ -181,6 +220,7 @@ export const COLUMNS = {
   NHL_GAME: NHL_GAME_COLUMNS,
   PLAYER_STATS: PLAYER_STATS_DISPLAY,
   WAIVER: WAIVER_CLAIM_COLUMNS,
+  WAIVER_BASE: WAIVER_CLAIM_COLUMNS_BASE,
   TRADE: TRADE_OFFER_COLUMNS,
   MATCHUP_LINES: MATCHUP_LINES_COLUMNS,
   PROFILE: PROFILE_COLUMNS,
@@ -196,6 +236,13 @@ export const COLUMNS = {
   PLAYOFF_BRACKET: PLAYOFF_BRACKET_COLUMNS,
   PLAYOFF_SEED: PLAYOFF_SEED_COLUMNS,
   PLAYOFF_SERIES: PLAYOFF_SERIES_COLUMNS,
+  PLAYER_DIRECTORY: PLAYER_DIRECTORY_COLUMNS,
+  PLAYER_TALENT_METRICS: PLAYER_TALENT_METRICS_COLUMNS,
+  GOALIE_GSAX: GOALIE_GSAX_COLUMNS,
+  TEAM_LINEUP: TEAM_LINEUP_COLUMNS,
+  MATCHUP_SIMULATION: MATCHUP_SIMULATION_COLUMNS,
+  FANTASY_WEEK: FANTASY_WEEK_COLUMNS,
+  AUDIT_LOG: AUDIT_LOG_COLUMNS,
 
   // Slim versions
   MATCHUP_SLIM: MATCHUP_COLUMNS_SLIM,

@@ -1,0 +1,54 @@
+import { SupabaseClient } from '@supabase/supabase-js';
+import { COLUMNS } from '@citrus/shared';
+
+export class AccountService {
+  private supabase: SupabaseClient;
+
+  constructor(supabase: SupabaseClient) {
+    this.supabase = supabase;
+  }
+
+  /** Get the current user's profile (RLS ensures they can only see their own) */
+  async getProfile() {
+    const { data: { user } } = await this.supabase.auth.getUser();
+    if (!user) return { success: false as const, error: 'Not authenticated' };
+
+    const { data, error } = await this.supabase
+      .from('profiles')
+      .select(COLUMNS.PROFILE)
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (error) return { success: false as const, error: error.message };
+    return { success: true as const, data: data || null };
+  }
+
+  async exportUserData() {
+    const { data, error } = await this.supabase.rpc('export_user_data');
+    if (error) return { success: false, error: error.message };
+    const result = data as Record<string, unknown>;
+    if (result && result.success === false) return { success: false, error: (result.error as string) || 'Export failed' };
+    return { success: true, data: result };
+  }
+
+  async deleteAccount() {
+    const { data, error } = await this.supabase.rpc('delete_user_account');
+    if (error) return { success: false, error: error.message };
+    const result = data as Record<string, unknown>;
+    if (result && result.success === false) return { success: false, error: (result.error as string) || 'Deletion failed' };
+    return { success: true };
+  }
+
+  async recordConsent(policyType: string, version: string) {
+    await this.supabase.rpc('record_user_consent', { p_policy_type: policyType, p_version: version });
+    return { success: true };
+  }
+
+  async logSecurityEvent(eventType: string, leagueId: string | null, details: Record<string, unknown>, severity: string = 'INFO') {
+    await this.supabase.rpc('log_security_event', {
+      p_event_type: eventType, p_league_id: leagueId || null,
+      p_details: details || {}, p_severity: severity,
+    });
+    return { success: true };
+  }
+}

@@ -1,4 +1,32 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// =============================================================================
+// MOCK SETUP
+// =============================================================================
+
+vi.mock('@/api/playoffs', () => ({
+  playoffApi: {
+    getBracket: vi.fn(),
+    generateBracket: vi.fn(),
+    advanceRound: vi.fn(),
+    resetBracket: vi.fn(),
+    getPlayoffPicture: vi.fn(),
+  },
+}));
+
+vi.mock('@/utils/logger', () => ({
+  logger: {
+    log: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
+// =============================================================================
+// Import AFTER mocks
+// =============================================================================
+
+import { playoffApi } from '@/api/playoffs';
 import { PlayoffService } from '../PlayoffService';
 import type {
   PlayoffSeries,
@@ -6,51 +34,9 @@ import type {
   BracketGenerationOptions,
 } from '../PlayoffService';
 
-// =============================================================================
-// MOCK SETUP
-// =============================================================================
-
-function createChainMock() {
-  const chain: Record<string, any> = {};
-  const chainMethods = ['select', 'insert', 'update', 'delete', 'eq', 'gte', 'is', 'in', 'order', 'limit', 'filter'];
-  chainMethods.forEach(m => {
-    chain[m] = vi.fn().mockReturnValue(chain);
-  });
-  chain.single = vi.fn().mockResolvedValue({ data: null, error: null });
-  chain.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
-  return chain;
-}
-
-let defaultChain = createChainMock();
-
-vi.mock('@/integrations/supabase/client', () => ({
-  supabase: {
-    from: vi.fn(() => defaultChain),
-    rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
-  },
-}));
-
-vi.mock('@/utils/seasonConstants', () => ({
-  CURRENT_SEASON: 2025,
-}));
-
-import { supabase } from '@/integrations/supabase/client';
-
-// =============================================================================
-// HELPERS
-// =============================================================================
-
-function resetChain() {
-  defaultChain = createChainMock();
-  (supabase.from as any).mockReturnValue(defaultChain);
-}
-
-function perTableChains(map: Record<string, ReturnType<typeof createChainMock>>) {
-  (supabase.from as any).mockImplementation((table: string) => {
-    return map[table] ?? defaultChain;
-  });
-  return map;
-}
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 // =============================================================================
 // getRoundName — Pure Function (no DB, no mocks needed)
@@ -261,20 +247,15 @@ describe('PlayoffService.buildBracketTree', () => {
 });
 
 // =============================================================================
-// getBracket — Fetching Bracket Data (Supabase Mocked)
+// getBracket — Fetching Bracket Data (API Mocked)
 // =============================================================================
 
 describe('PlayoffService.getBracket', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    resetChain();
-  });
-
   it('returns null bracket when no bracket exists for the league', async () => {
-    const bracketChain = createChainMock();
-    bracketChain.maybeSingle.mockResolvedValue({ data: null, error: null });
-
-    perTableChains({ playoff_brackets: bracketChain });
+    (playoffApi.getBracket as any).mockResolvedValue({
+      data: { bracket: null, seeds: [], series: [] },
+      error: undefined,
+    });
 
     const result = await PlayoffService.getBracket('league-no-bracket');
     expect(result.bracket).toBeNull();
@@ -315,30 +296,13 @@ describe('PlayoffService.getBracket', () => {
       { id: 'series-1', bracket_id: 'bracket-1', round_number: 1, match_number: 1 },
     ];
 
-    const bracketChain = createChainMock();
-    bracketChain.maybeSingle.mockResolvedValue({ data: mockBracket, error: null });
-
-    // Seeds chain: .select().eq().order() — single order call, awaited directly
-    const seedsChain = createChainMock();
-    seedsChain.order.mockResolvedValue({ data: mockSeeds, error: null });
-
-    // Series chain: .select().eq().order().order() — two order calls.
-    // First order returns chain, second order returns the awaited promise.
-    const seriesChain = createChainMock();
-    let seriesOrderCount = 0;
-    seriesChain.order.mockImplementation(() => {
-      seriesOrderCount++;
-      if (seriesOrderCount >= 2) {
-        return Promise.resolve({ data: mockSeries, error: null });
-      }
-      return seriesChain;
-    });
-
-    (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'playoff_brackets') return bracketChain;
-      if (table === 'playoff_seeds') return seedsChain;
-      if (table === 'playoff_series') return seriesChain;
-      return defaultChain;
+    (playoffApi.getBracket as any).mockResolvedValue({
+      data: {
+        bracket: mockBracket,
+        seeds: mockSeeds,
+        series: mockSeries,
+      },
+      error: undefined,
     });
 
     const result = await PlayoffService.getBracket('league-1');
@@ -350,14 +314,11 @@ describe('PlayoffService.getBracket', () => {
     expect(result.error).toBeNull();
   });
 
-  it('returns error when bracket query fails', async () => {
-    const bracketChain = createChainMock();
-    bracketChain.maybeSingle.mockResolvedValue({
+  it('returns error when API call fails', async () => {
+    (playoffApi.getBracket as any).mockResolvedValue({
       data: null,
-      error: new Error('Connection refused'),
+      error: 'Connection refused',
     });
-
-    perTableChains({ playoff_brackets: bracketChain });
 
     const result = await PlayoffService.getBracket('league-1');
     expect(result.bracket).toBeNull();
@@ -365,40 +326,13 @@ describe('PlayoffService.getBracket', () => {
     expect(result.error!.message).toContain('Connection refused');
   });
 
-  it('returns error when seeds query fails after bracket is found', async () => {
-    const bracketChain = createChainMock();
-    bracketChain.maybeSingle.mockResolvedValue({
-      data: { id: 'bracket-1' },
-      error: null,
-    });
-
-    const seedsChain = createChainMock();
-    seedsChain.order.mockResolvedValue({
-      data: null,
-      error: new Error('Seeds table missing'),
-    });
-
-    // Series chain needs to support .order().order() (two chained calls)
-    const seriesChain = createChainMock();
-    let seriesOrderCount = 0;
-    seriesChain.order.mockImplementation(() => {
-      seriesOrderCount++;
-      if (seriesOrderCount >= 2) {
-        return Promise.resolve({ data: [], error: null });
-      }
-      return seriesChain;
-    });
-
-    (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'playoff_brackets') return bracketChain;
-      if (table === 'playoff_seeds') return seedsChain;
-      if (table === 'playoff_series') return seriesChain;
-      return defaultChain;
-    });
+  it('returns error when API throws an exception', async () => {
+    (playoffApi.getBracket as any).mockRejectedValue(new Error('Network error'));
 
     const result = await PlayoffService.getBracket('league-1');
+    expect(result.bracket).toBeNull();
     expect(result.error).toBeInstanceOf(Error);
-    expect(result.error!.message).toContain('Seeds table missing');
+    expect(result.error!.message).toContain('Network error');
   });
 });
 
@@ -407,34 +341,23 @@ describe('PlayoffService.getBracket', () => {
 // =============================================================================
 
 describe('PlayoffService.generateBracket', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    resetChain();
-  });
-
-  it('calls RPC with default options when none provided', async () => {
-    (supabase.rpc as any).mockResolvedValue({
+  it('calls API with default options when none provided', async () => {
+    (playoffApi.generateBracket as any).mockResolvedValue({
       data: { bracket_id: 'new-bracket-1', bracket_size: 8 },
-      error: null,
+      error: undefined,
     });
 
     const result = await PlayoffService.generateBracket('league-1');
 
-    expect(supabase.rpc).toHaveBeenCalledWith('generate_playoff_bracket', {
-      p_league_id: 'league-1',
-      p_consolation_enabled: false,
-      p_two_week_matchups: false,
-      p_reseed_each_round: false,
-      p_seeding_method: 'standings',
-    });
+    expect(playoffApi.generateBracket).toHaveBeenCalledWith('league-1', {});
     expect(result.error).toBeNull();
     expect(result.result).toEqual({ bracket_id: 'new-bracket-1', bracket_size: 8 });
   });
 
-  it('passes all custom options to RPC', async () => {
-    (supabase.rpc as any).mockResolvedValue({
+  it('passes all custom options to API', async () => {
+    (playoffApi.generateBracket as any).mockResolvedValue({
       data: { bracket_id: 'new-bracket-2' },
-      error: null,
+      error: undefined,
     });
 
     const options: BracketGenerationOptions = {
@@ -446,35 +369,26 @@ describe('PlayoffService.generateBracket', () => {
 
     await PlayoffService.generateBracket('league-1', options);
 
-    expect(supabase.rpc).toHaveBeenCalledWith('generate_playoff_bracket', {
-      p_league_id: 'league-1',
-      p_consolation_enabled: true,
-      p_two_week_matchups: true,
-      p_reseed_each_round: true,
-      p_seeding_method: 'manual',
-    });
+    expect(playoffApi.generateBracket).toHaveBeenCalledWith('league-1', options);
   });
 
-  it('passes "standings" seeding method by default', async () => {
-    (supabase.rpc as any).mockResolvedValue({
+  it('passes partial options to API', async () => {
+    (playoffApi.generateBracket as any).mockResolvedValue({
       data: { bracket_id: 'b-1' },
-      error: null,
+      error: undefined,
     });
 
     await PlayoffService.generateBracket('league-1', { consolationEnabled: true });
 
-    expect(supabase.rpc).toHaveBeenCalledWith(
-      'generate_playoff_bracket',
-      expect.objectContaining({
-        p_seeding_method: 'standings',
-      })
-    );
+    expect(playoffApi.generateBracket).toHaveBeenCalledWith('league-1', {
+      consolationEnabled: true,
+    });
   });
 
-  it('returns error when RPC fails', async () => {
-    (supabase.rpc as any).mockResolvedValue({
+  it('returns error when API returns error', async () => {
+    (playoffApi.generateBracket as any).mockResolvedValue({
       data: null,
-      error: new Error('Not enough teams for bracket'),
+      error: 'Not enough teams for bracket',
     });
 
     const result = await PlayoffService.generateBracket('league-1');
@@ -483,32 +397,8 @@ describe('PlayoffService.generateBracket', () => {
     expect(result.error!.message).toContain('Not enough teams');
   });
 
-  it('handles RPC returning error in data payload (string)', async () => {
-    (supabase.rpc as any).mockResolvedValue({
-      data: JSON.stringify({ error: 'Bracket already exists for this season' }),
-      error: null,
-    });
-
-    const result = await PlayoffService.generateBracket('league-1');
-    expect(result.result).toBeNull();
-    expect(result.error).toBeInstanceOf(Error);
-    expect(result.error!.message).toContain('Bracket already exists');
-  });
-
-  it('handles RPC returning error in data payload (object)', async () => {
-    (supabase.rpc as any).mockResolvedValue({
-      data: { error: 'League has no completed regular season' },
-      error: null,
-    });
-
-    const result = await PlayoffService.generateBracket('league-1');
-    expect(result.result).toBeNull();
-    expect(result.error).toBeInstanceOf(Error);
-    expect(result.error!.message).toContain('no completed regular season');
-  });
-
   it('handles unexpected exceptions', async () => {
-    (supabase.rpc as any).mockRejectedValue(new Error('Network timeout'));
+    (playoffApi.generateBracket as any).mockRejectedValue(new Error('Network timeout'));
 
     const result = await PlayoffService.generateBracket('league-1');
     expect(result.result).toBeNull();
@@ -522,30 +412,23 @@ describe('PlayoffService.generateBracket', () => {
 // =============================================================================
 
 describe('PlayoffService.advanceRound', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    resetChain();
-  });
-
-  it('calls RPC with bracket ID and returns result', async () => {
-    (supabase.rpc as any).mockResolvedValue({
+  it('calls API with bracket ID and returns result', async () => {
+    (playoffApi.advanceRound as any).mockResolvedValue({
       data: { advanced_to_round: 2, series_created: 2 },
-      error: null,
+      error: undefined,
     });
 
     const result = await PlayoffService.advanceRound('bracket-1');
 
-    expect(supabase.rpc).toHaveBeenCalledWith('advance_playoff_round', {
-      p_bracket_id: 'bracket-1',
-    });
+    expect(playoffApi.advanceRound).toHaveBeenCalledWith('bracket-1');
     expect(result.error).toBeNull();
     expect(result.result).toEqual({ advanced_to_round: 2, series_created: 2 });
   });
 
-  it('returns error when RPC fails', async () => {
-    (supabase.rpc as any).mockResolvedValue({
+  it('returns error when API returns error', async () => {
+    (playoffApi.advanceRound as any).mockResolvedValue({
       data: null,
-      error: new Error('Round not complete yet'),
+      error: 'Round not complete yet',
     });
 
     const result = await PlayoffService.advanceRound('bracket-1');
@@ -554,32 +437,8 @@ describe('PlayoffService.advanceRound', () => {
     expect(result.error!.message).toContain('Round not complete');
   });
 
-  it('handles data-level error from RPC (string response)', async () => {
-    (supabase.rpc as any).mockResolvedValue({
-      data: JSON.stringify({ error: 'Cannot advance - not all series are completed' }),
-      error: null,
-    });
-
-    const result = await PlayoffService.advanceRound('bracket-1');
-    expect(result.result).toBeNull();
-    expect(result.error).toBeInstanceOf(Error);
-    expect(result.error!.message).toContain('not all series');
-  });
-
-  it('handles data-level error from RPC (object response)', async () => {
-    (supabase.rpc as any).mockResolvedValue({
-      data: { error: 'Bracket is already completed' },
-      error: null,
-    });
-
-    const result = await PlayoffService.advanceRound('bracket-1');
-    expect(result.result).toBeNull();
-    expect(result.error).toBeInstanceOf(Error);
-    expect(result.error!.message).toContain('already completed');
-  });
-
   it('handles unexpected exceptions', async () => {
-    (supabase.rpc as any).mockRejectedValue(new Error('Service unavailable'));
+    (playoffApi.advanceRound as any).mockRejectedValue(new Error('Service unavailable'));
 
     const result = await PlayoffService.advanceRound('bracket-1');
     expect(result.result).toBeNull();
@@ -593,26 +452,19 @@ describe('PlayoffService.advanceRound', () => {
 // =============================================================================
 
 describe('PlayoffService.resetBracket', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    resetChain();
-  });
-
-  it('calls RPC and returns success', async () => {
-    (supabase.rpc as any).mockResolvedValue({ data: null, error: null });
+  it('calls API and returns success', async () => {
+    (playoffApi.resetBracket as any).mockResolvedValue({ data: null, error: undefined });
 
     const result = await PlayoffService.resetBracket('league-1');
 
-    expect(supabase.rpc).toHaveBeenCalledWith('reset_playoff_bracket', {
-      p_league_id: 'league-1',
-    });
+    expect(playoffApi.resetBracket).toHaveBeenCalledWith('league-1');
     expect(result.error).toBeNull();
   });
 
-  it('returns error when RPC fails', async () => {
-    (supabase.rpc as any).mockResolvedValue({
+  it('returns error when API returns error', async () => {
+    (playoffApi.resetBracket as any).mockResolvedValue({
       data: null,
-      error: new Error('Permission denied'),
+      error: 'Permission denied',
     });
 
     const result = await PlayoffService.resetBracket('league-1');
@@ -620,19 +472,8 @@ describe('PlayoffService.resetBracket', () => {
     expect(result.error!.message).toContain('Permission denied');
   });
 
-  it('handles data-level error from RPC', async () => {
-    (supabase.rpc as any).mockResolvedValue({
-      data: { error: 'No bracket to reset' },
-      error: null,
-    });
-
-    const result = await PlayoffService.resetBracket('league-1');
-    expect(result.error).toBeInstanceOf(Error);
-    expect(result.error!.message).toContain('No bracket to reset');
-  });
-
   it('handles unexpected exceptions', async () => {
-    (supabase.rpc as any).mockRejectedValue(new Error('DB crash'));
+    (playoffApi.resetBracket as any).mockRejectedValue(new Error('DB crash'));
 
     const result = await PlayoffService.resetBracket('league-1');
     expect(result.error).toBeInstanceOf(Error);
@@ -645,12 +486,7 @@ describe('PlayoffService.resetBracket', () => {
 // =============================================================================
 
 describe('PlayoffService.getPlayoffPicture', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    resetChain();
-  });
-
-  it('returns playoff picture data from RPC', async () => {
+  it('returns playoff picture data from API', async () => {
     const mockPicture = {
       playoff_teams: 6,
       total_teams: 12,
@@ -684,7 +520,7 @@ describe('PlayoffService.getPlayoffPicture', () => {
       ],
     };
 
-    (supabase.rpc as any).mockResolvedValue({ data: mockPicture, error: null });
+    (playoffApi.getPlayoffPicture as any).mockResolvedValue({ data: mockPicture, error: undefined });
 
     const result = await PlayoffService.getPlayoffPicture('league-1');
     expect(result.error).toBeNull();
@@ -696,10 +532,10 @@ describe('PlayoffService.getPlayoffPicture', () => {
     expect(result.picture!.teams[1].clinch_status).toBe('eliminated');
   });
 
-  it('returns null picture on RPC error', async () => {
-    (supabase.rpc as any).mockResolvedValue({
+  it('returns null picture on API error', async () => {
+    (playoffApi.getPlayoffPicture as any).mockResolvedValue({
       data: null,
-      error: new Error('League has no standings'),
+      error: 'League has no standings',
     });
 
     const result = await PlayoffService.getPlayoffPicture('league-1');
@@ -708,51 +544,8 @@ describe('PlayoffService.getPlayoffPicture', () => {
     expect(result.error!.message).toContain('no standings');
   });
 
-  it('handles string data response (JSON parsing)', async () => {
-    const mockPicture = {
-      playoff_teams: 4,
-      total_teams: 8,
-      weeks_completed: 20,
-      remaining_weeks: 2,
-      teams: [],
-    };
-
-    (supabase.rpc as any).mockResolvedValue({
-      data: JSON.stringify(mockPicture),
-      error: null,
-    });
-
-    const result = await PlayoffService.getPlayoffPicture('league-1');
-    expect(result.picture).not.toBeNull();
-    expect(result.picture!.playoff_teams).toBe(4);
-  });
-
-  it('handles data-level error from RPC', async () => {
-    (supabase.rpc as any).mockResolvedValue({
-      data: { error: 'Season not started' },
-      error: null,
-    });
-
-    const result = await PlayoffService.getPlayoffPicture('league-1');
-    expect(result.picture).toBeNull();
-    expect(result.error).toBeInstanceOf(Error);
-    expect(result.error!.message).toContain('Season not started');
-  });
-
-  it('handles data-level error from RPC (string format)', async () => {
-    (supabase.rpc as any).mockResolvedValue({
-      data: JSON.stringify({ error: 'Insufficient data' }),
-      error: null,
-    });
-
-    const result = await PlayoffService.getPlayoffPicture('league-1');
-    expect(result.picture).toBeNull();
-    expect(result.error).toBeInstanceOf(Error);
-    expect(result.error!.message).toContain('Insufficient data');
-  });
-
   it('handles unexpected exceptions', async () => {
-    (supabase.rpc as any).mockRejectedValue(new Error('Unexpected failure'));
+    (playoffApi.getPlayoffPicture as any).mockRejectedValue(new Error('Unexpected failure'));
 
     const result = await PlayoffService.getPlayoffPicture('league-1');
     expect(result.picture).toBeNull();
@@ -760,71 +553,15 @@ describe('PlayoffService.getPlayoffPicture', () => {
     expect(result.error!.message).toContain('Unexpected failure');
   });
 
-  it('calls RPC with the correct league ID parameter', async () => {
-    (supabase.rpc as any).mockResolvedValue({ data: { teams: [] }, error: null });
+  it('calls API with the correct league ID', async () => {
+    (playoffApi.getPlayoffPicture as any).mockResolvedValue({
+      data: { playoff_teams: 4, total_teams: 8, weeks_completed: 20, remaining_weeks: 2, teams: [] },
+      error: undefined,
+    });
 
     await PlayoffService.getPlayoffPicture('my-league-id');
 
-    expect(supabase.rpc).toHaveBeenCalledWith('get_playoff_picture', {
-      p_league_id: 'my-league-id',
-    });
-  });
-});
-
-// =============================================================================
-// isCommissioner — Commissioner Check
-// =============================================================================
-
-describe('PlayoffService.isCommissioner', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    resetChain();
-  });
-
-  it('returns true when user is the commissioner', async () => {
-    const leagueChain = createChainMock();
-    leagueChain.maybeSingle.mockResolvedValue({
-      data: { commissioner_id: 'user-1' },
-      error: null,
-    });
-
-    perTableChains({ leagues: leagueChain });
-
-    const result = await PlayoffService.isCommissioner('league-1', 'user-1');
-    expect(result).toBe(true);
-  });
-
-  it('returns false when user is not the commissioner', async () => {
-    const leagueChain = createChainMock();
-    leagueChain.maybeSingle.mockResolvedValue({
-      data: { commissioner_id: 'user-1' },
-      error: null,
-    });
-
-    perTableChains({ leagues: leagueChain });
-
-    const result = await PlayoffService.isCommissioner('league-1', 'user-2');
-    expect(result).toBe(false);
-  });
-
-  it('returns false when league is not found', async () => {
-    const leagueChain = createChainMock();
-    leagueChain.maybeSingle.mockResolvedValue({ data: null, error: null });
-
-    perTableChains({ leagues: leagueChain });
-
-    const result = await PlayoffService.isCommissioner('missing-league', 'user-1');
-    expect(result).toBe(false);
-  });
-
-  it('returns false when query throws an error', async () => {
-    const leagueChain = createChainMock();
-    leagueChain.maybeSingle.mockRejectedValue(new Error('DB error'));
-
-    perTableChains({ leagues: leagueChain });
-
-    const result = await PlayoffService.isCommissioner('league-1', 'user-1');
-    expect(result).toBe(false);
+    expect(playoffApi.getPlayoffPicture).toHaveBeenCalledWith('my-league-id');
   });
 });
 
@@ -833,15 +570,10 @@ describe('PlayoffService.isCommissioner', () => {
 // =============================================================================
 
 describe('PlayoffService bracket size handling', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    resetChain();
-  });
-
   it('generates bracket for 4-team size', async () => {
-    (supabase.rpc as any).mockResolvedValue({
+    (playoffApi.generateBracket as any).mockResolvedValue({
       data: { bracket_id: 'b-4', bracket_size: 4, total_rounds: 2 },
-      error: null,
+      error: undefined,
     });
 
     const result = await PlayoffService.generateBracket('league-1');
@@ -851,9 +583,9 @@ describe('PlayoffService bracket size handling', () => {
   });
 
   it('generates bracket for 6-team size', async () => {
-    (supabase.rpc as any).mockResolvedValue({
+    (playoffApi.generateBracket as any).mockResolvedValue({
       data: { bracket_id: 'b-6', bracket_size: 6, total_rounds: 3 },
-      error: null,
+      error: undefined,
     });
 
     const result = await PlayoffService.generateBracket('league-1');
@@ -863,9 +595,9 @@ describe('PlayoffService bracket size handling', () => {
   });
 
   it('generates bracket for 8-team size', async () => {
-    (supabase.rpc as any).mockResolvedValue({
+    (playoffApi.generateBracket as any).mockResolvedValue({
       data: { bracket_id: 'b-8', bracket_size: 8, total_rounds: 3 },
-      error: null,
+      error: undefined,
     });
 
     const result = await PlayoffService.generateBracket('league-1');
@@ -874,10 +606,10 @@ describe('PlayoffService bracket size handling', () => {
     );
   });
 
-  it('RPC rejects invalid bracket size gracefully', async () => {
-    (supabase.rpc as any).mockResolvedValue({
-      data: { error: 'Invalid bracket size: 5. Must be 4, 6, or 8.' },
-      error: null,
+  it('API rejects invalid bracket size gracefully', async () => {
+    (playoffApi.generateBracket as any).mockResolvedValue({
+      data: null,
+      error: 'Invalid bracket size: 5. Must be 4, 6, or 8.',
     });
 
     const result = await PlayoffService.generateBracket('league-too-small');
@@ -891,42 +623,32 @@ describe('PlayoffService bracket size handling', () => {
 // =============================================================================
 
 describe('PlayoffService seeding methods', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    resetChain();
-  });
-
-  it('defaults to standings-based seeding', async () => {
-    (supabase.rpc as any).mockResolvedValue({ data: {}, error: null });
+  it('passes no seeding method when not specified (defaults handled server-side)', async () => {
+    (playoffApi.generateBracket as any).mockResolvedValue({ data: {}, error: undefined });
 
     await PlayoffService.generateBracket('league-1');
 
-    expect(supabase.rpc).toHaveBeenCalledWith(
-      'generate_playoff_bracket',
-      expect.objectContaining({ p_seeding_method: 'standings' })
-    );
+    expect(playoffApi.generateBracket).toHaveBeenCalledWith('league-1', {});
   });
 
   it('passes manual seeding method when specified', async () => {
-    (supabase.rpc as any).mockResolvedValue({ data: {}, error: null });
+    (playoffApi.generateBracket as any).mockResolvedValue({ data: {}, error: undefined });
 
     await PlayoffService.generateBracket('league-1', { seedingMethod: 'manual' });
 
-    expect(supabase.rpc).toHaveBeenCalledWith(
-      'generate_playoff_bracket',
-      expect.objectContaining({ p_seeding_method: 'manual' })
-    );
+    expect(playoffApi.generateBracket).toHaveBeenCalledWith('league-1', {
+      seedingMethod: 'manual',
+    });
   });
 
   it('passes reseedEachRound option correctly', async () => {
-    (supabase.rpc as any).mockResolvedValue({ data: {}, error: null });
+    (playoffApi.generateBracket as any).mockResolvedValue({ data: {}, error: undefined });
 
     await PlayoffService.generateBracket('league-1', { reseedEachRound: true });
 
-    expect(supabase.rpc).toHaveBeenCalledWith(
-      'generate_playoff_bracket',
-      expect.objectContaining({ p_reseed_each_round: true })
-    );
+    expect(playoffApi.generateBracket).toHaveBeenCalledWith('league-1', {
+      reseedEachRound: true,
+    });
   });
 });
 
@@ -935,16 +657,11 @@ describe('PlayoffService seeding methods', () => {
 // =============================================================================
 
 describe('PlayoffService full bracket flow', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    resetChain();
-  });
-
   it('generate → advance → advance → complete flow', async () => {
     // Step 1: Generate
-    (supabase.rpc as any).mockResolvedValueOnce({
+    (playoffApi.generateBracket as any).mockResolvedValue({
       data: { bracket_id: 'flow-bracket', bracket_size: 4, total_rounds: 2 },
-      error: null,
+      error: undefined,
     });
 
     const genResult = await PlayoffService.generateBracket('league-flow');
@@ -952,9 +669,9 @@ describe('PlayoffService full bracket flow', () => {
     expect(genResult.result.bracket_id).toBe('flow-bracket');
 
     // Step 2: Advance round 1 → round 2
-    (supabase.rpc as any).mockResolvedValueOnce({
+    (playoffApi.advanceRound as any).mockResolvedValue({
       data: { advanced_to_round: 2, series_created: 1 },
-      error: null,
+      error: undefined,
     });
 
     const advResult1 = await PlayoffService.advanceRound('flow-bracket');
@@ -962,9 +679,9 @@ describe('PlayoffService full bracket flow', () => {
     expect(advResult1.result.advanced_to_round).toBe(2);
 
     // Step 3: Advance round 2 → championship complete
-    (supabase.rpc as any).mockResolvedValueOnce({
+    (playoffApi.advanceRound as any).mockResolvedValue({
       data: { bracket_completed: true, champion_team_id: 'team-1' },
-      error: null,
+      error: undefined,
     });
 
     const advResult2 = await PlayoffService.advanceRound('flow-bracket');
@@ -974,15 +691,15 @@ describe('PlayoffService full bracket flow', () => {
   });
 
   it('generate → reset flow', async () => {
-    (supabase.rpc as any).mockResolvedValueOnce({
+    (playoffApi.generateBracket as any).mockResolvedValue({
       data: { bracket_id: 'reset-bracket' },
-      error: null,
+      error: undefined,
     });
 
     const genResult = await PlayoffService.generateBracket('league-reset');
     expect(genResult.error).toBeNull();
 
-    (supabase.rpc as any).mockResolvedValueOnce({ data: null, error: null });
+    (playoffApi.resetBracket as any).mockResolvedValue({ data: null, error: undefined });
 
     const resetResult = await PlayoffService.resetBracket('league-reset');
     expect(resetResult.error).toBeNull();

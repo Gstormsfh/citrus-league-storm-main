@@ -10,6 +10,9 @@ import './utils/logger'
 // Initialize Sentry error monitoring (no-ops if not installed or configured)
 import { initSentry } from './integrations/sentry/config'
 initSentry();
+// Initialize Core Web Vitals tracking (LCP, FID, CLS, FCP, TTFB, INP)
+import { initWebVitals } from './utils/webVitals'
+initWebVitals();
 
 // Ensure root element exists
 const rootElement = document.getElementById("root");

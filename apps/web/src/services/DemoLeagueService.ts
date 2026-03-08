@@ -251,7 +251,7 @@ export const DemoLeagueService = {
             draft_status: 'completed',
             settings: {},
           })
-          .select()
+          .select(COLUMNS.LEAGUE)
           .single();
 
         if (leagueError) {
@@ -275,7 +275,7 @@ export const DemoLeagueService = {
               owner_id: null, // No user ownership - pillar of isolation
               team_name: teamData.name,
             })
-            .select()
+            .select(COLUMNS.TEAM)
             .single();
 
           if (teamError) {

@@ -50,7 +50,7 @@ def load_goalie_gsax_data() -> Optional[pd.DataFrame]:
     logger.info("=" * 80)
     
     try:
-        response = supabase.table('goalie_gsax').select('*').execute()
+        response = supabase.table('goalie_gsax').select('goalie_id, regressed_gsax, total_shots_faced').execute()
         
         if not response.data or len(response.data) == 0:
             logger.warning("⚠️  No GSAx data found. Please run calculate_goalie_gsax.py first.")

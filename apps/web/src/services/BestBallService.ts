@@ -11,11 +11,10 @@
  *   3. The resulting "best possible lineup" becomes the team's score.
  */
 
-import { supabase } from '@/integrations/supabase/client';
-import { ScoringCalculator, extractScoringSettings, type ScoringSettings } from '@/utils/scoringUtils';
+import { ScoringCalculator, type ScoringSettings } from '@/utils/scoringUtils';
 import { DEFAULT_ROSTER_SLOTS, type RosterSlotConfig } from '@/types/leagueTypes';
-import { CURRENT_SEASON } from '@/utils/seasonConstants';
 import { logger } from '@/utils/logger';
+import { bestballApi } from '@/api/bestball';
 
 // Mapping of roster slot codes to eligible player positions
 const SLOT_ELIGIBLE_POSITIONS: Record<string, string[]> = {
@@ -129,43 +128,19 @@ export class BestBallService {
     };
 
     try {
-      // Get the team's rostered players
-      // IR players are included but score 0 (ESPN/Yahoo standard for Best Ball)
-      // This ensures they appear in player_scores for transparency but never
-      // get optimized into the lineup since the greedy algorithm picks higher scorers.
-      const { data: lineup } = await supabase
-        .from('team_lineups')
-        .select('starters, bench, ir')
-        .eq('league_id', leagueId)
-        .eq('team_id', teamId)
-        .maybeSingle();
+      // Fetch all data from the API server
+      const response = await bestballApi.getWeeklyData(leagueId, teamId, weekNumber);
+      const bbData = response.data;
+      if (!bbData) return emptyResult;
+
+      const { lineup, playerIds, players, weeklyStats } = bbData;
+
+      if (!playerIds || playerIds.length === 0) return emptyResult;
 
       // Track IR players so we can force their score to 0
       const irPlayerIds = new Set<string>(
         ((lineup?.ir as string[]) || []).map(String)
       );
-
-      const { data: assignments } = await supabase
-        .from('roster_assignments')
-        .select('player_id')
-        .eq('league_id', leagueId)
-        .eq('team_id', teamId);
-
-      if (!assignments || assignments.length === 0) return emptyResult;
-
-      // Include ALL rostered players (IR players will get 0 points below)
-      const playerIds = assignments.map(a => a.player_id);
-
-      if (playerIds.length === 0) return emptyResult;
-
-      const season = CURRENT_SEASON;
-
-      // Get player positions and eligible_positions
-      const { data: players } = await supabase
-        .from('player_directory')
-        .select('player_id, position_code, eligible_positions')
-        .eq('season', season)
-        .in('player_id', playerIds.map(Number));
 
       const posMap = new Map<string, string>();
       const eligibleMap = new Map<string, string[]>();
@@ -175,13 +150,6 @@ export class BestBallService {
           eligibleMap.set(String(p.player_id), p.eligible_positions.split(',').map(s => s.trim()).filter(Boolean));
         }
       });
-
-      // Get weekly stats for these players
-      const { data: weeklyStats } = await supabase
-        .from('player_weekly_stats')
-        .select('player_id, goals, assists, shots_on_goal, blocks, hits, pim, ppp, shp, plus_minus, wins, saves, shutouts, goals_against')
-        .eq('week_number', weekNumber)
-        .in('player_id', playerIds.map(Number));
 
       if (!weeklyStats || weeklyStats.length === 0) return emptyResult;
 
@@ -229,11 +197,9 @@ export class BestBallService {
     scoringSettings?: ScoringSettings | Partial<ScoringSettings> | null
   ): Promise<BestBallResult[]> {
     try {
-      // Get all teams in the league
-      const { data: teams } = await supabase
-        .from('teams')
-        .select('id')
-        .eq('league_id', leagueId);
+      // Get all teams in the league via API
+      const teamsResponse = await bestballApi.getLeagueTeams(leagueId);
+      const teams = teamsResponse.data;
 
       if (!teams || teams.length === 0) return [];
 
@@ -303,19 +269,13 @@ export class BestBallService {
     error?: string;
   }> {
     try {
-      const { data, error } = await supabase.rpc('optimize_best_ball_daily_rosters', {
-        p_league_id: leagueId,
-        p_roster_date: date,
-      });
-
-      if (error) throw error;
-
-      const results = (data || []).map((row: { team_id: string; players_optimized: number; total_points: number }) => ({
+      const response = await bestballApi.triggerOptimization(leagueId, date);
+      const data = response.data || [];
+      const results = (Array.isArray(data) ? data : []).map((row: { team_id: string; players_optimized: number; total_points: number }) => ({
         teamId: row.team_id,
         playersOptimized: row.players_optimized,
         totalPoints: row.total_points,
       }));
-
       return { results };
     } catch (error: unknown) {
       logger.error('[BestBallService] triggerServerOptimization error:', error);
@@ -325,7 +285,6 @@ export class BestBallService {
 
   /**
    * Trigger server-side optimization for an entire week's date range.
-   * Optimizes each day in the week sequentially.
    */
   static async triggerWeekOptimization(
     leagueId: string,
@@ -333,20 +292,8 @@ export class BestBallService {
     weekEndDate: string     // YYYY-MM-DD
   ): Promise<{ daysOptimized: number; error?: string }> {
     try {
-      let daysOptimized = 0;
-      // Parse date strings manually to avoid UTC midnight shift
-      const [sy, sm, sd] = weekStartDate.split('-').map(Number);
-      const [ey, em, ed] = weekEndDate.split('-').map(Number);
-      const start = new Date(sy, sm - 1, sd);
-      const end = new Date(ey, em - 1, ed);
-
-      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        const { error } = await this.triggerServerOptimization(leagueId, dateStr);
-        if (!error) daysOptimized++;
-      }
-
-      return { daysOptimized };
+      const response = await bestballApi.triggerWeekOptimization(leagueId, { weekStartDate, weekEndDate });
+      return { daysOptimized: response.data?.daysOptimized || 0 };
     } catch (error: unknown) {
       logger.error('[BestBallService] triggerWeekOptimization error:', error);
       return { daysOptimized: 0, error: error instanceof Error ? error.message : String(error) };

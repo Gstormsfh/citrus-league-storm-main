@@ -17,6 +17,22 @@ export class TradeService {
     this.membership = new LeagueMembershipService(supabase);
   }
 
+  /** Verify the caller is a member of the league that a trade belongs to */
+  async verifyTradeAccess(tradeId: string, userId: string): Promise<{ leagueId: string | null; error: string | null }> {
+    const { data } = await this.supabase
+      .from('trade_offers')
+      .select('league_id')
+      .eq('id', tradeId)
+      .single();
+
+    if (!data) return { leagueId: null, error: 'Trade not found' };
+
+    const isMember = await this.membership.verifyMembership(data.league_id, userId);
+    if (!isMember) return { leagueId: null, error: 'Not a member of this league' };
+
+    return { leagueId: data.league_id, error: null };
+  }
+
   /** Get all trades for a league */
   async getLeagueTrades(leagueId: string, status?: string) {
     let query = this.supabase
@@ -93,7 +109,7 @@ export class TradeService {
       .select(COLUMNS.TRADE)
       .single();
 
-    return { success: !error, error: error?.message, tradeId: (data as any)?.id };
+    return { success: !error, error: error?.message, tradeId: (data as unknown as Record<string, unknown>)?.id as string | undefined };
   }
 
   /** Accept a trade offer with review routing */
@@ -106,6 +122,7 @@ export class TradeService {
       .eq('status', 'pending')
       .single();
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const trade = tradeData as any;
     if (tradeError || !trade) {
       return { success: false, error: 'Trade not found or already processed' };
@@ -134,17 +151,17 @@ export class TradeService {
     const { count: fromCount } = await this.supabase
       .from('roster_assignments')
       .select('id', { count: 'exact', head: true })
-      .eq('team_id', trade.from_team_id)
-      .eq('league_id', trade.league_id);
+      .eq('team_id', String(trade.from_team_id))
+      .eq('league_id', String(trade.league_id));
 
     const { count: toCount } = await this.supabase
       .from('roster_assignments')
       .select('id', { count: 'exact', head: true })
-      .eq('team_id', trade.to_team_id)
-      .eq('league_id', trade.league_id);
+      .eq('team_id', String(trade.to_team_id))
+      .eq('league_id', String(trade.league_id));
 
-    const offeredCount = trade.offered_player_ids?.length || 0;
-    const requestedCount = trade.requested_player_ids?.length || 0;
+    const offeredCount = Array.isArray(trade.offered_player_ids) ? trade.offered_player_ids.length : 0;
+    const requestedCount = Array.isArray(trade.requested_player_ids) ? trade.requested_player_ids.length : 0;
 
     const newFromSize = (fromCount || 0) - offeredCount + requestedCount;
     const newToSize = (toCount || 0) - requestedCount + offeredCount;
@@ -157,7 +174,7 @@ export class TradeService {
     const reviewType = league?.trade_review_type || 'none';
 
     if (reviewType !== 'none') {
-      return this.submitTradeForReview(tradeId, trade.league_id);
+      return this.submitTradeForReview(tradeId, String(trade.league_id));
     }
 
     // Execute trade immediately
@@ -299,7 +316,7 @@ export class TradeService {
       .eq('trade_offer_id', tradeOfferId);
 
     return {
-      votes: (data || []).map((v: any) => ({
+      votes: (data || []).map((v: { voter_team_id: string; vote: string; created_at: string }) => ({
         voterTeamId: v.voter_team_id,
         vote: v.vote,
         createdAt: v.created_at,

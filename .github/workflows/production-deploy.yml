@@ -1,0 +1,148 @@
+name: Production Deploy
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false  # Never cancel production deploys
+
+jobs:
+  # ── Gate: all checks must pass before deploy ──────────────────────────
+  gate:
+    name: Pre-deploy Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npx eslint apps/web/src/ --max-warnings 0
+
+      - name: Type check (web)
+        run: cd apps/web && npx tsc --noEmit
+
+      - name: Type check (server)
+        run: cd server && npx tsc --noEmit
+
+      - name: Build shared
+        run: npm run build --workspace=packages/shared
+
+      - name: Build web
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+        run: npm run build --workspace=apps/web
+
+      - name: Build server
+        run: npm run build --workspace=server
+
+      - name: Run web tests
+        run: npm run test --workspace=apps/web
+
+      - name: Run server tests
+        run: npm run build --workspace=packages/shared && npm run test --workspace=server
+
+      - name: Security audit (high/critical only)
+        run: npm audit --audit-level=high
+
+      - name: Bundle size check
+        run: |
+          oversized=0
+          for file in apps/web/dist/assets/*.js; do
+            [ -f "$file" ] || continue
+            size=$(stat --format=%s "$file")
+            size_kb=$((size / 1024))
+            if [ "$size_kb" -gt 600 ]; then
+              echo "::warning::$(basename $file) is ${size_kb}KB (>600KB)"
+              oversized=$((oversized + 1))
+            fi
+          done
+          if [ "$oversized" -gt 0 ]; then
+            echo "::warning::$oversized oversized chunk(s)"
+          fi
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: apps/web/dist/
+          retention-days: 7
+
+  # ── Deploy to Firebase Hosting ────────────────────────────────────────
+  deploy:
+    name: Deploy to Production
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: web-build
+          path: apps/web/dist/
+
+      - name: Check Firebase credentials
+        id: check-creds
+        run: |
+          if [ -n "$FIREBASE_SA" ]; then
+            echo "has_creds=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_creds=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping deploy — FIREBASE_SERVICE_ACCOUNT not configured"
+          fi
+        env:
+          FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Deploy to Firebase
+        if: steps.check-creds.outputs.has_creds == 'true'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: citrus-fantasy-sports
+          channelId: live
+
+      - name: Post-deploy health check
+        if: steps.check-creds.outputs.has_creds == 'true'
+        run: |
+          echo "Waiting 15s for deploy propagation..."
+          sleep 15
+          status=$(curl -s -o /dev/null -w "%{http_code}" "https://citrusfantasysports.com/" --max-time 10) || true
+          if [ "$status" = "200" ]; then
+            echo "Health check passed (HTTP $status)"
+          else
+            echo "::warning::Health check returned HTTP $status — verify manually"
+          fi
+
+  # ── Notify team ───────────────────────────────────────────────────────
+  notify:
+    name: Notify
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Deployment result
+        run: |
+          if [ "${{ needs.deploy.result }}" = "success" ]; then
+            echo "Production deploy successful for ${{ github.sha }}"
+          else
+            echo "::error::Production deploy failed — investigate immediately"
+          fi
