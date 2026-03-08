@@ -127,4 +127,87 @@ export const schemas = {
     leagueId: z.string().min(1),
     decision: z.enum(['approve', 'veto']),
   }),
+
+  // Auction schemas
+  auctionInitialize: z.object({
+    sessionId: z.string().min(1, 'sessionId is required'),
+    teamIds: z.array(z.string()).min(1, 'At least one team required'),
+    budget: z.number().int().min(1).optional(),
+    minBid: z.number().int().min(0).optional(),
+  }),
+
+  auctionNominate: z.object({
+    sessionId: z.string().min(1, 'sessionId is required'),
+    teamId: z.string().min(1, 'teamId is required'),
+    playerId: z.union([z.string(), z.number()]).transform(String),
+    playerName: z.string().min(1, 'playerName is required'),
+    openingBid: z.number().int().min(0),
+    timerSeconds: z.number().int().min(1).optional(),
+  }),
+
+  auctionBid: z.object({
+    nominationId: z.string().min(1, 'nominationId is required'),
+    teamId: z.string().min(1, 'teamId is required'),
+    bidAmount: z.number().int().min(0, 'Bid must be non-negative'),
+  }),
+
+  auctionCloseNomination: z.object({
+    sessionId: z.string().min(1, 'sessionId is required'),
+    nominationId: z.string().min(1, 'nominationId is required'),
+  }),
+
+  // Keeper schemas
+  designateKeeper: z.object({
+    teamId: z.string().min(1, 'teamId is required'),
+    playerId: z.union([z.string(), z.number()]).transform(String),
+    seasonYear: z.number().int().min(2000).max(2100),
+    originalDraftRound: z.number().int().min(1).optional(),
+  }),
+
+  releaseKeeper: z.object({
+    teamId: z.string().min(1, 'teamId is required'),
+  }),
+
+  lockKeepers: z.object({
+    seasonYear: z.number().int().min(2000).max(2100),
+  }),
+
+  // Playoff schemas
+  generateBracket: z.object({
+    consolationEnabled: z.boolean().optional(),
+    twoWeekMatchups: z.boolean().optional(),
+    reseedEachRound: z.boolean().optional(),
+    seedingMethod: z.string().optional(),
+    format: z.string().optional(),
+    numTeams: z.number().int().min(2).max(32).optional(),
+    seriesLength: z.number().int().min(1).max(7).optional(),
+  }),
+
+  // Waiver drop schema
+  dropPlayer: z.object({
+    teamId: z.union([z.string(), z.number()]),
+    playerId: z.union([z.string(), z.number()]),
+  }),
+
+  // Matchup body-param schemas
+  matchupRotoStandings: z.object({
+    leagueId: z.string().min(1, 'leagueId is required'),
+    categories: z.array(z.string()).min(1),
+    throughWeek: z.number().int().optional(),
+  }),
+
+  matchupPPGStandings: z.object({
+    leagueId: z.string().min(1, 'leagueId is required'),
+    throughWeek: z.number().int().optional(),
+  }),
+
+  matchupH2HCategoryResults: z.object({
+    leagueId: z.string().min(1, 'leagueId is required'),
+    matchupId: z.string().min(1, 'matchupId is required'),
+    team1Id: z.string().min(1),
+    team2Id: z.string().min(1),
+    weekStart: z.string().min(1),
+    weekEnd: z.string().min(1),
+    categories: z.array(z.string()).min(1),
+  }),
 };

@@ -1,9 +1,12 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { membershipMiddleware, commissionerMiddleware } from '../middleware/membership';
+import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { MatchupService } from '../services/MatchupService';
+import { LeagueMembershipService } from '../services/LeagueMembershipService';
 import { AppError } from '../lib/errors';
 import { ok, fail, handleError } from '../lib/responses';
 import { logger, COLUMNS } from '@citrus/shared';
@@ -469,15 +472,19 @@ matchupRoutes.post('/auto-complete', async (c) => {
 });
 
 // POST /api/matchups/h2h-category-results — Calculate H2H category matchup
-matchupRoutes.post('/h2h-category-results', async (c) => {
-  const body = await c.req.json<{
-    leagueId: string; matchupId: string;
-    team1Id: string; team2Id: string;
-    weekStart: string; weekEnd: string;
-    categories: string[];
-  }>();
+matchupRoutes.post('/h2h-category-results', validateBody(schemas.matchupH2HCategoryResults), async (c) => {
+  const body = getValidatedBody<z.infer<typeof schemas.matchupH2HCategoryResults>>(c);
+  const userId = c.get('userId');
 
   const supabase = createUserClient(c.get('userToken'));
+
+  // Verify league membership
+  const membership = new LeagueMembershipService(supabase);
+  const memberCheck = await membership.checkMembership(body.leagueId, userId);
+  if (!memberCheck.isMember) {
+    return fail(c, AppError.forbidden('Not a member of this league'));
+  }
+
   const service = new MatchupService(supabase);
 
   const { results, error } = await service.getH2HCategoryResults(
@@ -495,9 +502,18 @@ matchupRoutes.post('/h2h-category-results', async (c) => {
 });
 
 // POST /api/matchups/roto-standings — Calculate Roto standings
-matchupRoutes.post('/roto-standings', async (c) => {
-  const body = await c.req.json<{ leagueId: string; categories: string[]; throughWeek?: number }>();
+matchupRoutes.post('/roto-standings', validateBody(schemas.matchupRotoStandings), async (c) => {
+  const body = getValidatedBody<z.infer<typeof schemas.matchupRotoStandings>>(c);
+  const userId = c.get('userId');
   const supabase = createUserClient(c.get('userToken'));
+
+  // Verify league membership
+  const membership = new LeagueMembershipService(supabase);
+  const memberCheck = await membership.checkMembership(body.leagueId, userId);
+  if (!memberCheck.isMember) {
+    return fail(c, AppError.forbidden('Not a member of this league'));
+  }
+
   const service = new MatchupService(supabase);
 
   const { standings, error } = await service.getRotoStandings(
@@ -512,9 +528,18 @@ matchupRoutes.post('/roto-standings', async (c) => {
 });
 
 // POST /api/matchups/ppg-standings — Calculate PPG standings
-matchupRoutes.post('/ppg-standings', async (c) => {
-  const body = await c.req.json<{ leagueId: string; throughWeek?: number }>();
+matchupRoutes.post('/ppg-standings', validateBody(schemas.matchupPPGStandings), async (c) => {
+  const body = getValidatedBody<z.infer<typeof schemas.matchupPPGStandings>>(c);
+  const userId = c.get('userId');
   const supabase = createUserClient(c.get('userToken'));
+
+  // Verify league membership
+  const membership = new LeagueMembershipService(supabase);
+  const memberCheck = await membership.checkMembership(body.leagueId, userId);
+  if (!memberCheck.isMember) {
+    return fail(c, AppError.forbidden('Not a member of this league'));
+  }
+
   const service = new MatchupService(supabase);
 
   const { standings, error } = await service.getPPGStandings(

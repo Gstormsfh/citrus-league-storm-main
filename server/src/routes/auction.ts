@@ -1,7 +1,9 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { membershipMiddleware } from '../middleware/membership';
+import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { AuctionService } from '../services/AuctionService';
 import { LeagueMembershipService } from '../services/LeagueMembershipService';
@@ -21,9 +23,9 @@ auctionRoutes.get('/league/:leagueId/state/:sessionId', membershipMiddleware, as
 });
 
 // POST /api/auction/league/:leagueId/initialize
-auctionRoutes.post('/league/:leagueId/initialize', membershipMiddleware, async (c) => {
+auctionRoutes.post('/league/:leagueId/initialize', membershipMiddleware, validateBody(schemas.auctionInitialize), async (c) => {
   const leagueId = c.req.param('leagueId');
-  const body = await c.req.json();
+  const body = getValidatedBody<z.infer<typeof schemas.auctionInitialize>>(c);
   const supabase = createUserClient(c.get('userToken'));
   const service = new AuctionService(supabase);
   const result = await service.initializeAuction(leagueId, body.sessionId, body.teamIds, body.budget, body.minBid);
@@ -32,9 +34,9 @@ auctionRoutes.post('/league/:leagueId/initialize', membershipMiddleware, async (
 });
 
 // POST /api/auction/league/:leagueId/nominate
-auctionRoutes.post('/league/:leagueId/nominate', membershipMiddleware, async (c) => {
+auctionRoutes.post('/league/:leagueId/nominate', membershipMiddleware, validateBody(schemas.auctionNominate), async (c) => {
   const leagueId = c.req.param('leagueId');
-  const body = await c.req.json();
+  const body = getValidatedBody<z.infer<typeof schemas.auctionNominate>>(c);
   const supabase = createUserClient(c.get('userToken'));
   const service = new AuctionService(supabase);
   const result = await service.nominatePlayer(leagueId, body.sessionId, body.teamId, body.playerId, body.playerName, body.openingBid, body.timerSeconds);
@@ -43,9 +45,9 @@ auctionRoutes.post('/league/:leagueId/nominate', membershipMiddleware, async (c)
 });
 
 // POST /api/auction/league/:leagueId/bid
-auctionRoutes.post('/league/:leagueId/bid', membershipMiddleware, async (c) => {
+auctionRoutes.post('/league/:leagueId/bid', membershipMiddleware, validateBody(schemas.auctionBid), async (c) => {
   const leagueId = c.req.param('leagueId');
-  const body = await c.req.json();
+  const body = getValidatedBody<z.infer<typeof schemas.auctionBid>>(c);
   const supabase = createUserClient(c.get('userToken'));
   const service = new AuctionService(supabase);
   const result = await service.placeBid(leagueId, body.nominationId, body.teamId, body.bidAmount);
@@ -54,9 +56,9 @@ auctionRoutes.post('/league/:leagueId/bid', membershipMiddleware, async (c) => {
 });
 
 // POST /api/auction/league/:leagueId/close-nomination
-auctionRoutes.post('/league/:leagueId/close-nomination', membershipMiddleware, async (c) => {
+auctionRoutes.post('/league/:leagueId/close-nomination', membershipMiddleware, validateBody(schemas.auctionCloseNomination), async (c) => {
   const leagueId = c.req.param('leagueId');
-  const body = await c.req.json();
+  const body = getValidatedBody<z.infer<typeof schemas.auctionCloseNomination>>(c);
   const supabase = createUserClient(c.get('userToken'));
   const service = new AuctionService(supabase);
   const result = await service.closeNomination(leagueId, body.sessionId, body.nominationId);

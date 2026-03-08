@@ -3,6 +3,7 @@ import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { createUserClient } from '../lib/supabase';
 import { NotificationService } from '../services/NotificationService';
+import { LeagueMembershipService } from '../services/LeagueMembershipService';
 import { AppError } from '../lib/errors';
 import { ok, fail, handleError } from '../lib/responses';
 
@@ -83,7 +84,15 @@ notificationRoutes.post('/chat', async (c) => {
     return fail(c, AppError.badRequest('leagueId and message are required'));
   }
 
+  const userId = c.get('userId');
   const supabase = createUserClient(c.get('userToken'));
+
+  // Verify league membership before allowing chat messages
+  const membership = new LeagueMembershipService(supabase);
+  const memberCheck = await membership.checkMembership(body.leagueId, userId);
+  if (!memberCheck.isMember) {
+    return fail(c, AppError.forbidden('Not a member of this league'));
+  }
 
   const { data, error } = await supabase.rpc('send_league_chat_message', {
     p_league_id: body.leagueId,

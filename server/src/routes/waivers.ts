@@ -172,24 +172,27 @@ waiverRoutes.post('/league/:leagueId/add-free-agent', membershipMiddleware, vali
 });
 
 // POST /api/waivers/league/:leagueId/drop-player — Drop player from roster
-waiverRoutes.post('/league/:leagueId/drop-player', membershipMiddleware, async (c) => {
+waiverRoutes.post('/league/:leagueId/drop-player', membershipMiddleware, validateBody(schemas.dropPlayer), async (c) => {
   const leagueId = c.req.param('leagueId');
-
-  let body: Record<string, unknown>;
-  try {
-    body = await c.req.json();
-  } catch {
-    return fail(c, AppError.badRequest('Invalid JSON body'));
-  }
+  const userId = c.get('userId');
+  const body = getValidatedBody<z.infer<typeof schemas.dropPlayer>>(c);
 
   const supabase = createUserClient(c.get('userToken'));
-  const service = new WaiverService(supabase);
 
-  if (!body.teamId || !body.playerId) {
-    return fail(c, AppError.badRequest('teamId and playerId are required'));
+  // Verify user owns the team before allowing player drop
+  const { data: team } = await supabase
+    .from('teams')
+    .select('id, owner_id')
+    .eq('id', String(body.teamId))
+    .eq('league_id', leagueId)
+    .single();
+  if (!team || team.owner_id !== userId) {
+    return fail(c, AppError.forbidden('You do not own this team'));
   }
 
-  const { success, error } = await service.dropPlayer(leagueId, body.teamId as string, Number(body.playerId));
+  const service = new WaiverService(supabase);
+
+  const { success, error } = await service.dropPlayer(leagueId, String(body.teamId), Number(body.playerId));
   if (!success) {
     return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to drop player'));
   }

@@ -4,8 +4,9 @@ import { authMiddleware } from '../middleware/auth';
 import { membershipMiddleware, commissionerMiddleware } from '../middleware/membership';
 import { z } from 'zod';
 import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
-import { createUserClient } from '../lib/supabase';
+import { createUserClient, supabaseAdmin } from '../lib/supabase';
 import { DraftService } from '../services/DraftService';
+import { LeagueMembershipService } from '../services/LeagueMembershipService';
 import { AppError } from '../lib/errors';
 import { ok, created, fail, handleError } from '../lib/responses';
 
@@ -317,6 +318,20 @@ draftRoutes.post('/league/:leagueId/rankings', membershipMiddleware, async (c) =
 
 // DELETE /api/draft/all — Delete ALL draft data across all leagues (admin only)
 draftRoutes.delete('/all', async (c) => {
+  // Verify admin privileges before allowing destructive cross-league operation
+  const userId = c.get('userId');
+  if (!supabaseAdmin) {
+    return fail(c, AppError.serviceUnavailable('Admin client not configured'));
+  }
+  const { data: profile } = await supabaseAdmin
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', userId)
+    .single();
+  if (!profile?.is_admin) {
+    return fail(c, AppError.forbidden('Admin access required'));
+  }
+
   const supabase = createUserClient(c.get('userToken'));
   const service = new DraftService(supabase);
 

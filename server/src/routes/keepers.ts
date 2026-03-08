@@ -1,7 +1,9 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { membershipMiddleware } from '../middleware/membership';
+import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { KeeperService } from '../services/KeeperService';
 import { AppError } from '../lib/errors';
@@ -33,10 +35,23 @@ keeperRoutes.get('/league/:leagueId', membershipMiddleware, async (c) => {
 });
 
 // POST /api/keepers/league/:leagueId/designate
-keeperRoutes.post('/league/:leagueId/designate', membershipMiddleware, async (c) => {
+keeperRoutes.post('/league/:leagueId/designate', membershipMiddleware, validateBody(schemas.designateKeeper), async (c) => {
   const leagueId = c.req.param('leagueId');
-  const body = await c.req.json();
+  const userId = c.get('userId');
+  const body = getValidatedBody<z.infer<typeof schemas.designateKeeper>>(c);
   const supabase = createUserClient(c.get('userToken'));
+
+  // Verify user owns the team
+  const { data: team } = await supabase
+    .from('teams')
+    .select('id, owner_id')
+    .eq('id', body.teamId)
+    .eq('league_id', leagueId)
+    .single();
+  if (!team || team.owner_id !== userId) {
+    return fail(c, AppError.forbidden('You do not own this team'));
+  }
+
   const service = new KeeperService(supabase);
   const result = await service.designateKeeper(leagueId, body.teamId, body.playerId, body.seasonYear, body.originalDraftRound);
   if (!result.success) return fail(c, AppError.badRequest(result.error || 'Failed to designate keeper'));
@@ -44,10 +59,22 @@ keeperRoutes.post('/league/:leagueId/designate', membershipMiddleware, async (c)
 });
 
 // PUT /api/keepers/:keeperId/release
-keeperRoutes.put('/:keeperId/release', async (c) => {
+keeperRoutes.put('/:keeperId/release', validateBody(schemas.releaseKeeper), async (c) => {
   const keeperId = c.req.param('keeperId');
-  const body = await c.req.json();
+  const userId = c.get('userId');
+  const body = getValidatedBody<z.infer<typeof schemas.releaseKeeper>>(c);
   const supabase = createUserClient(c.get('userToken'));
+
+  // Verify user owns the team before allowing keeper release
+  const { data: team } = await supabase
+    .from('teams')
+    .select('id, owner_id')
+    .eq('id', body.teamId)
+    .single();
+  if (!team || team.owner_id !== userId) {
+    return fail(c, AppError.forbidden('You do not own this team'));
+  }
+
   const service = new KeeperService(supabase);
   const result = await service.releaseKeeper(keeperId, body.teamId);
   if (!result.success) return fail(c, AppError.badRequest(result.error || 'Failed to release keeper'));
@@ -55,9 +82,9 @@ keeperRoutes.put('/:keeperId/release', async (c) => {
 });
 
 // POST /api/keepers/league/:leagueId/validate
-keeperRoutes.post('/league/:leagueId/validate', membershipMiddleware, async (c) => {
+keeperRoutes.post('/league/:leagueId/validate', membershipMiddleware, validateBody(schemas.designateKeeper.pick({ teamId: true, seasonYear: true })), async (c) => {
   const leagueId = c.req.param('leagueId');
-  const body = await c.req.json();
+  const body = getValidatedBody<{ teamId: string; seasonYear: number }>(c);
   const supabase = createUserClient(c.get('userToken'));
   const service = new KeeperService(supabase);
   const result = await service.validateKeepers(leagueId, body.teamId, body.seasonYear);
@@ -78,9 +105,9 @@ keeperRoutes.get('/league/:leagueId/draft-costs', membershipMiddleware, async (c
 });
 
 // POST /api/keepers/league/:leagueId/lock
-keeperRoutes.post('/league/:leagueId/lock', membershipMiddleware, async (c) => {
+keeperRoutes.post('/league/:leagueId/lock', membershipMiddleware, validateBody(schemas.lockKeepers), async (c) => {
   const leagueId = c.req.param('leagueId');
-  const body = await c.req.json();
+  const body = getValidatedBody<z.infer<typeof schemas.lockKeepers>>(c);
   const supabase = createUserClient(c.get('userToken'));
   const service = new KeeperService(supabase);
   const result = await service.lockKeepersForSeason(leagueId, body.seasonYear);

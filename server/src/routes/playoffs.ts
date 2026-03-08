@@ -1,7 +1,9 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { membershipMiddleware } from '../middleware/membership';
+import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { PlayoffService } from '../services/PlayoffService';
 import { LeagueMembershipService } from '../services/LeagueMembershipService';
@@ -22,9 +24,9 @@ playoffRoutes.get('/league/:leagueId/bracket', membershipMiddleware, async (c) =
 });
 
 // POST /api/playoffs/league/:leagueId/generate
-playoffRoutes.post('/league/:leagueId/generate', membershipMiddleware, async (c) => {
+playoffRoutes.post('/league/:leagueId/generate', membershipMiddleware, validateBody(schemas.generateBracket), async (c) => {
   const leagueId = c.req.param('leagueId');
-  const body = await c.req.json();
+  const body = getValidatedBody<z.infer<typeof schemas.generateBracket>>(c);
   const supabase = createUserClient(c.get('userToken'));
   const service = new PlayoffService(supabase);
   const result = await service.generateBracket(leagueId, body);
