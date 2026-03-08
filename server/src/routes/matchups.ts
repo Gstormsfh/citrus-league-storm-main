@@ -382,8 +382,17 @@ matchupRoutes.post('/projections/daily', validateBody(schemas.matchupPlayerIds),
 // POST /api/matchups/update-scores — Update all matchup scores
 matchupRoutes.post('/update-scores', validateBody(schemas.matchupUpdateScores), async (c) => {
   const body = getValidatedBody<z.infer<typeof schemas.matchupUpdateScores>>(c);
+  const userId = c.get('userId');
 
   const supabase = createUserClient(c.get('userToken'));
+
+  // Verify league membership before allowing score mutation
+  const membership = new LeagueMembershipService(supabase);
+  const memberCheck = await membership.checkMembership(body.leagueId, userId);
+  if (!memberCheck.isMember) {
+    return fail(c, AppError.forbidden('Not a member of this league'));
+  }
+
   const service = new MatchupService(supabase);
 
   const { data, error } = await service.updateMatchupScores(body.leagueId);
