@@ -519,7 +519,7 @@ const DraftRoom = () => {
             logger.debug('DraftRoom: Draft status is', leagueData.draft_status, 'but no picks or draft order found - treating as not started');
             setDraftHistory([]);
             setDraftedPlayerIds(new Set());
-            await leagueApi.updateSettings(leagueId, { draft_status: 'not_started' } as Record<string, unknown>);
+            await leagueApi.updateDraftSettings(leagueId, { draft_status: 'not_started' });
             setLeague({ ...leagueData, draft_status: 'not_started' });
           }
         }
@@ -1982,7 +1982,7 @@ const DraftRoom = () => {
     if (!leagueId || !isCommissioner) return;
 
     try {
-      await leagueApi.updateSettings(leagueId, { scheduled_draft_time: scheduledTime } as Record<string, unknown>);
+      await leagueApi.updateDraftSettings(leagueId, { scheduled_draft_time: scheduledTime });
 
       // Update local league state
       if (league) {
@@ -2075,7 +2075,7 @@ const DraftRoom = () => {
 
       // Set league status to 'queued' (ready to start)
       try {
-        await leagueApi.updateSettings(leagueId, { draft_status: 'queued' } as Record<string, unknown>);
+        await leagueApi.updateDraftSettings(leagueId, { draft_status: 'queued' });
       } catch (leagueStatusErr) {
         const leagueStatusError = leagueStatusErr instanceof Error ? leagueStatusErr : new Error('Unknown error');
         logger.error('Error updating league status to queued:', leagueStatusError);
@@ -2401,7 +2401,7 @@ const DraftRoom = () => {
       // Just reset the league status to 'not_started' - don't try to delete old data
       // Old draft sessions will remain but won't be used
       try {
-        await leagueApi.updateSettings(leagueId, { draft_status: 'not_started' } as Record<string, unknown>);
+        await leagueApi.updateDraftSettings(leagueId, { draft_status: 'not_started' });
       } catch (statusErr) {
         const statusError = statusErr instanceof Error ? statusErr : new Error('Unknown error');
         logger.error('Error resetting league status:', statusError);
@@ -2519,7 +2519,7 @@ const DraftRoom = () => {
         // If status wasn't updated, update it manually
         if (updatedLeague?.draft_status !== 'not_started') {
           logger.log('League status not updated, fixing it...');
-          await leagueApi.updateSettings(leagueId, { draft_status: 'not_started' } as Record<string, unknown>);
+          await leagueApi.updateDraftSettings(leagueId, { draft_status: 'not_started' });
         }
       } catch (verifyError) {
         logger.error('Error verifying league status:', verifyError);

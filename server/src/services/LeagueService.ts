@@ -220,7 +220,7 @@ export class LeagueService {
   async updateDraftSettings(
     leagueId: string,
     userId: string,
-    draftSettings: { draft_rounds?: number; pickTimeLimit?: number },
+    draftSettings: { draft_rounds?: number; pickTimeLimit?: number; draft_status?: string; scheduled_draft_time?: string },
   ) {
     await this.membership.requireCommissioner(leagueId, userId);
 
@@ -242,6 +242,12 @@ export class LeagueService {
     };
     if (draftSettings.draft_rounds !== undefined) {
       updatePayload.draft_rounds = draftSettings.draft_rounds;
+    }
+    if (draftSettings.draft_status !== undefined) {
+      updatePayload.draft_status = draftSettings.draft_status;
+    }
+    if (draftSettings.scheduled_draft_time !== undefined) {
+      updatePayload.scheduled_draft_time = draftSettings.scheduled_draft_time;
     }
 
     const { error } = await this.supabase
