@@ -1,3 +1,5 @@
+import { logger } from '@citrus/shared';
+
 /**
  * Circuit Breaker — Resilience pattern for external service calls.
  *
@@ -150,6 +152,6 @@ export const supabaseBreaker = new CircuitBreaker('supabase', {
   resetTimeoutMs: 30_000,
   successThreshold: 2,
   onStateChange: (name, from, to) => {
-    console.warn(`[CircuitBreaker] ${name}: ${from} → ${to}`);
+    logger.warn(`[CircuitBreaker] ${name}: ${from} → ${to}`);
   },
 });

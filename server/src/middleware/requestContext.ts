@@ -1,4 +1,5 @@
 import { Context, Next } from 'hono';
+import { logger } from '@citrus/shared';
 
 /**
  * Request context middleware — structured logging and observability.
@@ -57,11 +58,11 @@ export async function requestContextMiddleware(c: Context, next: Next) {
 
   // Structured JSON log line — parseable by Cloud Logging, ELK, Datadog
   if (process.env.NODE_ENV === 'production') {
-    console.log(JSON.stringify(log));
+    logger.info(JSON.stringify(log));
   }
 
   // Warn on slow responses (>2s)
   if (duration > 2000) {
-    console.warn(`[SLOW] ${c.req.method} ${c.req.path} took ${Math.round(duration)}ms`);
+    logger.warn(`[SLOW] ${c.req.method} ${c.req.path} took ${Math.round(duration)}ms`);
   }
 }

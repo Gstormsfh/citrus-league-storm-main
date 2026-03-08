@@ -25,6 +25,7 @@ import { metricsMiddleware, metrics } from './middleware/metrics';
 import { cacheControlMiddleware } from './middleware/cacheControl';
 import { AppError } from './lib/errors';
 import { supabaseBreaker } from './lib/circuitBreaker';
+import { logger } from '@citrus/shared';
 
 export type Env = {
   Variables: {
@@ -166,12 +167,9 @@ app.notFound((c) => {
 // ── Global error handler ─────────────────────────────────────────────
 app.onError((err, c) => {
   const reqId = c.get('requestId');
-  // Note: console.error is acceptable here since this is the last-resort global
-  // error handler. The logger from @citrus/shared may not be initialized yet
-  // if the error occurs during startup.
-  console.error(`[API Error] [${reqId}] ${c.req.method} ${c.req.path}:`, err.message);
+  logger.error(`[API Error] [${reqId}] ${c.req.method} ${c.req.path}:`, err.message);
   if (process.env.NODE_ENV === 'development') {
-    console.error(err.stack);
+    logger.error(err.stack);
   }
 
   // If it's an AppError, use its status and code

@@ -33,9 +33,10 @@ if (proxyUrl) {
     const require = createRequire(import.meta.url);
     const { ProxyAgent, setGlobalDispatcher } = require('undici');
     setGlobalDispatcher(new ProxyAgent(proxyUrl));
-    console.log('[proxy] Global fetch proxy configured');
+    // Logger not yet initialized — use process.stdout directly
+    process.stdout.write('[proxy] Global fetch proxy configured\n');
   } catch (e: unknown) {
-    console.warn('[proxy] Failed to configure proxy:', e instanceof Error ? e.message : e);
+    process.stderr.write(`[proxy] Failed to configure proxy: ${e instanceof Error ? e.message : e}\n`);
   }
 }
 
@@ -52,20 +53,20 @@ const server = serve({
   fetch: app.fetch,
   port,
 }, (info) => {
-  console.log(`Citrus API server running on http://localhost:${info.port}`);
+  logger.info(`Citrus API server running on http://localhost:${info.port}`);
 });
 
 // ── Graceful shutdown ────────────────────────────────────────────────
 function shutdown(signal: string) {
-  console.log(`\n[${signal}] Shutting down gracefully...`);
+  logger.info(`[${signal}] Shutting down gracefully...`);
   server.close(() => {
-    console.log('Server closed. Goodbye.');
+    logger.info('Server closed. Goodbye.');
     process.exit(0);
   });
 
   // Force exit after 10 seconds if connections don't drain
   setTimeout(() => {
-    console.error('Forced shutdown after timeout.');
+    logger.error('Forced shutdown after timeout.');
     process.exit(1);
   }, 10_000).unref();
 }
