@@ -66,11 +66,11 @@ async function request<T = unknown>(
   const json = await response.json();
 
   if (!response.ok) {
-    throw new ApiError(
-      json.error || `API request failed with status ${response.status}`,
-      response.status,
-      json
-    );
+    const fallback = `API request failed with status ${response.status}`;
+    const errorMsg = typeof json.error === 'string'
+      ? json.error
+      : json.error?.message || json.message || fallback;
+    throw new ApiError(errorMsg, response.status, json);
   }
 
   return json;

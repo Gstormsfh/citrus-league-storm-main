@@ -144,7 +144,7 @@ const App = () => {
           <TooltipProvider>
             <Toaster />
             <Sonner position="top-right" closeButton />
-            <BrowserRouter>
+            <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
               <a href="#main-content" className="skip-to-content">Skip to content</a>
               <ScrollToTop />
               <LeagueProvider>
