@@ -5,6 +5,7 @@ import { authMiddleware } from '../middleware/auth';
 import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { AccountService } from '../services/AccountService';
+import { AuditService } from '../services/AuditService';
 import { AppError } from '../lib/errors';
 import { ok, fail, handleError } from '../lib/responses';
 
@@ -26,6 +27,10 @@ accountRoutes.post('/export', validateBody(schemas.accountExport), async (c) => 
   const service = new AccountService(supabase);
   const result = await service.exportUserData();
   if (!result.success) return fail(c, AppError.badRequest(result.error || 'Export failed'));
+
+  const audit = new AuditService(supabase);
+  audit.log('DATA_EXPORT', null, { format: 'json' });
+
   return ok(c, result.data);
 });
 
@@ -33,6 +38,11 @@ accountRoutes.post('/export', validateBody(schemas.accountExport), async (c) => 
 accountRoutes.post('/delete', validateBody(schemas.accountDelete), async (c) => {
   const supabase = createUserClient(c.get('userToken'));
   const service = new AccountService(supabase);
+
+  // Audit BEFORE deletion since user context will be lost after
+  const audit = new AuditService(supabase);
+  audit.log('ADMIN_ACTION', null, { action: 'account_delete' }, 'WARN');
+
   const result = await service.deleteAccount();
   if (!result.success) return fail(c, AppError.badRequest(result.error || 'Deletion failed'));
   return ok(c, { success: true });

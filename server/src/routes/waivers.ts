@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { WaiverService } from '../services/WaiverService';
+import { AuditService } from '../services/AuditService';
 import { AppError, getErrorMessage } from '../lib/errors';
 import { ok, created, fail, handleError } from '../lib/responses';
 import { logger } from '@citrus/shared';
@@ -122,6 +123,9 @@ waiverRoutes.post('/league/:leagueId', membershipMiddleware, validateBody(schema
     return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to submit waiver claim'));
   }
 
+  const audit = new AuditService(supabase);
+  audit.log('WAIVER_CLAIM', leagueId, { claimId, playerId: body.playerId, teamId: body.teamId, dropPlayerId: body.dropPlayerId });
+
   return created(c, { claimId });
 });
 
@@ -145,6 +149,9 @@ waiverRoutes.post('/league/:leagueId/faab-bid', membershipMiddleware, validateBo
     return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to submit FAAB bid'));
   }
 
+  const audit = new AuditService(supabase);
+  audit.log('WAIVER_CLAIM', leagueId, { claimId, playerId: body.playerId, teamId: body.teamId, bidAmount: body.bidAmount, type: 'faab' });
+
   return created(c, { claimId });
 });
 
@@ -167,6 +174,9 @@ waiverRoutes.post('/league/:leagueId/add-free-agent', membershipMiddleware, vali
   if (!success) {
     return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to add free agent'));
   }
+
+  const audit = new AuditService(supabase);
+  audit.logRosterMove(leagueId, { addPlayerId: String(body.playerId), dropPlayerId: body.dropPlayerId ? String(body.dropPlayerId) : undefined, teamId: String(body.teamId) });
 
   return ok(c, { success: true });
 });
@@ -196,6 +206,9 @@ waiverRoutes.post('/league/:leagueId/drop-player', membershipMiddleware, validat
   if (!success) {
     return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to drop player'));
   }
+
+  const audit = new AuditService(supabase);
+  audit.logRosterMove(leagueId, { dropPlayerId: String(body.playerId), teamId: String(body.teamId) });
 
   return ok(c, { success: true });
 });

@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { LeagueService } from '../services/LeagueService';
+import { AuditService } from '../services/AuditService';
 import { AppError } from '../lib/errors';
 import { ok, created, fail, handleError } from '../lib/responses';
 
@@ -66,6 +67,9 @@ leagueRoutes.post('/', validateBody(schemas.createLeague), async (c) => {
     return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to create league'));
   }
 
+  const audit = new AuditService(supabase);
+  audit.logLeagueEvent('LEAGUE_CREATE', league.id, { name: body.name });
+
   return created(c, { league, team });
 });
 
@@ -84,6 +88,11 @@ leagueRoutes.post('/join', validateBody(schemas.joinLeague), async (c) => {
 
   if (error) {
     return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to join league'));
+  }
+
+  if (league) {
+    const audit = new AuditService(supabase);
+    audit.logLeagueEvent('LEAGUE_JOIN', league.id, { joinCode: body.joinCode });
   }
 
   return created(c, { league, team });
@@ -109,6 +118,10 @@ leagueRoutes.put('/:leagueId/settings', commissionerMiddleware, validateBody(sch
     if (error) {
       return handleError(c, error, 'Failed to update settings');
     }
+
+    const audit = new AuditService(supabase);
+    audit.log('ADMIN_ACTION', leagueId, { action: 'update_settings', changedBy: userId });
+
     return ok(c, league);
   } catch (err) {
     return handleError(c, err, 'Failed to update settings');
@@ -249,6 +262,10 @@ leagueRoutes.delete('/:leagueId/teams/:teamId', commissionerMiddleware, async (c
     if (!success) {
       return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to delete team'));
     }
+
+    const audit = new AuditService(supabase);
+    audit.log('ADMIN_ACTION', leagueId, { action: 'delete_team', teamId, deletedBy: userId });
+
     return ok(c, { success: true });
   } catch (err) {
     return handleError(c, err, 'Failed to delete team');

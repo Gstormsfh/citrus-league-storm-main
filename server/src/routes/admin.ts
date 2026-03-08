@@ -3,7 +3,8 @@ import { z } from 'zod';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
-import { supabaseAdmin } from '../lib/supabase';
+import { createUserClient, supabaseAdmin } from '../lib/supabase';
+import { AuditService } from '../services/AuditService';
 import { AppError } from '../lib/errors';
 import { ok, okPaginated, fail, handleError } from '../lib/responses';
 import { COLUMNS } from '@citrus/shared';
@@ -168,6 +169,10 @@ adminRoutes.post('/recalculate-scores', validateBody(schemas.adminRecalculateSco
         .eq('week_number', week)
         .eq('status', 'in_progress');
     }
+
+    const supabase = createUserClient(c.get('userToken'));
+    const audit = new AuditService(supabase);
+    audit.log('ADMIN_ACTION', leagueId, { action: 'recalculate_scores', week: week || 'all', rostersLocked: lockResult?.length || 0 });
 
     return ok(c, {
       message: 'Score recalculation completed',

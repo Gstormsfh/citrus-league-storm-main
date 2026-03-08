@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { TradeService } from '../services/TradeService';
+import { AuditService } from '../services/AuditService';
 import { AppError } from '../lib/errors';
 import { ok, created, fail, handleError } from '../lib/responses';
 
@@ -60,6 +61,9 @@ tradeRoutes.post('/league/:leagueId', membershipMiddleware, validateBody(schemas
     return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to create trade'));
   }
 
+  const audit = new AuditService(supabase);
+  audit.log('TRADE_OFFER', leagueId, { tradeId, fromTeamId: body.fromTeamId, toTeamId: body.toTeamId });
+
   return created(c, { tradeId });
 });
 
@@ -78,6 +82,9 @@ tradeRoutes.put('/:tradeId/accept', async (c) => {
     return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to accept trade'));
   }
 
+  const audit = new AuditService(supabase);
+  audit.log('TRADE_ACCEPT', null, { tradeId });
+
   return ok(c, { success: true });
 });
 
@@ -95,6 +102,9 @@ tradeRoutes.put('/:tradeId/reject', async (c) => {
   if (!success) {
     return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to reject trade'));
   }
+
+  const audit = new AuditService(supabase);
+  audit.log('TRADE_REJECT', null, { tradeId });
 
   return ok(c, { success: true });
 });
@@ -204,6 +214,9 @@ tradeRoutes.put('/:tradeId/commissioner-decision', validateBody(schemas.commissi
     if (!success) {
       return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Commissioner decision failed'));
     }
+
+    const audit = new AuditService(supabase);
+    audit.log('ADMIN_ACTION', body.leagueId, { action: 'commissioner_trade_decision', tradeId, decision: body.decision });
 
     return ok(c, { success: true });
   } catch (err) {

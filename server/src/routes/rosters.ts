@@ -6,6 +6,7 @@ import { membershipMiddleware } from '../middleware/membership';
 import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { MatchupService } from '../services/MatchupService';
+import { AuditService } from '../services/AuditService';
 import { AppError } from '../lib/errors';
 import { ok, fail, handleError } from '../lib/responses';
 import { COLUMNS } from '@citrus/shared';
@@ -104,6 +105,9 @@ rosterRoutes.put('/league/:leagueId/team/:teamId/lineup', membershipMiddleware, 
   if (error) {
     return handleError(c, error, 'Failed to update lineup');
   }
+
+  const audit = new AuditService(supabase);
+  audit.logRosterMove(leagueId, { teamId });
 
   return ok(c, data);
 });

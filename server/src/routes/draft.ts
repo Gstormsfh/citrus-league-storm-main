@@ -7,6 +7,7 @@ import { validateBody, schemas, getValidatedBody } from '../middleware/validate'
 import { createUserClient, supabaseAdmin } from '../lib/supabase';
 import { DraftService } from '../services/DraftService';
 import { LeagueMembershipService } from '../services/LeagueMembershipService';
+import { AuditService } from '../services/AuditService';
 import { AppError } from '../lib/errors';
 import { ok, created, fail, handleError } from '../lib/responses';
 
@@ -75,6 +76,9 @@ draftRoutes.delete('/league/:leagueId', commissionerMiddleware, async (c) => {
     return handleError(c, error, 'Failed to delete draft data');
   }
 
+  const audit = new AuditService(supabase);
+  audit.logDraftEvent('DRAFT_RESET', leagueId, { action: 'hard_delete' });
+
   return ok(c, { success: true });
 });
 
@@ -130,6 +134,10 @@ draftRoutes.post('/league/:leagueId/start', commissionerMiddleware, async (c) =>
     if (error) {
       return fail(c, AppError.badRequest('Failed to start draft'));
     }
+
+    const audit = new AuditService(supabase);
+    audit.logDraftEvent('DRAFT_START', leagueId, { startedBy: userId });
+
     return ok(c, league);
   } catch (err) {
     return handleError(c, err, 'Failed to start draft');
@@ -169,6 +177,9 @@ draftRoutes.post('/league/:leagueId/reset', commissionerMiddleware, async (c) =>
   if (error) {
     return fail(c, AppError.badRequest('Failed to reset draft'));
   }
+
+  const audit = new AuditService(supabase);
+  audit.logDraftEvent('DRAFT_RESET', leagueId, { newSessionId });
 
   return ok(c, { newSessionId });
 });
@@ -313,6 +324,10 @@ draftRoutes.delete('/all', async (c) => {
 
   try {
     const result = await service.deleteAllDraftData();
+
+    const audit = new AuditService(supabase);
+    audit.log('ADMIN_ACTION', null, { action: 'delete_all_draft_data', deletedCounts: result.deletedCounts }, 'WARN');
+
     return ok(c, { success: true, deletedCounts: result.deletedCounts });
   } catch (err) {
     return handleError(c, err, 'Failed to delete all draft data');
