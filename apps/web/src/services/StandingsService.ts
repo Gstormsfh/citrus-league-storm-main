@@ -24,8 +24,9 @@ const standingsCache = new Map<string, {
     pointsAgainst: number;
     wins: number;
     losses: number;
+    ties: number;
     streak: string;
-    last5: { wins: number; losses: number };
+    last5: { wins: number; losses: number; ties: number };
   }>;
   timestamp: number;
 }>();
@@ -528,7 +529,7 @@ export const StandingsService = {
 
         // Check if player is a goalie below minimum appearances
         const isGoalie = stats.position_code === 'G';
-        const goalieGames = isGoalie ? (stats.wins ?? 0) + (stats.saves ? 1 : 0) : 0;
+        const goalieGames = isGoalie ? Number(stats.wins ?? 0) + (stats.saves ? 1 : 0) : 0;
         const belowMinGoalieGames = isGoalie && minGoalieGames > 0 && goalieGames < minGoalieGames;
 
         categories.forEach(cat => {
@@ -536,7 +537,7 @@ export const StandingsService = {
           if (belowMinGoalieGames && goalieCategories.has(cat)) return;
 
           const col = catColumnMap[cat] || cat;
-          teamCategoryTotals[a.team_id][cat] += (stats[col] ?? 0);
+          teamCategoryTotals[a.team_id][cat] += Number(stats[col] ?? 0);
         });
       });
 
@@ -736,7 +737,7 @@ export const StandingsService = {
 
         // Check if goalie below minimum appearances (industry standard)
         const isGoalie = stats.position_code === 'G';
-        const goalieGames = isGoalie ? (stats.wins ?? 0) + (stats.saves ? 1 : 0) : 0;
+        const goalieGames = isGoalie ? Number(stats.wins ?? 0) + (stats.saves ? 1 : 0) : 0;
         const belowMinGoalie = isGoalie && rotoMinGoalieGames > 0 && goalieGames < rotoMinGoalieGames;
 
         categories.forEach(cat => {

@@ -320,7 +320,7 @@ export const LineupService = {
               player_id: parseInt(playerId),
               roster_date: dateStr,
               slot_type: 'active',
-              slot_id: savedLineup.slot_assignments?.[playerId] || null,
+              slot_id: savedLineup.slotAssignments?.[playerId] || null,
               is_locked: true, // Mark as locked since we're backfilling
               locked_at: new Date().toISOString()
             });
@@ -356,7 +356,7 @@ export const LineupService = {
               player_id: parseInt(playerId),
               roster_date: dateStr,
               slot_type: 'ir',
-              slot_id: savedLineup.slot_assignments?.[playerId] || null,
+              slot_id: savedLineup.slotAssignments?.[playerId] || null,
               is_locked: true,
               locked_at: new Date().toISOString()
             });
