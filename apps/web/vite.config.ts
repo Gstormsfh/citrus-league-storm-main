@@ -122,8 +122,8 @@ export default defineConfig(({ mode }) => ({
         assetFileNames: 'assets/[name]-[hash].[ext]',
         manualChunks: (id) => {
           if (id.includes('node_modules')) {
-            // React + ReactDOM — keep together, loaded first via modulepreload
-            if (id.includes('react-dom') || id.includes('/react/')) {
+            // React + ReactDOM + scheduler — keep together, loaded first
+            if (id.includes('react-dom') || id.includes('/react/') || id.includes('scheduler')) {
               return 'vendor-react';
             }
             // Supabase — separate chunk (auth-critical, loaded early)
@@ -150,7 +150,9 @@ export default defineConfig(({ mode }) => ({
             if (id.includes('date-fns') || id.includes('luxon')) {
               return 'vendor-dates';
             }
-            // Remaining vendor code
+            // Remaining vendor code — all in one chunk
+            // These libraries (lucide-react, sonner, cmdk, etc.) depend on React
+            // but ES module imports ensure vendor-react executes first
             return 'vendor';
           }
         },
