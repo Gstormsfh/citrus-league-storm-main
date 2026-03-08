@@ -180,8 +180,8 @@ export class DraftService {
     }
 
     // Try RPC first, fallback to direct insert
-    let pick: any = null;
-    let error: any = null;
+    let pick: Record<string, unknown> | null = null;
+    let error: { message?: string } | null = null;
 
     const { data: rpcResult, error: rpcError } = await this.supabase.rpc('make_draft_pick', {
       p_league_id: leagueId,
@@ -207,7 +207,7 @@ export class DraftService {
         .select(COLUMNS.DRAFT_PICK)
         .single();
 
-      pick = insertResult;
+      pick = insertResult as unknown as Record<string, unknown>;
       error = insertError;
     } else {
       pick = rpcResult;
@@ -289,7 +289,7 @@ export class DraftService {
     const isLinear = draftType === 'linear';
     const teamOrder = customTeamOrder || teams.map((t) => t.id);
 
-    const orders: any[] = [];
+    const orders: { league_id: string; round_number: number; team_order: string[]; draft_session_id: string }[] = [];
     for (let round = 1; round <= totalRounds; round++) {
       const roundOrder = !isLinear && round % 2 === 0
         ? [...teamOrder].reverse()
@@ -412,7 +412,7 @@ export class DraftService {
       p_league_id: leagueId,
     });
 
-    const picks = (data || []).map((row: any) => ({
+    const picks = (data || []).map((row: { round_number: number; pick_number: number; team_id: string; player_id: number; player_name?: string }) => ({
       round: row.round_number,
       pick: row.pick_number,
       teamId: row.team_id,
@@ -530,7 +530,7 @@ export class DraftService {
 
     const { data, error } = await query;
     return {
-      rankings: (data || []).map((r: any) => ({
+      rankings: (data || []).map((r: { player_id: number; rank: number; position_code: string; tier?: number }) => ({
         playerId: r.player_id,
         rank: r.rank,
         positionCode: r.position_code,

@@ -1,10 +1,26 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import { COLUMNS } from '@citrus/shared';
 
 export class AccountService {
   private supabase: SupabaseClient;
 
   constructor(supabase: SupabaseClient) {
     this.supabase = supabase;
+  }
+
+  /** Get the current user's profile (RLS ensures they can only see their own) */
+  async getProfile() {
+    const { data: { user } } = await this.supabase.auth.getUser();
+    if (!user) return { success: false as const, error: 'Not authenticated' };
+
+    const { data, error } = await this.supabase
+      .from('profiles')
+      .select(COLUMNS.PROFILE)
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (error) return { success: false as const, error: error.message };
+    return { success: true as const, data: data || null };
   }
 
   async exportUserData() {

@@ -13,7 +13,7 @@ export class BestBallService {
       p_league_id: leagueId, p_roster_date: date,
     });
     if (error) return { results: [], error: error.message };
-    const results = (data || []).map((row: any) => ({
+    const results = (data || []).map((row: { team_id: string; players_optimized: number; total_points: number }) => ({
       team_id: row.team_id, players_optimized: row.players_optimized, total_points: row.total_points,
     }));
     return { results };
@@ -58,7 +58,7 @@ export class BestBallService {
       return { lineup: null, playerIds: [], players: [], weeklyStats: [] };
     }
 
-    const playerIds = assignments.map((a: any) => a.player_id);
+    const playerIds = assignments.map((a: { player_id: number }) => a.player_id);
 
     // Get player positions
     const { data: players } = await this.supabase

@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { Env } from '../app';
-import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth';
+import { authMiddleware } from '../middleware/auth';
 import { createUserClient } from '../lib/supabase';
 import { PlayerService } from '../services/PlayerService';
 import { AppError } from '../lib/errors';
@@ -10,12 +10,8 @@ import { logger } from '@citrus/shared';
 const playerRoutes = new Hono<Env>();
 
 // GET /api/players — Get all players with stats (primary endpoint)
-playerRoutes.get('/', optionalAuthMiddleware, async (c) => {
-  const token = c.get('userToken');
-  if (!token) {
-    return fail(c, AppError.unauthorized());
-  }
-  const supabase = createUserClient(token);
+playerRoutes.get('/', authMiddleware, async (c) => {
+  const supabase = createUserClient(c.get('userToken'));
   const service = new PlayerService(supabase);
 
   const search = c.req.query('search');

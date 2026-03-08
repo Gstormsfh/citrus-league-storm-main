@@ -165,6 +165,41 @@ export const PLAYOFF_SEED_COLUMNS = 'id, bracket_id, team_id, seed_number, regul
 export const PLAYOFF_SERIES_COLUMNS = 'id, bracket_id, round_number, match_number, bracket_position, home_seed, away_seed, home_team_id, away_team_id, home_score, away_score, winner_team_id, loser_team_id, status, matchup_week_1, matchup_week_2, winner_advances_to, winner_slot, loser_drops_to, loser_slot, created_at, updated_at';
 
 // ============================================================================
+// PLAYER DIRECTORY COLUMNS
+// ============================================================================
+export const PLAYER_DIRECTORY_COLUMNS = 'player_id, full_name, position_code, current_team_abbrev, sweater_number, headshot_url, roster_status, eligible_positions';
+
+// ============================================================================
+// PLAYER TALENT METRICS COLUMNS
+// ============================================================================
+export const PLAYER_TALENT_METRICS_COLUMNS = 'player_id, xg_per_60, xg_rating';
+
+// ============================================================================
+// GOALIE GSAX COLUMNS
+// ============================================================================
+export const GOALIE_GSAX_COLUMNS = 'player_id, gsax';
+
+// ============================================================================
+// TEAM LINEUPS COLUMNS
+// ============================================================================
+export const TEAM_LINEUP_COLUMNS = 'id, team_id, league_id, starters, bench, ir, slot_assignments, updated_at, created_at';
+
+// ============================================================================
+// MATCHUP SIMULATIONS COLUMNS
+// ============================================================================
+export const MATCHUP_SIMULATION_COLUMNS = 'id, league_id, week_number, team1_id, team2_id, team1_win_pct, team2_win_pct, simulated_at, matchup_id, num_simulations';
+
+// ============================================================================
+// FANTASY WEEKS COLUMNS
+// ============================================================================
+export const FANTASY_WEEK_COLUMNS = 'id, week_number, start_date, end_date, season, label';
+
+// ============================================================================
+// AUDIT LOG COLUMNS
+// ============================================================================
+export const AUDIT_LOG_COLUMNS = 'id, user_id, event_type, league_id, details, severity, ip_address, user_agent, created_at';
+
+// ============================================================================
 // COUNT-ONLY QUERIES (use with { count: 'exact', head: true })
 // ============================================================================
 // For count queries, we still need a column selection even though data isn't returned
@@ -201,6 +236,13 @@ export const COLUMNS = {
   PLAYOFF_BRACKET: PLAYOFF_BRACKET_COLUMNS,
   PLAYOFF_SEED: PLAYOFF_SEED_COLUMNS,
   PLAYOFF_SERIES: PLAYOFF_SERIES_COLUMNS,
+  PLAYER_DIRECTORY: PLAYER_DIRECTORY_COLUMNS,
+  PLAYER_TALENT_METRICS: PLAYER_TALENT_METRICS_COLUMNS,
+  GOALIE_GSAX: GOALIE_GSAX_COLUMNS,
+  TEAM_LINEUP: TEAM_LINEUP_COLUMNS,
+  MATCHUP_SIMULATION: MATCHUP_SIMULATION_COLUMNS,
+  FANTASY_WEEK: FANTASY_WEEK_COLUMNS,
+  AUDIT_LOG: AUDIT_LOG_COLUMNS,
 
   // Slim versions
   MATCHUP_SLIM: MATCHUP_COLUMNS_SLIM,

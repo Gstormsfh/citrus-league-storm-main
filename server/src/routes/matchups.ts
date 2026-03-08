@@ -6,7 +6,7 @@ import { createUserClient } from '../lib/supabase';
 import { MatchupService } from '../services/MatchupService';
 import { AppError } from '../lib/errors';
 import { ok, fail, handleError } from '../lib/responses';
-import { logger } from '@citrus/shared';
+import { logger, COLUMNS } from '@citrus/shared';
 
 const matchupRoutes = new Hono<Env>();
 
@@ -125,7 +125,7 @@ matchupRoutes.get('/league/:leagueId/simulations', membershipMiddleware, async (
 
   let query = supabase
     .from('matchup_simulations')
-    .select('*')
+    .select(COLUMNS.MATCHUP_SIMULATION)
     .eq('league_id', leagueId)
     .order('simulated_at', { ascending: false });
 

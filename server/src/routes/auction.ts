@@ -4,6 +4,7 @@ import { authMiddleware } from '../middleware/auth';
 import { membershipMiddleware } from '../middleware/membership';
 import { createUserClient } from '../lib/supabase';
 import { AuctionService } from '../services/AuctionService';
+import { LeagueMembershipService } from '../services/LeagueMembershipService';
 import { AppError } from '../lib/errors';
 import { ok, created, fail, handleError } from '../lib/responses';
 
@@ -76,7 +77,22 @@ auctionRoutes.get('/league/:leagueId/budgets', membershipMiddleware, async (c) =
 // GET /api/auction/bids/:nominationId
 auctionRoutes.get('/bids/:nominationId', async (c) => {
   const nominationId = c.req.param('nominationId');
+  const userId = c.get('userId');
   const supabase = createUserClient(c.get('userToken'));
+
+  // Look up nomination's league and verify membership
+  const { data: nomination } = await supabase
+    .from('auction_nominations')
+    .select('league_id')
+    .eq('id', nominationId)
+    .single();
+
+  if (!nomination) return fail(c, AppError.notFound('Nomination'));
+
+  const membership = new LeagueMembershipService(supabase);
+  const isMember = await membership.verifyMembership(nomination.league_id, userId);
+  if (!isMember) return fail(c, AppError.forbidden('Not a member of this league'));
+
   const service = new AuctionService(supabase);
   const result = await service.getBidHistory(nominationId);
   if (result.error) return handleError(c, result.error, 'Failed to fetch bids');

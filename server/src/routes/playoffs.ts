@@ -4,6 +4,7 @@ import { authMiddleware } from '../middleware/auth';
 import { membershipMiddleware } from '../middleware/membership';
 import { createUserClient } from '../lib/supabase';
 import { PlayoffService } from '../services/PlayoffService';
+import { LeagueMembershipService } from '../services/LeagueMembershipService';
 import { AppError } from '../lib/errors';
 import { ok, fail, handleError } from '../lib/responses';
 
@@ -34,7 +35,22 @@ playoffRoutes.post('/league/:leagueId/generate', membershipMiddleware, async (c)
 // POST /api/playoffs/bracket/:bracketId/advance
 playoffRoutes.post('/bracket/:bracketId/advance', async (c) => {
   const bracketId = c.req.param('bracketId');
+  const userId = c.get('userId');
   const supabase = createUserClient(c.get('userToken'));
+
+  // Look up the bracket's league and verify membership
+  const { data: bracket } = await supabase
+    .from('playoff_brackets')
+    .select('league_id')
+    .eq('id', bracketId)
+    .single();
+
+  if (!bracket) return fail(c, AppError.notFound('Bracket'));
+
+  const membership = new LeagueMembershipService(supabase);
+  const isMember = await membership.verifyMembership(bracket.league_id, userId);
+  if (!isMember) return fail(c, AppError.forbidden('Not a member of this league'));
+
   const service = new PlayoffService(supabase);
   const result = await service.advanceRound(bracketId);
   if (result.error) return handleError(c, result.error, 'Failed to advance round');

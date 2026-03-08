@@ -4,6 +4,21 @@
 import { apiClient } from './client';
 
 export const accountApi = {
+  getProfile() {
+    return apiClient.get<{
+      id: string;
+      username: string;
+      first_name: string | null;
+      last_name: string | null;
+      phone: string | null;
+      location: string | null;
+      bio: string | null;
+      default_team_name: string | null;
+      timezone: string | null;
+      created_at: string;
+      updated_at: string;
+    }>('/api/account/profile');
+  },
   exportUserData() {
     return apiClient.post('/api/account/export');
   },

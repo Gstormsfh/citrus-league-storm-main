@@ -119,7 +119,7 @@ rosterRoutes.get('/league/:leagueId/team/:teamId/lineup', membershipMiddleware, 
 
   const { data, error } = await supabase
     .from('team_lineups')
-    .select('*')
+    .select(COLUMNS.TEAM_LINEUP)
     .eq('team_id', teamId)
     .eq('league_id', leagueId)
     .order('updated_at', { ascending: false })

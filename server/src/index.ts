@@ -34,8 +34,8 @@ if (proxyUrl) {
     const { ProxyAgent, setGlobalDispatcher } = require('undici');
     setGlobalDispatcher(new ProxyAgent(proxyUrl));
     console.log('[proxy] Global fetch proxy configured');
-  } catch (e: any) {
-    console.warn('[proxy] Failed to configure proxy:', e.message);
+  } catch (e: unknown) {
+    console.warn('[proxy] Failed to configure proxy:', e instanceof Error ? e.message : e);
   }
 }
 

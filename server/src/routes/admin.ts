@@ -4,6 +4,7 @@ import { authMiddleware } from '../middleware/auth';
 import { supabaseAdmin } from '../lib/supabase';
 import { AppError } from '../lib/errors';
 import { ok, okPaginated, fail, handleError } from '../lib/responses';
+import { COLUMNS } from '@citrus/shared';
 
 const adminRoutes = new Hono<Env>();
 
@@ -118,7 +119,7 @@ adminRoutes.get('/audit-log', async (c) => {
 
   const { data, error } = await supabaseAdmin
     .from('audit_log')
-    .select('*')
+    .select(COLUMNS.AUDIT_LOG)
     .order('created_at', { ascending: false })
     .limit(limit);
 
@@ -179,7 +180,7 @@ adminRoutes.post('/recalculate-scores', async (c) => {
       week: week || 'all',
       rostersLocked: lockResult?.length || 0,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     return handleError(c, err, 'Score recalculation failed');
   }
 });

@@ -16,7 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 // VITE_API_URL should be set to the deployed API server URL.
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
-interface ApiResponse<T = any> {
+interface ApiResponse<T = unknown> {
   data?: T;
   error?: string;
   pagination?: {
@@ -36,7 +36,7 @@ async function getAuthToken(): Promise<string | null> {
   return session?.access_token || null;
 }
 
-async function request<T = any>(
+async function request<T = unknown>(
   method: string,
   path: string,
   body?: unknown,
@@ -78,9 +78,9 @@ async function request<T = any>(
 
 export class ApiError extends Error {
   status: number;
-  data: any;
+  data: unknown;
 
-  constructor(message: string, status: number, data?: any) {
+  constructor(message: string, status: number, data?: unknown) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
@@ -89,23 +89,23 @@ export class ApiError extends Error {
 }
 
 export const apiClient = {
-  get<T = any>(path: string, options?: RequestOptions): Promise<ApiResponse<T>> {
+  get<T = unknown>(path: string, options?: RequestOptions): Promise<ApiResponse<T>> {
     return request<T>('GET', path, undefined, options);
   },
 
-  post<T = any>(path: string, body?: unknown, options?: RequestOptions): Promise<ApiResponse<T>> {
+  post<T = unknown>(path: string, body?: unknown, options?: RequestOptions): Promise<ApiResponse<T>> {
     return request<T>('POST', path, body, options);
   },
 
-  put<T = any>(path: string, body?: unknown, options?: RequestOptions): Promise<ApiResponse<T>> {
+  put<T = unknown>(path: string, body?: unknown, options?: RequestOptions): Promise<ApiResponse<T>> {
     return request<T>('PUT', path, body, options);
   },
 
-  patch<T = any>(path: string, body?: unknown, options?: RequestOptions): Promise<ApiResponse<T>> {
+  patch<T = unknown>(path: string, body?: unknown, options?: RequestOptions): Promise<ApiResponse<T>> {
     return request<T>('PATCH', path, body, options);
   },
 
-  delete<T = any>(path: string, options?: RequestOptions): Promise<ApiResponse<T>> {
+  delete<T = unknown>(path: string, options?: RequestOptions): Promise<ApiResponse<T>> {
     return request<T>('DELETE', path, undefined, options);
   },
 };

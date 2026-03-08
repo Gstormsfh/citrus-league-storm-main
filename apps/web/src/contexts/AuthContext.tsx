@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session, AuthError, AuthResponse } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { accountApi } from '@/api/account';
 import { analyticsService } from '@/services/AnalyticsService';
 import { setSentryUser } from '@/integrations/sentry/config';
 import { logger } from '@/utils/logger';
@@ -42,28 +43,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (_userId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, username, first_name, last_name, phone, location, bio, default_team_name, timezone, created_at, updated_at')
-        .eq('id', userId)
-        .maybeSingle();
-
-      // If table doesn't exist or no profile found, that's okay - user needs to set up profile
-      if (error && error.code !== 'PGRST116') {
-        // PGRST116 = no rows found (which is fine)
-        // Check if it's a table doesn't exist error
-        if (error.message?.includes('relation') || error.message?.includes('does not exist')) {
-          logger.warn('Profiles table does not exist. Please run Supabase migrations.');
-          setProfile(null);
-          return;
-        }
-        throw error;
-      }
-      
-      // If profile exists but has auto-generated username, still set it (user can update it)
-      setProfile(data || null);
+      const response = await accountApi.getProfile();
+      setProfile(response.data || null);
     } catch (error) {
       logger.error('Error fetching profile:', error);
       setProfile(null);

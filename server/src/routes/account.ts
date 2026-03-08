@@ -9,6 +9,15 @@ import { ok, fail, handleError } from '../lib/responses';
 const accountRoutes = new Hono<Env>();
 accountRoutes.use('*', authMiddleware);
 
+// GET /api/account/profile — Get current user's profile
+accountRoutes.get('/profile', async (c) => {
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new AccountService(supabase);
+  const result = await service.getProfile();
+  if (!result.success) return fail(c, AppError.badRequest(result.error || 'Failed to fetch profile'));
+  return ok(c, result.data);
+});
+
 // POST /api/account/export
 accountRoutes.post('/export', async (c) => {
   const supabase = createUserClient(c.get('userToken'));

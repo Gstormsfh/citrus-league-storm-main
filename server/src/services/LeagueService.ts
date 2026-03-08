@@ -29,19 +29,19 @@ export class LeagueService {
       .select('league_id')
       .eq('owner_id', userId);
 
-    const teamLeagueIds = (teamData || []).map((t: any) => t.league_id);
+    const teamLeagueIds = (teamData || []).map((t: { league_id: string }) => t.league_id);
 
-    let memberLeagues: any[] = [];
+    let memberLeagues: Record<string, unknown>[] = [];
     if (teamLeagueIds.length > 0) {
       const { data } = await this.supabase
         .from('leagues')
         .select(COLUMNS.LEAGUE)
         .in('id', teamLeagueIds);
-      memberLeagues = data || [];
+      memberLeagues = (data || []) as unknown as Record<string, unknown>[];
     }
 
     const allLeagues = [...(commissionerLeagues || []), ...memberLeagues];
-    const unique = Array.from(new Map(allLeagues.map((l: any) => [l.id, l])).values());
+    const unique = Array.from(new Map(allLeagues.map((l: Record<string, unknown>) => [l.id, l])).values());
     return { leagues: unique, error: null };
   }
 
@@ -278,7 +278,7 @@ export class LeagueService {
     const updatedSettings = { ...currentSettings, rosterSlots };
 
     // Calculate new roster size from slots
-    const newRosterSize = Object.values(rosterSlots).reduce((sum: number, v: any) => sum + (v || 0), 0);
+    const newRosterSize = Object.values(rosterSlots).reduce((sum: number, v: number) => sum + (v || 0), 0);
 
     const { error } = await this.supabase
       .from('leagues')
@@ -319,8 +319,8 @@ export class LeagueService {
     const { teams, error } = await this.getLeagueTeams(leagueId);
     if (error || !teams.length) return { teams: [], error };
 
-    const ownerIds = [...new Set(teams.map((t: any) => t.owner_id).filter(Boolean))];
-    let profiles: any[] = [];
+    const ownerIds = [...new Set(teams.map((t: { owner_id: string }) => t.owner_id).filter(Boolean))];
+    let profiles: { id: string; username: string | null; first_name: string | null; last_name: string | null }[] = [];
     if (ownerIds.length > 0) {
       const { data } = await this.supabase
         .from('profiles')
@@ -329,8 +329,8 @@ export class LeagueService {
       profiles = data || [];
     }
 
-    const profileMap = new Map(profiles.map((p: any) => [p.id, p]));
-    const teamsWithOwners = teams.map((t: any) => {
+    const profileMap = new Map(profiles.map((p: { id: string; username: string | null; first_name: string | null; last_name: string | null }) => [p.id, p]));
+    const teamsWithOwners = teams.map((t: { owner_id: string; [key: string]: unknown }) => {
       const profile = profileMap.get(t.owner_id);
       const ownerName = profile
         ? (profile.first_name && profile.last_name
@@ -428,7 +428,7 @@ export class LeagueService {
           .eq('league_id', leagueId);
 
         if (teams && teams.length > 0) {
-          const notifications = teams.map((t: any) => ({
+          const notifications = teams.map((t: { owner_id: string }) => ({
             user_id: t.owner_id,
             league_id: leagueId,
             type: 'SYSTEM',

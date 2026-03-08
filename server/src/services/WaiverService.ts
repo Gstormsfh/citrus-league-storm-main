@@ -76,9 +76,10 @@ export class WaiverService {
    * If the full column set fails (e.g., bid_amount doesn't exist yet),
    * retries with WAIVER_BASE which only includes columns from the initial migration.
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async queryWaiverClaims(
-    buildQuery: (columns: string) => any,
-  ): Promise<{ claims: any[]; error: any }> {
+    buildQuery: (columns: string) => PromiseLike<{ data: any; error: any }>,
+  ): Promise<{ claims: Record<string, unknown>[]; error: unknown }> {
     const { data, error } = await buildQuery(COLUMNS.WAIVER);
 
     if (error && this.isColumnError(error)) {
@@ -279,7 +280,7 @@ export class WaiverService {
       return initialBudget;
     }
 
-    const spent = (claims || []).reduce((sum: number, c: any) => sum + (c.bid_amount || 0), 0);
+    const spent = (claims || []).reduce((sum: number, c: { bid_amount?: number }) => sum + (c.bid_amount || 0), 0);
     return initialBudget - spent;
   }
 
@@ -307,7 +308,7 @@ export class WaiverService {
     // If bid_amount column doesn't exist, treat all budgets as full
     if (claimsError && this.isColumnError(claimsError)) {
       logger.warn('[waivers] bid_amount column not ready, returning full budgets');
-      return (teams || []).map((t: any) => ({
+      return (teams || []).map((t: { id: string; team_name: string }) => ({
         team_id: t.id,
         team_name: t.team_name,
         remaining_budget: initialBudget,

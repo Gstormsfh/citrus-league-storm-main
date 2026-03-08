@@ -80,11 +80,11 @@ export class KeeperService {
     });
     if (error) return { results: [], error: error.message };
 
-    const results = (data || []).map((row: any) => ({
+    const results = (data || []).map((row: { team_id: string; keepers_locked: number; rounds_consumed?: number[] }) => ({
       team_id: row.team_id, keepers_locked: row.keepers_locked, rounds_consumed: row.rounds_consumed || [],
     }));
 
-    const totalKeepers = results.reduce((sum: number, r: any) => sum + r.keepers_locked, 0);
+    const totalKeepers = results.reduce((sum, r) => sum + r.keepers_locked, 0);
     try {
       await this.supabase.rpc('notify_league_members', {
         p_league_id: leagueId,

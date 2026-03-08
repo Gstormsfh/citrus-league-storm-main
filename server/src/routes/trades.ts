@@ -70,6 +70,9 @@ tradeRoutes.put('/:tradeId/accept', async (c) => {
   const supabase = createUserClient(c.get('userToken'));
   const service = new TradeService(supabase);
 
+  const access = await service.verifyTradeAccess(tradeId, userId);
+  if (access.error) return fail(c, AppError.forbidden(access.error));
+
   const { success, error } = await service.acceptTradeOffer(tradeId, userId);
   if (!success) {
     return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to accept trade'));
@@ -85,6 +88,9 @@ tradeRoutes.put('/:tradeId/reject', async (c) => {
   const supabase = createUserClient(c.get('userToken'));
   const service = new TradeService(supabase);
 
+  const access = await service.verifyTradeAccess(tradeId, userId);
+  if (access.error) return fail(c, AppError.forbidden(access.error));
+
   const { success, error } = await service.rejectTradeOffer(tradeId, userId);
   if (!success) {
     return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to reject trade'));
@@ -99,6 +105,9 @@ tradeRoutes.put('/:tradeId/cancel', async (c) => {
   const userId = c.get('userId');
   const supabase = createUserClient(c.get('userToken'));
   const service = new TradeService(supabase);
+
+  const access = await service.verifyTradeAccess(tradeId, userId);
+  if (access.error) return fail(c, AppError.forbidden(access.error));
 
   const { success, error } = await service.cancelTradeOffer(tradeId, userId);
   if (!success) {
@@ -122,6 +131,9 @@ tradeRoutes.put('/:tradeId/respond', async (c) => {
 
   const supabase = createUserClient(c.get('userToken'));
   const service = new TradeService(supabase);
+
+  const access = await service.verifyTradeAccess(tradeId, userId);
+  if (access.error) return fail(c, AppError.forbidden(access.error));
 
   const action = body.action as string;
 
@@ -148,9 +160,13 @@ tradeRoutes.put('/:tradeId/respond', async (c) => {
 // POST /api/trades/:tradeId/vote — Submit a trade vote
 tradeRoutes.post('/:tradeId/vote', validateBody(schemas.tradeVote), async (c) => {
   const tradeId = c.req.param('tradeId');
+  const userId = c.get('userId');
   const body = getValidatedBody<z.infer<typeof schemas.tradeVote>>(c);
   const supabase = createUserClient(c.get('userToken'));
   const service = new TradeService(supabase);
+
+  const access = await service.verifyTradeAccess(tradeId, userId);
+  if (access.error) return fail(c, AppError.forbidden(access.error));
 
   const result = await service.submitTradeVote(tradeId, String(body.voterTeamId), body.vote);
   if (!result.success) {
@@ -163,8 +179,12 @@ tradeRoutes.post('/:tradeId/vote', validateBody(schemas.tradeVote), async (c) =>
 // GET /api/trades/:tradeId/votes — Get trade votes
 tradeRoutes.get('/:tradeId/votes', async (c) => {
   const tradeId = c.req.param('tradeId');
+  const userId = c.get('userId');
   const supabase = createUserClient(c.get('userToken'));
   const service = new TradeService(supabase);
+
+  const access = await service.verifyTradeAccess(tradeId, userId);
+  if (access.error) return fail(c, AppError.forbidden(access.error));
 
   const { votes, error } = await service.getTradeVotes(tradeId);
   if (error) {
@@ -181,6 +201,9 @@ tradeRoutes.put('/:tradeId/commissioner-decision', validateBody(schemas.commissi
   const body = getValidatedBody<z.infer<typeof schemas.commissionerDecision>>(c);
   const supabase = createUserClient(c.get('userToken'));
   const service = new TradeService(supabase);
+
+  const access = await service.verifyTradeAccess(tradeId, userId);
+  if (access.error) return fail(c, AppError.forbidden(access.error));
 
   try {
     const { success, error } = await service.commissionerDecision(

@@ -117,7 +117,7 @@ export class MatchupService {
       .eq('team_id', teamId)
       .eq('league_id', leagueId);
 
-    const ids = (data || []).map((r: any) => String(r.player_id));
+    const ids = (data || []).map((r: { player_id: number }) => String(r.player_id));
     logger.info(`[getRosterPlayerIds] team=${teamId.slice(0,8)} count=${ids.length}${error ? ' ERROR: ' + error.message : ''}`);
     return ids;
   }
@@ -143,7 +143,7 @@ export class MatchupService {
       .in('status', ['completed', 'final']);
 
     const all = [...(forward || []), ...(reverse || [])];
-    all.sort((a: any, b: any) => a.week_number - b.week_number);
+    all.sort((a, b) => (a as unknown as { week_number: number }).week_number - (b as unknown as { week_number: number }).week_number);
 
     return { matchups: all, error: null };
   }
@@ -161,7 +161,15 @@ export class MatchupService {
 
     const numTeams = teams.length;
     const numRounds = numTeams % 2 === 0 ? numTeams - 1 : numTeams;
-    const matchups: any[] = [];
+    const matchups: Array<{
+      league_id: string;
+      week_number: number;
+      team1_id: string;
+      team2_id: string;
+      week_start_date: string;
+      week_end_date: string;
+      status: string;
+    }> = [];
 
     for (const week of fantasyWeeks) {
       const pairings = this.getRoundRobinPairings(week.week_number, teams, numRounds);
@@ -650,14 +658,14 @@ export class MatchupService {
     }
 
     // Log RPC results for debugging AI team scoring issues
-    const team1Sum = (team1Result.data || []).reduce((s: number, r: any) => s + parseFloat(r.daily_score || 0), 0);
-    const team2Sum = (team2Result.data || []).reduce((s: number, r: any) => s + parseFloat(r.daily_score || 0), 0);
+    const team1Sum = (team1Result.data || []).reduce((s: number, r: { daily_score?: string | number }) => s + parseFloat(String(r.daily_score || 0)), 0);
+    const team2Sum = (team2Result.data || []).reduce((s: number, r: { daily_score?: string | number }) => s + parseFloat(String(r.daily_score || 0)), 0);
     logger.info(`[calculateDailyMatchupScores] matchup=${matchupId} team1=${matchup.team1_id} sum=${team1Sum.toFixed(1)} team2=${matchup.team2_id} sum=${team2Sum.toFixed(1)}`);
 
     // Combine results with team_id attached (frontend filters by team_id)
     const combined = [
-      ...(team1Result.data || []).map((row: any) => ({ ...row, team_id: matchup.team1_id })),
-      ...(team2Result.data || []).map((row: any) => ({ ...row, team_id: matchup.team2_id })),
+      ...(team1Result.data || []).map((row: Record<string, unknown>) => ({ ...row, team_id: matchup.team1_id })),
+      ...(team2Result.data || []).map((row: Record<string, unknown>) => ({ ...row, team_id: matchup.team2_id })),
     ];
 
     return { data: combined, error: null };
@@ -671,7 +679,7 @@ export class MatchupService {
       p_end_date: endDate,
     });
 
-    const statsMap = new Map<number, any>();
+    const statsMap = new Map<number, Record<string, unknown>>();
     for (const row of data || []) {
       statsMap.set(row.player_id, row);
     }
@@ -686,7 +694,7 @@ export class MatchupService {
       p_target_date: targetDate,
     });
 
-    const projMap = new Map<number, any>();
+    const projMap = new Map<number, Record<string, unknown>>();
     for (const row of data || []) {
       projMap.set(row.player_id, row);
     }
@@ -821,20 +829,28 @@ export class MatchupService {
     // Join with player_directory to return player details.
     // This eliminates the need for frontend enrichment, which fails for
     // AI teams whose roster_assignments are blocked by RLS.
-    const uniquePlayerIds = [...new Set(entries.map((e: any) => Number(e.player_id)))];
+    const uniquePlayerIds = [...new Set(entries.map((e: { player_id: number }) => Number(e.player_id)))];
 
     const { data: players } = await admin
       .from('player_directory')
       .select('player_id, full_name, position_code, is_goalie, team_abbrev, headshot_url')
       .in('player_id', uniquePlayerIds);
 
-    const playerMap = new Map<number, any>();
-    (players || []).forEach((p: any) => {
+    interface PlayerDirectoryRow {
+      player_id: number;
+      full_name: string;
+      position_code: string;
+      is_goalie: boolean;
+      team_abbrev: string;
+      headshot_url: string;
+    }
+    const playerMap = new Map<number, PlayerDirectoryRow>();
+    (players || []).forEach((p: PlayerDirectoryRow) => {
       playerMap.set(Number(p.player_id), p);
     });
 
     // Enrich entries with player details
-    const enrichedEntries = entries.map((entry: any) => {
+    const enrichedEntries = entries.map((entry: { player_id: number; team_id: string; roster_date: string; slot_type: string; slot_id: string | null }) => {
       const player = playerMap.get(Number(entry.player_id));
       return {
         ...entry,
@@ -848,7 +864,7 @@ export class MatchupService {
       };
     });
 
-    const withNames = enrichedEntries.filter((e: any) => e.player_name);
+    const withNames = enrichedEntries.filter((e: { player_name: string }) => e.player_name);
     logger.info(`[getFrozenRosterBatch] entries=${entries.length} playerDir=${players?.length || 0} enriched=${withNames.length}`);
     return { entries: enrichedEntries, error };
   }
@@ -865,7 +881,7 @@ export class MatchupService {
       return { lockedCount: 0, error: gamesError };
     }
 
-    const gameDates = [...new Set(finalGames.map((g: any) => g.game_date))];
+    const gameDates = [...new Set(finalGames.map((g: { game_date: string }) => g.game_date))];
 
     const { data: updated, error: updateError } = await this.supabase
       .from('fantasy_daily_rosters')
