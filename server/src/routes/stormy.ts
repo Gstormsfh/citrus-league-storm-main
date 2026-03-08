@@ -3,6 +3,8 @@ import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { z } from 'zod';
 import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
+import { createUserClient } from '../lib/supabase';
+import { LeagueMembershipService } from '../services/LeagueMembershipService';
 import { AppError } from '../lib/errors';
 import { ok, fail } from '../lib/responses';
 
@@ -16,6 +18,16 @@ stormyRoutes.post('/chat', validateBody(schemas.stormyChat), async (c) => {
   const body = getValidatedBody<z.infer<typeof schemas.stormyChat>>(c);
 
   const { message, leagueId, context } = body;
+
+  // Verify league membership before forwarding to AI assistant
+  if (leagueId) {
+    const supabase = createUserClient(c.get('userToken'));
+    const membership = new LeagueMembershipService(supabase);
+    const memberCheck = await membership.checkMembership(leagueId, userId);
+    if (!memberCheck.isMember) {
+      return fail(c, AppError.forbidden('Not a member of this league'));
+    }
+  }
 
   const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
