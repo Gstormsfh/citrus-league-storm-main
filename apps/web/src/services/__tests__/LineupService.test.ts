@@ -103,6 +103,11 @@ vi.mock('@/api/playoffs', () => ({ playoffApi: {} }));
 vi.mock('@/api/schedule', () => ({ scheduleApi: {} }));
 vi.mock('@/api/stormy', () => ({ stormyApi: {} }));
 vi.mock('@/utils/queryColumns', () => ({ COLUMNS: {} }));
+vi.mock('@/utils/scoringUtils', () => ({
+  ScoringCalculator: { calculateScore: vi.fn() },
+  compareCategoryMatchup: vi.fn(),
+  calculateRotoStandings: vi.fn(),
+}));
 
 // =============================================================================
 // Import AFTER mocks
