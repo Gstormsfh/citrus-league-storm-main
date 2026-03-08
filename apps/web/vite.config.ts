@@ -121,14 +121,36 @@ export default defineConfig(({ mode }) => ({
         entryFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash].[ext]',
         manualChunks: (id) => {
-          // Don't split React - keep it in main bundle to ensure it loads first
-          // This prevents vendor bundles from trying to use React before it's available
           if (id.includes('node_modules')) {
-            // Supabase (important for auth)
+            // React + ReactDOM — keep together, loaded first via modulepreload
+            if (id.includes('react-dom') || id.includes('/react/')) {
+              return 'vendor-react';
+            }
+            // Supabase — separate chunk (auth-critical, loaded early)
             if (id.includes('@supabase')) {
               return 'vendor-supabase';
             }
-            // All other node_modules in one chunk (React stays in main bundle)
+            // Radix UI primitives (shadcn foundation) — separate chunk
+            if (id.includes('@radix-ui')) {
+              return 'vendor-radix';
+            }
+            // React Router — separate chunk
+            if (id.includes('react-router') || id.includes('@remix-run')) {
+              return 'vendor-router';
+            }
+            // TanStack / React Query — separate chunk
+            if (id.includes('@tanstack')) {
+              return 'vendor-tanstack';
+            }
+            // Recharts / D3 (charting) — heavy, separate chunk
+            if (id.includes('recharts') || id.includes('d3-')) {
+              return 'vendor-charts';
+            }
+            // Date utilities
+            if (id.includes('date-fns') || id.includes('luxon')) {
+              return 'vendor-dates';
+            }
+            // Remaining vendor code
             return 'vendor';
           }
         },

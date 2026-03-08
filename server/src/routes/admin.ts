@@ -144,12 +144,44 @@ adminRoutes.post('/recalculate-scores', async (c) => {
     return fail(c, AppError.badRequest('leagueId is required'));
   }
 
-  // TODO: Trigger Python pipeline score recalculation
-  return ok(c, {
-    message: 'Score recalculation queued',
-    leagueId,
-    week,
-  });
+  try {
+    // Step 1: Lock completed daily rosters for the league
+    const { data: lockResult, error: lockError } = await supabaseAdmin
+      .from('fantasy_daily_rosters')
+      .update({ is_locked: true, locked_at: new Date().toISOString() })
+      .eq('league_id', leagueId as string)
+      .eq('is_locked', false)
+      .lt('roster_date', new Date().toISOString().split('T')[0])
+      .select('player_id');
+
+    // Step 2: Recalculate matchup scores via RPC
+    const { error: rpcError } = await supabaseAdmin.rpc('update_all_matchup_scores', {
+      p_league_id: leagueId,
+    });
+
+    if (rpcError) {
+      return fail(c, AppError.internal(`Score recalculation failed: ${rpcError.message}`));
+    }
+
+    // Step 3: If a specific week was requested, auto-complete matchups for that week
+    if (week) {
+      await supabaseAdmin
+        .from('matchups')
+        .update({ status: 'completed', updated_at: new Date().toISOString() })
+        .eq('league_id', leagueId as string)
+        .eq('week_number', week as number)
+        .eq('status', 'in_progress');
+    }
+
+    return ok(c, {
+      message: 'Score recalculation completed',
+      leagueId,
+      week: week || 'all',
+      rostersLocked: lockResult?.length || 0,
+    });
+  } catch (err: any) {
+    return handleError(c, err, 'Score recalculation failed');
+  }
 });
 
 // GET /api/admin/pipeline-status — Data pipeline health

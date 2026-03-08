@@ -1,10 +1,15 @@
 import { Context, Next } from 'hono';
 
 /**
- * Simple in-memory rate limiter for the API server.
- * Uses a sliding window approach with per-IP and per-user buckets.
+ * Scalable in-memory rate limiter with LRU eviction.
  *
- * For production at scale, replace with Redis-backed rate limiting.
+ * Improvements over the original:
+ * - LRU eviction prevents unbounded memory growth under DDoS / many unique IPs
+ * - Configurable max bucket size (default: 10,000 entries)
+ * - Periodic cleanup still runs but LRU eviction is the primary memory safety mechanism
+ *
+ * For multi-instance deployments (Cloud Run), replace with Redis-backed
+ * rate limiting using a sorted set sliding window (ZRANGEBYSCORE + ZADD).
  */
 
 interface RateLimitEntry {
@@ -12,18 +17,67 @@ interface RateLimitEntry {
   resetAt: number;
 }
 
-const ipBuckets = new Map<string, RateLimitEntry>();
-const userBuckets = new Map<string, RateLimitEntry>();
+/**
+ * LRU-evicting Map — drops the oldest entry when capacity is exceeded.
+ * Uses Map insertion order (guaranteed by ES2015) for LRU behavior.
+ */
+class LRUBucketMap {
+  private map = new Map<string, RateLimitEntry>();
+  private maxSize: number;
+
+  constructor(maxSize: number) {
+    this.maxSize = maxSize;
+  }
+
+  get(key: string): RateLimitEntry | undefined {
+    const entry = this.map.get(key);
+    if (entry) {
+      // Move to end (most recently used)
+      this.map.delete(key);
+      this.map.set(key, entry);
+    }
+    return entry;
+  }
+
+  set(key: string, entry: RateLimitEntry): void {
+    // Delete first to update insertion order
+    this.map.delete(key);
+
+    // Evict oldest entry if at capacity
+    if (this.map.size >= this.maxSize) {
+      const oldestKey = this.map.keys().next().value;
+      if (oldestKey !== undefined) {
+        this.map.delete(oldestKey);
+      }
+    }
+
+    this.map.set(key, entry);
+  }
+
+  get size(): number {
+    return this.map.size;
+  }
+
+  /** Remove expired entries */
+  cleanup(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.map) {
+      if (entry.resetAt <= now) {
+        this.map.delete(key);
+      }
+    }
+  }
+}
+
+// LRU-bounded buckets — 10,000 unique IPs / users max
+const MAX_BUCKET_SIZE = 10_000;
+const ipBuckets = new LRUBucketMap(MAX_BUCKET_SIZE);
+const userBuckets = new LRUBucketMap(MAX_BUCKET_SIZE);
 
 // Cleanup stale entries every 60 seconds
 setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of ipBuckets) {
-    if (entry.resetAt <= now) ipBuckets.delete(key);
-  }
-  for (const [key, entry] of userBuckets) {
-    if (entry.resetAt <= now) userBuckets.delete(key);
-  }
+  ipBuckets.cleanup();
+  userBuckets.cleanup();
 }, 60_000).unref();
 
 function getClientIp(c: Context): string {
@@ -35,7 +89,7 @@ function getClientIp(c: Context): string {
 }
 
 function checkLimit(
-  bucket: Map<string, RateLimitEntry>,
+  bucket: LRUBucketMap,
   key: string,
   maxRequests: number,
   windowMs: number,
@@ -71,6 +125,7 @@ interface RateLimitOptions {
  * Rate limiting middleware.
  *
  * Default: 100 requests per IP per minute, 200 per authenticated user per minute.
+ * Uses LRU eviction to prevent unbounded memory growth at scale.
  */
 export function rateLimitMiddleware(options: RateLimitOptions = {}) {
   const {

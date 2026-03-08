@@ -15,7 +15,9 @@ import { notificationRoutes } from './routes/notifications';
 import { stormyRoutes } from './routes/stormy';
 import { adminRoutes } from './routes/admin';
 import { standardRateLimit, strictRateLimit } from './middleware/rateLimit';
+import { requestContextMiddleware } from './middleware/requestContext';
 import { AppError } from './lib/errors';
+import { supabaseBreaker } from './lib/circuitBreaker';
 
 export type Env = {
   Variables: {
@@ -48,7 +50,10 @@ app.use('*', cors({
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 }));
 
-// Rate limiting — 100 req/min per IP for standard routes
+// Structured request logging for observability (production JSON logs)
+app.use('/api/*', requestContextMiddleware);
+
+// Rate limiting — 300 req/min per IP for standard routes (LRU-bounded)
 app.use('/api/*', standardRateLimit);
 // Stricter limit on AI chat — 10 req/min per IP
 app.use('/api/stormy/*', strictRateLimit);
@@ -80,6 +85,8 @@ app.get('/api/health', async (c) => {
   }
 
   checks.server = 'ok';
+  checks.circuitBreaker = supabaseBreaker.currentState === 'CLOSED' ? 'ok' : supabaseBreaker.currentState.toLowerCase();
+  if (supabaseBreaker.currentState !== 'CLOSED') healthy = false;
 
   return c.json({
     status: healthy ? 'ok' : 'degraded',
