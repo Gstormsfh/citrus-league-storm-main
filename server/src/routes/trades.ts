@@ -118,16 +118,10 @@ tradeRoutes.put('/:tradeId/cancel', async (c) => {
 });
 
 // PUT /api/trades/:tradeId/respond — Legacy respond endpoint (accept/reject/counter)
-tradeRoutes.put('/:tradeId/respond', async (c) => {
+tradeRoutes.put('/:tradeId/respond', validateBody(schemas.tradeRespond), async (c) => {
   const tradeId = c.req.param('tradeId');
   const userId = c.get('userId');
-
-  let body: Record<string, unknown>;
-  try {
-    body = await c.req.json();
-  } catch {
-    return fail(c, AppError.badRequest('Invalid JSON body'));
-  }
+  const body = getValidatedBody<z.infer<typeof schemas.tradeRespond>>(c);
 
   const supabase = createUserClient(c.get('userToken'));
   const service = new TradeService(supabase);
@@ -135,16 +129,10 @@ tradeRoutes.put('/:tradeId/respond', async (c) => {
   const access = await service.verifyTradeAccess(tradeId, userId);
   if (access.error) return fail(c, AppError.forbidden(access.error));
 
-  const action = body.action as string;
-
-  if (!action || !['accept', 'reject', 'counter'].includes(action)) {
-    return fail(c, AppError.badRequest('Invalid action. Must be accept, reject, or counter'));
-  }
-
   let result;
-  if (action === 'accept') {
+  if (body.action === 'accept') {
     result = await service.acceptTradeOffer(tradeId, userId);
-  } else if (action === 'reject') {
+  } else if (body.action === 'reject') {
     result = await service.rejectTradeOffer(tradeId, userId);
   } else {
     result = await service.cancelTradeOffer(tradeId, userId);

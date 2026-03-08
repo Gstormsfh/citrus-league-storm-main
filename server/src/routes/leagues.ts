@@ -90,15 +90,10 @@ leagueRoutes.post('/join', validateBody(schemas.joinLeague), async (c) => {
 });
 
 // PUT /api/leagues/:leagueId/settings — Update league settings (commissioner only)
-leagueRoutes.put('/:leagueId/settings', commissionerMiddleware, async (c) => {
+leagueRoutes.put('/:leagueId/settings', commissionerMiddleware, validateBody(schemas.leagueSettings), async (c) => {
   const leagueId = c.req.param('leagueId');
   const userId = c.get('userId');
-  let body: Record<string, unknown>;
-  try {
-    body = await c.req.json();
-  } catch {
-    return fail(c, AppError.badRequest('Invalid JSON body'));
-  }
+  const body = getValidatedBody<z.infer<typeof schemas.leagueSettings>>(c);
 
   const supabase = createUserClient(c.get('userToken'));
   const service = new LeagueService(supabase);
@@ -107,8 +102,8 @@ leagueRoutes.put('/:leagueId/settings', commissionerMiddleware, async (c) => {
     const { league, error } = await service.updateSettings(
       leagueId,
       userId,
-      body.settings,
-      body.scoring_settings,
+      body.settings as Record<string, unknown>,
+      body.scoring_settings as Record<string, number> | undefined,
     );
 
     if (error) {
@@ -121,16 +116,10 @@ leagueRoutes.put('/:leagueId/settings', commissionerMiddleware, async (c) => {
 });
 
 // PUT /api/leagues/:leagueId/waiver-settings — Update waiver settings
-leagueRoutes.put('/:leagueId/waiver-settings', commissionerMiddleware, async (c) => {
+leagueRoutes.put('/:leagueId/waiver-settings', commissionerMiddleware, validateBody(schemas.waiverSettings), async (c) => {
   const leagueId = c.req.param('leagueId');
   const userId = c.get('userId');
-
-  let body: Record<string, unknown>;
-  try {
-    body = await c.req.json();
-  } catch {
-    return fail(c, AppError.badRequest('Invalid JSON body'));
-  }
+  const body = getValidatedBody<z.infer<typeof schemas.waiverSettings>>(c);
 
   const supabase = createUserClient(c.get('userToken'));
   const service = new LeagueService(supabase);
@@ -147,16 +136,10 @@ leagueRoutes.put('/:leagueId/waiver-settings', commissionerMiddleware, async (c)
 });
 
 // PUT /api/leagues/:leagueId/scoring-settings — Update scoring settings
-leagueRoutes.put('/:leagueId/scoring-settings', commissionerMiddleware, async (c) => {
+leagueRoutes.put('/:leagueId/scoring-settings', commissionerMiddleware, validateBody(schemas.scoringSettings), async (c) => {
   const leagueId = c.req.param('leagueId');
   const userId = c.get('userId');
-
-  let body: Record<string, unknown>;
-  try {
-    body = await c.req.json();
-  } catch {
-    return fail(c, AppError.badRequest('Invalid JSON body'));
-  }
+  const body = getValidatedBody<z.infer<typeof schemas.scoringSettings>>(c);
 
   const supabase = createUserClient(c.get('userToken'));
   const service = new LeagueService(supabase);
@@ -173,16 +156,10 @@ leagueRoutes.put('/:leagueId/scoring-settings', commissionerMiddleware, async (c
 });
 
 // PUT /api/leagues/:leagueId/draft-settings — Update draft settings
-leagueRoutes.put('/:leagueId/draft-settings', commissionerMiddleware, async (c) => {
+leagueRoutes.put('/:leagueId/draft-settings', commissionerMiddleware, validateBody(schemas.draftSettings), async (c) => {
   const leagueId = c.req.param('leagueId');
   const userId = c.get('userId');
-
-  let body: Record<string, unknown>;
-  try {
-    body = await c.req.json();
-  } catch {
-    return fail(c, AppError.badRequest('Invalid JSON body'));
-  }
+  const body = getValidatedBody<z.infer<typeof schemas.draftSettings>>(c);
 
   const supabase = createUserClient(c.get('userToken'));
   const service = new LeagueService(supabase);
@@ -199,22 +176,16 @@ leagueRoutes.put('/:leagueId/draft-settings', commissionerMiddleware, async (c) 
 });
 
 // PUT /api/leagues/:leagueId/roster-slots — Update roster slot settings
-leagueRoutes.put('/:leagueId/roster-slots', commissionerMiddleware, async (c) => {
+leagueRoutes.put('/:leagueId/roster-slots', commissionerMiddleware, validateBody(schemas.rosterSlots), async (c) => {
   const leagueId = c.req.param('leagueId');
   const userId = c.get('userId');
-
-  let body: Record<string, unknown>;
-  try {
-    body = await c.req.json();
-  } catch {
-    return fail(c, AppError.badRequest('Invalid JSON body'));
-  }
+  const body = getValidatedBody<z.infer<typeof schemas.rosterSlots>>(c);
 
   const supabase = createUserClient(c.get('userToken'));
   const service = new LeagueService(supabase);
 
   try {
-    const { success, error } = await service.updateRosterSlotSettings(leagueId, userId, body.rosterSlots as unknown as Record<string, number>);
+    const { success, error } = await service.updateRosterSlotSettings(leagueId, userId, body.rosterSlots);
     if (!success) {
       return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to update roster slots'));
     }

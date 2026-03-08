@@ -181,25 +181,17 @@ matchupRoutes.delete('/league/:leagueId', commissionerMiddleware, async (c) => {
 });
 
 // POST /api/matchups/league/:leagueId/generate — Generate matchups (commissioner only)
-matchupRoutes.post('/league/:leagueId/generate', commissionerMiddleware, async (c) => {
+matchupRoutes.post('/league/:leagueId/generate', commissionerMiddleware, validateBody(schemas.matchupGenerate), async (c) => {
   const leagueId = c.req.param('leagueId');
-  const body = await c.req.json<{
-    teams: Array<{ id: string }>;
-    fantasyWeeks: Array<{ week_number: number; start_date: string; end_date: string }>;
-    forceRegenerate?: boolean;
-  }>();
-
-  if (!body.teams?.length || !body.fantasyWeeks?.length) {
-    return fail(c, AppError.badRequest('teams and fantasyWeeks are required'));
-  }
+  const body = getValidatedBody<z.infer<typeof schemas.matchupGenerate>>(c);
 
   const supabase = createUserClient(c.get('userToken'));
   const service = new MatchupService(supabase);
 
   const { error } = await service.generateMatchupsForLeague(
     leagueId,
-    body.teams,
-    body.fantasyWeeks,
+    body.teams as Array<{ id: string }>,
+    body.fantasyWeeks as Array<{ week_number: number; start_date: string; end_date: string }>,
     body.forceRegenerate,
   );
 
@@ -320,13 +312,9 @@ matchupRoutes.get('/:matchupId/frozen-roster', async (c) => {
 });
 
 // POST /api/matchups/:matchupId/frozen-roster-batch — Get frozen roster entries for multiple dates
-matchupRoutes.post('/:matchupId/frozen-roster-batch', async (c) => {
+matchupRoutes.post('/:matchupId/frozen-roster-batch', validateBody(schemas.matchupFrozenRosterBatch), async (c) => {
   const matchupId = c.req.param('matchupId');
-  const body = await c.req.json<{ dates: string[] }>();
-
-  if (!body.dates?.length) {
-    return fail(c, AppError.badRequest('dates (string[]) required'));
-  }
+  const body = getValidatedBody<z.infer<typeof schemas.matchupFrozenRosterBatch>>(c);
 
   const supabase = createUserClient(c.get('userToken'));
   const service = new MatchupService(supabase);
@@ -372,12 +360,8 @@ matchupRoutes.get('/:matchupId/simulation', async (c) => {
 // ── Batch / global operations ────────────────────────────────────────
 
 // POST /api/matchups/projections/daily — Get daily projections for players
-matchupRoutes.post('/projections/daily', async (c) => {
-  const body = await c.req.json<{ playerIds: number[]; date: string }>();
-
-  if (!body.playerIds?.length || !body.date) {
-    return fail(c, AppError.badRequest('playerIds (number[]) and date (YYYY-MM-DD) are required'));
-  }
+matchupRoutes.post('/projections/daily', validateBody(schemas.matchupPlayerIds), async (c) => {
+  const body = getValidatedBody<z.infer<typeof schemas.matchupPlayerIds>>(c);
 
   const supabase = createUserClient(c.get('userToken'));
   const service = new MatchupService(supabase);
@@ -396,18 +380,13 @@ matchupRoutes.post('/projections/daily', async (c) => {
 });
 
 // POST /api/matchups/update-scores — Update all matchup scores
-matchupRoutes.post('/update-scores', async (c) => {
-  let body: Record<string, unknown>;
-  try {
-    body = await c.req.json();
-  } catch {
-    body = {};
-  }
+matchupRoutes.post('/update-scores', validateBody(schemas.matchupUpdateScores), async (c) => {
+  const body = getValidatedBody<z.infer<typeof schemas.matchupUpdateScores>>(c);
 
   const supabase = createUserClient(c.get('userToken'));
   const service = new MatchupService(supabase);
 
-  const { data, error } = await service.updateMatchupScores(body.leagueId as string | undefined);
+  const { data, error } = await service.updateMatchupScores(body.leagueId);
   if (error) {
     return handleError(c, error, 'Failed to update scores');
   }
@@ -416,12 +395,8 @@ matchupRoutes.post('/update-scores', async (c) => {
 });
 
 // POST /api/matchups/daily-game-stats — Get daily game stats for players
-matchupRoutes.post('/daily-game-stats', async (c) => {
-  const body = await c.req.json<{ playerIds: number[]; date: string }>();
-
-  if (!body.playerIds?.length || !body.date) {
-    return fail(c, AppError.badRequest('playerIds (number[]) and date (YYYY-MM-DD) are required'));
-  }
+matchupRoutes.post('/daily-game-stats', validateBody(schemas.matchupPlayerIds), async (c) => {
+  const body = getValidatedBody<z.infer<typeof schemas.matchupPlayerIds>>(c);
 
   const supabase = createUserClient(c.get('userToken'));
   const service = new MatchupService(supabase);
@@ -435,12 +410,8 @@ matchupRoutes.post('/daily-game-stats', async (c) => {
 });
 
 // POST /api/matchups/matchup-stats — Get weekly matchup stats for players
-matchupRoutes.post('/matchup-stats', async (c) => {
-  const body = await c.req.json<{ playerIds: number[]; startDate: string; endDate: string }>();
-
-  if (!body.playerIds?.length || !body.startDate || !body.endDate) {
-    return fail(c, AppError.badRequest('playerIds, startDate, endDate required'));
-  }
+matchupRoutes.post('/matchup-stats', validateBody(schemas.matchupPlayerIdsRange), async (c) => {
+  const body = getValidatedBody<z.infer<typeof schemas.matchupPlayerIdsRange>>(c);
 
   const supabase = createUserClient(c.get('userToken'));
   const service = new MatchupService(supabase);

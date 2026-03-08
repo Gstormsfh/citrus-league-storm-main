@@ -210,4 +210,140 @@ export const schemas = {
     weekEnd: z.string().min(1),
     categories: z.array(z.string()).min(1),
   }),
+
+  // Account schemas
+  recordConsent: z.object({
+    policyType: z.string().min(1, 'policyType is required'),
+    version: z.string().min(1, 'version is required'),
+  }),
+
+  auditLog: z.object({
+    eventType: z.string().min(1, 'eventType is required'),
+    leagueId: z.string().nullable().optional(),
+    details: z.record(z.unknown()).optional().default({}),
+    severity: z.enum(['INFO', 'WARN', 'ERROR', 'CRITICAL']).optional().default('INFO'),
+  }),
+
+  // Best ball schemas
+  bestballOptimize: z.object({
+    date: z.string().optional(),
+  }),
+
+  bestballOptimizeWeek: z.object({
+    weekStartDate: z.string().min(1, 'weekStartDate is required'),
+    weekEndDate: z.string().min(1, 'weekEndDate is required'),
+  }),
+
+  bestballWeeklyData: z.object({
+    teamId: z.union([z.string(), z.number()]).transform(String),
+    weekNumber: z.number().int().min(1),
+  }),
+
+  // Draft additional schemas
+  initializeDraftOrder: z.object({
+    teams: z.array(z.object({ id: z.string() })).min(1, 'At least one team required'),
+    totalRounds: z.number().int().min(1).max(30),
+    customTeamOrder: z.array(z.string()).optional(),
+    draftType: z.string().min(1, 'draftType is required'),
+  }),
+
+  draftAutopick: z.object({
+    teamId: z.string().min(1, 'teamId is required'),
+    sessionId: z.string().min(1, 'sessionId is required'),
+    roundNumber: z.number().int().min(1),
+    pickNumber: z.number().int().min(1),
+  }),
+
+  draftSnapshot: z.object({
+    draftSessionId: z.string().min(1, 'draftSessionId is required'),
+    snapshotData: z.unknown(),
+  }),
+
+  draftRankings: z.object({
+    teamId: z.string().min(1, 'teamId is required'),
+    rankings: z.array(z.object({
+      playerId: z.number().int(),
+      rank: z.number().int(),
+      positionCode: z.string(),
+    })).min(1, 'At least one ranking required'),
+  }),
+
+  // League settings schemas (commissioner-only)
+  leagueSettings: z.object({
+    settings: z.record(z.unknown()).optional(),
+    scoring_settings: z.record(z.unknown()).optional(),
+  }),
+
+  waiverSettings: z.object({
+    waiver_process_time: z.string().optional(),
+    waiver_period_hours: z.number().int().min(0).optional(),
+    waiver_game_lock: z.boolean().optional(),
+    waiver_type: z.enum(['rolling', 'faab', 'reverse_standings']).optional(),
+    allow_trades_during_games: z.boolean().optional(),
+  }),
+
+  scoringSettings: z.object({
+    skater: z.record(z.number()).optional(),
+    goalie: z.record(z.number()).optional(),
+  }),
+
+  draftSettings: z.object({
+    draft_rounds: z.number().int().min(1).max(30).optional(),
+    pickTimeLimit: z.number().int().min(0).optional(),
+  }),
+
+  rosterSlots: z.object({
+    rosterSlots: z.record(z.number().int().min(0)),
+  }),
+
+  // Matchup additional schemas
+  matchupGenerate: z.object({
+    teams: z.array(z.object({ id: z.string() })).min(1, 'At least one team required'),
+    fantasyWeeks: z.array(z.object({
+      week_number: z.number().int(),
+      start_date: z.string(),
+      end_date: z.string(),
+    })).min(1, 'At least one week required'),
+    forceRegenerate: z.boolean().optional(),
+  }),
+
+  matchupFrozenRosterBatch: z.object({
+    dates: z.array(z.string()).min(1, 'At least one date required'),
+  }),
+
+  matchupPlayerIds: z.object({
+    playerIds: z.array(z.number().int()).min(1, 'At least one playerId required'),
+    date: z.string().min(1, 'date is required'),
+  }),
+
+  matchupPlayerIdsRange: z.object({
+    playerIds: z.array(z.number().int()).min(1, 'At least one playerId required'),
+    startDate: z.string().min(1, 'startDate is required'),
+    endDate: z.string().min(1, 'endDate is required'),
+  }),
+
+  matchupUpdateScores: z.object({
+    leagueId: z.string().optional(),
+  }),
+
+  // Roster lineup schema
+  rosterLineup: z.object({
+    starters: z.array(z.unknown()).optional(),
+    bench: z.array(z.unknown()).optional(),
+    ir: z.array(z.unknown()).optional(),
+    slot_assignments: z.record(z.unknown()).optional(),
+  }),
+
+  // Trade respond schema
+  tradeRespond: z.object({
+    action: z.enum(['accept', 'reject', 'counter']),
+  }),
+
+  // Keeper settings schema
+  keeperSettings: z.object({
+    keeperEnabled: z.boolean(),
+    keeperCount: z.number().int().min(0),
+    keeperPenalty: z.string(),
+    dynastyMode: z.boolean(),
+  }),
 };

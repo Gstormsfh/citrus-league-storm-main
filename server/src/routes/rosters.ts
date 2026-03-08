@@ -1,7 +1,9 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { membershipMiddleware } from '../middleware/membership';
+import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { MatchupService } from '../services/MatchupService';
 import { AppError } from '../lib/errors';
@@ -60,16 +62,11 @@ rosterRoutes.get('/league/:leagueId', membershipMiddleware, async (c) => {
 });
 
 // PUT /api/rosters/league/:leagueId/team/:teamId/lineup — Update lineup
-rosterRoutes.put('/league/:leagueId/team/:teamId/lineup', membershipMiddleware, async (c) => {
+rosterRoutes.put('/league/:leagueId/team/:teamId/lineup', membershipMiddleware, validateBody(schemas.rosterLineup), async (c) => {
   const leagueId = c.req.param('leagueId');
   const teamId = c.req.param('teamId');
   const userId = c.get('userId');
-  let body: Record<string, unknown>;
-  try {
-    body = await c.req.json();
-  } catch {
-    return fail(c, AppError.badRequest('Invalid JSON body'));
-  }
+  const body = getValidatedBody<z.infer<typeof schemas.rosterLineup>>(c);
 
   const parsedTeamId = parseInt(teamId, 10);
   if (isNaN(parsedTeamId)) {

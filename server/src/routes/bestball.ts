@@ -1,7 +1,9 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { membershipMiddleware } from '../middleware/membership';
+import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { BestBallService } from '../services/BestBallService';
 import { AppError } from '../lib/errors';
@@ -11,9 +13,9 @@ const bestballRoutes = new Hono<Env>();
 bestballRoutes.use('*', authMiddleware);
 
 // POST /api/bestball/league/:leagueId/optimize
-bestballRoutes.post('/league/:leagueId/optimize', membershipMiddleware, async (c) => {
+bestballRoutes.post('/league/:leagueId/optimize', membershipMiddleware, validateBody(schemas.bestballOptimize), async (c) => {
   const leagueId = c.req.param('leagueId');
-  const body = await c.req.json();
+  const body = getValidatedBody<z.infer<typeof schemas.bestballOptimize>>(c);
   const supabase = createUserClient(c.get('userToken'));
   const service = new BestBallService(supabase);
   const result = await service.triggerOptimization(leagueId, body.date);
@@ -22,9 +24,9 @@ bestballRoutes.post('/league/:leagueId/optimize', membershipMiddleware, async (c
 });
 
 // POST /api/bestball/league/:leagueId/optimize-week
-bestballRoutes.post('/league/:leagueId/optimize-week', membershipMiddleware, async (c) => {
+bestballRoutes.post('/league/:leagueId/optimize-week', membershipMiddleware, validateBody(schemas.bestballOptimizeWeek), async (c) => {
   const leagueId = c.req.param('leagueId');
-  const body = await c.req.json();
+  const body = getValidatedBody<z.infer<typeof schemas.bestballOptimizeWeek>>(c);
   const supabase = createUserClient(c.get('userToken'));
   const service = new BestBallService(supabase);
   const result = await service.triggerWeekOptimization(leagueId, body.weekStartDate, body.weekEndDate);
@@ -32,14 +34,12 @@ bestballRoutes.post('/league/:leagueId/optimize-week', membershipMiddleware, asy
 });
 
 // POST /api/bestball/league/:leagueId/weekly-data — Get data for weekly best ball calculation
-bestballRoutes.post('/league/:leagueId/weekly-data', membershipMiddleware, async (c) => {
+bestballRoutes.post('/league/:leagueId/weekly-data', membershipMiddleware, validateBody(schemas.bestballWeeklyData), async (c) => {
   const leagueId = c.req.param('leagueId');
-  const body = await c.req.json();
-  const { teamId, weekNumber } = body;
-  if (!teamId || !weekNumber) return fail(c, AppError.badRequest('teamId and weekNumber are required'));
+  const body = getValidatedBody<z.infer<typeof schemas.bestballWeeklyData>>(c);
   const supabase = createUserClient(c.get('userToken'));
   const service = new BestBallService(supabase);
-  const result = await service.getWeeklyBestBallData(leagueId, teamId, weekNumber);
+  const result = await service.getWeeklyBestBallData(leagueId, body.teamId, body.weekNumber);
   return ok(c, result);
 });
 

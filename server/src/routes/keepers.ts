@@ -116,13 +116,13 @@ keeperRoutes.post('/league/:leagueId/lock', membershipMiddleware, validateBody(s
 });
 
 // PUT /api/keepers/league/:leagueId/settings
-keeperRoutes.put('/league/:leagueId/settings', membershipMiddleware, async (c) => {
+keeperRoutes.put('/league/:leagueId/settings', membershipMiddleware, validateBody(schemas.keeperSettings), async (c) => {
   const leagueId = c.req.param('leagueId');
   const userId = c.get('userId');
-  const body = await c.req.json();
+  const body = getValidatedBody<z.infer<typeof schemas.keeperSettings>>(c);
   const supabase = createUserClient(c.get('userToken'));
   const service = new KeeperService(supabase);
-  const result = await service.updateKeeperSettings(leagueId, userId, body);
+  const result = await service.updateKeeperSettings(leagueId, userId, body as { keeperEnabled: boolean; keeperCount: number; keeperPenalty: string; dynastyMode: boolean });
   if (!result.success) return fail(c, AppError.badRequest(result.error || 'Failed to update settings'));
   return ok(c, result);
 });
