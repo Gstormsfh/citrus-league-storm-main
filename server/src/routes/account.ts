@@ -21,7 +21,7 @@ accountRoutes.get('/profile', async (c) => {
 });
 
 // POST /api/account/export
-accountRoutes.post('/export', async (c) => {
+accountRoutes.post('/export', validateBody(schemas.accountExport), async (c) => {
   const supabase = createUserClient(c.get('userToken'));
   const service = new AccountService(supabase);
   const result = await service.exportUserData();
@@ -30,7 +30,7 @@ accountRoutes.post('/export', async (c) => {
 });
 
 // POST /api/account/delete
-accountRoutes.post('/delete', async (c) => {
+accountRoutes.post('/delete', validateBody(schemas.accountDelete), async (c) => {
   const supabase = createUserClient(c.get('userToken'));
   const service = new AccountService(supabase);
   const result = await service.deleteAccount();

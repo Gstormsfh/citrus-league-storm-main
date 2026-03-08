@@ -149,3 +149,82 @@ jobs:
 
       - name: Run web tests
         run: npm run test --workspace=apps/web
+
+  test-server:
+    name: Test (Server)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build shared package
+        run: npm run build --workspace=packages/shared
+
+      - name: Run server tests
+        run: npm run test --workspace=server
+
+  validate-migrations:
+    name: Validate Migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate migration file naming
+        run: |
+          echo "=== Migration Naming Validation ==="
+          errors=0
+          for file in supabase/migrations/*.sql; do
+            [ -f "$file" ] || continue
+            name=$(basename "$file")
+            if ! echo "$name" | grep -qE '^[0-9]{14}_[a-z0-9_]+\.sql$'; then
+              echo "::error file=$file::Invalid migration name: $name (expected YYYYMMDDHHMMSS_description.sql)"
+              errors=$((errors + 1))
+            fi
+          done
+          if [ "$errors" -gt 0 ]; then
+            echo "::error::$errors migration(s) have invalid naming"
+            exit 1
+          fi
+          echo "All migrations follow naming convention."
+
+      - name: Check for duplicate timestamps
+        run: |
+          echo "=== Duplicate Timestamp Check ==="
+          timestamps=$(ls supabase/migrations/*.sql 2>/dev/null | xargs -I{} basename {} | cut -c1-14 | sort)
+          dupes=$(echo "$timestamps" | uniq -d)
+          if [ -n "$dupes" ]; then
+            echo "::error::Duplicate migration timestamps found: $dupes"
+            exit 1
+          fi
+          echo "No duplicate timestamps found."
+
+      - name: Validate SQL syntax (basic)
+        run: |
+          echo "=== Basic SQL Validation ==="
+          errors=0
+          for file in supabase/migrations/*.sql; do
+            [ -f "$file" ] || continue
+            name=$(basename "$file")
+            # Check for common SQL issues
+            if grep -qiP 'DROP\s+TABLE.*CASCADE' "$file" 2>/dev/null; then
+              echo "::warning file=$file::$name contains DROP TABLE CASCADE — verify this is intentional"
+            fi
+            # Check SECURITY DEFINER functions have SET search_path
+            if grep -qi 'SECURITY DEFINER' "$file" && ! grep -qi 'SET search_path' "$file"; then
+              echo "::error file=$file::$name has SECURITY DEFINER without SET search_path = public"
+              errors=$((errors + 1))
+            fi
+          done
+          if [ "$errors" -gt 0 ]; then
+            echo "::error::$errors migration(s) have security issues"
+            exit 1
+          fi
+          echo "All migrations pass basic validation."

@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
+import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
 import { supabaseAdmin } from '../lib/supabase';
 import { AppError } from '../lib/errors';
 import { ok, okPaginated, fail, handleError } from '../lib/responses';
@@ -68,10 +70,14 @@ adminRoutes.get('/users', async (c) => {
     .range(offset, offset + limit - 1);
 
   if (search) {
-    // Sanitize search: strip characters that could manipulate PostgREST filters
-    const sanitized = search.replace(/[%,.()\\"']/g, '');
+    // Whitelist: only allow alphanumeric, spaces, and hyphens
+    const sanitized = search.replace(/[^a-zA-Z0-9\s\-]/g, '').trim();
     if (sanitized) {
-      query = query.or(`username.ilike.%${sanitized}%,first_name.ilike.%${sanitized}%,last_name.ilike.%${sanitized}%`);
+      query = query.or(
+        ['username', 'first_name', 'last_name']
+          .map((col) => `${col}.ilike.%${sanitized}%`)
+          .join(',')
+      );
     }
   }
 
@@ -98,7 +104,7 @@ adminRoutes.get('/leagues', async (c) => {
     .range(offset, offset + limit - 1);
 
   if (search) {
-    const sanitized = search.replace(/[%,.()\\"']/g, '');
+    const sanitized = search.replace(/[^a-zA-Z0-9\s\-]/g, '').trim();
     if (sanitized) {
       query = query.ilike('name', `%${sanitized}%`);
     }
@@ -131,26 +137,15 @@ adminRoutes.get('/audit-log', async (c) => {
 });
 
 // POST /api/admin/recalculate-scores — Trigger score recalculation
-adminRoutes.post('/recalculate-scores', async (c) => {
-  let body: Record<string, unknown>;
-  try {
-    body = await c.req.json();
-  } catch {
-    return fail(c, AppError.badRequest('Invalid JSON body'));
-  }
-
-  const { leagueId, week } = body;
-
-  if (!leagueId) {
-    return fail(c, AppError.badRequest('leagueId is required'));
-  }
+adminRoutes.post('/recalculate-scores', validateBody(schemas.adminRecalculateScores), async (c) => {
+  const { leagueId, week } = getValidatedBody<z.infer<typeof schemas.adminRecalculateScores>>(c);
 
   try {
     // Step 1: Lock completed daily rosters for the league
     const { data: lockResult, error: lockError } = await supabaseAdmin
       .from('fantasy_daily_rosters')
       .update({ is_locked: true, locked_at: new Date().toISOString() })
-      .eq('league_id', leagueId as string)
+      .eq('league_id', leagueId)
       .eq('is_locked', false)
       .lt('roster_date', new Date().toISOString().split('T')[0])
       .select('player_id');
@@ -169,8 +164,8 @@ adminRoutes.post('/recalculate-scores', async (c) => {
       await supabaseAdmin
         .from('matchups')
         .update({ status: 'completed', updated_at: new Date().toISOString() })
-        .eq('league_id', leagueId as string)
-        .eq('week_number', week as number)
+        .eq('league_id', leagueId)
+        .eq('week_number', week)
         .eq('status', 'in_progress');
     }
 

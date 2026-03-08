@@ -328,7 +328,7 @@ matchupRoutes.post('/:matchupId/frozen-roster-batch', validateBody(schemas.match
 });
 
 // POST /api/matchups/:matchupId/ensure-rosters — Ensure both teams have rosters
-matchupRoutes.post('/:matchupId/ensure-rosters', async (c) => {
+matchupRoutes.post('/:matchupId/ensure-rosters', validateBody(schemas.matchupEnsureRosters), async (c) => {
   const matchupId = c.req.param('matchupId');
   const supabase = createUserClient(c.get('userToken'));
   const service = new MatchupService(supabase);
@@ -430,7 +430,7 @@ matchupRoutes.post('/matchup-stats', validateBody(schemas.matchupPlayerIdsRange)
 });
 
 // POST /api/matchups/auto-complete — Auto-complete matchups
-matchupRoutes.post('/auto-complete', async (c) => {
+matchupRoutes.post('/auto-complete', validateBody(schemas.matchupAutoComplete), async (c) => {
   const supabase = createUserClient(c.get('userToken'));
   const service = new MatchupService(supabase);
 
@@ -525,7 +525,7 @@ matchupRoutes.post('/ppg-standings', validateBody(schemas.matchupPPGStandings), 
 });
 
 // POST /api/matchups/lock-completed-days — Lock completed roster days
-matchupRoutes.post('/lock-completed-days', async (c) => {
+matchupRoutes.post('/lock-completed-days', validateBody(schemas.matchupLockCompletedDays), async (c) => {
   const supabase = createUserClient(c.get('userToken'));
   const service = new MatchupService(supabase);
 

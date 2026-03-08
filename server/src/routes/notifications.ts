@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
+import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { NotificationService } from '../services/NotificationService';
 import { LeagueMembershipService } from '../services/LeagueMembershipService';
@@ -77,12 +79,8 @@ notificationRoutes.put('/:id/read', async (c) => {
 });
 
 // POST /api/notifications/chat — Send a chat message in a league
-notificationRoutes.post('/chat', async (c) => {
-  const body = await c.req.json<{ leagueId: string; message: string; senderName?: string | null }>();
-
-  if (!body.leagueId || !body.message?.trim()) {
-    return fail(c, AppError.badRequest('leagueId and message are required'));
-  }
+notificationRoutes.post('/chat', validateBody(schemas.notificationChat), async (c) => {
+  const body = getValidatedBody<z.infer<typeof schemas.notificationChat>>(c);
 
   const userId = c.get('userId');
   const supabase = createUserClient(c.get('userToken'));

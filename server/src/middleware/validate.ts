@@ -346,4 +346,26 @@ export const schemas = {
     keeperPenalty: z.string(),
     dynastyMode: z.boolean(),
   }),
+
+  // Account schemas (no-body mutations)
+  accountExport: z.object({}).strict(),
+  accountDelete: z.object({}).strict(),
+
+  // Notification chat schema
+  notificationChat: z.object({
+    leagueId: z.string().min(1, 'leagueId is required'),
+    message: z.string().min(1, 'Message is required').max(2000),
+    senderName: z.string().max(100).nullable().optional(),
+  }),
+
+  // Admin recalculate scores schema
+  adminRecalculateScores: z.object({
+    leagueId: z.string().min(1, 'leagueId is required'),
+    week: z.number().int().min(1).optional(),
+  }),
+
+  // Matchup background operation schemas (no-body)
+  matchupEnsureRosters: z.object({}).strict(),
+  matchupAutoComplete: z.object({}).strict(),
+  matchupLockCompletedDays: z.object({}).strict(),
 };
