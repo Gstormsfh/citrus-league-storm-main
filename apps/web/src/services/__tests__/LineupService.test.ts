@@ -1,14 +1,32 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // =============================================================================
-// Mock modules
+// Mock modules — must be hoisted before imports
 // =============================================================================
 
-const mockSupabaseFrom = vi.fn();
+// Chainable Supabase mock (same pattern as MatchupService.test.ts)
+function createChainMock(defaultResolve: { data: any; error: any } = { data: null, error: null }) {
+  const chain: Record<string, any> = {};
+  chain._resolve = defaultResolve;
+  const chainMethods = [
+    'select', 'insert', 'update', 'delete', 'upsert',
+    'eq', 'neq', 'gte', 'gt', 'lt', 'is', 'in', 'or', 'order', 'limit', 'filter',
+  ];
+  chainMethods.forEach(m => {
+    chain[m] = vi.fn().mockReturnValue(chain);
+  });
+  chain.single = vi.fn().mockResolvedValue({ data: null, error: null });
+  chain.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+  chain.then = (resolve: any, reject?: any) => Promise.resolve(chain._resolve).then(resolve, reject);
+  return chain;
+}
+
+let defaultChain = createChainMock();
 
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
-    from: (...args: unknown[]) => mockSupabaseFrom(...args),
+    from: vi.fn(() => defaultChain),
+    rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
   },
 }));
 
@@ -26,87 +44,31 @@ vi.mock('@/utils/timezoneUtils', () => ({
   getTodayMSTDate: vi.fn().mockReturnValue(new Date('2026-03-08T00:00:00')),
 }));
 
-vi.mock('./MatchupService', () => ({
+// Mock relative imports used by LineupService
+vi.mock('../MatchupService', () => ({
   MatchupService: {
     clearRosterCache: vi.fn(),
+    getTeamRoster: vi.fn().mockResolvedValue([]),
   },
 }));
 
-vi.mock('@/services/MatchupService', () => ({
-  MatchupService: {
-    clearRosterCache: vi.fn(),
-  },
-}));
-
-vi.mock('./RosterCacheService', () => ({
+vi.mock('../RosterCacheService', () => ({
   RosterCacheService: {
     clearCache: vi.fn(),
   },
 }));
 
-vi.mock('@/services/RosterCacheService', () => ({
-  RosterCacheService: {
-    clearCache: vi.fn(),
-  },
+vi.mock('../DemoLeagueService', () => ({
+  DEMO_LEAGUE_ID_FOR_GUESTS: 'demo-league-id',
 }));
 
+// Mock @/services/PlayerService (used by LineupService with @ path)
 vi.mock('@/services/PlayerService', () => ({
   PlayerService: {
     getPlayersByIds: vi.fn().mockResolvedValue([]),
+    getAllPlayers: vi.fn().mockResolvedValue([]),
   },
   Player: {},
-}));
-
-vi.mock('./DemoLeagueService', () => ({
-  DEMO_LEAGUE_ID_FOR_GUESTS: 'demo-league-id',
-}));
-
-vi.mock('@/services/DemoLeagueService', () => ({
-  DEMO_LEAGUE_ID_FOR_GUESTS: 'demo-league-id',
-}));
-
-vi.mock('@/utils/seasonConstants', () => ({
-  CURRENT_SEASON: '20252026',
-  getHeadshotUrl: vi.fn().mockReturnValue(''),
-}));
-
-vi.mock('@/api/players', () => ({
-  playerApi: {
-    getPlayers: vi.fn().mockResolvedValue({ data: [] }),
-    getPlayerById: vi.fn().mockResolvedValue({ data: null }),
-  },
-}));
-
-vi.mock('@/api/client', () => ({
-  apiClient: {
-    get: vi.fn(),
-    post: vi.fn(),
-    put: vi.fn(),
-    delete: vi.fn(),
-  },
-  ApiError: class ApiError extends Error {},
-}));
-
-// Mock all transitive API modules used by DemoLeagueService / LeagueService chain
-vi.mock('@/api/leagues', () => ({ leagueApi: {} }));
-vi.mock('@/api/rosters', () => ({ rosterApi: {} }));
-vi.mock('@/api/trades', () => ({ tradeApi: {} }));
-vi.mock('@/api/waivers', () => ({ waiverApi: {} }));
-vi.mock('@/api/notifications', () => ({ notificationApi: {} }));
-vi.mock('@/api/matchups', () => ({ matchupApi: {} }));
-vi.mock('@/api/account', () => ({ accountApi: {} }));
-vi.mock('@/api/keepers', () => ({ keeperApi: {} }));
-vi.mock('@/api/bestball', () => ({ bestballApi: {} }));
-vi.mock('@/api/draft', () => ({ draftApi: {} }));
-vi.mock('@/api/auction', () => ({ auctionApi: {} }));
-vi.mock('@/api/playoffs', () => ({ playoffApi: {} }));
-vi.mock('@/api/schedule', () => ({ scheduleApi: {} }));
-vi.mock('@/api/stormy', () => ({ stormyApi: {} }));
-vi.mock('@/utils/queryColumns', () => ({ COLUMNS: {} }));
-vi.mock('@/utils/scoringUtils', () => ({
-  ScoringCalculator: { calculateScore: vi.fn() },
-  compareCategoryMatchup: vi.fn(),
-  calculateRotoStandings: vi.fn(),
 }));
 
 // =============================================================================
@@ -114,6 +76,7 @@ vi.mock('@/utils/scoringUtils', () => ({
 // =============================================================================
 
 import { LineupService } from '../LineupService';
+import { supabase } from '@/integrations/supabase/client';
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -130,6 +93,8 @@ Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock });
 beforeEach(() => {
   vi.clearAllMocks();
   localStorageMock.clear();
+  defaultChain = createChainMock();
+  (supabase.from as any).mockReturnValue(defaultChain);
 });
 
 // =============================================================================
@@ -145,20 +110,7 @@ describe('LineupService.getLineup', () => {
       slot_assignments: { '101': 'slot-C-1', '102': 'slot-LW-1' },
       updated_at: '2026-03-08T00:00:00Z',
     };
-
-    mockSupabaseFrom.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockReturnValue({
-              limit: vi.fn().mockReturnValue({
-                maybeSingle: vi.fn().mockResolvedValue({ data: lineupData, error: null }),
-              }),
-            }),
-          }),
-        }),
-      }),
-    });
+    defaultChain.maybeSingle = vi.fn().mockResolvedValue({ data: lineupData, error: null });
 
     const result = await LineupService.getLineup('team-1', 'a1b2c3d4-e5f6-7890-abcd-ef1234567890');
 
@@ -170,19 +122,7 @@ describe('LineupService.getLineup', () => {
   });
 
   it('returns null when no lineup exists in Supabase', async () => {
-    mockSupabaseFrom.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockReturnValue({
-              limit: vi.fn().mockReturnValue({
-                maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-              }),
-            }),
-          }),
-        }),
-      }),
-    });
+    defaultChain.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
 
     const result = await LineupService.getLineup('team-1', 'a1b2c3d4-e5f6-7890-abcd-ef1234567890');
 
@@ -190,28 +130,15 @@ describe('LineupService.getLineup', () => {
     expect(localStorageMock.removeItem).toHaveBeenCalled();
   });
 
-  it('falls back to localStorage on Supabase PGRST116 error', async () => {
-    mockSupabaseFrom.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockReturnValue({
-              limit: vi.fn().mockReturnValue({
-                maybeSingle: vi.fn().mockResolvedValue({
-                  data: null,
-                  error: { code: 'PGRST116', message: 'Not found' },
-                }),
-              }),
-            }),
-          }),
-        }),
-      }),
+  it('clears localStorage on Supabase PGRST116 error and returns null', async () => {
+    defaultChain.maybeSingle = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: 'PGRST116', message: 'Not found' },
     });
 
     const result = await LineupService.getLineup('team-1', 'a1b2c3d4-e5f6-7890-abcd-ef1234567890');
 
     expect(result).toBeNull();
-    // Should clear stale localStorage on PGRST116
     expect(localStorageMock.removeItem).toHaveBeenCalledWith('lineup_team_team-1');
   });
 
@@ -228,7 +155,7 @@ describe('LineupService.getLineup', () => {
 
     expect(result).toEqual(localLineup);
     // Should NOT call Supabase
-    expect(mockSupabaseFrom).not.toHaveBeenCalled();
+    expect(supabase.from).not.toHaveBeenCalled();
   });
 
   it('returns null for non-UUID league IDs with no localStorage data', async () => {
@@ -245,20 +172,7 @@ describe('LineupService.getLineup', () => {
       slot_assignments: { 101: 'slot-C-1' }, // Numeric key
       updated_at: '2026-03-08T00:00:00Z',
     };
-
-    mockSupabaseFrom.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockReturnValue({
-              limit: vi.fn().mockReturnValue({
-                maybeSingle: vi.fn().mockResolvedValue({ data: lineupData, error: null }),
-              }),
-            }),
-          }),
-        }),
-      }),
-    });
+    defaultChain.maybeSingle = vi.fn().mockResolvedValue({ data: lineupData, error: null });
 
     const result = await LineupService.getLineup('team-1', 'a1b2c3d4-e5f6-7890-abcd-ef1234567890');
 
@@ -266,21 +180,9 @@ describe('LineupService.getLineup', () => {
   });
 
   it('falls back to localStorage on Supabase error (non-PGRST116)', async () => {
-    mockSupabaseFrom.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockReturnValue({
-              limit: vi.fn().mockReturnValue({
-                maybeSingle: vi.fn().mockResolvedValue({
-                  data: null,
-                  error: { code: 'PGRST500', message: 'Server error' },
-                }),
-              }),
-            }),
-          }),
-        }),
-      }),
+    defaultChain.maybeSingle = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: 'PGRST500', message: 'Server error' },
     });
 
     const localLineup = { starters: ['101'], bench: [], ir: [], slotAssignments: {} };
@@ -308,30 +210,18 @@ describe('LineupService.canUpdateRosterForDate', () => {
   });
 
   it('returns true when no games are scheduled', async () => {
+    // First call: player_directory -> returns player
+    // Second call: nhl_games -> returns empty
     let callCount = 0;
-    mockSupabaseFrom.mockImplementation(() => {
+    (supabase.from as any).mockImplementation(() => {
       callCount++;
+      const chain = createChainMock();
       if (callCount === 1) {
-        // player_directory
-        return {
-          select: vi.fn().mockReturnValue({
-            in: vi.fn().mockResolvedValue({
-              data: [{ player_id: 101, team: 'EDM' }],
-              error: null,
-            }),
-          }),
-        };
+        chain._resolve = { data: [{ player_id: 101, team: 'EDM' }], error: null };
+      } else {
+        chain._resolve = { data: [], error: null };
       }
-      // nhl_games
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            in: vi.fn().mockReturnValue({
-              or: vi.fn().mockResolvedValue({ data: [], error: null }),
-            }),
-          }),
-        }),
-      };
+      return chain;
     });
 
     const result = await LineupService.canUpdateRosterForDate(
@@ -344,33 +234,21 @@ describe('LineupService.canUpdateRosterForDate', () => {
   });
 
   it('returns false when a game has already started', async () => {
-    const pastGameTime = new Date(Date.now() - 3600000).toISOString(); // 1 hour ago
+    const pastGameTime = new Date(Date.now() - 3600000).toISOString();
 
     let callCount = 0;
-    mockSupabaseFrom.mockImplementation(() => {
+    (supabase.from as any).mockImplementation(() => {
       callCount++;
+      const chain = createChainMock();
       if (callCount === 1) {
-        return {
-          select: vi.fn().mockReturnValue({
-            in: vi.fn().mockResolvedValue({
-              data: [{ player_id: 101, team: 'EDM' }],
-              error: null,
-            }),
-          }),
+        chain._resolve = { data: [{ player_id: 101, team: 'EDM' }], error: null };
+      } else {
+        chain._resolve = {
+          data: [{ game_time: pastGameTime, home_team: 'EDM', away_team: 'CGY' }],
+          error: null,
         };
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            in: vi.fn().mockReturnValue({
-              or: vi.fn().mockResolvedValue({
-                data: [{ game_time: pastGameTime, home_team: 'EDM', away_team: 'CGY' }],
-                error: null,
-              }),
-            }),
-          }),
-        }),
-      };
+      return chain;
     });
 
     const result = await LineupService.canUpdateRosterForDate(
@@ -383,33 +261,21 @@ describe('LineupService.canUpdateRosterForDate', () => {
   });
 
   it('returns true when game is in the future', async () => {
-    const futureGameTime = new Date(Date.now() + 3600000).toISOString(); // 1 hour from now
+    const futureGameTime = new Date(Date.now() + 3600000).toISOString();
 
     let callCount = 0;
-    mockSupabaseFrom.mockImplementation(() => {
+    (supabase.from as any).mockImplementation(() => {
       callCount++;
+      const chain = createChainMock();
       if (callCount === 1) {
-        return {
-          select: vi.fn().mockReturnValue({
-            in: vi.fn().mockResolvedValue({
-              data: [{ player_id: 101, team: 'EDM' }],
-              error: null,
-            }),
-          }),
+        chain._resolve = { data: [{ player_id: 101, team: 'EDM' }], error: null };
+      } else {
+        chain._resolve = {
+          data: [{ game_time: futureGameTime, home_team: 'EDM', away_team: 'CGY' }],
+          error: null,
         };
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            in: vi.fn().mockReturnValue({
-              or: vi.fn().mockResolvedValue({
-                data: [{ game_time: futureGameTime, home_team: 'EDM', away_team: 'CGY' }],
-                error: null,
-              }),
-            }),
-          }),
-        }),
-      };
+      return chain;
     });
 
     const result = await LineupService.canUpdateRosterForDate(
@@ -422,7 +288,7 @@ describe('LineupService.canUpdateRosterForDate', () => {
   });
 
   it('returns true on error (fail open)', async () => {
-    mockSupabaseFrom.mockImplementation(() => {
+    (supabase.from as any).mockImplementation(() => {
       throw new Error('Network error');
     });
 
@@ -442,15 +308,7 @@ describe('LineupService.canUpdateRosterForDate', () => {
 
 describe('LineupService.loadDailyRoster', () => {
   it('returns null when no daily roster records exist', async () => {
-    mockSupabaseFrom.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        }),
-      }),
-    });
+    defaultChain._resolve = { data: [], error: null };
 
     const result = await LineupService.loadDailyRoster(
       'team-1',
@@ -463,15 +321,7 @@ describe('LineupService.loadDailyRoster', () => {
   });
 
   it('returns null on query error', async () => {
-    mockSupabaseFrom.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({ data: null, error: { message: 'RLS error' } }),
-          }),
-        }),
-      }),
-    });
+    defaultChain._resolve = { data: null, error: { message: 'RLS error' } };
 
     const result = await LineupService.loadDailyRoster(
       'team-1',
@@ -490,16 +340,7 @@ describe('LineupService.loadDailyRoster', () => {
       { player_id: 201, slot_type: 'bench', slot_id: null },
       { player_id: 301, slot_type: 'ir', slot_id: 'slot-IR-1' },
     ];
-
-    mockSupabaseFrom.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({ data: dailyRosters, error: null }),
-          }),
-        }),
-      }),
-    });
+    defaultChain._resolve = { data: dailyRosters, error: null };
 
     const allPlayers = [
       { id: 101, name: 'Player A' },
@@ -527,18 +368,9 @@ describe('LineupService.loadDailyRoster', () => {
   it('tracks missing player IDs not in allPlayers', async () => {
     const dailyRosters = [
       { player_id: 101, slot_type: 'active', slot_id: 'slot-C-1' },
-      { player_id: 999, slot_type: 'active', slot_id: 'slot-LW-1' }, // Not in allPlayers
+      { player_id: 999, slot_type: 'active', slot_id: 'slot-LW-1' },
     ];
-
-    mockSupabaseFrom.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({ data: dailyRosters, error: null }),
-          }),
-        }),
-      }),
-    });
+    defaultChain._resolve = { data: dailyRosters, error: null };
 
     const allPlayers = [{ id: 101, name: 'Player A' }];
 
@@ -551,12 +383,12 @@ describe('LineupService.loadDailyRoster', () => {
     );
 
     expect(result).not.toBeNull();
-    expect(result!.starters).toHaveLength(1); // Only the player that exists
+    expect(result!.starters).toHaveLength(1);
     expect(result!.missingPlayerIds).toContain('999');
   });
 
   it('handles exception gracefully', async () => {
-    mockSupabaseFrom.mockImplementation(() => {
+    (supabase.from as any).mockImplementation(() => {
       throw new Error('Connection lost');
     });
 
@@ -577,12 +409,9 @@ describe('LineupService.loadDailyRoster', () => {
 
 describe('LineupService.backfillMissingDailyRosters', () => {
   it('returns 0 when matchup not found', async () => {
-    mockSupabaseFrom.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({ data: null, error: { message: 'Not found' } }),
-        }),
-      }),
+    defaultChain.single = vi.fn().mockResolvedValue({
+      data: null,
+      error: { message: 'Not found' },
     });
 
     const result = await LineupService.backfillMissingDailyRosters('team-1', 'league-1', 'bad-matchup');
@@ -592,46 +421,26 @@ describe('LineupService.backfillMissingDailyRosters', () => {
   });
 
   it('returns 0 when no lineup exists for team', async () => {
-    let callCount = 0;
-    mockSupabaseFrom.mockImplementation(() => {
-      callCount++;
-      if (callCount === 1) {
-        // matchups query
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              single: vi.fn().mockResolvedValue({
-                data: { id: 'matchup-1', week_start_date: '2026-03-01', week_end_date: '2026-03-07' },
-                error: null,
-              }),
-            }),
-          }),
-        };
-      }
-      // team_lineups query (getLineup - no UUID -> localStorage fallback)
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockReturnValue({
-                limit: vi.fn().mockReturnValue({
-                  maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-                }),
-              }),
-            }),
-          }),
-        }),
-      };
+    // matchup found
+    defaultChain.single = vi.fn().mockResolvedValue({
+      data: { id: 'matchup-1', week_start_date: '2026-03-01', week_end_date: '2026-03-07' },
+      error: null,
     });
+    // getLineup -> no data
+    defaultChain.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
 
-    const result = await LineupService.backfillMissingDailyRosters('team-1', 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', 'matchup-1');
+    const result = await LineupService.backfillMissingDailyRosters(
+      'team-1',
+      'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+      'matchup-1'
+    );
 
     expect(result.backfilledCount).toBe(0);
     expect(result.error).toBeNull();
   });
 
   it('handles exceptions gracefully', async () => {
-    mockSupabaseFrom.mockImplementation(() => {
+    (supabase.from as any).mockImplementation(() => {
       throw new Error('DB crash');
     });
 
@@ -648,11 +457,7 @@ describe('LineupService.backfillMissingDailyRosters', () => {
 
 describe('LineupService.backfillAllMatchupsForLeague', () => {
   it('returns zeros when no matchups exist', async () => {
-    mockSupabaseFrom.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-      }),
-    });
+    defaultChain._resolve = { data: [], error: null };
 
     const result = await LineupService.backfillAllMatchupsForLeague('league-1');
 
@@ -662,11 +467,7 @@ describe('LineupService.backfillAllMatchupsForLeague', () => {
   });
 
   it('returns error info when matchups query fails', async () => {
-    mockSupabaseFrom.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockResolvedValue({ data: null, error: { message: 'Permission denied' } }),
-      }),
-    });
+    defaultChain._resolve = { data: null, error: { message: 'Permission denied' } };
 
     const result = await LineupService.backfillAllMatchupsForLeague('league-1');
 
@@ -675,7 +476,7 @@ describe('LineupService.backfillAllMatchupsForLeague', () => {
   });
 
   it('handles exceptions gracefully', async () => {
-    mockSupabaseFrom.mockImplementation(() => {
+    (supabase.from as any).mockImplementation(() => {
       throw new Error('Network error');
     });
 
@@ -693,15 +494,9 @@ describe('LineupService.backfillAllMatchupsForLeague', () => {
 
 describe('LineupService.saveLineup', () => {
   it('blocks saves to demo league when lineup already exists', async () => {
-    // Demo league check: lineup exists
-    mockSupabaseFrom.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'existing' }, error: null }),
-          }),
-        }),
-      }),
+    defaultChain.maybeSingle = vi.fn().mockResolvedValue({
+      data: { id: 'existing' },
+      error: null,
     });
 
     await LineupService.saveLineup(
@@ -710,7 +505,8 @@ describe('LineupService.saveLineup', () => {
       { starters: ['101'], bench: [], ir: [], slotAssignments: {} }
     );
 
-    // Should NOT attempt to upsert (the from call is only for the demo check)
-    // The service returns early, so no upsert call happens
+    // Should NOT attempt an upsert since demo league is read-only
+    // The from() call is only for the existence check
+    expect(defaultChain.upsert).not.toHaveBeenCalled();
   });
 });

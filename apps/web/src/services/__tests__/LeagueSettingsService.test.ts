@@ -16,13 +16,7 @@ vi.mock('@/integrations/supabase/client', () => ({
   },
 }));
 
-vi.mock('./LeagueMembershipService', () => ({
-  LeagueMembershipService: {
-    requireCommissioner: vi.fn(),
-  },
-}));
-
-vi.mock('@/services/LeagueMembershipService', () => ({
+vi.mock('../LeagueMembershipService', () => ({
   LeagueMembershipService: {
     requireCommissioner: vi.fn(),
   },
