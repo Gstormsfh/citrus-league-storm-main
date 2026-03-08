@@ -2,7 +2,7 @@ name: Production Deploy
 
 on:
   push:
-    branches: [main]
+    branches: [master]
 
 concurrency:
   group: production-deploy
@@ -82,10 +82,91 @@ jobs:
           path: apps/web/dist/
           retention-days: 7
 
-  # ── Deploy to Firebase Hosting ────────────────────────────────────────
+  # ── Deploy API server to Cloud Run ──────────────────────────────────
+  deploy-api:
+    name: Deploy API to Cloud Run
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check GCP credentials
+        id: check-gcp
+        run: |
+          if [ -n "$GCP_SA_KEY" ]; then
+            echo "has_creds=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_creds=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping Cloud Run deploy — GCP_SA_KEY not configured"
+          fi
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Authenticate to Google Cloud
+        if: steps.check-gcp.outputs.has_creds == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        if: steps.check-gcp.outputs.has_creds == 'true'
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        if: steps.check-gcp.outputs.has_creds == 'true'
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
+      - name: Build and push Docker image
+        if: steps.check-gcp.outputs.has_creds == 'true'
+        run: |
+          IMAGE="us-central1-docker.pkg.dev/citrus-fantasy-sports/citrus-api/server:${{ github.sha }}"
+          docker build -t "$IMAGE" -f Dockerfile .
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - name: Deploy to Cloud Run
+        if: steps.check-gcp.outputs.has_creds == 'true'
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: citrus-api
+          region: us-central1
+          image: us-central1-docker.pkg.dev/citrus-fantasy-sports/citrus-api/server:${{ github.sha }}
+          env_vars: |
+            NODE_ENV=production
+            SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
+            SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
+            SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          flags: >-
+            --allow-unauthenticated
+            --memory=512Mi
+            --cpu=1
+            --min-instances=0
+            --max-instances=3
+            --concurrency=80
+            --timeout=60s
+
+      - name: API health check
+        if: steps.check-gcp.outputs.has_creds == 'true'
+        run: |
+          API_URL=$(gcloud run services describe citrus-api --region=us-central1 --format='value(status.url)' 2>/dev/null) || true
+          if [ -n "$API_URL" ]; then
+            echo "Checking $API_URL/api/health..."
+            sleep 10
+            status=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/api/health" --max-time 10) || true
+            if [ "$status" = "200" ]; then
+              echo "API health check passed (HTTP $status)"
+            else
+              echo "::warning::API health check returned HTTP $status"
+            fi
+          fi
+
+  # ── Deploy frontend to Firebase Hosting ─────────────────────────────
   deploy:
     name: Deploy to Production
-    needs: gate
+    needs: [gate, deploy-api]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: production
