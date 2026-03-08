@@ -1,4 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
+import { accountApi } from '@/api/account';
 import { logger } from '@/utils/logger';
 
 /**
@@ -39,12 +39,7 @@ export const AuditService = {
     severity: Severity = 'INFO'
   ): Promise<void> {
     try {
-      await supabase.rpc('log_security_event', {
-        p_event_type: eventType,
-        p_league_id: leagueId || null,
-        p_details: details || {},
-        p_severity: severity
-      });
+      await accountApi.logSecurityEvent(eventType, leagueId, details || {}, severity);
     } catch (error) {
       // Fire-and-forget — never block user operations
       logger.error('[AuditService] Failed to log event:', eventType, error);

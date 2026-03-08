@@ -247,12 +247,14 @@ class StormyServiceImpl {
       }
 
       // ── 3. All teams in league + all roster assignments (parallel) ──
-      const [allTeamsResult, allRosterResult] = await Promise.all([
-        supabase.from("teams").select("id, team_name").eq("league_id", leagueId),
-        supabase.from("roster_assignments").select("player_id, team_id").eq("league_id", leagueId),
+      const { leagueApi } = await import('@/api/leagues');
+      const { rosterApi } = await import('@/api/rosters');
+      const [allTeamsResponse, allRosterResponse] = await Promise.all([
+        leagueApi.getTeams(leagueId),
+        rosterApi.getLeagueRosters(leagueId),
       ]);
-      const allTeams = allTeamsResult.data ?? [];
-      const allRosters = allRosterResult.data ?? [];
+      const allTeams = allTeamsResponse.data ?? [];
+      const allRosters = allRosterResponse.data ?? [];
 
       // User's roster IDs
       const userRosterRows = allRosters.filter(r => r.team_id === team.id);

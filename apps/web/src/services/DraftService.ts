@@ -1,9 +1,9 @@
 import { supabase } from '@/integrations/supabase/client';
-import type { Json } from '@/integrations/supabase/types';
 import { logger } from '@/utils/logger';
 import { Team, LeagueService } from './LeagueService';
 import { PlayerService } from './PlayerService';
 import { draftApi } from '@/api/draft';
+import { leagueApi } from '@/api/leagues';
 
 export interface DraftPick {
   id: string;
@@ -195,7 +195,7 @@ export const DraftService = {
       const isComplete = response.data?.isComplete || false;
 
       if (isComplete) {
-        // Post-draft-completion tasks (still using supabase for now — will migrate later)
+        // Post-draft-completion tasks
         logger.log('Draft is complete! Running post-completion tasks...');
 
         try {
@@ -211,8 +211,8 @@ export const DraftService = {
         try {
           logger.log('Saving draft snapshot...');
           const targetSessionId = sessionId || pick?.draft_session_id || '';
-          const { data: snapshotTeams } = await supabase
-            .from('teams').select('id, team_name, owner_id').eq('league_id', leagueId);
+          const teamsResponse = await leagueApi.getTeams(leagueId, true);
+          const snapshotTeams = teamsResponse.data;
           const { picks: snapshotPicks } = await this.getDraftPicks(leagueId, '', targetSessionId);
           if (snapshotTeams && snapshotPicks) {
             const playerIds = snapshotPicks.map(p => p.player_id);
@@ -377,44 +377,11 @@ export const DraftService = {
 
   /**
    * Delete ALL draft data across all leagues — admin only
-   * NOTE: This still uses Supabase directly as it's an admin-only operation
    */
   async deleteAllDraftData(): Promise<{ error: unknown; deletedCounts?: { picks: number; orders: number; leagues: number } }> {
     try {
-      const { count: picksCountBefore } = await supabase
-        .from('draft_picks')
-        .select('*', { count: 'exact', head: true });
-
-      const { count: ordersCountBefore } = await supabase
-        .from('draft_order')
-        .select('*', { count: 'exact', head: true });
-
-      const { count: leaguesCount } = await supabase
-        .from('leagues')
-        .select('*', { count: 'exact', head: true });
-
-      const { data: allLeagues } = await supabase
-        .from('leagues')
-        .select('id');
-
-      for (const league of allLeagues || []) {
-        await supabase.from('draft_picks').delete().eq('league_id', league.id);
-        await supabase.from('draft_order').delete().eq('league_id', league.id);
-      }
-
-      await supabase
-        .from('leagues')
-        .update({ draft_status: 'not_started' })
-        .in('draft_status', ['in_progress', 'completed']);
-
-      return {
-        error: null,
-        deletedCounts: {
-          picks: picksCountBefore || 0,
-          orders: ordersCountBefore || 0,
-          leagues: leaguesCount || 0
-        }
-      };
+      const response = await draftApi.deleteAllDraftData();
+      return { error: null, deletedCounts: response.data?.deletedCounts };
     } catch (error: unknown) {
       return { error };
     }
@@ -480,15 +447,8 @@ export const DraftService = {
     try {
       logger.log(`Initializing rosters for all teams in league ${leagueId}...`);
 
-      const { data: teams, error: teamsError } = await supabase
-        .from('teams')
-        .select('id')
-        .eq('league_id', leagueId);
-
-      if (teamsError) {
-        logger.error('Error fetching teams:', teamsError);
-        return { error: teamsError };
-      }
+      const teamsResponse = await leagueApi.getTeams(leagueId);
+      const teams = teamsResponse.data;
 
       if (!teams || teams.length === 0) {
         logger.log('No teams found in league');
@@ -497,13 +457,8 @@ export const DraftService = {
 
       const allPlayers = await PlayerService.getAllPlayers();
 
-      const { data: leagueData } = await supabase
-        .from('leagues')
-        .select('commissioner_id')
-        .eq('id', leagueId)
-        .single();
-
-      const commissionerId = leagueData?.commissioner_id;
+      const leagueResponse = await leagueApi.getLeague(leagueId);
+      const commissionerId = leagueResponse.data?.commissioner_id;
 
       const results = await Promise.allSettled(
         teams.map(async (team) => {

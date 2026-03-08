@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { AuditService } from './AuditService';
+import { accountApi } from '@/api/account';
 import { logger } from '@/utils/logger';
 
 /**
@@ -28,17 +28,12 @@ export class UserAccountService {
    */
   static async exportUserData(): Promise<{ success: boolean; data?: Record<string, unknown>; error?: string }> {
     try {
-      const { data, error } = await supabase.rpc('export_user_data');
-      if (error) {
-        return { success: false, error: error.message };
-      }
-
-      const result = data as Record<string, unknown>;
+      const response = await accountApi.exportUserData();
+      const result = response.data as Record<string, unknown>;
       if (result && result.success === false) {
         return { success: false, error: (result.error as string) || 'Export failed' };
       }
-
-      AuditService.log('DATA_EXPORT' as 'ADMIN_ACTION', null, { action: 'export_user_data' });
+      // Audit logging is now handled server-side
       return { success: true, data: result };
     } catch (error: unknown) {
       logger.error('[UserAccountService] Data export error:', error);
@@ -52,12 +47,8 @@ export class UserAccountService {
    */
   static async deleteAccount(): Promise<{ success: boolean; error?: string }> {
     try {
-      const { data, error } = await supabase.rpc('delete_user_account');
-      if (error) {
-        return { success: false, error: error.message };
-      }
-
-      const result = data as Record<string, unknown>;
+      const response = await accountApi.deleteAccount();
+      const result = response.data as Record<string, unknown>;
       if (result && result.success === false) {
         return { success: false, error: (result.error as string) || 'Deletion failed' };
       }
@@ -75,10 +66,7 @@ export class UserAccountService {
    */
   static async recordConsent(policyType: string, version: string): Promise<void> {
     try {
-      await supabase.rpc('record_user_consent', {
-        p_policy_type: policyType,
-        p_version: version
-      });
+      await accountApi.recordConsent(policyType, version);
     } catch {
       // Fire-and-forget — consent recording should never block auth
     }

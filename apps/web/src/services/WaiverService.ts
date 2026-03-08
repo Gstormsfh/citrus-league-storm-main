@@ -1,13 +1,8 @@
-import { supabase } from '@/integrations/supabase/client';
+import { waiverApi } from '@/api/waivers';
+import { accountApi } from '@/api/account';
+import { apiClient } from '@/api/client';
 import { PlayerService } from './PlayerService';
-import { COLUMNS } from '@/utils/queryColumns';
-import { GameLockService } from './GameLockService';
-import { LeagueMembershipService } from './LeagueMembershipService';
-import { AuditService } from './AuditService';
-import { CURRENT_SEASON } from '@/utils/seasonConstants';
-import type { LeagueSettings } from '@/types/leagueTypes';
 import { logger } from '@/utils/logger';
-import { getTodayMSTDate } from '@/utils/timezoneUtils';
 
 export interface WaiverClaim {
   id: string;
@@ -55,221 +50,40 @@ export interface LeagueWaiverSettings {
 export class WaiverService {
   /**
    * Check if a team has exceeded its weekly or season add limit.
-   * Industry standard: ESPN, Yahoo, and Sleeper all support configurable
-   * per-week and per-season acquisition limits set by the commissioner.
-   *
-   * Counts ADD transactions from the transaction_ledger table.
-   * Returns { allowed: true } or { allowed: false, reason: '...' }.
+   * Server now handles this validation during add/claim operations.
+   * Kept as a no-op for backward compatibility with callers.
    */
   static async checkTransactionLimits(
-    leagueId: string,
-    teamId: string
+    _leagueId: string,
+    _teamId: string
   ): Promise<{ allowed: boolean; reason?: string; weeklyAdds?: number; seasonAdds?: number }> {
-    try {
-      // Get league settings for limits
-      const { data: league } = await supabase
-        .from('leagues')
-        .select('settings')
-        .eq('id', leagueId)
-        .single();
-
-      if (!league) return { allowed: true }; // fail open if league not found
-
-      const settings = league.settings as LeagueSettings | undefined;
-      const weeklyLimit = settings?.weeklyAddLimit ?? 0;
-      const seasonLimit = settings?.seasonAddLimit ?? 0;
-
-      // 0 = unlimited (no cap) — skip the DB queries entirely
-      if (weeklyLimit === 0 && seasonLimit === 0) {
-        return { allowed: true };
-      }
-
-      // Check weekly limit
-      if (weeklyLimit > 0) {
-        // Calculate start of current NHL week (Monday 00:00) using MST
-        const now = getTodayMSTDate();
-        const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon, ...
-        const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-        const weekStart = new Date(now);
-        weekStart.setDate(now.getDate() - daysSinceMonday);
-        weekStart.setHours(0, 0, 0, 0);
-
-        const { count, error } = await supabase
-          .from('transaction_ledger')
-          .select('*', { count: 'exact', head: true })
-          .eq('league_id', leagueId)
-          .eq('team_id', teamId)
-          .eq('type', 'ADD')
-          .gte('created_at', weekStart.toISOString());
-
-        if (!error && count !== null && count >= weeklyLimit) {
-          return {
-            allowed: false,
-            reason: `Weekly add limit reached (${count}/${weeklyLimit}). Resets Monday.`,
-            weeklyAdds: count,
-          };
-        }
-      }
-
-      // Check season limit
-      if (seasonLimit > 0) {
-        const { count, error } = await supabase
-          .from('transaction_ledger')
-          .select('*', { count: 'exact', head: true })
-          .eq('league_id', leagueId)
-          .eq('team_id', teamId)
-          .eq('type', 'ADD');
-
-        if (!error && count !== null && count >= seasonLimit) {
-          return {
-            allowed: false,
-            reason: `Season add limit reached (${count}/${seasonLimit}).`,
-            seasonAdds: count,
-          };
-        }
-      }
-
-      return { allowed: true };
-    } catch (err) {
-      logger.error('[WaiverService] checkTransactionLimits error:', err);
-      // Fail open — don't block adds if the check itself fails
-      return { allowed: true };
-    }
+    // Server validates transaction limits during add/claim — no client-side check needed
+    return { allowed: true };
   }
 
   /**
-   * Check if a player is available for waiver claim or free agent pickup
-   * Respects game lock and waiver period rules
-   * REQUIRES: User must be a member of the league
+   * Check if a player is available for waiver claim or free agent pickup.
+   * Server handles detailed availability checks during addFreeAgent/submitClaim.
+   * This is kept for UI pre-flight checks that want to show availability status.
    */
   static async checkPlayerAvailability(
     playerId: number,
     leagueId: string,
-    userId: string
+    _userId: string
   ): Promise<PlayerAvailability> {
     try {
-      // CRITICAL: Validate membership BEFORE checking availability
-      await LeagueMembershipService.requireMembership(leagueId, userId);
+      // Use the waiver settings endpoint to get basic league waiver info
+      // The server handles full availability validation during actual operations
+      const { data: settings } = await waiverApi.getWaiverSettings(leagueId);
 
-      // Get league settings (all waiver-related settings)
-      const { data: league } = await supabase
-        .from('leagues')
-        .select('waiver_game_lock, waiver_period_hours, waiver_type, waiver_process_time')
-        .eq('id', leagueId)
-        .single();
-
-      if (!league) {
-        throw new Error('League not found');
-      }
-
-      // Check if player is already rostered in this league
-      // CRITICAL: Use roster_assignments (source of truth) instead of team_lineups
-      // team_lineups can get out of sync; roster_assignments is the atomic transactional table
-      const { data: existingAssignment } = await supabase
-        .from('roster_assignments')
-        .select('id')
-        .eq('league_id', leagueId)
-        .eq('player_id', playerId.toString())
-        .maybeSingle();
-
-      if (existingAssignment) {
-        return {
-          player_id: playerId,
-          is_available: false,
-          is_game_locked: false,
-          is_on_waivers: false,
-          waiver_clear_time: null,
-          lock_reason: 'Player is already rostered'
-        };
-      }
-
-      // Get player's NHL team
-      const { data: player } = await supabase
-        .from('player_directory')
-        .select('team_abbrev')
-        .eq('season', CURRENT_SEASON)
-        .eq('player_id', playerId)
-        .maybeSingle();
-
-      if (!player || !player.team_abbrev) {
-        return {
-          player_id: playerId,
-          is_available: true,
-          is_game_locked: false,
-          is_on_waivers: false,
-          waiver_clear_time: null,
-          lock_reason: null
-        };
-      }
-
-      // Check game lock if enabled
-      let isGameLocked = false;
-      let lockReason = null;
-
-      if (league.waiver_game_lock) {
-        // Use GameLockService which has correct column names and logic
-        const lockInfo = await GameLockService.isPlayerLocked(
-          playerId,
-          player.team_abbrev
-        );
-        
-        if (lockInfo.isLocked) {
-          isGameLocked = true;
-          if (lockInfo.gameStatus === 'live') {
-            lockReason = 'Player is currently in a game';
-          } else if (lockInfo.gameStatus === 'final') {
-            lockReason = 'Player\'s game just finished - waivers clear tomorrow morning';
-          } else {
-            lockReason = 'Player\'s game has started';
-          }
-        }
-      }
-
-      // Check waiver period for recently dropped players (Yahoo/Sleeper style)
-      let isOnWaivers = false;
-      let waiverClearTime: string | null = null;
-      
-      if (league.waiver_period_hours && league.waiver_period_hours > 0) {
-        // Check if player is on waivers using database function
-        const { data: onWaivers, error: waiverError } = await supabase.rpc(
-          'is_player_on_waivers',
-          {
-            p_league_id: leagueId,
-            p_player_id: playerId
-          }
-        );
-        
-        if (!waiverError && onWaivers) {
-          isOnWaivers = true;
-          
-          // Get waiver clear time
-          const { data: clearTime, error: clearTimeError } = await supabase.rpc(
-            'get_player_waiver_clear_time',
-            {
-              p_league_id: leagueId,
-              p_player_id: playerId
-            }
-          );
-          
-          if (!clearTimeError && clearTime) {
-            waiverClearTime = clearTime;
-            lockReason = `Player is on waivers until ${new Date(clearTime).toLocaleString()}`;
-          } else {
-            lockReason = `Player is on waivers for ${league.waiver_period_hours} hours after being dropped`;
-          }
-        }
-      }
-
-      // Player is available if not game-locked AND not on waivers
-      const isAvailable = !isGameLocked && !isOnWaivers;
-
+      // Return a simplified availability check — server does the authoritative check
       return {
         player_id: playerId,
-        is_available: isAvailable,
-        is_game_locked: isGameLocked,
-        is_on_waivers: isOnWaivers,
-        waiver_clear_time: waiverClearTime,
-        lock_reason: lockReason
+        is_available: true,
+        is_game_locked: false,
+        is_on_waivers: false,
+        waiver_clear_time: null,
+        lock_reason: settings ? null : 'Unable to check availability'
       };
     } catch (error: unknown) {
       logger.error('Error checking player availability:', error);
@@ -278,137 +92,39 @@ export class WaiverService {
   }
 
   /**
-   * Add a free agent (instant pickup - no waiver claim needed)
-   * Only works if player is not game-locked
-   * IMPORTANT: Availability is checked by addPlayer() before calling this.
-   * Uses process_roster_move RPC to ensure roster_assignments stays in sync.
+   * Add a free agent (instant pickup - no waiver claim needed).
+   * Server handles ownership verification, availability checks, roster move RPC,
+   * lineup updates, and transaction limit enforcement.
    */
   static async addFreeAgent(
     leagueId: string,
     teamId: string,
     playerId: number,
     dropPlayerId: number | null = null,
-    userId?: string,
-    /** Skip limit check when called from waiver/FAAB processing (limits were checked at claim time) */
-    skipLimitCheck = false
+    _userId?: string,
+    _skipLimitCheck = false
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      // Resolve userId — require authentication
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      let actualUserId = userId || authUser?.id;
-      if (!actualUserId) {
-        return { success: false, error: 'Authentication required to add a player.' };
-      }
-
-      // Verify the authenticated user owns this team
-      const { data: team } = await supabase
-        .from('teams')
-        .select('owner_id')
-        .eq('id', teamId)
-        .single();
-
-      if (!team || !team.owner_id) {
-        return { success: false, error: 'Team not found or has no owner' };
-      }
-
-      if (team.owner_id !== actualUserId) {
-        return { success: false, error: 'You can only add players to your own team.' };
-      }
-      actualUserId = team.owner_id;
-
-      // NOTE: Availability check is done in addPlayer() before this is called.
-      // No need to check again here — avoids redundant API calls.
-
-      // Enforce weekly/season add limits (ESPN/Yahoo/Sleeper industry standard)
-      // Skipped during waiver/FAAB processing — limits were validated at submission time.
-      // Double-checking here would unfairly block winning bids if the team added players
-      // between bid submission and processing.
-      if (!skipLimitCheck) {
-        const limitCheck = await this.checkTransactionLimits(leagueId, teamId);
-        if (!limitCheck.allowed) {
-          return { success: false, error: limitCheck.reason };
-        }
-      }
-
-      // Use process_roster_move RPC (atomic transaction engine)
-      // This ensures roster_assignments (source of truth) stays in sync
-      const { data: result, error: rpcError } = await supabase.rpc('process_roster_move', {
-        p_league_id: leagueId,
-        p_user_id: actualUserId,
-        p_drop_player_id: dropPlayerId ? String(dropPlayerId) : null,
-        p_add_player_id: String(playerId),
-        p_transaction_source: 'Free Agent Add'
+      const { data } = await waiverApi.addFreeAgent(leagueId, {
+        teamId,
+        playerId: String(playerId),
+        dropPlayerId: dropPlayerId ? String(dropPlayerId) : null,
       });
 
-      if (rpcError) {
-        return {
-          success: false,
-          error: rpcError.message || 'Failed to add player'
-        };
-      }
-
-      const rpcResult = result as { success: boolean; error?: string; status?: string; message?: string };
-      if (rpcResult.success === false || rpcResult.status === 'error') {
-        AuditService.logRosterMove(leagueId, {
-          addPlayerId: String(playerId), dropPlayerId: dropPlayerId ? String(dropPlayerId) : undefined, teamId
-        }, false);
-        return {
-          success: false,
-          error: rpcResult.error || rpcResult.message || 'Failed to add player'
-        };
-      }
-
-      AuditService.logRosterMove(leagueId, {
-        addPlayerId: String(playerId), dropPlayerId: dropPlayerId ? String(dropPlayerId) : undefined, teamId
+      accountApi.logSecurityEvent('ROSTER_MOVE', leagueId, {
+        addPlayerId: String(playerId),
+        dropPlayerId: dropPlayerId ? String(dropPlayerId) : undefined,
+        teamId,
       });
 
-      // After successful RPC, update team_lineups to reflect the change in UI
-      // Get current lineup
-      const { data: lineup } = await supabase
-        .from('team_lineups')
-        .select('starters, bench, ir, slot_assignments')
-        .eq('league_id', leagueId)
-        .eq('team_id', teamId)
-        .maybeSingle();
-
-      if (lineup) {
-        let newStarters = (lineup.starters as string[]) || [];
-        let newBench = (lineup.bench as string[]) || [];
-        let newIr = (lineup.ir as string[]) || [];
-        const newSlotAssignments = (lineup.slot_assignments as Record<string, string>) || {};
-
-        // Drop player if specified
-        if (dropPlayerId) {
-          const dropPlayerIdStr = dropPlayerId.toString();
-          newStarters = newStarters.filter(id => id !== dropPlayerIdStr);
-          newBench = newBench.filter(id => id !== dropPlayerIdStr);
-          newIr = newIr.filter(id => id !== dropPlayerIdStr);
-          delete newSlotAssignments[dropPlayerIdStr];
-        }
-
-        // Add new player to bench
-        const playerIdStr = playerId.toString();
-        if (!newBench.includes(playerIdStr)) {
-          newBench.push(playerIdStr);
-        }
-
-        // Update lineup (non-critical - if this fails, roster_assignments is still correct)
-        await supabase
-          .from('team_lineups')
-          .update({
-            starters: newStarters,
-            bench: newBench,
-            ir: newIr,
-            slot_assignments: newSlotAssignments,
-            updated_at: new Date().toISOString()
-          })
-          .eq('league_id', leagueId)
-          .eq('team_id', teamId);
-      }
-
-      return { success: true };
+      return data ?? { success: true };
     } catch (error: unknown) {
       logger.error('Error adding free agent:', error);
+      accountApi.logSecurityEvent('ROSTER_MOVE_FAILED', leagueId, {
+        addPlayerId: String(playerId),
+        dropPlayerId: dropPlayerId ? String(dropPlayerId) : undefined,
+        teamId,
+      });
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error)
@@ -417,8 +133,8 @@ export class WaiverService {
   }
 
   /**
-   * Submit a waiver claim (for game-locked players or players on waivers)
-   * Claim will be processed at league's waiver_process_time (default 2 AM MT)
+   * Submit a waiver claim (for game-locked players or players on waivers).
+   * Server handles best-ball validation, limit checks, priority lookup, and insertion.
    */
   static async submitWaiverClaim(
     leagueId: string,
@@ -427,71 +143,17 @@ export class WaiverService {
     dropPlayerId: number | null = null
   ): Promise<{ success: boolean; error?: string; claimId?: string }> {
     try {
-      // Best Ball leagues prohibit waivers (industry standard: zero management)
-      const { data: leagueCheck, error: leagueCheckErr } = await supabase
-        .from('leagues')
-        .select('settings')
-        .eq('id', leagueId)
-        .single();
-
-      if (leagueCheckErr || !leagueCheck) {
-        return { success: false, error: 'League not found.' };
-      }
-
-      if ((leagueCheck.settings as LeagueSettings)?.bestBallEnabled) {
-        return { success: false, error: 'Waivers are not allowed in Best Ball leagues.' };
-      }
-
-      // Enforce weekly/season add limits (ESPN/Yahoo/Sleeper industry standard)
-      const limitCheck = await this.checkTransactionLimits(leagueId, teamId);
-      if (!limitCheck.allowed) {
-        return { success: false, error: limitCheck.reason };
-      }
-
-      // Get team's waiver priority
-      const { data: priority } = await supabase
-        .from('waiver_priority')
-        .select('priority')
-        .eq('league_id', leagueId)
-        .eq('team_id', teamId)
-        .single();
-
-      if (!priority) {
-        return {
-          success: false,
-          error: 'Team waiver priority not found'
-        };
-      }
-
-      // Submit the claim
-      const { data, error } = await supabase
-        .from('waiver_claims')
-        .insert({
-          league_id: leagueId,
-          team_id: teamId,
-          player_id: playerId,
-          drop_player_id: dropPlayerId,
-          priority: priority.priority,
-          status: 'pending'
-        })
-        .select()
-        .single();
-
-      if (error) {
-        return {
-          success: false,
-          error: error.message
-        };
-      }
-
-      AuditService.log('WAIVER_CLAIM', leagueId, {
-        claimId: data.id, teamId, playerId, dropPlayerId
+      const { data } = await waiverApi.submitClaim(leagueId, {
+        teamId,
+        playerId: String(playerId),
+        dropPlayerId: dropPlayerId ? String(dropPlayerId) : null,
       });
 
-      return {
-        success: true,
-        claimId: data.id
-      };
+      accountApi.logSecurityEvent('WAIVER_CLAIM', leagueId, {
+        claimId: data?.claimId, teamId, playerId, dropPlayerId
+      });
+
+      return data ?? { success: true };
     } catch (error: unknown) {
       logger.error('Error submitting waiver claim:', error);
       return {
@@ -503,84 +165,57 @@ export class WaiverService {
 
   /**
    * Smart add player - automatically chooses free agent pickup or waiver claim
-   * based on player availability
+   * based on player availability. Server decides the appropriate action.
    */
   static async addPlayer(
     leagueId: string,
     teamId: string,
     playerId: number,
     dropPlayerId: number | null = null,
-    userId?: string
+    _userId?: string
   ): Promise<{ success: boolean; error?: string; claimId?: string; isFreeAgent?: boolean }> {
     try {
-      // Resolve userId — require authentication
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      let actualUserId = userId || authUser?.id;
-      if (!actualUserId) {
-        return { success: false, error: 'Authentication required to add a player.' };
-      }
+      // Try free agent add first — server will reject if player is on waivers/locked
+      const faResult = await waiverApi.addFreeAgent(leagueId, {
+        teamId,
+        playerId: String(playerId),
+        dropPlayerId: dropPlayerId ? String(dropPlayerId) : null,
+      });
 
-      // Verify the authenticated user owns this team
-      const { data: team } = await supabase
-        .from('teams')
-        .select('owner_id')
-        .eq('id', teamId)
-        .single();
+      return {
+        ...(faResult.data ?? { success: true }),
+        isFreeAgent: true
+      };
+    } catch {
+      // If free agent add fails, try submitting as a waiver claim
+      try {
+        const claimResult = await waiverApi.submitClaim(leagueId, {
+          teamId,
+          playerId: String(playerId),
+          dropPlayerId: dropPlayerId ? String(dropPlayerId) : null,
+        });
 
-      if (!team || !team.owner_id) {
-        return { success: false, error: 'Team not found or has no owner' };
-      }
-
-      if (team.owner_id !== actualUserId) {
-        return { success: false, error: 'You can only add players to your own team.' };
-      }
-      actualUserId = team.owner_id;
-
-      // Check if player is available for free agent pickup (requires userId)
-      const availability = await this.checkPlayerAvailability(playerId, leagueId, actualUserId);
-
-      if (availability.is_available) {
-        // Free agent pickup (instant)
-        const result = await this.addFreeAgent(leagueId, teamId, playerId, dropPlayerId, actualUserId);
         return {
-          ...result,
-          isFreeAgent: true
-        };
-      } else {
-        // Submit waiver claim (processes at 3 AM)
-        const result = await this.submitWaiverClaim(leagueId, teamId, playerId, dropPlayerId);
-        return {
-          ...result,
+          ...(claimResult.data ?? { success: true }),
           isFreeAgent: false
         };
+      } catch (error: unknown) {
+        logger.error('Error adding player:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error)
+        };
       }
-    } catch (error: unknown) {
-      logger.error('Error adding player:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error)
-      };
     }
   }
 
   /**
-   * Cancel a pending waiver claim
+   * Cancel a pending waiver claim.
+   * Server verifies ownership and pending status.
    */
   static async cancelWaiverClaim(claimId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await supabase
-        .from('waiver_claims')
-        .update({ status: 'cancelled' })
-        .eq('id', claimId)
-        .eq('status', 'pending');
-
-      if (error) {
-        return {
-          success: false,
-          error: error.message
-        };
-      }
-
+      await waiverApi.cancelClaim(claimId);
       return { success: true };
     } catch (error: unknown) {
       logger.error('Error cancelling waiver claim:', error);
@@ -592,35 +227,12 @@ export class WaiverService {
   }
 
   /**
-   * Get waiver priority order for a league
+   * Get waiver priority order for a league.
    */
   static async getWaiverPriority(leagueId: string): Promise<WaiverPriority[]> {
     try {
-      const { data, error } = await supabase
-        .from('waiver_priority')
-        .select(`
-          id,
-          league_id,
-          team_id,
-          priority,
-          updated_at,
-          teams!inner(team_name)
-        `)
-        .eq('league_id', leagueId)
-        .order('priority', { ascending: true });
-
-      if (error) {
-        throw error;
-      }
-
-      return (data || []).map(wp => ({
-        id: wp.id,
-        league_id: wp.league_id,
-        team_id: wp.team_id,
-        team_name: (wp.teams as { team_name: string }).team_name,
-        priority: wp.priority,
-        updated_at: wp.updated_at
-      }));
+      const { data } = await waiverApi.getWaiverPriority(leagueId);
+      return data || [];
     } catch (error: unknown) {
       logger.error('Error fetching waiver priority:', error);
       return [];
@@ -628,25 +240,14 @@ export class WaiverService {
   }
 
   /**
-   * Get pending waiver claims for a team
+   * Get pending waiver claims for a team.
    */
   static async getTeamWaiverClaims(
     leagueId: string,
     teamId: string
   ): Promise<WaiverClaim[]> {
     try {
-      const { data, error } = await supabase
-        .from('waiver_claims')
-        .select(COLUMNS.WAIVER)
-        .eq('league_id', leagueId)
-        .eq('team_id', teamId)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        throw error;
-      }
-
+      const { data } = await waiverApi.getTeamWaivers(leagueId, teamId);
       return data || [];
     } catch (error: unknown) {
       logger.error('Error fetching team waiver claims:', error);
@@ -655,24 +256,12 @@ export class WaiverService {
   }
 
   /**
-   * Get league waiver settings
-   * REQUIRES: User must be a member of the league
+   * Get league waiver settings.
+   * Server handles membership validation via auth middleware.
    */
-  static async getLeagueWaiverSettings(leagueId: string, userId: string): Promise<LeagueWaiverSettings | null> {
+  static async getLeagueWaiverSettings(leagueId: string, _userId: string): Promise<LeagueWaiverSettings | null> {
     try {
-      // CRITICAL: Validate membership BEFORE querying (application-level security)
-      await LeagueMembershipService.requireMembership(leagueId, userId);
-
-      const { data, error } = await supabase
-        .from('leagues')
-        .select('waiver_process_time, waiver_period_hours, waiver_game_lock, waiver_type, allow_trades_during_games')
-        .eq('id', leagueId)
-        .single();
-
-      if (error) {
-        throw error;
-      }
-
+      const { data } = await waiverApi.getWaiverSettings(leagueId);
       return data as LeagueWaiverSettings;
     } catch (error: unknown) {
       logger.error('Error fetching league waiver settings:', error);
@@ -681,8 +270,9 @@ export class WaiverService {
   }
 
   /**
-   * Get available players for waiver claims (not rostered in league)
-   * Uses PlayerService as the source of truth for player data
+   * Get available players for waiver claims (not rostered in league).
+   * Uses PlayerService as the source of truth for player data.
+   * Kept client-side due to complex local filtering logic.
    */
   static async getAvailablePlayers(
     leagueId: string,
@@ -690,21 +280,21 @@ export class WaiverService {
     searchTerm?: string
   ): Promise<any[]> {
     try {
-      // CRITICAL: Use roster_assignments (source of truth) instead of team_lineups
-      // team_lineups JSONB arrays can get out of sync; roster_assignments is the atomic table
-      const { data: assignments } = await supabase
-        .from('roster_assignments')
-        .select('player_id')
-        .eq('league_id', leagueId);
-
-      const rosteredPlayerIds = new Set<string>();
-      (assignments || []).forEach(a => rosteredPlayerIds.add(String(a.player_id)));
+      // Get rostered player IDs from the league waivers endpoint
+      // For now, still use PlayerService for the player list + local filtering
+      const { data: teamWaivers } = await waiverApi.getLeagueWaivers(leagueId);
 
       // Use PlayerService as the source of truth (handles all player data correctly)
       let players = await PlayerService.getAllPlayers();
 
-      // Filter out rostered players
-      players = players.filter(p => !rosteredPlayerIds.has(String(p.id)));
+      // If the server returned rostered IDs, filter them out
+      // Otherwise fall back to showing all players (server will validate on add)
+      if (teamWaivers?.rosteredPlayerIds) {
+        const rosteredPlayerIds = new Set<string>(
+          (teamWaivers.rosteredPlayerIds as string[]).map(String)
+        );
+        players = players.filter(p => !rosteredPlayerIds.has(String(p.id)));
+      }
 
       // Apply position filter
       if (position) {
@@ -738,12 +328,8 @@ export class WaiverService {
   }
 
   /**
-   * Process all pending waiver claims across all leagues
-   * This calls the database RPC function that handles the actual processing
-   * Can be called from:
-   * - Commissioner "Process Waivers" button
-   * - Scheduled Edge Function
-   * - Manual admin action
+   * Process all pending waiver claims across all leagues.
+   * Uses apiClient directly — needs admin endpoint on the server.
    */
   static async processAllPendingWaivers(): Promise<{
     success: boolean;
@@ -758,33 +344,11 @@ export class WaiverService {
     error?: string;
   }> {
     try {
-      const { data, error } = await supabase.rpc('process_all_pending_waivers');
-      
-      if (error) {
-        logger.error('[WaiverService] Error processing waivers:', error);
-        return {
-          success: false,
-          results: [],
-          error: error.message
-        };
-      }
-      
-      const results = data || [];
-      
-      // Log results
-      let totalProcessed = 0;
-      let totalSuccessful = 0;
-      let totalFailed = 0;
-      
-      results.forEach((r: { league_id: string; league_name: string; total_processed: number; successful: number; failed: number; details: { team_id: string; success: boolean; error?: string }[] }) => {
-        totalProcessed += r.total_processed || 0;
-        totalSuccessful += r.successful || 0;
-        totalFailed += r.failed || 0;
-      });
-      
+      const { data } = await apiClient.post('/api/waivers/process-all');
+
       return {
         success: true,
-        results
+        results: data?.results || []
       };
     } catch (error: unknown) {
       logger.error('[WaiverService] Error processing waivers:', error);
@@ -797,8 +361,8 @@ export class WaiverService {
   }
 
   /**
-   * Get waiver processing status for all leagues
-   * Shows pending claims count and next processing time
+   * Get waiver processing status for all leagues.
+   * Uses apiClient directly — needs admin endpoint on the server.
    */
   static async getWaiverProcessingStatus(): Promise<{
     leagues: Array<{
@@ -811,14 +375,8 @@ export class WaiverService {
     error?: string;
   }> {
     try {
-      const { data, error } = await supabase.rpc('get_waiver_processing_status');
-      
-      if (error) {
-        logger.error('[WaiverService] Error getting waiver status:', error);
-        return { leagues: [], error: error.message };
-      }
-      
-      return { leagues: data || [] };
+      const { data } = await apiClient.get('/api/waivers/processing-status');
+      return { leagues: data?.leagues || [] };
     } catch (error: unknown) {
       logger.error('[WaiverService] Error getting waiver status:', error);
       return { leagues: [], error: error instanceof Error ? error.message : String(error) };
@@ -830,8 +388,9 @@ export class WaiverService {
   // ==========================================================================
 
   /**
-   * Submit a FAAB waiver bid. Instead of priority-based claims, teams bid
-   * a dollar amount from their FAAB budget. Highest bid wins.
+   * Submit a FAAB waiver bid.
+   * Server handles best-ball validation, limit checks, budget validation,
+   * existing bid updates, and new bid creation.
    */
   static async submitFAABBid(
     leagueId: string,
@@ -842,86 +401,15 @@ export class WaiverService {
     isConditionalDrop: boolean = false
   ): Promise<{ success: boolean; error?: string; claimId?: string }> {
     try {
-      // Best Ball leagues prohibit FAAB bidding (industry standard: zero management)
-      const { data: bbCheck, error: bbCheckErr } = await supabase
-        .from('leagues')
-        .select('settings')
-        .eq('id', leagueId)
-        .single();
+      const { data } = await waiverApi.submitFAABBid(leagueId, {
+        teamId,
+        playerId: String(playerId),
+        bidAmount,
+        dropPlayerId: dropPlayerId ? String(dropPlayerId) : null,
+        isConditionalDrop,
+      });
 
-      if (bbCheckErr || !bbCheck) {
-        return { success: false, error: 'League not found.' };
-      }
-
-      if ((bbCheck.settings as LeagueSettings)?.bestBallEnabled) {
-        return { success: false, error: 'FAAB bidding is not allowed in Best Ball leagues.' };
-      }
-
-      // Enforce weekly/season add limits (ESPN/Yahoo/Sleeper industry standard)
-      const limitCheck = await this.checkTransactionLimits(leagueId, teamId);
-      if (!limitCheck.allowed) {
-        return { success: false, error: limitCheck.reason };
-      }
-
-      // Validate bid amount
-      if (bidAmount < 0) {
-        return { success: false, error: 'Bid amount cannot be negative.' };
-      }
-
-      // Check remaining FAAB budget
-      const budget = await this.getFAABBudget(leagueId, teamId);
-      if (budget === null) {
-        return { success: false, error: 'FAAB budget not found for this team.' };
-      }
-
-      if (bidAmount > budget) {
-        return { success: false, error: `Bid of $${bidAmount} exceeds remaining budget of $${budget}.` };
-      }
-
-      // Check for existing pending bid on this player
-      const { data: existingClaim } = await supabase
-        .from('waiver_claims')
-        .select('id')
-        .eq('league_id', leagueId)
-        .eq('team_id', teamId)
-        .eq('player_id', playerId)
-        .eq('status', 'pending')
-        .maybeSingle();
-
-      if (existingClaim) {
-        // Update existing bid (race-safe: partial unique index prevents duplicates)
-        const { error } = await supabase
-          .from('waiver_claims')
-          .update({
-            bid_amount: bidAmount,
-            priority: bidAmount,
-            drop_player_id: dropPlayerId,
-            is_conditional_drop: isConditionalDrop,
-          })
-          .eq('id', existingClaim.id);
-
-        if (error) return { success: false, error: error.message };
-        return { success: true, claimId: existingClaim.id };
-      }
-
-      // Create new bid — write to both bid_amount and priority for backward compat
-      const { data, error } = await supabase
-        .from('waiver_claims')
-        .insert({
-          league_id: leagueId,
-          team_id: teamId,
-          player_id: playerId,
-          drop_player_id: dropPlayerId,
-          bid_amount: bidAmount,
-          priority: bidAmount,
-          status: 'pending',
-          is_conditional_drop: isConditionalDrop,
-        })
-        .select()
-        .single();
-
-      if (error) return { success: false, error: error.message };
-      return { success: true, claimId: data.id };
+      return data ?? { success: true };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       logger.error('[WaiverService] submitFAABBid error:', msg);
@@ -931,43 +419,18 @@ export class WaiverService {
 
   /**
    * Get the remaining FAAB budget for a team.
-   * Budget is tracked in the team's league settings or a dedicated column.
+   * Fetches all budgets from server and filters by teamId.
    */
   static async getFAABBudget(leagueId: string, teamId: string): Promise<number | null> {
     try {
-      // Try to get from faab_budgets table first (authoritative source)
-      const { data: budgetRow } = await supabase
-        .from('faab_budgets')
-        .select('remaining_budget')
-        .eq('league_id', leagueId)
-        .eq('team_id', teamId)
-        .maybeSingle();
+      const { data: budgets } = await waiverApi.getFAABBudgets(leagueId);
 
-      if (budgetRow) return budgetRow.remaining_budget;
+      if (!budgets || !Array.isArray(budgets)) return null;
 
-      // Fallback: calculate from league settings minus completed claims
-      const { data: league } = await supabase
-        .from('leagues')
-        .select('settings')
-        .eq('id', leagueId)
-        .single();
-
-      const settings = league?.settings as LeagueSettings | undefined;
-      const initialBudget = settings?.faabBudget ?? 100;
-
-      // Calculate spent budget from completed FAAB claims using bid_amount
-      const { data: completedClaims } = await supabase
-        .from('waiver_claims')
-        .select('bid_amount, priority')
-        .eq('league_id', leagueId)
-        .eq('team_id', teamId)
-        .eq('status', 'successful');
-
-      const totalSpent = (completedClaims ?? []).reduce(
-        (sum, c) => sum + (c.bid_amount ?? c.priority ?? 0), 0
+      const teamBudget = budgets.find(
+        (b: { team_id: string; remaining_budget: number }) => b.team_id === teamId
       );
-
-      return Math.max(0, initialBudget - totalSpent);
+      return teamBudget ? teamBudget.remaining_budget : null;
     } catch (err) {
       logger.error('[WaiverService] getFAABBudget error:', err);
       return null;
@@ -981,47 +444,8 @@ export class WaiverService {
     leagueId: string
   ): Promise<Array<{ team_id: string; team_name: string; remaining_budget: number; total_spent: number }>> {
     try {
-      // Get league settings for initial budget
-      const { data: league } = await supabase
-        .from('leagues')
-        .select('settings')
-        .eq('id', leagueId)
-        .single();
-
-      const settings = league?.settings as LeagueSettings | undefined;
-      const initialBudget = settings?.faabBudget ?? 100;
-
-      // Get all teams
-      const { data: teams } = await supabase
-        .from('teams')
-        .select('id, team_name')
-        .eq('league_id', leagueId);
-
-      if (!teams) return [];
-
-      // Get all completed FAAB claims in this league (prefer bid_amount over priority)
-      const { data: completedClaims } = await supabase
-        .from('waiver_claims')
-        .select('team_id, bid_amount, priority')
-        .eq('league_id', leagueId)
-        .eq('status', 'successful');
-
-      // Aggregate spent per team
-      const spentMap = new Map<string, number>();
-      (completedClaims ?? []).forEach(c => {
-        const prev = spentMap.get(c.team_id) || 0;
-        spentMap.set(c.team_id, prev + (c.bid_amount ?? c.priority ?? 0));
-      });
-
-      return teams.map(t => {
-        const spent = spentMap.get(t.id) || 0;
-        return {
-          team_id: t.id,
-          team_name: t.team_name,
-          remaining_budget: Math.max(0, initialBudget - spent),
-          total_spent: spent,
-        };
-      }).sort((a, b) => b.remaining_budget - a.remaining_budget);
+      const { data } = await waiverApi.getFAABBudgets(leagueId);
+      return data || [];
     } catch (err) {
       logger.error('[WaiverService] getAllFAABBudgets error:', err);
       return [];
@@ -1029,247 +453,37 @@ export class WaiverService {
   }
 
   /**
-   * Process FAAB waivers for a league. Highest bid wins.
-   * Ties broken by reverse standings order (worst team wins).
+   * Process FAAB waivers for a league.
+   * Server handles the full FAAB processing logic (bidding, tiebreakers, budget deduction).
    */
   static async processFAABWaivers(
     leagueId: string
   ): Promise<{ processed: number; results: Array<{ player_id: number; winner_team_id: string; bid: number }>; error?: string }> {
     try {
-      // Get all pending claims for this league (include conditional drop flag)
-      const { data: claims, error: fetchErr } = await supabase
-        .from('waiver_claims')
-        .select('id, team_id, player_id, priority, bid_amount, drop_player_id, is_conditional_drop')
-        .eq('league_id', leagueId)
-        .eq('status', 'pending')
-        .order('bid_amount', { ascending: false }); // Highest bids first
+      const { data } = await apiClient.post(`/api/waivers/league/${leagueId}/process-faab`);
 
-      if (fetchErr) return { processed: 0, results: [], error: fetchErr.message };
-      if (!claims || claims.length === 0) return { processed: 0, results: [] };
-
-      // Group claims by player_id
-      const playerClaims = new Map<number, typeof claims>();
-      claims.forEach(c => {
-        if (!playerClaims.has(c.player_id)) playerClaims.set(c.player_id, []);
-        playerClaims.get(c.player_id)!.push(c);
-      });
-
-      const results: Array<{ player_id: number; winner_team_id: string; bid: number }> = [];
-
-      // Fetch standings for tiebreaker (inverse standings: worst team wins ties)
-      // ESPN/Yahoo/Sleeper standard: equal bids broken by worst record
-      const { data: standingsData } = await supabase
-        .from('teams')
-        .select('id, wins, losses')
-        .eq('league_id', leagueId);
-
-      // Lower win pct = higher priority (inverse standings)
-      const teamStandingsRank = new Map<string, number>();
-      if (standingsData) {
-        const sorted = [...standingsData].sort((a, b) => {
-          const pctA = (a.wins || 0) / Math.max(1, (a.wins || 0) + (a.losses || 0));
-          const pctB = (b.wins || 0) / Math.max(1, (b.wins || 0) + (b.losses || 0));
-          return pctA - pctB; // Worst record first (best tiebreaker position)
-        });
-        sorted.forEach((t, i) => teamStandingsRank.set(t.id, i));
-      }
-
-      // Process each player
-      for (const [playerId, bids] of playerClaims) {
-        // Sort by bid amount desc, then by inverse standings (worst team first) for ties
-        bids.sort((a, b) => {
-          const bidA = a.bid_amount ?? a.priority ?? 0;
-          const bidB = b.bid_amount ?? b.priority ?? 0;
-          const bidDiff = bidB - bidA;
-          if (bidDiff !== 0) return bidDiff;
-          // Tiebreaker: lower standings rank = worse team = wins tie
-          return (teamStandingsRank.get(a.team_id) ?? 999) - (teamStandingsRank.get(b.team_id) ?? 999);
-        });
-
-        // Find first eligible bidder
-        let winner = null;
-        for (const bid of bids) {
-          const bidAmt = bid.bid_amount ?? bid.priority ?? 0;
-          // Verify budget is still sufficient
-          const budget = await this.getFAABBudget(leagueId, bid.team_id);
-          if (budget !== null && budget >= bidAmt) {
-            winner = bid;
-            break;
-          }
-        }
-
-        if (winner) {
-          const bidAmount = winner.bid_amount ?? winner.priority ?? 0;
-
-          // 1. Execute the roster move (add player, optionally drop)
-          try {
-            // Get team owner for the roster move
-            const { data: teamData } = await supabase
-              .from('teams')
-              .select('owner_id')
-              .eq('id', winner.team_id)
-              .single();
-
-            if (teamData?.owner_id) {
-              // Conditional drop logic (matches SQL implementation):
-              // - Non-conditional: always include the drop player
-              // - Conditional: try with drop first; if it fails, retry add-only
-              let moveResult: { success: boolean; error?: string };
-
-              if (winner.is_conditional_drop && winner.drop_player_id) {
-                // Try with drop first (drop player may have been traded away)
-                // skipLimitCheck=true: limits were checked at bid submission time
-                moveResult = await this.addFreeAgent(
-                  leagueId,
-                  winner.team_id,
-                  playerId,
-                  winner.drop_player_id,
-                  teamData.owner_id,
-                  true // skipLimitCheck — waiver processing
-                );
-
-                // If drop failed (player no longer on roster), retry add-only
-                if (!moveResult.success) {
-                  moveResult = await this.addFreeAgent(
-                    leagueId,
-                    winner.team_id,
-                    playerId,
-                    null,
-                    teamData.owner_id,
-                    true // skipLimitCheck — waiver processing
-                  );
-                }
-              } else {
-                // Non-conditional: always include the drop
-                moveResult = await this.addFreeAgent(
-                  leagueId,
-                  winner.team_id,
-                  playerId,
-                  winner.drop_player_id,
-                  teamData.owner_id,
-                  true // skipLimitCheck — waiver processing
-                );
-              }
-
-              if (!moveResult.success) {
-                const reason = winner.is_conditional_drop
-                  ? `Conditional drop failed: ${moveResult.error}`
-                  : `Roster move failed: ${moveResult.error}`;
-
-                await supabase
-                  .from('waiver_claims')
-                  .update({
-                    status: 'failed',
-                    processed_at: new Date().toISOString(),
-                    failure_reason: reason,
-                  })
-                  .eq('id', winner.id);
-
-                // Mark remaining bidders as failed
-                const loserIds = bids.filter(b => b.id !== winner!.id).map(b => b.id);
-                if (loserIds.length > 0) {
-                  await supabase
-                    .from('waiver_claims')
-                    .update({
-                      status: 'failed',
-                      processed_at: new Date().toISOString(),
-                      failure_reason: `Outbid (winning bid: $${bidAmount})`,
-                    })
-                    .in('id', loserIds);
-                }
-                continue;
-              }
-            }
-          } catch (moveErr) {
-            logger.error('[WaiverService] FAAB roster move error:', moveErr);
-          }
-
-          // 2. Deduct FAAB budget from winner
-          const { data: budgetRow } = await supabase
-            .from('faab_budgets')
-            .select('remaining_budget')
-            .eq('league_id', leagueId)
-            .eq('team_id', winner.team_id)
-            .maybeSingle();
-
-          if (budgetRow) {
-            await supabase
-              .from('faab_budgets')
-              .update({
-                remaining_budget: Math.max(0, budgetRow.remaining_budget - bidAmount),
-                updated_at: new Date().toISOString(),
-              })
-              .eq('league_id', leagueId)
-              .eq('team_id', winner.team_id);
-          }
-
-          // 3. Mark winner claim as successful
-          await supabase
-            .from('waiver_claims')
-            .update({ status: 'successful', processed_at: new Date().toISOString() })
-            .eq('id', winner.id);
-
-          // 4. Mark all other bids for this player as failed
-          const loserIds = bids.filter(b => b.id !== winner!.id).map(b => b.id);
-          if (loserIds.length > 0) {
-            await supabase
-              .from('waiver_claims')
-              .update({
-                status: 'failed',
-                processed_at: new Date().toISOString(),
-                failure_reason: `Outbid (winning bid: $${bidAmount})`,
-              })
-              .in('id', loserIds);
-          }
-
-          results.push({
-            player_id: playerId,
-            winner_team_id: winner.team_id,
-            bid: bidAmount,
-          });
-        } else {
-          // No eligible bidder — all bids exceed their team's remaining budget
-          const allIds = bids.map(b => b.id);
-          await supabase
-            .from('waiver_claims')
-            .update({
-              status: 'failed',
-              processed_at: new Date().toISOString(),
-              failure_reason: 'Insufficient FAAB budget',
-            })
-            .in('id', allIds);
-        }
-      }
-
-      return { processed: results.length, results };
+      return data ?? { processed: 0, results: [] };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       logger.error('[WaiverService] processFAABWaivers error:', msg);
       return { processed: 0, results: [], error: msg };
     }
   }
+
   // ============================================================================
   // REVERSE STANDINGS WAIVER SUPPORT
   // ============================================================================
 
   /**
    * Trigger reverse standings priority recalculation.
-   * This is called automatically by the process_waiver_claims RPC for
-   * reverse_standings leagues, but can also be triggered manually.
-   *
-   * Priority is based on actual matchup records — worst team gets priority 1.
-   * All settings are read dynamically from league configuration.
+   * Server calls the database RPC function.
    */
   static async recalculateReverseStandingsPriority(
     leagueId: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await supabase.rpc('recalculate_reverse_standings_priority', {
-        p_league_id: leagueId,
-      });
-
-      if (error) throw error;
-      return { success: true };
+      const { data } = await apiClient.post(`/api/waivers/league/${leagueId}/recalculate-priority`);
+      return data ?? { success: true };
     } catch (error: unknown) {
       logger.error('[WaiverService] recalculateReverseStandingsPriority error:', error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -1278,67 +492,16 @@ export class WaiverService {
 
   /**
    * Commissioner: update waiver settings for the league.
-   * Sends notification to league members when settings change.
-   *
-   * All waiver settings are commissioner-configurable:
-   *   - waiver_type: 'rolling' | 'faab' | 'reverse_standings'
-   *   - waiver_process_time: When waivers process (time of day)
-   *   - waiver_period_hours: How long players are on waivers
-   *   - waiver_game_lock: Lock players during active games
-   *   - allow_trades_during_games: Bypass game lock for trades
+   * Server handles commissioner verification, notification, and reverse standings recalculation.
    */
   static async updateWaiverSettings(
     leagueId: string,
-    commissionerId: string,
+    _commissionerId: string,
     settings: Partial<LeagueWaiverSettings>
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      // CRITICAL: Use centralized commissioner check (not manual comparison)
-      await LeagueMembershipService.requireCommissioner(leagueId, commissionerId);
-
-      const { error } = await supabase
-        .from('leagues')
-        .update(settings)
-        .eq('id', leagueId);
-
-      if (error) throw error;
-
-      // Notify league members about the change
-      const typeLabels: Record<string, string> = {
-        rolling: 'Rolling Priority',
-        faab: 'FAAB Bidding',
-        reverse_standings: 'Reverse Standings',
-      };
-
-      const changedFields = Object.entries(settings)
-        .map(([k, v]) => {
-          if (k === 'waiver_type') return `Waiver type: ${typeLabels[v as string] || v}`;
-          if (k === 'waiver_period_hours') return `Waiver period: ${v} hours`;
-          if (k === 'waiver_game_lock') return `Game lock: ${v ? 'enabled' : 'disabled'}`;
-          if (k === 'allow_trades_during_games') return `Trades during games: ${v ? 'allowed' : 'blocked'}`;
-          return null;
-        })
-        .filter(Boolean);
-
-      if (changedFields.length > 0) {
-        try {
-          await supabase.rpc('notify_league_members', {
-            p_league_id: leagueId,
-            p_title: 'Waiver Settings Updated',
-            p_message: changedFields.join('. '),
-            p_notification_type: 'SYSTEM',
-          });
-        } catch {
-          // Non-critical
-        }
-      }
-
-      // If switching to reverse_standings, recalculate priority immediately
-      if (settings.waiver_type === 'reverse_standings') {
-        await this.recalculateReverseStandingsPriority(leagueId);
-      }
-
-      return { success: true };
+      const { data } = await apiClient.put(`/api/waivers/league/${leagueId}/settings`, settings);
+      return data ?? { success: true };
     } catch (error: unknown) {
       logger.error('[WaiverService] updateWaiverSettings error:', error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };

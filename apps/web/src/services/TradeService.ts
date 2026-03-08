@@ -1,9 +1,6 @@
-import { supabase } from '@/integrations/supabase/client';
-import { PlayerService } from './PlayerService';
-import { LeagueMembershipService } from './LeagueMembershipService';
-import { AuditService } from './AuditService';
-import { COLUMNS } from '@/utils/queryColumns';
-import type { LeagueSettings } from '@/types/leagueTypes';
+import { tradeApi } from '@/api/trades';
+import { accountApi } from '@/api/account';
+import { apiClient } from '@/api/client';
 import { logger } from '@/utils/logger';
 
 export interface TradeOffer {
@@ -28,13 +25,6 @@ interface TradePlayerSummary {
   team_abbrev: string;
 }
 
-interface TeamLineup {
-  starters: string[];
-  bench: string[];
-  ir: string[];
-  slot_assignments: Record<string, string>;
-}
-
 export interface TradeOfferWithPlayers extends TradeOffer {
   from_team_name: string;
   to_team_name: string;
@@ -53,418 +43,99 @@ export class TradeService {
     offeredPlayerIds: number[],
     requestedPlayerIds: number[],
     message?: string,
-    userId?: string
+    _userId?: string
   ): Promise<{ success: boolean; error?: string; tradeId?: string }> {
     try {
-      // Verify auth — the current user must own the from_team
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      const effectiveUserId = userId || authUser?.id;
-      if (!effectiveUserId) {
-        return { success: false, error: 'Authentication required to create a trade offer.' };
-      }
-
-      const { data: fromTeam } = await supabase
-        .from('teams')
-        .select('owner_id')
-        .eq('id', fromTeamId)
-        .eq('league_id', leagueId)
-        .single();
-
-      if (!fromTeam || fromTeam.owner_id !== effectiveUserId) {
-        return { success: false, error: 'You can only propose trades from your own team.' };
-      }
-
-      // Best Ball leagues prohibit trades (industry standard: zero management after draft)
-      // Also fetch settings for dynamic trade expiration (commissioner-configurable)
-      const { data: league, error: leagueErr } = await supabase
-        .from('leagues')
-        .select('settings')
-        .eq('id', leagueId)
-        .single();
-
-      if (leagueErr || !league) {
-        return { success: false, error: 'League not found.' };
-      }
-
-      if ((league.settings as LeagueSettings)?.bestBallEnabled) {
-        return { success: false, error: 'Trades are not allowed in Best Ball leagues.' };
-      }
-
-      // Check trade deadline (also enforced by DB trigger, but give a friendly message)
-      const tradeDeadlineWeek = (league.settings as LeagueSettings)?.tradeDeadlineWeek ?? 0;
-      if (tradeDeadlineWeek > 0) {
-        const { data: latestMatchup } = await supabase
-          .from('matchups')
-          .select('week_number')
-          .eq('league_id', leagueId)
-          .in('status', ['in_progress', 'completed'])
-          .order('week_number', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        const currentWeek = latestMatchup?.week_number ?? 0;
-        if (currentWeek >= tradeDeadlineWeek) {
-          return { success: false, error: `The trade deadline has passed (Week ${tradeDeadlineWeek}). No new trades allowed.` };
-        }
-      }
-
-      // Trade expiration: read from league settings (commissioner-configurable), default 7 days
-      const tradeExpirationDays = (league?.settings as LeagueSettings)?.tradeExpirationDays ?? 7;
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + tradeExpirationDays);
-
-      const { data, error } = await supabase
-        .from('trade_offers')
-        .insert({
-          league_id: leagueId,
-          from_team_id: fromTeamId,
-          to_team_id: toTeamId,
-          offered_player_ids: offeredPlayerIds,
-          requested_player_ids: requestedPlayerIds,
-          status: 'pending',
-          message: message || null,
-          expires_at: expiresAt.toISOString()
-        })
-        .select()
-        .single();
-
-      if (error) {
-        return {
-          success: false,
-          error: error.message
-        };
-      }
-
-      AuditService.log('TRADE_OFFER', leagueId, {
-        tradeId: data.id, fromTeamId, toTeamId,
-        offeredPlayerIds, requestedPlayerIds
+      const result = await tradeApi.createTradeOffer(leagueId, {
+        fromTeamId,
+        toTeamId,
+        offeredPlayerIds: offeredPlayerIds.map(String),
+        requestedPlayerIds: requestedPlayerIds.map(String),
+        message,
       });
 
-      return {
-        success: true,
-        tradeId: data.id
-      };
+      if (result.error) {
+        return { success: false, error: result.error };
+      }
+
+      const tradeId = result.data?.id || result.data?.tradeId;
+
+      accountApi.logSecurityEvent('TRADE_OFFER', leagueId, {
+        tradeId, fromTeamId, toTeamId,
+        offeredPlayerIds, requestedPlayerIds,
+      }).catch(() => { /* non-critical */ });
+
+      return { success: true, tradeId };
     } catch (error: unknown) {
       logger.error('Error creating trade offer:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       };
     }
   }
 
   /**
-   * Accept a trade offer - validates that the accepting user owns the to_team
+   * Accept a trade offer — server handles ownership validation, roster checks,
+   * review routing, trade execution (RPC), and lineup updates.
    */
-  static async acceptTradeOffer(tradeId: string, userId?: string): Promise<{ success: boolean; error?: string }> {
+  static async acceptTradeOffer(tradeId: string, _userId?: string): Promise<{ success: boolean; error?: string }> {
     try {
-      // Resolve userId — require authentication
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      const effectiveUserId = userId || authUser?.id;
-      if (!effectiveUserId) {
-        return { success: false, error: 'Authentication required to accept a trade.' };
+      const result = await tradeApi.acceptTrade(tradeId);
+
+      if (result.error) {
+        return { success: false, error: result.error };
       }
 
-      // Get the trade offer details
-      const { data: trade, error: fetchError } = await supabase
-        .from('trade_offers')
-        .select(COLUMNS.TRADE)
-        .eq('id', tradeId)
-        .eq('status', 'pending')
-        .single();
+      accountApi.logSecurityEvent('TRADE_ACCEPT', null, { tradeId }).catch(() => { /* non-critical */ });
 
-      if (fetchError || !trade) {
-        return {
-          success: false,
-          error: 'Trade offer not found or no longer pending'
-        };
+      // Server may return a message for review-routed trades
+      if (result.data?.message) {
+        return { success: true, error: result.data.message };
       }
-
-      // Validate that the accepting user owns the to_team (always enforced)
-      const { data: toTeam } = await supabase
-        .from('teams')
-        .select('owner_id')
-        .eq('id', trade.to_team_id)
-        .eq('league_id', trade.league_id)
-        .single();
-
-      if (!toTeam || toTeam.owner_id !== effectiveUserId) {
-        return {
-          success: false,
-          error: 'You can only accept trades sent to your team'
-        };
-      }
-
-      // Validate roster size: ensure neither team exceeds the limit after trade
-      const { data: league } = await supabase
-        .from('leagues')
-        .select('trade_review_type, trade_review_period_hours, roster_size')
-        .eq('id', trade.league_id)
-        .single();
-
-      if (league?.roster_size) {
-        const maxRoster = league.roster_size;
-        const offeredCount = (trade.offered_player_ids || []).length;
-        const requestedCount = (trade.requested_player_ids || []).length;
-
-        // Check both teams' current roster sizes
-        const [{ count: fromCount }, { count: toCount }] = await Promise.all([
-          supabase.from('roster_assignments').select(COLUMNS.COUNT, { count: 'exact', head: true })
-            .eq('league_id', trade.league_id).eq('team_id', trade.from_team_id),
-          supabase.from('roster_assignments').select(COLUMNS.COUNT, { count: 'exact', head: true })
-            .eq('league_id', trade.league_id).eq('team_id', trade.to_team_id),
-        ]);
-
-        const fromAfter = (fromCount || 0) - offeredCount + requestedCount;
-        const toAfter = (toCount || 0) - requestedCount + offeredCount;
-
-        if (fromAfter > maxRoster) {
-          return { success: false, error: `Trade would put the proposing team over the ${maxRoster}-player roster limit.` };
-        }
-        if (toAfter > maxRoster) {
-          return { success: false, error: `Trade would put your team over the ${maxRoster}-player roster limit.` };
-        }
-      }
-
-      const reviewType = league?.trade_review_type || 'none';
-
-      if (reviewType !== 'none') {
-        // Route through review process instead of immediate execution
-        const reviewResult = await this.submitTradeForReview(tradeId, trade.league_id);
-        if (!reviewResult.success) {
-          return { success: false, error: reviewResult.error };
-        }
-        return {
-          success: true,
-          error: reviewType === 'commissioner'
-            ? 'Trade accepted — awaiting commissioner approval.'
-            : `Trade accepted — under league review for ${league?.trade_review_period_hours || 48} hours.`
-        };
-      }
-
-      // No review required — execute immediately
-      // Update trade status to accepted
-      const { error: updateError } = await supabase
-        .from('trade_offers')
-        .update({
-          status: 'accepted',
-          processed_at: new Date().toISOString()
-        })
-        .eq('id', tradeId);
-
-      if (updateError) {
-        return {
-          success: false,
-          error: updateError.message
-        };
-      }
-
-      // ===== EXECUTE THE TRADE (Atomic RPC) =====
-      // Uses execute_trade RPC for full transactional safety:
-      // - Validates player ownership before moving
-      // - Rolls back ALL changes if any step fails
-      // - Logs to transaction_ledger and trade_history inside the transaction
-      const { data: tradeResult, error: tradeRpcError } = await supabase.rpc('execute_trade', {
-        p_trade_id: trade.id,
-        p_league_id: trade.league_id,
-        p_from_team_id: trade.from_team_id,
-        p_to_team_id: trade.to_team_id,
-        p_offered_player_ids: trade.offered_player_ids.map(String),
-        p_requested_player_ids: trade.requested_player_ids.map(String),
-      });
-
-      if (tradeRpcError) {
-        logger.error('[TradeService] execute_trade RPC error:', tradeRpcError);
-        // Rollback trade status since roster changes didn't happen
-        await supabase.from('trade_offers').update({ status: 'pending', processed_at: null }).eq('id', trade.id);
-        return { success: false, error: `Trade execution failed: ${tradeRpcError.message}` };
-      }
-
-      const rpcResult = tradeResult as { success: boolean; error?: string } | null;
-      if (rpcResult && !rpcResult.success) {
-        // Rollback trade status since roster changes didn't happen
-        await supabase.from('trade_offers').update({ status: 'pending', processed_at: null }).eq('id', trade.id);
-        return { success: false, error: rpcResult.error || 'Trade execution failed' };
-      }
-
-      // Update team_lineups display layer (bench new acquisitions)
-      // This is best-effort — roster_assignments is already correct from the RPC
-      try {
-        const [{ data: fromTeamLineup }, { data: toTeamLineup }] = await Promise.all([
-          supabase.from('team_lineups').select('starters, bench, ir, slot_assignments')
-            .eq('league_id', trade.league_id).eq('team_id', trade.from_team_id).single(),
-          supabase.from('team_lineups').select('starters, bench, ir, slot_assignments')
-            .eq('league_id', trade.league_id).eq('team_id', trade.to_team_id).single(),
-        ]);
-
-        if (fromTeamLineup && toTeamLineup) {
-          const removePlayers = (lineup: TeamLineup, playerIds: number[]): TeamLineup => {
-            const playerIdStrs = playerIds.map(id => id.toString());
-            return {
-              starters: (lineup.starters || []).filter((id: string) => !playerIdStrs.includes(id)),
-              bench: (lineup.bench || []).filter((id: string) => !playerIdStrs.includes(id)),
-              ir: (lineup.ir || []).filter((id: string) => !playerIdStrs.includes(id)),
-              slot_assignments: Object.fromEntries(
-                Object.entries(lineup.slot_assignments || {}).filter(([key]) => !playerIdStrs.includes(key))
-              )
-            };
-          };
-
-          const addPlayersToBench = (lineup: TeamLineup, playerIds: number[]): TeamLineup => {
-            const newBench = [...(lineup.bench || []), ...playerIds.map(id => id.toString())];
-            return { ...lineup, bench: newBench };
-          };
-
-          let newFromTeamLineup = removePlayers(fromTeamLineup, trade.offered_player_ids);
-          newFromTeamLineup = addPlayersToBench(newFromTeamLineup, trade.requested_player_ids);
-
-          let newToTeamLineup = removePlayers(toTeamLineup, trade.requested_player_ids);
-          newToTeamLineup = addPlayersToBench(newToTeamLineup, trade.offered_player_ids);
-
-          await Promise.all([
-            supabase.from('team_lineups').update({
-              starters: newFromTeamLineup.starters, bench: newFromTeamLineup.bench,
-              ir: newFromTeamLineup.ir, slot_assignments: newFromTeamLineup.slot_assignments,
-              updated_at: new Date().toISOString()
-            }).eq('league_id', trade.league_id).eq('team_id', trade.from_team_id),
-            supabase.from('team_lineups').update({
-              starters: newToTeamLineup.starters, bench: newToTeamLineup.bench,
-              ir: newToTeamLineup.ir, slot_assignments: newToTeamLineup.slot_assignments,
-              updated_at: new Date().toISOString()
-            }).eq('league_id', trade.league_id).eq('team_id', trade.to_team_id),
-          ]);
-        }
-      } catch (lineupErr) {
-        // Best-effort — roster_assignments (source of truth) is already correct
-        logger.error('[TradeService] team_lineups update failed (non-critical):', lineupErr);
-      }
-
-      AuditService.log('TRADE_ACCEPT', trade.league_id, {
-        tradeId, fromTeamId: trade.from_team_id, toTeamId: trade.to_team_id,
-        offeredPlayerIds: trade.offered_player_ids, requestedPlayerIds: trade.requested_player_ids
-      });
 
       return { success: true };
     } catch (error: unknown) {
       logger.error('Error accepting trade:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       };
     }
   }
 
   /**
-   * Reject a trade offer - validates that the rejecting user owns the to_team
+   * Reject a trade offer — server validates ownership
    */
-  static async rejectTradeOffer(tradeId: string, userId?: string): Promise<{ success: boolean; error?: string }> {
+  static async rejectTradeOffer(tradeId: string, _userId?: string): Promise<{ success: boolean; error?: string }> {
     try {
-      // Resolve userId — require authentication
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      const effectiveUserId = userId || authUser?.id;
-      if (!effectiveUserId) {
-        return { success: false, error: 'Authentication required to reject a trade.' };
+      const result = await tradeApi.rejectTrade(tradeId);
+
+      if (result.error) {
+        return { success: false, error: result.error };
       }
 
-      // Always validate ownership
-      const { data: trade } = await supabase
-        .from('trade_offers')
-        .select('to_team_id, league_id')
-        .eq('id', tradeId)
-        .eq('status', 'pending')
-        .single();
-
-      if (!trade) {
-        return { success: false, error: 'Trade offer not found or no longer pending' };
-      }
-
-      const { data: toTeam } = await supabase
-        .from('teams')
-        .select('owner_id')
-        .eq('id', trade.to_team_id)
-        .eq('league_id', trade.league_id)
-        .single();
-
-      if (!toTeam || toTeam.owner_id !== effectiveUserId) {
-        return { success: false, error: 'You can only reject trades sent to your team' };
-      }
-
-      const { error } = await supabase
-        .from('trade_offers')
-        .update({
-          status: 'rejected',
-          processed_at: new Date().toISOString()
-        })
-        .eq('id', tradeId)
-        .eq('status', 'pending');
-
-      if (error) {
-        return {
-          success: false,
-          error: error.message
-        };
-      }
-
-      AuditService.log('TRADE_REJECT', trade.league_id, { tradeId });
+      accountApi.logSecurityEvent('TRADE_REJECT', null, { tradeId }).catch(() => { /* non-critical */ });
 
       return { success: true };
     } catch (error: unknown) {
       logger.error('Error rejecting trade:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       };
     }
   }
 
   /**
-   * Cancel a trade offer (by the proposer) - validates that the canceller owns the from_team
+   * Cancel a trade offer (by the proposer) — server validates ownership
    */
-  static async cancelTradeOffer(tradeId: string, userId?: string): Promise<{ success: boolean; error?: string }> {
+  static async cancelTradeOffer(tradeId: string, _userId?: string): Promise<{ success: boolean; error?: string }> {
     try {
-      // Resolve userId — require authentication
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      const effectiveUserId = userId || authUser?.id;
-      if (!effectiveUserId) {
-        return { success: false, error: 'Authentication required to cancel a trade.' };
-      }
+      const result = await tradeApi.cancelTrade(tradeId);
 
-      // Always validate ownership
-      const { data: trade } = await supabase
-        .from('trade_offers')
-        .select('from_team_id, league_id')
-        .eq('id', tradeId)
-        .eq('status', 'pending')
-        .single();
-
-      if (!trade) {
-        return { success: false, error: 'Trade offer not found or no longer pending' };
-      }
-
-      const { data: fromTeam } = await supabase
-        .from('teams')
-        .select('owner_id')
-        .eq('id', trade.from_team_id)
-        .eq('league_id', trade.league_id)
-        .single();
-
-      if (!fromTeam || fromTeam.owner_id !== effectiveUserId) {
-        return { success: false, error: 'You can only cancel trades you proposed' };
-      }
-
-      const { error } = await supabase
-        .from('trade_offers')
-        .update({
-          status: 'cancelled',
-          processed_at: new Date().toISOString()
-        })
-        .eq('id', tradeId)
-        .eq('status', 'pending');
-
-      if (error) {
-        return {
-          success: false,
-          error: error.message
-        };
+      if (result.error) {
+        return { success: false, error: result.error };
       }
 
       return { success: true };
@@ -472,79 +143,34 @@ export class TradeService {
       logger.error('Error cancelling trade:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       };
     }
   }
 
   /**
-   * Get trade offers for a team (both sent and received)
-   * REQUIRES: Caller must be a member of the league
+   * Get trade offers for a team (both sent and received).
+   * Server handles membership checks. Filters client-side by teamId.
    */
   static async getTeamTradeOffers(
     leagueId: string,
     teamId: string,
-    userId?: string
+    _userId?: string
   ): Promise<TradeOfferWithPlayers[]> {
     try {
-      // Resolve userId — require authentication and league membership
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      const effectiveUserId = userId || authUser?.id;
-      if (!effectiveUserId) {
-        logger.error('[TradeService] getTeamTradeOffers called without authentication');
+      const result = await tradeApi.getLeagueTrades(leagueId);
+
+      if (result.error || !result.data) {
+        logger.error('[TradeService] getTeamTradeOffers error:', result.error);
         return [];
       }
-      await LeagueMembershipService.requireMembership(leagueId, effectiveUserId);
 
-      const { data: trades, error } = await supabase
-        .from('trade_offers')
-        .select(`
-          *,
-          from_team:teams!from_team_id(team_name),
-          to_team:teams!to_team_id(team_name)
-        `)
-        .eq('league_id', leagueId)
-        .or(`from_team_id.eq.${teamId},to_team_id.eq.${teamId}`)
-        .order('created_at', { ascending: false });
+      const trades = result.data as TradeOfferWithPlayers[];
 
-      if (error) {
-        throw error;
-      }
-
-      // Fetch player details for each trade using PlayerService
-      const tradesWithPlayers = await Promise.all(
-        (trades || []).map(async (trade) => {
-          // Get offered players using PlayerService
-          const offeredPlayerIds = (trade.offered_player_ids || []).map(String);
-          const offeredPlayersRaw = await PlayerService.getPlayersByIds(offeredPlayerIds);
-          const offeredPlayers = offeredPlayersRaw.map(p => ({
-            player_id: Number(p.id),
-            full_name: p.full_name,
-            position_code: p.position,
-            team_abbrev: p.team
-          }));
-
-          // Get requested players using PlayerService
-          const requestedPlayerIds = (trade.requested_player_ids || []).map(String);
-          const requestedPlayersRaw = await PlayerService.getPlayersByIds(requestedPlayerIds);
-          const requestedPlayers = requestedPlayersRaw.map(p => ({
-            player_id: Number(p.id),
-            full_name: p.full_name,
-            position_code: p.position,
-            team_abbrev: p.team
-          }));
-
-          return {
-            ...trade,
-            from_team_name: (trade.from_team as { team_name: string }).team_name,
-            to_team_name: (trade.to_team as { team_name: string }).team_name,
-            offered_players: offeredPlayers,
-            requested_players: requestedPlayers
-          };
-        })
+      // Filter to trades involving this team
+      return trades.filter(
+        (t) => t.from_team_id === teamId || t.to_team_id === teamId
       );
-
-      return tradesWithPlayers;
     } catch (error) {
       logger.error('Error fetching trade offers:', error);
       return [];
@@ -552,104 +178,51 @@ export class TradeService {
   }
 
   /**
-   * Get league trade history
-   * REQUIRES: Caller must be a member of the league
+   * Get league trade history.
+   * Server handles membership checks.
    */
-  static async getLeagueTradeHistory(leagueId: string, userId?: string): Promise<Record<string, unknown>[]> {
+  static async getLeagueTradeHistory(leagueId: string, _userId?: string): Promise<Record<string, unknown>[]> {
     try {
-      // Resolve userId — require authentication and league membership
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      const effectiveUserId = userId || authUser?.id;
-      if (!effectiveUserId) {
-        logger.error('[TradeService] getLeagueTradeHistory called without authentication');
+      const result = await tradeApi.getLeagueTrades(leagueId);
+
+      if (result.error || !result.data) {
+        logger.error('[TradeService] getLeagueTradeHistory error:', result.error);
         return [];
       }
-      await LeagueMembershipService.requireMembership(leagueId, effectiveUserId);
 
-      const { data, error } = await supabase
-        .from('trade_history')
-        .select(`
-          *,
-          team1:teams!team1_id(team_name),
-          team2:teams!team2_id(team_name)
-        `)
-        .eq('league_id', leagueId)
-        .order('executed_at', { ascending: false })
-        .limit(20);
-
-      if (error) {
-        throw error;
-      }
-
-      return data || [];
+      return result.data as Record<string, unknown>[];
     } catch (error) {
       logger.error('Error fetching trade history:', error);
       return [];
     }
   }
+
   // ============================================================================
   // TRADE VETO / VOTING SYSTEM
   // ============================================================================
 
   /**
    * Submit a trade to the league review process.
-   * Based on the league's trade_review_type setting (commissioner-configured):
-   *   - 'none': Trade executes immediately (default)
-   *   - 'commissioner': Commissioner must approve
-   *   - 'league_vote': League members vote, majority can veto
-   *
-   * The review period (hours) and veto threshold (fraction) are both
-   * commissioner-configurable in league settings.
+   * Now handled server-side during accept — this is a no-op thin wrapper
+   * kept for backward compatibility.
    */
   static async submitTradeForReview(
     tradeId: string,
-    leagueId: string
+    _leagueId: string
   ): Promise<{ success: boolean; reviewType: string; error?: string }> {
+    // The server handles review routing during acceptTrade.
+    // This method is retained for any callers that invoke it directly.
     try {
-      // Get league review settings (commissioner-configured)
-      const { data: league } = await supabase
-        .from('leagues')
-        .select('trade_review_type, trade_review_period_hours')
-        .eq('id', leagueId)
-        .single();
+      const result = await tradeApi.acceptTrade(tradeId);
 
-      const reviewType = league?.trade_review_type || 'none';
-
-      if (reviewType === 'none') {
-        return { success: true, reviewType: 'none' };
+      if (result.error) {
+        return { success: false, reviewType: 'unknown', error: result.error };
       }
 
-      // Set trade to under_review with dynamic review period from league settings
-      const reviewPeriodHours = league?.trade_review_period_hours || 48;
-      const reviewEndsAt = new Date();
-      reviewEndsAt.setHours(reviewEndsAt.getHours() + reviewPeriodHours);
-
-      const { error } = await supabase
-        .from('trade_offers')
-        .update({
-          status: 'under_review',
-          review_started_at: new Date().toISOString(),
-          review_ends_at: reviewEndsAt.toISOString(),
-        })
-        .eq('id', tradeId);
-
-      if (error) {
-        return { success: false, reviewType, error: error.message };
-      }
-
-      // Notify league members about the pending trade review
-      try {
-        await supabase.rpc('notify_league_members', {
-          p_league_id: leagueId,
-          p_title: 'Trade Under Review',
-          p_message: `A trade has been submitted for league review. ${reviewType === 'commissioner' ? 'The commissioner will review.' : `League vote open for ${reviewPeriodHours} hours.`}`,
-          p_notification_type: 'SYSTEM',
-        });
-      } catch {
-        // Non-critical
-      }
-
-      return { success: true, reviewType };
+      return {
+        success: true,
+        reviewType: result.data?.reviewType || 'none',
+      };
     } catch (error: unknown) {
       logger.error('Error submitting trade for review:', error);
       return {
@@ -662,10 +235,6 @@ export class TradeService {
 
   /**
    * Submit a vote on a trade under review.
-   * Only eligible for league_vote review type.
-   * Cannot vote on your own trade.
-   *
-   * Veto threshold is commissioner-configurable (default: 50% majority).
    */
   static async submitTradeVote(
     tradeOfferId: string,
@@ -680,22 +249,30 @@ export class TradeService {
     error?: string;
   }> {
     try {
-      const { data, error } = await supabase.rpc('submit_trade_vote', {
-        p_trade_offer_id: tradeOfferId,
-        p_voter_team_id: voterTeamId,
-        p_vote: vote,
+      const result = await tradeApi.submitVote(tradeOfferId, {
+        voterTeamId,
+        vote,
       });
 
-      if (error) throw error;
+      if (result.error) {
+        return {
+          success: false,
+          vetoCount: 0,
+          approveCount: 0,
+          votesNeeded: 0,
+          isVetoed: false,
+          error: result.error,
+        };
+      }
 
-      const result = data?.[0] || data;
+      const data = result.data || {};
       return {
-        success: result?.success ?? false,
-        vetoCount: result?.veto_count ?? 0,
-        approveCount: result?.approve_count ?? 0,
-        votesNeeded: result?.votes_needed ?? 0,
-        isVetoed: result?.is_vetoed ?? false,
-        error: result?.success ? undefined : (result?.message || 'Unknown error'),
+        success: data.success ?? true,
+        vetoCount: data.vetoCount ?? data.veto_count ?? 0,
+        approveCount: data.approveCount ?? data.approve_count ?? 0,
+        votesNeeded: data.votesNeeded ?? data.votes_needed ?? 0,
+        isVetoed: data.isVetoed ?? data.is_vetoed ?? false,
+        error: data.success === false ? (data.message || 'Unknown error') : undefined,
       };
     } catch (error: unknown) {
       logger.error('Error submitting trade vote:', error);
@@ -712,9 +289,6 @@ export class TradeService {
 
   /**
    * Get all votes for a specific trade.
-   * NOTE: RLS on trade_votes table ensures users can only see votes for
-   * trades in leagues they belong to. No additional membership check needed
-   * since Supabase client carries the authenticated user's JWT.
    */
   static async getTradeVotes(
     tradeOfferId: string
@@ -723,21 +297,19 @@ export class TradeService {
     error?: string;
   }> {
     try {
-      const { data, error } = await supabase
-        .from('trade_votes')
-        .select('voter_team_id, vote, created_at')
-        .eq('trade_offer_id', tradeOfferId)
-        .order('created_at', { ascending: true });
+      const result = await tradeApi.getVotes(tradeOfferId);
 
-      if (error) throw error;
+      if (result.error) {
+        return { votes: [], error: result.error };
+      }
 
-      return {
-        votes: (data || []).map((v: { voter_team_id: string; vote: 'approve' | 'veto'; created_at: string }) => ({
-          voterTeamId: v.voter_team_id,
-          vote: v.vote,
-          createdAt: v.created_at,
-        })),
-      };
+      const votes = (result.data || []).map((v: { voter_team_id?: string; voterTeamId?: string; vote: 'approve' | 'veto'; created_at?: string; createdAt?: string }) => ({
+        voterTeamId: v.voterTeamId || v.voter_team_id || '',
+        vote: v.vote,
+        createdAt: v.createdAt || v.created_at || '',
+      }));
+
+      return { votes };
     } catch (error: unknown) {
       logger.error('Error fetching trade votes:', error);
       return { votes: [], error: error instanceof Error ? error.message : String(error) };
@@ -746,67 +318,24 @@ export class TradeService {
 
   /**
    * Commissioner: approve or veto a trade directly.
-   * Only works for 'commissioner' review type trades.
    */
   static async commissionerDecision(
     tradeId: string,
     leagueId: string,
     decision: 'approve' | 'veto',
-    commissionerId: string
+    _commissionerId: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      // CRITICAL: Use centralized commissioner check (not manual comparison)
-      await LeagueMembershipService.requireCommissioner(leagueId, commissionerId);
+      const result = await tradeApi.commissionerDecision(tradeId, {
+        leagueId,
+        decision,
+      });
 
-      const { data: league } = await supabase
-        .from('leagues')
-        .select('trade_review_type')
-        .eq('id', leagueId)
-        .single();
-
-      if (!league) {
-        return { success: false, error: 'League not found' };
+      if (result.error) {
+        return { success: false, error: result.error };
       }
 
-      if (league.trade_review_type !== 'commissioner') {
-        return { success: false, error: 'League is not configured for commissioner review' };
-      }
-
-      if (decision === 'approve') {
-        const { error } = await supabase
-          .from('trade_offers')
-          .update({ status: 'accepted', processed_at: new Date().toISOString() })
-          .eq('id', tradeId)
-          .eq('status', 'under_review');
-
-        if (error) return { success: false, error: error.message };
-        return await this.acceptTradeOffer(tradeId);
-      } else {
-        const { error } = await supabase
-          .from('trade_offers')
-          .update({
-            status: 'vetoed',
-            vetoed_at: new Date().toISOString(),
-            processed_at: new Date().toISOString(),
-          })
-          .eq('id', tradeId)
-          .eq('status', 'under_review');
-
-        if (error) return { success: false, error: error.message };
-
-        try {
-          await supabase.rpc('notify_league_members', {
-            p_league_id: leagueId,
-            p_title: 'Trade Vetoed',
-            p_message: 'A trade has been vetoed by the commissioner.',
-            p_notification_type: 'SYSTEM',
-          });
-        } catch {
-          // Non-critical
-        }
-
-        return { success: true };
-      }
+      return { success: true };
     } catch (error: unknown) {
       logger.error('Error on commissioner decision:', error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -825,18 +354,22 @@ export class TradeService {
     error?: string;
   }> {
     try {
-      const { data, error } = await supabase
-        .from('leagues')
-        .select('trade_review_type, trade_review_period_hours, trade_veto_threshold')
-        .eq('id', leagueId)
-        .single();
+      const result = await tradeApi.getReviewSettings(leagueId);
 
-      if (error) throw error;
+      if (result.error) {
+        return {
+          reviewType: 'none',
+          reviewPeriodHours: 48,
+          vetoThreshold: 0.5,
+          error: result.error,
+        };
+      }
 
+      const data = result.data || {};
       return {
-        reviewType: data?.trade_review_type || 'none',
-        reviewPeriodHours: data?.trade_review_period_hours || 48,
-        vetoThreshold: data?.trade_veto_threshold || 0.5,
+        reviewType: data.reviewType ?? data.trade_review_type ?? 'none',
+        reviewPeriodHours: data.reviewPeriodHours ?? data.trade_review_period_hours ?? 48,
+        vetoThreshold: data.vetoThreshold ?? data.trade_veto_threshold ?? 0.5,
       };
     } catch (error: unknown) {
       return {
@@ -850,11 +383,10 @@ export class TradeService {
 
   /**
    * Commissioner: update trade review settings for the league.
-   * Sends notification to all league members about the settings change.
    */
   static async updateTradeReviewSettings(
     leagueId: string,
-    commissionerId: string,
+    _commissionerId: string,
     settings: {
       trade_review_type: 'none' | 'commissioner' | 'league_vote';
       trade_review_period_hours: number;
@@ -862,36 +394,10 @@ export class TradeService {
     }
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      // CRITICAL: Use centralized commissioner check (not manual comparison)
-      await LeagueMembershipService.requireCommissioner(leagueId, commissionerId);
+      const result = await apiClient.put(`/api/trades/league/${leagueId}/review-settings`, settings);
 
-      const { error } = await supabase
-        .from('leagues')
-        .update({
-          trade_review_type: settings.trade_review_type,
-          trade_review_period_hours: settings.trade_review_period_hours,
-          trade_veto_threshold: settings.trade_veto_threshold,
-        })
-        .eq('id', leagueId);
-
-      if (error) throw error;
-
-      // Notify league about the settings change
-      const reviewLabels: Record<string, string> = {
-        none: 'Instant (no review)',
-        commissioner: 'Commissioner review',
-        league_vote: `League vote (${Math.round(settings.trade_veto_threshold * 100)}% to veto, ${settings.trade_review_period_hours}h window)`,
-      };
-
-      try {
-        await supabase.rpc('notify_league_members', {
-          p_league_id: leagueId,
-          p_title: 'Trade Review Settings Updated',
-          p_message: `Trade review changed to: ${reviewLabels[settings.trade_review_type] || settings.trade_review_type}`,
-          p_notification_type: 'SYSTEM',
-        });
-      } catch {
-        // Non-critical
+      if (result.error) {
+        return { success: false, error: result.error };
       }
 
       return { success: true };

@@ -315,4 +315,17 @@ draftRoutes.post('/league/:leagueId/rankings', membershipMiddleware, async (c) =
   return ok(c, { success: true });
 });
 
+// DELETE /api/draft/all — Delete ALL draft data across all leagues (admin only)
+draftRoutes.delete('/all', async (c) => {
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new DraftService(supabase);
+
+  try {
+    const result = await service.deleteAllDraftData();
+    return ok(c, { success: true, deletedCounts: result.deletedCounts });
+  } catch (err) {
+    return handleError(c, err, 'Failed to delete all draft data');
+  }
+});
+
 export { draftRoutes };

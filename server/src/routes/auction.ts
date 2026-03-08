@@ -1,0 +1,86 @@
+import { Hono } from 'hono';
+import type { Env } from '../app';
+import { authMiddleware } from '../middleware/auth';
+import { membershipMiddleware } from '../middleware/membership';
+import { createUserClient } from '../lib/supabase';
+import { AuctionService } from '../services/AuctionService';
+import { AppError } from '../lib/errors';
+import { ok, created, fail, handleError } from '../lib/responses';
+
+const auctionRoutes = new Hono<Env>();
+auctionRoutes.use('*', authMiddleware);
+
+// GET /api/auction/league/:leagueId/state/:sessionId
+auctionRoutes.get('/league/:leagueId/state/:sessionId', membershipMiddleware, async (c) => {
+  const { leagueId, sessionId } = c.req.param();
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new AuctionService(supabase);
+  const state = await service.getAuctionState(leagueId, sessionId);
+  return ok(c, state);
+});
+
+// POST /api/auction/league/:leagueId/initialize
+auctionRoutes.post('/league/:leagueId/initialize', membershipMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const body = await c.req.json();
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new AuctionService(supabase);
+  const result = await service.initializeAuction(leagueId, body.sessionId, body.teamIds, body.budget, body.minBid);
+  if (!result.success) return fail(c, AppError.badRequest(result.error || 'Failed to initialize auction'));
+  return ok(c, result);
+});
+
+// POST /api/auction/league/:leagueId/nominate
+auctionRoutes.post('/league/:leagueId/nominate', membershipMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const body = await c.req.json();
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new AuctionService(supabase);
+  const result = await service.nominatePlayer(leagueId, body.sessionId, body.teamId, body.playerId, body.playerName, body.openingBid, body.timerSeconds);
+  if (!result.success) return fail(c, AppError.badRequest(result.error || 'Failed to nominate'));
+  return ok(c, result);
+});
+
+// POST /api/auction/league/:leagueId/bid
+auctionRoutes.post('/league/:leagueId/bid', membershipMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const body = await c.req.json();
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new AuctionService(supabase);
+  const result = await service.placeBid(leagueId, body.nominationId, body.teamId, body.bidAmount);
+  if (!result.success) return fail(c, AppError.badRequest(result.error || 'Failed to place bid'));
+  return ok(c, result);
+});
+
+// POST /api/auction/league/:leagueId/close-nomination
+auctionRoutes.post('/league/:leagueId/close-nomination', membershipMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const body = await c.req.json();
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new AuctionService(supabase);
+  const result = await service.closeNomination(leagueId, body.sessionId, body.nominationId);
+  if (!result.success) return fail(c, AppError.badRequest(result.error || 'Failed to close nomination'));
+  return ok(c, result);
+});
+
+// GET /api/auction/league/:leagueId/budgets
+auctionRoutes.get('/league/:leagueId/budgets', membershipMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new AuctionService(supabase);
+  const result = await service.getAuctionBudgets(leagueId);
+  if (result.error) return handleError(c, result.error, 'Failed to fetch budgets');
+  return ok(c, result.budgets);
+});
+
+// GET /api/auction/bids/:nominationId
+auctionRoutes.get('/bids/:nominationId', async (c) => {
+  const nominationId = c.req.param('nominationId');
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new AuctionService(supabase);
+  const result = await service.getBidHistory(nominationId);
+  if (result.error) return handleError(c, result.error, 'Failed to fetch bids');
+  return ok(c, result.bids);
+});
+
+export { auctionRoutes };

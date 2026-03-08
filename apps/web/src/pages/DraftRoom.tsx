@@ -8,6 +8,7 @@ import { DraftService, DraftPick, DraftState } from '@/services/DraftService';
 import { PlayerService, Player } from '@/services/PlayerService';
 import { AuctionDraftService } from '@/services/AuctionDraftService';
 import { supabase } from '@/integrations/supabase/client';
+import { leagueApi } from '@/api/leagues';
 import { logger } from '@/utils/logger';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import Navbar from '@/components/Navbar';
@@ -518,10 +519,7 @@ const DraftRoom = () => {
             logger.debug('DraftRoom: Draft status is', leagueData.draft_status, 'but no picks or draft order found - treating as not started');
             setDraftHistory([]);
             setDraftedPlayerIds(new Set());
-            await supabase
-              .from('leagues')
-              .update({ draft_status: 'not_started' })
-              .eq('id', leagueId);
+            await leagueApi.updateSettings(leagueId, { draft_status: 'not_started' } as Record<string, unknown>);
             setLeague({ ...leagueData, draft_status: 'not_started' });
           }
         }
@@ -736,11 +734,8 @@ const DraftRoom = () => {
 
         // Reload league to get updated timerStartedAt (set after each pick)
         // This drives the server-timestamp-based timer for all clients
-        const { data: freshLeague } = await supabase
-          .from('leagues')
-          .select('settings, draft_rounds, draft_status')
-          .eq('id', leagueId)
-          .single();
+        const freshLeagueRes = await leagueApi.getLeague(leagueId);
+        const freshLeague = freshLeagueRes.data as League | null;
         if (freshLeague) {
           setLeague(prev => prev ? {
             ...prev,
@@ -795,11 +790,8 @@ const DraftRoom = () => {
         }
 
         // Reload league for timerStartedAt and settings
-        const { data: freshLeague } = await supabase
-          .from('leagues')
-          .select('settings, draft_rounds, draft_status')
-          .eq('id', leagueId)
-          .single();
+        const freshLeagueRes = await leagueApi.getLeague(leagueId);
+        const freshLeague = freshLeagueRes.data as League | null;
 
         if (freshLeague) {
           setLeague(prev => {
@@ -1319,18 +1311,15 @@ const DraftRoom = () => {
 
       // Save timerStartedAt to DB - this is the SERVER TIMESTAMP that ALL clients use
       const timerStartedAt = new Date().toISOString();
-      const { error: updateError } = await supabase
-        .from('leagues')
-        .update({
+      try {
+        await leagueApi.updateSettings(leagueId, {
           settings: {
             ...(league?.settings || {}),
             timerStartedAt
           }
-        })
-        .eq('id', leagueId);
-
-      if (updateError) {
-        logger.error('Error saving timerStartedAt:', updateError);
+        });
+      } catch (updateErr) {
+        logger.error('Error saving timerStartedAt:', updateErr);
         toast({ title: "Error", description: "Failed to start timer. Please try again.", variant: "destructive" });
         return;
       }
@@ -1606,15 +1595,12 @@ const DraftRoom = () => {
 
       // Update timerStartedAt in DB so ALL clients reset their countdown
       const newTimerStartedAt = new Date().toISOString();
-      await supabase
-        .from('leagues')
-        .update({
-          settings: {
-            ...(league?.settings || {}),
-            timerStartedAt: newTimerStartedAt
-          }
-        })
-        .eq('id', leagueId);
+      await leagueApi.updateSettings(leagueId, {
+        settings: {
+          ...(league?.settings || {}),
+          timerStartedAt: newTimerStartedAt
+        }
+      });
 
       // Update local league state
       setLeague(prev => prev ? {
@@ -1871,10 +1857,9 @@ const DraftRoom = () => {
 
       // Publish a fresh timerStartedAt to DB so all clients restart their countdown
       const newTimerStartedAt = new Date().toISOString();
-      await supabase
-        .from('leagues')
-        .update({ settings: { ...(league?.settings || {}), timerStartedAt: newTimerStartedAt } })
-        .eq('id', leagueId);
+      await leagueApi.updateSettings(leagueId, {
+        settings: { ...(league?.settings || {}), timerStartedAt: newTimerStartedAt }
+      });
       setLeague(prev => prev ? {
         ...prev,
         settings: { ...prev.settings, timerStartedAt: newTimerStartedAt }
@@ -1997,17 +1982,7 @@ const DraftRoom = () => {
     if (!leagueId || !isCommissioner) return;
 
     try {
-      const { error: updateError } = await supabase
-        .from('leagues')
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .update({ scheduled_draft_time: scheduledTime } as any)
-        .eq('id', leagueId);
-
-      if (updateError) {
-        logger.error('Error updating scheduled draft time:', updateError);
-        toast({ title: "Error", description: `Failed to schedule draft: ${updateError.message || 'Unknown error'}`, variant: "destructive" });
-        return;
-      }
+      await leagueApi.updateSettings(leagueId, { scheduled_draft_time: scheduledTime } as Record<string, unknown>);
 
       // Update local league state
       if (league) {
@@ -2044,16 +2019,13 @@ const DraftRoom = () => {
 
       // Save pickTimeLimit to league settings for persistence
       if (league) {
-        await supabase
-          .from('leagues')
-          .update({
-            settings: {
-              ...(league.settings || {}),
-              pickTimeLimit: settings.pickTimeLimit,
-              draftOrder: settings.draftOrder
-            }
-          })
-          .eq('id', leagueId);
+        await leagueApi.updateSettings(leagueId, {
+          settings: {
+            ...(league.settings || {}),
+            pickTimeLimit: settings.pickTimeLimit,
+            draftOrder: settings.draftOrder
+          }
+        });
       }
 
       // Initialize draft order
@@ -2102,13 +2074,10 @@ const DraftRoom = () => {
       }
 
       // Set league status to 'queued' (ready to start)
-      const { error: leagueStatusError } = await supabase
-        .from('leagues')
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .update({ draft_status: 'queued' as any })
-        .eq('id', leagueId);
-      
-      if (leagueStatusError) {
+      try {
+        await leagueApi.updateSettings(leagueId, { draft_status: 'queued' } as Record<string, unknown>);
+      } catch (leagueStatusErr) {
+        const leagueStatusError = leagueStatusErr instanceof Error ? leagueStatusErr : new Error('Unknown error');
         logger.error('Error updating league status to queued:', leagueStatusError);
         toast({ title: "Error", description: `Failed to queue draft: ${leagueStatusError.message || 'Unknown error'}`, variant: "destructive" });
         return;
@@ -2255,9 +2224,8 @@ const DraftRoom = () => {
       }
 
       // Update league status to in_progress and save draft settings + rounds
-      const { error: leagueStatusError } = await supabase
-        .from('leagues')
-        .update({
+      try {
+        await leagueApi.updateSettings(leagueId, {
           draft_status: 'in_progress',
           draft_rounds: settings.rounds,
           settings: {
@@ -2265,10 +2233,9 @@ const DraftRoom = () => {
             pickTimeLimit: settings.pickTimeLimit,
             draftOrder: settings.draftOrder
           }
-        })
-        .eq('id', leagueId);
-      
-      if (leagueStatusError) {
+        } as Record<string, unknown>);
+      } catch (leagueStatusErr) {
+        const leagueStatusError = leagueStatusErr instanceof Error ? leagueStatusErr : new Error('Unknown error');
         logger.error('Error updating league status:', leagueStatusError);
         toast({ title: "Error", description: `Failed to start draft: ${leagueStatusError.message || 'Unknown error'}`, variant: "destructive" });
         return;
@@ -2316,11 +2283,8 @@ const DraftRoom = () => {
           }
 
           // Load draft state
-          const { data: updatedLeague } = await supabase
-            .from('leagues')
-            .select('draft_status')
-            .eq('id', leagueId)
-            .single();
+          const updatedLeagueRes = await leagueApi.getLeague(leagueId);
+          const updatedLeague = updatedLeagueRes.data as League | null;
 
           if (updatedLeague?.draft_status === 'in_progress') {
             const loadedState = await loadDraftState();
@@ -2374,10 +2338,9 @@ const DraftRoom = () => {
     if (leagueId) {
       const currentSettings = league?.settings || {};
       const { timerStartedAt: _, ...settingsWithoutTimer } = currentSettings as LeagueSettings & { timerStartedAt?: string | null };
-      await supabase
-        .from('leagues')
-        .update({ settings: { ...settingsWithoutTimer, timerStartedAt: null } })
-        .eq('id', leagueId);
+      await leagueApi.updateSettings(leagueId, {
+        settings: { ...settingsWithoutTimer, timerStartedAt: null }
+      });
       setLeague(prev => prev ? {
         ...prev,
         settings: { ...settingsWithoutTimer, timerStartedAt: null }
@@ -2402,10 +2365,9 @@ const DraftRoom = () => {
     // Set new timerStartedAt in DB - all clients will start counting from this point
     const timerStartedAt = new Date().toISOString();
     if (leagueId) {
-      await supabase
-        .from('leagues')
-        .update({ settings: { ...(league?.settings || {}), timerStartedAt } })
-        .eq('id', leagueId);
+      await leagueApi.updateSettings(leagueId, {
+        settings: { ...(league?.settings || {}), timerStartedAt }
+      });
       setLeague(prev => prev ? {
         ...prev,
         settings: { ...prev.settings, timerStartedAt }
@@ -2438,12 +2400,10 @@ const DraftRoom = () => {
       
       // Just reset the league status to 'not_started' - don't try to delete old data
       // Old draft sessions will remain but won't be used
-      const { error: statusError } = await supabase
-        .from('leagues')
-        .update({ draft_status: 'not_started' })
-        .eq('id', leagueId);
-      
-      if (statusError) {
+      try {
+        await leagueApi.updateSettings(leagueId, { draft_status: 'not_started' } as Record<string, unknown>);
+      } catch (statusErr) {
+        const statusError = statusErr instanceof Error ? statusErr : new Error('Unknown error');
         logger.error('Error resetting league status:', statusError);
         toast({ title: "Error", description: `Failed to reset draft: ${statusError.message || 'Unknown error'}`, variant: "destructive" });
         return;
@@ -2551,25 +2511,18 @@ const DraftRoom = () => {
       logger.log('Draft data deleted successfully, verifying reset...');
       
       // Verify the league status was updated
-      const { data: updatedLeague, error: verifyError } = await supabase
-        .from('leagues')
-        .select('draft_status')
-        .eq('id', leagueId)
-        .single();
-      
-      if (verifyError) {
-        logger.error('Error verifying league status:', verifyError);
-      } else {
+      try {
+        const verifyRes = await leagueApi.getLeague(leagueId);
+        const updatedLeague = verifyRes.data as League | null;
         logger.log('League status after reset:', updatedLeague?.draft_status);
-        
+
         // If status wasn't updated, update it manually
         if (updatedLeague?.draft_status !== 'not_started') {
           logger.log('League status not updated, fixing it...');
-          await supabase
-            .from('leagues')
-            .update({ draft_status: 'not_started' })
-            .eq('id', leagueId);
+          await leagueApi.updateSettings(leagueId, { draft_status: 'not_started' } as Record<string, unknown>);
         }
+      } catch (verifyError) {
+        logger.error('Error verifying league status:', verifyError);
       }
       
       // Update local league object

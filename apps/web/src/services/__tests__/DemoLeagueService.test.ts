@@ -32,6 +32,27 @@ vi.mock('@/integrations/supabase/client', () => ({
   },
 }));
 
+// Mock API client modules used transitively by services
+vi.mock('@/api/client', () => ({
+  apiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
+  ApiError: class ApiError extends Error {},
+}));
+vi.mock('@/api/leagues', () => ({ leagueApi: {} }));
+vi.mock('@/api/players', () => ({ playerApi: {} }));
+vi.mock('@/api/rosters', () => ({ rosterApi: {} }));
+vi.mock('@/api/trades', () => ({ tradeApi: {} }));
+vi.mock('@/api/waivers', () => ({ waiverApi: {} }));
+vi.mock('@/api/notifications', () => ({ notificationApi: {} }));
+vi.mock('@/api/matchups', () => ({ matchupApi: {} }));
+vi.mock('@/api/account', () => ({ accountApi: {} }));
+vi.mock('@/api/keepers', () => ({ keeperApi: {} }));
+vi.mock('@/api/bestball', () => ({ bestballApi: {} }));
+vi.mock('@/api/draft', () => ({ draftApi: {} }));
+vi.mock('@/api/auction', () => ({ auctionApi: {} }));
+vi.mock('@/api/playoffs', () => ({ playoffApi: {} }));
+vi.mock('@/api/schedule', () => ({ scheduleApi: {} }));
+vi.mock('@/api/stormy', () => ({ stormyApi: {} }));
+
 vi.mock('./LeagueService', () => ({
   LeagueService: { saveLineup: vi.fn().mockResolvedValue(undefined) },
   LEAGUE_TEAMS_DATA: [

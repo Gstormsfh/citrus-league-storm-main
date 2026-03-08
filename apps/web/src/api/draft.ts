@@ -110,4 +110,9 @@ export const draftApi = {
   }) {
     return apiClient.post(`/api/draft/league/${leagueId}/rankings`, params);
   },
+
+  /** Delete ALL draft data across all leagues (admin only) */
+  deleteAllDraftData() {
+    return apiClient.delete('/api/draft/all');
+  },
 };

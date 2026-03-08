@@ -14,6 +14,11 @@ import { scheduleRoutes } from './routes/schedule';
 import { notificationRoutes } from './routes/notifications';
 import { stormyRoutes } from './routes/stormy';
 import { adminRoutes } from './routes/admin';
+import { auctionRoutes } from './routes/auction';
+import { keeperRoutes } from './routes/keepers';
+import { playoffRoutes } from './routes/playoffs';
+import { bestballRoutes } from './routes/bestball';
+import { accountRoutes } from './routes/account';
 import { standardRateLimit, strictRateLimit } from './middleware/rateLimit';
 import { requestContextMiddleware } from './middleware/requestContext';
 import { AppError } from './lib/errors';
@@ -110,6 +115,11 @@ app.route('/api/schedule', scheduleRoutes);
 app.route('/api/notifications', notificationRoutes);
 app.route('/api/stormy', stormyRoutes);
 app.route('/api/admin', adminRoutes);
+app.route('/api/auction', auctionRoutes);
+app.route('/api/keepers', keeperRoutes);
+app.route('/api/playoffs', playoffRoutes);
+app.route('/api/bestball', bestballRoutes);
+app.route('/api/account', accountRoutes);
 
 // ── 404 handler ──────────────────────────────────────────────────────
 app.notFound((c) => {

@@ -5,32 +5,33 @@ import { WaiverService } from '../WaiverService';
 // MOCK SETUP
 // =============================================================================
 
-// Build a chainable mock factory. Each chainable method returns `this` so that
-// calls like `.from('x').select('y').eq('a', 'b').single()` work seamlessly.
-// Terminal methods (`single`, `maybeSingle`) are separate so tests can override
-// the resolved value per-call.
+vi.mock('@/api/waivers', () => ({
+  waiverApi: {
+    getLeagueWaivers: vi.fn(),
+    getTeamWaivers: vi.fn(),
+    getWaiverPriority: vi.fn(),
+    getFAABBudgets: vi.fn(),
+    getWaiverSettings: vi.fn(),
+    submitClaim: vi.fn(),
+    submitFAABBid: vi.fn(),
+    addFreeAgent: vi.fn(),
+    dropPlayer: vi.fn(),
+    cancelClaim: vi.fn(),
+  },
+}));
 
-function createChainMock() {
-  const chain: Record<string, any> = {};
-  const chainMethods = ['select', 'insert', 'update', 'delete', 'eq', 'gte', 'is', 'in', 'order', 'limit', 'filter'];
-  chainMethods.forEach(m => {
-    chain[m] = vi.fn().mockReturnValue(chain);
-  });
-  chain.single = vi.fn().mockResolvedValue({ data: null, error: null });
-  chain.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
-  return chain;
-}
+vi.mock('@/api/account', () => ({
+  accountApi: {
+    logSecurityEvent: vi.fn().mockResolvedValue({ data: null }),
+  },
+}));
 
-let defaultChain = createChainMock();
-
-vi.mock('@/integrations/supabase/client', () => ({
-  supabase: {
-    from: vi.fn(() => defaultChain),
-    rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
-    auth: {
-      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user-id' } } }),
-      getSession: vi.fn().mockResolvedValue({ data: { session: { access_token: 'mock-token' } } }),
-    },
+vi.mock('@/api/client', () => ({
+  apiClient: {
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
   },
 }));
 
@@ -40,22 +41,13 @@ vi.mock('../PlayerService', () => ({
   },
 }));
 
-vi.mock('../GameLockService', () => ({
-  GameLockService: {
-    isPlayerLocked: vi.fn().mockResolvedValue({ isLocked: false, gameStatus: 'not_started' }),
-  },
-}));
-
-vi.mock('../LeagueMembershipService', () => ({
-  LeagueMembershipService: {
-    requireMembership: vi.fn().mockResolvedValue(undefined),
-    requireCommissioner: vi.fn().mockResolvedValue(undefined),
-  },
-}));
-
-vi.mock('@/utils/queryColumns', () => ({
-  COLUMNS: {
-    WAIVER: 'id, league_id, team_id, player_id, drop_player_id, priority, bid_amount, is_conditional_drop, status, created_at, processed_at, failure_reason',
+vi.mock('@/utils/logger', () => ({
+  logger: {
+    log: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
   },
 }));
 
@@ -63,1038 +55,326 @@ vi.mock('@/utils/seasonConstants', () => ({
   CURRENT_SEASON: 2025,
 }));
 
-// Grab the mocked modules so we can configure them per-test
-import { supabase } from '@/integrations/supabase/client';
-import { GameLockService } from '../GameLockService';
-import { LeagueMembershipService } from '../LeagueMembershipService';
+import { waiverApi } from '@/api/waivers';
+import { accountApi } from '@/api/account';
+import { apiClient } from '@/api/client';
+import { PlayerService } from '../PlayerService';
 
 // =============================================================================
-// HELPERS
-// =============================================================================
-
-/** Rebuild a fresh chain mock and wire it into `supabase.from`. */
-function resetChain() {
-  defaultChain = createChainMock();
-  (supabase.from as any).mockReturnValue(defaultChain);
-}
-
-/**
- * Configure `supabase.from` to return different chain mocks depending on the
- * table name. This is critical for methods that query multiple tables.
- *
- * Usage:
- *   const chains = perTableChains({ leagues: leagueChain, transaction_ledger: txChain });
- */
-function perTableChains(map: Record<string, ReturnType<typeof createChainMock>>) {
-  (supabase.from as any).mockImplementation((table: string) => {
-    return map[table] ?? defaultChain;
-  });
-  return map;
-}
-
-// =============================================================================
-// checkTransactionLimits
+// checkTransactionLimits — Now a no-op (server validates)
 // =============================================================================
 
 describe('WaiverService.checkTransactionLimits', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    resetChain();
   });
 
-  // ---- Unlimited (0) ----
-
-  it('allows adds when both limits are 0 (unlimited)', async () => {
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { settings: { weeklyAddLimit: 0, seasonAddLimit: 0 } },
-      error: null,
-    });
-
-    perTableChains({ leagues: leagueChain });
-
+  it('always returns allowed (server validates limits)', async () => {
     const result = await WaiverService.checkTransactionLimits('league-1', 'team-1');
     expect(result.allowed).toBe(true);
   });
 
-  it('allows adds when limits are not set in settings (defaults to 0)', async () => {
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { settings: {} },
-      error: null,
-    });
-
-    perTableChains({ leagues: leagueChain });
-
-    const result = await WaiverService.checkTransactionLimits('league-1', 'team-1');
-    expect(result.allowed).toBe(true);
-  });
-
-  it('allows adds when settings is undefined', async () => {
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { settings: undefined },
-      error: null,
-    });
-
-    perTableChains({ leagues: leagueChain });
-
-    const result = await WaiverService.checkTransactionLimits('league-1', 'team-1');
-    expect(result.allowed).toBe(true);
-  });
-
-  // ---- Weekly cap ----
-
-  it('blocks adds when weekly limit is reached', async () => {
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { settings: { weeklyAddLimit: 3, seasonAddLimit: 0 } },
-      error: null,
-    });
-
-    const txChain = createChainMock();
-    // Terminal select with count returns on the chain itself (head: true → no rows, just count)
-    txChain.gte.mockReturnValue({
-      ...txChain,
-      // The final promise resolution (no terminal method — the chain itself resolves)
-      then: (cb: any) => Promise.resolve({ data: null, error: null, count: 3 }).then(cb),
-    });
-
-    // Because the method uses `select('*', { count: 'exact', head: true })` which
-    // returns a promise directly (no `.single()`), we mock the chain to resolve.
-    // Re-implement: the Supabase pattern here ends with `.gte(...)` as the last
-    // chained call, and the whole chain is awaited. So we need the chain's final
-    // call to resolve as a promise.
-    const weeklyTxChain = createChainMock();
-    // Make the chain itself thenable after .gte()
-    const gteResult = {
-      data: null,
-      error: null,
-      count: 3,
-    };
-    weeklyTxChain.gte.mockResolvedValue(gteResult);
-
-    perTableChains({
-      leagues: leagueChain,
-      transaction_ledger: weeklyTxChain,
-    });
-
-    const result = await WaiverService.checkTransactionLimits('league-1', 'team-1');
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toContain('Weekly add limit reached');
-    expect(result.reason).toContain('3/3');
-    expect(result.weeklyAdds).toBe(3);
-  });
-
-  it('allows adds when weekly count is below the weekly limit', async () => {
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { settings: { weeklyAddLimit: 5, seasonAddLimit: 0 } },
-      error: null,
-    });
-
-    const weeklyTxChain = createChainMock();
-    weeklyTxChain.gte.mockResolvedValue({ data: null, error: null, count: 2 });
-
-    perTableChains({
-      leagues: leagueChain,
-      transaction_ledger: weeklyTxChain,
-    });
-
-    const result = await WaiverService.checkTransactionLimits('league-1', 'team-1');
-    expect(result.allowed).toBe(true);
-  });
-
-  // ---- Season cap ----
-
-  it('blocks adds when season limit is reached', async () => {
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { settings: { weeklyAddLimit: 0, seasonAddLimit: 50 } },
-      error: null,
-    });
-
-    // Season check: select → eq → eq → eq (no gte) — chain ends and resolves
-    const seasonTxChain = createChainMock();
-    // The season check chain ends at `.eq('type', 'ADD')` which is the 3rd eq call.
-    // Since all eq's return the chain itself, the chain must resolve as a promise.
-    // Override the chain to be thenable for the season path (no gte call).
-    // Actually the chain is awaited directly after the last `.eq()`.
-    // We make `.eq` aware of the call count.
-    let eqCount = 0;
-    seasonTxChain.eq.mockImplementation(() => {
-      eqCount++;
-      if (eqCount === 3) {
-        // Third `.eq('type', 'ADD')` — return a thenable with count
-        return Promise.resolve({ data: null, error: null, count: 50 });
-      }
-      return seasonTxChain;
-    });
-
-    perTableChains({
-      leagues: leagueChain,
-      transaction_ledger: seasonTxChain,
-    });
-
-    const result = await WaiverService.checkTransactionLimits('league-1', 'team-1');
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toContain('Season add limit reached');
-    expect(result.reason).toContain('50/50');
-    expect(result.seasonAdds).toBe(50);
-  });
-
-  // ---- Both caps ----
-
-  it('checks weekly limit first when both caps are set', async () => {
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { settings: { weeklyAddLimit: 3, seasonAddLimit: 100 } },
-      error: null,
-    });
-
-    // Weekly hits limit first
-    const txChain = createChainMock();
-    txChain.gte.mockResolvedValue({ data: null, error: null, count: 3 });
-
-    perTableChains({
-      leagues: leagueChain,
-      transaction_ledger: txChain,
-    });
-
-    const result = await WaiverService.checkTransactionLimits('league-1', 'team-1');
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toContain('Weekly');
-  });
-
-  it('falls through to season limit when weekly is under cap', async () => {
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { settings: { weeklyAddLimit: 10, seasonAddLimit: 50 } },
-      error: null,
-    });
-
-    // Weekly: under limit — need gte to return count < limit
-    // Season: at limit — need eq chain to resolve with count = 50
-    // Because the same table is queried twice, we track call order.
-    const callNum = 0;
-    const txChain = createChainMock();
-    // First await (weekly): ends at .gte() → resolves with low count
-    txChain.gte.mockResolvedValue({ data: null, error: null, count: 2 });
-    // Second await (season): we need `.eq('type', 'ADD')` to resolve
-    // Since weekly path also uses eq, we handle season by counting selects
-    let selectCallNum = 0;
-    txChain.select.mockImplementation(() => {
-      selectCallNum++;
-      return txChain;
-    });
-    // For the season path, the chain ends at the 3rd eq without gte
-    const seasonEqCount = 0;
-    const origEq = txChain.eq;
-    txChain.eq.mockImplementation(() => {
-      // After the weekly path is done (gte was called), reset for season path
-      return txChain;
-    });
-    // This is getting complex — let's use a simpler approach.
-    // Override `from` to return different chains per call order.
-    let fromCallNum = 0;
-    (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'leagues') return leagueChain;
-      if (table === 'transaction_ledger') {
-        fromCallNum++;
-        if (fromCallNum === 1) {
-          // Weekly check — ends at gte
-          const weeklyChain = createChainMock();
-          weeklyChain.gte.mockResolvedValue({ data: null, error: null, count: 2 });
-          return weeklyChain;
-        } else {
-          // Season check — ends at 3rd eq
-          const seasonChain = createChainMock();
-          let eqCalls = 0;
-          seasonChain.eq.mockImplementation(() => {
-            eqCalls++;
-            if (eqCalls === 3) {
-              return Promise.resolve({ data: null, error: null, count: 50 });
-            }
-            return seasonChain;
-          });
-          return seasonChain;
-        }
-      }
-      return defaultChain;
-    });
-
-    const result = await WaiverService.checkTransactionLimits('league-1', 'team-1');
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toContain('Season add limit reached');
-  });
-
-  // ---- Edge cases ----
-
-  it('fails open (allows) when no league is found', async () => {
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({ data: null, error: null });
-
-    perTableChains({ leagues: leagueChain });
-
+  it('returns allowed regardless of input', async () => {
     const result = await WaiverService.checkTransactionLimits('missing-league', 'team-1');
-    expect(result.allowed).toBe(true);
-  });
-
-  it('fails open when DB query throws an error', async () => {
-    const leagueChain = createChainMock();
-    leagueChain.single.mockRejectedValue(new Error('DB connection failed'));
-
-    perTableChains({ leagues: leagueChain });
-
-    const result = await WaiverService.checkTransactionLimits('league-1', 'team-1');
-    expect(result.allowed).toBe(true);
-  });
-
-  it('allows adds when weekly count query has an error (fails open)', async () => {
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { settings: { weeklyAddLimit: 3, seasonAddLimit: 0 } },
-      error: null,
-    });
-
-    const txChain = createChainMock();
-    // Query returns an error — count should be ignored
-    txChain.gte.mockResolvedValue({ data: null, error: { message: 'timeout' }, count: null });
-
-    perTableChains({
-      leagues: leagueChain,
-      transaction_ledger: txChain,
-    });
-
-    const result = await WaiverService.checkTransactionLimits('league-1', 'team-1');
-    // When error occurs, the `if (!error && count !== null)` check fails → falls through → allowed
     expect(result.allowed).toBe(true);
   });
 });
 
 // =============================================================================
-// submitWaiverClaim — Waiver Claim Creation Validation
+// submitWaiverClaim
 // =============================================================================
 
 describe('WaiverService.submitWaiverClaim', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    resetChain();
-  });
-
-  it('returns error when league is not found', async () => {
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({ data: null, error: { message: 'not found' } });
-
-    perTableChains({ leagues: leagueChain });
-
-    const result = await WaiverService.submitWaiverClaim('bad-league', 'team-1', 8478402, null);
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('League not found');
-  });
-
-  it('blocks waivers in Best Ball leagues', async () => {
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { settings: { bestBallEnabled: true } },
-      error: null,
-    });
-
-    perTableChains({ leagues: leagueChain });
-
-    const result = await WaiverService.submitWaiverClaim('league-1', 'team-1', 8478402, null);
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('Best Ball');
-  });
-
-  it('blocks waivers when transaction limits are exceeded', async () => {
-    // We spy on checkTransactionLimits so it returns denied
-    vi.spyOn(WaiverService, 'checkTransactionLimits').mockResolvedValue({
-      allowed: false,
-      reason: 'Weekly add limit reached (3/3). Resets Monday.',
-    });
-
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { settings: {} },
-      error: null,
-    });
-    perTableChains({ leagues: leagueChain });
-
-    const result = await WaiverService.submitWaiverClaim('league-1', 'team-1', 8478402, null);
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('Weekly add limit');
-
-    vi.restoreAllMocks();
-  });
-
-  it('returns error when waiver priority is not found', async () => {
-    vi.spyOn(WaiverService, 'checkTransactionLimits').mockResolvedValue({ allowed: true });
-
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { settings: {} },
-      error: null,
-    });
-
-    const priorityChain = createChainMock();
-    priorityChain.single.mockResolvedValue({ data: null, error: null });
-
-    (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'leagues') return leagueChain;
-      if (table === 'waiver_priority') return priorityChain;
-      return defaultChain;
-    });
-
-    const result = await WaiverService.submitWaiverClaim('league-1', 'team-1', 8478402, null);
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('waiver priority not found');
-
-    vi.restoreAllMocks();
   });
 
   it('successfully submits a waiver claim', async () => {
-    vi.spyOn(WaiverService, 'checkTransactionLimits').mockResolvedValue({ allowed: true });
-
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { settings: {} },
-      error: null,
-    });
-
-    const priorityChain = createChainMock();
-    priorityChain.single.mockResolvedValue({
-      data: { priority: 3 },
-      error: null,
-    });
-
-    const claimChain = createChainMock();
-    claimChain.single.mockResolvedValue({
-      data: { id: 'claim-uuid-123' },
-      error: null,
-    });
-
-    (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'leagues') return leagueChain;
-      if (table === 'waiver_priority') return priorityChain;
-      if (table === 'waiver_claims') return claimChain;
-      return defaultChain;
+    (waiverApi.submitClaim as any).mockResolvedValue({
+      data: { success: true, claimId: 'claim-uuid-123' },
     });
 
     const result = await WaiverService.submitWaiverClaim('league-1', 'team-1', 8478402, null);
     expect(result.success).toBe(true);
     expect(result.claimId).toBe('claim-uuid-123');
-
-    vi.restoreAllMocks();
   });
 
-  it('forwards the drop_player_id into the claim insert', async () => {
-    vi.spyOn(WaiverService, 'checkTransactionLimits').mockResolvedValue({ allowed: true });
-
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { settings: {} },
-      error: null,
-    });
-
-    const priorityChain = createChainMock();
-    priorityChain.single.mockResolvedValue({
-      data: { priority: 1 },
-      error: null,
-    });
-
-    const claimChain = createChainMock();
-    claimChain.single.mockResolvedValue({
-      data: { id: 'claim-uuid-456' },
-      error: null,
-    });
-
-    (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'leagues') return leagueChain;
-      if (table === 'waiver_priority') return priorityChain;
-      if (table === 'waiver_claims') return claimChain;
-      return defaultChain;
+  it('passes drop_player_id when provided', async () => {
+    (waiverApi.submitClaim as any).mockResolvedValue({
+      data: { success: true, claimId: 'claim-uuid-456' },
     });
 
     await WaiverService.submitWaiverClaim('league-1', 'team-1', 8478402, 8477474);
 
-    // Verify insert was called with drop_player_id
-    expect(claimChain.insert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        drop_player_id: 8477474,
-        player_id: 8478402,
-        priority: 1,
-        status: 'pending',
-      })
-    );
-
-    vi.restoreAllMocks();
+    expect(waiverApi.submitClaim).toHaveBeenCalledWith('league-1', {
+      teamId: 'team-1',
+      playerId: '8478402',
+      dropPlayerId: '8477474',
+    });
   });
 
-  it('returns DB error message on insert failure', async () => {
-    vi.spyOn(WaiverService, 'checkTransactionLimits').mockResolvedValue({ allowed: true });
-
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { settings: {} },
-      error: null,
+  it('passes null drop_player_id when not provided', async () => {
+    (waiverApi.submitClaim as any).mockResolvedValue({
+      data: { success: true },
     });
 
-    const priorityChain = createChainMock();
-    priorityChain.single.mockResolvedValue({
-      data: { priority: 2 },
-      error: null,
+    await WaiverService.submitWaiverClaim('league-1', 'team-1', 8478402, null);
+
+    expect(waiverApi.submitClaim).toHaveBeenCalledWith('league-1', {
+      teamId: 'team-1',
+      playerId: '8478402',
+      dropPlayerId: null,
+    });
+  });
+
+  it('logs security event on success', async () => {
+    (waiverApi.submitClaim as any).mockResolvedValue({
+      data: { success: true, claimId: 'claim-1' },
     });
 
-    const claimChain = createChainMock();
-    claimChain.single.mockResolvedValue({
-      data: null,
-      error: { message: 'Unique constraint violation' },
-    });
+    await WaiverService.submitWaiverClaim('league-1', 'team-1', 8478402, null);
 
-    (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'leagues') return leagueChain;
-      if (table === 'waiver_priority') return priorityChain;
-      if (table === 'waiver_claims') return claimChain;
-      return defaultChain;
-    });
+    expect(accountApi.logSecurityEvent).toHaveBeenCalledWith(
+      'WAIVER_CLAIM', 'league-1',
+      expect.objectContaining({ teamId: 'team-1', playerId: 8478402 })
+    );
+  });
+
+  it('returns error on API failure', async () => {
+    (waiverApi.submitClaim as any).mockRejectedValue(new Error('Unique constraint violation'));
 
     const result = await WaiverService.submitWaiverClaim('league-1', 'team-1', 8478402, null);
     expect(result.success).toBe(false);
-    expect(result.error).toBe('Unique constraint violation');
-
-    vi.restoreAllMocks();
+    expect(result.error).toContain('Unique constraint violation');
   });
 });
 
 // =============================================================================
-// checkPlayerAvailability — Game Lock Integration
+// checkPlayerAvailability
 // =============================================================================
 
 describe('WaiverService.checkPlayerAvailability', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    resetChain();
   });
 
-  it('validates league membership before checking availability', async () => {
-    (LeagueMembershipService.requireMembership as any).mockRejectedValue(
-      new Error('Not a member')
-    );
-
-    await expect(
-      WaiverService.checkPlayerAvailability(8478402, 'league-1', 'user-1')
-    ).rejects.toThrow('Not a member');
-
-    expect(LeagueMembershipService.requireMembership).toHaveBeenCalledWith('league-1', 'user-1');
-  });
-
-  it('returns unavailable when player is already rostered', async () => {
-    (LeagueMembershipService.requireMembership as any).mockResolvedValue(undefined);
-
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { waiver_game_lock: false, waiver_period_hours: 0, waiver_type: 'rolling', waiver_process_time: '03:00' },
-      error: null,
-    });
-
-    const rosterChain = createChainMock();
-    rosterChain.maybeSingle.mockResolvedValue({
-      data: { id: 'assignment-1' },
-      error: null,
-    });
-
-    (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'leagues') return leagueChain;
-      if (table === 'roster_assignments') return rosterChain;
-      return defaultChain;
-    });
-
-    const result = await WaiverService.checkPlayerAvailability(8478402, 'league-1', 'user-1');
-    expect(result.is_available).toBe(false);
-    expect(result.lock_reason).toContain('already rostered');
-  });
-
-  it('returns available when player is not rostered and game lock is off', async () => {
-    (LeagueMembershipService.requireMembership as any).mockResolvedValue(undefined);
-
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { waiver_game_lock: false, waiver_period_hours: 0, waiver_type: 'rolling', waiver_process_time: '03:00' },
-      error: null,
-    });
-
-    const rosterChain = createChainMock();
-    rosterChain.maybeSingle.mockResolvedValue({ data: null, error: null });
-
-    const playerChain = createChainMock();
-    playerChain.maybeSingle.mockResolvedValue({
-      data: { team_abbrev: 'TOR' },
-      error: null,
-    });
-
-    (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'leagues') return leagueChain;
-      if (table === 'roster_assignments') return rosterChain;
-      if (table === 'player_directory') return playerChain;
-      return defaultChain;
+  it('returns available when settings can be fetched', async () => {
+    (waiverApi.getWaiverSettings as any).mockResolvedValue({
+      data: { waiver_game_lock: false, waiver_period_hours: 0 },
     });
 
     const result = await WaiverService.checkPlayerAvailability(8478402, 'league-1', 'user-1');
     expect(result.is_available).toBe(true);
     expect(result.is_game_locked).toBe(false);
     expect(result.is_on_waivers).toBe(false);
+    expect(result.lock_reason).toBeNull();
   });
 
-  it('marks player as game-locked when game lock is enabled and player is in a live game', async () => {
-    (LeagueMembershipService.requireMembership as any).mockResolvedValue(undefined);
-    (GameLockService.isPlayerLocked as any).mockResolvedValue({
-      isLocked: true,
-      gameStatus: 'live',
-    });
-
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { waiver_game_lock: true, waiver_period_hours: 0, waiver_type: 'rolling', waiver_process_time: '03:00' },
-      error: null,
-    });
-
-    const rosterChain = createChainMock();
-    rosterChain.maybeSingle.mockResolvedValue({ data: null, error: null });
-
-    const playerChain = createChainMock();
-    playerChain.maybeSingle.mockResolvedValue({
-      data: { team_abbrev: 'TOR' },
-      error: null,
-    });
-
-    (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'leagues') return leagueChain;
-      if (table === 'roster_assignments') return rosterChain;
-      if (table === 'player_directory') return playerChain;
-      return defaultChain;
+  it('returns available with null lock_reason when settings are null', async () => {
+    (waiverApi.getWaiverSettings as any).mockResolvedValue({
+      data: null,
     });
 
     const result = await WaiverService.checkPlayerAvailability(8478402, 'league-1', 'user-1');
-    expect(result.is_available).toBe(false);
-    expect(result.is_game_locked).toBe(true);
-    expect(result.lock_reason).toContain('currently in a game');
-  });
-
-  it('marks player as game-locked with final game status', async () => {
-    (LeagueMembershipService.requireMembership as any).mockResolvedValue(undefined);
-    (GameLockService.isPlayerLocked as any).mockResolvedValue({
-      isLocked: true,
-      gameStatus: 'final',
-    });
-
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { waiver_game_lock: true, waiver_period_hours: 0 },
-      error: null,
-    });
-
-    const rosterChain = createChainMock();
-    rosterChain.maybeSingle.mockResolvedValue({ data: null, error: null });
-
-    const playerChain = createChainMock();
-    playerChain.maybeSingle.mockResolvedValue({
-      data: { team_abbrev: 'EDM' },
-      error: null,
-    });
-
-    (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'leagues') return leagueChain;
-      if (table === 'roster_assignments') return rosterChain;
-      if (table === 'player_directory') return playerChain;
-      return defaultChain;
-    });
-
-    const result = await WaiverService.checkPlayerAvailability(8478402, 'league-1', 'user-1');
-    expect(result.is_game_locked).toBe(true);
-    expect(result.lock_reason).toContain('just finished');
-  });
-
-  it('returns available for a player with no NHL team (unsigned/retired)', async () => {
-    (LeagueMembershipService.requireMembership as any).mockResolvedValue(undefined);
-
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { waiver_game_lock: true, waiver_period_hours: 0 },
-      error: null,
-    });
-
-    const rosterChain = createChainMock();
-    rosterChain.maybeSingle.mockResolvedValue({ data: null, error: null });
-
-    const playerChain = createChainMock();
-    playerChain.maybeSingle.mockResolvedValue({ data: null, error: null });
-
-    (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'leagues') return leagueChain;
-      if (table === 'roster_assignments') return rosterChain;
-      if (table === 'player_directory') return playerChain;
-      return defaultChain;
-    });
-
-    const result = await WaiverService.checkPlayerAvailability(9999999, 'league-1', 'user-1');
     expect(result.is_available).toBe(true);
-    expect(result.is_game_locked).toBe(false);
+    expect(result.lock_reason).toBe('Unable to check availability');
   });
 
-  it('throws when league is not found', async () => {
-    (LeagueMembershipService.requireMembership as any).mockResolvedValue(undefined);
-
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({ data: null, error: null });
-
-    perTableChains({ leagues: leagueChain });
+  it('throws when API call fails', async () => {
+    (waiverApi.getWaiverSettings as any).mockRejectedValue(new Error('Not a member'));
 
     await expect(
-      WaiverService.checkPlayerAvailability(8478402, 'bad-league', 'user-1')
-    ).rejects.toThrow('League not found');
+      WaiverService.checkPlayerAvailability(8478402, 'league-1', 'user-1')
+    ).rejects.toThrow('Not a member');
   });
 });
 
 // =============================================================================
-// submitFAABBid — FAAB Bid Validation
+// addFreeAgent
+// =============================================================================
+
+describe('WaiverService.addFreeAgent', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('adds a free agent successfully', async () => {
+    (waiverApi.addFreeAgent as any).mockResolvedValue({
+      data: { success: true },
+    });
+
+    const result = await WaiverService.addFreeAgent('league-1', 'team-1', 8478402, null);
+    expect(result.success).toBe(true);
+  });
+
+  it('passes drop player ID when provided', async () => {
+    (waiverApi.addFreeAgent as any).mockResolvedValue({
+      data: { success: true },
+    });
+
+    await WaiverService.addFreeAgent('league-1', 'team-1', 8478402, 8477474);
+
+    expect(waiverApi.addFreeAgent).toHaveBeenCalledWith('league-1', {
+      teamId: 'team-1',
+      playerId: '8478402',
+      dropPlayerId: '8477474',
+    });
+  });
+
+  it('logs security event on success', async () => {
+    (waiverApi.addFreeAgent as any).mockResolvedValue({
+      data: { success: true },
+    });
+
+    await WaiverService.addFreeAgent('league-1', 'team-1', 8478402, null);
+
+    expect(accountApi.logSecurityEvent).toHaveBeenCalledWith(
+      'ROSTER_MOVE', 'league-1',
+      expect.objectContaining({ addPlayerId: '8478402', teamId: 'team-1' })
+    );
+  });
+
+  it('logs failure event on error', async () => {
+    (waiverApi.addFreeAgent as any).mockRejectedValue(new Error('Player already rostered'));
+
+    const result = await WaiverService.addFreeAgent('league-1', 'team-1', 8478402, null);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Player already rostered');
+    expect(accountApi.logSecurityEvent).toHaveBeenCalledWith(
+      'ROSTER_MOVE_FAILED', 'league-1',
+      expect.objectContaining({ addPlayerId: '8478402', teamId: 'team-1' })
+    );
+  });
+});
+
+// =============================================================================
+// submitFAABBid
 // =============================================================================
 
 describe('WaiverService.submitFAABBid', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    resetChain();
   });
 
-  it('rejects negative bid amounts', async () => {
-    vi.spyOn(WaiverService, 'checkTransactionLimits').mockResolvedValue({ allowed: true });
-
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { settings: {} },
-      error: null,
+  it('submits a FAAB bid successfully', async () => {
+    (waiverApi.submitFAABBid as any).mockResolvedValue({
+      data: { success: true, claimId: 'claim-faab-1' },
     });
-    perTableChains({ leagues: leagueChain });
 
-    const result = await WaiverService.submitFAABBid('league-1', 'team-1', 8478402, -5, null);
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('negative');
-
-    vi.restoreAllMocks();
+    const result = await WaiverService.submitFAABBid('league-1', 'team-1', 8478402, 25, null);
+    expect(result.success).toBe(true);
+    expect(result.claimId).toBe('claim-faab-1');
   });
 
-  it('rejects bids exceeding remaining budget', async () => {
-    vi.spyOn(WaiverService, 'checkTransactionLimits').mockResolvedValue({ allowed: true });
-    vi.spyOn(WaiverService, 'getFAABBudget').mockResolvedValue(25);
-
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { settings: {} },
-      error: null,
+  it('passes correct parameters to API', async () => {
+    (waiverApi.submitFAABBid as any).mockResolvedValue({
+      data: { success: true },
     });
-    perTableChains({ leagues: leagueChain });
 
-    const result = await WaiverService.submitFAABBid('league-1', 'team-1', 8478402, 50, null);
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('exceeds remaining budget');
-    expect(result.error).toContain('$25');
+    await WaiverService.submitFAABBid('league-1', 'team-1', 8478402, 50, 8477474, true);
 
-    vi.restoreAllMocks();
-  });
-
-  it('rejects bids when FAAB budget is not found (null)', async () => {
-    vi.spyOn(WaiverService, 'checkTransactionLimits').mockResolvedValue({ allowed: true });
-    vi.spyOn(WaiverService, 'getFAABBudget').mockResolvedValue(null);
-
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { settings: {} },
-      error: null,
+    expect(waiverApi.submitFAABBid).toHaveBeenCalledWith('league-1', {
+      teamId: 'team-1',
+      playerId: '8478402',
+      bidAmount: 50,
+      dropPlayerId: '8477474',
+      isConditionalDrop: true,
     });
-    perTableChains({ leagues: leagueChain });
-
-    const result = await WaiverService.submitFAABBid('league-1', 'team-1', 8478402, 10, null);
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('FAAB budget not found');
-
-    vi.restoreAllMocks();
   });
 
   it('allows a zero-dollar bid ($0 FAAB)', async () => {
-    vi.spyOn(WaiverService, 'checkTransactionLimits').mockResolvedValue({ allowed: true });
-    vi.spyOn(WaiverService, 'getFAABBudget').mockResolvedValue(100);
-
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { settings: {} },
-      error: null,
-    });
-
-    // No existing claim
-    const claimCheckChain = createChainMock();
-    claimCheckChain.maybeSingle.mockResolvedValue({ data: null, error: null });
-
-    // New claim insert
-    const claimInsertChain = createChainMock();
-    claimInsertChain.single.mockResolvedValue({
-      data: { id: 'claim-faab-0' },
-      error: null,
-    });
-
-    (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'leagues') return leagueChain;
-      if (table === 'waiver_claims') {
-        // First call: check existing (maybeSingle), Second: insert
-        return claimCheckChain;
-      }
-      return defaultChain;
-    });
-
-    // Since the check and insert use the same table, we need to handle two calls.
-    // First call to from('waiver_claims'): returns chain with maybeSingle for check
-    // Second call: returns chain with insert + single for creation
-    let waiverCallNum = 0;
-    (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'leagues') return leagueChain;
-      if (table === 'waiver_claims') {
-        waiverCallNum++;
-        if (waiverCallNum === 1) return claimCheckChain;
-        return claimInsertChain;
-      }
-      return defaultChain;
+    (waiverApi.submitFAABBid as any).mockResolvedValue({
+      data: { success: true, claimId: 'claim-faab-0' },
     });
 
     const result = await WaiverService.submitFAABBid('league-1', 'team-1', 8478402, 0, null);
     expect(result.success).toBe(true);
-    expect(result.claimId).toBe('claim-faab-0');
-
-    vi.restoreAllMocks();
   });
 
-  it('blocks FAAB bids in Best Ball leagues', async () => {
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { settings: { bestBallEnabled: true } },
-      error: null,
-    });
-    perTableChains({ leagues: leagueChain });
+  it('returns error on API failure', async () => {
+    (waiverApi.submitFAABBid as any).mockRejectedValue(new Error('Budget exceeded'));
 
-    const result = await WaiverService.submitFAABBid('league-1', 'team-1', 8478402, 10, null);
+    const result = await WaiverService.submitFAABBid('league-1', 'team-1', 8478402, 200, null);
     expect(result.success).toBe(false);
-    expect(result.error).toContain('Best Ball');
-  });
-
-  it('returns error when league is not found for FAAB', async () => {
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({ data: null, error: { message: 'not found' } });
-    perTableChains({ leagues: leagueChain });
-
-    const result = await WaiverService.submitFAABBid('bad-league', 'team-1', 8478402, 10, null);
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('League not found');
-  });
-
-  it('updates existing pending bid instead of creating a new one', async () => {
-    vi.spyOn(WaiverService, 'checkTransactionLimits').mockResolvedValue({ allowed: true });
-    vi.spyOn(WaiverService, 'getFAABBudget').mockResolvedValue(100);
-
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { settings: {} },
-      error: null,
-    });
-
-    // Existing claim found
-    const existingClaimChain = createChainMock();
-    existingClaimChain.maybeSingle.mockResolvedValue({
-      data: { id: 'existing-claim-id' },
-      error: null,
-    });
-
-    // Update chain (for the update call on existing)
-    const updateChain = createChainMock();
-    updateChain.eq.mockResolvedValue({ data: null, error: null });
-
-    let waiverCallNum = 0;
-    (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'leagues') return leagueChain;
-      if (table === 'waiver_claims') {
-        waiverCallNum++;
-        if (waiverCallNum === 1) return existingClaimChain;
-        return updateChain;
-      }
-      return defaultChain;
-    });
-
-    const result = await WaiverService.submitFAABBid('league-1', 'team-1', 8478402, 30, null);
-    expect(result.success).toBe(true);
-    expect(result.claimId).toBe('existing-claim-id');
-
-    vi.restoreAllMocks();
-  });
-
-  it('enforces transaction limits before allowing FAAB bid', async () => {
-    vi.spyOn(WaiverService, 'checkTransactionLimits').mockResolvedValue({
-      allowed: false,
-      reason: 'Season add limit reached (100/100).',
-    });
-
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { settings: {} },
-      error: null,
-    });
-    perTableChains({ leagues: leagueChain });
-
-    const result = await WaiverService.submitFAABBid('league-1', 'team-1', 8478402, 10, null);
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('Season add limit');
-
-    vi.restoreAllMocks();
+    expect(result.error).toContain('Budget exceeded');
   });
 });
 
 // =============================================================================
-// getFAABBudget — Budget Calculations
+// getFAABBudget
 // =============================================================================
 
 describe('WaiverService.getFAABBudget', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    resetChain();
   });
 
-  it('returns budget from faab_budgets table when available', async () => {
-    const budgetChain = createChainMock();
-    budgetChain.maybeSingle.mockResolvedValue({
-      data: { remaining_budget: 75 },
-      error: null,
+  it('returns budget for the team from API', async () => {
+    (waiverApi.getFAABBudgets as any).mockResolvedValue({
+      data: [
+        { team_id: 'team-1', remaining_budget: 75 },
+        { team_id: 'team-2', remaining_budget: 50 },
+      ],
     });
-
-    perTableChains({ faab_budgets: budgetChain });
 
     const budget = await WaiverService.getFAABBudget('league-1', 'team-1');
     expect(budget).toBe(75);
   });
 
-  it('falls back to calculating from settings minus completed claims', async () => {
-    const budgetChain = createChainMock();
-    budgetChain.maybeSingle.mockResolvedValue({ data: null, error: null });
-
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { settings: { faabBudget: 200 } },
-      error: null,
+  it('returns null when team is not found in budgets', async () => {
+    (waiverApi.getFAABBudgets as any).mockResolvedValue({
+      data: [
+        { team_id: 'team-2', remaining_budget: 50 },
+      ],
     });
-
-    const claimsChain = createChainMock();
-    // completed claims with bid_amount values
-    claimsChain.eq.mockImplementation(() => claimsChain);
-    // The final eq call on status resolves the query
-    let eqCalls = 0;
-    claimsChain.eq.mockImplementation(() => {
-      eqCalls++;
-      if (eqCalls >= 3) {
-        return Promise.resolve({
-          data: [
-            { bid_amount: 50, priority: 50 },
-            { bid_amount: 30, priority: 30 },
-          ],
-          error: null,
-        });
-      }
-      return claimsChain;
-    });
-
-    (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'faab_budgets') return budgetChain;
-      if (table === 'leagues') return leagueChain;
-      if (table === 'waiver_claims') return claimsChain;
-      return defaultChain;
-    });
-
-    const budget = await WaiverService.getFAABBudget('league-1', 'team-1');
-    // 200 - 50 - 30 = 120
-    expect(budget).toBe(120);
-  });
-
-  it('defaults to $100 budget when faabBudget is not set in settings', async () => {
-    const budgetChain = createChainMock();
-    budgetChain.maybeSingle.mockResolvedValue({ data: null, error: null });
-
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { settings: {} },
-      error: null,
-    });
-
-    const claimsChain = createChainMock();
-    let eqCalls = 0;
-    claimsChain.eq.mockImplementation(() => {
-      eqCalls++;
-      if (eqCalls >= 3) {
-        return Promise.resolve({ data: [], error: null });
-      }
-      return claimsChain;
-    });
-
-    (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'faab_budgets') return budgetChain;
-      if (table === 'leagues') return leagueChain;
-      if (table === 'waiver_claims') return claimsChain;
-      return defaultChain;
-    });
-
-    const budget = await WaiverService.getFAABBudget('league-1', 'team-1');
-    expect(budget).toBe(100);
-  });
-
-  it('never returns negative budget (clamps to 0)', async () => {
-    const budgetChain = createChainMock();
-    budgetChain.maybeSingle.mockResolvedValue({ data: null, error: null });
-
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { settings: { faabBudget: 50 } },
-      error: null,
-    });
-
-    const claimsChain = createChainMock();
-    let eqCalls = 0;
-    claimsChain.eq.mockImplementation(() => {
-      eqCalls++;
-      if (eqCalls >= 3) {
-        return Promise.resolve({
-          data: [
-            { bid_amount: 30, priority: 30 },
-            { bid_amount: 25, priority: 25 },
-          ],
-          error: null,
-        });
-      }
-      return claimsChain;
-    });
-
-    (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'faab_budgets') return budgetChain;
-      if (table === 'leagues') return leagueChain;
-      if (table === 'waiver_claims') return claimsChain;
-      return defaultChain;
-    });
-
-    const budget = await WaiverService.getFAABBudget('league-1', 'team-1');
-    // 50 - 30 - 25 = -5 → clamped to 0
-    expect(budget).toBe(0);
-  });
-
-  it('returns null when DB query throws', async () => {
-    const budgetChain = createChainMock();
-    budgetChain.maybeSingle.mockRejectedValue(new Error('DB error'));
-
-    perTableChains({ faab_budgets: budgetChain });
 
     const budget = await WaiverService.getFAABBudget('league-1', 'team-1');
     expect(budget).toBeNull();
+  });
+
+  it('returns null when budgets data is null', async () => {
+    (waiverApi.getFAABBudgets as any).mockResolvedValue({
+      data: null,
+    });
+
+    const budget = await WaiverService.getFAABBudget('league-1', 'team-1');
+    expect(budget).toBeNull();
+  });
+
+  it('returns null when API throws', async () => {
+    (waiverApi.getFAABBudgets as any).mockRejectedValue(new Error('DB error'));
+
+    const budget = await WaiverService.getFAABBudget('league-1', 'team-1');
+    expect(budget).toBeNull();
+  });
+});
+
+// =============================================================================
+// getAllFAABBudgets
+// =============================================================================
+
+describe('WaiverService.getAllFAABBudgets', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns all budgets from API', async () => {
+    const budgets = [
+      { team_id: 'team-1', team_name: 'Team 1', remaining_budget: 75, total_spent: 25 },
+      { team_id: 'team-2', team_name: 'Team 2', remaining_budget: 50, total_spent: 50 },
+    ];
+    (waiverApi.getFAABBudgets as any).mockResolvedValue({ data: budgets });
+
+    const result = await WaiverService.getAllFAABBudgets('league-1');
+    expect(result).toEqual(budgets);
+  });
+
+  it('returns empty array on API error', async () => {
+    (waiverApi.getFAABBudgets as any).mockRejectedValue(new Error('Error'));
+
+    const result = await WaiverService.getAllFAABBudgets('league-1');
+    expect(result).toEqual([]);
   });
 });
 
@@ -1105,47 +385,162 @@ describe('WaiverService.getFAABBudget', () => {
 describe('WaiverService.cancelWaiverClaim', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    resetChain();
   });
 
   it('successfully cancels a pending claim', async () => {
-    // cancelWaiverClaim chain: .from('waiver_claims').update({...}).eq('id', ...).eq('status', 'pending')
-    // The second .eq() is the terminal call (awaited), so it must return a promise.
-    const claimChain = createChainMock();
-    let eqCount = 0;
-    claimChain.eq.mockImplementation(() => {
-      eqCount++;
-      if (eqCount >= 2) {
-        return Promise.resolve({ data: null, error: null });
-      }
-      return claimChain;
-    });
-
-    perTableChains({ waiver_claims: claimChain });
+    (waiverApi.cancelClaim as any).mockResolvedValue({ data: null });
 
     const result = await WaiverService.cancelWaiverClaim('claim-123');
     expect(result.success).toBe(true);
   });
 
-  it('returns error on DB failure', async () => {
-    const claimChain = createChainMock();
-    let eqCount = 0;
-    claimChain.eq.mockImplementation(() => {
-      eqCount++;
-      if (eqCount >= 2) {
-        return Promise.resolve({
-          data: null,
-          error: { message: 'Row not found' },
-        });
-      }
-      return claimChain;
-    });
-
-    perTableChains({ waiver_claims: claimChain });
+  it('returns error on API failure', async () => {
+    (waiverApi.cancelClaim as any).mockRejectedValue(new Error('Row not found'));
 
     const result = await WaiverService.cancelWaiverClaim('claim-123');
     expect(result.success).toBe(false);
-    expect(result.error).toBe('Row not found');
+    expect(result.error).toContain('Row not found');
+  });
+});
+
+// =============================================================================
+// getWaiverPriority
+// =============================================================================
+
+describe('WaiverService.getWaiverPriority', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns priority data from API', async () => {
+    const priorities = [
+      { id: 'p1', league_id: 'league-1', team_id: 'team-1', team_name: 'Team 1', priority: 1, updated_at: '2025-01-01' },
+      { id: 'p2', league_id: 'league-1', team_id: 'team-2', team_name: 'Team 2', priority: 2, updated_at: '2025-01-01' },
+    ];
+    (waiverApi.getWaiverPriority as any).mockResolvedValue({ data: priorities });
+
+    const result = await WaiverService.getWaiverPriority('league-1');
+    expect(result).toEqual(priorities);
+  });
+
+  it('returns empty array on error', async () => {
+    (waiverApi.getWaiverPriority as any).mockRejectedValue(new Error('Error'));
+
+    const result = await WaiverService.getWaiverPriority('league-1');
+    expect(result).toEqual([]);
+  });
+});
+
+// =============================================================================
+// getTeamWaiverClaims
+// =============================================================================
+
+describe('WaiverService.getTeamWaiverClaims', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns claims from API', async () => {
+    const claims = [{ id: 'claim-1', status: 'pending' }];
+    (waiverApi.getTeamWaivers as any).mockResolvedValue({ data: claims });
+
+    const result = await WaiverService.getTeamWaiverClaims('league-1', 'team-1');
+    expect(result).toEqual(claims);
+  });
+
+  it('returns empty array on error', async () => {
+    (waiverApi.getTeamWaivers as any).mockRejectedValue(new Error('Error'));
+
+    const result = await WaiverService.getTeamWaiverClaims('league-1', 'team-1');
+    expect(result).toEqual([]);
+  });
+});
+
+// =============================================================================
+// getLeagueWaiverSettings
+// =============================================================================
+
+describe('WaiverService.getLeagueWaiverSettings', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns settings from API', async () => {
+    const settings = {
+      waiver_process_time: '03:00',
+      waiver_period_hours: 24,
+      waiver_game_lock: true,
+      waiver_type: 'rolling',
+      allow_trades_during_games: false,
+    };
+    (waiverApi.getWaiverSettings as any).mockResolvedValue({ data: settings });
+
+    const result = await WaiverService.getLeagueWaiverSettings('league-1', 'user-1');
+    expect(result).toEqual(settings);
+  });
+
+  it('returns null on error', async () => {
+    (waiverApi.getWaiverSettings as any).mockRejectedValue(new Error('Error'));
+
+    const result = await WaiverService.getLeagueWaiverSettings('league-1', 'user-1');
+    expect(result).toBeNull();
+  });
+});
+
+// =============================================================================
+// getAvailablePlayers
+// =============================================================================
+
+describe('WaiverService.getAvailablePlayers', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns filtered players', async () => {
+    (waiverApi.getLeagueWaivers as any).mockResolvedValue({
+      data: { rosteredPlayerIds: ['101'] },
+    });
+
+    (PlayerService.getAllPlayers as any).mockResolvedValue([
+      { id: 101, full_name: 'Player A', position: 'C', team: 'TOR', jersey_number: '97' },
+      { id: 102, full_name: 'Player B', position: 'LW', team: 'EDM', jersey_number: '29' },
+    ]);
+
+    const result = await WaiverService.getAvailablePlayers('league-1');
+    expect(result).toHaveLength(1);
+    expect(result[0].player_id).toBe(102);
+    expect(result[0].full_name).toBe('Player B');
+  });
+
+  it('filters by position', async () => {
+    (waiverApi.getLeagueWaivers as any).mockResolvedValue({ data: {} });
+    (PlayerService.getAllPlayers as any).mockResolvedValue([
+      { id: 101, full_name: 'Player A', position: 'C', team: 'TOR', jersey_number: '' },
+      { id: 102, full_name: 'Player B', position: 'G', team: 'EDM', jersey_number: '' },
+    ]);
+
+    const result = await WaiverService.getAvailablePlayers('league-1', 'G');
+    expect(result).toHaveLength(1);
+    expect(result[0].position_code).toBe('G');
+  });
+
+  it('filters by search term', async () => {
+    (waiverApi.getLeagueWaivers as any).mockResolvedValue({ data: {} });
+    (PlayerService.getAllPlayers as any).mockResolvedValue([
+      { id: 101, full_name: 'Connor McDavid', position: 'C', team: 'EDM', jersey_number: '97' },
+      { id: 102, full_name: 'Leon Draisaitl', position: 'C', team: 'EDM', jersey_number: '29' },
+    ]);
+
+    const result = await WaiverService.getAvailablePlayers('league-1', undefined, 'mcdavid');
+    expect(result).toHaveLength(1);
+    expect(result[0].full_name).toBe('Connor McDavid');
+  });
+
+  it('returns empty array on error', async () => {
+    (waiverApi.getLeagueWaivers as any).mockRejectedValue(new Error('Error'));
+
+    const result = await WaiverService.getAvailablePlayers('league-1');
+    expect(result).toEqual([]);
   });
 });
 
@@ -1156,22 +551,22 @@ describe('WaiverService.cancelWaiverClaim', () => {
 describe('WaiverService.processAllPendingWaivers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    resetChain();
   });
 
-  it('returns success with results from RPC', async () => {
-    (supabase.rpc as any).mockResolvedValue({
-      data: [
-        {
-          league_id: 'league-1',
-          league_name: 'Test League',
-          total_processed: 3,
-          successful: 2,
-          failed: 1,
-          details: [],
-        },
-      ],
-      error: null,
+  it('returns success with results from API', async () => {
+    (apiClient.post as any).mockResolvedValue({
+      data: {
+        results: [
+          {
+            league_id: 'league-1',
+            league_name: 'Test League',
+            total_processed: 3,
+            successful: 2,
+            failed: 1,
+            details: [],
+          },
+        ],
+      },
     });
 
     const result = await WaiverService.processAllPendingWaivers();
@@ -1180,20 +575,17 @@ describe('WaiverService.processAllPendingWaivers', () => {
     expect(result.results[0].successful).toBe(2);
   });
 
-  it('returns error when RPC fails', async () => {
-    (supabase.rpc as any).mockResolvedValue({
-      data: null,
-      error: { message: 'RPC timeout' },
-    });
+  it('returns error when API fails', async () => {
+    (apiClient.post as any).mockRejectedValue(new Error('RPC timeout'));
 
     const result = await WaiverService.processAllPendingWaivers();
     expect(result.success).toBe(false);
-    expect(result.error).toBe('RPC timeout');
+    expect(result.error).toContain('RPC timeout');
     expect(result.results).toEqual([]);
   });
 
   it('handles empty results gracefully', async () => {
-    (supabase.rpc as any).mockResolvedValue({ data: null, error: null });
+    (apiClient.post as any).mockResolvedValue({ data: null });
 
     const result = await WaiverService.processAllPendingWaivers();
     expect(result.success).toBe(true);
@@ -1208,21 +600,22 @@ describe('WaiverService.processAllPendingWaivers', () => {
 describe('WaiverService.getWaiverProcessingStatus', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    resetChain();
   });
 
-  it('returns league status data from RPC', async () => {
-    const statusData = [
-      {
-        league_id: 'league-1',
-        league_name: 'Test League',
-        pending_claims: 5,
-        last_processed: '2025-12-08T03:00:00Z',
-        next_process_time: '2025-12-09T03:00:00Z',
-      },
-    ];
+  it('returns league status data from API', async () => {
+    const statusData = {
+      leagues: [
+        {
+          league_id: 'league-1',
+          league_name: 'Test League',
+          pending_claims: 5,
+          last_processed: '2025-12-08T03:00:00Z',
+          next_process_time: '2025-12-09T03:00:00Z',
+        },
+      ],
+    };
 
-    (supabase.rpc as any).mockResolvedValue({ data: statusData, error: null });
+    (apiClient.get as any).mockResolvedValue({ data: statusData });
 
     const result = await WaiverService.getWaiverProcessingStatus();
     expect(result.leagues).toHaveLength(1);
@@ -1230,15 +623,12 @@ describe('WaiverService.getWaiverProcessingStatus', () => {
     expect(result.error).toBeUndefined();
   });
 
-  it('returns empty array and error on RPC failure', async () => {
-    (supabase.rpc as any).mockResolvedValue({
-      data: null,
-      error: { message: 'Permission denied' },
-    });
+  it('returns empty array and error on API failure', async () => {
+    (apiClient.get as any).mockRejectedValue(new Error('Permission denied'));
 
     const result = await WaiverService.getWaiverProcessingStatus();
     expect(result.leagues).toEqual([]);
-    expect(result.error).toBe('Permission denied');
+    expect(result.error).toContain('Permission denied');
   });
 });
 
@@ -1249,26 +639,18 @@ describe('WaiverService.getWaiverProcessingStatus', () => {
 describe('WaiverService.recalculateReverseStandingsPriority', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    resetChain();
   });
 
-  it('returns success when RPC succeeds', async () => {
-    (supabase.rpc as any).mockResolvedValue({ data: null, error: null });
+  it('returns success when API succeeds', async () => {
+    (apiClient.post as any).mockResolvedValue({ data: { success: true } });
 
     const result = await WaiverService.recalculateReverseStandingsPriority('league-1');
     expect(result.success).toBe(true);
-    expect(supabase.rpc).toHaveBeenCalledWith('recalculate_reverse_standings_priority', {
-      p_league_id: 'league-1',
-    });
+    expect(apiClient.post).toHaveBeenCalledWith('/api/waivers/league/league-1/recalculate-priority');
   });
 
-  it('returns error when RPC fails', async () => {
-    // The code does `if (error) throw error` — supply an actual Error so the catch
-    // block's `error instanceof Error ? error.message : ...` path works correctly.
-    (supabase.rpc as any).mockResolvedValue({
-      data: null,
-      error: new Error('Function does not exist'),
-    });
+  it('returns error when API fails', async () => {
+    (apiClient.post as any).mockRejectedValue(new Error('Function does not exist'));
 
     const result = await WaiverService.recalculateReverseStandingsPriority('league-1');
     expect(result.success).toBe(false);
@@ -1277,84 +659,30 @@ describe('WaiverService.recalculateReverseStandingsPriority', () => {
 });
 
 // =============================================================================
-// updateWaiverSettings — Commissioner Settings
+// updateWaiverSettings
 // =============================================================================
 
 describe('WaiverService.updateWaiverSettings', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    resetChain();
   });
 
-  it('requires commissioner permissions', async () => {
-    (LeagueMembershipService.requireCommissioner as any).mockRejectedValue(
-      new Error('Not the commissioner')
-    );
-
-    const result = await WaiverService.updateWaiverSettings('league-1', 'user-2', {
-      waiver_type: 'faab',
-    });
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('Not the commissioner');
-  });
-
-  it('updates settings and triggers reverse standings recalculation when switching to reverse_standings', async () => {
-    (LeagueMembershipService.requireCommissioner as any).mockResolvedValue(undefined);
-
-    const leagueChain = createChainMock();
-    leagueChain.eq.mockResolvedValue({ data: null, error: null });
-
-    perTableChains({ leagues: leagueChain });
-
-    // Mock rpc for recalculate and notify
-    (supabase.rpc as any).mockResolvedValue({ data: null, error: null });
-
-    vi.spyOn(WaiverService, 'recalculateReverseStandingsPriority').mockResolvedValue({
-      success: true,
-    });
+  it('updates settings successfully', async () => {
+    (apiClient.put as any).mockResolvedValue({ data: { success: true } });
 
     const result = await WaiverService.updateWaiverSettings('league-1', 'commissioner-1', {
       waiver_type: 'reverse_standings',
     });
 
     expect(result.success).toBe(true);
-    expect(WaiverService.recalculateReverseStandingsPriority).toHaveBeenCalledWith('league-1');
-
-    vi.restoreAllMocks();
+    expect(apiClient.put).toHaveBeenCalledWith(
+      '/api/waivers/league/league-1/settings',
+      { waiver_type: 'reverse_standings' }
+    );
   });
 
-  it('does not recalculate priority when switching to faab', async () => {
-    (LeagueMembershipService.requireCommissioner as any).mockResolvedValue(undefined);
-
-    const leagueChain = createChainMock();
-    leagueChain.eq.mockResolvedValue({ data: null, error: null });
-    perTableChains({ leagues: leagueChain });
-
-    (supabase.rpc as any).mockResolvedValue({ data: null, error: null });
-
-    vi.spyOn(WaiverService, 'recalculateReverseStandingsPriority');
-
-    const result = await WaiverService.updateWaiverSettings('league-1', 'commissioner-1', {
-      waiver_type: 'faab',
-    });
-
-    expect(result.success).toBe(true);
-    expect(WaiverService.recalculateReverseStandingsPriority).not.toHaveBeenCalled();
-
-    vi.restoreAllMocks();
-  });
-
-  it('returns error when league update fails', async () => {
-    (LeagueMembershipService.requireCommissioner as any).mockResolvedValue(undefined);
-
-    const leagueChain = createChainMock();
-    // The chain is .update(settings).eq('id', leagueId) — eq is awaited.
-    // Code does `if (error) throw error`, so supply an actual Error instance.
-    leagueChain.eq.mockResolvedValue({
-      data: null,
-      error: new Error('Update failed'),
-    });
-    perTableChains({ leagues: leagueChain });
+  it('returns error when API fails', async () => {
+    (apiClient.put as any).mockRejectedValue(new Error('Update failed'));
 
     const result = await WaiverService.updateWaiverSettings('league-1', 'commissioner-1', {
       waiver_game_lock: true,
@@ -1366,84 +694,89 @@ describe('WaiverService.updateWaiverSettings', () => {
 });
 
 // =============================================================================
+// processFAABWaivers
+// =============================================================================
+
+describe('WaiverService.processFAABWaivers', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns processed results from API', async () => {
+    (apiClient.post as any).mockResolvedValue({
+      data: {
+        processed: 3,
+        results: [
+          { player_id: 101, winner_team_id: 'team-1', bid: 25 },
+        ],
+      },
+    });
+
+    const result = await WaiverService.processFAABWaivers('league-1');
+    expect(result.processed).toBe(3);
+    expect(result.results).toHaveLength(1);
+  });
+
+  it('returns error on API failure', async () => {
+    (apiClient.post as any).mockRejectedValue(new Error('Processing error'));
+
+    const result = await WaiverService.processFAABWaivers('league-1');
+    expect(result.processed).toBe(0);
+    expect(result.error).toContain('Processing error');
+  });
+});
+
+// =============================================================================
 // addPlayer — Smart add (free agent vs waiver claim routing)
 // =============================================================================
 
 describe('WaiverService.addPlayer', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    resetChain();
   });
 
-  it('routes to free agent pickup when player is available', async () => {
-    vi.spyOn(WaiverService, 'checkPlayerAvailability').mockResolvedValue({
-      player_id: 8478402,
-      is_available: true,
-      is_game_locked: false,
-      is_on_waivers: false,
-      waiver_clear_time: null,
-      lock_reason: null,
+  it('routes to free agent pickup when API succeeds', async () => {
+    (waiverApi.addFreeAgent as any).mockResolvedValue({
+      data: { success: true },
     });
-    vi.spyOn(WaiverService, 'addFreeAgent').mockResolvedValue({ success: true });
-
-    // Mock team owned by the authenticated user (test-user-id from auth mock)
-    const teamChain = createChainMock();
-    teamChain.single.mockResolvedValue({
-      data: { owner_id: 'test-user-id' },
-      error: null,
-    });
-    perTableChains({ teams: teamChain });
 
     const result = await WaiverService.addPlayer('league-1', 'team-1', 8478402, null);
     expect(result.success).toBe(true);
     expect(result.isFreeAgent).toBe(true);
-    expect(WaiverService.addFreeAgent).toHaveBeenCalled();
-
-    vi.restoreAllMocks();
   });
 
-  it('routes to waiver claim when player is unavailable', async () => {
-    vi.spyOn(WaiverService, 'checkPlayerAvailability').mockResolvedValue({
-      player_id: 8478402,
-      is_available: false,
-      is_game_locked: true,
-      is_on_waivers: false,
-      waiver_clear_time: null,
-      lock_reason: 'Player is currently in a game',
+  it('falls back to waiver claim when free agent add fails', async () => {
+    (waiverApi.addFreeAgent as any).mockRejectedValue(new Error('Player locked'));
+    (waiverApi.submitClaim as any).mockResolvedValue({
+      data: { success: true, claimId: 'claim-xyz' },
     });
-    vi.spyOn(WaiverService, 'submitWaiverClaim').mockResolvedValue({
-      success: true,
-      claimId: 'claim-xyz',
-    });
-
-    // Mock team owned by the authenticated user (test-user-id from auth mock)
-    const teamChain = createChainMock();
-    teamChain.single.mockResolvedValue({
-      data: { owner_id: 'test-user-id' },
-      error: null,
-    });
-    perTableChains({ teams: teamChain });
 
     const result = await WaiverService.addPlayer('league-1', 'team-1', 8478402, null);
     expect(result.success).toBe(true);
     expect(result.isFreeAgent).toBe(false);
     expect(result.claimId).toBe('claim-xyz');
-    expect(WaiverService.submitWaiverClaim).toHaveBeenCalled();
-
-    vi.restoreAllMocks();
   });
 
-  it('returns error when team has no owner', async () => {
-    const teamChain = createChainMock();
-    teamChain.single.mockResolvedValue({
-      data: { owner_id: null },
-      error: null,
-    });
-    perTableChains({ teams: teamChain });
+  it('returns error when both free agent and waiver claim fail', async () => {
+    (waiverApi.addFreeAgent as any).mockRejectedValue(new Error('Player locked'));
+    (waiverApi.submitClaim as any).mockRejectedValue(new Error('Claim failed'));
 
     const result = await WaiverService.addPlayer('league-1', 'team-1', 8478402, null);
     expect(result.success).toBe(false);
-    // Auth checks now verify team ownership — null owner_id fails the "no owner" check
-    expect(result.error).toBeDefined();
+    expect(result.error).toContain('Claim failed');
+  });
+
+  it('passes drop player ID through', async () => {
+    (waiverApi.addFreeAgent as any).mockResolvedValue({
+      data: { success: true },
+    });
+
+    await WaiverService.addPlayer('league-1', 'team-1', 8478402, 8477474);
+
+    expect(waiverApi.addFreeAgent).toHaveBeenCalledWith('league-1', {
+      teamId: 'team-1',
+      playerId: '8478402',
+      dropPlayerId: '8477474',
+    });
   });
 });

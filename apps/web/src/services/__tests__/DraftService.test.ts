@@ -73,6 +73,14 @@ vi.mock('../LeagueMembershipService', () => ({
   },
 }));
 
+// leagueApi mock — DraftService imports leagueApi for post-draft operations
+vi.mock('@/api/leagues', () => ({
+  leagueApi: {
+    getTeams: vi.fn().mockResolvedValue({ data: [] }),
+    getLeague: vi.fn().mockResolvedValue({ data: null }),
+  },
+}));
+
 // Supabase mock still needed for module resolution (subscribeToDraftPicks + some post-draft code)
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {

@@ -681,43 +681,9 @@ async joinLeagueByCode(
       // Use the SECURITY DEFINER RPC to insert notifications for all league members.
       // Direct INSERT is blocked by RLS (no INSERT policy for type='SYSTEM' from client).
       // The RPC verifies the caller is the commissioner and creates notifications for everyone.
-      const { data: result, error: rpcError } = await supabase.rpc('notify_league_members', {
-        p_league_id: leagueId,
-        p_title: title || 'League Settings Changed',
-        p_message: message,
-        p_notification_type: 'SYSTEM',
-      });
-
-      if (rpcError) {
-        logger.error('Error calling notify_league_members RPC:', rpcError);
-        // Fallback: try direct insert (will work if the INSERT policy migration is applied)
-        const { data: teams } = await supabase
-          .from('teams')
-          .select('owner_id')
-          .eq('league_id', leagueId)
-          .not('owner_id', 'is', null);
-
-        if (teams && teams.length > 0) {
-          const notifications = teams.map(team => ({
-            league_id: leagueId,
-            user_id: team.owner_id,
-            title: title || 'League Settings Changed',
-            message,
-            type: 'SYSTEM',
-            read_status: false,
-          }));
-
-          const { error: insertError } = await supabase.from('notifications').insert(notifications);
-          if (insertError) {
-            logger.error('Fallback direct insert also failed:', insertError);
-          }
-        }
-        return;
-      }
-
-      if (result && !result.success) {
-        logger.error('notify_league_members RPC returned error:', result.error);
-      }
+      // Route through the API server to send league-wide notifications
+      const { notificationApi } = await import('@/api/notifications');
+      await notificationApi.sendChatMessage(leagueId, message, title || 'League Settings Changed');
     } catch (error) {
       logger.error('Error creating notifications:', error);
       // Don't throw - notification failure shouldn't block settings update
@@ -2960,20 +2926,14 @@ async joinLeagueByCode(
     try {
       const todayStr = getTodayMST();
 
-      // Fetch completed and past matchups
-      const [completedResult, pastResult] = await Promise.all([
-        supabase.from('matchups')
-          .select('id, team1_id, team2_id, team1_score, team2_score, week_number, status, week_end_date')
-          .eq('league_id', leagueId).eq('status', 'completed'),
-        supabase.from('matchups')
-          .select('id, team1_id, team2_id, team1_score, team2_score, week_number, status, week_end_date')
-          .eq('league_id', leagueId).lt('week_end_date', todayStr).neq('status', 'completed'),
-      ]);
+      // Fetch matchups via API
+      const { matchupApi } = await import('@/api/matchups');
+      const matchupsResult = await matchupApi.getLeagueMatchups(leagueId);
+      const allMatchupData = (matchupsResult.data ?? []) as Array<{ id: string; team1_id: string; team2_id: string | null; team1_score: number | null; team2_score: number | null; week_number: number; status: string; week_end_date: string }>;
 
       type MatchupRow = { id: string; team1_id: string; team2_id: string | null; team1_score: number | null; team2_score: number | null; week_number: number; status: string; week_end_date: string };
       const matchupMap = new Map<string, MatchupRow>();
-      (completedResult.data ?? []).forEach(m => { if (m.id) matchupMap.set(m.id, m as MatchupRow); });
-      (pastResult.data ?? []).forEach(m => { if (m.id && !matchupMap.has(m.id)) matchupMap.set(m.id, m as MatchupRow); });
+      allMatchupData.filter(m => m.status === 'completed' || m.week_end_date < todayStr).forEach(m => { if (m.id) matchupMap.set(m.id, m); });
       const matchups = Array.from(matchupMap.values()).sort((a, b) => a.week_number - b.week_number);
 
       // Import category comparison function from scoringUtils
@@ -2981,10 +2941,9 @@ async joinLeagueByCode(
 
       // For each matchup, compute per-category W/L/T using roster-based stats.
       // Fetch all roster assignments and player stats for per-category comparisons.
-      const { data: allAssignments } = await supabase
-        .from('roster_assignments')
-        .select('team_id, player_id')
-        .eq('league_id', leagueId);
+      const { rosterApi } = await import('@/api/rosters');
+      const assignmentsResult = await rosterApi.getLeagueRosters(leagueId);
+      const allAssignments = (assignmentsResult.data ?? []) as Array<{ team_id: string; player_id: string }>;
 
       const playerIds = [...new Set((allAssignments || []).map(a => Number(a.player_id)))];
 
@@ -3507,36 +3466,21 @@ async joinLeagueByCode(
     }
 
     try {
-      const { data, error } = await supabase.rpc('process_roster_move', {
-        p_league_id: leagueId,
-        p_user_id: userId,
-        p_drop_player_id: playerId,
-        p_add_player_id: null,
-        p_transaction_source: source
-      });
+      // Route through API server for roster moves
+      const { waiverApi } = await import('@/api/waivers');
+      const { leagueApi } = await import('@/api/leagues');
 
-      if (error) {
-        return { success: false, error };
+      // Get user's team ID
+      const teamResult = await leagueApi.getMyTeam(leagueId);
+      const teamId = teamResult.data?.id;
+      if (!teamId) return { success: false, error: new Error('Team not found') };
+
+      const dropResult = await waiverApi.dropPlayer(leagueId, { teamId, playerId });
+      if (dropResult.error) {
+        return { success: false, error: new Error(dropResult.error) };
       }
 
-      const result = data as { success?: boolean; error?: string; status?: string; message?: string };
-      if (result.success === false || result.status === 'error') {
-        return { success: false, error: new Error(result.error || result.message || 'Roster move failed') };
-      }
-
-      // Clear roster cache for the user's team when player is dropped
-      // Get team ID to clear cache
-      const { data: teamData } = await supabase
-        .from('teams')
-        .select('id')
-        .eq('league_id', leagueId)
-        .eq('owner_id', userId)
-        .maybeSingle();
-
-      if (teamData) {
-        MatchupService.clearRosterCache(teamData.id, leagueId);
-      }
-
+      MatchupService.clearRosterCache(teamId, leagueId);
       return { success: true, error: null };
     } catch (error) {
       return { success: false, error };
@@ -3567,90 +3511,23 @@ async joinLeagueByCode(
         return { success: false, error: leagueError || new Error('League not found') };
       }
 
-      // Get current roster size
-      const { data: teamData } = await supabase
-        .from('teams')
-        .select('id')
-        .eq('league_id', leagueId)
-        .eq('owner_id', userId)
-        .single();
+      // Route through API server for roster moves (server handles size checks)
+      const { waiverApi } = await import('@/api/waivers');
+      const { leagueApi: leagueApiImport } = await import('@/api/leagues');
 
-      if (!teamData) {
-        return { success: false, error: new Error('Team not found') };
-      }
+      // Get user's team ID
+      const teamResult = await leagueApiImport.getMyTeam(leagueId);
+      const teamId = teamResult.data?.id;
+      if (!teamId) return { success: false, error: new Error('Team not found') };
 
-      // Get lineup data (use maybeSingle to handle case where no lineup exists yet)
-      const { data: lineupData, error: lineupError } = await supabase
-        .from('team_lineups')
-        .select('starters, bench, ir')
-        .eq('team_id', teamData.id)
-        .eq('league_id', leagueId)
-        .maybeSingle();
-
-      // Check for query errors (not just "no rows found")
-      if (lineupError && lineupError.code !== 'PGRST116') {
-        // PGRST116 = no rows found (expected when no lineup exists yet)
-        // Any other error is a real database error
-        logger.error('Error fetching lineup data:', lineupError);
-        return { success: false, error: new Error('Could not load lineup information') };
-      }
-
-      // Calculate current roster size
-      // If lineup exists, use it; otherwise count roster_assignments (source of truth)
-      let currentRosterSize = 0;
-      if (lineupData) {
-        // Lineup exists - use lineup data
-        currentRosterSize = 
-          (lineupData.starters?.length || 0) +
-          (lineupData.bench?.length || 0) +
-          (lineupData.ir?.length || 0);
-      } else {
-        // No lineup exists yet - count roster_assignments instead
-        const { count: rosterCount, error: rosterError } = await supabase
-          .from('roster_assignments')
-          .select('*', { count: 'exact', head: true })
-          .eq('team_id', teamData.id)
-          .eq('league_id', leagueId);
-        
-        if (rosterError) {
-          logger.error('Error counting roster_assignments:', rosterError);
-          return { success: false, error: new Error('Could not load roster for size check') };
-        } else {
-          currentRosterSize = rosterCount || 0;
-        }
-      }
-
-      const maxRosterSize = league.roster_size + 3; // roster_size + 3 IR slots
-
-      if (currentRosterSize >= maxRosterSize) {
-        return { 
-          success: false, 
-          error: new Error(`Roster is full. Maximum size is ${maxRosterSize} (${league.roster_size} roster + 3 IR slots)`) 
-        };
-      }
-
-      const { data, error } = await supabase.rpc('process_roster_move', {
-        p_league_id: leagueId,
-        p_user_id: userId,
-        p_drop_player_id: null,
-        p_add_player_id: playerId,
-        p_transaction_source: source
-      });
-
-      if (error) {
-        return { success: false, error };
-      }
-
-      const result = data as { success?: boolean; error?: string; status?: string; message?: string };
-      if (result.success === false || result.status === 'error') {
-        return { success: false, error: new Error(result.error || result.message || 'Roster move failed') };
+      const addResult = await waiverApi.addFreeAgent(leagueId, { teamId, playerId });
+      if (addResult.error) {
+        return { success: false, error: new Error(addResult.error) };
       }
 
       // Clear roster cache for this team when player is added
-      if (teamData) {
-        const { MatchupService } = await import('./MatchupService');
-        MatchupService.clearRosterCache(teamData.id, leagueId);
-      }
+      const { MatchupService } = await import('./MatchupService');
+      MatchupService.clearRosterCache(teamId, leagueId);
 
       return { success: true, error: null };
     } catch (error) {

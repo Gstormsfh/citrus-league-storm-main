@@ -478,6 +478,43 @@ export class DraftService {
     return { error };
   }
 
+  /** Delete ALL draft data across all leagues (admin only) */
+  async deleteAllDraftData() {
+    const { count: picksCountBefore } = await this.supabase
+      .from('draft_picks')
+      .select('*', { count: 'exact', head: true });
+
+    const { count: ordersCountBefore } = await this.supabase
+      .from('draft_order')
+      .select('*', { count: 'exact', head: true });
+
+    const { count: leaguesCount } = await this.supabase
+      .from('leagues')
+      .select('*', { count: 'exact', head: true });
+
+    const { data: allLeagues } = await this.supabase
+      .from('leagues')
+      .select('id');
+
+    for (const league of allLeagues || []) {
+      await this.supabase.from('draft_picks').delete().eq('league_id', league.id);
+      await this.supabase.from('draft_order').delete().eq('league_id', league.id);
+    }
+
+    await this.supabase
+      .from('leagues')
+      .update({ draft_status: 'not_started' })
+      .in('draft_status', ['in_progress', 'completed']);
+
+    return {
+      deletedCounts: {
+        picks: picksCountBefore || 0,
+        orders: ordersCountBefore || 0,
+        leagues: leaguesCount || 0,
+      },
+    };
+  }
+
   async getAutopickRankings(leagueId: string, teamId?: string) {
     let query = this.supabase
       .from('player_autopick_rankings')

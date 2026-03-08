@@ -2,7 +2,9 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
-import { supabase } from '@/integrations/supabase/client';
+import { leagueApi } from '@/api/leagues';
+import { matchupApi } from '@/api/matchups';
+import { rosterApi } from '@/api/rosters';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
@@ -211,18 +213,13 @@ const FreeAgents = () => {
       // Fallback: if no activeLeagueId is set, query for user's first team
       if (!currentLeagueId && user) {
         try {
-          const { data: userTeamDataResult } = await supabase
-            .from('teams')
-            .select('league_id')
-            .eq('owner_id', user.id)
-            .maybeSingle();
-          
-          if (userTeamDataResult) {
-            const userTeamData = userTeamDataResult as { league_id: string };
-            currentLeagueId = userTeamData.league_id;
+          const response = await leagueApi.getUserLeagues();
+          const leagues = response.data as Array<{ id: string }>;
+          if (leagues && leagues.length > 0) {
+            currentLeagueId = leagues[0].id;
           }
         } catch (error) {
-          logger.error('Error fetching user team:', error);
+          logger.error('Error fetching user leagues:', error);
           // Continue without league ID - will show all players
         }
       }
@@ -310,20 +307,16 @@ const FreeAgents = () => {
         weekEnd.setDate(weekStart.getDate() + 6);
         weekEnd.setHours(23, 59, 59, 999);
       } else {
-        // For logged-in users with real leagues, try to get matchup week from database
+        // For logged-in users with real leagues, try to get matchup week from API
         try {
-          const { data: matchups, error: matchupError } = await supabase
-            .from('matchups')
-            .select('week_start_date, week_end_date')
-            .eq('league_id', effectiveLeagueId)
-            .eq('status', 'in_progress')
-            .limit(1);
-          
-          if (!matchupError && matchups && matchups.length > 0) {
-            const matchup = matchups[0];
-            weekStart = new Date(matchup.week_start_date + 'T00:00:00');
+          const matchupResponse = await matchupApi.getLeagueMatchups(effectiveLeagueId);
+          const allMatchups = matchupResponse.data as Array<{ week_start_date: string; week_end_date: string; status: string }>;
+          const inProgressMatchup = allMatchups?.find(m => m.status === 'in_progress');
+
+          if (inProgressMatchup) {
+            weekStart = new Date(inProgressMatchup.week_start_date + 'T00:00:00');
             weekStart.setHours(0, 0, 0, 0);
-            weekEnd = new Date(matchup.week_end_date + 'T23:59:59');
+            weekEnd = new Date(inProgressMatchup.week_end_date + 'T23:59:59');
             weekEnd.setHours(23, 59, 59, 999);
           }
         } catch (error) {
@@ -474,20 +467,16 @@ const FreeAgents = () => {
         weekEnd.setDate(weekStart.getDate() + 6);
         weekEnd.setHours(23, 59, 59, 999);
       } else {
-        // For logged-in users with real leagues, try to get matchup week from database
+        // For logged-in users with real leagues, try to get matchup week from API
         try {
-          const { data: matchups, error: matchupError } = await supabase
-            .from('matchups')
-            .select('week_start_date, week_end_date')
-            .eq('league_id', effectiveLeagueId)
-            .eq('status', 'in_progress')
-            .limit(1);
-          
-          if (!matchupError && matchups && matchups.length > 0) {
-            const matchup = matchups[0];
-            weekStart = new Date(matchup.week_start_date + 'T00:00:00');
+          const matchupResponse = await matchupApi.getLeagueMatchups(effectiveLeagueId);
+          const allMatchups = matchupResponse.data as Array<{ week_start_date: string; week_end_date: string; status: string }>;
+          const inProgressMatchup = allMatchups?.find(m => m.status === 'in_progress');
+
+          if (inProgressMatchup) {
+            weekStart = new Date(inProgressMatchup.week_start_date + 'T00:00:00');
             weekStart.setHours(0, 0, 0, 0);
-            weekEnd = new Date(matchup.week_end_date + 'T23:59:59');
+            weekEnd = new Date(inProgressMatchup.week_end_date + 'T23:59:59');
             weekEnd.setHours(23, 59, 59, 999);
           }
         } catch (error) {
@@ -629,12 +618,9 @@ const FreeAgents = () => {
 
     // Check draft status FIRST - must complete draft before adding free agents
     try {
-      const { data: leagueData } = await supabase
-        .from('leagues')
-        .select('draft_status')
-        .eq('id', leagueId)
-        .single();
-      
+      const leagueResponse = await leagueApi.getLeague(leagueId);
+      const leagueData = leagueResponse.data as { draft_status?: string } | undefined;
+
       if (leagueData && leagueData.draft_status !== 'completed') {
         toast({
           title: "Draft Required",
@@ -666,12 +652,8 @@ const FreeAgents = () => {
       }
 
       // Get current roster size
-      const { data: teamDataResult } = await supabase
-        .from('teams')
-        .select('id')
-        .eq('league_id', leagueId)
-        .eq('owner_id', user.id)
-        .single();
+      const myTeamResponse = await leagueApi.getMyTeam(leagueId);
+      const teamDataResult = myTeamResponse.data as { id: string } | undefined;
 
       if (!teamDataResult) {
         toast({
@@ -681,29 +663,17 @@ const FreeAgents = () => {
         });
         return;
       }
-      const teamData = teamDataResult as { id: string };
+      const teamData = teamDataResult;
 
-      // Get lineup data (use maybeSingle to handle case where no lineup exists yet)
-      const { data: lineupDataResult, error: lineupError } = await supabase
-        .from('team_lineups')
-        .select('starters, bench, ir')
-        .eq('team_id', teamData.id)
-        .eq('league_id', leagueId)
-        .maybeSingle();
-
-      // Check for query errors (not just "no rows found")
-      if (lineupError && lineupError.code !== 'PGRST116') {
-        // PGRST116 = no rows found (expected when no lineup exists yet)
-        // Any other error is a real database error
-        logger.error('Error fetching lineup data:', lineupError);
-        toast({
-          title: "Error",
-          description: "Could not load lineup information.",
-          variant: "destructive"
-        });
-        return;
+      // Get lineup data from API
+      let lineupData: { starters?: string[]; bench?: string[]; ir?: string[] } | null = null;
+      try {
+        const lineupResponse = await rosterApi.getLineup(leagueId, teamData.id);
+        lineupData = lineupResponse.data as { starters?: string[]; bench?: string[]; ir?: string[] } | null;
+      } catch (lineupErr) {
+        // No lineup exists yet - lineupData stays null, which is handled below
+        logger.debug('No lineup found for team, will count roster_assignments instead');
       }
-      const lineupData = lineupDataResult as { starters?: string[]; bench?: string[]; ir?: string[] } | null;
 
       // Calculate current roster size
       // If lineup exists, use it; otherwise count roster_assignments (source of truth)

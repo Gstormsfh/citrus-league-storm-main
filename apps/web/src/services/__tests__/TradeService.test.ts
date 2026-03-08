@@ -2,61 +2,35 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { TradeOffer, TradeOfferWithPlayers } from '../TradeService';
 
 // =============================================================================
-// Mock Supabase client
+// Mock API modules
 // =============================================================================
 
-function createChainableMock() {
-  const chain: Record<string, any> = {};
-  chain.select = vi.fn().mockReturnValue(chain);
-  chain.insert = vi.fn().mockReturnValue(chain);
-  chain.update = vi.fn().mockReturnValue(chain);
-  chain.delete = vi.fn().mockReturnValue(chain);
-  chain.upsert = vi.fn().mockReturnValue(chain);
-  chain.eq = vi.fn().mockReturnValue(chain);
-  chain.is = vi.fn().mockReturnValue(chain);
-  chain.in = vi.fn().mockReturnValue(chain);
-  chain.or = vi.fn().mockReturnValue(chain);
-  chain.order = vi.fn().mockReturnValue(chain);
-  chain.limit = vi.fn().mockReturnValue(chain);
-  chain.single = vi.fn().mockResolvedValue({ data: null, error: null });
-  chain.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
-  return chain;
-}
-
-let mockChain = createChainableMock();
-
-const mockGetUser = vi.fn().mockResolvedValue({
-  data: { user: { id: 'auth-user-1' } },
-});
-
-vi.mock('@/integrations/supabase/client', () => ({
-  supabase: {
-    from: vi.fn(() => mockChain),
-    rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
-    auth: {
-      getUser: (...args: unknown[]) => mockGetUser(...args),
-      getSession: vi.fn().mockResolvedValue({ data: { session: { access_token: 'mock-token' } } }),
-    },
+vi.mock('@/api/trades', () => ({
+  tradeApi: {
+    getLeagueTrades: vi.fn(),
+    getReviewSettings: vi.fn(),
+    createTradeOffer: vi.fn(),
+    acceptTrade: vi.fn(),
+    rejectTrade: vi.fn(),
+    cancelTrade: vi.fn(),
+    submitVote: vi.fn(),
+    getVotes: vi.fn(),
+    commissionerDecision: vi.fn(),
   },
 }));
 
-vi.mock('../PlayerService', () => ({
-  PlayerService: {
-    getPlayersByIds: vi.fn().mockResolvedValue([]),
+vi.mock('@/api/account', () => ({
+  accountApi: {
+    logSecurityEvent: vi.fn().mockResolvedValue({ data: null }),
   },
 }));
 
-vi.mock('../LeagueMembershipService', () => ({
-  LeagueMembershipService: {
-    requireMembership: vi.fn().mockResolvedValue(undefined),
-    requireCommissioner: vi.fn().mockResolvedValue(undefined),
-  },
-}));
-
-vi.mock('@/utils/queryColumns', () => ({
-  COLUMNS: {
-    TRADE: 'id, league_id, from_team_id, to_team_id, offered_player_ids, requested_player_ids, status, message, created_at, expires_at, processed_at, counter_offer_id',
-    COUNT: 'id',
+vi.mock('@/api/client', () => ({
+  apiClient: {
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
   },
 }));
 
@@ -68,27 +42,17 @@ vi.mock('@/utils/logger', () => ({
   },
 }));
 
-vi.mock('../AuditService', () => ({
-  AuditService: {
-    log: vi.fn(),
-  },
-}));
-
 // =============================================================================
 // Import TradeService AFTER mocks
 // =============================================================================
 
-let TradeService: typeof import('../TradeService').TradeService;
+import { TradeService } from '../TradeService';
+import { tradeApi } from '@/api/trades';
+import { accountApi } from '@/api/account';
+import { apiClient } from '@/api/client';
 
-beforeEach(async () => {
+beforeEach(() => {
   vi.clearAllMocks();
-  mockChain = createChainableMock();
-  mockGetUser.mockResolvedValue({ data: { user: { id: 'auth-user-1' } } });
-  const mod = await import('../TradeService');
-  TradeService = mod.TradeService;
-
-  const { supabase } = await import('@/integrations/supabase/client');
-  (supabase.from as ReturnType<typeof vi.fn>).mockReturnValue(mockChain);
 });
 
 // =============================================================================
@@ -160,28 +124,33 @@ describe('TradeService Interfaces', () => {
 });
 
 // =============================================================================
-// createTradeOffer — Validation
+// createTradeOffer
 // =============================================================================
 
 describe('TradeService.createTradeOffer', () => {
-  it('rejects trades in Best Ball leagues', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
+  it('creates a trade offer successfully', async () => {
+    (tradeApi.createTradeOffer as any).mockResolvedValue({
+      data: { id: 'new-trade-id' },
+    });
 
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'teams') {
-        chain.single.mockResolvedValue({
-          data: { owner_id: 'auth-user-1' },
-          error: null,
-        });
-      }
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({
-          data: { settings: { bestBallEnabled: true } },
-          error: null,
-        });
-      }
-      return chain;
+    const result = await TradeService.createTradeOffer(
+      'league-1', 'team-a', 'team-b', [101], [201], 'Please accept'
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.tradeId).toBe('new-trade-id');
+    expect(tradeApi.createTradeOffer).toHaveBeenCalledWith('league-1', {
+      fromTeamId: 'team-a',
+      toTeamId: 'team-b',
+      offeredPlayerIds: ['101'],
+      requestedPlayerIds: ['201'],
+      message: 'Please accept',
+    });
+  });
+
+  it('returns error when API returns error', async () => {
+    (tradeApi.createTradeOffer as any).mockResolvedValue({
+      error: 'Best Ball leagues do not allow trades',
     });
 
     const result = await TradeService.createTradeOffer(
@@ -192,36 +161,9 @@ describe('TradeService.createTradeOffer', () => {
     expect(result.error).toContain('Best Ball');
   });
 
-  it('rejects trades after the trade deadline', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'teams') {
-        chain.single.mockResolvedValue({
-          data: { owner_id: 'auth-user-1' },
-          error: null,
-        });
-      }
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({
-          data: {
-            settings: {
-              bestBallEnabled: false,
-              tradeDeadlineWeek: 12,
-            },
-          },
-          error: null,
-        });
-      }
-      if (table === 'matchups') {
-        // Current week is 14, past the deadline of 12
-        chain.maybeSingle.mockResolvedValue({
-          data: { week_number: 14 },
-          error: null,
-        });
-      }
-      return chain;
+  it('returns error when API returns trade deadline error', async () => {
+    (tradeApi.createTradeOffer as any).mockResolvedValue({
+      error: 'The trade deadline has passed (Week 12)',
     });
 
     const result = await TradeService.createTradeOffer(
@@ -230,113 +172,11 @@ describe('TradeService.createTradeOffer', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('trade deadline has passed');
-    expect(result.error).toContain('Week 12');
   });
 
-  it('allows trades before the trade deadline', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'teams') {
-        chain.single.mockResolvedValue({
-          data: { owner_id: 'auth-user-1' },
-          error: null,
-        });
-      }
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({
-          data: {
-            settings: {
-              bestBallEnabled: false,
-              tradeDeadlineWeek: 12,
-              tradeExpirationDays: 3,
-            },
-          },
-          error: null,
-        });
-      }
-      if (table === 'matchups') {
-        // Current week is 8, before the deadline
-        chain.maybeSingle.mockResolvedValue({
-          data: { week_number: 8 },
-          error: null,
-        });
-      }
-      if (table === 'trade_offers') {
-        chain.single.mockResolvedValue({
-          data: { id: 'new-trade-id' },
-          error: null,
-        });
-      }
-      return chain;
-    });
-
-    const result = await TradeService.createTradeOffer(
-      'league-1', 'team-a', 'team-b', [101], [201], 'Please accept'
-    );
-
-    expect(result.success).toBe(true);
-    expect(result.tradeId).toBe('new-trade-id');
-  });
-
-  it('allows trades when no trade deadline is set (week 0)', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'teams') {
-        chain.single.mockResolvedValue({
-          data: { owner_id: 'auth-user-1' },
-          error: null,
-        });
-      }
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({
-          data: {
-            settings: {
-              bestBallEnabled: false,
-              tradeDeadlineWeek: 0,
-            },
-          },
-          error: null,
-        });
-      }
-      if (table === 'trade_offers') {
-        chain.single.mockResolvedValue({
-          data: { id: 'trade-no-deadline' },
-          error: null,
-        });
-      }
-      return chain;
-    });
-
-    const result = await TradeService.createTradeOffer(
-      'league-1', 'team-a', 'team-b', [101], [201]
-    );
-
-    expect(result.success).toBe(true);
-    expect(result.tradeId).toBe('trade-no-deadline');
-  });
-
-  it('returns error when league is not found', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'teams') {
-        chain.single.mockResolvedValue({
-          data: { owner_id: 'auth-user-1' },
-          error: null,
-        });
-      }
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({
-          data: null,
-          error: { message: 'League not found' },
-        });
-      }
-      return chain;
+  it('returns error when API returns league not found', async () => {
+    (tradeApi.createTradeOffer as any).mockResolvedValue({
+      error: 'League not found',
     });
 
     const result = await TradeService.createTradeOffer(
@@ -347,83 +187,8 @@ describe('TradeService.createTradeOffer', () => {
     expect(result.error).toContain('League not found');
   });
 
-  it('returns error on insert failure', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'teams') {
-        chain.single.mockResolvedValue({
-          data: { owner_id: 'auth-user-1' },
-          error: null,
-        });
-      }
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({
-          data: { settings: { bestBallEnabled: false, tradeDeadlineWeek: 0 } },
-          error: null,
-        });
-      }
-      if (table === 'trade_offers') {
-        chain.single.mockResolvedValue({
-          data: null,
-          error: { message: 'Unique constraint violation' },
-        });
-      }
-      return chain;
-    });
-
-    const result = await TradeService.createTradeOffer(
-      'league-1', 'team-a', 'team-b', [101], [201]
-    );
-
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('Unique constraint violation');
-  });
-
-  it('sets null message when no message provided', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    let insertedData: any = null;
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'teams') {
-        chain.single.mockResolvedValue({
-          data: { owner_id: 'auth-user-1' },
-          error: null,
-        });
-      }
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({
-          data: { settings: { bestBallEnabled: false, tradeDeadlineWeek: 0 } },
-          error: null,
-        });
-      }
-      if (table === 'trade_offers') {
-        chain.insert.mockImplementation((data: any) => {
-          insertedData = data;
-          return chain;
-        });
-        chain.single.mockResolvedValue({ data: { id: 'trade-1' }, error: null });
-      }
-      return chain;
-    });
-
-    await TradeService.createTradeOffer(
-      'league-1', 'team-a', 'team-b', [101], [201]
-      // no message
-    );
-
-    expect(insertedData.message).toBeNull();
-  });
-
   it('catches unexpected errors gracefully', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
-      throw new Error('Unexpected network failure');
-    });
+    (tradeApi.createTradeOffer as any).mockRejectedValue(new Error('Unexpected network failure'));
 
     const result = await TradeService.createTradeOffer(
       'league-1', 'team-a', 'team-b', [101], [201]
@@ -432,151 +197,87 @@ describe('TradeService.createTradeOffer', () => {
     expect(result.success).toBe(false);
     expect(result.error).toContain('Unexpected network failure');
   });
-});
 
-// =============================================================================
-// Trade Expiration Calculation
-// =============================================================================
-
-describe('Trade Expiration', () => {
-  it('uses default 7-day expiration when league has no custom setting', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    let insertedData: any = null;
-    const now = new Date();
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'teams') {
-        chain.single.mockResolvedValue({
-          data: { owner_id: 'auth-user-1' },
-          error: null,
-        });
-      }
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({
-          data: { settings: { bestBallEnabled: false, tradeDeadlineWeek: 0 } },
-          error: null,
-        });
-      }
-      if (table === 'trade_offers') {
-        chain.insert.mockImplementation((data: any) => {
-          insertedData = data;
-          return chain;
-        });
-        chain.single.mockResolvedValue({ data: { id: 'trade-exp' }, error: null });
-      }
-      return chain;
+  it('logs security event on successful creation', async () => {
+    (tradeApi.createTradeOffer as any).mockResolvedValue({
+      data: { id: 'trade-1' },
     });
 
-    await TradeService.createTradeOffer('league-1', 'team-a', 'team-b', [101], [201]);
+    await TradeService.createTradeOffer(
+      'league-1', 'team-a', 'team-b', [101], [201]
+    );
 
-    expect(insertedData).not.toBeNull();
-    const expiresAt = new Date(insertedData.expires_at);
-    // Should be approximately 7 days from now
-    const diffMs = expiresAt.getTime() - now.getTime();
-    const diffDays = diffMs / (1000 * 60 * 60 * 24);
-    expect(diffDays).toBeGreaterThanOrEqual(6.9);
-    expect(diffDays).toBeLessThanOrEqual(7.1);
+    expect(accountApi.logSecurityEvent).toHaveBeenCalledWith(
+      'TRADE_OFFER', 'league-1',
+      expect.objectContaining({ fromTeamId: 'team-a', toTeamId: 'team-b' })
+    );
   });
 
-  it('uses commissioner-configured expiration days', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    let insertedData: any = null;
-    const now = new Date();
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'teams') {
-        chain.single.mockResolvedValue({
-          data: { owner_id: 'auth-user-1' },
-          error: null,
-        });
-      }
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({
-          data: {
-            settings: {
-              bestBallEnabled: false,
-              tradeDeadlineWeek: 0,
-              tradeExpirationDays: 3,
-            },
-          },
-          error: null,
-        });
-      }
-      if (table === 'trade_offers') {
-        chain.insert.mockImplementation((data: any) => {
-          insertedData = data;
-          return chain;
-        });
-        chain.single.mockResolvedValue({ data: { id: 'trade-exp' }, error: null });
-      }
-      return chain;
+  it('handles empty player arrays', async () => {
+    (tradeApi.createTradeOffer as any).mockResolvedValue({
+      data: { id: 'trade-empty' },
     });
 
-    await TradeService.createTradeOffer('league-1', 'team-a', 'team-b', [101], [201]);
+    const result = await TradeService.createTradeOffer(
+      'league-1', 'team-a', 'team-b', [], []
+    );
 
-    const expiresAt = new Date(insertedData.expires_at);
-    const diffMs = expiresAt.getTime() - now.getTime();
-    const diffDays = diffMs / (1000 * 60 * 60 * 24);
-    expect(diffDays).toBeGreaterThanOrEqual(2.9);
-    expect(diffDays).toBeLessThanOrEqual(3.1);
+    expect(result.success).toBe(true);
+    expect(tradeApi.createTradeOffer).toHaveBeenCalledWith('league-1', expect.objectContaining({
+      offeredPlayerIds: [],
+      requestedPlayerIds: [],
+    }));
   });
 
-  it('sets status to pending on creation', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    let insertedData: any = null;
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'teams') {
-        chain.single.mockResolvedValue({
-          data: { owner_id: 'auth-user-1' },
-          error: null,
-        });
-      }
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({
-          data: { settings: { bestBallEnabled: false, tradeDeadlineWeek: 0 } },
-          error: null,
-        });
-      }
-      if (table === 'trade_offers') {
-        chain.insert.mockImplementation((data: any) => {
-          insertedData = data;
-          return chain;
-        });
-        chain.single.mockResolvedValue({ data: { id: 'trade-new' }, error: null });
-      }
-      return chain;
+  it('converts player IDs to strings', async () => {
+    (tradeApi.createTradeOffer as any).mockResolvedValue({
+      data: { id: 'trade-msg' },
     });
 
-    await TradeService.createTradeOffer('league-1', 'team-a', 'team-b', [101], [201]);
+    await TradeService.createTradeOffer(
+      'league-1', 'team-a', 'team-b', [101, 102], [201, 202, 203],
+      'This is a fair trade, McDavid for three depth players.'
+    );
 
-    expect(insertedData.status).toBe('pending');
+    expect(tradeApi.createTradeOffer).toHaveBeenCalledWith('league-1', expect.objectContaining({
+      offeredPlayerIds: ['101', '102'],
+      requestedPlayerIds: ['201', '202', '203'],
+      message: 'This is a fair trade, McDavid for three depth players.',
+    }));
+  });
+
+  it('sets undefined message when no message provided', async () => {
+    (tradeApi.createTradeOffer as any).mockResolvedValue({
+      data: { id: 'trade-1' },
+    });
+
+    await TradeService.createTradeOffer(
+      'league-1', 'team-a', 'team-b', [101], [201]
+    );
+
+    expect(tradeApi.createTradeOffer).toHaveBeenCalledWith('league-1', expect.objectContaining({
+      message: undefined,
+    }));
   });
 });
 
 // =============================================================================
-// acceptTradeOffer — Status Transitions & Validation
+// acceptTradeOffer
 // =============================================================================
 
 describe('TradeService.acceptTradeOffer', () => {
-  it('returns error when trade is not found or no longer pending', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
+  it('accepts a trade successfully', async () => {
+    (tradeApi.acceptTrade as any).mockResolvedValue({ data: {} });
 
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'trade_offers') {
-        chain.single.mockResolvedValue({
-          data: null,
-          error: { code: 'PGRST116', message: 'No rows found' },
-        });
-      }
-      return chain;
+    const result = await TradeService.acceptTradeOffer('trade-1');
+
+    expect(result.success).toBe(true);
+    expect(tradeApi.acceptTrade).toHaveBeenCalledWith('trade-1');
+  });
+
+  it('returns error when API returns error', async () => {
+    (tradeApi.acceptTrade as any).mockResolvedValue({
+      error: 'Trade not found or no longer pending',
     });
 
     const result = await TradeService.acceptTradeOffer('trade-expired');
@@ -585,101 +286,10 @@ describe('TradeService.acceptTradeOffer', () => {
     expect(result.error).toContain('not found or no longer pending');
   });
 
-  it('rejects accept from user who does not own the to_team', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'trade_offers') {
-        chain.single.mockResolvedValue({
-          data: {
-            id: 'trade-1',
-            league_id: 'league-1',
-            from_team_id: 'team-a',
-            to_team_id: 'team-b',
-            offered_player_ids: [101],
-            requested_player_ids: [201],
-            status: 'pending',
-          },
-          error: null,
-        });
-      }
-      if (table === 'teams') {
-        chain.single.mockResolvedValue({
-          data: { owner_id: 'user-OTHER' }, // Different user
-          error: null,
-        });
-      }
-      return chain;
+  it('returns review message when trade is routed to commissioner approval', async () => {
+    (tradeApi.acceptTrade as any).mockResolvedValue({
+      data: { message: 'Trade submitted for commissioner approval' },
     });
-
-    const result = await TradeService.acceptTradeOffer('trade-1', 'user-IMPOSTER');
-
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('only accept trades sent to your team');
-  });
-
-  it('routes to review process when league has commissioner review', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    let tradeOffersCallCount = 0;
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'trade_offers') {
-        tradeOffersCallCount++;
-        if (tradeOffersCallCount === 1) {
-          // First call: select(COLUMNS.TRADE).eq('id', tradeId).eq('status', 'pending').single()
-          let eqCallCount = 0;
-          chain.eq.mockImplementation(() => {
-            eqCallCount++;
-            if (eqCallCount >= 2) {
-              // After second .eq(), return chain so .single() can be called
-              return chain;
-            }
-            return chain;
-          });
-          chain.single.mockResolvedValue({
-            data: {
-              id: 'trade-1',
-              league_id: 'league-1',
-              from_team_id: 'team-a',
-              to_team_id: 'team-b',
-              offered_player_ids: [101],
-              requested_player_ids: [201],
-              status: 'pending',
-            },
-            error: null,
-          });
-        } else {
-          // Subsequent calls: submitTradeForReview update
-          chain.update.mockReturnValue(chain);
-          chain.eq.mockResolvedValue({ data: null, error: null });
-        }
-      }
-      if (table === 'teams') {
-        // Ownership check — auth-user-1 owns team-b (the to_team)
-        chain.single.mockResolvedValue({
-          data: { owner_id: 'auth-user-1' },
-          error: null,
-        });
-      }
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({
-          data: {
-            trade_review_type: 'commissioner',
-            trade_review_period_hours: 24,
-            roster_size: null,
-          },
-          error: null,
-        });
-      }
-      if (table === 'roster_assignments') {
-        chain.eq.mockResolvedValue({ count: 10, data: null, error: null });
-      }
-      return chain;
-    });
-
-    (supabase.rpc as ReturnType<typeof vi.fn>).mockResolvedValue({ data: null, error: null });
 
     const result = await TradeService.acceptTradeOffer('trade-1');
 
@@ -687,12 +297,18 @@ describe('TradeService.acceptTradeOffer', () => {
     expect(result.error).toContain('commissioner approval');
   });
 
-  it('catches unexpected errors gracefully', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
+  it('logs security event on successful accept', async () => {
+    (tradeApi.acceptTrade as any).mockResolvedValue({ data: {} });
 
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
-      throw new Error('Connection reset');
-    });
+    await TradeService.acceptTradeOffer('trade-1');
+
+    expect(accountApi.logSecurityEvent).toHaveBeenCalledWith(
+      'TRADE_ACCEPT', null, { tradeId: 'trade-1' }
+    );
+  });
+
+  it('catches unexpected errors gracefully', async () => {
+    (tradeApi.acceptTrade as any).mockRejectedValue(new Error('Connection reset'));
 
     const result = await TradeService.acceptTradeOffer('trade-1');
 
@@ -706,71 +322,18 @@ describe('TradeService.acceptTradeOffer', () => {
 // =============================================================================
 
 describe('TradeService.rejectTradeOffer', () => {
-  it('updates status to rejected', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    let updatedData: any = null;
-    let tradeOffersCallCount = 0;
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'trade_offers') {
-        tradeOffersCallCount++;
-        if (tradeOffersCallCount === 1) {
-          // First call: select('to_team_id, league_id').eq(...).eq(...).single()
-          chain.single.mockResolvedValue({
-            data: { to_team_id: 'team-b', league_id: 'league-1' },
-            error: null,
-          });
-        } else {
-          // Second call: update({status:'rejected'...}).eq().eq()
-          chain.update.mockImplementation((data: any) => {
-            updatedData = data;
-            return chain;
-          });
-          let eqCallCount = 0;
-          chain.eq.mockImplementation(() => {
-            eqCallCount++;
-            if (eqCallCount >= 2) return Promise.resolve({ data: null, error: null });
-            return chain;
-          });
-        }
-      }
-      if (table === 'teams') {
-        chain.single.mockResolvedValue({
-          data: { owner_id: 'auth-user-1' },
-          error: null,
-        });
-      }
-      return chain;
-    });
+  it('rejects a trade successfully', async () => {
+    (tradeApi.rejectTrade as any).mockResolvedValue({ data: {} });
 
     const result = await TradeService.rejectTradeOffer('trade-1');
 
     expect(result.success).toBe(true);
-    expect(updatedData.status).toBe('rejected');
-    expect(updatedData.processed_at).toBeDefined();
+    expect(tradeApi.rejectTrade).toHaveBeenCalledWith('trade-1');
   });
 
-  it('validates ownership when userId is provided', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'trade_offers') {
-        // select().eq('id', tradeId).eq('status', 'pending').single()
-        chain.single.mockResolvedValue({
-          data: { to_team_id: 'team-b', league_id: 'league-1' },
-          error: null,
-        });
-      }
-      if (table === 'teams') {
-        chain.single.mockResolvedValue({
-          data: { owner_id: 'user-WRONG' },
-          error: null,
-        });
-      }
-      return chain;
+  it('returns error when API returns error', async () => {
+    (tradeApi.rejectTrade as any).mockResolvedValue({
+      error: 'You can only reject trades sent to your team',
     });
 
     const result = await TradeService.rejectTradeOffer('trade-1', 'user-NOT-OWNER');
@@ -779,38 +342,9 @@ describe('TradeService.rejectTradeOffer', () => {
     expect(result.error).toContain('only reject trades sent to your team');
   });
 
-  it('returns error on DB failure', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    let tradeOffersCallCount = 0;
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'trade_offers') {
-        tradeOffersCallCount++;
-        if (tradeOffersCallCount === 1) {
-          // First call: select trade data
-          chain.single.mockResolvedValue({
-            data: { to_team_id: 'team-b', league_id: 'league-1' },
-            error: null,
-          });
-        } else {
-          // Second call: update
-          chain.update.mockReturnValue(chain);
-          let eqCallCount = 0;
-          chain.eq.mockImplementation(() => {
-            eqCallCount++;
-            if (eqCallCount >= 2) return Promise.resolve({ data: null, error: { message: 'DB write error' } });
-            return chain;
-          });
-        }
-      }
-      if (table === 'teams') {
-        chain.single.mockResolvedValue({
-          data: { owner_id: 'auth-user-1' },
-          error: null,
-        });
-      }
-      return chain;
+  it('returns error on API failure', async () => {
+    (tradeApi.rejectTrade as any).mockResolvedValue({
+      error: 'DB write error',
     });
 
     const result = await TradeService.rejectTradeOffer('trade-1');
@@ -819,12 +353,18 @@ describe('TradeService.rejectTradeOffer', () => {
     expect(result.error).toContain('DB write error');
   });
 
-  it('catches thrown exceptions gracefully', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
+  it('logs security event on successful reject', async () => {
+    (tradeApi.rejectTrade as any).mockResolvedValue({ data: {} });
 
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
-      throw new Error('Network timeout');
-    });
+    await TradeService.rejectTradeOffer('trade-1');
+
+    expect(accountApi.logSecurityEvent).toHaveBeenCalledWith(
+      'TRADE_REJECT', null, { tradeId: 'trade-1' }
+    );
+  });
+
+  it('catches thrown exceptions gracefully', async () => {
+    (tradeApi.rejectTrade as any).mockRejectedValue(new Error('Network timeout'));
 
     const result = await TradeService.rejectTradeOffer('trade-1');
 
@@ -838,78 +378,18 @@ describe('TradeService.rejectTradeOffer', () => {
 // =============================================================================
 
 describe('TradeService.cancelTradeOffer', () => {
-  it('updates status to cancelled', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    let updatedData: any = null;
-    let tradeOffersCallCount = 0;
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'trade_offers') {
-        tradeOffersCallCount++;
-        if (tradeOffersCallCount === 1) {
-          // First call: select('from_team_id, league_id').eq().eq().single()
-          chain.single.mockResolvedValue({
-            data: { from_team_id: 'team-a', league_id: 'league-1' },
-            error: null,
-          });
-        } else {
-          // Second call: update({status:'cancelled'...}).eq().eq()
-          chain.update.mockImplementation((data: any) => {
-            updatedData = data;
-            return chain;
-          });
-          let eqCallCount = 0;
-          chain.eq.mockImplementation(() => {
-            eqCallCount++;
-            if (eqCallCount >= 2) return Promise.resolve({ data: null, error: null });
-            return chain;
-          });
-        }
-      }
-      if (table === 'teams') {
-        chain.single.mockResolvedValue({
-          data: { owner_id: 'auth-user-1' },
-          error: null,
-        });
-      }
-      return chain;
-    });
+  it('cancels a trade successfully', async () => {
+    (tradeApi.cancelTrade as any).mockResolvedValue({ data: {} });
 
     const result = await TradeService.cancelTradeOffer('trade-1');
 
     expect(result.success).toBe(true);
-    expect(updatedData.status).toBe('cancelled');
-    expect(updatedData.processed_at).toBeDefined();
+    expect(tradeApi.cancelTrade).toHaveBeenCalledWith('trade-1');
   });
 
-  it('validates that only the proposer (from_team owner) can cancel', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    let fromCallCount = 0;
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      if (table === 'trade_offers') {
-        fromCallCount++;
-        const chain = createChainableMock();
-        if (fromCallCount === 1) {
-          // First call: select().eq('id', tradeId).eq('status', 'pending').single()
-          chain.single.mockResolvedValue({
-            data: { from_team_id: 'team-a', league_id: 'league-1' },
-            error: null,
-          });
-        }
-        return chain;
-      }
-      if (table === 'teams') {
-        const chain = createChainableMock();
-        chain.single.mockResolvedValue({
-          data: { owner_id: 'user-REAL-OWNER' },
-          error: null,
-        });
-        return chain;
-      }
-      return createChainableMock();
+  it('returns error when API returns error', async () => {
+    (tradeApi.cancelTrade as any).mockResolvedValue({
+      error: 'You can only cancel trades you proposed',
     });
 
     const result = await TradeService.cancelTradeOffer('trade-1', 'user-IMPOSTER');
@@ -918,46 +398,13 @@ describe('TradeService.cancelTradeOffer', () => {
     expect(result.error).toContain('only cancel trades you proposed');
   });
 
-  it('allows the proposer to cancel', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
+  it('catches thrown exceptions gracefully', async () => {
+    (tradeApi.cancelTrade as any).mockRejectedValue(new Error('Connection error'));
 
-    let fromCallCount = 0;
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      if (table === 'trade_offers') {
-        fromCallCount++;
-        const chain = createChainableMock();
-        if (fromCallCount === 1) {
-          // First call: select().eq('id', tradeId).eq('status', 'pending').single()
-          chain.single.mockResolvedValue({
-            data: { from_team_id: 'team-a', league_id: 'league-1' },
-            error: null,
-          });
-        } else {
-          // Second call: update({...}).eq('id', tradeId).eq('status', 'pending')
-          chain.update.mockReturnValue(chain);
-          let eqCallCount = 0;
-          chain.eq.mockImplementation(() => {
-            eqCallCount++;
-            if (eqCallCount >= 2) return Promise.resolve({ data: null, error: null });
-            return chain;
-          });
-        }
-        return chain;
-      }
-      if (table === 'teams') {
-        const chain = createChainableMock();
-        chain.single.mockResolvedValue({
-          data: { owner_id: 'user-PROPOSER' },
-          error: null,
-        });
-        return chain;
-      }
-      return createChainableMock();
-    });
+    const result = await TradeService.cancelTradeOffer('trade-1');
 
-    const result = await TradeService.cancelTradeOffer('trade-1', 'user-PROPOSER');
-
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Connection error');
   });
 });
 
@@ -967,14 +414,31 @@ describe('TradeService.cancelTradeOffer', () => {
 
 describe('TradeService.getTeamTradeOffers', () => {
   it('returns empty array when no trades exist', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
+    (tradeApi.getLeagueTrades as any).mockResolvedValue({ data: [] });
 
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'trade_offers') {
-        chain.order.mockResolvedValue({ data: [], error: null });
-      }
-      return chain;
+    const result = await TradeService.getTeamTradeOffers('league-1', 'team-a');
+
+    expect(result).toEqual([]);
+  });
+
+  it('filters trades by team ID', async () => {
+    const trades = [
+      { id: 't1', from_team_id: 'team-a', to_team_id: 'team-b' },
+      { id: 't2', from_team_id: 'team-c', to_team_id: 'team-a' },
+      { id: 't3', from_team_id: 'team-c', to_team_id: 'team-d' },
+    ];
+    (tradeApi.getLeagueTrades as any).mockResolvedValue({ data: trades });
+
+    const result = await TradeService.getTeamTradeOffers('league-1', 'team-a');
+
+    expect(result).toHaveLength(2);
+    expect(result.map((t: any) => t.id)).toEqual(['t1', 't2']);
+  });
+
+  it('returns empty array on API error (graceful fallback)', async () => {
+    (tradeApi.getLeagueTrades as any).mockResolvedValue({
+      data: null,
+      error: 'Query timeout',
     });
 
     const result = await TradeService.getTeamTradeOffers('league-1', 'team-a');
@@ -982,36 +446,8 @@ describe('TradeService.getTeamTradeOffers', () => {
     expect(result).toEqual([]);
   });
 
-  it('validates membership when userId is provided', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-    const { LeagueMembershipService } = await import('../LeagueMembershipService');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'trade_offers') {
-        chain.order.mockResolvedValue({ data: [], error: null });
-      }
-      return chain;
-    });
-
-    await TradeService.getTeamTradeOffers('league-1', 'team-a', 'user-1');
-
-    expect(LeagueMembershipService.requireMembership).toHaveBeenCalledWith('league-1', 'user-1');
-  });
-
-  it('returns empty array on DB error (graceful fallback)', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'trade_offers') {
-        chain.order.mockResolvedValue({
-          data: null,
-          error: { message: 'Query timeout' },
-        });
-      }
-      return chain;
-    });
+  it('returns empty array on thrown exception', async () => {
+    (tradeApi.getLeagueTrades as any).mockRejectedValue(new Error('Network error'));
 
     const result = await TradeService.getTeamTradeOffers('league-1', 'team-a');
 
@@ -1025,54 +461,26 @@ describe('TradeService.getTeamTradeOffers', () => {
 
 describe('TradeService.getLeagueTradeHistory', () => {
   it('returns empty array when no history exists', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'trade_history') {
-        chain.limit.mockResolvedValue({ data: [], error: null });
-      }
-      return chain;
-    });
+    (tradeApi.getLeagueTrades as any).mockResolvedValue({ data: [] });
 
     const result = await TradeService.getLeagueTradeHistory('league-1');
 
     expect(result).toEqual([]);
   });
 
-  it('limits results to 20', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
+  it('returns trade data from API', async () => {
+    const trades = [{ id: 't1', status: 'accepted' }];
+    (tradeApi.getLeagueTrades as any).mockResolvedValue({ data: trades });
 
-    let limitArg: number | undefined;
+    const result = await TradeService.getLeagueTradeHistory('league-1');
 
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'trade_history') {
-        chain.limit.mockImplementation((n: number) => {
-          limitArg = n;
-          return Promise.resolve({ data: [], error: null });
-        });
-      }
-      return chain;
-    });
-
-    await TradeService.getLeagueTradeHistory('league-1');
-
-    expect(limitArg).toBe(20);
+    expect(result).toEqual(trades);
   });
 
-  it('returns empty array on DB error', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'trade_history') {
-        chain.limit.mockResolvedValue({
-          data: null,
-          error: { message: 'Not found' },
-        });
-      }
-      return chain;
+  it('returns empty array on API error', async () => {
+    (tradeApi.getLeagueTrades as any).mockResolvedValue({
+      data: null,
+      error: 'Not found',
     });
 
     const result = await TradeService.getLeagueTradeHistory('league-1');
@@ -1086,18 +494,9 @@ describe('TradeService.getLeagueTradeHistory', () => {
 // =============================================================================
 
 describe('TradeService.submitTradeForReview', () => {
-  it('returns immediately for "none" review type', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({
-          data: { trade_review_type: 'none', trade_review_period_hours: 48 },
-          error: null,
-        });
-      }
-      return chain;
+  it('returns success with review type from API', async () => {
+    (tradeApi.acceptTrade as any).mockResolvedValue({
+      data: { reviewType: 'none' },
     });
 
     const result = await TradeService.submitTradeForReview('trade-1', 'league-1');
@@ -1106,98 +505,35 @@ describe('TradeService.submitTradeForReview', () => {
     expect(result.reviewType).toBe('none');
   });
 
-  it('sets trade to under_review for commissioner review type', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    let updatedData: any = null;
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({
-          data: { trade_review_type: 'commissioner', trade_review_period_hours: 24 },
-          error: null,
-        });
-      }
-      if (table === 'trade_offers') {
-        chain.update.mockImplementation((data: any) => {
-          updatedData = data;
-          return chain;
-        });
-        chain.eq.mockResolvedValue({ data: null, error: null });
-      }
-      return chain;
+  it('returns commissioner review type', async () => {
+    (tradeApi.acceptTrade as any).mockResolvedValue({
+      data: { reviewType: 'commissioner' },
     });
-
-    // Mock the notification RPC
-    (supabase.rpc as ReturnType<typeof vi.fn>).mockResolvedValue({ data: null, error: null });
 
     const result = await TradeService.submitTradeForReview('trade-1', 'league-1');
 
     expect(result.success).toBe(true);
     expect(result.reviewType).toBe('commissioner');
-    expect(updatedData.status).toBe('under_review');
-    expect(updatedData.review_started_at).toBeDefined();
-    expect(updatedData.review_ends_at).toBeDefined();
   });
 
-  it('uses dynamic review period from league settings', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    let updatedData: any = null;
-    const now = new Date();
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({
-          data: { trade_review_type: 'league_vote', trade_review_period_hours: 72 },
-          error: null,
-        });
-      }
-      if (table === 'trade_offers') {
-        chain.update.mockImplementation((data: any) => {
-          updatedData = data;
-          return chain;
-        });
-        chain.eq.mockResolvedValue({ data: null, error: null });
-      }
-      return chain;
-    });
-
-    (supabase.rpc as ReturnType<typeof vi.fn>).mockResolvedValue({ data: null, error: null });
-
-    await TradeService.submitTradeForReview('trade-1', 'league-1');
-
-    const reviewEnds = new Date(updatedData.review_ends_at);
-    const diffHours = (reviewEnds.getTime() - now.getTime()) / (1000 * 60 * 60);
-    // Should be approximately 72 hours
-    expect(diffHours).toBeGreaterThanOrEqual(71);
-    expect(diffHours).toBeLessThanOrEqual(73);
-  });
-
-  it('returns error on update failure', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({
-          data: { trade_review_type: 'commissioner', trade_review_period_hours: 48 },
-          error: null,
-        });
-      }
-      if (table === 'trade_offers') {
-        chain.update.mockReturnValue(chain);
-        chain.eq.mockResolvedValue({ data: null, error: { message: 'Row not found' } });
-      }
-      return chain;
+  it('returns error on API failure', async () => {
+    (tradeApi.acceptTrade as any).mockResolvedValue({
+      error: 'Row not found',
     });
 
     const result = await TradeService.submitTradeForReview('trade-1', 'league-1');
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('Row not found');
+  });
+
+  it('catches exceptions gracefully', async () => {
+    (tradeApi.acceptTrade as any).mockRejectedValue(new Error('Network error'));
+
+    const result = await TradeService.submitTradeForReview('trade-1', 'league-1');
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Network error');
   });
 });
 
@@ -1206,19 +542,15 @@ describe('TradeService.submitTradeForReview', () => {
 // =============================================================================
 
 describe('TradeService.submitTradeVote', () => {
-  it('calls submit_trade_vote RPC and returns vote counts', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.rpc as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: [{
+  it('calls API and returns vote counts', async () => {
+    (tradeApi.submitVote as any).mockResolvedValue({
+      data: {
         success: true,
         veto_count: 3,
         approve_count: 5,
         votes_needed: 4,
         is_vetoed: false,
-        message: 'Vote recorded',
-      }],
-      error: null,
+      },
     });
 
     const result = await TradeService.submitTradeVote('trade-1', 'voter-team', 'approve');
@@ -1232,18 +564,14 @@ describe('TradeService.submitTradeVote', () => {
   });
 
   it('returns vetoed state when veto threshold reached', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.rpc as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: [{
+    (tradeApi.submitVote as any).mockResolvedValue({
+      data: {
         success: true,
         veto_count: 5,
         approve_count: 2,
         votes_needed: 4,
         is_vetoed: true,
-        message: 'Trade vetoed',
-      }],
-      error: null,
+      },
     });
 
     const result = await TradeService.submitTradeVote('trade-1', 'voter-team', 'veto');
@@ -1252,13 +580,9 @@ describe('TradeService.submitTradeVote', () => {
     expect(result.vetoCount).toBe(5);
   });
 
-  it('handles RPC error gracefully', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    const rpcError = new Error('Cannot vote on own trade');
-    (supabase.rpc as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: null,
-      error: rpcError,
+  it('handles API error gracefully', async () => {
+    (tradeApi.submitVote as any).mockResolvedValue({
+      error: 'Cannot vote on own trade',
     });
 
     const result = await TradeService.submitTradeVote('trade-1', 'voter-team', 'approve');
@@ -1269,17 +593,11 @@ describe('TradeService.submitTradeVote', () => {
     expect(result.approveCount).toBe(0);
   });
 
-  it('defaults to safe values when RPC returns unexpected structure', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.rpc as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: null,
-      error: null,
-    });
+  it('handles exceptions gracefully', async () => {
+    (tradeApi.submitVote as any).mockRejectedValue(new Error('Network error'));
 
     const result = await TradeService.submitTradeVote('trade-1', 'voter-team', 'veto');
 
-    // data is null, so result?.[0] is undefined
     expect(result.success).toBe(false);
     expect(result.vetoCount).toBe(0);
     expect(result.approveCount).toBe(0);
@@ -1293,21 +611,12 @@ describe('TradeService.submitTradeVote', () => {
 // =============================================================================
 
 describe('TradeService.getTradeVotes', () => {
-  it('returns mapped votes from DB', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'trade_votes') {
-        chain.order.mockResolvedValue({
-          data: [
-            { voter_team_id: 'team-1', vote: 'approve', created_at: '2025-01-01' },
-            { voter_team_id: 'team-2', vote: 'veto', created_at: '2025-01-02' },
-          ],
-          error: null,
-        });
-      }
-      return chain;
+  it('returns mapped votes from API', async () => {
+    (tradeApi.getVotes as any).mockResolvedValue({
+      data: [
+        { voter_team_id: 'team-1', vote: 'approve', created_at: '2025-01-01' },
+        { voter_team_id: 'team-2', vote: 'veto', created_at: '2025-01-02' },
+      ],
     });
 
     const result = await TradeService.getTradeVotes('trade-1');
@@ -1321,24 +630,23 @@ describe('TradeService.getTradeVotes', () => {
   });
 
   it('returns empty array on error', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    const dbError = new Error('RLS violation');
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'trade_votes') {
-        chain.order.mockResolvedValue({
-          data: null,
-          error: dbError,
-        });
-      }
-      return chain;
+    (tradeApi.getVotes as any).mockResolvedValue({
+      error: 'RLS violation',
     });
 
     const result = await TradeService.getTradeVotes('trade-1');
 
     expect(result.votes).toEqual([]);
     expect(result.error).toContain('RLS violation');
+  });
+
+  it('returns empty array on thrown exception', async () => {
+    (tradeApi.getVotes as any).mockRejectedValue(new Error('DB error'));
+
+    const result = await TradeService.getTradeVotes('trade-1');
+
+    expect(result.votes).toEqual([]);
+    expect(result.error).toContain('DB error');
   });
 });
 
@@ -1347,18 +655,29 @@ describe('TradeService.getTradeVotes', () => {
 // =============================================================================
 
 describe('TradeService.commissionerDecision', () => {
-  it('rejects when league is not configured for commissioner review', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
+  it('approves trade successfully', async () => {
+    (tradeApi.commissionerDecision as any).mockResolvedValue({ data: {} });
 
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({
-          data: { trade_review_type: 'league_vote' },
-          error: null,
-        });
-      }
-      return chain;
+    const result = await TradeService.commissionerDecision('trade-1', 'league-1', 'approve', 'commissioner-id');
+
+    expect(result.success).toBe(true);
+    expect(tradeApi.commissionerDecision).toHaveBeenCalledWith('trade-1', {
+      leagueId: 'league-1',
+      decision: 'approve',
+    });
+  });
+
+  it('vetoes trade successfully', async () => {
+    (tradeApi.commissionerDecision as any).mockResolvedValue({ data: {} });
+
+    const result = await TradeService.commissionerDecision('trade-1', 'league-1', 'veto', 'commissioner-id');
+
+    expect(result.success).toBe(true);
+  });
+
+  it('returns error when API returns error', async () => {
+    (tradeApi.commissionerDecision as any).mockResolvedValue({
+      error: 'League not configured for commissioner review',
     });
 
     const result = await TradeService.commissionerDecision('trade-1', 'league-1', 'approve', 'commissioner-id');
@@ -1367,86 +686,13 @@ describe('TradeService.commissionerDecision', () => {
     expect(result.error).toContain('not configured for commissioner review');
   });
 
-  it('returns error when league is not found', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({ data: null, error: null });
-      }
-      return chain;
-    });
+  it('catches exceptions gracefully', async () => {
+    (tradeApi.commissionerDecision as any).mockRejectedValue(new Error('Permission denied'));
 
     const result = await TradeService.commissionerDecision('trade-1', 'league-1', 'veto', 'commissioner-id');
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain('League not found');
-  });
-
-  it('vetoes trade and sends notification', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    let updatedData: any = null;
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({
-          data: { trade_review_type: 'commissioner' },
-          error: null,
-        });
-      }
-      if (table === 'trade_offers') {
-        chain.update.mockImplementation((data: any) => {
-          updatedData = data;
-          return chain;
-        });
-        // .eq('id', tradeId).eq('status', 'under_review') — two chained eq calls
-        let eqCallCount = 0;
-        chain.eq.mockImplementation(() => {
-          eqCallCount++;
-          if (eqCallCount >= 2) return Promise.resolve({ data: null, error: null });
-          return chain;
-        });
-      }
-      return chain;
-    });
-
-    (supabase.rpc as ReturnType<typeof vi.fn>).mockResolvedValue({ data: null, error: null });
-
-    const result = await TradeService.commissionerDecision('trade-1', 'league-1', 'veto', 'commissioner-id');
-
-    expect(result.success).toBe(true);
-    expect(updatedData.status).toBe('vetoed');
-    expect(updatedData.vetoed_at).toBeDefined();
-    expect(updatedData.processed_at).toBeDefined();
-  });
-
-  it('validates commissioner identity via LeagueMembershipService', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-    const { LeagueMembershipService } = await import('../LeagueMembershipService');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({
-          data: { trade_review_type: 'commissioner' },
-          error: null,
-        });
-      }
-      if (table === 'trade_offers') {
-        chain.update.mockReturnValue(chain);
-        chain.eq.mockResolvedValue({ data: null, error: null });
-      }
-      return chain;
-    });
-
-    (supabase.rpc as ReturnType<typeof vi.fn>).mockResolvedValue({ data: null, error: null });
-
-    await TradeService.commissionerDecision('trade-1', 'league-1', 'veto', 'comm-user');
-
-    expect(LeagueMembershipService.requireCommissioner).toHaveBeenCalledWith('league-1', 'comm-user');
+    expect(result.error).toContain('Permission denied');
   });
 });
 
@@ -1455,22 +701,13 @@ describe('TradeService.commissionerDecision', () => {
 // =============================================================================
 
 describe('TradeService.getTradeReviewSettings', () => {
-  it('returns settings from league table', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({
-          data: {
-            trade_review_type: 'league_vote',
-            trade_review_period_hours: 72,
-            trade_veto_threshold: 0.67,
-          },
-          error: null,
-        });
-      }
-      return chain;
+  it('returns settings from API', async () => {
+    (tradeApi.getReviewSettings as any).mockResolvedValue({
+      data: {
+        reviewType: 'league_vote',
+        reviewPeriodHours: 72,
+        vetoThreshold: 0.67,
+      },
     });
 
     const result = await TradeService.getTradeReviewSettings('league-1');
@@ -1481,22 +718,13 @@ describe('TradeService.getTradeReviewSettings', () => {
     expect(result.error).toBeUndefined();
   });
 
-  it('returns defaults when league has no settings', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({
-          data: {
-            trade_review_type: null,
-            trade_review_period_hours: null,
-            trade_veto_threshold: null,
-          },
-          error: null,
-        });
-      }
-      return chain;
+  it('returns defaults when API returns null values', async () => {
+    (tradeApi.getReviewSettings as any).mockResolvedValue({
+      data: {
+        reviewType: null,
+        reviewPeriodHours: null,
+        vetoThreshold: null,
+      },
     });
 
     const result = await TradeService.getTradeReviewSettings('league-1');
@@ -1506,19 +734,37 @@ describe('TradeService.getTradeReviewSettings', () => {
     expect(result.vetoThreshold).toBe(0.5);
   });
 
-  it('returns defaults on error', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({
-          data: null,
-          error: { message: 'Not found' },
-        });
-      }
-      return chain;
+  it('returns defaults with snake_case field names', async () => {
+    (tradeApi.getReviewSettings as any).mockResolvedValue({
+      data: {
+        trade_review_type: 'commissioner',
+        trade_review_period_hours: 24,
+        trade_veto_threshold: 0.6,
+      },
     });
+
+    const result = await TradeService.getTradeReviewSettings('league-1');
+
+    expect(result.reviewType).toBe('commissioner');
+    expect(result.reviewPeriodHours).toBe(24);
+    expect(result.vetoThreshold).toBe(0.6);
+  });
+
+  it('returns defaults on API error', async () => {
+    (tradeApi.getReviewSettings as any).mockResolvedValue({
+      error: 'Not found',
+    });
+
+    const result = await TradeService.getTradeReviewSettings('league-1');
+
+    expect(result.reviewType).toBe('none');
+    expect(result.reviewPeriodHours).toBe(48);
+    expect(result.vetoThreshold).toBe(0.5);
+    expect(result.error).toBeDefined();
+  });
+
+  it('returns defaults on thrown exception', async () => {
+    (tradeApi.getReviewSettings as any).mockRejectedValue(new Error('Network error'));
 
     const result = await TradeService.getTradeReviewSettings('league-1');
 
@@ -1534,24 +780,8 @@ describe('TradeService.getTradeReviewSettings', () => {
 // =============================================================================
 
 describe('TradeService.updateTradeReviewSettings', () => {
-  it('updates league settings and sends notification', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    let updatedData: any = null;
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'leagues') {
-        chain.update.mockImplementation((data: any) => {
-          updatedData = data;
-          return chain;
-        });
-        chain.eq.mockResolvedValue({ data: null, error: null });
-      }
-      return chain;
-    });
-
-    (supabase.rpc as ReturnType<typeof vi.fn>).mockResolvedValue({ data: null, error: null });
+  it('updates league settings successfully', async () => {
+    (apiClient.put as any).mockResolvedValue({ data: null });
 
     const result = await TradeService.updateTradeReviewSettings('league-1', 'comm-id', {
       trade_review_type: 'league_vote',
@@ -1560,42 +790,19 @@ describe('TradeService.updateTradeReviewSettings', () => {
     });
 
     expect(result.success).toBe(true);
-    expect(updatedData.trade_review_type).toBe('league_vote');
-    expect(updatedData.trade_review_period_hours).toBe(72);
-    expect(updatedData.trade_veto_threshold).toBe(0.6);
+    expect(apiClient.put).toHaveBeenCalledWith(
+      '/api/trades/league/league-1/review-settings',
+      expect.objectContaining({
+        trade_review_type: 'league_vote',
+        trade_review_period_hours: 72,
+        trade_veto_threshold: 0.6,
+      })
+    );
   });
 
-  it('validates commissioner identity', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-    const { LeagueMembershipService } = await import('../LeagueMembershipService');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      chain.update.mockReturnValue(chain);
-      chain.eq.mockResolvedValue({ data: null, error: null });
-      return chain;
-    });
-
-    (supabase.rpc as ReturnType<typeof vi.fn>).mockResolvedValue({ data: null, error: null });
-
-    await TradeService.updateTradeReviewSettings('league-1', 'comm-user', {
-      trade_review_type: 'none',
-      trade_review_period_hours: 48,
-      trade_veto_threshold: 0.5,
-    });
-
-    expect(LeagueMembershipService.requireCommissioner).toHaveBeenCalledWith('league-1', 'comm-user');
-  });
-
-  it('returns error on update failure', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    const updateError = new Error('Permission denied');
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      chain.update.mockReturnValue(chain);
-      chain.eq.mockResolvedValue({ data: null, error: updateError });
-      return chain;
+  it('returns error when API returns error', async () => {
+    (apiClient.put as any).mockResolvedValue({
+      error: 'Permission denied',
     });
 
     const result = await TradeService.updateTradeReviewSettings('league-1', 'comm-id', {
@@ -1607,630 +814,17 @@ describe('TradeService.updateTradeReviewSettings', () => {
     expect(result.success).toBe(false);
     expect(result.error).toContain('Permission denied');
   });
-});
 
-// =============================================================================
-// Edge Cases
-// =============================================================================
+  it('catches thrown exceptions gracefully', async () => {
+    (apiClient.put as any).mockRejectedValue(new Error('Network error'));
 
-describe('TradeService Edge Cases', () => {
-  it('handles empty player arrays in trade offer creation', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    let insertedData: any = null;
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'teams') {
-        chain.single.mockResolvedValue({
-          data: { owner_id: 'auth-user-1' },
-          error: null,
-        });
-      }
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({
-          data: { settings: { bestBallEnabled: false, tradeDeadlineWeek: 0 } },
-          error: null,
-        });
-      }
-      if (table === 'trade_offers') {
-        chain.insert.mockImplementation((data: any) => {
-          insertedData = data;
-          return chain;
-        });
-        chain.single.mockResolvedValue({ data: { id: 'trade-empty' }, error: null });
-      }
-      return chain;
+    const result = await TradeService.updateTradeReviewSettings('league-1', 'comm-id', {
+      trade_review_type: 'none',
+      trade_review_period_hours: 48,
+      trade_veto_threshold: 0.5,
     });
-
-    const result = await TradeService.createTradeOffer(
-      'league-1', 'team-a', 'team-b', [], []
-    );
-
-    // The service does not validate empty arrays at the application level
-    // (that's typically handled by the DB or UI layer)
-    expect(result.success).toBe(true);
-    expect(insertedData.offered_player_ids).toEqual([]);
-    expect(insertedData.requested_player_ids).toEqual([]);
-  });
-
-  it('trade deadline check handles when no matchups exist (week 0)', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'teams') {
-        chain.single.mockResolvedValue({
-          data: { owner_id: 'auth-user-1' },
-          error: null,
-        });
-      }
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({
-          data: {
-            settings: {
-              bestBallEnabled: false,
-              tradeDeadlineWeek: 12,
-            },
-          },
-          error: null,
-        });
-      }
-      if (table === 'matchups') {
-        // No matchups yet
-        chain.maybeSingle.mockResolvedValue({ data: null, error: null });
-      }
-      if (table === 'trade_offers') {
-        chain.single.mockResolvedValue({ data: { id: 'trade-pre-season' }, error: null });
-      }
-      return chain;
-    });
-
-    // When no matchups exist, currentWeek = 0, which is < 12 (deadline)
-    const result = await TradeService.createTradeOffer(
-      'league-1', 'team-a', 'team-b', [101], [201]
-    );
-
-    expect(result.success).toBe(true);
-  });
-
-  it('trade deadline check blocks when current week equals deadline week', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'teams') {
-        chain.single.mockResolvedValue({
-          data: { owner_id: 'auth-user-1' },
-          error: null,
-        });
-      }
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({
-          data: {
-            settings: {
-              bestBallEnabled: false,
-              tradeDeadlineWeek: 10,
-            },
-          },
-          error: null,
-        });
-      }
-      if (table === 'matchups') {
-        // Current week IS the deadline week (10 >= 10)
-        chain.maybeSingle.mockResolvedValue({
-          data: { week_number: 10 },
-          error: null,
-        });
-      }
-      return chain;
-    });
-
-    const result = await TradeService.createTradeOffer(
-      'league-1', 'team-a', 'team-b', [101], [201]
-    );
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain('trade deadline has passed');
-  });
-
-  it('self-trade (same from and to team) is not rejected at service level', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    let insertedData: any = null;
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'teams') {
-        chain.single.mockResolvedValue({
-          data: { owner_id: 'auth-user-1' },
-          error: null,
-        });
-      }
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({
-          data: { settings: { bestBallEnabled: false, tradeDeadlineWeek: 0 } },
-          error: null,
-        });
-      }
-      if (table === 'trade_offers') {
-        chain.insert.mockImplementation((data: any) => {
-          insertedData = data;
-          return chain;
-        });
-        chain.single.mockResolvedValue({ data: { id: 'self-trade' }, error: null });
-      }
-      return chain;
-    });
-
-    // Self-trade: from and to are the same team
-    // The service doesn't block this — it's enforced by DB constraints or UI
-    const result = await TradeService.createTradeOffer(
-      'league-1', 'team-a', 'team-a', [101], [201]
-    );
-
-    expect(result.success).toBe(true);
-    expect(insertedData.from_team_id).toBe('team-a');
-    expect(insertedData.to_team_id).toBe('team-a');
-  });
-
-  it('handles league with null settings gracefully', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'teams') {
-        chain.single.mockResolvedValue({
-          data: { owner_id: 'auth-user-1' },
-          error: null,
-        });
-      }
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({
-          data: { settings: null },
-          error: null,
-        });
-      }
-      if (table === 'trade_offers') {
-        chain.single.mockResolvedValue({ data: { id: 'trade-null-settings' }, error: null });
-      }
-      return chain;
-    });
-
-    // When settings is null:
-    // - bestBallEnabled: (null)?.bestBallEnabled = undefined (falsy, so no block)
-    // - tradeDeadlineWeek: (null)?.tradeDeadlineWeek ?? 0 = 0 (no deadline)
-    // - tradeExpirationDays: (null)?.tradeExpirationDays ?? 7 = 7 (default)
-    const result = await TradeService.createTradeOffer(
-      'league-1', 'team-a', 'team-b', [101], [201]
-    );
-
-    expect(result.success).toBe(true);
-  });
-
-  it('preserves message in trade offer', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    let insertedData: any = null;
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'teams') {
-        chain.single.mockResolvedValue({
-          data: { owner_id: 'auth-user-1' },
-          error: null,
-        });
-      }
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({
-          data: { settings: { bestBallEnabled: false, tradeDeadlineWeek: 0 } },
-          error: null,
-        });
-      }
-      if (table === 'trade_offers') {
-        chain.insert.mockImplementation((data: any) => {
-          insertedData = data;
-          return chain;
-        });
-        chain.single.mockResolvedValue({ data: { id: 'trade-msg' }, error: null });
-      }
-      return chain;
-    });
-
-    await TradeService.createTradeOffer(
-      'league-1', 'team-a', 'team-b', [101, 102], [201, 202, 203],
-      'This is a fair trade, McDavid for three depth players.'
-    );
-
-    expect(insertedData.message).toBe('This is a fair trade, McDavid for three depth players.');
-    expect(insertedData.offered_player_ids).toEqual([101, 102]);
-    expect(insertedData.requested_player_ids).toEqual([201, 202, 203]);
-  });
-});
-
-// =============================================================================
-// Auth Enforcement Tests
-// =============================================================================
-// These tests verify the new auth enforcement pattern:
-//   1. Every mutation calls supabase.auth.getUser()
-//   2. Unauthenticated requests are rejected
-//   3. Ownership is ALWAYS validated (not conditionally)
-// =============================================================================
-
-describe('TradeService Auth Enforcement', () => {
-  // ---------------------------------------------------------------------------
-  // createTradeOffer — Auth
-  // ---------------------------------------------------------------------------
-  describe('createTradeOffer auth', () => {
-    it('calls supabase.auth.getUser() to resolve the current user', async () => {
-      const { supabase } = await import('@/integrations/supabase/client');
-
-      (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-        const chain = createChainableMock();
-        if (table === 'teams') {
-          chain.single.mockResolvedValue({
-            data: { owner_id: 'auth-user-1' },
-            error: null,
-          });
-        }
-        if (table === 'leagues') {
-          chain.single.mockResolvedValue({
-            data: { settings: { bestBallEnabled: false, tradeDeadlineWeek: 0 } },
-            error: null,
-          });
-        }
-        if (table === 'trade_offers') {
-          chain.single.mockResolvedValue({ data: { id: 'trade-auth' }, error: null });
-        }
-        return chain;
-      });
-
-      await TradeService.createTradeOffer('league-1', 'team-a', 'team-b', [101], [201]);
-
-      expect(mockGetUser).toHaveBeenCalled();
-    });
-
-    it('returns error when not authenticated (getUser returns null)', async () => {
-      mockGetUser.mockResolvedValue({ data: { user: null } });
-
-      const result = await TradeService.createTradeOffer(
-        'league-1', 'team-a', 'team-b', [101], [201]
-      );
-
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('Authentication required');
-    });
-
-    it('verifies from_team ownership against auth user', async () => {
-      const { supabase } = await import('@/integrations/supabase/client');
-
-      // Auth user is 'auth-user-1' but team owner is 'someone-else'
-      (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-        const chain = createChainableMock();
-        if (table === 'teams') {
-          chain.single.mockResolvedValue({
-            data: { owner_id: 'someone-else' },
-            error: null,
-          });
-        }
-        return chain;
-      });
-
-      const result = await TradeService.createTradeOffer(
-        'league-1', 'team-a', 'team-b', [101], [201]
-      );
-
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('only propose trades from your own team');
-    });
-
-    it('uses provided userId over getUser when both are available', async () => {
-      const { supabase } = await import('@/integrations/supabase/client');
-
-      // Auth returns 'auth-user-1', explicit userId is 'explicit-user'
-      // Team owner matches the explicit userId
-      (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-        const chain = createChainableMock();
-        if (table === 'teams') {
-          chain.single.mockResolvedValue({
-            data: { owner_id: 'explicit-user' },
-            error: null,
-          });
-        }
-        if (table === 'leagues') {
-          chain.single.mockResolvedValue({
-            data: { settings: { bestBallEnabled: false, tradeDeadlineWeek: 0 } },
-            error: null,
-          });
-        }
-        if (table === 'trade_offers') {
-          chain.single.mockResolvedValue({ data: { id: 'trade-explicit' }, error: null });
-        }
-        return chain;
-      });
-
-      const result = await TradeService.createTradeOffer(
-        'league-1', 'team-a', 'team-b', [101], [201], undefined, 'explicit-user'
-      );
-
-      expect(result.success).toBe(true);
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // acceptTradeOffer — Auth
-  // ---------------------------------------------------------------------------
-  describe('acceptTradeOffer auth', () => {
-    it('returns error when not authenticated', async () => {
-      mockGetUser.mockResolvedValue({ data: { user: null } });
-
-      const result = await TradeService.acceptTradeOffer('trade-1');
-
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('Authentication required');
-    });
-
-    it('always validates to_team ownership (not conditionally)', async () => {
-      const { supabase } = await import('@/integrations/supabase/client');
-
-      // Auth user is 'auth-user-1'; to_team owner is 'different-user'
-      (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-        const chain = createChainableMock();
-        if (table === 'trade_offers') {
-          chain.single.mockResolvedValue({
-            data: {
-              id: 'trade-1',
-              league_id: 'league-1',
-              from_team_id: 'team-a',
-              to_team_id: 'team-b',
-              offered_player_ids: [101],
-              requested_player_ids: [201],
-              status: 'pending',
-            },
-            error: null,
-          });
-        }
-        if (table === 'teams') {
-          chain.single.mockResolvedValue({
-            data: { owner_id: 'different-user' },
-            error: null,
-          });
-        }
-        return chain;
-      });
-
-      // No explicit userId — relies entirely on auth.getUser()
-      const result = await TradeService.acceptTradeOffer('trade-1');
-
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('only accept trades sent to your team');
-    });
-
-    it('calls getUser even when userId is provided', async () => {
-      const { supabase } = await import('@/integrations/supabase/client');
-
-      (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-        const chain = createChainableMock();
-        if (table === 'trade_offers') {
-          chain.single.mockResolvedValue({
-            data: {
-              id: 'trade-1',
-              league_id: 'league-1',
-              from_team_id: 'team-a',
-              to_team_id: 'team-b',
-              offered_player_ids: [101],
-              requested_player_ids: [201],
-              status: 'pending',
-            },
-            error: null,
-          });
-        }
-        if (table === 'teams') {
-          chain.single.mockResolvedValue({
-            data: { owner_id: 'explicit-user' },
-            error: null,
-          });
-        }
-        if (table === 'leagues') {
-          chain.single.mockResolvedValue({
-            data: { trade_review_type: 'none', roster_size: null },
-            error: null,
-          });
-        }
-        return chain;
-      });
-
-      (supabase.rpc as ReturnType<typeof vi.fn>).mockResolvedValue({
-        data: { success: true },
-        error: null,
-      });
-
-      await TradeService.acceptTradeOffer('trade-1', 'explicit-user');
-
-      expect(mockGetUser).toHaveBeenCalled();
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // rejectTradeOffer — Auth
-  // ---------------------------------------------------------------------------
-  describe('rejectTradeOffer auth', () => {
-    it('returns error when not authenticated', async () => {
-      mockGetUser.mockResolvedValue({ data: { user: null } });
-
-      const result = await TradeService.rejectTradeOffer('trade-1');
-
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('Authentication required');
-    });
-
-    it('always validates to_team ownership even without explicit userId', async () => {
-      const { supabase } = await import('@/integrations/supabase/client');
-
-      // Auth user 'auth-user-1' does not own to_team
-      (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-        const chain = createChainableMock();
-        if (table === 'trade_offers') {
-          chain.single.mockResolvedValue({
-            data: { to_team_id: 'team-b', league_id: 'league-1' },
-            error: null,
-          });
-        }
-        if (table === 'teams') {
-          chain.single.mockResolvedValue({
-            data: { owner_id: 'not-auth-user' },
-            error: null,
-          });
-        }
-        return chain;
-      });
-
-      const result = await TradeService.rejectTradeOffer('trade-1');
-
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('only reject trades sent to your team');
-    });
-
-    it('calls getUser to resolve authenticated user', async () => {
-      const { supabase } = await import('@/integrations/supabase/client');
-
-      let tradeOffersCallCount = 0;
-      (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-        const chain = createChainableMock();
-        if (table === 'trade_offers') {
-          tradeOffersCallCount++;
-          if (tradeOffersCallCount === 1) {
-            chain.single.mockResolvedValue({
-              data: { to_team_id: 'team-b', league_id: 'league-1' },
-              error: null,
-            });
-          } else {
-            chain.update.mockReturnValue(chain);
-            let eqCallCount = 0;
-            chain.eq.mockImplementation(() => {
-              eqCallCount++;
-              if (eqCallCount >= 2) return Promise.resolve({ data: null, error: null });
-              return chain;
-            });
-          }
-        }
-        if (table === 'teams') {
-          chain.single.mockResolvedValue({
-            data: { owner_id: 'auth-user-1' },
-            error: null,
-          });
-        }
-        return chain;
-      });
-
-      await TradeService.rejectTradeOffer('trade-1');
-
-      expect(mockGetUser).toHaveBeenCalled();
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // cancelTradeOffer — Auth
-  // ---------------------------------------------------------------------------
-  describe('cancelTradeOffer auth', () => {
-    it('returns error when not authenticated', async () => {
-      mockGetUser.mockResolvedValue({ data: { user: null } });
-
-      const result = await TradeService.cancelTradeOffer('trade-1');
-
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('Authentication required');
-    });
-
-    it('always validates from_team ownership even without explicit userId', async () => {
-      const { supabase } = await import('@/integrations/supabase/client');
-
-      // Auth user 'auth-user-1' does not own from_team
-      (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-        const chain = createChainableMock();
-        if (table === 'trade_offers') {
-          chain.single.mockResolvedValue({
-            data: { from_team_id: 'team-a', league_id: 'league-1' },
-            error: null,
-          });
-        }
-        if (table === 'teams') {
-          chain.single.mockResolvedValue({
-            data: { owner_id: 'not-auth-user' },
-            error: null,
-          });
-        }
-        return chain;
-      });
-
-      const result = await TradeService.cancelTradeOffer('trade-1');
-
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('only cancel trades you proposed');
-    });
-
-    it('allows cancel when auth user owns the from_team', async () => {
-      const { supabase } = await import('@/integrations/supabase/client');
-
-      let tradeOffersCallCount = 0;
-      (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-        const chain = createChainableMock();
-        if (table === 'trade_offers') {
-          tradeOffersCallCount++;
-          if (tradeOffersCallCount === 1) {
-            chain.single.mockResolvedValue({
-              data: { from_team_id: 'team-a', league_id: 'league-1' },
-              error: null,
-            });
-          } else {
-            chain.update.mockReturnValue(chain);
-            let eqCallCount = 0;
-            chain.eq.mockImplementation(() => {
-              eqCallCount++;
-              if (eqCallCount >= 2) return Promise.resolve({ data: null, error: null });
-              return chain;
-            });
-          }
-        }
-        if (table === 'teams') {
-          chain.single.mockResolvedValue({
-            data: { owner_id: 'auth-user-1' },
-            error: null,
-          });
-        }
-        return chain;
-      });
-
-      const result = await TradeService.cancelTradeOffer('trade-1');
-
-      expect(result.success).toBe(true);
-      expect(mockGetUser).toHaveBeenCalled();
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // getTeamTradeOffers — Auth
-  // ---------------------------------------------------------------------------
-  describe('getTeamTradeOffers auth', () => {
-    it('returns empty array when not authenticated', async () => {
-      mockGetUser.mockResolvedValue({ data: { user: null } });
-
-      const result = await TradeService.getTeamTradeOffers('league-1', 'team-a');
-
-      expect(result).toEqual([]);
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // getLeagueTradeHistory — Auth
-  // ---------------------------------------------------------------------------
-  describe('getLeagueTradeHistory auth', () => {
-    it('returns empty array when not authenticated', async () => {
-      mockGetUser.mockResolvedValue({ data: { user: null } });
-
-      const result = await TradeService.getLeagueTradeHistory('league-1');
-
-      expect(result).toEqual([]);
-    });
+    expect(result.error).toContain('Network error');
   });
 });

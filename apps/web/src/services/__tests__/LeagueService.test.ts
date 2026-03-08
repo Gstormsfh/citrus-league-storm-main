@@ -73,6 +73,18 @@ vi.mock('@/utils/seasonConstants', () => ({
   CURRENT_SEASON: '20252026',
 }));
 
+vi.mock('@/utils/scoringUtils', () => ({
+  ScoringCalculator: vi.fn().mockImplementation(() => ({
+    calculateScore: vi.fn().mockReturnValue(0),
+  })),
+  DEFAULT_SCORING: {},
+  extractScoringSettings: vi.fn().mockReturnValue({}),
+  createScorerFromLeague: vi.fn().mockReturnValue({
+    calculateScore: vi.fn().mockReturnValue(0),
+  }),
+  EMPTY_CATEGORY_STATS: {},
+}));
+
 vi.mock('../LeagueMembershipService', () => ({
   LeagueMembershipService: {
     requireMembership: vi.fn().mockResolvedValue(undefined),
@@ -84,6 +96,30 @@ vi.mock('../PlayerService', () => ({
   PlayerService: {
     getAllPlayers: vi.fn().mockResolvedValue([]),
     getPlayersByIds: vi.fn().mockResolvedValue([]),
+  },
+}));
+
+// Also mock the alias path since LeagueService imports via @/services/PlayerService
+vi.mock('@/services/PlayerService', () => ({
+  PlayerService: {
+    getAllPlayers: vi.fn().mockResolvedValue([]),
+    getPlayersByIds: vi.fn().mockResolvedValue([]),
+  },
+  Player: {},
+}));
+
+// Mock API client modules (transitive imports from PlayerService and other services)
+vi.mock('@/api/client', () => ({
+  apiClient: {
+    get: vi.fn().mockResolvedValue({ data: [] }),
+    post: vi.fn().mockResolvedValue({ data: null }),
+  },
+}));
+
+vi.mock('@/api/players', () => ({
+  playerApi: {
+    getTrendingPlayers: vi.fn().mockResolvedValue({ data: [] }),
+    recordPlayerTransaction: vi.fn().mockResolvedValue({ data: null }),
   },
 }));
 
