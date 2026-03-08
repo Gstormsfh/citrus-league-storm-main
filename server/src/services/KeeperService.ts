@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import { COLUMNS } from '@citrus/shared';
 
 export class KeeperService {
   private supabase: SupabaseClient;
@@ -14,7 +15,7 @@ export class KeeperService {
         league_id: leagueId, team_id: teamId, player_id: playerId,
         season_year: seasonYear, original_draft_round: originalDraftRound || null, status: 'designated',
       })
-      .select().single();
+      .select(COLUMNS.KEEPER_DESIGNATION).single();
 
     if (error) {
       if (error.code === '23505') return { success: false, error: 'Player is already designated as a keeper' };

@@ -13,6 +13,7 @@ import { CURRENT_SEASON } from "@/utils/seasonConstants";
 import type { LeagueType, ScoringFormat, DraftType as LeagueDraftType, LeagueSettings } from "@/types/leagueTypes";
 import { extractFormatSettings } from "@/types/leagueTypes";
 import { leagueApi } from "@/api/leagues";
+import { COLUMNS } from "@/utils/queryColumns";
 
 // Sub-services extracted from this file for modularity
 import { StandingsService } from "./StandingsService";
@@ -524,7 +525,7 @@ async joinLeagueByCode(
       const { data: insertedTeams, error } = await supabase
         .from('teams')
         .insert(teamsToInsert)
-        .select();
+        .select(COLUMNS.TEAM);
 
       if (error) {
         logger.error('simulateLeagueFill: Insert error:', error);
@@ -1230,7 +1231,7 @@ async joinLeagueByCode(
         .from('teams')
         .update({ team_name: trimmedName })
         .eq('owner_id', userId)
-        .select();
+        .select(COLUMNS.TEAM);
 
       if (error) {
         logger.error('Error updating user team names:', error);

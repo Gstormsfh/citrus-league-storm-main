@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import { COLUMNS } from '@citrus/shared';
 
 export class AuctionService {
   private supabase: SupabaseClient;
@@ -101,7 +102,7 @@ export class AuctionService {
         current_high_bid: openingBid, current_high_bidder_team_id: teamId,
         status: 'active', nomination_number: state.total_nominations + 1, expires_at: expiresAt,
       })
-      .select().single();
+      .select('id, league_id, draft_session_id, nominated_by_team_id, player_id, player_name, minimum_bid, current_high_bid, current_high_bidder_team_id, status, nomination_number, expires_at, created_at').single();
 
     if (error) return { success: false, error: error.message };
 

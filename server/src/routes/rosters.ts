@@ -99,7 +99,7 @@ rosterRoutes.put('/league/:leagueId/team/:teamId/lineup', membershipMiddleware, 
       slot_assignments: body.slot_assignments,
       updated_at: new Date().toISOString(),
     })
-    .select()
+    .select(COLUMNS.TEAM_LINEUP)
     .single();
 
   if (error) {

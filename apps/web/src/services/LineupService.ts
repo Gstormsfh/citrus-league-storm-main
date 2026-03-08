@@ -19,6 +19,7 @@ import { RosterCacheService } from "./RosterCacheService";
 import { DEMO_LEAGUE_ID_FOR_GUESTS } from "./DemoLeagueService";
 import { logger } from "@/utils/logger";
 import { getTodayMST, getTodayMSTDate } from "@/utils/timezoneUtils";
+import { COLUMNS } from "@/utils/queryColumns";
 
 export const LineupService = {
   /**
@@ -189,7 +190,7 @@ export const LineupService = {
         }, {
           onConflict: 'league_id,team_id'
         })
-        .select()
+        .select(COLUMNS.TEAM_LINEUP)
         .single();
 
       if (error) {
