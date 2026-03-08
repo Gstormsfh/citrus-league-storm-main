@@ -244,7 +244,7 @@ jobs:
       - run: npm ci
 
       - name: npm audit (high/critical vulnerabilities)
-        run: npm audit --audit-level=high || true
+        run: npm audit --audit-level=high
 
       - name: Check for hardcoded secrets
         run: |

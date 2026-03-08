@@ -57,7 +57,7 @@ jobs:
         run: npm run build --workspace=packages/shared && npm run test --workspace=server
 
       - name: Security audit (high/critical only)
-        run: npm audit --audit-level=high || true
+        run: npm audit --audit-level=high
 
       - name: Bundle size check
         run: |

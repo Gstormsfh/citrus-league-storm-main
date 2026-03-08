@@ -109,10 +109,18 @@ app.get('/api/health', async (c) => {
   }, healthy ? 200 : 503);
 });
 
-// ── Metrics endpoint — Prometheus-compatible, no auth (internal only) ──
+// ── Metrics endpoint — supports JSON and Prometheus text format ──────
 app.get('/api/metrics', (c) => {
+  const accept = c.req.header('Accept') || '';
+
+  // Prometheus scraping sends Accept: text/plain or application/openmetrics-text
+  if (accept.includes('text/plain') || accept.includes('openmetrics-text')) {
+    return c.text(metrics.toPrometheusText(), 200, { 'Content-Type': 'text/plain; version=0.0.4; charset=utf-8' });
+  }
+
+  // Default: JSON for dashboards and health checks
   const snapshot = metrics.getSnapshot();
-  return c.json({ ...snapshot, circuitBreaker: supabaseBreaker.stats });
+  return c.json({ ...snapshot, circuitBreaker: supabaseBreaker.stats, alerts: metrics.getAlerts() });
 });
 
 // ── Web Vitals receiver — fire-and-forget from frontend ─────────────

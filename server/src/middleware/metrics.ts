@@ -147,6 +147,87 @@ class MetricsCollector {
     return metric.latencyBuckets[metric.latencyBuckets.length - 1]?.le ?? 0;
   }
 
+  /**
+   * Export metrics in Prometheus text exposition format.
+   * Compatible with /metrics scraping by Prometheus, Grafana Agent, Datadog, etc.
+   */
+  toPrometheusText(): string {
+    const lines: string[] = [];
+    const uptimeSeconds = Math.floor((Date.now() - this.startTime) / 1000);
+
+    // Global counters
+    lines.push('# HELP citrus_http_requests_total Total HTTP requests received');
+    lines.push('# TYPE citrus_http_requests_total counter');
+    lines.push(`citrus_http_requests_total ${this.totalRequests}`);
+
+    lines.push('# HELP citrus_http_errors_total Total 5xx errors');
+    lines.push('# TYPE citrus_http_errors_total counter');
+    lines.push(`citrus_http_errors_total ${this.totalErrors}`);
+
+    lines.push('# HELP citrus_http_active_requests Currently in-flight requests');
+    lines.push('# TYPE citrus_http_active_requests gauge');
+    lines.push(`citrus_http_active_requests ${this.activeRequests}`);
+
+    lines.push('# HELP citrus_uptime_seconds Server uptime in seconds');
+    lines.push('# TYPE citrus_uptime_seconds gauge');
+    lines.push(`citrus_uptime_seconds ${uptimeSeconds}`);
+
+    // Per-route histograms
+    lines.push('# HELP citrus_http_request_duration_ms HTTP request latency in milliseconds');
+    lines.push('# TYPE citrus_http_request_duration_ms histogram');
+
+    for (const [routeKey, metric] of this.routes) {
+      // Sanitize route key for Prometheus labels
+      const route = routeKey.replace(/"/g, '\\"');
+
+      for (const bucket of metric.latencyBuckets) {
+        lines.push(`citrus_http_request_duration_ms_bucket{route="${route}",le="${bucket.le}"} ${bucket.count}`);
+      }
+      lines.push(`citrus_http_request_duration_ms_bucket{route="${route}",le="+Inf"} ${metric.requests}`);
+      lines.push(`citrus_http_request_duration_ms_sum{route="${route}"} ${Math.round(metric.totalDurationMs)}`);
+      lines.push(`citrus_http_request_duration_ms_count{route="${route}"} ${metric.requests}`);
+    }
+
+    // Error rate alert thresholds (expose as metric for alerting rules)
+    const errorRate = this.totalRequests > 0 ? this.totalErrors / this.totalRequests : 0;
+    lines.push('# HELP citrus_http_error_rate Current error rate (0.0-1.0)');
+    lines.push('# TYPE citrus_http_error_rate gauge');
+    lines.push(`citrus_http_error_rate ${errorRate.toFixed(6)}`);
+
+    return lines.join('\n') + '\n';
+  }
+
+  /**
+   * Check if any alerting thresholds are breached.
+   * Returns an array of active alerts for the health dashboard.
+   */
+  getAlerts(): Array<{ level: 'warning' | 'critical'; message: string }> {
+    const alerts: Array<{ level: 'warning' | 'critical'; message: string }> = [];
+
+    // Error rate alerting
+    if (this.totalRequests >= 100) {
+      const errorRate = this.totalErrors / this.totalRequests;
+      if (errorRate > 0.05) {
+        alerts.push({ level: 'critical', message: `Error rate ${(errorRate * 100).toFixed(1)}% exceeds 5% threshold` });
+      } else if (errorRate > 0.02) {
+        alerts.push({ level: 'warning', message: `Error rate ${(errorRate * 100).toFixed(1)}% exceeds 2% threshold` });
+      }
+    }
+
+    // Per-route p95 latency alerting
+    for (const [routeKey, metric] of this.routes) {
+      if (metric.requests < 10) continue;
+      const p95 = this.percentileFromBuckets(metric, 0.95);
+      if (p95 >= 5000) {
+        alerts.push({ level: 'critical', message: `${routeKey} p95 latency ${p95}ms exceeds 5s threshold` });
+      } else if (p95 >= 2000) {
+        alerts.push({ level: 'warning', message: `${routeKey} p95 latency ${p95}ms exceeds 2s threshold` });
+      }
+    }
+
+    return alerts;
+  }
+
   reset(): void {
     this.routes.clear();
     this.totalRequests = 0;
