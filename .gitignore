@@ -65,3 +65,8 @@ git-diagnostic-output/
 
 # Firebase
 .firebase/
+
+# Flutter (not part of this project)
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
