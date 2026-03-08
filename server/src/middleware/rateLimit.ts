@@ -165,6 +165,9 @@ export function rateLimitMiddleware(options: RateLimitOptions = {}) {
 /** Strict rate limit for sensitive operations — 10 req/min per IP */
 export const strictRateLimit = rateLimitMiddleware({ maxRequests: 10, windowMs: 60_000 });
 
+/** Auth rate limit — 5 req/min per IP (brute force protection) */
+export const authRateLimit = rateLimitMiddleware({ maxRequests: 5, windowMs: 60_000, perUser: false });
+
 /** Standard API rate limit — 300 req/min per IP, 600 per user
  *  Bumped from 100 because the SPA fires many parallel schedule/league
  *  calls on page load until caching/dedup is added. */

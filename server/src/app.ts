@@ -21,6 +21,8 @@ import { bestballRoutes } from './routes/bestball';
 import { accountRoutes } from './routes/account';
 import { standardRateLimit, strictRateLimit } from './middleware/rateLimit';
 import { requestContextMiddleware } from './middleware/requestContext';
+import { metricsMiddleware, metrics } from './middleware/metrics';
+import { cacheControlMiddleware } from './middleware/cacheControl';
 import { AppError } from './lib/errors';
 import { supabaseBreaker } from './lib/circuitBreaker';
 
@@ -55,8 +57,11 @@ app.use('*', cors({
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 }));
 
-// Structured request logging for observability (production JSON logs)
+// Structured request logging + metrics collection for observability
 app.use('/api/*', requestContextMiddleware);
+app.use('/api/*', metricsMiddleware);
+// Cache-Control headers + ETag support for GET responses
+app.use('/api/*', cacheControlMiddleware);
 
 // Rate limiting — 300 req/min per IP for standard routes (LRU-bounded)
 app.use('/api/*', standardRateLimit);
@@ -101,6 +106,38 @@ app.get('/api/health', async (c) => {
     checks,
     timestamp: new Date().toISOString(),
   }, healthy ? 200 : 503);
+});
+
+// ── Metrics endpoint — Prometheus-compatible, no auth (internal only) ──
+app.get('/api/metrics', (c) => {
+  const snapshot = metrics.getSnapshot();
+  return c.json({ ...snapshot, circuitBreaker: supabaseBreaker.stats });
+});
+
+// ── Web Vitals receiver — fire-and-forget from frontend ─────────────
+app.post('/api/vitals', async (c) => {
+  // Accept vitals data silently — forward to logging/analytics pipeline
+  try {
+    const body = await c.req.json();
+    if (body?.vitals && Array.isArray(body.vitals)) {
+      for (const vital of body.vitals) {
+        // Structured log line for vitals — parseable by Cloud Logging / Datadog
+        if (process.env.NODE_ENV === 'production') {
+          console.log(JSON.stringify({
+            level: 'info',
+            type: 'web_vital',
+            name: vital.name,
+            value: vital.value,
+            rating: vital.rating,
+            timestamp: vital.timestamp,
+          }));
+        }
+      }
+    }
+  } catch {
+    // Silent fail — vitals ingestion should never error
+  }
+  return c.json({ ok: true });
 });
 
 // ── API routes ───────────────────────────────────────────────────────

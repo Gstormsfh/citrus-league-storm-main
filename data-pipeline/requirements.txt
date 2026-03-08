@@ -1,5 +1,17 @@
+# Core dependencies — pinned for reproducible builds
 requests==2.32.3
 python-dotenv==1.0.1
 psycopg2-binary==2.9.9
 APScheduler==3.10.4
+
+# ML / Projections (required by xG model and projection pipeline)
+joblib==1.4.2
+numpy==1.26.4
+pandas==2.2.3
+scikit-learn==1.5.2
+xgboost==2.1.3
+
+# HTTP / Networking
+urllib3==2.2.3
+certifi==2024.8.30
 

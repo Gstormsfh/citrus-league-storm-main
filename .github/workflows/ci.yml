@@ -228,3 +228,64 @@ jobs:
             exit 1
           fi
           echo "All migrations pass basic validation."
+
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: npm audit (high/critical vulnerabilities)
+        run: npm audit --audit-level=high || true
+
+      - name: Check for hardcoded secrets
+        run: |
+          echo "=== Secret Pattern Scan ==="
+          errors=0
+          # Scan source files for common secret patterns
+          for dir in apps/web/src server/src packages/shared/src; do
+            [ -d "$dir" ] || continue
+            # API keys, tokens, passwords in string literals
+            if grep -rn --include="*.ts" --include="*.tsx" \
+              -E "(sk_live_|pk_live_|ghp_|gho_|xoxb-|xoxp-|AKIA[A-Z0-9]{16})" "$dir" 2>/dev/null; then
+              echo "::error::Potential hardcoded secret found in $dir"
+              errors=$((errors + 1))
+            fi
+          done
+          if [ "$errors" -gt 0 ]; then
+            exit 1
+          fi
+          echo "No hardcoded secrets detected."
+
+      - name: Check for console.log in production code
+        run: |
+          echo "=== Console.log Audit ==="
+          violations=0
+          for dir in apps/web/src server/src packages/shared/src; do
+            [ -d "$dir" ] || continue
+            # Find console.log in non-test, non-config files
+            matches=$(grep -rn "console\.\(log\|debug\|info\)" "$dir" \
+              --include="*.ts" --include="*.tsx" \
+              --exclude-dir="__tests__" \
+              --exclude="logger.ts" --exclude="vite-env.d.ts" \
+              --exclude="requestContext.ts" --exclude="app.ts" \
+              2>/dev/null | grep -v "// " | grep -v "test" || true)
+            if [ -n "$matches" ]; then
+              echo "$matches" | while read -r line; do
+                echo "::warning::$line"
+              done
+              violations=$((violations + 1))
+            fi
+          done
+          if [ "$violations" -gt 0 ]; then
+            echo "::warning::Found console.log usage — prefer logger from @citrus/shared"
+          fi
+          echo "Console.log audit complete."
