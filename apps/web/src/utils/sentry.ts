@@ -11,6 +11,7 @@
  * captureException() and setSentryUser() without the dependency installed.
  */
 
+// eslint-disable-next-line prefer-const -- reassigned when @sentry/react is activated
 let sentryInstance: any = null;
 
 /**

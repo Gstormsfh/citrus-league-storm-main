@@ -275,8 +275,7 @@ export const TeamIntelHub = () => {
             const lastSuccessful = teamWaivers
               .filter((w: { status: string }) => w.status === 'successful')
               .sort((a: { processed_at: string }, b: { processed_at: string }) =>
-                (b.processed_at || '').localeCompare(a.processed_at || ''))
-              [0];
+                (b.processed_at || '').localeCompare(a.processed_at || ''))[0];
             if (lastSuccessful?.processed_at) {
               setLastClaimDate(lastSuccessful.processed_at);
             }

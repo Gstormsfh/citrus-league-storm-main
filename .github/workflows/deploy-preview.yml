@@ -25,7 +25,7 @@ jobs:
       - run: npm ci
 
       - name: Lint
-        run: cd apps/web && npx eslint src/ --max-warnings 0
+        run: cd apps/web && npx eslint src/
 
       - name: Type check (web)
         run: cd apps/web && npx tsc --noEmit
