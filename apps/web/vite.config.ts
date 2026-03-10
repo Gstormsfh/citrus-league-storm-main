@@ -4,38 +4,14 @@ import { VitePWA } from "vite-plugin-pwa";
 import path from "path";
 import type { Plugin } from "vite";
 
-// Plugin to remove crossorigin attribute and ensure React loads first
+// Plugin to remove crossorigin attribute from module/preload tags
 function removeCrossorigin(): Plugin {
   return {
     name: "remove-crossorigin",
     transformIndexHtml(html) {
       // Only strip bare crossorigin attributes (added by Vite to module/preload tags).
       // Preserve crossorigin="anonymous" required by third-party scripts like AdSense.
-      let result = html
-        .replace(/\s+crossorigin(?!=)/g, "");
-      
-      // Reorder modulepreload links to ensure React loads first
-      const reactPreload = result.match(/<link rel="modulepreload" href="[^"]*vendor-react[^"]*">/);
-      const otherPreloads = result.match(/<link rel="modulepreload" href="[^"]*vendor[^"]*">/g) || [];
-      
-      if (reactPreload && otherPreloads.length > 1) {
-        // Remove all vendor preloads
-        otherPreloads.forEach(preload => {
-          result = result.replace(preload, '');
-        });
-        
-        // Add React first, then others
-        const scriptTag = result.match(/<script type="module"[^>]*>/);
-        if (scriptTag) {
-          const beforeScript = result.substring(0, result.indexOf(scriptTag[0]));
-          const afterScript = result.substring(result.indexOf(scriptTag[0]));
-          result = beforeScript + reactPreload[0] + '\n    ' + 
-                   otherPreloads.filter(p => !p.includes('vendor-react')).join('\n    ') + 
-                   '\n    ' + afterScript;
-        }
-      }
-      
-      return result;
+      return html.replace(/\s+crossorigin(?!=)/g, "");
     },
   };
 }
@@ -122,37 +98,16 @@ export default defineConfig(({ mode }) => ({
         assetFileNames: 'assets/[name]-[hash].[ext]',
         manualChunks: (id) => {
           if (id.includes('node_modules')) {
-            // React + ReactDOM + scheduler — keep together, loaded first
-            if (id.includes('react-dom') || id.includes('/react/') || id.includes('scheduler')) {
-              return 'vendor-react';
-            }
             // Supabase — separate chunk (auth-critical, loaded early)
             if (id.includes('@supabase')) {
               return 'vendor-supabase';
             }
-            // Radix UI primitives (shadcn foundation) — separate chunk
-            if (id.includes('@radix-ui')) {
-              return 'vendor-radix';
-            }
-            // React Router — separate chunk
-            if (id.includes('react-router') || id.includes('@remix-run')) {
-              return 'vendor-router';
-            }
-            // TanStack / React Query — separate chunk
-            if (id.includes('@tanstack')) {
-              return 'vendor-tanstack';
-            }
-            // Recharts / D3 (charting) — heavy, separate chunk
+            // Recharts / D3 (charting) — heavy, lazy-loaded pages only
             if (id.includes('recharts') || id.includes('d3-')) {
               return 'vendor-charts';
             }
-            // Date utilities
-            if (id.includes('date-fns') || id.includes('luxon')) {
-              return 'vendor-dates';
-            }
-            // Remaining vendor code — all in one chunk
-            // These libraries (lucide-react, sonner, cmdk, etc.) depend on React
-            // but ES module imports ensure vendor-react executes first
+            // All other vendor code (React, Radix, Router, etc.) in one chunk
+            // Avoids circular dependency issues from manual splitting
             return 'vendor';
           }
         },
