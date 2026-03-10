@@ -56,20 +56,36 @@ async function request<T = unknown>(
 
   const url = `${API_BASE_URL}${path}`;
 
-  const response = await fetch(url, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-    signal: options?.signal,
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+      signal: options?.signal,
+    });
+  } catch (err) {
+    throw new ApiError(
+      'Unable to reach the API server. Please check your connection.',
+      0
+    );
+  }
 
-  const json = await response.json();
+  let json: ApiResponse<T>;
+  try {
+    json = await response.json();
+  } catch {
+    throw new ApiError(
+      `API returned non-JSON response (HTTP ${response.status})`,
+      response.status
+    );
+  }
 
   if (!response.ok) {
     const fallback = `API request failed with status ${response.status}`;
     const errorMsg = typeof json.error === 'string'
       ? json.error
-      : json.error?.message || json.message || fallback;
+      : (json as Record<string, unknown>).message as string || fallback;
     throw new ApiError(errorMsg, response.status, json);
   }
 
