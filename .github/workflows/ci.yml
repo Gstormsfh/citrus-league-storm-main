@@ -26,7 +26,7 @@ jobs:
       - run: npm ci
 
       - name: Run ESLint (fail on warnings)
-        run: npx eslint apps/web/src/ --max-warnings 0
+        run: cd apps/web && npx eslint src/ --max-warnings 0
 
   typecheck:
     name: Type Check (Web)
