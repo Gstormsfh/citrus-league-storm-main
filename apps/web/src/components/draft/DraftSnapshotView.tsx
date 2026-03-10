@@ -69,7 +69,7 @@ export const DraftSnapshotView = ({
         
         <div className="flex-1 overflow-auto min-h-0">
           <DraftBoard
-            teams={teams}
+            teams={teams as any}
             draftHistory={picks}
             currentPick={picks.length}
             currentRound={leagueSettings.rounds}

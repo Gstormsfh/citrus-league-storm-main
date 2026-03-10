@@ -271,7 +271,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
         onPlayerDropped?.();
         onClose();
       } else {
-        toast({ title: "Error", description: error?.message || "Failed to drop player.", variant: "destructive" });
+        toast({ title: "Error", description: (error as { message?: string })?.message || "Failed to drop player.", variant: "destructive" });
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to drop player.";
@@ -593,12 +593,12 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                             {gp.isGoalie ? (
                               <div className="grid grid-cols-6 gap-1">
                                 {[
-                                  { label: 'W', value: gp.projection.projected_wins?.toFixed(2) },
-                                  { label: 'SV', value: gp.projection.projected_saves?.toFixed(0) },
-                                  { label: 'SO', value: gp.projection.projected_shutouts?.toFixed(2) },
-                                  { label: 'GA', value: gp.projection.projected_goals_against?.toFixed(2) },
-                                  { label: 'GAA', value: gp.projection.projected_gaa?.toFixed(2) },
-                                  { label: 'SV%', value: gp.projection.projected_save_pct ? `${(gp.projection.projected_save_pct * 100).toFixed(1)}` : '—' },
+                                  { label: 'W', value: (gp.projection.projected_wins as number | undefined)?.toFixed(2) },
+                                  { label: 'SV', value: (gp.projection.projected_saves as number | undefined)?.toFixed(0) },
+                                  { label: 'SO', value: (gp.projection.projected_shutouts as number | undefined)?.toFixed(2) },
+                                  { label: 'GA', value: (gp.projection.projected_goals_against as number | undefined)?.toFixed(2) },
+                                  { label: 'GAA', value: (gp.projection.projected_gaa as number | undefined)?.toFixed(2) },
+                                  { label: 'SV%', value: gp.projection.projected_save_pct ? `${(Number(gp.projection.projected_save_pct) * 100).toFixed(1)}` : '—' },
                                 ].map((s, i) => (
                                   <div key={i} className="flex flex-col items-center py-1 bg-[#E8EED9]/40 rounded border border-citrus-sage/10">
                                     <span className="text-[7px] font-display font-semibold text-citrus-charcoal/40 uppercase">{s.label}</span>
@@ -609,14 +609,14 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                             ) : (
                               <div className="grid grid-cols-8 gap-1">
                                 {[
-                                  { label: 'G', value: gp.projection.projected_goals?.toFixed(2) },
-                                  { label: 'A', value: gp.projection.projected_assists?.toFixed(2) },
-                                  { label: 'SOG', value: gp.projection.projected_sog?.toFixed(1) },
-                                  { label: 'BLK', value: gp.projection.projected_blocks?.toFixed(1) },
-                                  { label: 'PPP', value: gp.projection.projected_ppp?.toFixed(2) },
-                                  { label: 'SHP', value: gp.projection.projected_shp?.toFixed(2) },
-                                  { label: 'HIT', value: gp.projection.projected_hits?.toFixed(1) },
-                                  { label: 'PIM', value: gp.projection.projected_pim?.toFixed(1) },
+                                  { label: 'G', value: (gp.projection.projected_goals as number | undefined)?.toFixed(2) },
+                                  { label: 'A', value: (gp.projection.projected_assists as number | undefined)?.toFixed(2) },
+                                  { label: 'SOG', value: (gp.projection.projected_sog as number | undefined)?.toFixed(1) },
+                                  { label: 'BLK', value: (gp.projection.projected_blocks as number | undefined)?.toFixed(1) },
+                                  { label: 'PPP', value: (gp.projection.projected_ppp as number | undefined)?.toFixed(2) },
+                                  { label: 'SHP', value: (gp.projection.projected_shp as number | undefined)?.toFixed(2) },
+                                  { label: 'HIT', value: (gp.projection.projected_hits as number | undefined)?.toFixed(1) },
+                                  { label: 'PIM', value: (gp.projection.projected_pim as number | undefined)?.toFixed(1) },
                                 ].map((s, i) => (
                                   <div key={i} className="flex flex-col items-center py-1 bg-[#E8EED9]/40 rounded border border-citrus-sage/10">
                                     <span className="text-[7px] font-display font-semibold text-citrus-charcoal/40 uppercase">{s.label}</span>
