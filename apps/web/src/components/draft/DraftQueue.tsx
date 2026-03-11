@@ -54,6 +54,8 @@ interface SortableQueueItemProps {
   onRemove: () => void;
   onDraft: () => void;
   isYourTurn: boolean;
+  estimatedPick?: number;
+  totalPicks?: number;
 }
 
 function SortableQueueItem({ 
