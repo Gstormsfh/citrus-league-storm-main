@@ -6,6 +6,17 @@ import { analyticsService } from '@/services/AnalyticsService';
 import { setSentryUser } from '@/integrations/sentry/config';
 import { logger } from '@/utils/logger';
 
+/** Returns true if JWT is expired or within 30s of expiry. */
+function isTokenExpired(token: string | undefined): boolean {
+  if (!token) return true;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return typeof payload.exp !== 'number' || Date.now() >= payload.exp * 1000 - 30_000;
+  } catch {
+    return true;
+  }
+}
+
 interface Profile {
   id: string;
   username: string;
@@ -80,9 +91,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
       setSession(session);
-      setUser(session?.user ?? null);
+
       if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'USER_UPDATED') {
         if (session?.user) {
+          // If the token is expired/near-expiry, do NOT expose user to
+          // downstream consumers yet.  Supabase will fire TOKEN_REFRESHED
+          // once it finishes its internal refresh cycle.  Setting user now
+          // would trigger LeagueContext / Matchup / etc. to fire API calls
+          // with the stale token, producing a flood of 401 errors.
+          if (isTokenExpired(session.access_token)) {
+            logger.info('[Auth] Stale token on', event, '— deferring until TOKEN_REFRESHED');
+            initialSessionHandled = true; // prevent getSession() fallback from also running
+            return;
+          }
+          setUser(session.user);
           initialSessionHandled = true;
           clearTimeout(timeout);
           analyticsService.setUserId(session.user.id);
@@ -100,14 +122,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (mounted) setLoading(false);
         }
       } else if (event === 'TOKEN_REFRESHED') {
-        // Supabase finished refreshing the token — retry profile if it failed earlier
-        if (session?.user && !profileFetchSucceeded) {
-          logger.info('[Auth] Token refreshed, retrying profile fetch');
-          fetchProfile(session.user.id).then(() => {
-            profileFetchSucceeded = true;
-          }).catch(() => {});
+        // Supabase finished refreshing — token is now valid.
+        // Set user (may have been deferred from INITIAL_SESSION) and fetch profile.
+        if (session?.user) {
+          setUser(session.user);
+          clearTimeout(timeout);
+          analyticsService.setUserId(session.user.id);
+          setSentryUser({ id: session.user.id, email: session.user.email });
+          if (!profileFetchSucceeded) {
+            logger.info('[Auth] Token refreshed, fetching profile');
+            fetchProfile(session.user.id).then(() => {
+              profileFetchSucceeded = true;
+            }).catch(() => {}).finally(() => {
+              if (mounted) setLoading(false);
+            });
+          }
         }
       } else if (event === 'SIGNED_OUT') {
+        setUser(null);
         analyticsService.setUserId(null);
         setSentryUser(null);
         setProfile(null);
@@ -120,8 +152,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // (e.g., OAuth SIGNED_IN fired), skip duplicate work
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mounted || initialSessionHandled) return;
-      clearTimeout(timeout);
       setSession(session);
+      if (session?.user && isTokenExpired(session.access_token)) {
+        // Stale token — wait for TOKEN_REFRESHED instead of firing API calls
+        logger.info('[Auth] Stale token in getSession fallback — deferring');
+        initialSessionHandled = true;
+        return;
+      }
+      clearTimeout(timeout);
       setUser(session?.user ?? null);
       if (session?.user) {
         analyticsService.setUserId(session.user.id);
