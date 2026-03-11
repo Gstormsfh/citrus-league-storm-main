@@ -271,6 +271,7 @@ CREATE OR REPLACE FUNCTION public.process_roster_move(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
   v_team_id UUID;

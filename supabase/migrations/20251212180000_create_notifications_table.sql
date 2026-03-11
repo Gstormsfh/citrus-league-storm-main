@@ -58,6 +58,7 @@ create or replace function public.create_notifications_from_transaction()
 returns trigger
 language plpgsql
 security definer
+SET search_path = public
 as $$
 declare
   v_league_id uuid;

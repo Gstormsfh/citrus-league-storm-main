@@ -97,6 +97,7 @@ create or replace function public.handle_roster_transaction(
 returns jsonb
 language plpgsql
 security definer
+SET search_path = public
 as $$
 declare
   v_team_id uuid;

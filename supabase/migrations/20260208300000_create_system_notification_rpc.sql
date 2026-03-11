@@ -44,6 +44,7 @@ CREATE OR REPLACE FUNCTION public.notify_league_members(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
   v_caller_id UUID;
