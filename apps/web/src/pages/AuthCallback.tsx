@@ -43,7 +43,7 @@ const AuthCallback = () => {
       setMessage(msg);
       // Hard redirect — immune to React lifecycle / effect cleanup races.
       // AuthContext will pick up the session from localStorage on reload.
-      setTimeout(() => window.location.replace('/profile-setup'), 1500);
+      setTimeout(() => window.location.replace('/'), 1500);
     };
 
     const fail = (msg: string) => {

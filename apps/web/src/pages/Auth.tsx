@@ -80,8 +80,8 @@ const Auth = () => {
       setError(getBetterErrorMessage(error.message));
       setLoading(false);
     } else {
-      // Navigate to profile setup - it will redirect if profile is already complete
-      navigate('/profile-setup');
+      // Navigate to home — if profile setup is needed, the app will redirect
+      navigate('/');
     }
   };
 
@@ -143,7 +143,7 @@ const Auth = () => {
         setConfirmPassword('');
         setLoading(false);
       } else if (data?.session) {
-        navigate('/profile-setup');
+        navigate('/');
       } else {
         setError('Account created! Please check your email to verify, then sign in.');
         setLoading(false);
