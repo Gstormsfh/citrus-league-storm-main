@@ -41,9 +41,18 @@ async function refreshTokenOnce(): Promise<string | null> {
 
   refreshPromise = supabase.auth.refreshSession().then(({ data, error }) => {
     refreshPromise = null;
-    if (error || !data.session) return null;
+    if (error || !data.session) {
+      // Refresh token is dead (expired / revoked) — sign the user out so
+      // they get a clean login prompt instead of being stuck in an error loop.
+      // (Network errors hit the .catch() branch below and do NOT sign out.)
+      supabase.auth.signOut().catch(() => {});
+      return null;
+    }
     return data.session.access_token;
   }).catch(() => {
+    // Network / transient error — don't sign out; just return null so
+    // the request fails gracefully.  The user can retry when connectivity
+    // is restored.
     refreshPromise = null;
     return null;
   });
@@ -51,9 +60,37 @@ async function refreshTokenOnce(): Promise<string | null> {
   return refreshPromise;
 }
 
+/**
+ * Decode a JWT payload without verification (we just need the `exp` claim).
+ * Returns null on any parse error so callers can fall back safely.
+ */
+function jwtExpiry(token: string): number | null {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return typeof payload.exp === 'number' ? payload.exp : null;
+  } catch {
+    return null;
+  }
+}
+
 async function getAuthToken(): Promise<string | null> {
   const { data: { session } } = await supabase.auth.getSession();
-  return session?.access_token || null;
+  const token = session?.access_token;
+  if (!token) return null;
+
+  // If the JWT is expired (or expires within 30 s), proactively refresh
+  // BEFORE making the request.  This prevents the 401 → retry cascade that
+  // floods the console when the page loads with a stale token in localStorage.
+  const exp = jwtExpiry(token);
+  if (exp !== null && Date.now() >= exp * 1000 - 30_000) {
+    const freshToken = await refreshTokenOnce();
+    // If refresh succeeded, use the new token.
+    // If it failed, return null so the caller skips the auth header
+    // (the request will fail cleanly instead of cascading).
+    return freshToken;
+  }
+
+  return token;
 }
 
 async function doFetch(
