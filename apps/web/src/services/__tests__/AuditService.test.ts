@@ -16,6 +16,7 @@ vi.mock('@/api/account', () => ({
 vi.mock('@/utils/logger', () => ({
   logger: {
     log: vi.fn(),
+    debug: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
   },
@@ -95,14 +96,26 @@ describe('AuditService', () => {
       await expect(AuditService.log('AUTH_LOGIN')).resolves.toBeUndefined();
     });
 
-    it('logs error to logger when API call fails', async () => {
+    it('logs debug message for auth events when API call fails', async () => {
       mockLogSecurityEvent.mockRejectedValue(new Error('Database connection lost'));
 
       await AuditService.log('AUTH_LOGIN');
 
+      // Auth events use debug level (token may be cleared during sign-out)
+      expect(logger.debug).toHaveBeenCalledWith(
+        '[AuditService] Could not log event (expected during sign-out):',
+        'AUTH_LOGIN'
+      );
+    });
+
+    it('logs error for non-auth events when API call fails', async () => {
+      mockLogSecurityEvent.mockRejectedValue(new Error('Database connection lost'));
+
+      await AuditService.log('LEAGUE_CREATE', 'league-1');
+
       expect(logger.error).toHaveBeenCalledWith(
         '[AuditService] Failed to log event:',
-        'AUTH_LOGIN',
+        'LEAGUE_CREATE',
         expect.any(Error)
       );
     });

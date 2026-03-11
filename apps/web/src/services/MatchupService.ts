@@ -843,11 +843,18 @@ export const MatchupService = {
       // Route through API server which uses admin client — bypasses RLS.
       // Critical for AI teams (owner_id = NULL) whose roster_assignments
       // are not visible through user-scoped Supabase clients.
-      const { rosterApi } = await import('@/api/rosters');
+      // For demo league guests, use the public endpoint (no auth required).
       let playerIds: string[];
       try {
-        const response = await rosterApi.getPlayerIds(leagueId, teamId);
-        playerIds = (response.data as string[]) || [];
+        if (leagueId === DEMO_LEAGUE_ID_FOR_GUESTS) {
+          const { apiClient } = await import('@/api/client');
+          const response = await apiClient.get(`/api/public/leagues/${leagueId}/teams/${teamId}/player-ids`);
+          playerIds = (response.data as string[]) || [];
+        } else {
+          const { rosterApi } = await import('@/api/rosters');
+          const response = await rosterApi.getPlayerIds(leagueId, teamId);
+          playerIds = (response.data as string[]) || [];
+        }
       } catch (apiErr: unknown) {
         logger.error('Error fetching roster player IDs via API:', apiErr);
         playerIds = [];
@@ -1462,9 +1469,9 @@ export const MatchupService = {
       let league: League | null = null;
       const isDemoLeague = matchup.league_id === DEMO_LEAGUE_ID_FOR_GUESTS;
       if (isDemoLeague && !userId) {
-        // Guest viewing demo league - use public API
-        const { leagueApi } = await import('@/api/leagues');
-        const response = await leagueApi.getLeague(matchup.league_id);
+        // Guest viewing demo league - use public API (no auth required)
+        const { apiClient } = await import('@/api/client');
+        const response = await apiClient.get(`/api/public/leagues/${matchup.league_id}`);
         league = (response.data as League) || null;
         if (!league) throw new Error('League not found');
       } else if (userId) {
