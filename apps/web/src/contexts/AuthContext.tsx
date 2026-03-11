@@ -81,7 +81,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!mounted) return;
       setSession(session);
       setUser(session?.user ?? null);
-      if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+      if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'USER_UPDATED') {
         if (session?.user) {
           initialSessionHandled = true;
           clearTimeout(timeout);
@@ -94,6 +94,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }).finally(() => {
             if (mounted) setLoading(false);
           });
+        } else if (event === 'INITIAL_SESSION') {
+          // No session at all (guest) — stop loading
+          clearTimeout(timeout);
+          if (mounted) setLoading(false);
         }
       } else if (event === 'TOKEN_REFRESHED') {
         // Supabase finished refreshing the token — retry profile if it failed earlier
