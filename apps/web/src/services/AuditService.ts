@@ -41,8 +41,13 @@ export const AuditService = {
     try {
       await accountApi.logSecurityEvent(eventType, leagueId, details || {}, severity);
     } catch (error) {
-      // Fire-and-forget — never block user operations
-      logger.error('[AuditService] Failed to log event:', eventType, error);
+      // Fire-and-forget — never block user operations.
+      // Use debug level for auth events (token may already be cleared during sign-out)
+      if (eventType === 'AUTH_LOGOUT' || eventType === 'AUTH_LOGIN') {
+        logger.debug('[AuditService] Could not log event (expected during sign-out):', eventType);
+      } else {
+        logger.error('[AuditService] Failed to log event:', eventType, error);
+      }
     }
   },
 

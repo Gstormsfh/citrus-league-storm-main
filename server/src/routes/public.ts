@@ -87,6 +87,30 @@ publicRoutes.get('/leagues/:leagueId/teams', async (c) => {
   return ok(c, data || []);
 });
 
+// GET /api/public/leagues/:leagueId/teams/:teamId/player-ids — Demo team roster player IDs
+publicRoutes.get('/leagues/:leagueId/teams/:teamId/player-ids', async (c) => {
+  const leagueId = c.req.param('leagueId');
+  if (!isDemoLeague(leagueId)) {
+    return fail(c, AppError.forbidden('Public access is only available for the demo league'));
+  }
+
+  const teamId = c.req.param('teamId');
+  const supabase = getSupabaseAdmin();
+
+  const { data, error } = await supabase
+    .from('roster_assignments')
+    .select('player_id')
+    .eq('league_id', leagueId)
+    .eq('team_id', teamId);
+
+  if (error) {
+    return handleError(c, error, 'Failed to fetch demo roster');
+  }
+
+  const playerIds = (data || []).map((r: { player_id: string }) => r.player_id);
+  return ok(c, playerIds);
+});
+
 // GET /api/public/matchups/:matchupId/daily-scores — Demo matchup daily scores
 publicRoutes.get('/matchups/:matchupId/daily-scores', async (c) => {
   const matchupId = c.req.param('matchupId');

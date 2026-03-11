@@ -36,14 +36,13 @@ async function getAuthToken(): Promise<string | null> {
   return session?.access_token || null;
 }
 
-async function request<T = unknown>(
+async function doFetch<T = unknown>(
   method: string,
   path: string,
+  token: string | null,
   body?: unknown,
   options?: RequestOptions
-): Promise<ApiResponse<T>> {
-  const token = await getAuthToken();
-
+): Promise<{ response: Response; json: ApiResponse<T> }> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'x-client-info': 'citrus-web',
@@ -64,6 +63,28 @@ async function request<T = unknown>(
   });
 
   const json = await response.json();
+  return { response, json };
+}
+
+async function request<T = unknown>(
+  method: string,
+  path: string,
+  body?: unknown,
+  options?: RequestOptions
+): Promise<ApiResponse<T>> {
+  let token = await getAuthToken();
+  let { response, json } = await doFetch<T>(method, path, token, body, options);
+
+  // On 401, try refreshing the session and retry once.
+  // This handles the race condition where the stored token has expired
+  // but Supabase hasn't completed its background refresh yet.
+  if (response.status === 401 && token) {
+    const { data, error } = await supabase.auth.refreshSession();
+    const newToken = data?.session?.access_token;
+    if (!error && newToken && newToken !== token) {
+      ({ response, json } = await doFetch<T>(method, path, newToken, body, options));
+    }
+  }
 
   if (!response.ok) {
     const fallback = `API request failed with status ${response.status}`;
