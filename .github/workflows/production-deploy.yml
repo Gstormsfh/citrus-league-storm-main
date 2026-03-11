@@ -177,6 +177,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: production
+    permissions:
+      checks: write
 
     steps:
       - uses: actions/checkout@v4
