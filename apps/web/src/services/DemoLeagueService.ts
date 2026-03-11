@@ -40,7 +40,6 @@ export const DEMO_LEAGUE_ID_FOR_GUESTS = '750f4e1a-92ae-44cf-a798-2f3e06d0d5c9';
  * that are valid at runtime but not in the generated Supabase types.
  */
 function typedFrom(table: string) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (supabase as any).from(table);
 }
 

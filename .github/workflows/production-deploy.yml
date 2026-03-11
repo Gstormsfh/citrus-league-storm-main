@@ -8,6 +8,9 @@ concurrency:
   group: production-deploy
   cancel-in-progress: false  # Never cancel production deploys
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   # ── Gate: all checks must pass before deploy ──────────────────────────
   gate:
@@ -19,7 +22,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - run: npm ci

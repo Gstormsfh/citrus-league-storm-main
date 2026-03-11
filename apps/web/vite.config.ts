@@ -106,8 +106,15 @@ export default defineConfig(({ mode }) => ({
             if (id.includes('recharts') || id.includes('d3-')) {
               return 'vendor-charts';
             }
-            // All other vendor code (React, Radix, Router, etc.) in one chunk
-            // Avoids circular dependency issues from manual splitting
+            // Firebase — separate chunk (analytics/hosting, not needed on every page)
+            if (id.includes('firebase') || id.includes('@firebase')) {
+              return 'vendor-firebase';
+            }
+            // Radix UI — separate chunk (UI primitives, loaded with first interaction)
+            if (id.includes('@radix-ui')) {
+              return 'vendor-radix';
+            }
+            // All other vendor code (React, Router, TanStack, etc.) in one chunk
             return 'vendor';
           }
         },
