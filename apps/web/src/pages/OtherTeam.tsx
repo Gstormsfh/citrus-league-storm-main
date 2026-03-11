@@ -19,6 +19,8 @@ import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { leagueApi } from '@/api/leagues';
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { AdSpace } from '@/components/AdSpace';
+import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { logger } from '@/utils/logger';
 
 // Helper for fantasy position (reused)

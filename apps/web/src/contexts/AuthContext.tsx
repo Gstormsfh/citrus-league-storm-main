@@ -72,6 +72,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // that fire during the getSession() call (e.g., OAuth callback redirect)
     let initialSessionHandled = false;
 
+    // Track whether profile fetch succeeded so TOKEN_REFRESHED can retry
+    let profileFetchSucceeded = false;
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
@@ -84,14 +87,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           clearTimeout(timeout);
           analyticsService.setUserId(session.user.id);
           setSentryUser({ id: session.user.id, email: session.user.email });
-          fetchProfile(session.user.id).finally(() => {
+          fetchProfile(session.user.id).then(() => {
+            profileFetchSucceeded = true;
+          }).catch(() => {
+            profileFetchSucceeded = false;
+          }).finally(() => {
             if (mounted) setLoading(false);
           });
+        }
+      } else if (event === 'TOKEN_REFRESHED') {
+        // Supabase finished refreshing the token — retry profile if it failed earlier
+        if (session?.user && !profileFetchSucceeded) {
+          logger.info('[Auth] Token refreshed, retrying profile fetch');
+          fetchProfile(session.user.id).then(() => {
+            profileFetchSucceeded = true;
+          }).catch(() => {});
         }
       } else if (event === 'SIGNED_OUT') {
         analyticsService.setUserId(null);
         setSentryUser(null);
         setProfile(null);
+        profileFetchSucceeded = false;
         setLoading(false);
       }
     });
