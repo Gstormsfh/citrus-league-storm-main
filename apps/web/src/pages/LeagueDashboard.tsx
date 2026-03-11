@@ -101,7 +101,7 @@ const LeagueDashboard = () => {
       const { league: leagueData, error: leagueError } = await LeagueService.getLeague(leagueId, user.id);
       if (leagueError) {
         // Check if it's an access denied error
-        if (leagueError.message?.includes('Access denied') || leagueError.message?.includes('not a member')) {
+        if ((leagueError as Error).message?.includes('Access denied') || (leagueError as Error).message?.includes('not a member')) {
           navigate('/gm-office');
           toast({
             title: "Access Denied",
@@ -245,7 +245,7 @@ const LeagueDashboard = () => {
       
       if (simError) {
         logger.error('handleSimulateFill: Error from simulateLeagueFill:', simError);
-        const errorMessage = simError.message || JSON.stringify(simError) || 'Failed to simulate teams';
+        const errorMessage = (simError as Error).message || JSON.stringify(simError) || 'Failed to simulate teams';
         toast({
           title: 'Error Creating Teams',
           description: errorMessage,
@@ -367,7 +367,7 @@ const LeagueDashboard = () => {
           { waiver_process_time, waiver_period_hours, waiver_game_lock, waiver_type, allow_trades_during_games }
         );
         saved = success;
-        errorMessage = saveError?.message || 'Failed to save waiver settings';
+        errorMessage = (saveError as Error)?.message || 'Failed to save waiver settings';
 
         // Also persist transaction limits into JSONB settings column
         if (saved) {
@@ -394,7 +394,7 @@ const LeagueDashboard = () => {
           scoringSettings
         );
         saved = success;
-        errorMessage = saveError?.message || 'Failed to save scoring settings';
+        errorMessage = (saveError as Error)?.message || 'Failed to save scoring settings';
       } else if (activeSettingsTab === 'draft') {
         const { success, error: saveError } = await LeagueService.updateDraftSettings(
           leagueId,
@@ -402,7 +402,7 @@ const LeagueDashboard = () => {
           draftSettings
         );
         saved = success;
-        errorMessage = saveError?.message || 'Failed to save draft settings';
+        errorMessage = (saveError as Error)?.message || 'Failed to save draft settings';
       } else if (activeSettingsTab === 'trades') {
         const { success, error: tradeErr } = await TradeService.updateTradeReviewSettings(
           leagueId,
@@ -418,7 +418,7 @@ const LeagueDashboard = () => {
           keeperSettings
         );
         saved = success;
-        errorMessage = keeperErr?.message || 'Failed to save keeper settings';
+        errorMessage = (keeperErr as Error)?.message || 'Failed to save keeper settings';
       } else if (activeSettingsTab === 'categories') {
         const { success, error: catErr } = await LeagueService.updateCategorySettings(
           leagueId,
@@ -426,7 +426,7 @@ const LeagueDashboard = () => {
           categorySettings
         );
         saved = success;
-        errorMessage = catErr?.message || 'Failed to save category settings';
+        errorMessage = (catErr as Error)?.message || 'Failed to save category settings';
       } else if (activeSettingsTab === 'rosterslots') {
         const { success, error: slotErr } = await LeagueService.updateRosterSlotSettings(
           leagueId,
@@ -434,7 +434,7 @@ const LeagueDashboard = () => {
           rosterSlotSettings
         );
         saved = success;
-        errorMessage = slotErr?.message || 'Failed to save roster slot settings';
+        errorMessage = (slotErr as Error)?.message || 'Failed to save roster slot settings';
       }
 
       if (!saved) {
@@ -518,8 +518,8 @@ const LeagueDashboard = () => {
     setSyncingRosters(true);
     try {
       // Step 1: Sync roster_assignments from draft_picks
-      const { data: syncResult, error: syncError } = await supabase
-        .rpc('sync_roster_assignments_for_league', { p_league_id: leagueId });
+      const { data: syncResult, error: syncError } = await (supabase
+        .rpc as any)('sync_roster_assignments_for_league', { p_league_id: leagueId });
 
       if (syncError) {
         toast({
@@ -530,7 +530,7 @@ const LeagueDashboard = () => {
         return;
       }
 
-      const playersSynced = syncResult?.players_synced || 0;
+      const playersSynced = (syncResult as any)?.players_synced || 0;
 
       // Step 2: Also rebuild team_lineups from roster_assignments
       try {

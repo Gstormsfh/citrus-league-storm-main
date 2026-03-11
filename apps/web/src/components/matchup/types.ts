@@ -6,7 +6,7 @@ export interface StatBreakdown {
   [category: string]: {
     count: number;
     points: number;
-    logic: string; // e.g., "2 goals * 3.0 points"
+    logic?: string; // e.g., "2 goals * 3.0 points"
   };
 }
 
@@ -126,6 +126,11 @@ export type MatchupPlayer = {
     starter_confirmed: boolean;
     confidence_score: number;
     calculation_method: string;
+    // Monte Carlo uncertainty (shared with skater projections)
+    likely_low?: number;
+    likely_high?: number;
+    confidence_label?: string;
+    dynamic_confidence?: number;
   };
   // IR Status fields from player_talent_metrics
   roster_status?: string; // Official NHL roster status: ACT, IR, LTIR, etc.

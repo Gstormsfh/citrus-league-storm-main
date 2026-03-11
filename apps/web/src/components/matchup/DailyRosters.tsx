@@ -173,7 +173,7 @@ export const DailyRosters = ({
     variant: 'active' | 'bench' | 'ir'
   ) => {
     const name = 'player_name' in player ? player.player_name : player.name;
-    const position = 'position' in player ? player.position : player.position;
+    const position = player.position;
     
     if (variant === 'active') {
       return (
@@ -233,20 +233,20 @@ export const DailyRosters = ({
           : myTeamRoster.filter(p => p.isStarter);
         const myBenchPlayers = isPast && dayState.myLineup
           ? dayState.myLineup.filter(p => p.slot_type === 'bench')
-          : myTeamRoster.filter(p => !p.isStarter && !p.isOnIR);
+          : myTeamRoster.filter(p => !p.isStarter && !p.is_ir_eligible);
         const myIRPlayers = isPast && dayState.myLineup
           ? dayState.myLineup.filter(p => p.slot_type === 'ir')
-          : myTeamRoster.filter(p => p.isOnIR);
+          : myTeamRoster.filter(p => p.is_ir_eligible);
 
         const oppActivePlayers = isPast && dayState.oppLineup
           ? dayState.oppLineup.filter(p => p.slot_type === 'active')
           : opponentTeamRoster.filter(p => p.isStarter);
         const oppBenchPlayers = isPast && dayState.oppLineup
           ? dayState.oppLineup.filter(p => p.slot_type === 'bench')
-          : opponentTeamRoster.filter(p => !p.isStarter && !p.isOnIR);
+          : opponentTeamRoster.filter(p => !p.isStarter && !p.is_ir_eligible);
         const oppIRPlayers = isPast && dayState.oppLineup
           ? dayState.oppLineup.filter(p => p.slot_type === 'ir')
-          : opponentTeamRoster.filter(p => p.isOnIR);
+          : opponentTeamRoster.filter(p => p.is_ir_eligible);
 
         return (
           <Card key={date} className="overflow-visible">

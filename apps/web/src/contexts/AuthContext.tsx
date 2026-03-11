@@ -145,14 +145,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Get the current origin for redirect URL
     const redirectUrl = `${window.location.origin}/auth/callback`;
     
-    const { data, error } = await supabase.auth.signUp({
+    const result = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo: redirectUrl,
       },
     });
-    return { data, error };
+    return result;
   };
 
   const signOut = async () => {

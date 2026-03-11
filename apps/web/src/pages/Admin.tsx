@@ -75,8 +75,8 @@ const Admin = () => {
         adminApi.getPipelineStatus(),
         adminApi.getHealth(),
       ]);
-      setStats(statsRes.data);
-      setPipeline(pipelineRes.data);
+      setStats(statsRes.data as PlatformStats);
+      setPipeline(pipelineRes.data as PipelineStatus);
       setHealth(healthRes as any);
       setAuthorized(true);
     } catch (err: any) {
@@ -98,7 +98,7 @@ const Admin = () => {
   const loadUsers = useCallback(async () => {
     try {
       const res = await adminApi.getUsers({ page: userPage, limit: 25, search: userSearch || undefined });
-      setUsers(res.data || []);
+      setUsers((res.data || []) as any[]);
       setUserTotal(res.pagination?.total || 0);
     } catch { /* authorized check already passed */ }
   }, [userPage, userSearch]);
@@ -106,7 +106,7 @@ const Admin = () => {
   const loadLeagues = useCallback(async () => {
     try {
       const res = await adminApi.getLeagues({ page: leaguePage, limit: 25, search: leagueSearch || undefined });
-      setLeagues(res.data || []);
+      setLeagues((res.data || []) as any[]);
       setLeagueTotal(res.pagination?.total || 0);
     } catch { /* silent */ }
   }, [leaguePage, leagueSearch]);
@@ -114,7 +114,7 @@ const Admin = () => {
   const loadAuditLog = useCallback(async () => {
     try {
       const res = await adminApi.getAuditLog(100);
-      setAuditLog(res.data || []);
+      setAuditLog((res.data || []) as any[]);
     } catch { /* silent */ }
   }, []);
 
