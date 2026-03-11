@@ -265,7 +265,7 @@ const DraftRoom = () => {
           return;
         }
 
-        const demoLeague = demoLeagueData as League;
+        const demoLeague = demoLeagueData as unknown as League;
         logger.debug('[DraftRoom] Demo league loaded:', demoLeague.id);
         setLeague(demoLeague);
         setIsCommissioner(false); // Guests are never commissioners
@@ -285,7 +285,7 @@ const DraftRoom = () => {
         }
         
         // Map database teams and add owner names from LEAGUE_TEAMS_DATA
-        const demoTeams: (Team & { owner_name?: string })[] = (demoTeamsData as Team[]).map((team, index) => {
+        const demoTeams: (Team & { owner_name?: string })[] = (demoTeamsData as unknown as Team[]).map((team, index) => {
           const teamData = LEAGUE_TEAMS_DATA[index];
           return {
             ...team,
@@ -315,7 +315,7 @@ const DraftRoom = () => {
           return;
         }
         
-        const demoPicks: DraftPick[] = (draftPicksData || []) as DraftPick[];
+        const demoPicks: DraftPick[] = (draftPicksData || []) as unknown as DraftPick[];
         logger.debug('[DraftRoom] Loaded', demoPicks.length, 'demo draft picks');
         
         setDraftHistory(demoPicks);
@@ -382,7 +382,7 @@ const DraftRoom = () => {
       if (leagueError) {
         logger.error('DraftRoom: Error loading league:', leagueError);
         // Check if it's an access denied error
-        if (leagueError.message?.includes('Access denied') || leagueError.message?.includes('not a member')) {
+        if ((leagueError as Error).message?.includes('Access denied') || (leagueError as Error).message?.includes('not a member')) {
           navigate('/gm-office');
           return;
         }
@@ -403,7 +403,11 @@ const DraftRoom = () => {
       logger.debug('DraftRoom: League loaded:', leagueData);
       setLeague(leagueData);
       setIsCommissioner(leagueData.commissioner_id === user.id);
-      
+
+      // Load user's team early (needed by auction state below)
+      const { team: userTeamData } = await LeagueService.getUserTeam(leagueId, user.id);
+      setUserTeam(userTeamData);
+
       // Detect auction draft type
       const draftTypeFromSettings = (leagueData.settings as LeagueSettings)?.draftType;
       if (draftTypeFromSettings === 'auction') {
@@ -485,10 +489,6 @@ const DraftRoom = () => {
       }
       logger.debug('DraftRoom: Teams loaded:', teamsData?.length || 0, 'teams');
       setTeams(teamsData || []);
-
-      // Load user's team
-      const { team: userTeamData } = await LeagueService.getUserTeam(leagueId, user.id);
-      setUserTeam(userTeamData);
 
       // Load draft picks (only active session, not deleted)
       // Check if there are actually any active draft picks/orders to determine if draft exists
@@ -687,7 +687,7 @@ const DraftRoom = () => {
     }
 
     // Don't redirect guests - they should see demo draft room
-    if (!user && userLeagueState !== 'guest' && userLeagueState !== 'logged-in-no-league') {
+    if (!user && (userLeagueState as string) !== 'guest' && (userLeagueState as string) !== 'logged-in-no-league') {
       // Small delay to ensure component has rendered loading state
       const timer = setTimeout(() => {
         navigate('/auth');
@@ -1112,7 +1112,7 @@ const DraftRoom = () => {
       if (error) {
         logger.error('loadDraftState: Error loading draft state', error);
         // If draft order doesn't exist, retry a few times (might be still initializing)
-        if (error.message?.includes('not initialized') || error.message?.includes('not found')) {
+        if ((error as Error).message?.includes('not initialized') || (error as Error).message?.includes('not found')) {
           if (retryCount < 5) {
             logger.log(`loadDraftState: Draft order not found, retrying (${retryCount + 1}/5)...`);
             await new Promise(resolve => setTimeout(resolve, 500));
@@ -1386,7 +1386,7 @@ const DraftRoom = () => {
       return cleanup;
     }
 
-    const timerStartMs = new Date(timerStartedAt).getTime();
+    const timerStartMs = new Date(timerStartedAt as string | number).getTime();
     const isAITeam = !currentTeamRef.current.owner_id;
 
     // For AI teams, auto-pick after 2 seconds
@@ -1569,7 +1569,7 @@ const DraftRoom = () => {
       if (error) {
         logger.error('DraftService.makePick error:', error);
         // Extract message from various error formats (Supabase errors aren't Error instances)
-        const msg = error?.message || error?.details || error?.hint || JSON.stringify(error);
+        const msg = (error as any)?.message || (error as any)?.details || (error as any)?.hint || JSON.stringify(error);
         throw new Error(msg);
       }
 
@@ -1822,7 +1822,7 @@ const DraftRoom = () => {
       const { undone, error: undoError } = await DraftService.undoLastPick(leagueId, user.id);
       if (undoError || !undone) {
         logger.error('handleUndoLastPick error:', undoError);
-        toast({ title: "Error", description: `Failed to undo pick: ${undoError?.message || 'No picks to undo'}`, variant: "destructive" });
+        toast({ title: "Error", description: `Failed to undo pick: ${(undoError as any)?.message || 'No picks to undo'}`, variant: "destructive" });
         return;
       }
 
@@ -1871,7 +1871,7 @@ const DraftRoom = () => {
       const { error: resetError } = await DraftService.resetDraft(leagueId);
       if (resetError) {
         logger.error('Nuclear delete draft error:', resetError);
-        toast({ title: "Error", description: `Failed to delete draft: ${resetError.message || 'Unknown error'}`, variant: "destructive" });
+        toast({ title: "Error", description: `Failed to delete draft: ${(resetError as any).message || 'Unknown error'}`, variant: "destructive" });
         return;
       }
 
@@ -2060,7 +2060,7 @@ const DraftRoom = () => {
         );
         
         if (retryError) {
-          toast({ title: "Error", description: `Failed to prepare draft: ${retryError.message || 'Unknown error'}. Please try resetting the draft.`, variant: "destructive" });
+          toast({ title: "Error", description: `Failed to prepare draft: ${(retryError as any).message || 'Unknown error'}. Please try resetting the draft.`, variant: "destructive" });
           return;
         }
       }
@@ -2211,7 +2211,7 @@ const DraftRoom = () => {
       );
 
       if (initError) {
-        toast({ title: "Error", description: `Failed to initialize draft order: ${initError.message || 'Unknown error'}. Please try preparing the draft first.`, variant: "destructive" });
+        toast({ title: "Error", description: `Failed to initialize draft order: ${(initError as any).message || 'Unknown error'}. Please try preparing the draft first.`, variant: "destructive" });
         return;
       }
 
@@ -2443,7 +2443,7 @@ const DraftRoom = () => {
       const { error } = await DraftService.deleteAllDraftData();
       if (error) {
         logger.error('Error deleting all draft data:', error);
-        toast({ title: "Error", description: `Failed to delete all draft data: ${error.message || 'Unknown error'}`, variant: "destructive" });
+        toast({ title: "Error", description: `Failed to delete all draft data: ${(error as any).message || 'Unknown error'}`, variant: "destructive" });
         return;
       }
 
@@ -2496,7 +2496,7 @@ const DraftRoom = () => {
       const { error } = await DraftService.hardDeleteDraft(leagueId);
       if (error) {
         logger.error('Error resetting draft:', error);
-        toast({ title: "Error", description: `Failed to reset draft: ${error.message || 'Unknown error'}`, variant: "destructive" });
+        toast({ title: "Error", description: `Failed to reset draft: ${(error as any).message || 'Unknown error'}`, variant: "destructive" });
         return;
       }
 
@@ -3726,7 +3726,7 @@ const DraftRoom = () => {
             )}
 
             {/* Show Pause/Continue buttons for in-progress drafts - Disabled in demo state */}
-            {isCommissioner && userLeagueState === 'active-user' && draftPhase === DraftPhase.ACTIVE && (draftHistory?.length || 0) > 0 && (
+            {isCommissioner && userLeagueState === 'active-user' && (draftPhase as string) === DraftPhase.ACTIVE && (draftHistory?.length || 0) > 0 && (
               <div className="fixed bottom-4 right-4 z-50">
                 {league?.settings?.timerStartedAt ? (
                   <Button

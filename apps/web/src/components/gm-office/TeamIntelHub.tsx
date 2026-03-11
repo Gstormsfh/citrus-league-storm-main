@@ -165,7 +165,7 @@ export const TeamIntelHub = () => {
         setLoading(true);
 
         // Get user's team via API client
-        const { data: userTeam } = await leagueApi.getMyTeam(activeLeagueId);
+        const { data: userTeam } = await leagueApi.getMyTeam(activeLeagueId) as { data?: { id: string } };
 
         if (!userTeam) {
           setLoading(false);
@@ -184,7 +184,7 @@ export const TeamIntelHub = () => {
         const allPlayers = await PlayerService.getAllPlayers();
 
         // Use roster API to get player IDs (source of truth)
-        const { data: rosterPlayerIdList } = await rosterApi.getPlayerIds(activeLeagueId, userTeam.id);
+        const { data: rosterPlayerIdList } = await rosterApi.getPlayerIds(activeLeagueId, userTeam.id) as { data?: (string | number)[] };
 
         let players: Player[] = [];
 

@@ -96,8 +96,8 @@ export const RosterDepthWidget = () => {
         const { data: userTeam, error: teamError } = await supabase
           .from('teams')
           .select('id, league_id')
-          .eq('league_id', activeLeagueId)
-          .eq('owner_id', user.id)
+          .eq('league_id' as any, activeLeagueId as any)
+          .eq('owner_id' as any, user.id as any)
           .maybeSingle();
 
         if (teamError || !userTeam) {
@@ -118,8 +118,8 @@ export const RosterDepthWidget = () => {
         const { data: rosterAssignments, error: picksError } = await supabase
           .from('roster_assignments')
           .select('player_id')
-          .eq('league_id', activeLeagueId)
-          .eq('team_id', userTeam.id);
+          .eq('league_id' as any, activeLeagueId as any)
+          .eq('team_id' as any, (userTeam as any).id as any);
 
         let rosterPlayers: Player[] = [];
 
@@ -133,7 +133,7 @@ export const RosterDepthWidget = () => {
             return;
           }
 
-          const playerIds = rosterAssignments.map((r: { player_id: string }) => String(r.player_id));
+          const playerIds = (rosterAssignments as any[]).map((r: { player_id: string }) => String(r.player_id));
           rosterPlayers = allPlayers.filter(p => playerIds.includes(String(p.id)));
         }
 

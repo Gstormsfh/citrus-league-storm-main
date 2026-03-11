@@ -135,6 +135,13 @@ interface DailyProjection {
   projected_save_pct?: number;
   projected_gp?: number;
   starter_confirmed?: boolean;
+  // Monte Carlo uncertainty (Citrus 3.1)
+  likely_low?: number;
+  likely_high?: number;
+  confidence_label?: string;
+  dynamic_confidence?: number;
+  projection_mean?: number;
+  projection_std_dev?: number;
 }
 
 /** A matchup row from a Supabase query with joined team names */
@@ -457,7 +464,7 @@ const Matchup = () => {
         if (!dateMap.has(r.team_id)) {
           dateMap.set(r.team_id, []);
         }
-        dateMap.get(r.team_id)!.push(parseInt(r.player_id));
+        dateMap.get(r.team_id)!.push(typeof r.player_id === 'number' ? r.player_id : parseInt(r.player_id));
       });
       
       // Calculate scores for each past date
@@ -2092,7 +2099,7 @@ const Matchup = () => {
           return {
             ...player,
             daily_total_points: stats?.daily_total_points ?? 0,
-            daily_stats_breakdown: stats?.daily_stats_breakdown
+            daily_stats_breakdown: stats?.daily_stats_breakdown as StatBreakdown | undefined
           };
         });
         dayOppStarters = frozenRoster.oppRoster.filter(p => p.isStarter).map(player => {
@@ -2101,7 +2108,7 @@ const Matchup = () => {
           return {
             ...player,
             daily_total_points: stats?.daily_total_points ?? 0,
-            daily_stats_breakdown: stats?.daily_stats_breakdown
+            daily_stats_breakdown: stats?.daily_stats_breakdown as StatBreakdown | undefined
           };
         });
         dayMySlots = frozenRoster.mySlots;
@@ -3312,11 +3319,11 @@ const Matchup = () => {
 
   // Calculate total games remaining for each team (position-aware, respects roster slots)
   const myTeamGamesRemaining = useMemo(() => {
-    return calculateEligibleGamesRemaining(myStarters);
+    return calculateEligibleGamesRemaining(myStarters as MatchupPlayer[]);
   }, [myStarters]);
 
   const opponentTeamGamesRemaining = useMemo(() => {
-    return calculateEligibleGamesRemaining(opponentStarters);
+    return calculateEligibleGamesRemaining(opponentStarters as MatchupPlayer[]);
   }, [opponentStarters]);
 
   // YAHOO/SLEEPER DISPLAY: Use frozen lineup for past days, current for today/future
@@ -4010,7 +4017,7 @@ const Matchup = () => {
 
           // Check if ANY matchups exist for this league (via API)
           const anyMatchupsRes = await matchupApi.getLeagueMatchups(currentLeague.id);
-          const anyMatchups = anyMatchupsRes?.data || [];
+          const anyMatchups = (anyMatchupsRes?.data || []) as any[];
           const hasAnyMatchups = anyMatchups.length > 0;
           
           // If no matchups exist at all, force regenerate ALL weeks
@@ -4051,7 +4058,7 @@ const Matchup = () => {
           // Invalidate cache first since we just generated matchups
           matchupApi.invalidate(`matchups:league:${currentLeague.id}`);
           const weekMatchupsRes = await matchupApi.getLeagueMatchups(currentLeague.id, weekToShow);
-          const allMatchups = weekMatchupsRes?.data || [];
+          const allMatchups = (weekMatchupsRes?.data || []) as any[];
           log(' Debug - All matchups for week', weekToShow, ':', allMatchups);
 
           // Also check ALL weeks via API
@@ -4063,7 +4070,7 @@ const Matchup = () => {
 
           // Also check user's team via API
           const teamsRes = await leagueApi.getTeams(currentLeague.id);
-          const allTeamsData = teamsRes?.data || [];
+          const allTeamsData = (teamsRes?.data || []) as any[];
           const userTeamData = allTeamsData.find((t: any) => t.owner_id === user.id) || null;
           
           log(' Debug - User team:', userTeamData);
@@ -5373,15 +5380,15 @@ const Matchup = () => {
                     MatchupComparison displays pre-calc values immediately (no flicker)
                     And recalculates in background to update if needed */}
                 <MatchupComparison
-                  userStarters={displayStarters}
-                  opponentStarters={displayOpponentStarters}
-                  userBench={myBench}
-                  opponentBench={opponentBench}
+                  userStarters={displayStarters as MatchupPlayer[]}
+                  opponentStarters={displayOpponentStarters as MatchupPlayer[]}
+                  userBench={myBench as MatchupPlayer[]}
+                  opponentBench={opponentBench as MatchupPlayer[]}
                   userSlotAssignments={displayMyTeamSlotAssignments}
                   opponentSlotAssignments={displayOpponentTeamSlotAssignments}
                   onPlayerClick={handlePlayerClick}
                   selectedDate={selectedDate}
-                  dailyStatsMap={selectedDate ? dailyStatsByDate.get(selectedDate) : dailyStatsMap}
+                  dailyStatsMap={(selectedDate ? dailyStatsByDate.get(selectedDate) : dailyStatsMap) as any}
                   onTotalsCalculated={handleTotalsCalculated}
                   calculatedDailyTotals={calculatedDailyTotals}
                   weeklyUserTotal={(() => {

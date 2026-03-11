@@ -50,11 +50,12 @@ export function usePlayerNews(
         return;
       }
 
-      const { data: metrics, error } = await supabase
-        .from('player_talent_metrics')
+      const query = supabase
+        .from('player_talent_metrics' as any)
         .select('player_id, roster_status, is_ir_eligible, roster_status_updated_at')
         .eq('season', CURRENT_SEASON)
         .in('player_id', playerIds);
+      const { data: metrics, error } = await (query as any);
 
       if (error) {
         logger.error('Error fetching player news:', error);
@@ -67,7 +68,7 @@ export function usePlayerNews(
       const playerMap = new Map(allPlayers.map(p => [Number(p.id), p]));
 
       // Build news items
-      const items: PlayerNewsItem[] = (metrics || [])
+      const items: PlayerNewsItem[] = ((metrics || []) as { player_id: number; roster_status: string | null; is_ir_eligible: boolean | null; roster_status_updated_at: string | null }[])
         .filter(m => m.roster_status) // Only include players with status
         .map(metric => {
           const player = playerMap.get(metric.player_id);

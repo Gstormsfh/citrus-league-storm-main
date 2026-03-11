@@ -293,7 +293,7 @@ export const LeagueService = {
     rosterSize: number = 21,
     draftRounds: number = 21,
     settings: LeagueSettings = {},
-    scoringSettings?: Record<string, number>,
+    scoringSettings?: Record<string, unknown>,
     waiverSettings?: {
       waiver_process_time?: string;
       waiver_period_hours?: number;

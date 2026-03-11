@@ -30,7 +30,6 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     // Pro: Token auto-refresh runs before expiry to avoid mid-session interruptions
     detectSessionInUrl: true,
     flowType: 'pkce', // Pro: More secure auth flow (PKCE)
-    redirectTo: `${getSiteUrl()}/auth/callback`,
   },
   realtime: {
     params: {
