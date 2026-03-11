@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useMemo, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { LeagueService, League, getLeagueFormat } from '@/services/LeagueService';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
@@ -7,6 +7,7 @@ import { MatchupService } from '@/services/MatchupService';
 import { RosterCacheService } from '@/services/RosterCacheService';
 import { PlayerService } from '@/services/PlayerService';
 import { LeagueMembershipService } from '@/services/LeagueMembershipService';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import type { LeagueType, ScoringFormat, DraftType } from '@/types/leagueTypes';
 import { logger } from '@/utils/logger';
@@ -112,6 +113,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       const { leagues, error: leaguesError } = await LeagueService.getUserLeagues(user.id);
       
       if (leaguesError) {
+        leagueLoadSucceeded.current = false;
         setError('Failed to load your leagues');
         setLoading(false);
         return;
@@ -152,9 +154,11 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
         setActiveLeague(null);
       }
 
+      leagueLoadSucceeded.current = true;
       setLoading(false);
     } catch (err: unknown) {
       logger.error('Error loading leagues:', err);
+      leagueLoadSucceeded.current = false;
       setError('Failed to load leagues');
       setLoading(false);
     }
@@ -238,10 +242,33 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     //   }
     // }, [user]);
 
+  // Track whether league load succeeded so TOKEN_REFRESHED can retry
+  const leagueLoadSucceeded = useRef(false);
+
   // Load leagues on mount and when user changes
   useEffect(() => {
-    loadUserLeagues();
+    leagueLoadSucceeded.current = false;
+    loadUserLeagues().then(() => {
+      // If we got leagues, mark as succeeded
+      leagueLoadSucceeded.current = true;
+    }).catch(() => {
+      leagueLoadSucceeded.current = false;
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- loadUserLeagues is not memoized; user is the only meaningful trigger
+  }, [user]);
+
+  // When Supabase finishes refreshing the token, retry if leagues failed to load
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'TOKEN_REFRESHED' && user && !leagueLoadSucceeded.current) {
+        logger.info('[LeagueContext] Token refreshed, retrying league load');
+        loadUserLeagues().then(() => {
+          leagueLoadSucceeded.current = true;
+        }).catch(() => {});
+      }
+    });
+    return () => subscription.unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   // Update active league when URL param changes (with membership validation)

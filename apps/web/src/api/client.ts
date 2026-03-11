@@ -31,6 +31,26 @@ interface RequestOptions {
   signal?: AbortSignal;
 }
 
+// ── Token refresh lock ──────────────────────────────────────────────────
+// When multiple concurrent requests hit 401, only ONE refresh runs.
+// All others await the same promise to avoid a stampede of refreshSession() calls.
+let refreshPromise: Promise<string | null> | null = null;
+
+async function refreshTokenOnce(): Promise<string | null> {
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = supabase.auth.refreshSession().then(({ data, error }) => {
+    refreshPromise = null;
+    if (error || !data.session) return null;
+    return data.session.access_token;
+  }).catch(() => {
+    refreshPromise = null;
+    return null;
+  });
+
+  return refreshPromise;
+}
+
 async function getAuthToken(): Promise<string | null> {
   const { data: { session } } = await supabase.auth.getSession();
   return session?.access_token || null;
@@ -76,12 +96,10 @@ async function request<T = unknown>(
   let { response, json } = await doFetch(method, path, token, body, options);
 
   // On 401, try refreshing the session and retry once.
-  // This handles the race condition where the stored token has expired
-  // but Supabase hasn't completed its background refresh yet.
+  // Uses a lock so concurrent 401s share a single refreshSession() call.
   if (response.status === 401 && token) {
-    const { data, error } = await supabase.auth.refreshSession();
-    const newToken = data?.session?.access_token;
-    if (!error && newToken && newToken !== token) {
+    const newToken = await refreshTokenOnce();
+    if (newToken && newToken !== token) {
       ({ response, json } = await doFetch(method, path, newToken, body, options));
     }
   }
