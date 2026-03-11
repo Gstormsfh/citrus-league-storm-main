@@ -36,13 +36,13 @@ async function getAuthToken(): Promise<string | null> {
   return session?.access_token || null;
 }
 
-async function doFetch<T = unknown>(
+async function doFetch(
   method: string,
   path: string,
   token: string | null,
   body?: unknown,
   options?: RequestOptions
-): Promise<{ response: Response; json: ApiResponse<T> }> {
+): Promise<{ response: Response; json: any }> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'x-client-info': 'citrus-web',
