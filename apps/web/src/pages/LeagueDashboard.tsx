@@ -201,7 +201,7 @@ const LeagueDashboard = () => {
     } finally {
       setLoading(false);
     }
-  }, [leagueId, user, navigate]);
+  }, [leagueId, user, navigate, toast]);
 
   useEffect(() => {
     if (!user) {

@@ -4,8 +4,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
-import { LeagueService } from '@/services/LeagueService';
-import { MatchupService } from '@/services/MatchupService';
+import { LeagueService, type Team } from '@/services/LeagueService';
+import { PlayerService } from '@/services/PlayerService';
 import { supabase } from '@/integrations/supabase/client';
 import { Trophy, TrendingUp, Shield } from 'lucide-react';
 import { CitrusSparkle, CitrusBurst, CitrusLeaf } from '@/components/icons/CitrusIcons';
@@ -32,34 +32,55 @@ export const StatsOverviewCards = () => {
       }
 
       try {
-        // Get user's team
-        const { data: userTeam } = await supabase
-          .from('teams')
-          .select('id')
-          .eq('league_id', activeLeagueId)
-          .eq('owner_id', user.id)
-          .maybeSingle();
-
-        if (!userTeam) {
+        // Fetch league teams
+        const { teams: leagueTeams } = await LeagueService.getLeagueTeams(activeLeagueId);
+        if (!leagueTeams || leagueTeams.length === 0) {
           setStats(prev => ({ ...prev, loading: false }));
           return;
         }
 
-        // Get team standings
-        const standings = await LeagueService.calculateTeamStandings(activeLeagueId);
-        const myStanding = standings.find(s => s.teamId === userTeam.id);
+        // Find user's team
+        const userTeamId = leagueTeams.find(t => t.owner_id === user.id)?.id;
+        if (!userTeamId) {
+          setStats(prev => ({ ...prev, loading: false }));
+          return;
+        }
+
+        // Fetch draft picks and players for standings calculation
+        const { data: draftPicksData } = await (supabase as any)
+          .from('draft_picks')
+          .select('team_id, player_id')
+          .eq('league_id', activeLeagueId);
+        const draftPicks = (draftPicksData || []) as Array<{ team_id: string; player_id: string }>;
+        const allPlayers = await PlayerService.getAllPlayers();
+
+        // Get team standings (returns Record<teamId, stats>)
+        const standingsMap = await LeagueService.calculateTeamStandings(
+          activeLeagueId,
+          leagueTeams,
+          draftPicks,
+          allPlayers
+        );
+
+        // Convert to sorted array for ranking
+        const standingsArray = Object.entries(standingsMap)
+          .map(([teamId, s]) => ({ teamId, ...s }))
+          .sort((a, b) => b.pointsFor - a.pointsFor);
+
+        const myStanding = standingsMap[userTeamId];
 
         if (myStanding) {
-          const rank = standings.findIndex(s => s.teamId === userTeam.id) + 1;
-          const percentile = Math.round((1 - (rank - 1) / standings.length) * 100);
+          const rank = standingsArray.findIndex(s => s.teamId === userTeamId) + 1;
+          const percentile = Math.round((1 - (rank - 1) / standingsArray.length) * 100);
+          const gamesPlayed = myStanding.wins + myStanding.losses + myStanding.ties || 1;
 
           setStats({
             rank: `${rank}${getRankSuffix(rank)}`,
             percentile: `Top ${percentile}%`,
             pointsFor: myStanding.pointsFor,
-            avgPointsFor: myStanding.pointsFor / (myStanding.wins + myStanding.losses || 1),
+            avgPointsFor: myStanding.pointsFor / gamesPlayed,
             pointsAgainst: myStanding.pointsAgainst,
-            avgPointsAgainst: myStanding.pointsAgainst / (myStanding.wins + myStanding.losses || 1),
+            avgPointsAgainst: myStanding.pointsAgainst / gamesPlayed,
             loading: false
           });
         } else {

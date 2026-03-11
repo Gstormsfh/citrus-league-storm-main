@@ -102,11 +102,11 @@ export const PlayerCard = ({ player, onClick, draggable = true, className }: Pla
           </div>
           <div className="text-center p-2 bg-[#E8EED9]/50 backdrop-blur-sm/60 rounded-lg border-2 border-citrus-sage/30">
             <div className="text-citrus-charcoal font-display font-semibold">{isGoalie ? "GAA" : "A"}</div>
-            <div className="font-varsity font-black text-lg text-citrus-forest">{isGoalie ? (player.stats.gaa?.toFixed(2) ?? '0.00') : player.stats.assists}</div>
+            <div className="font-varsity font-black text-lg text-citrus-forest">{isGoalie ? (Number(player.stats.gaa ?? 0).toFixed(2)) : player.stats.assists}</div>
           </div>
           <div className="text-center p-2 bg-[#E8EED9]/50 backdrop-blur-sm/60 rounded-lg border-2 border-citrus-sage/30">
             <div className="text-citrus-charcoal font-display font-semibold">{isGoalie ? "SV%" : "PTS"}</div>
-            <div className="font-varsity font-black text-lg text-citrus-forest">{isGoalie ? (player.stats.savePct ? (player.stats.savePct * 100).toFixed(3) : '0.000') + '%' : player.stats.points}</div>
+            <div className="font-varsity font-black text-lg text-citrus-forest">{isGoalie ? (player.stats.savePct ? (Number(player.stats.savePct) * 100).toFixed(3) : '0.000') + '%' : player.stats.points}</div>
           </div>
         </div>
       </div>

@@ -255,7 +255,6 @@ const DraftRoom = () => {
         const { data: demoLeagueData, error: leagueError } = await supabase
           .from('leagues')
           .select(COLUMNS.LEAGUE)
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .eq('id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
           .maybeSingle();
 
@@ -275,7 +274,6 @@ const DraftRoom = () => {
         const { data: demoTeamsData, error: teamsError } = await supabase
           .from('teams')
           .select(COLUMNS.TEAM)
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
           .order('created_at', { ascending: true });
         
@@ -306,7 +304,6 @@ const DraftRoom = () => {
         const { data: draftPicksData, error: picksError } = await supabase
           .from('draft_picks')
           .select(COLUMNS.DRAFT_PICK)
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
           .is('deleted_at', null)
           .order('pick_number', { ascending: true });
@@ -669,10 +666,10 @@ const DraftRoom = () => {
       setDraftPhase(DraftPhase.LOBBY);
       // Don't redirect on error - show error message instead
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- All other values used inside are either React state setters
-  // (setLoading, setError, setLeague, etc. -- guaranteed stable by React), module-level imports
-  // (supabase, DraftService, PlayerService, etc.), or constants (DraftPhase, COLUMNS). The exhaustive
-  // list of non-stable deps is: leagueId, user, navigate, userLeagueState, generateDemoDraftPicks.
+  // All other values used inside are either React state setters (guaranteed stable by React),
+  // module-level imports, or constants. draftPhase/resolveTeamOrder/teams.length are excluded because
+  // loadDraftData sets teams and draftPhase, so including them would cause infinite re-render loops.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leagueId, user, navigate, userLeagueState, generateDemoDraftPicks]);
 
   useEffect(() => {
@@ -757,10 +754,9 @@ const DraftRoom = () => {
       clearTimeout(updateTimeout);
       unsubscribe();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- Supabase realtime subscription: only re-subscribe when
-  // channel identity changes (leagueId, user?.id). The callback uses loadDraftState (not memoized) and
-  // state setters (stable) via closures. Including loadDraftState would cause re-subscription on every render.
-  // draftTimerStartedRef is a stable ref.
+  // Supabase realtime subscription: only re-subscribe when channel identity changes (leagueId, user?.id).
+  // loadDraftState is not memoized — including it would cause re-subscription on every render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leagueId, user?.id]);
 
   // POLLING FALLBACK: safety net in case Supabase realtime drops.
@@ -847,10 +843,9 @@ const DraftRoom = () => {
     }, 15000);
 
     return () => clearInterval(pollInterval);
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- Polling interval: only recreate when phase changes or identity
-  // changes. The callback uses loadDraftState (not memoized), state setters (stable), and
-  // draftTimerStartedRef (stable ref). Including loadDraftState would cause interval recreation on every
-  // render since it's not wrapped in useCallback (it depends on league/teams state).
+  // Polling interval: only recreate when phase or identity changes. loadDraftState is not memoized —
+  // including it would cause interval recreation on every render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftPhase, leagueId, user?.id]);
 
   // Reload teams when page becomes visible again (e.g., user changed team name in another tab)
@@ -946,10 +941,11 @@ const DraftRoom = () => {
     const bidPoll = setInterval(loadBidHistory, 3000);
 
     return () => { clearInterval(interval); clearInterval(bidPoll); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- Auction timer: re-creates interval when nomination changes
-  // (?.id, ?.expires_at). userTeam?.id is intentionally excluded to avoid restarting timer on team state
-  // updates. toast is stable (from useToast hook). State setters (setAuctionTimeRemaining, setAuctionState)
-  // are guaranteed stable by React.
+  // Auction timer: re-creates interval when nomination changes (?.id, ?.expires_at).
+  // auctionState.currentNomination is accessed via ?.id and ?.expires_at granularly.
+  // userTeam.id is excluded to avoid restarting timer on team state updates.
+  // toast is stable from useToast but excluded to keep deps minimal.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuctionDraft, auctionState?.currentNomination?.id, auctionState?.currentNomination?.expires_at, draftPhase, leagueId, auctionSessionId]);
 
   // Real-time subscription to league status changes
@@ -1070,10 +1066,9 @@ const DraftRoom = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- Supabase realtime subscription: only re-subscribe when channel
-  // identity changes (leagueId, user?.id) or draftPhase changes. league, teams, and resolveTeamOrder are
-  // accessed via closures inside the async callback and intentionally excluded to prevent re-subscribing
-  // on every state update. Re-subscribing would cause missed events and connection churn.
+  // Supabase realtime subscription: league, teams, and resolveTeamOrder are accessed via closures
+  // and intentionally excluded to prevent re-subscribing on every state update (causes missed events).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leagueId, user?.id, draftPhase]);
 
   const loadDraftState = async (retryCount: number = 0): Promise<DraftState | null> => {
@@ -1423,10 +1418,9 @@ const DraftRoom = () => {
     timerRunningRef.current = true;
 
     return cleanup;
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- Timer interval: only recreate when server timestamp changes
-  // (new pick made), time limit changes, or current pick number changes. draftPhase and currentTeam are
-  // accessed via refs (draftPhaseRef, currentTeamRef) that are kept in sync by separate useEffects above,
-  // avoiding unnecessary interval recreation. handleAutoDraftRef is also a stable ref.
+  // Timer interval: draftPhase and currentTeam are accessed via refs to avoid unnecessary interval
+  // recreation. draftState is accessed via ?.currentPick granularly. handleAutoDraftRef is a stable ref.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [league?.settings?.timerStartedAt, draftSettings.pickTimeLimit, draftState?.currentPick]);
 
   // Auto-start draft at scheduled time (commissioner only)
@@ -1454,11 +1448,9 @@ const DraftRoom = () => {
       handleStartDraft(draftSettings);
     }, msUntilStart);
     return () => clearTimeout(timeout);
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- handleStartDraft and draftSettings are intentionally excluded.
-  // handleStartDraft is not memoized (it reads league/teams/user state), and draftSettings changes on
-  // every settings update. Including them would cause the scheduled timeout to be reset unnecessarily.
-  // The timeout only needs to fire once at the scheduled time; handleStartDraft will read current state
-  // when it executes.
+  // handleStartDraft is not memoized and draftSettings changes on every settings update.
+  // Including them would cause the scheduled timeout to be reset unnecessarily.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCommissioner, league?.scheduled_draft_time, league?.draft_status, draftPhase]);
 
   const handlePlayerDraft = async (player: Player, isAutoDraft: boolean = false) => {

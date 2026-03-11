@@ -1181,10 +1181,7 @@ const Roster = () => {
         // Always set loading to false at the end
         setLoading(false);
       }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- calculateInitialSlotAssignments is a pure function (no closures
-  // over state) that is recreated each render but is functionally stable. Including it would cause
-  // loadRoster to be recreated on every render, triggering unnecessary re-loads. State setters
-  // (setRoster, setLoading, etc.) are guaranteed stable by React.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- userTeam.league_id and userTeamId derived from state set within this callback
   }, [user, profile, toast, userLeagueState, leagueLoading, activeLeagueId, selectedDate, currentMatchup]);
 
   // Initial load on mount and when userLeagueState changes
@@ -1415,9 +1412,7 @@ const Roster = () => {
     if (roster.starters.length > 0 || roster.bench.length > 0 || roster.ir.length > 0) {
       fetchLockedPlayerIds();
     }
-  // fetchLockedPlayerIds already depends on roster.starters, roster.bench, roster.ir, and selectedDate,
-  // so it will change when any of those change. The guard condition reads roster lengths but they don't
-  // need to be separate deps since fetchLockedPlayerIds transitively covers them.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchLockedPlayerIds transitively covers roster arrays
   }, [fetchLockedPlayerIds]);
 
   // Reload roster when selected date changes to a PAST date (to load frozen roster)
@@ -1434,9 +1429,7 @@ const Roster = () => {
       // For today/future dates: projections are automatically fetched by the fetchDailyProjections useEffect
       // which triggers on selectedDate changes
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- currentMatchup is narrowed to ?.id intentionally.
-  // The effect only needs to detect when the matchup identity changes, not when matchup scores or other
-  // fields update, which would trigger unnecessary frozen roster reloads.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- currentMatchup object would cause infinite re-renders; .id is sufficient
   }, [selectedDate, currentMatchup?.id, userTeamId, loadRoster]);
 
   // EGRESS OPTIMIZATION: Refresh lock status every 60 seconds (was 30s)
@@ -1451,8 +1444,7 @@ const Roster = () => {
     }, 60000); // 60 seconds (was 30s - enterprise egress optimization)
 
     return () => clearInterval(interval);
-  // The guard condition reads roster.starters/bench/ir lengths, but fetchLockedPlayerIds already depends
-  // on those arrays, so the interval is recreated when roster changes. No additional deps needed.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- guard reads roster lengths but fetchLockedPlayerIds transitively covers them
   }, [fetchLockedPlayerIds]);
 
   // Auto-save lineup when leaving page (backup)
@@ -1598,10 +1590,7 @@ const Roster = () => {
     };
 
     calculateStats();
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentionally narrows userTeam to ?.id and user to ?.id to
-  // prevent recalculation on unrelated state changes. transactions.length is used instead of the full
-  // transactions array to only recalc when a new transaction is added, not when the array reference changes.
-  // The calculateStats function fetches fresh data from services, so it doesn't need stale closure values.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- transactions/user/userTeam objects would cause loops; using stable sub-values
   }, [userTeam?.id, user?.id, transactions.length]);
 
   // Fetch daily projections for selected date (WORLD-CLASS PATTERN - matches Matchup tab)
@@ -1665,9 +1654,7 @@ const Roster = () => {
     // Fetch projections for this date
     fetchProjectionsForDate(targetDate, allPlayerIds);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- roster.starters.length, roster.bench.length, roster.ir.length
-  // are used instead of the full arrays to detect roster composition changes without triggering on every
-  // object reference change. The actual player IDs are extracted from the arrays inside the effect body.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- roster arrays as deps would cause circular triggers; lengths are sufficient
   }, [selectedDate, roster.starters.length, roster.bench.length, roster.ir.length, fetchProjectionsForDate]);
 
   // =============================================================================
@@ -2021,10 +2008,7 @@ const Roster = () => {
     };
     
     loadAnalytics();
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- roster.starters.length is used instead of the full roster object
-  // to prevent infinite loops: loadAnalytics calls setRoster(), which would change the roster reference,
-  // re-triggering this effect. Using .length ensures it only runs when the number of starters changes
-  // (i.e., roster composition changed), not when player data within starters is enriched.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- roster arrays would cause re-renders; starters.length is sufficient trigger
   }, [loading, analyticsLoaded, roster.starters.length, toast]);
 
   // Update statView on players when it changes

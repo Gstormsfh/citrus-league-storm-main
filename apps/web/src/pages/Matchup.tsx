@@ -379,9 +379,10 @@ const Matchup = () => {
     
     // Fire-and-forget
     runBackfillAndCalculate();
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentionally depends only on currentMatchup?.id to run once per matchup.
+  // Intentionally depends only on currentMatchup?.id to run once per matchup.
   // The effect reads currentMatchup properties (league_id, team1_id, etc.) but should NOT re-run when
   // scores or other matchup fields update (which would cause infinite loops since this effect updates scores).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentMatchup?.id]);
 
   // Fetch and cache daily scores for past days (Yahoo/Sleeper frozen scoring)
@@ -524,9 +525,10 @@ const Matchup = () => {
     };
     
     fetchCachedScores();
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentionally narrows currentMatchup to ?.id, ?.team1_id, ?.team2_id
-  // and userTeam to ?.id. Using the full objects would cause re-runs whenever any field changes
-  // (e.g., score updates), triggering redundant frozen-score recalculations.
+  // Intentionally narrows currentMatchup to ?.id, ?.team1_id, ?.team2_id and userTeam to ?.id.
+  // Using the full objects would cause re-runs whenever any field changes (e.g., score updates),
+  // triggering redundant frozen-score recalculations.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentMatchup?.id, dailyStatsByDate, currentMatchup?.team1_id, currentMatchup?.team2_id, userTeam?.id]);
 
   const [myDailyPoints, setMyDailyPoints] = useState<number[]>([]);
@@ -1145,9 +1147,10 @@ const Matchup = () => {
     };
 
     fetchAllWeekMatchups();
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentionally narrows league to ?.id and currentMatchup to ?.id.
+  // Intentionally narrows league to ?.id and currentMatchup to ?.id.
   // Using full objects would cause unnecessary re-fetches when scores or other fields update.
   // selectedMatchupId is read inside to conditionally setSelectedMatchupId but should not trigger re-fetch.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [league?.id, selectedWeek, userLeagueState, currentMatchup?.id]);
 
   // Update player ID refs when teams change (stable references to break death loop)
@@ -1456,11 +1459,10 @@ const Matchup = () => {
       } finally {
         statsLoadingRef.current = false;
       }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- Player IDs are read from refs (myTeamPlayerIdsRef, opponentTeamPlayerIdsRef,
-  // myStarterIdsRef, oppStarterIdsRef) which are stable references. playerIdsVersion is used as a proxy
-  // to signal when those ref values change, avoiding direct dependency on myTeam/opponentTeamPlayers arrays
-  // which would create an infinite re-render loop ("Death Loop").
-  }, [currentMatchup, userLeagueState, scoringSettings, playerIdsVersion, demoMyTeam, demoOpponentTeam]);
+  // Player IDs are read from refs (myTeamPlayerIdsRef, opponentTeamPlayerIdsRef,
+  // myStarterIdsRef, oppStarterIdsRef) which are stable references. demoMyTeam/demoOpponentTeam are
+  // state arrays used for guest mode. playerIdsVersion was removed per ESLint (unnecessary dep).
+  }, [currentMatchup, userLeagueState, scoringSettings, demoMyTeam, demoOpponentTeam]);
 
   // Initial fetch on mount and when dependencies change
   useEffect(() => {
@@ -1829,10 +1831,10 @@ const Matchup = () => {
     };
 
     fetchData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchProjectionsForDate is intentionally excluded because it depends on
-  // projectionsByDate (cache check), and including it would create circular triggers: this effect fetches
-  // projections -> updates projectionsByDate -> fetchProjectionsForDate changes -> effect re-runs.
-  // playerIdsVersion is used instead of team arrays to prevent "Death Loop" (see fetchAllDailyStats comment).
+  // fetchProjectionsForDate is intentionally excluded because it depends on projectionsByDate (cache check),
+  // and including it would create circular triggers: this effect fetches projections -> updates projectionsByDate
+  // -> fetchProjectionsForDate changes -> effect re-runs.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate, currentMatchup, userLeagueState, scoringSettings, playerIdsVersion, demoMyTeam, demoOpponentTeam]);
 
   // Auto-select today's date on initial load (so user sees something immediately)
@@ -2497,9 +2499,6 @@ const Matchup = () => {
     }
     
     // Note: This effect can re-run when frozen rosters are loaded to ensure dropped players are included
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- dailyStatsMap is intentionally excluded because it is derived
-  // from dailyStatsByDate (today's entry), which IS in the dep array. Including dailyStatsMap would cause
-  // redundant re-calculations since it updates in sync with dailyStatsByDate.
   }, [
     currentMatchup,
     baseCurrentRoster,
@@ -2595,7 +2594,10 @@ const Matchup = () => {
     }
     
     setIsPlayerDialogOpen(true);
-  }, []); // All dependencies are stable: setSelectedPlayer, setIsPlayerDialogOpen (React state setters), PlayerService, playerApi (module-level imports)
+  // toHockeyPlayer is a plain function redefined each render (not wrapped in useCallback);
+  // including it would cause unnecessary re-creation. Its logic is pure and has no stale closure risk.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Use real data if active user, otherwise demo data
   // CRITICAL: Ensure myTeam is always the user's team (left side)
@@ -2917,9 +2919,9 @@ const Matchup = () => {
       }
       return transformedPlayer;
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- demoMyTeam.length is used instead of demoMyTeam to avoid
-  // re-computing when demo team objects change but roster composition hasn't. playerIdsVersion proxies
-  // actual player ID changes. previousRosterRef is a stable ref accessed via .current.
+  // demoMyTeam.length is used instead of demoMyTeam to avoid re-computing when demo team objects
+  // change but roster composition hasn't. playerIdsVersion proxies actual player ID changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userLeagueState, playerIdsVersion, demoMyTeam.length, dailyStatsMap, dailyStatsByDate, selectedDate, projectionsByDate, isSwitchingDate, myTeam]);
 
   const displayOpponentTeam = useMemo(() => {
@@ -3137,9 +3139,9 @@ const Matchup = () => {
         wasDropped: player.wasDropped
       };
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- demoOpponentTeam.length is used instead of demoOpponentTeam
-  // to avoid re-computing when demo team objects change but roster composition hasn't. playerIdsVersion
-  // proxies actual player ID changes. previousRosterRef is a stable ref accessed via .current.
+  // demoOpponentTeam.length is used instead of demoOpponentTeam to avoid re-computing when demo team
+  // objects change but roster composition hasn't. playerIdsVersion proxies actual player ID changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userLeagueState, playerIdsVersion, demoOpponentTeam.length, dailyStatsMap, dailyStatsByDate, selectedDate, projectionsByDate, isSwitchingDate, opponentTeamPlayers]);
   const displayMyTeamSlotAssignments = useMemo(() => {
     // For past dates with frozen rosters, use frozen slot assignments directly
@@ -4751,11 +4753,11 @@ const Matchup = () => {
 
     loadMatchupData();
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- CRITICAL: selectedDate is intentionally excluded.
-  // Date changes are handled by a separate useEffect that uses frozenRostersByDate for instant local switching.
-  // Including selectedDate here would trigger a full data reload (API calls) on every date click.
-  // Other exclusions: loadMatchupData is defined inline (not wrapped in useCallback due to size/complexity),
-  // and league/userTeam/currentMatchup objects are narrowed to ?.id to prevent re-runs on score updates.
+  // CRITICAL: selectedDate is intentionally excluded - date changes are handled by a separate useEffect.
+  // loadMatchupData is defined inline (not useCallback) due to size/complexity. league/userTeam/currentMatchup
+  // are narrowed to ?.id to prevent re-runs on score updates. Other deps (navigate, profile, etc.) are stable
+  // or would cause unnecessary full reloads.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, userLeagueState, urlLeagueId, urlWeekId, selectedMatchupId, activeLeagueId]);
 
   // ============================================================
@@ -5027,11 +5029,10 @@ const Matchup = () => {
       liveRefreshSetupRef.current = false;
       log(' Stopped live stats refresh (no live games or matchup ended)');
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentionally excludes myTeam/opponentTeamPlayers to prevent
-  // infinite loop (refresh updates state -> state change triggers effect -> refresh again).
-  // refreshGameStatuses uses functional state updates (setMyTeam(prev => ...)) to read current state
-  // without depending on it. league and currentMatchup are narrowed to specific fields (?.id, ?.status, etc.)
+  // Intentionally excludes myTeam/opponentTeamPlayers to prevent infinite loop (refresh updates state
+  // -> state change triggers effect -> refresh again). currentMatchup is narrowed to specific fields
   // to prevent re-subscription when unrelated fields (e.g., scores) change.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [league?.id, currentMatchup?.id, currentMatchup?.week_start_date, currentMatchup?.week_end_date, currentMatchup?.status, userLeagueState, fetchAllDailyStats]);
 
 

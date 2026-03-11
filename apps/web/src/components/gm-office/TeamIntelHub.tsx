@@ -534,7 +534,7 @@ export const TeamIntelHub = () => {
     };
 
     loadNextManUp();
-  }, [newsItems, activeLeagueId, user?.id]);
+  }, [newsItems, activeLeagueId, user]);
 
   if (loading) {
     return (
