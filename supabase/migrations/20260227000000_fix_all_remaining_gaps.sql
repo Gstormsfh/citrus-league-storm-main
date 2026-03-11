@@ -219,6 +219,7 @@ CREATE OR REPLACE FUNCTION public.enforce_trade_deadline()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $td$
 DECLARE
   v_league RECORD;
@@ -316,6 +317,7 @@ RETURNS TABLE (
 LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
+SET search_path = public
 AS $ppg$
 BEGIN
   RETURN QUERY
@@ -386,6 +388,7 @@ CREATE OR REPLACE FUNCTION public.sync_playoff_scores()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $sync$
 DECLARE
   v_series RECORD;

@@ -7,6 +7,7 @@ CREATE OR REPLACE FUNCTION public.create_notifications_from_transaction()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
   v_league_id uuid;

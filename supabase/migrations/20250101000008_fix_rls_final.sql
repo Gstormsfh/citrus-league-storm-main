@@ -26,6 +26,7 @@ create or replace function public.validate_team_insert()
 returns trigger
 language plpgsql
 security definer
+SET search_path = public
 as $$
 declare
   league_commissioner_id uuid;
@@ -80,6 +81,7 @@ create or replace function public.check_commissioner_simple(p_league_id uuid)
 returns boolean
 language sql
 security definer
+SET search_path = public
 stable
 as $$
   select commissioner_id = auth.uid()
@@ -101,6 +103,7 @@ create or replace function public.check_team_owner_simple(p_league_id uuid)
 returns boolean
 language sql
 security definer
+SET search_path = public
 stable
 as $$
   select exists (

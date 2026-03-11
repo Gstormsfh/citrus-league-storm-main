@@ -231,6 +231,7 @@ BEGIN
   RETURN;
 END;
 $faab_league$ LANGUAGE plpgsql SECURITY DEFINER;
+SET search_path = public;
 
 GRANT EXECUTE ON FUNCTION public.process_faab_waivers_for_league(UUID) TO authenticated;
 
@@ -284,6 +285,7 @@ BEGIN
   RETURN;
 END;
 $faab_all$ LANGUAGE plpgsql SECURITY DEFINER;
+SET search_path = public;
 
 GRANT EXECUTE ON FUNCTION public.process_all_faab_waivers() TO authenticated;
 

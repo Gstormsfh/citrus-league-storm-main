@@ -64,6 +64,7 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 STABLE
 AS $$
 BEGIN
@@ -101,6 +102,7 @@ CREATE OR REPLACE FUNCTION record_player_transaction(
 RETURNS UUID
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
     v_transaction_id UUID;

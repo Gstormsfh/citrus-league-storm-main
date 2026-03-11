@@ -79,6 +79,7 @@ BEGIN
   RETURN;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+SET search_path = public;
 
 -- Grant execute permission to authenticated users
 GRANT EXECUTE ON FUNCTION public.process_all_pending_waivers() TO authenticated;

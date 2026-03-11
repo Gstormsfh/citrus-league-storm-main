@@ -48,6 +48,7 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+SET search_path = public;
 
 -- Drop trigger if exists (idempotency)
 DROP TRIGGER IF EXISTS trigger_track_dropped_players ON roster_transactions;
@@ -363,6 +364,7 @@ EXCEPTION
     RETURN;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+SET search_path = public;
 
 -- Grant execute permission
 GRANT EXECUTE ON FUNCTION process_waiver_claims(UUID) TO authenticated;

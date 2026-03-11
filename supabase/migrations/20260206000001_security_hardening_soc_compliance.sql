@@ -369,6 +369,7 @@ CREATE OR REPLACE FUNCTION public.cleanup_old_audit_logs(
 RETURNS INT
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
   v_deleted INT;
@@ -408,6 +409,7 @@ RETURNS TABLE(
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 BEGIN
   -- Detect 1: Users with roster assignments in leagues they don't belong to

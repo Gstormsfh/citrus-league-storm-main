@@ -50,6 +50,7 @@ begin
   return new;
 end;
 $$ language plpgsql security definer;
+SET search_path = public;
 
 -- Trigger to create profile when user signs up
 create trigger on_auth_user_created

@@ -47,6 +47,7 @@ create or replace function public.send_league_chat_message(
 returns jsonb
 language plpgsql
 security definer
+SET search_path = public
 as $$
 declare
   v_sender_id uuid;

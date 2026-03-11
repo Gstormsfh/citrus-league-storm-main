@@ -103,6 +103,7 @@ CREATE OR REPLACE FUNCTION public.validate_league_settings()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
   v_teams_count INT;
@@ -166,6 +167,7 @@ CREATE OR REPLACE FUNCTION public.expire_stale_trade_offers()
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
   v_expired_count INT;
@@ -221,6 +223,7 @@ CREATE OR REPLACE FUNCTION public.log_settings_change()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
   v_changes TEXT[];

@@ -6,6 +6,7 @@ CREATE OR REPLACE FUNCTION public.auto_create_waiver_priority()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
   v_max_priority INT;

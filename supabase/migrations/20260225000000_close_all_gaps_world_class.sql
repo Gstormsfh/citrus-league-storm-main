@@ -179,6 +179,7 @@ BEGIN
   RETURN;
 END;
 $h2h_cat$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+SET search_path = public;
 
 GRANT EXECUTE ON FUNCTION public.calculate_h2h_category_matchup(UUID, UUID, UUID, UUID, DATE, DATE, TEXT[]) TO authenticated;
 
@@ -291,6 +292,7 @@ BEGIN
   RETURN;
 END;
 $roto$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+SET search_path = public;
 
 GRANT EXECUTE ON FUNCTION public.calculate_roto_standings(UUID, TEXT[], INT) TO authenticated;
 
@@ -356,6 +358,7 @@ BEGIN
 
 END;
 $reverse$ LANGUAGE plpgsql SECURITY DEFINER;
+SET search_path = public;
 
 GRANT EXECUTE ON FUNCTION public.recalculate_reverse_standings_priority(UUID) TO authenticated;
 
@@ -499,6 +502,7 @@ BEGIN
   RETURN;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+SET search_path = public;
 
 
 -- ============================================================================
@@ -668,6 +672,7 @@ BEGIN
   RETURN;
 END;
 $bb$ LANGUAGE plpgsql SECURITY DEFINER;
+SET search_path = public;
 
 GRANT EXECUTE ON FUNCTION public.optimize_best_ball_daily_rosters(UUID, DATE) TO authenticated;
 
@@ -787,6 +792,7 @@ BEGIN
   RETURN QUERY SELECT true, NULL::TEXT, v_current_count, v_max_keepers;
 END;
 $keeper_validate$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+SET search_path = public;
 
 GRANT EXECUTE ON FUNCTION public.validate_keeper_selections(UUID, UUID, INT) TO authenticated;
 
@@ -833,6 +839,7 @@ BEGIN
     AND kd.status IN ('approved', 'locked');
 END;
 $keeper_cost$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+SET search_path = public;
 
 GRANT EXECUTE ON FUNCTION public.get_keeper_draft_costs(UUID, UUID, INT) TO authenticated;
 
@@ -885,6 +892,7 @@ BEGIN
   RETURN;
 END;
 $lock_keepers$ LANGUAGE plpgsql SECURITY DEFINER;
+SET search_path = public;
 
 GRANT EXECUTE ON FUNCTION public.lock_keepers_for_season(UUID, INT) TO authenticated;
 
@@ -1018,6 +1026,7 @@ BEGIN
   RETURN QUERY SELECT v_best_player_id, v_best_name, v_best_position, v_pick_id;
 END;
 $autopick$ LANGUAGE plpgsql SECURITY DEFINER;
+SET search_path = public;
 
 GRANT EXECUTE ON FUNCTION public.autopick_next_player(UUID, UUID, UUID, INT, INT) TO authenticated;
 
@@ -1096,6 +1105,7 @@ BEGIN
   RETURN;
 END;
 $full_auto$ LANGUAGE plpgsql SECURITY DEFINER;
+SET search_path = public;
 
 GRANT EXECUTE ON FUNCTION public.run_full_autopick_draft(UUID) TO authenticated;
 
@@ -1240,6 +1250,7 @@ BEGIN
     v_veto_count, v_approve_count, v_threshold, v_is_vetoed;
 END;
 $vote$ LANGUAGE plpgsql SECURITY DEFINER;
+SET search_path = public;
 
 GRANT EXECUTE ON FUNCTION public.submit_trade_vote(UUID, UUID, TEXT) TO authenticated;
 
@@ -1289,6 +1300,7 @@ BEGIN
   RETURN;
 END;
 $review$ LANGUAGE plpgsql SECURITY DEFINER;
+SET search_path = public;
 
 GRANT EXECUTE ON FUNCTION public.process_expired_trade_reviews() TO authenticated;
 

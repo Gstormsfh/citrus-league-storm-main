@@ -129,6 +129,7 @@ BEGIN
   RETURN;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+SET search_path = public;
 
 GRANT EXECUTE ON FUNCTION public.score_survivor_week(UUID, INT) TO authenticated;
 
@@ -213,6 +214,7 @@ BEGIN
   RETURN;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+SET search_path = public;
 
 GRANT EXECUTE ON FUNCTION public.score_pickem_week(UUID, INT) TO authenticated;
 
@@ -286,6 +288,7 @@ BEGIN
   RETURN;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+SET search_path = public;
 
 GRANT EXECUTE ON FUNCTION public.score_confidence_week(UUID, INT) TO authenticated;
 
@@ -361,6 +364,7 @@ BEGIN
   RETURN;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+SET search_path = public;
 
 GRANT EXECUTE ON FUNCTION public.score_all_pools_for_week(INT) TO authenticated;
 
