@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import { logger } from '@/utils/logger';
 
 const ProfileSetup = () => {
   const navigate = useNavigate();
-  const { user, profile, refreshProfile } = useAuth();
+  const { user, profile, loading: authLoading, refreshProfile } = useAuth();
   const [username, setUsername] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -21,8 +21,12 @@ const ProfileSetup = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
+  const retryAttempted = useRef(false);
 
   useEffect(() => {
+    // Wait for auth to finish loading before deciding
+    if (authLoading) return;
+
     if (!user) {
       navigate('/auth');
       return;
@@ -35,9 +39,17 @@ const ProfileSetup = () => {
       return;
     }
 
+    // If profile is null, the fetch may have failed (API error).
+    // Retry once to distinguish "no profile" from "server error".
+    if (!profile && !retryAttempted.current) {
+      retryAttempted.current = true;
+      refreshProfile();
+      return;
+    }
+
     // If user has auto-generated username or no profile, allow them to set it up
     setChecking(false);
-  }, [user, profile, navigate]);
+  }, [user, profile, authLoading, navigate, refreshProfile]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

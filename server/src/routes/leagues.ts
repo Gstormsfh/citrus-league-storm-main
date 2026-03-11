@@ -16,16 +16,20 @@ leagueRoutes.use('*', authMiddleware);
 
 // GET /api/leagues — Get all leagues for the authenticated user
 leagueRoutes.get('/', async (c) => {
-  const userId = c.get('userId');
-  const supabase = createUserClient(c.get('userToken'));
-  const service = new LeagueService(supabase);
+  try {
+    const userId = c.get('userId');
+    const supabase = createUserClient(c.get('userToken'));
+    const service = new LeagueService(supabase);
 
-  const { leagues, error } = await service.getUserLeagues(userId);
-  if (error) {
-    return handleError(c, error, 'Failed to fetch leagues');
+    const { leagues, error } = await service.getUserLeagues(userId);
+    if (error) {
+      return handleError(c, error, 'Failed to fetch leagues');
+    }
+
+    return ok(c, leagues);
+  } catch (err) {
+    return handleError(c, err, 'Failed to fetch leagues');
   }
-
-  return ok(c, leagues);
 });
 
 // GET /api/leagues/:leagueId — Get a specific league

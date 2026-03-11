@@ -178,7 +178,7 @@ app.notFound((c) => {
 app.onError((err, c) => {
   const reqId = c.get('requestId');
   logger.error(`[API Error] [${reqId}] ${c.req.method} ${c.req.path}:`, err.message);
-  if (process.env.NODE_ENV === 'development') {
+  if (err.stack) {
     logger.error(err.stack);
   }
 
