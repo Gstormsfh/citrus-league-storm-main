@@ -72,7 +72,7 @@ async function request<T = unknown>(
   body?: unknown,
   options?: RequestOptions
 ): Promise<ApiResponse<T>> {
-  let token = await getAuthToken();
+  const token = await getAuthToken();
   let { response, json } = await doFetch<T>(method, path, token, body, options);
 
   // On 401, try refreshing the session and retry once.
