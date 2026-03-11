@@ -200,11 +200,12 @@ const Profile = () => {
       setLoadingCommSettings(true);
       try {
         // Load league data
+        // Cast needed: COLUMNS.LEAGUE is a runtime string so Supabase can't infer column types
         const { data: leagueData, error: leagueError } = await supabase
           .from('leagues')
           .select(COLUMNS.LEAGUE)
           .eq('id', selectedSettingsLeagueId)
-          .single();
+          .single() as { data: any; error: any };
         
         if (leagueError) throw leagueError;
         setSelectedLeagueData(leagueData);
@@ -314,7 +315,7 @@ const Profile = () => {
           commWaiverSettings
         );
         saved = success;
-        errorMessage = saveError?.message || 'Failed to save waiver settings';
+        errorMessage = saveError instanceof Error ? saveError.message : String(saveError || 'Failed to save waiver settings');
       } else if (commSettingsTab === 'scoring') {
         const { success, error: saveError } = await LeagueService.updateScoringSettings(
           selectedSettingsLeagueId,
@@ -322,7 +323,7 @@ const Profile = () => {
           commScoringSettings
         );
         saved = success;
-        errorMessage = saveError?.message || 'Failed to save scoring settings';
+        errorMessage = saveError instanceof Error ? saveError.message : String(saveError || 'Failed to save scoring settings');
       } else if (commSettingsTab === 'draft') {
         const { success, error: saveError } = await LeagueService.updateDraftSettings(
           selectedSettingsLeagueId,
@@ -330,7 +331,7 @@ const Profile = () => {
           commDraftSettings
         );
         saved = success;
-        errorMessage = saveError?.message || 'Failed to save draft settings';
+        errorMessage = saveError instanceof Error ? saveError.message : String(saveError || 'Failed to save draft settings');
       }
 
       if (!saved) {
@@ -405,8 +406,9 @@ const Profile = () => {
     setSyncingRosters(true);
     try {
       // Step 1: Sync roster_assignments from draft_picks (source of truth)
-      const { data: syncResult, error: syncError } = await supabase
-        .rpc('sync_roster_assignments_for_league', { p_league_id: selectedSettingsLeagueId });
+      // Cast needed: RPC function not in generated Supabase types
+      const { data: syncResult, error: syncError } = await (supabase
+        .rpc as any)('sync_roster_assignments_for_league', { p_league_id: selectedSettingsLeagueId });
 
       if (syncError) {
         toast({
@@ -417,7 +419,7 @@ const Profile = () => {
         return;
       }
 
-      const playersSynced = syncResult?.players_synced || 0;
+      const playersSynced = (syncResult as any)?.players_synced || 0;
 
       // Step 2: ALSO rebuild team_lineups from roster_assignments
       // Without this, the Roster page reads stale team_lineups data

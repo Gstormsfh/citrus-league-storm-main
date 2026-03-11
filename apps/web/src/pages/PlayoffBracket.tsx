@@ -24,6 +24,7 @@ import LoadingScreen from '@/components/LoadingScreen';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
+import { LeagueMembershipService } from '@/services/LeagueMembershipService';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { logger } from '@/utils/logger';
@@ -497,7 +498,7 @@ const PlayoffBracket = () => {
       const [bracketResult, teamsResult, commResult] = await Promise.all([
         PlayoffService.getBracket(effectiveLeagueId),
         LeagueService.getLeagueTeams(effectiveLeagueId),
-        PlayoffService.isCommissioner(effectiveLeagueId, user.id),
+        LeagueMembershipService.isCommissioner(effectiveLeagueId, user.id),
       ]);
 
       if (bracketResult.error) throw bracketResult.error;
