@@ -1,6 +1,7 @@
 import { Context, Next } from 'hono';
 import { createClient } from '@supabase/supabase-js';
 import type { Env } from '../app';
+import { logger } from '@citrus/shared';
 
 // NOTE: env vars are read inside each middleware function (not at module scope)
 // because ESM import hoisting causes module-level code to run before .env is loaded.
@@ -30,6 +31,7 @@ export async function authMiddleware(c: Context<Env>, next: Next) {
   const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    logger.error('[Auth] Missing env vars — SUPABASE_URL:', !!SUPABASE_URL, 'SUPABASE_ANON_KEY:', !!SUPABASE_ANON_KEY);
     return c.json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Server configuration error' } }, 500);
   }
 
@@ -46,6 +48,16 @@ export async function authMiddleware(c: Context<Env>, next: Next) {
   const { data: { user }, error } = await supabase.auth.getUser(token);
 
   if (error || !user) {
+    // Log the actual Supabase error for server-side debugging (Cloud Run logs)
+    logger.error('[Auth] getUser failed:', {
+      errorMessage: error?.message,
+      errorStatus: error?.status,
+      errorName: error?.name,
+      supabaseUrl: SUPABASE_URL,
+      anonKeyPrefix: SUPABASE_ANON_KEY.substring(0, 20) + '...',
+      tokenPrefix: token.substring(0, 20) + '...',
+      path: c.req.path,
+    });
     return c.json({ error: { code: 'AUTHENTICATION_REQUIRED', message: 'Invalid or expired token' } }, 401);
   }
 

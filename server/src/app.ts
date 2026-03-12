@@ -110,6 +110,56 @@ app.get('/api/health', async (c) => {
   }, healthy ? 200 : 503);
 });
 
+// ── Auth diagnostic — verify token validation pipeline ──────────────
+app.get('/api/health/auth-check', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+
+  const result: Record<string, unknown> = {
+    hasAuthHeader: !!authHeader,
+    hasSupabaseUrl: !!SUPABASE_URL,
+    hasAnonKey: !!SUPABASE_ANON_KEY,
+    supabaseUrlPrefix: SUPABASE_URL ? SUPABASE_URL.substring(0, 30) + '...' : null,
+    anonKeyPrefix: SUPABASE_ANON_KEY ? SUPABASE_ANON_KEY.substring(0, 20) + '...' : null,
+  };
+
+  if (authHeader?.startsWith('Bearer ') && SUPABASE_URL && SUPABASE_ANON_KEY) {
+    const token = authHeader.slice(7);
+    result.tokenPrefix = token.substring(0, 20) + '...';
+
+    // Decode JWT to check expiry without verification
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      result.tokenExp = payload.exp;
+      result.tokenIat = payload.iat;
+      result.tokenExpDate = new Date(payload.exp * 1000).toISOString();
+      result.tokenIssuer = payload.iss;
+      result.serverTime = new Date().toISOString();
+      result.isExpired = Date.now() >= payload.exp * 1000;
+    } catch {
+      result.tokenDecodeError = 'Failed to decode JWT payload';
+    }
+
+    // Try to validate with Supabase
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: { persistSession: false, autoRefreshToken: false },
+        global: { headers: { Authorization: `Bearer ${token}` } },
+      });
+      const { data: { user }, error } = await sb.auth.getUser(token);
+      result.getUserSuccess = !!user;
+      result.getUserError = error ? { message: error.message, status: error.status, name: error.name } : null;
+      result.userId = user?.id;
+    } catch (err: unknown) {
+      result.getUserException = err instanceof Error ? err.message : 'Unknown error';
+    }
+  }
+
+  return c.json({ authDiagnostic: result }, 200);
+});
+
 // ── Metrics endpoint — supports JSON and Prometheus text format ──────
 app.get('/api/metrics', (c) => {
   const accept = c.req.header('Accept') || '';
