@@ -8,3 +8,4 @@ export { WaiverService } from './WaiverService';
 export { TradeService } from './TradeService';
 export { NotificationService } from './NotificationService';
 export { AuditService } from './AuditService';
+export { PoolService } from './PoolService';

@@ -1,8 +1,13 @@
 /**
  * Player API client — replaces direct Supabase calls for player operations.
+ *
+ * Includes request deduplication and TTL caching to prevent redundant API calls.
  */
 
 import { apiClient } from './client';
+import { createApiCache, CACHE_TTL } from './cache';
+
+const c = createApiCache();
 
 export const playerApi = {
   /** Search/list players */
@@ -18,7 +23,8 @@ export const playerApi = {
     if (params?.team) query.set('team', params.team);
     if (params?.limit) query.set('limit', params.limit.toString());
     const qs = query.toString();
-    return apiClient.get(`/api/players${qs ? `?${qs}` : ''}`);
+    const key = `players:search:${qs}`;
+    return c.cached(key, () => apiClient.get(`/api/players${qs ? `?${qs}` : ''}`), CACHE_TTL.MEDIUM);
   },
 
   /** Get trending players */
@@ -27,7 +33,11 @@ export const playerApi = {
     if (daysBack) params.set('days', String(daysBack));
     if (limitCount) params.set('limit', String(limitCount));
     const qs = params.toString();
-    return apiClient.get(`/api/players/trending${qs ? `?${qs}` : ''}`);
+    return c.cached(
+      `players:trending:${qs}`,
+      () => apiClient.get(`/api/players/trending${qs ? `?${qs}` : ''}`),
+      CACHE_TTL.LONG,
+    );
   },
 
   /** Record a player transaction (add/drop) for trending analytics */
@@ -41,28 +51,56 @@ export const playerApi = {
     playerTeam: string;
     playerPosition: string;
   }) {
+    c.invalidate('players:trending');
     return apiClient.post('/api/players/transaction', params);
   },
 
   /** Get players by IDs (batch) */
   getPlayersByIds(ids: string[]) {
-    return apiClient.get(`/api/players/by-ids?ids=${ids.join(',')}`);
+    const sorted = [...ids].sort();
+    return c.cached(
+      `players:by-ids:${sorted.join(',')}`,
+      () => apiClient.get(`/api/players/by-ids?ids=${ids.join(',')}`),
+      CACHE_TTL.LONG,
+    );
   },
 
   /** Get a single player */
   getPlayer(playerId: string) {
-    return apiClient.get(`/api/players/${playerId}`);
+    return c.cached(
+      `players:${playerId}`,
+      () => apiClient.get(`/api/players/${playerId}`),
+      CACHE_TTL.LONG,
+    );
   },
 
   /** Get player season stats */
   getPlayerStats(playerId: string, season?: number) {
     const qs = season ? `?season=${season}` : '';
-    return apiClient.get(`/api/players/${playerId}/stats${qs}`);
+    return c.cached(
+      `players:${playerId}:stats:${season ?? 'current'}`,
+      () => apiClient.get(`/api/players/${playerId}/stats${qs}`),
+      CACHE_TTL.LONG,
+    );
   },
 
-  /** Get player projections — pass startDate to get all from that date onward */
+  /** Get player projections */
   getPlayerProjections(playerId: string, startDate?: string) {
     const qs = startDate ? `?startDate=${startDate}` : '';
-    return apiClient.get(`/api/players/${playerId}/projections${qs}`);
+    return c.cached(
+      `players:${playerId}:projections:${startDate ?? 'all'}`,
+      () => apiClient.get(`/api/players/${playerId}/projections${qs}`),
+      CACHE_TTL.MEDIUM,
+    );
+  },
+
+  /** Clear all player caches */
+  clearCache() {
+    c.clearCache();
+  },
+
+  /** Invalidate caches matching a prefix */
+  invalidate(prefix: string) {
+    c.invalidate(prefix);
   },
 };

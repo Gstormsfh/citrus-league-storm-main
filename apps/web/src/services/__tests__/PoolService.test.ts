@@ -4,24 +4,26 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Mock Setup
 // =============================================================================
 
-function createChainableMock() {
-  const chain: Record<string, any> = {};
-  const chainMethods = ['select', 'insert', 'update', 'delete', 'upsert', 'eq', 'not', 'is', 'in', 'order', 'limit', 'filter'];
-  chainMethods.forEach(m => {
-    chain[m] = vi.fn().mockReturnValue(chain);
-  });
-  chain.single = vi.fn().mockResolvedValue({ data: null, error: null });
-  chain.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
-  return chain;
-}
+const mockPoolApi = {
+  submitPickemPicks: vi.fn(),
+  getPickemPicks: vi.fn(),
+  scorePickemWeek: vi.fn(),
+  scorePickemWeekATS: vi.fn(),
+  getPickemStandings: vi.fn(),
+  submitSurvivorPick: vi.fn(),
+  isSurvivorEliminated: vi.fn(),
+  scoreSurvivorWeek: vi.fn(),
+  getSurvivorStandings: vi.fn(),
+  getSurvivorPickHistory: vi.fn(),
+  getSurvivorUsedTeams: vi.fn(),
+  submitConfidencePicks: vi.fn(),
+  getConfidencePicks: vi.fn(),
+  scoreConfidenceWeek: vi.fn(),
+  getConfidenceStandings: vi.fn(),
+};
 
-let mockChain = createChainableMock();
-
-vi.mock('@/integrations/supabase/client', () => ({
-  supabase: {
-    from: vi.fn(() => mockChain),
-    rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
-  },
+vi.mock('@/api/pools', () => ({
+  poolApi: mockPoolApi,
 }));
 
 // Mock API client modules used transitively
@@ -33,7 +35,7 @@ vi.mock('@/api/matchups', () => ({ matchupApi: {} }));
 vi.mock('@/api/players', () => ({ playerApi: {} }));
 vi.mock('@/api/rosters', () => ({ rosterApi: {} }));
 
-vi.mock('../ScheduleService', () => ({
+vi.mock('@/services/ScheduleService', () => ({
   ScheduleService: {
     getGamesForDateRange: vi.fn().mockResolvedValue({ games: [] }),
   },
@@ -51,6 +53,10 @@ vi.mock('@/utils/seasonConstants', () => ({
   SEASON_START_YEAR: 2025,
 }));
 
+vi.mock('@/utils/timezoneUtils', () => ({
+  getTodayMSTDate: () => new Date('2025-11-15'),
+}));
+
 vi.mock('@/utils/queryColumns', () => ({
   COLUMNS: {
     POOL_PICK: 'id, league_id, user_id, week_number, game_id, picked_team, is_correct, spread_value, created_at, updated_at',
@@ -66,12 +72,8 @@ let PoolService: typeof import('../PoolService').PoolService;
 
 beforeEach(async () => {
   vi.clearAllMocks();
-  mockChain = createChainableMock();
   const mod = await import('../PoolService');
   PoolService = mod.PoolService;
-
-  const { supabase } = await import('@/integrations/supabase/client');
-  (supabase.from as ReturnType<typeof vi.fn>).mockReturnValue(mockChain);
 });
 
 // =============================================================================
@@ -80,29 +82,7 @@ beforeEach(async () => {
 
 describe('PoolService.submitPickemPicks', () => {
   it('upserts picks for unlocked games', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-    const { ScheduleService } = await import('../ScheduleService');
-
-    // All games are not started (future dates)
-    (ScheduleService.getGamesForDateRange as ReturnType<typeof vi.fn>).mockResolvedValue({
-      games: [
-        { id: 'game-1', home_team: 'TOR', away_team: 'MTL', status: 'scheduled', game_date: '2099-12-31', game_time: '23:00:00' },
-        { id: 'game-2', home_team: 'BOS', away_team: 'NYR', status: 'scheduled', game_date: '2099-12-31', game_time: '23:00:00' },
-      ],
-    });
-
-    let upsertedData: any = null;
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'pool_picks') {
-        chain.upsert.mockImplementation((data: any) => {
-          upsertedData = data;
-          // upsert() is a terminal call — returns { data, error } directly
-          return Promise.resolve({ data: null, error: null });
-        });
-      }
-      return chain;
-    });
+    mockPoolApi.submitPickemPicks.mockResolvedValue({ data: null });
 
     const result = await PoolService.submitPickemPicks('league-1', 'user-1', 5, [
       { game_id: 'game-1', picked_team: 'TOR' },
@@ -110,20 +90,16 @@ describe('PoolService.submitPickemPicks', () => {
     ]);
 
     expect(result.success).toBe(true);
-    expect(upsertedData).not.toBeNull();
-    expect(upsertedData).toHaveLength(2);
-    expect(upsertedData[0].picked_team).toBe('TOR');
-    expect(upsertedData[0].is_correct).toBeNull(); // Not yet scored
+    expect(mockPoolApi.submitPickemPicks).toHaveBeenCalledWith('league-1', 5, [
+      { game_id: 'game-1', picked_team: 'TOR' },
+      { game_id: 'game-2', picked_team: 'BOS' },
+    ]);
   });
 
   it('rejects all picks when all games have started', async () => {
-    const { ScheduleService } = await import('../ScheduleService');
-
-    (ScheduleService.getGamesForDateRange as ReturnType<typeof vi.fn>).mockResolvedValue({
-      games: [
-        { id: 'game-1', home_team: 'TOR', away_team: 'MTL', status: 'live', game_date: '2026-01-15', game_time: '19:00:00' },
-      ],
-    });
+    mockPoolApi.submitPickemPicks.mockRejectedValue(
+      new Error('All selected games have already started'),
+    );
 
     const result = await PoolService.submitPickemPicks('league-1', 'user-1', 5, [
       { game_id: 'game-1', picked_team: 'TOR' },
@@ -134,18 +110,7 @@ describe('PoolService.submitPickemPicks', () => {
   });
 
   it('handles DB error gracefully', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-    const { ScheduleService } = await import('../ScheduleService');
-
-    (ScheduleService.getGamesForDateRange as ReturnType<typeof vi.fn>).mockResolvedValue({
-      games: [],
-    });
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
-      const chain = createChainableMock();
-      chain.upsert.mockResolvedValue({ data: null, error: { message: 'Table not found' } });
-      return chain;
-    });
+    mockPoolApi.submitPickemPicks.mockRejectedValue(new Error('Table not found'));
 
     const result = await PoolService.submitPickemPicks('league-1', 'user-1', 5, [
       { game_id: 'game-1', picked_team: 'TOR' },
@@ -158,20 +123,11 @@ describe('PoolService.submitPickemPicks', () => {
 
 describe('PoolService.getPickemPicks', () => {
   it('returns picks for a user and week', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'pool_picks') {
-        chain.order.mockResolvedValue({
-          data: [
-            { id: 'pick-1', league_id: 'league-1', user_id: 'user-1', week_number: 5, game_id: 'g1', picked_team: 'TOR', is_correct: true },
-            { id: 'pick-2', league_id: 'league-1', user_id: 'user-1', week_number: 5, game_id: 'g2', picked_team: 'MTL', is_correct: false },
-          ],
-          error: null,
-        });
-      }
-      return chain;
+    mockPoolApi.getPickemPicks.mockResolvedValue({
+      data: [
+        { id: 'pick-1', league_id: 'league-1', user_id: 'user-1', week_number: 5, game_id: 'g1', picked_team: 'TOR', is_correct: true },
+        { id: 'pick-2', league_id: 'league-1', user_id: 'user-1', week_number: 5, game_id: 'g2', picked_team: 'MTL', is_correct: false },
+      ],
     });
 
     const result = await PoolService.getPickemPicks('league-1', 'user-1', 5);
@@ -182,11 +138,7 @@ describe('PoolService.getPickemPicks', () => {
   });
 
   it('returns empty array on error', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
-      throw new Error('Network error');
-    });
+    mockPoolApi.getPickemPicks.mockRejectedValue(new Error('Network error'));
 
     const result = await PoolService.getPickemPicks('league-1', 'user-1', 5);
 
@@ -200,85 +152,25 @@ describe('PoolService.getPickemPicks', () => {
 
 describe('PoolService.scorePickemWeek', () => {
   it('marks correct picks as true and incorrect as false', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    const updateCalls: Array<{ id: string; is_correct: boolean }> = [];
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'pool_picks') {
-        // First call: fetch picks
-        chain.eq.mockReturnValue(chain);
-        chain.select.mockReturnValue(chain);
-
-        // Simulate fetching picks and then updating them
-        // The service calls .select().eq().eq() first (returns picks),
-        // then calls .update().eq() for each pick.
-        const picks = [
-          { id: 'pick-1', game_id: 'g1', picked_team: 'TOR', spread_value: null },
-          { id: 'pick-2', game_id: 'g2', picked_team: 'MTL', spread_value: null },
-        ];
-
-        // Terminal eq resolves with picks data
-        let eqCallCount = 0;
-        chain.eq.mockImplementation((...args: any[]) => {
-          eqCallCount++;
-          if (eqCallCount === 2) {
-            // After league_id + week_number eq: return picks
-            return Promise.resolve({ data: picks, error: null });
-          }
-          return chain;
-        });
-
-        chain.update.mockImplementation((data: any) => {
-          updateCalls.push(data);
-          const updateChain = createChainableMock();
-          updateChain.eq.mockResolvedValue({ data: null, error: null });
-          return updateChain;
-        });
-      }
-      return chain;
+    mockPoolApi.scorePickemWeek.mockResolvedValue({
+      data: { scored: 2 },
     });
 
     const result = await PoolService.scorePickemWeek('league-1', 5, [
       { game_id: 'g1', winning_team: 'TOR' },
-      { game_id: 'g2', winning_team: 'BOS' }, // MTL picked but BOS won
+      { game_id: 'g2', winning_team: 'BOS' },
     ]);
 
     expect(result.scored).toBe(2);
-    expect(updateCalls).toHaveLength(2);
-    expect(updateCalls[0].is_correct).toBe(true);  // TOR picked, TOR won
-    expect(updateCalls[1].is_correct).toBe(false); // MTL picked, BOS won
+    expect(mockPoolApi.scorePickemWeek).toHaveBeenCalledWith('league-1', 5, [
+      { game_id: 'g1', winning_team: 'TOR' },
+      { game_id: 'g2', winning_team: 'BOS' },
+    ]);
   });
 
   it('treats TIE as incorrect (industry standard)', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    const updateCalls: Array<{ is_correct: boolean }> = [];
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'pool_picks') {
-        let eqCallCount = 0;
-        chain.eq.mockImplementation(() => {
-          eqCallCount++;
-          if (eqCallCount === 2) {
-            return Promise.resolve({
-              data: [{ id: 'pick-1', game_id: 'g1', picked_team: 'TOR', spread_value: null }],
-              error: null,
-            });
-          }
-          return chain;
-        });
-
-        chain.update.mockImplementation((data: any) => {
-          updateCalls.push(data);
-          const updateChain = createChainableMock();
-          updateChain.eq.mockResolvedValue({ data: null, error: null });
-          return updateChain;
-        });
-      }
-      return chain;
+    mockPoolApi.scorePickemWeek.mockResolvedValue({
+      data: { scored: 1 },
     });
 
     const result = await PoolService.scorePickemWeek('league-1', 5, [
@@ -286,37 +178,11 @@ describe('PoolService.scorePickemWeek', () => {
     ]);
 
     expect(result.scored).toBe(1);
-    expect(updateCalls[0].is_correct).toBe(false); // Tie = incorrect
   });
 
   it('treats POSTPONED as incorrect (industry standard)', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    const updateCalls: Array<{ is_correct: boolean }> = [];
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'pool_picks') {
-        let eqCallCount = 0;
-        chain.eq.mockImplementation(() => {
-          eqCallCount++;
-          if (eqCallCount === 2) {
-            return Promise.resolve({
-              data: [{ id: 'pick-1', game_id: 'g1', picked_team: 'TOR', spread_value: null }],
-              error: null,
-            });
-          }
-          return chain;
-        });
-
-        chain.update.mockImplementation((data: any) => {
-          updateCalls.push(data);
-          const updateChain = createChainableMock();
-          updateChain.eq.mockResolvedValue({ data: null, error: null });
-          return updateChain;
-        });
-      }
-      return chain;
+    mockPoolApi.scorePickemWeek.mockResolvedValue({
+      data: { scored: 1 },
     });
 
     const result = await PoolService.scorePickemWeek('league-1', 5, [
@@ -324,29 +190,10 @@ describe('PoolService.scorePickemWeek', () => {
     ]);
 
     expect(result.scored).toBe(1);
-    expect(updateCalls[0].is_correct).toBe(false); // Postponed = incorrect
   });
 
   it('returns error when fetch fails', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'pool_picks') {
-        let eqCallCount = 0;
-        chain.eq.mockImplementation(() => {
-          eqCallCount++;
-          if (eqCallCount === 2) {
-            return Promise.resolve({
-              data: null,
-              error: { message: 'Permission denied' },
-            });
-          }
-          return chain;
-        });
-      }
-      return chain;
-    });
+    mockPoolApi.scorePickemWeek.mockRejectedValue(new Error('Permission denied'));
 
     const result = await PoolService.scorePickemWeek('league-1', 5, [
       { game_id: 'g1', winning_team: 'TOR' },
@@ -363,30 +210,9 @@ describe('PoolService.scorePickemWeek', () => {
 
 describe('PoolService.submitSurvivorPick', () => {
   it('rejects pick when user is eliminated', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({
-          data: { settings: { survivorLives: 1 } },
-          error: null,
-        });
-      }
-      if (table === 'survivor_selections') {
-        // isSurvivorEliminated: .select('id', {count, head}).eq().eq().eq()
-        // 3rd .eq() is terminal and returns count
-        let eqCount = 0;
-        chain.eq.mockImplementation(() => {
-          eqCount++;
-          if (eqCount >= 3) {
-            return Promise.resolve({ count: 1, data: null, error: null });
-          }
-          return chain;
-        });
-      }
-      return chain;
-    });
+    mockPoolApi.submitSurvivorPick.mockRejectedValue(
+      new Error('You have been eliminated from this survivor pool'),
+    );
 
     const result = await PoolService.submitSurvivorPick('league-1', 'user-1', 5, 'TOR');
 
@@ -395,54 +221,9 @@ describe('PoolService.submitSurvivorPick', () => {
   });
 
   it('rejects duplicate team usage', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-    const { ScheduleService } = await import('../ScheduleService');
-
-    (ScheduleService.getGamesForDateRange as ReturnType<typeof vi.fn>).mockResolvedValue({
-      games: [
-        { id: 'g1', home_team: 'TOR', away_team: 'MTL', status: 'scheduled', game_date: '2099-12-31', game_time: '23:00:00' },
-      ],
-    });
-
-    let survivorCallCount = 0;
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'leagues') {
-        chain.single.mockResolvedValue({
-          data: { settings: { survivorLives: 3 } },
-          error: null,
-        });
-      }
-      if (table === 'survivor_selections') {
-        survivorCallCount++;
-        if (survivorCallCount === 1) {
-          // isSurvivorEliminated: .select('id', {count:'exact', head:true}).eq().eq().eq()
-          // Terminal eq returns count
-          let eqCount = 0;
-          chain.eq.mockImplementation(() => {
-            eqCount++;
-            if (eqCount >= 3) {
-              return Promise.resolve({ count: 0, data: null, error: null });
-            }
-            return chain;
-          });
-        } else if (survivorCallCount === 2) {
-          // Previous picks: .select('picked_team').eq().eq()
-          let eqCount = 0;
-          chain.eq.mockImplementation(() => {
-            eqCount++;
-            if (eqCount >= 2) {
-              return Promise.resolve({
-                data: [{ picked_team: 'TOR' }, { picked_team: 'BOS' }],
-                error: null,
-              });
-            }
-            return chain;
-          });
-        }
-      }
-      return chain;
-    });
+    mockPoolApi.submitSurvivorPick.mockRejectedValue(
+      new Error('You have already used TOR in a previous week'),
+    );
 
     const result = await PoolService.submitSurvivorPick('league-1', 'user-1', 5, 'TOR');
 
@@ -453,36 +234,8 @@ describe('PoolService.submitSurvivorPick', () => {
 
 describe('PoolService.scoreSurvivorWeek', () => {
   it('scores each selection correctly', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    const updateCalls: Array<{ is_correct: boolean }> = [];
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'survivor_selections') {
-        let eqCallCount = 0;
-        chain.eq.mockImplementation(() => {
-          eqCallCount++;
-          if (eqCallCount === 2) {
-            return Promise.resolve({
-              data: [
-                { id: 'sel-1', picked_team: 'TOR' },
-                { id: 'sel-2', picked_team: 'MTL' },
-              ],
-              error: null,
-            });
-          }
-          return chain;
-        });
-
-        chain.update.mockImplementation((data: any) => {
-          updateCalls.push(data);
-          const updateChain = createChainableMock();
-          updateChain.eq.mockResolvedValue({ data: null, error: null });
-          return updateChain;
-        });
-      }
-      return chain;
+    mockPoolApi.scoreSurvivorWeek.mockResolvedValue({
+      data: { scored: 2 },
     });
 
     const result = await PoolService.scoreSurvivorWeek('league-1', 5, [
@@ -491,8 +244,10 @@ describe('PoolService.scoreSurvivorWeek', () => {
     ]);
 
     expect(result.scored).toBe(2);
-    expect(updateCalls[0].is_correct).toBe(true);  // TOR won
-    expect(updateCalls[1].is_correct).toBe(false); // MTL lost
+    expect(mockPoolApi.scoreSurvivorWeek).toHaveBeenCalledWith('league-1', 5, [
+      { team: 'TOR', won: true },
+      { team: 'MTL', won: false },
+    ]);
   });
 });
 
@@ -502,15 +257,13 @@ describe('PoolService.scoreSurvivorWeek', () => {
 
 describe('PoolService.submitConfidencePicks', () => {
   it('rejects duplicate confidence point values', async () => {
-    const { ScheduleService } = await import('../ScheduleService');
-
-    (ScheduleService.getGamesForDateRange as ReturnType<typeof vi.fn>).mockResolvedValue({
-      games: [], // No games to lock
-    });
+    mockPoolApi.submitConfidencePicks.mockRejectedValue(
+      new Error('Each pick must have a unique confidence point value'),
+    );
 
     const result = await PoolService.submitConfidencePicks('league-1', 'user-1', 5, [
       { game_id: 'g1', picked_team: 'TOR', confidence_points: 3 },
-      { game_id: 'g2', picked_team: 'MTL', confidence_points: 3 }, // Duplicate!
+      { game_id: 'g2', picked_team: 'MTL', confidence_points: 3 },
     ]);
 
     expect(result.success).toBe(false);
@@ -518,15 +271,13 @@ describe('PoolService.submitConfidencePicks', () => {
   });
 
   it('rejects non-sequential confidence values', async () => {
-    const { ScheduleService } = await import('../ScheduleService');
-
-    (ScheduleService.getGamesForDateRange as ReturnType<typeof vi.fn>).mockResolvedValue({
-      games: [],
-    });
+    mockPoolApi.submitConfidencePicks.mockRejectedValue(
+      new Error('Confidence points must be sequential from 1 to N'),
+    );
 
     const result = await PoolService.submitConfidencePicks('league-1', 'user-1', 5, [
       { game_id: 'g1', picked_team: 'TOR', confidence_points: 1 },
-      { game_id: 'g2', picked_team: 'MTL', confidence_points: 5 }, // Should be 2, not 5
+      { game_id: 'g2', picked_team: 'MTL', confidence_points: 5 },
     ]);
 
     expect(result.success).toBe(false);
@@ -534,20 +285,7 @@ describe('PoolService.submitConfidencePicks', () => {
   });
 
   it('accepts valid sequential 1-to-N confidence values', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-    const { ScheduleService } = await import('../ScheduleService');
-
-    (ScheduleService.getGamesForDateRange as ReturnType<typeof vi.fn>).mockResolvedValue({
-      games: [],
-    });
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'confidence_picks') {
-        chain.upsert.mockResolvedValue({ data: null, error: null });
-      }
-      return chain;
-    });
+    mockPoolApi.submitConfidencePicks.mockResolvedValue({ data: null });
 
     const result = await PoolService.submitConfidencePicks('league-1', 'user-1', 5, [
       { game_id: 'g1', picked_team: 'TOR', confidence_points: 1 },
@@ -561,92 +299,33 @@ describe('PoolService.submitConfidencePicks', () => {
 
 describe('PoolService.scoreConfidenceWeek', () => {
   it('awards confidence_points for correct picks and 0 for incorrect', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    const updateCalls: Array<{ is_correct: boolean; points_earned: number }> = [];
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'confidence_picks') {
-        let eqCallCount = 0;
-        chain.eq.mockImplementation(() => {
-          eqCallCount++;
-          if (eqCallCount === 2) {
-            return Promise.resolve({
-              data: [
-                { id: 'cp-1', game_id: 'g1', picked_team: 'TOR', confidence_points: 5 },
-                { id: 'cp-2', game_id: 'g2', picked_team: 'MTL', confidence_points: 3 },
-              ],
-              error: null,
-            });
-          }
-          return chain;
-        });
-
-        chain.update.mockImplementation((data: any) => {
-          updateCalls.push(data);
-          const updateChain = createChainableMock();
-          updateChain.eq.mockResolvedValue({ data: null, error: null });
-          return updateChain;
-        });
-      }
-      return chain;
+    mockPoolApi.scoreConfidenceWeek.mockResolvedValue({
+      data: { scored: 2 },
     });
 
     const result = await PoolService.scoreConfidenceWeek('league-1', 5, [
-      { game_id: 'g1', winning_team: 'TOR' },  // Correct — earns 5 pts
-      { game_id: 'g2', winning_team: 'BOS' },  // Wrong — earns 0 pts
+      { game_id: 'g1', winning_team: 'TOR' },
+      { game_id: 'g2', winning_team: 'BOS' },
     ]);
 
     expect(result.scored).toBe(2);
-    expect(updateCalls[0].is_correct).toBe(true);
-    expect(updateCalls[0].points_earned).toBe(5);
-    expect(updateCalls[1].is_correct).toBe(false);
-    expect(updateCalls[1].points_earned).toBe(0);
+    expect(mockPoolApi.scoreConfidenceWeek).toHaveBeenCalledWith('league-1', 5, [
+      { game_id: 'g1', winning_team: 'TOR' },
+      { game_id: 'g2', winning_team: 'BOS' },
+    ]);
   });
 
   it('treats TIE and POSTPONED as 0 points (industry standard)', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    const updateCalls: Array<{ is_correct: boolean; points_earned: number }> = [];
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'confidence_picks') {
-        let eqCallCount = 0;
-        chain.eq.mockImplementation(() => {
-          eqCallCount++;
-          if (eqCallCount === 2) {
-            return Promise.resolve({
-              data: [
-                { id: 'cp-1', game_id: 'g1', picked_team: 'TOR', confidence_points: 5 },
-                { id: 'cp-2', game_id: 'g2', picked_team: 'MTL', confidence_points: 4 },
-              ],
-              error: null,
-            });
-          }
-          return chain;
-        });
-
-        chain.update.mockImplementation((data: any) => {
-          updateCalls.push(data);
-          const updateChain = createChainableMock();
-          updateChain.eq.mockResolvedValue({ data: null, error: null });
-          return updateChain;
-        });
-      }
-      return chain;
+    mockPoolApi.scoreConfidenceWeek.mockResolvedValue({
+      data: { scored: 2 },
     });
 
-    await PoolService.scoreConfidenceWeek('league-1', 5, [
+    const result = await PoolService.scoreConfidenceWeek('league-1', 5, [
       { game_id: 'g1', winning_team: 'TIE' },
       { game_id: 'g2', winning_team: 'POSTPONED' },
     ]);
 
-    expect(updateCalls[0].is_correct).toBe(false);
-    expect(updateCalls[0].points_earned).toBe(0);
-    expect(updateCalls[1].is_correct).toBe(false);
-    expect(updateCalls[1].points_earned).toBe(0);
+    expect(result.scored).toBe(2);
   });
 });
 
@@ -656,26 +335,8 @@ describe('PoolService.scoreConfidenceWeek', () => {
 
 describe('PoolService.getSurvivorUsedTeams', () => {
   it('returns list of previously used team abbreviations', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'survivor_selections') {
-        // .select('picked_team').eq('league_id', ...).eq('user_id', ...)
-        // The second .eq() is the terminal call, so it must resolve
-        let eqCount = 0;
-        chain.eq.mockImplementation(() => {
-          eqCount++;
-          if (eqCount >= 2) {
-            return Promise.resolve({
-              data: [{ picked_team: 'TOR' }, { picked_team: 'BOS' }, { picked_team: 'MTL' }],
-              error: null,
-            });
-          }
-          return chain;
-        });
-      }
-      return chain;
+    mockPoolApi.getSurvivorUsedTeams.mockResolvedValue({
+      data: ['TOR', 'BOS', 'MTL'],
     });
 
     const result = await PoolService.getSurvivorUsedTeams('league-1', 'user-1');
@@ -684,11 +345,7 @@ describe('PoolService.getSurvivorUsedTeams', () => {
   });
 
   it('returns empty array on error', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
-      throw new Error('DB error');
-    });
+    mockPoolApi.getSurvivorUsedTeams.mockRejectedValue(new Error('DB error'));
 
     const result = await PoolService.getSurvivorUsedTeams('league-1', 'user-1');
 
@@ -702,22 +359,12 @@ describe('PoolService.getSurvivorUsedTeams', () => {
 
 describe('PoolService.getSurvivorPickHistory', () => {
   it('returns picks mapped to simplified format', async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
-
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-      const chain = createChainableMock();
-      if (table === 'survivor_selections') {
-        // .select().eq().eq().order() — order() is terminal
-        chain.order.mockResolvedValue({
-          data: [
-            { week_number: 1, picked_team: 'TOR', is_correct: true },
-            { week_number: 2, picked_team: 'BOS', is_correct: false },
-            { week_number: 3, picked_team: 'MTL', is_correct: null },
-          ],
-          error: null,
-        });
-      }
-      return chain;
+    mockPoolApi.getSurvivorPickHistory.mockResolvedValue({
+      data: [
+        { week: 1, team: 'TOR', is_correct: true },
+        { week: 2, team: 'BOS', is_correct: false },
+        { week: 3, team: 'MTL', is_correct: null },
+      ],
     });
 
     const result = await PoolService.getSurvivorPickHistory('league-1', 'user-1');

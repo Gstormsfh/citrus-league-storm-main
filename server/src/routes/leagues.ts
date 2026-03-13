@@ -212,6 +212,48 @@ leagueRoutes.put('/:leagueId/roster-slots', commissionerMiddleware, validateBody
   }
 });
 
+// PUT /api/leagues/:leagueId/keeper-settings — Update keeper settings
+leagueRoutes.put('/:leagueId/keeper-settings', commissionerMiddleware, validateBody(schemas.keeperSettings), async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const userId = c.get('userId');
+  const body = getValidatedBody<z.infer<typeof schemas.keeperSettings>>(c);
+
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new LeagueService(supabase);
+
+  try {
+    const { success, error } = await service.updateKeeperSettings(leagueId, userId, body as any);
+    if (!success) {
+      return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to update keeper settings'));
+    }
+    return ok(c, { success: true });
+  } catch (err) {
+    return handleError(c, err, 'Failed to update keeper settings');
+  }
+});
+
+// PUT /api/leagues/:leagueId/category-settings — Update category settings
+leagueRoutes.put('/:leagueId/category-settings', commissionerMiddleware, validateBody(z.object({
+  categories: z.array(z.string()).min(2, 'At least 2 categories are required'),
+})), async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const userId = c.get('userId');
+  const body = getValidatedBody<{ categories: string[] }>(c);
+
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new LeagueService(supabase);
+
+  try {
+    const { success, error } = await service.updateCategorySettings(leagueId, userId, body.categories);
+    if (!success) {
+      return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to update category settings'));
+    }
+    return ok(c, { success: true });
+  } catch (err) {
+    return handleError(c, err, 'Failed to update category settings');
+  }
+});
+
 // GET /api/leagues/:leagueId/teams — Get all teams in a league
 leagueRoutes.get('/:leagueId/teams', membershipMiddleware, async (c) => {
   const leagueId = c.req.param('leagueId');
