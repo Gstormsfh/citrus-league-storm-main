@@ -1184,7 +1184,6 @@ async joinLeagueByCode(
   saveLineup: LineupService.saveLineup.bind(LineupService),
   backfillMissingDailyRosters: LineupService.backfillMissingDailyRosters.bind(LineupService),
   backfillAllMatchupsForLeague: LineupService.backfillAllMatchupsForLeague.bind(LineupService),
-  createDailyRosterSnapshots: LineupService.createDailyRosterSnapshots.bind(LineupService),
   canUpdateRosterForDate: LineupService.canUpdateRosterForDate.bind(LineupService),
   getLineup: LineupService.getLineup.bind(LineupService),
   loadDailyRoster: LineupService.loadDailyRoster.bind(LineupService),

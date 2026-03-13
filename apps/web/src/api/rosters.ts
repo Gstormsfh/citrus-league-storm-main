@@ -37,14 +37,27 @@ export const rosterApi = {
     );
   },
 
-  /** Update lineup for a team */
+  /** Save lineup with validation, roster protection, and daily snapshots */
+  saveLineup(leagueId: string, teamId: string, lineup: {
+    starters?: string[];
+    bench?: string[];
+    ir?: string[];
+    slot_assignments?: Record<string, unknown>;
+    target_date?: string;
+    allow_player_removal?: boolean;
+  }) {
+    // Invalidate roster caches for this team after lineup change
+    c.invalidate(`rosters:${leagueId}:${teamId}`);
+    return apiClient.put(`/api/rosters/league/${leagueId}/team/${teamId}/lineup`, lineup);
+  },
+
+  /** Update lineup for a team (alias for saveLineup for backward compatibility) */
   updateLineup(leagueId: string, teamId: string, lineup: {
     starters?: string[];
     bench?: string[];
     ir?: string[];
     slot_assignments?: Record<string, unknown>;
   }) {
-    // Invalidate roster caches for this team after lineup change
     c.invalidate(`rosters:${leagueId}:${teamId}`);
     return apiClient.put(`/api/rosters/league/${leagueId}/team/${teamId}/lineup`, lineup);
   },
@@ -56,6 +69,37 @@ export const rosterApi = {
       () => apiClient.get(`/api/rosters/league/${leagueId}/team/${teamId}/lineup`),
       CACHE_TTL.MEDIUM,
     );
+  },
+
+  /** Get daily roster entries for a team/matchup/date */
+  getDailyRoster(teamId: string, matchupId: string, rosterDate: string) {
+    return c.cached(
+      `rosters:daily:${teamId}:${matchupId}:${rosterDate}`,
+      () => apiClient.get(`/api/rosters/daily-roster?team_id=${teamId}&matchup_id=${matchupId}&roster_date=${rosterDate}`),
+      CACHE_TTL.SHORT,
+    );
+  },
+
+  /** Check if roster can be updated for a date */
+  canUpdateRoster(date: string, playerIds: number[]) {
+    const idsParam = playerIds.join(',');
+    return apiClient.get(`/api/rosters/can-update?date=${date}&player_ids=${idsParam}`);
+  },
+
+  /** Backfill missing daily rosters for a matchup */
+  backfillDailyRosters(leagueId: string, teamId: string, matchupId: string) {
+    return apiClient.post(`/api/rosters/league/${leagueId}/team/${teamId}/backfill`, { matchup_id: matchupId });
+  },
+
+  /** Backfill daily rosters for all matchups in a league */
+  backfillAllMatchups(leagueId: string) {
+    return apiClient.post(`/api/rosters/league/${leagueId}/backfill-all`, {});
+  },
+
+  /** Initialize lineup from roster assignments (server-side slot computation) */
+  initializeLineup(leagueId: string, teamId: string) {
+    c.invalidate(`rosters:${leagueId}:${teamId}`);
+    return apiClient.post(`/api/rosters/league/${leagueId}/team/${teamId}/initialize`, {});
   },
 
   /** Clear all roster caches */
