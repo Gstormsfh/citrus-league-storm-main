@@ -20,10 +20,10 @@ export const accountApi = {
     }>('/api/account/profile');
   },
   exportUserData() {
-    return apiClient.post('/api/account/export', {});
+    return apiClient.post('/api/account/export');
   },
   deleteAccount() {
-    return apiClient.post('/api/account/delete', {});
+    return apiClient.post('/api/account/delete');
   },
   recordConsent(policyType: string, version: string) {
     return apiClient.post('/api/account/consent', { policyType, version });
