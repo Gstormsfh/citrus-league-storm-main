@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { PlayerService, Player } from '@/services/PlayerService';
+import { PlayerService } from '@/services/PlayerService';
 import { CURRENT_SEASON } from '@/utils/seasonConstants';
 import { logger } from '@/utils/logger';
 
@@ -16,9 +16,8 @@ export interface PlayerNewsItem {
 }
 
 /**
- * Hook for real-time player news feed (roster status updates)
- * Subscribes to player_talent_metrics table changes
- * Caches data locally to prevent excessive egress
+ * Hook for real-time player news feed (roster status updates).
+ * Uses PlayerService (API server) for data, Supabase realtime for live updates.
  */
 export function usePlayerNews(
   rosterPlayerIds: string[],
@@ -28,10 +27,10 @@ export function usePlayerNews(
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const subscriptionRef = useRef<(() => void) | null>(null);
-  const cacheRef = useRef<Map<number, PlayerNewsItem>>(new Map());
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const cacheRef = useRef<Map<number, PlayerNewsItem>>(new Map());
 
-  // Fetch initial player news data
+  // Fetch player news from PlayerService (API server, 3-tier)
   const fetchPlayerNews = useCallback(async () => {
     if (!enabled || rosterPlayerIds.length === 0) {
       setLoading(false);
@@ -41,72 +40,31 @@ export function usePlayerNews(
     try {
       setLoading(true);
 
-      // Get roster status for all roster players
-      const playerIds = rosterPlayerIds.map(id => parseInt(id)).filter(id => !isNaN(id));
-      
+      const playerIds = rosterPlayerIds.filter(id => !isNaN(parseInt(id)));
       if (playerIds.length === 0) {
         setNewsItems([]);
         setLoading(false);
         return;
       }
 
-      const query = supabase
-        .from('player_talent_metrics' as any)
-        .select('player_id, roster_status, is_ir_eligible, roster_status_updated_at')
-        .eq('season', CURRENT_SEASON)
-        .in('player_id', playerIds);
-      const { data: metrics, error } = await (query as any);
+      // Get player data from API server (includes roster_status and is_ir_eligible)
+      const players = await PlayerService.getPlayersByIds(playerIds);
 
-      if (error) {
-        logger.error('Error fetching player news:', error);
-        setLoading(false);
-        return;
-      }
-
-      // Get player details from PlayerService
-      const allPlayers = await PlayerService.getAllPlayers();
-      const playerMap = new Map(allPlayers.map(p => [Number(p.id), p]));
-
-      // Build news items
-      const items: PlayerNewsItem[] = ((metrics || []) as { player_id: number; roster_status: string | null; is_ir_eligible: boolean | null; roster_status_updated_at: string | null }[])
-        .filter(m => m.roster_status) // Only include players with status
-        .map(metric => {
-          const player = playerMap.get(metric.player_id);
-          if (!player) return null;
-
-          const updatedAt = metric.roster_status_updated_at 
-            ? new Date(metric.roster_status_updated_at)
-            : new Date();
-
-          // Format timestamp
-          const now = new Date();
-          const diffMs = now.getTime() - updatedAt.getTime();
-          const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-          const diffDays = Math.floor(diffHours / 24);
-          
-          let lastUpdated = '';
-          if (diffDays > 0) {
-            lastUpdated = `${diffDays}d ago`;
-          } else if (diffHours > 0) {
-            lastUpdated = `${diffHours}h ago`;
-          } else {
-            const diffMins = Math.floor(diffMs / (1000 * 60));
-            lastUpdated = diffMins > 0 ? `${diffMins}m ago` : 'Just now';
-          }
-
+      const now = new Date();
+      const items: PlayerNewsItem[] = players
+        .filter(p => p.roster_status) // Only include players with a roster status
+        .map(player => {
           return {
-            player_id: metric.player_id,
+            player_id: Number(player.id),
             player_name: player.full_name,
             team: player.team,
             position: player.position,
-            roster_status: metric.roster_status || 'ACT',
-            is_ir_eligible: metric.is_ir_eligible || false,
-            updated_at: updatedAt.toISOString(),
-            last_updated: lastUpdated
+            roster_status: player.roster_status || 'ACT',
+            is_ir_eligible: player.is_ir_eligible || false,
+            updated_at: now.toISOString(),
+            last_updated: 'Recently',
           };
-        })
-        .filter((item): item is PlayerNewsItem => item !== null)
-        .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+        });
 
       // Update cache
       items.forEach(item => {
@@ -127,7 +85,7 @@ export function usePlayerNews(
     fetchPlayerNews();
   }, [fetchPlayerNews]);
 
-  // Set up real-time subscription
+  // Set up real-time subscription (acceptable client-side Supabase usage)
   useEffect(() => {
     if (!enabled || rosterPlayerIds.length === 0) {
       return;
@@ -136,15 +94,12 @@ export function usePlayerNews(
     // Fetch initial data
     fetchPlayerNews();
 
-    // Subscribe to roster_status changes
     const playerIds = rosterPlayerIds.map(id => parseInt(id)).filter(id => !isNaN(id));
-    
     if (playerIds.length === 0) {
       return;
     }
 
-    // Create subscription for roster_status updates
-    // Only listen to UPDATE events on roster_status column
+    // Subscribe to roster_status changes (realtime is acceptable client-side)
     const channel = supabase
       .channel(`player_news:${playerIds.join(',')}`)
       .on(
@@ -156,19 +111,16 @@ export function usePlayerNews(
           filter: `season=eq.${CURRENT_SEASON}`,
         },
         (payload) => {
-          // Debounce rapid updates
           if (debounceTimeoutRef.current) {
             clearTimeout(debounceTimeoutRef.current);
           }
 
           debounceTimeoutRef.current = setTimeout(() => {
-            // Check if this update affects one of our roster players
             const updatedPlayerId = Number((payload.new as { player_id?: string })?.player_id);
             if (!isNaN(updatedPlayerId) && playerIds.includes(updatedPlayerId)) {
-              // Refresh news feed
               fetchPlayerNews();
             }
-          }, 300); // 300ms debounce
+          }, 300);
         }
       )
       .subscribe();
@@ -180,7 +132,6 @@ export function usePlayerNews(
       supabase.removeChannel(channel);
     };
 
-    // Cleanup on unmount
     return () => {
       if (subscriptionRef.current) {
         subscriptionRef.current();
