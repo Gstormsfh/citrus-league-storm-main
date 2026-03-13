@@ -158,4 +158,64 @@ publicRoutes.get('/matchups/:matchupId', async (c) => {
   return ok(c, { ...matchup, lines });
 });
 
+// POST /api/public/waitlist — Add email to waitlist (no auth required)
+publicRoutes.post('/waitlist', async (c) => {
+  let body: { email?: string; source?: string };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: { code: 'BAD_REQUEST', message: 'Invalid JSON body' } }, 400);
+  }
+
+  const email = body.email?.toLowerCase().trim();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return fail(c, AppError.badRequest('Please enter a valid email address'));
+  }
+
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase
+    .from('waitlist')
+    .insert({ email, source: body.source || 'landing_page' });
+
+  if (error) {
+    if (error.code === '23505' || error.message?.includes('duplicate')) {
+      return c.json({ data: { success: false, message: 'This email is already on the waitlist!' } });
+    }
+    return handleError(c, error, 'Failed to add to waitlist');
+  }
+
+  return ok(c, { success: true, message: "Successfully added to waitlist! We'll notify you when we launch." });
+});
+
+// GET /api/public/schedule/games — Public game schedule (for GameLockService)
+publicRoutes.get('/schedule/games', async (c) => {
+  const date = c.req.query('date');
+  const teams = c.req.query('teams');
+  if (!date) {
+    return fail(c, AppError.badRequest('date query parameter required'));
+  }
+
+  const supabase = getSupabaseAdmin();
+  let query = supabase
+    .from('nhl_games')
+    .select('game_time, status, home_team, away_team, game_date')
+    .eq('game_date', date)
+    .in('status', ['scheduled', 'live', 'final']);
+
+  if (teams) {
+    const teamList = teams.split(',');
+    const orConditions = teamList
+      .map(team => `home_team.eq.${team},away_team.eq.${team}`)
+      .join(',');
+    query = query.or(orConditions);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    return handleError(c, error, 'Failed to fetch games');
+  }
+
+  return ok(c, data || []);
+});
+
 export { publicRoutes };
