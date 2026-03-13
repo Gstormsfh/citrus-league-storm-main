@@ -7,8 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, User, Mail, Phone, MapPin } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { logger } from '@/utils/logger';
+import { accountApi } from '@/api/account';
 
 const ProfileSetup = () => {
   const navigate = useNavigate();
@@ -74,59 +73,24 @@ const ProfileSetup = () => {
 
     try {
       // Check if username is already taken
-      const { data: existing, error: checkError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('username', username)
-        .maybeSingle();
+      const { data: availability } = await accountApi.checkUsername(username);
 
-      if (checkError && checkError.code !== 'PGRST116') {
-        // PGRST116 = no rows found (which is fine)
-        // Other errors might indicate table doesn't exist
-        if (checkError.message?.includes('relation') || checkError.message?.includes('does not exist')) {
-          throw new Error('Database not set up. Please run the Supabase migrations first.');
-        }
-        throw checkError;
-      }
-
-      if (existing) {
+      if (!availability.available) {
         setError('Username is already taken');
         setLoading(false);
         return;
       }
 
-      // First, save the username (required field that definitely exists)
-      const { error: usernameError } = await supabase
-        .from('profiles')
-        .upsert({
-          id: user!.id,
-          username: username.trim(),
-        });
+      // Save the username along with any optional fields in a single call
+      const profileFields: Record<string, string> = {
+        username: username.trim(),
+      };
+      if (firstName.trim()) profileFields.first_name = firstName.trim();
+      if (lastName.trim()) profileFields.last_name = lastName.trim();
+      if (phone.trim()) profileFields.phone = phone.trim();
+      if (location.trim()) profileFields.location = location.trim();
 
-      if (usernameError) {
-        throw usernameError;
-      }
-
-      // Then try to update optional fields if they exist
-      // We'll do this in a separate call to avoid errors if columns don't exist
-      const optionalFields: any = {};
-      if (firstName.trim()) optionalFields.first_name = firstName.trim();
-      if (lastName.trim()) optionalFields.last_name = lastName.trim();
-      if (phone.trim()) optionalFields.phone = phone.trim();
-      if (location.trim()) optionalFields.location = location.trim();
-
-      // Only update optional fields if we have any to save
-      if (Object.keys(optionalFields).length > 0) {
-        const { error: optionalError } = await supabase
-          .from('profiles')
-          .update(optionalFields)
-          .eq('id', user!.id);
-
-        // Don't throw on optional field errors - they can be added later
-        if (optionalError) {
-          logger.warn('Some optional fields could not be saved:', optionalError.message);
-        }
-      }
+      await accountApi.updateProfile(profileFields);
 
       // Success - refresh profile and redirect
       await refreshProfile();

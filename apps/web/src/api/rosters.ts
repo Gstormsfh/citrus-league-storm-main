@@ -102,6 +102,21 @@ export const rosterApi = {
     return apiClient.post(`/api/rosters/league/${leagueId}/team/${teamId}/initialize`, {});
   },
 
+  /** Get roster count for a team */
+  getRosterCount(leagueId: string, teamId: string) {
+    return c.cached(
+      `rosters:${leagueId}:${teamId}:count`,
+      () => apiClient.get(`/api/rosters/league/${leagueId}/team/${teamId}/roster-count`),
+      CACHE_TTL.SHORT,
+    );
+  },
+
+  /** Sync roster_assignments from draft_picks (commissioner action) */
+  syncRosters(leagueId: string) {
+    c.invalidate(`rosters:${leagueId}`);
+    return apiClient.post(`/api/rosters/league/${leagueId}/sync`, {});
+  },
+
   /** Clear all roster caches */
   clearCache() {
     c.clearCache();

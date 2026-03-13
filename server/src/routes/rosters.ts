@@ -63,6 +63,25 @@ rosterRoutes.get('/league/:leagueId', membershipMiddleware, async (c) => {
   return ok(c, data || []);
 });
 
+// GET /api/rosters/league/:leagueId/team/:teamId/roster-count — Get roster count
+rosterRoutes.get('/league/:leagueId/team/:teamId/roster-count', membershipMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const teamId = c.req.param('teamId');
+  const supabase = createUserClient(c.get('userToken'));
+
+  const { count, error } = await supabase
+    .from('roster_assignments')
+    .select('*', { count: 'exact', head: true })
+    .eq('league_id', leagueId)
+    .eq('team_id', teamId);
+
+  if (error) {
+    return handleError(c, error, 'Failed to fetch roster count');
+  }
+
+  return ok(c, { count: count ?? 0 });
+});
+
 // PUT /api/rosters/league/:leagueId/team/:teamId/lineup — Save lineup with validation + snapshots
 rosterRoutes.put('/league/:leagueId/team/:teamId/lineup', membershipMiddleware, validateBody(schemas.rosterLineup), async (c) => {
   const leagueId = c.req.param('leagueId');
@@ -235,6 +254,20 @@ rosterRoutes.post('/league/:leagueId/team/:teamId/initialize', membershipMiddlew
   }
 
   return ok(c, result.lineup);
+});
+
+// POST /api/rosters/league/:leagueId/sync — Sync roster_assignments from draft_picks (commissioner only)
+rosterRoutes.post('/league/:leagueId/sync', membershipMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const supabase = createUserClient(c.get('userToken'));
+
+  const { data, error } = await (supabase.rpc as any)('sync_roster_assignments_for_league', { p_league_id: leagueId });
+
+  if (error) {
+    return handleError(c, error, 'Failed to sync rosters');
+  }
+
+  return ok(c, data);
 });
 
 export { rosterRoutes };

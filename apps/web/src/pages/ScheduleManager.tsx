@@ -9,19 +9,29 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar, Trophy, Users, ArrowRight, Clock } from 'lucide-react';
 import { CitrusBackground } from '@/components/CitrusBackground';
 import { CitrusSparkle, CitrusLeaf } from '@/components/icons/CitrusIcons';
-import { supabase } from '@/integrations/supabase/client';
+import { scheduleApi } from '@/api/schedule';
+import { leagueApi } from '@/api/leagues';
+import { rosterApi } from '@/api/rosters';
 import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { format } from 'date-fns';
-import { COLUMNS } from '@/utils/queryColumns';
 import { logger } from '@/utils/logger';
 import { getTodayMST, getTodayMSTDate, formatDateToString } from '@/utils/timezoneUtils';
+
+interface NhlGame {
+  id: string | number;
+  game_date: string;
+  game_time: string;
+  home_team: string;
+  away_team: string;
+  status: string;
+}
 
 const ScheduleManager = () => {
   const { user } = useAuth();
   const { activeLeagueId, userLeagueState } = useLeague();
   const [viewMode, setViewMode] = useState<'summary' | 'full'>('summary');
-  const [nhlGames, setNhlGames] = useState<Record<string, unknown>[]>([]);
+  const [nhlGames, setNhlGames] = useState<NhlGame[]>([]);
   const [loading, setLoading] = useState(true);
   const [myRoster, setMyRoster] = useState<Record<string, unknown>[]>([]);
 
@@ -35,33 +45,18 @@ const ScheduleManager = () => {
       nextWeek.setDate(nextWeek.getDate() + 7);
       const nextWeekStr = formatDateToString(nextWeek);
 
-      const { data: games } = await supabase
-        .from('nhl_games')
-        .select(COLUMNS.NHL_GAME)
-        .gte('game_date', todayStr)
-        .lte('game_date', nextWeekStr)
-        .order('game_date', { ascending: true })
-        .order('game_time', { ascending: true });
+      const { data: games } = await scheduleApi.getGames({ startDate: todayStr, endDate: nextWeekStr }) as { data?: NhlGame[] };
 
       setNhlGames(games || []);
 
       // Load user's roster if logged in
       if (user && activeLeagueId) {
-        const { data: team } = await supabase
-          .from('teams')
-          .select('id')
-          .eq('league_id', activeLeagueId)
-          .eq('owner_id', user.id)
-          .maybeSingle();
+        const { data: team } = await leagueApi.getMyTeam(activeLeagueId) as { data?: { id: string } };
 
         if (team) {
-          const { data: roster } = await supabase
-            .from('team_lineups')
-            .select('starters, bench, ir, slot_assignments')
-            .eq('team_id', team.id)
-            .eq('league_id', activeLeagueId);
+          const { data: roster } = await rosterApi.getLineup(activeLeagueId, team.id) as { data?: Record<string, unknown> };
 
-          setMyRoster(roster || []);
+          setMyRoster(roster ? [roster] : []);
         }
       }
     } catch (error) {

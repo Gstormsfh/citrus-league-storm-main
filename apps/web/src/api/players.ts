@@ -104,6 +104,32 @@ export const playerApi = {
     );
   },
 
+  /** Get batch player projections */
+  getBatchProjections(ids: string[], options?: { startDate?: string; endDate?: string; season?: number }) {
+    const params = new URLSearchParams();
+    params.set('ids', ids.join(','));
+    if (options?.startDate) params.set('startDate', options.startDate);
+    if (options?.endDate) params.set('endDate', options.endDate);
+    if (options?.season) params.set('season', String(options.season));
+    return c.cached(
+      `players:projections:batch:${params.toString()}`,
+      () => apiClient.get(`/api/players/projections/batch?${params.toString()}`),
+      CACHE_TTL.MEDIUM,
+    );
+  },
+
+  /** Get player directory entries */
+  getDirectory(ids: string[], season?: number) {
+    const params = new URLSearchParams();
+    params.set('ids', ids.join(','));
+    if (season) params.set('season', String(season));
+    return c.cached(
+      `players:directory:${params.toString()}`,
+      () => apiClient.get(`/api/players/directory?${params.toString()}`),
+      CACHE_TTL.LONG,
+    );
+  },
+
   /** Clear all player caches */
   clearCache() {
     c.clearCache();

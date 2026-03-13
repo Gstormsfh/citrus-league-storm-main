@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Link } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { COLUMNS } from '@/utils/queryColumns';
+import { leagueApi } from '@/api/leagues';
+import { rosterApi } from '@/api/rosters';
+import { accountApi } from '@/api/account';
 import { LeagueService } from '@/services/LeagueService';
 import { DraftService } from '@/services/DraftService';
 import { WaiverService } from '@/services/WaiverService';
@@ -200,24 +201,17 @@ const Profile = () => {
       setLoadingCommSettings(true);
       try {
         // Load league data
-        // Cast needed: COLUMNS.LEAGUE is a runtime string so Supabase can't infer column types
-        const { data: leagueData, error: leagueError } = await supabase
-          .from('leagues')
-          .select(COLUMNS.LEAGUE)
-          .eq('id', selectedSettingsLeagueId)
-          .single() as { data: any; error: any };
-        
-        if (leagueError) throw leagueError;
+        const { data: leagueData } = await leagueApi.getLeague(selectedSettingsLeagueId) as { data: any };
+
+        if (!leagueData) throw new Error('League not found');
         setSelectedLeagueData(leagueData);
-        
+
         // Load teams for this league
-        const { data: teamsData, error: teamsError } = await supabase
-          .from('teams')
-          .select(COLUMNS.TEAM)
-          .eq('league_id', selectedSettingsLeagueId);
-        
-        if (!teamsError) {
+        try {
+          const { data: teamsData } = await leagueApi.getTeams(selectedSettingsLeagueId) as { data: any[] };
           setSelectedLeagueTeams(teamsData || []);
+        } catch {
+          // Non-fatal: teams may fail to load
         }
         
         // Initialize waiver settings from league data
@@ -271,15 +265,10 @@ const Profile = () => {
       const counts: Record<string, number> = {};
       
       for (const team of selectedLeagueTeams) {
-        const { count, error } = await supabase
-          .from('roster_assignments')
-          .select('*', { count: 'exact', head: true })
-          .eq('league_id', selectedSettingsLeagueId)
-          .eq('team_id', team.id);
-        
-        if (!error && count !== null) {
-          counts[team.id] = count;
-        } else {
+        try {
+          const { data: playerIds } = await rosterApi.getPlayerIds(selectedSettingsLeagueId, team.id);
+          counts[team.id] = Array.isArray(playerIds) ? playerIds.length : 0;
+        } catch {
           counts[team.id] = 0;
         }
       }
@@ -406,14 +395,13 @@ const Profile = () => {
     setSyncingRosters(true);
     try {
       // Step 1: Sync roster_assignments from draft_picks (source of truth)
-      // Cast needed: RPC function not in generated Supabase types
-      const { data: syncResult, error: syncError } = await (supabase
-        .rpc as any)('sync_roster_assignments_for_league', { p_league_id: selectedSettingsLeagueId });
+      const syncResponse = await rosterApi.syncRosters(selectedSettingsLeagueId);
+      const syncResult = syncResponse.data;
 
-      if (syncError) {
+      if (!syncResult) {
         toast({
           title: 'Error',
-          description: syncError.message || 'Failed to sync rosters',
+          description: 'Failed to sync rosters',
           variant: 'destructive',
         });
         return;
@@ -526,37 +514,13 @@ const Profile = () => {
       if (formData.location.trim()) updateData.location = formData.location.trim();
       if (formData.bio.trim()) updateData.bio = formData.bio.trim();
 
-      // Try to update - if bio column doesn't exist, try without it
-      const { error } = await supabase
-        .from('profiles')
-        .update(updateData)
-        .eq('id', user.id);
+      await accountApi.updateProfile(updateData);
 
-      // If error mentions bio column, try again without it
-      if (error && error.message?.includes('bio')) {
-        const { bio, ...updateWithoutBio } = updateData;
-        const { error: retryError } = await supabase
-          .from('profiles')
-          .update(updateWithoutBio)
-          .eq('id', user.id);
-        
-        if (retryError) throw retryError;
-        
-        // Show warning about bio
-        toast({
-          title: "Profile updated",
-          description: "Profile saved, but bio field is not available yet. Please run the database migration.",
-          variant: "default"
-        });
-      } else if (error) {
-        throw error;
-      } else {
-        toast({
-          title: "Profile updated",
-          description: "Your profile information has been saved successfully.",
-          variant: "default"
-        });
-      }
+      toast({
+        title: "Profile updated",
+        description: "Your profile information has been saved successfully.",
+        variant: "default"
+      });
 
       setIsEditing(false);
       await refreshProfile();
@@ -579,12 +543,7 @@ const Profile = () => {
         updateData.default_team_name = formData.teamName.trim();
       }
 
-      const { error } = await supabase
-        .from('profiles')
-        .update(updateData)
-        .eq('id', user.id);
-
-      if (error) throw error;
+      await accountApi.updateProfile(updateData);
 
       // Also update all existing teams owned by this user
       if (formData.teamName.trim()) {

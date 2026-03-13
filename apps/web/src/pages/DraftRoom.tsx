@@ -9,6 +9,7 @@ import { PlayerService, Player } from '@/services/PlayerService';
 import { AuctionDraftService } from '@/services/AuctionDraftService';
 import { supabase } from '@/integrations/supabase/client';
 import { leagueApi } from '@/api/leagues';
+import { apiClient } from '@/api/client';
 import { logger } from '@/utils/logger';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import Navbar from '@/components/Navbar';
@@ -249,36 +250,28 @@ const DraftRoom = () => {
         
         // Import DEMO_LEAGUE_ID_FOR_GUESTS
         const { DEMO_LEAGUE_ID_FOR_GUESTS } = await import('@/services/DemoLeagueService');
-        const { COLUMNS } = await import('@/utils/queryColumns');
-        
-        // Get the demo league from database
-        const { data: demoLeagueData, error: leagueError } = await supabase
-          .from('leagues')
-          .select(COLUMNS.LEAGUE)
-          .eq('id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
-          .maybeSingle();
 
-        if (leagueError || !demoLeagueData) {
-          logger.error('[DraftRoom] Error loading demo league:', leagueError);
+        // Get the demo league via public API (no auth required)
+        const leagueResponse = await apiClient.get(`/api/public/leagues/${DEMO_LEAGUE_ID_FOR_GUESTS}`);
+
+        if (!leagueResponse.data) {
+          logger.error('[DraftRoom] Error loading demo league: no data returned');
           setError('Failed to load demo league. Please try again.');
           setLoading(false);
           return;
         }
 
-        const demoLeague = demoLeagueData as unknown as League;
+        const demoLeague = leagueResponse.data as unknown as League;
         logger.debug('[DraftRoom] Demo league loaded:', demoLeague.id);
         setLeague(demoLeague);
         setIsCommissioner(false); // Guests are never commissioners
 
-        // Get teams from the demo league
-        const { data: demoTeamsData, error: teamsError } = await supabase
-          .from('teams')
-          .select(COLUMNS.TEAM)
-          .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
-          .order('created_at', { ascending: true });
-        
-        if (teamsError || !demoTeamsData || demoTeamsData.length === 0) {
-          logger.error('[DraftRoom] Error loading demo teams:', teamsError);
+        // Get teams from the demo league via public API (no auth required)
+        const teamsResponse = await apiClient.get(`/api/public/leagues/${DEMO_LEAGUE_ID_FOR_GUESTS}/teams`);
+        const demoTeamsData = teamsResponse.data as unknown[] | null;
+
+        if (!demoTeamsData || (demoTeamsData as unknown[]).length === 0) {
+          logger.error('[DraftRoom] Error loading demo teams: no teams returned');
           setError('Failed to load demo teams. Please try again.');
           setLoading(false);
           return;
@@ -300,21 +293,18 @@ const DraftRoom = () => {
         const userDemoTeam = demoTeams[0] || null;
         setUserTeam(userDemoTeam);
         
-        // Get REAL draft picks from database
-        const { data: draftPicksData, error: picksError } = await supabase
-          .from('draft_picks')
-          .select(COLUMNS.DRAFT_PICK)
-          .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
-          .is('deleted_at', null)
-          .order('pick_number', { ascending: true });
-        
+        // Get REAL draft picks via public API (no auth required)
+        // Use DemoLeagueService which already wraps the public API endpoints
+        const { DemoLeagueService } = await import('@/services/DemoLeagueService');
+        const { data: draftPicksData, error: picksError } = await DemoLeagueService.getDemoDraftPicks();
+
         if (picksError) {
           logger.error('[DraftRoom] Error loading demo draft picks:', picksError);
           setError('Failed to load demo draft picks. Please try again.');
           setLoading(false);
           return;
         }
-        
+
         const demoPicks: DraftPick[] = (draftPicksData || []) as unknown as DraftPick[];
         logger.debug('[DraftRoom] Loaded', demoPicks.length, 'demo draft picks');
         

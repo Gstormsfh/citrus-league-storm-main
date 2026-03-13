@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
-import { supabase } from '@/integrations/supabase/client';
+import { leagueApi } from '@/api/leagues';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -114,17 +114,14 @@ const TeamAnalytics = () => {
       // Fallback: if no activeLeagueId is set, query for user's first team
       if (!currentLeagueId && user) {
         try {
-          const { data: userTeamData } = await supabase
-            .from('teams')
-            .select('league_id')
-            .eq('owner_id', user.id)
-            .maybeSingle();
-          
-          if (userTeamData) {
-            currentLeagueId = userTeamData.league_id;
+          // Try to get user's leagues and use the first one
+          const { data: leagues } = await leagueApi.getUserLeagues();
+
+          if (leagues && Array.isArray(leagues) && leagues.length > 0) {
+            currentLeagueId = leagues[0].id;
           }
         } catch (error) {
-          logger.error('Error fetching user team:', error);
+          logger.error('Error fetching user leagues:', error);
           // Continue without league ID
         }
       }

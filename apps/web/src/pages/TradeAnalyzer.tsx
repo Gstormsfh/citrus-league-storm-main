@@ -35,7 +35,8 @@ import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { isGuestMode } from '@/utils/guestHelpers';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { leagueApi } from '@/api/leagues';
+import { rosterApi } from '@/api/rosters';
 import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { logger } from '@/utils/logger';
@@ -89,12 +90,8 @@ const TradeAnalyzer = () => {
       try {
         // STEP 1: Check draft status FIRST - if not completed, show message and STOP
         if (activeLeagueId) {
-          const { data: leagueData } = await supabase
-            .from('leagues')
-            .select('draft_status')
-            .eq('id', activeLeagueId)
-            .single();
-          
+          const { data: leagueData } = await leagueApi.getLeague(activeLeagueId) as { data?: { draft_status: string } };
+
           if (leagueData && leagueData.draft_status !== 'completed') {
             if (isMounted) {
               setDraftNotCompleted(true);
@@ -110,12 +107,7 @@ const TradeAnalyzer = () => {
 
         if (user && activeLeagueId) {
           // Real league: load from database
-          const { data: myTeamData } = await supabase
-            .from('teams')
-            .select('id, team_name')
-            .eq('league_id', activeLeagueId)
-            .eq('owner_id', user.id)
-            .maybeSingle();
+          const { data: myTeamData } = await leagueApi.getMyTeam(activeLeagueId) as { data?: { id: string; team_name: string } };
 
           if (myTeamData && isMounted) {
             setMyTeamId(myTeamData.id);
@@ -124,18 +116,12 @@ const TradeAnalyzer = () => {
           if (!isMounted) return;
 
           // Load all teams in the league
-          const { data: leagueTeams } = await supabase
-            .from('teams')
-            .select('id, team_name, owner_id')
-            .eq('league_id', activeLeagueId);
+          const { data: leagueTeams } = await leagueApi.getTeams(activeLeagueId) as { data?: { id: string; team_name: string; owner_id: string }[] };
 
           if (!leagueTeams || !isMounted) return;
 
           // Load roster assignments for all teams in this league
-          const { data: rosterAssignments } = await supabase
-            .from('roster_assignments')
-            .select('team_id, player_id')
-            .eq('league_id', activeLeagueId);
+          const { data: rosterAssignments } = await rosterApi.getLeagueRosters(activeLeagueId) as { data?: { team_id: string; player_id: string }[] };
 
           if (!isMounted) return;
 

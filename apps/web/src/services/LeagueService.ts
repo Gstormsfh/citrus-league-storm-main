@@ -1,6 +1,6 @@
 import { Player, PlayerService } from "@/services/PlayerService";
-import { supabase } from "@/integrations/supabase/client";
-import type { PostgrestError } from '@supabase/supabase-js';
+import { rosterApi } from "@/api/rosters";
+import { apiClient } from "@/api/client";
 import { DraftService } from "./DraftService";
 import { MatchupService } from "./MatchupService";
 import { RosterCacheService } from "./RosterCacheService";
@@ -13,7 +13,6 @@ import { CURRENT_SEASON } from "@/utils/seasonConstants";
 import type { LeagueType, ScoringFormat, DraftType as LeagueDraftType, LeagueSettings } from "@/types/leagueTypes";
 import { extractFormatSettings } from "@/types/leagueTypes";
 import { leagueApi } from "@/api/leagues";
-import { COLUMNS } from "@/utils/queryColumns";
 
 // Sub-services extracted from this file for modularity
 import { StandingsService } from "./StandingsService";
@@ -464,18 +463,10 @@ async joinLeagueByCode(
   async simulateLeagueFill(leagueId: string, numTeams: number = 12): Promise<{ error: unknown }> {
     try {
       // Get ALL existing teams with their names to avoid duplicates
-      const { data: existingTeams, error: countError } = await supabase
-        .from('teams')
-        .select('id, team_name, owner_id')
-        .eq('league_id', leagueId)
-        .order('created_at', { ascending: true });
+      const teamsResponse = await leagueApi.getTeams(leagueId);
+      const existingTeams = (teamsResponse.data || []) as Array<{ id: string; team_name: string; owner_id: string | null }>;
 
-      if (countError) {
-        logger.error('simulateLeagueFill: Error counting existing teams:', countError);
-        throw countError;
-      }
-
-      const existingCount = existingTeams?.length || 0;
+      const existingCount = existingTeams.length;
 
       const teamsToCreate = numTeams - existingCount;
 
@@ -485,7 +476,7 @@ async joinLeagueByCode(
 
       // Get existing AI team numbers to avoid duplicates
       const existingAITeamNumbers = new Set<number>();
-      existingTeams?.forEach(team => {
+      existingTeams.forEach(team => {
         // Match "AI Team X" pattern
         const match = team.team_name.match(/^AI Team (\d+)$/);
         if (match) {
@@ -495,44 +486,31 @@ async joinLeagueByCode(
       });
 
       // Find the next available team numbers starting from 1
-      const teamsToInsert = [];
+      const teamNames: string[] = [];
       let teamNumber = 1;
       let attempts = 0;
       const maxAttempts = 100; // Safety limit
-      
-      while (teamsToInsert.length < teamsToCreate && attempts < maxAttempts) {
+
+      while (teamNames.length < teamsToCreate && attempts < maxAttempts) {
         if (!existingAITeamNumbers.has(teamNumber)) {
-          teamsToInsert.push({
-            league_id: leagueId,
-            owner_id: null, // Simulated teams have no owner
-            team_name: `AI Team ${teamNumber}`,
-          });
+          teamNames.push(`AI Team ${teamNumber}`);
         }
         teamNumber++;
         attempts++;
       }
 
-      if (teamsToInsert.length === 0) {
+      if (teamNames.length === 0) {
         return { error: null };
       }
 
-      if (teamsToInsert.length < teamsToCreate) {
-        logger.warn('simulateLeagueFill: Could only create', teamsToInsert.length, 'out of', teamsToCreate, 'requested teams');
+      if (teamNames.length < teamsToCreate) {
+        logger.warn('simulateLeagueFill: Could only create', teamNames.length, 'out of', teamsToCreate, 'requested teams');
       }
 
-      // Insert teams one at a time to avoid any potential race conditions
-      // Actually, let's do a single insert for efficiency, but with proper error handling
-      const { data: insertedTeams, error } = await supabase
-        .from('teams')
-        .insert(teamsToInsert)
-        .select(COLUMNS.TEAM);
+      // TODO: Add server route POST /api/leagues/:leagueId/simulate-fill
+      // For now, call the planned endpoint which will handle the insert server-side
+      await apiClient.post(`/api/leagues/${leagueId}/simulate-fill`, { numTeams, teamNames });
 
-      if (error) {
-        logger.error('simulateLeagueFill: Insert error:', error);
-        throw error;
-      }
-
-      
       return { error: null };
     } catch (error) {
       logger.error('simulateLeagueFill: Exception:', error);
@@ -987,19 +965,12 @@ async joinLeagueByCode(
         // CRITICAL FIX: Use roster_assignments (single source of truth) instead of draft_picks.
         // draft_picks only tracks drafted players — players added via waivers/FA are NOT in draft_picks,
         // causing them to incorrectly appear as free agents while already on a roster.
-        const { data: rosterAssignments, error: rosterError } = await supabase
-          .from('roster_assignments')
-          .select('player_id')
-          .eq('league_id', leagueId);
-
-        if (rosterError) {
-          logger.error('Error fetching roster_assignments for free agents:', rosterError);
-          throw rosterError;
-        }
+        const rostersResponse = await rosterApi.getLeagueRosters(leagueId);
+        const rosterAssignments = (rostersResponse.data || []) as Array<{ player_id: string }>;
 
         // Get player IDs that are currently on any roster in this league
         const ownedPlayerIds = new Set(
-          (rosterAssignments || []).map((r: { player_id: string }) => String(r.player_id))
+          rosterAssignments.map((r: { player_id: string }) => String(r.player_id))
         );
 
         // Filter out owned players - only return players NOT on any roster
@@ -1047,25 +1018,8 @@ async joinLeagueByCode(
    */
   async fetchTransactions(leagueId: string): Promise<{ transactions: Transaction[]; error: unknown }> {
     try {
-      const { data, error } = await supabase
-        .from('transaction_ledger')
-        .select(`
-          id,
-          type,
-          player_id,
-          created_at,
-          source,
-          teams(team_name),
-          profiles(first_name, last_name)
-        `)
-        .eq('league_id', leagueId)
-        .order('created_at', { ascending: false })
-        .limit(100);
-
-      if (error) {
-        logger.error('Error fetching transactions:', error);
-        return { transactions: [], error };
-      }
+      const response = await leagueApi.getTransactions(leagueId);
+      const data = (response.data || []) as Array<{ id: string; type: string; player_id: string; created_at: string; source: string | null; teams: { team_name: string } | null; profiles: { first_name: string | null; last_name: string | null } | null }>;
 
       // Get all players to map player_id to player details
       const allPlayers = await PlayerService.getAllPlayers();
@@ -1102,36 +1056,34 @@ async joinLeagueByCode(
    */
   async fetchRecentTransactionsForNotifications(userId: string): Promise<Transaction[]> {
     try {
-      // Get all leagues the user is in
-      const { data: userTeams, error: teamsError } = await supabase
-        .from('teams')
-        .select('league_id')
-        .eq('owner_id', userId);
+      // Get all leagues the user is in via the API
+      const leaguesResponse = await leagueApi.getUserLeagues();
+      const userLeagues = (leaguesResponse.data || []) as Array<{ id: string }>;
 
-      if (teamsError || !userTeams || userTeams.length === 0) {
+      if (userLeagues.length === 0) {
         return [];
       }
 
-      const leagueIds = userTeams.map(t => t.league_id);
+      // Fetch transactions from each league and combine
+      const allTransactionData: Array<{ id: string; type: string; player_id: string; created_at: string; source: string | null; league_id: string; teams: { team_name: string } | null }> = [];
 
-      const { data, error } = await supabase
-        .from('roster_transactions')
-        .select(`
-          id,
-          type,
-          player_id,
-          created_at,
-          source,
-          league_id,
-          teams(team_name)
-        `)
-        .in('league_id', leagueIds)
-        .order('created_at', { ascending: false })
-        .limit(10);
+      for (const league of userLeagues) {
+        try {
+          const txResponse = await leagueApi.getTransactions(league.id);
+          const txData = (txResponse.data || []) as Array<{ id: string; type: string; player_id: string; created_at: string; source: string | null; league_id?: string; teams: { team_name: string } | null }>;
+          txData.forEach(tx => allTransactionData.push({ ...tx, league_id: league.id }));
+        } catch {
+          // Skip leagues where transaction fetch fails
+        }
+      }
 
-      if (error || !data) {
+      if (allTransactionData.length === 0) {
         return [];
       }
+
+      // Sort by created_at descending and take the 10 most recent
+      allTransactionData.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      const data = allTransactionData.slice(0, 10);
 
       // Get all players to map player_id to player details
       const allPlayers = await PlayerService.getAllPlayers();
@@ -1208,38 +1160,12 @@ async joinLeagueByCode(
 
       const trimmedName = newTeamName.trim();
 
-      // First, check how many teams will be updated
-      const { data: existingTeams, error: countError } = await supabase
-        .from('teams')
-        .select('id, team_name')
-        .eq('owner_id', userId);
+      // TODO: Add server route PUT /api/account/team-name
+      // For now, call the planned endpoint which will handle the update server-side
+      const response = await apiClient.put('/api/account/team-name', { teamName: trimmedName });
+      const result = response.data as { updatedCount?: number } | undefined;
 
-      if (countError) {
-        logger.error('Error checking existing teams:', countError);
-        throw countError;
-      }
-
-      const teamCount = existingTeams?.length || 0;
-
-      if (teamCount === 0) {
-        return { error: null, updatedCount: 0 };
-      }
-
-      // Update all teams owned by this user
-      const { data, error } = await supabase
-        .from('teams')
-        .update({ team_name: trimmedName })
-        .eq('owner_id', userId)
-        .select(COLUMNS.TEAM);
-
-      if (error) {
-        logger.error('Error updating user team names:', error);
-        throw error;
-      }
-
-      const updatedCount = data?.length || 0;
-
-      return { error: null, updatedCount };
+      return { error: null, updatedCount: result?.updatedCount || 0 };
     } catch (error) {
       logger.error('Exception in updateUserTeamNames:', error);
       return { error, updatedCount: 0 };

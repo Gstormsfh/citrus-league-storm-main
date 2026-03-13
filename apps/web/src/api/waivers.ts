@@ -72,4 +72,9 @@ export const waiverApi = {
   cancelClaim(claimId: string) {
     return apiClient.delete(`/api/waivers/${claimId}`);
   },
+
+  /** Initialize waiver priority for a team */
+  initializePriority(leagueId: string, teamId: string) {
+    return apiClient.post(`/api/waivers/league/${leagueId}/initialize-priority`, { teamId });
+  },
 };
