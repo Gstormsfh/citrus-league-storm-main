@@ -192,7 +192,7 @@ export const matchupApi = {
    */
   ensureRosters(matchupId: string) {
     // NOT cached — must always run to ensure data exists
-    return apiClient.post(`/api/matchups/${matchupId}/ensure-rosters`);
+    return apiClient.post(`/api/matchups/${matchupId}/ensure-rosters`, {});
   },
 
   // ── Score updates & maintenance ────────────────────────────────────────
@@ -204,12 +204,12 @@ export const matchupApi = {
 
   /** Auto-complete matchups */
   autoComplete() {
-    return apiClient.post('/api/matchups/auto-complete');
+    return apiClient.post('/api/matchups/auto-complete', {});
   },
 
   /** Lock completed roster days */
   lockCompletedDays() {
-    return apiClient.post('/api/matchups/lock-completed-days');
+    return apiClient.post('/api/matchups/lock-completed-days', {});
   },
 
   /** Get matchup score job status */
