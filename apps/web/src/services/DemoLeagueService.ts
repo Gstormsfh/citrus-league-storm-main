@@ -15,6 +15,7 @@ import { DraftService } from './DraftService';
 import { MatchupService } from './MatchupService';
 import { COLUMNS } from '@/utils/queryColumns';
 import { logger } from '@/utils/logger';
+import { apiClient } from '@/api/client';
 import type { PostgrestError } from '@supabase/supabase-js';
 
 /** Shape of a row from the `teams` table, used for demo league operations. */
@@ -45,44 +46,57 @@ function typedFrom(table: string) {
 
 export const DemoLeagueService = {
   /**
-   * Load the demo league row from the database.
-   * Used by guest views (OtherTeam, Standings, DraftRoom, etc.)
+   * Load the demo league row via public API (3-tier, no auth required).
    */
   async getDemoLeague() {
-    const { data, error } = await typedFrom('leagues')
-      .select(COLUMNS.LEAGUE)
-      .eq('id', DEMO_LEAGUE_ID_FOR_GUESTS)
-      .maybeSingle();
-    if (error) logger.error('[DemoLeagueService] getDemoLeague error:', error);
-    return { data, error };
+    try {
+      const response = await apiClient.get(`/api/public/leagues/${DEMO_LEAGUE_ID_FOR_GUESTS}`);
+      return { data: response.data, error: null };
+    } catch (error) {
+      logger.error('[DemoLeagueService] getDemoLeague error:', error);
+      return { data: null, error };
+    }
   },
 
   /**
-   * Load all teams in the demo league, ordered by creation date.
+   * Load all teams in the demo league via public API (3-tier, no auth required).
    */
   async getDemoTeams() {
-    const { data, error } = await typedFrom('teams')
-      .select(COLUMNS.TEAM)
-      .eq('league_id', DEMO_LEAGUE_ID_FOR_GUESTS)
-      .order('created_at', { ascending: true });
-    if (error) logger.error('[DemoLeagueService] getDemoTeams error:', error);
-    return { data: data || [], error };
+    try {
+      const response = await apiClient.get(`/api/public/leagues/${DEMO_LEAGUE_ID_FOR_GUESTS}/teams`);
+      return { data: response.data || [], error: null };
+    } catch (error) {
+      logger.error('[DemoLeagueService] getDemoTeams error:', error);
+      return { data: [], error };
+    }
   },
 
   /**
-   * Load draft picks for the demo league, optionally filtered by team.
+   * Load draft picks for the demo league via public API.
+   * When teamId is provided, returns player IDs for that team.
    */
   async getDemoDraftPicks(teamId?: string) {
-    let query = typedFrom('draft_picks')
-      .select(teamId ? 'player_id' : COLUMNS.DRAFT_PICK)
-      .eq('league_id', DEMO_LEAGUE_ID_FOR_GUESTS)
-      .is('deleted_at', null);
-    if (teamId) {
-      query = query.eq('team_id', teamId);
+    try {
+      if (teamId) {
+        // Use the public player-ids endpoint for team-specific queries
+        const response = await apiClient.get(`/api/public/leagues/${DEMO_LEAGUE_ID_FOR_GUESTS}/teams/${teamId}/player-ids`);
+        const playerIds = (response.data || []) as string[];
+        return { data: playerIds.map(pid => ({ player_id: pid })), error: null };
+      }
+      // For all picks, get all teams then fetch each team's player IDs
+      const teamsResponse = await apiClient.get(`/api/public/leagues/${DEMO_LEAGUE_ID_FOR_GUESTS}/teams`);
+      const teams = (teamsResponse.data || []) as Array<{ id: string }>;
+      const allPicks: Array<{ team_id: string; player_id: string }> = [];
+      await Promise.all(teams.map(async (t) => {
+        const resp = await apiClient.get(`/api/public/leagues/${DEMO_LEAGUE_ID_FOR_GUESTS}/teams/${t.id}/player-ids`);
+        const pids = (resp.data || []) as string[];
+        pids.forEach(pid => allPicks.push({ team_id: t.id, player_id: pid }));
+      }));
+      return { data: allPicks, error: null };
+    } catch (error) {
+      logger.error('[DemoLeagueService] getDemoDraftPicks error:', error);
+      return { data: [], error };
     }
-    const { data, error } = await query;
-    if (error) logger.error('[DemoLeagueService] getDemoDraftPicks error:', error);
-    return { data: data || [], error };
   },
   /**
    * Get static demo roster for a team (fallback when DB fails)

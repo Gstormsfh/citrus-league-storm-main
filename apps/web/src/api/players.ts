@@ -65,6 +65,16 @@ export const playerApi = {
     );
   },
 
+  /** Get rest-of-season projections (top unrostered) */
+  getRosProjections(limit?: number) {
+    const qs = limit ? `?limit=${limit}` : '';
+    return c.cached(
+      `players:ros-projections:${limit ?? 'default'}`,
+      () => apiClient.get(`/api/players/ros-projections${qs}`),
+      CACHE_TTL.LONG,
+    );
+  },
+
   /** Get a single player */
   getPlayer(playerId: string) {
     return c.cached(

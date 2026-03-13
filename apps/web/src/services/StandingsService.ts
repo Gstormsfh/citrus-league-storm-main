@@ -6,13 +6,13 @@
  * - calculateSeasonPointsStandings (Roto, Total Points, PPG)
  * - calculateCategoryStandings (H2H Categories)
  * - calculateRotoStandingsFromDB (Rotisserie)
+ *
+ * Uses API server (3-tier architecture) instead of direct Supabase calls.
  */
 
-import { supabase } from "@/integrations/supabase/client";
 import { logger } from "@/utils/logger";
 import type { CategoryStats } from "@/utils/scoringUtils";
 import { getTodayMST } from "@/utils/timezoneUtils";
-import { CURRENT_SEASON } from "@/utils/seasonConstants";
 import type { LeagueSettings } from "@/types/leagueTypes";
 import type { Team } from "./LeagueService";
 
@@ -34,15 +34,6 @@ const standingsCache = new Map<string, {
 export const StandingsService = {
   /**
    * Calculate team standings stats from completed matchup results.
-   *
-   * Format-aware behavior:
-   * - H2H Points / H2H Categories / Best Ball: Standard W/L from matchup scores
-   * - Roto / Total Points / PPG: No matchups; standings based on cumulative points
-   * - Pool formats: Not applicable (no player-based scoring)
-   *
-   * Points for/against come from actual matchup scores (team1_score, team2_score).
-   * Wins/losses determined by higher score in each matchup.
-   * Also calculates streak and last 5 games.
    */
   async calculateTeamStandings(
     leagueId: string,
@@ -58,17 +49,15 @@ export const StandingsService = {
     streak: string;
     last5: { wins: number; losses: number; ties: number };
   }>> {
-    // Check cache first (60 second TTL) - prevents redundant calculations
+    // Check cache first (60 second TTL)
     const cacheKey = leagueId;
     const cached = standingsCache.get(cacheKey);
     const now = Date.now();
 
     if (cached && now - cached.timestamp < 60000) {
-      logger.debug('[StandingsService] Using CACHED team standings (age:', Math.round((now - cached.timestamp) / 1000), 'seconds)');
       return cached.data;
     }
 
-    // Initialize all teams with 0 stats
     type TeamStatsWithHistory = {
       pointsFor: number;
       pointsAgainst: number;
@@ -77,17 +66,14 @@ export const StandingsService = {
       ties: number;
       streak: string;
       last5: { wins: number; losses: number; ties: number };
-      matchupHistory: Array<{ week: number; result: 'win' | 'loss' | 'tie' }>; // Track matchup history for streak/last5
+      matchupHistory: Array<{ week: number; result: 'win' | 'loss' | 'tie' }>;
     };
     const teamStats: Record<string, TeamStatsWithHistory> = {};
 
     teams.forEach(team => {
       teamStats[team.id] = {
-        pointsFor: 0,
-        pointsAgainst: 0,
-        wins: 0,
-        losses: 0,
-        ties: 0,
+        pointsFor: 0, pointsAgainst: 0,
+        wins: 0, losses: 0, ties: 0,
         streak: '-',
         last5: { wins: 0, losses: 0, ties: 0 },
         matchupHistory: []
@@ -95,100 +81,48 @@ export const StandingsService = {
     });
 
     try {
-      // Query all completed matchups OR past matchups (week_end_date < CURRENT_DATE) for this league
-      // This ensures Week 1 and Week 2 are both included even if Week 1 wasn't marked as completed
-      // CRITICAL: Include past weeks regardless of status to ensure all historical data is included
       const todayStr = getTodayMST();
 
-      // Use two separate queries and combine: completed matchups OR past matchups
-      // This is more reliable than complex .or() syntax
-      const [completedResult, pastResult] = await Promise.all([
-        supabase
-          .from('matchups')
-          .select('team1_id, team2_id, team1_score, team2_score, week_number, status, week_end_date, id')
-          .eq('league_id', leagueId)
-          .eq('status', 'completed'),
-        supabase
-          .from('matchups')
-          .select('team1_id, team2_id, team1_score, team2_score, week_number, status, week_end_date, id')
-          .eq('league_id', leagueId)
-          .lt('week_end_date', todayStr)
-          .neq('status', 'completed') // Exclude already completed ones to avoid duplicates
-      ]);
+      // Fetch all matchups via API
+      const { matchupApi } = await import('@/api/matchups');
+      const matchupsResult = await matchupApi.getLeagueMatchups(leagueId);
+      const allMatchupData = (matchupsResult.data ?? []) as Array<{
+        id: string; team1_id: string; team2_id: string | null;
+        team1_score: number | null; team2_score: number | null;
+        week_number: number; status: string; week_end_date: string;
+      }>;
 
-      if (completedResult.error) {
-        logger.error('[StandingsService] Error fetching completed matchups:', completedResult.error);
-      }
-      if (pastResult.error) {
-        logger.error('[StandingsService] Error fetching past matchups:', pastResult.error);
-      }
-
-      // Combine results and deduplicate by matchup ID
-      const completedMatchups = completedResult.data || [];
-      const pastMatchups = pastResult.data || [];
-      const matchupMap = new Map();
-
-      // Add completed matchups first
-      completedMatchups.forEach(m => {
-        if (m.id) matchupMap.set(m.id, m);
-      });
-
-      // Add past matchups (will overwrite if already in map, but that's fine - completed takes precedence)
-      pastMatchups.forEach(m => {
-        if (m.id && !matchupMap.has(m.id)) {
-          matchupMap.set(m.id, m);
-        }
-      });
-
-      // Convert to array and sort by week_number
+      // Filter to completed or past matchups, deduplicate
+      const matchupMap = new Map<string, typeof allMatchupData[0]>();
+      allMatchupData
+        .filter(m => m.status === 'completed' || m.week_end_date < todayStr)
+        .forEach(m => { if (m.id) matchupMap.set(m.id, m); });
       const matchups = Array.from(matchupMap.values()).sort((a, b) => a.week_number - b.week_number);
-      const error = completedResult.error || pastResult.error;
-
-      if (error) {
-        logger.error('[StandingsService] Error fetching completed matchups:', error);
-        return teamStats; // Return empty stats if query fails
-      }
 
       if (!matchups || matchups.length === 0) {
-        // No completed matchups yet - return empty stats
         return teamStats;
       }
 
-      // Calculate stats from each matchup
-      // CRITICAL: Only use scores from matchups table - these are matchup totals (sum of 7 daily scores)
-      // NOT season totals or player totals
-      // This logic applies to ALL weeks (Week 1, Week 2, etc.) - same calculation for all
-      // All matchups returned are already past (week_end_date < CURRENT_DATE) or completed, so process all
-
       matchups.forEach(matchup => {
-        // Parse scores - ensure we're getting matchup scores, not season totals
         const team1Score = parseFloat(String(matchup.team1_score)) || 0;
         const team2Score = matchup.team2_id ? (parseFloat(String(matchup.team2_score)) || 0) : 0;
 
-        // Handle bye weeks (team2_id is null)
         if (!matchup.team2_id) {
-          // Team1 gets a win and their points, no points against
           if (teamStats[matchup.team1_id]) {
             teamStats[matchup.team1_id].wins++;
             teamStats[matchup.team1_id].pointsFor += team1Score;
-            teamStats[matchup.team1_id].matchupHistory.push({
-              week: matchup.week_number,
-              result: 'win'
-            });
+            teamStats[matchup.team1_id].matchupHistory.push({ week: matchup.week_number, result: 'win' });
           }
         } else {
-          // Both teams participated - calculate points and win/loss
           if (teamStats[matchup.team1_id]) {
             teamStats[matchup.team1_id].pointsFor += team1Score;
             teamStats[matchup.team1_id].pointsAgainst += team2Score;
           }
-
           if (teamStats[matchup.team2_id]) {
             teamStats[matchup.team2_id].pointsFor += team2Score;
             teamStats[matchup.team2_id].pointsAgainst += team1Score;
           }
 
-          // Determine winner (higher score wins)
           const team1Won = team1Score > team2Score;
           const team2Won = team2Score > team1Score;
           const isTie = team1Score === team2Score;
@@ -196,48 +130,29 @@ export const StandingsService = {
           if (team1Won) {
             if (teamStats[matchup.team1_id]) {
               teamStats[matchup.team1_id].wins++;
-              teamStats[matchup.team1_id].matchupHistory.push({
-                week: matchup.week_number,
-                result: 'win'
-              });
+              teamStats[matchup.team1_id].matchupHistory.push({ week: matchup.week_number, result: 'win' });
             }
             if (teamStats[matchup.team2_id]) {
               teamStats[matchup.team2_id].losses++;
-              teamStats[matchup.team2_id].matchupHistory.push({
-                week: matchup.week_number,
-                result: 'loss'
-              });
+              teamStats[matchup.team2_id].matchupHistory.push({ week: matchup.week_number, result: 'loss' });
             }
           } else if (team2Won) {
             if (teamStats[matchup.team2_id]) {
               teamStats[matchup.team2_id].wins++;
-              teamStats[matchup.team2_id].matchupHistory.push({
-                week: matchup.week_number,
-                result: 'win'
-              });
+              teamStats[matchup.team2_id].matchupHistory.push({ week: matchup.week_number, result: 'win' });
             }
             if (teamStats[matchup.team1_id]) {
               teamStats[matchup.team1_id].losses++;
-              teamStats[matchup.team1_id].matchupHistory.push({
-                week: matchup.week_number,
-                result: 'loss'
-              });
+              teamStats[matchup.team1_id].matchupHistory.push({ week: matchup.week_number, result: 'loss' });
             }
           } else if (isTie) {
-            // Tie game - both teams get a tie (industry standard: ties count as half a win)
             if (teamStats[matchup.team1_id]) {
               teamStats[matchup.team1_id].ties++;
-              teamStats[matchup.team1_id].matchupHistory.push({
-                week: matchup.week_number,
-                result: 'tie'
-              });
+              teamStats[matchup.team1_id].matchupHistory.push({ week: matchup.week_number, result: 'tie' });
             }
             if (teamStats[matchup.team2_id]) {
               teamStats[matchup.team2_id].ties++;
-              teamStats[matchup.team2_id].matchupHistory.push({
-                week: matchup.week_number,
-                result: 'tie'
-              });
+              teamStats[matchup.team2_id].matchupHistory.push({ week: matchup.week_number, result: 'tie' });
             }
           }
         }
@@ -247,28 +162,19 @@ export const StandingsService = {
       Object.keys(teamStats).forEach(teamId => {
         const stats = teamStats[teamId];
         const history = stats.matchupHistory;
-
-        // Sort by week descending (most recent first)
         history.sort((a, b) => b.week - a.week);
 
-        // Calculate streak (from most recent game backwards)
         if (history.length > 0) {
           const mostRecent = history[0];
           let streakCount = 1;
-
           for (let i = 1; i < history.length; i++) {
-            if (history[i].result === mostRecent.result) {
-              streakCount++;
-            } else {
-              break;
-            }
+            if (history[i].result === mostRecent.result) streakCount++;
+            else break;
           }
-
           const streakLabel = mostRecent.result === 'win' ? 'W' : mostRecent.result === 'loss' ? 'L' : 'T';
           stats.streak = `${streakLabel}${streakCount}`;
         }
 
-        // Calculate last 5 games
         const last5Games = history.slice(0, 5);
         stats.last5 = {
           wins: last5Games.filter(g => g.result === 'win').length,
@@ -276,31 +182,22 @@ export const StandingsService = {
           ties: last5Games.filter(g => g.result === 'tie').length,
         };
 
-        // Remove matchupHistory from final result (it was just for calculation)
         delete (stats as Partial<TeamStatsWithHistory>).matchupHistory;
       });
     } catch (error) {
       logger.error('[StandingsService] Exception calculating team standings:', error);
-      // Return empty stats on error
     }
 
-    // Remove matchupHistory from all teams before caching/returning
     Object.keys(teamStats).forEach(teamId => {
       delete (teamStats[teamId] as any).matchupHistory;
     });
 
-    // Cache the result for 60 seconds
     standingsCache.set(cacheKey, { data: teamStats, timestamp: now });
-
     return teamStats;
   },
 
   /**
    * Calculate standings for non-matchup formats (Roto, Total Points, PPG).
-   * Instead of querying matchups (which don't exist for these formats),
-   * sums cumulative fantasy points from daily_scores or draft_picks + player stats.
-   *
-   * @returns Map of teamId -> { pointsFor, gamesPlayed }
    */
   async calculateSeasonPointsStandings(
     leagueId: string,
@@ -318,48 +215,34 @@ export const StandingsService = {
     gamesPlayed: number;
   }>> {
     const result: Record<string, {
-      pointsFor: number;
-      pointsAgainst: number;
-      wins: number;
-      losses: number;
-      ties: number;
-      streak: string;
-      last5: { wins: number; losses: number; ties: number };
+      pointsFor: number; pointsAgainst: number;
+      wins: number; losses: number; ties: number;
+      streak: string; last5: { wins: number; losses: number; ties: number };
       gamesPlayed: number;
     }> = {};
 
-    // Initialize all teams
     teams.forEach(team => {
       result[team.id] = {
-        pointsFor: 0,
-        pointsAgainst: 0,
-        wins: 0,
-        losses: 0,
-        ties: 0,
-        streak: '-',
-        last5: { wins: 0, losses: 0, ties: 0 },
+        pointsFor: 0, pointsAgainst: 0,
+        wins: 0, losses: 0, ties: 0,
+        streak: '-', last5: { wins: 0, losses: 0, ties: 0 },
         gamesPlayed: 0,
       };
     });
 
     try {
-      // Build a map of playerId -> total season points
       const playerPointsMap = new Map<string, number>();
       allPlayers.forEach(p => playerPointsMap.set(p.id, p.points || 0));
 
-      // CRITICAL FIX: Use roster_assignments (source of truth) instead of draftPicks parameter.
-      // draftPicks misses players acquired via waivers/trades, causing incorrect standings.
-      const { data: rosterAssignments, error: rosterError } = await supabase
-        .from('roster_assignments')
-        .select('player_id, team_id')
-        .eq('league_id', leagueId);
+      // Use roster API for current roster assignments
+      const { rosterApi } = await import('@/api/rosters');
+      const assignmentsResult = await rosterApi.getLeagueRosters(leagueId);
+      const assignments = (assignmentsResult.data ?? []) as Array<{ team_id: string; player_id: string }>;
 
-      const rosterData = rosterError ? draftPicks : (rosterAssignments || []).map((r: { player_id: string; team_id: string }) => ({
-        team_id: r.team_id,
-        player_id: String(r.player_id)
-      }));
+      const rosterData = assignments.length > 0
+        ? assignments.map(r => ({ team_id: r.team_id, player_id: String(r.player_id) }))
+        : draftPicks;
 
-      // Sum points for each team based on their current roster
       rosterData.forEach((pick: { team_id: string; player_id: string }) => {
         if (result[pick.team_id]) {
           const pts = playerPointsMap.get(pick.player_id) || 0;
@@ -367,42 +250,19 @@ export const StandingsService = {
         }
       });
 
-      // Try to get actual daily scores for more accurate game counts
-      const { data: dailyScores } = await supabase
-        .from('daily_scores')
-        .select('team_id, score_date')
-        .eq('league_id', leagueId);
+      // Estimate games played from past matchup weeks
+      const { matchupApi } = await import('@/api/matchups');
+      const matchupsResult = await matchupApi.getLeagueMatchups(leagueId);
+      const allMatchupData = (matchupsResult.data ?? []) as Array<{ week_number: number; week_end_date: string }>;
+      const pastMatchups = allMatchupData.filter(m => m.week_end_date < getTodayMST());
 
-      if (dailyScores && dailyScores.length > 0) {
-        // Count unique game dates per team
-        const teamGameDates = new Map<string, Set<string>>();
-        dailyScores.forEach((ds: any) => {
-          if (!teamGameDates.has(ds.team_id)) {
-            teamGameDates.set(ds.team_id, new Set());
-          }
-          teamGameDates.get(ds.team_id)!.add(ds.score_date);
-        });
-        teamGameDates.forEach((dates, teamId) => {
-          if (result[teamId]) {
-            result[teamId].gamesPlayed = dates.size;
+      if (pastMatchups.length > 0) {
+        const maxWeek = Math.max(...pastMatchups.map(m => m.week_number));
+        teams.forEach(team => {
+          if (result[team.id]) {
+            result[team.id].gamesPlayed = maxWeek;
           }
         });
-      } else {
-        // Fallback: estimate games played from weeks elapsed
-        const { data: matchupData } = await supabase
-          .from('matchups')
-          .select('week_number')
-          .eq('league_id', leagueId)
-          .lt('week_end_date', getTodayMST());
-
-        if (matchupData && matchupData.length > 0) {
-          const maxWeek = Math.max(...matchupData.map((m: any) => m.week_number));
-          teams.forEach(team => {
-            if (result[team.id]) {
-              result[team.id].gamesPlayed = maxWeek;
-            }
-          });
-        }
       }
     } catch (error) {
       logger.error('[StandingsService] Exception calculating season points standings:', error);
@@ -413,9 +273,6 @@ export const StandingsService = {
 
   /**
    * Calculate H2H Categories standings from completed matchups.
-   * Instead of comparing total points, each stat category is a separate W/L/T.
-   * Returns the same structure as calculateTeamStandings so Standings page can
-   * consume it uniformly, plus an extra categoryRecord per team.
    */
   async calculateCategoryStandings(
     leagueId: string,
@@ -433,13 +290,9 @@ export const StandingsService = {
     categoryRecord: Record<string, { wins: number; losses: number; ties: number }>;
   }>> {
     type CatStandingsEntry = {
-      pointsFor: number;
-      pointsAgainst: number;
-      wins: number;
-      losses: number;
-      ties: number;
-      streak: string;
-      last5: { wins: number; losses: number; ties: number };
+      pointsFor: number; pointsAgainst: number;
+      wins: number; losses: number; ties: number;
+      streak: string; last5: { wins: number; losses: number; ties: number };
       categoryRecord: Record<string, { wins: number; losses: number; ties: number }>;
       matchupHistory: Array<{ week: number; result: 'win' | 'loss' | 'tie' }>;
     };
@@ -451,8 +304,7 @@ export const StandingsService = {
       result[t.id] = {
         pointsFor: 0, pointsAgainst: 0,
         wins: 0, losses: 0, ties: 0,
-        streak: '-',
-        last5: { wins: 0, losses: 0, ties: 0 },
+        streak: '-', last5: { wins: 0, losses: 0, ties: 0 },
         categoryRecord: catRec,
         matchupHistory: [],
       };
@@ -464,37 +316,52 @@ export const StandingsService = {
       // Fetch matchups via API
       const { matchupApi } = await import('@/api/matchups');
       const matchupsResult = await matchupApi.getLeagueMatchups(leagueId);
-      const allMatchupData = (matchupsResult.data ?? []) as Array<{ id: string; team1_id: string; team2_id: string | null; team1_score: number | null; team2_score: number | null; week_number: number; status: string; week_end_date: string }>;
+      const allMatchupData = (matchupsResult.data ?? []) as Array<{
+        id: string; team1_id: string; team2_id: string | null;
+        team1_score: number | null; team2_score: number | null;
+        week_number: number; status: string; week_end_date: string;
+      }>;
 
-      type MatchupRow = { id: string; team1_id: string; team2_id: string | null; team1_score: number | null; team2_score: number | null; week_number: number; status: string; week_end_date: string };
+      type MatchupRow = typeof allMatchupData[0];
       const matchupMap = new Map<string, MatchupRow>();
       allMatchupData.filter(m => m.status === 'completed' || m.week_end_date < todayStr).forEach(m => { if (m.id) matchupMap.set(m.id, m); });
       const matchups = Array.from(matchupMap.values()).sort((a, b) => a.week_number - b.week_number);
 
-      // Import category comparison function from scoringUtils
       const { compareCategoryMatchup } = await import('@/utils/scoringUtils');
 
-      // For each matchup, compute per-category W/L/T using roster-based stats.
-      // Fetch all roster assignments and player stats for per-category comparisons.
+      // Fetch roster assignments via API
       const { rosterApi } = await import('@/api/rosters');
       const assignmentsResult = await rosterApi.getLeagueRosters(leagueId);
       const allAssignments = (assignmentsResult.data ?? []) as Array<{ team_id: string; player_id: string }>;
 
-      const playerIds = [...new Set((allAssignments || []).map(a => Number(a.player_id)))];
+      // Fetch player stats via PlayerService (API server)
+      const playerIds = [...new Set(allAssignments.map(a => String(a.player_id)))];
+      const { PlayerService } = await import('@/services/PlayerService');
+      const players = playerIds.length > 0 ? await PlayerService.getPlayersByIds(playerIds) : [];
 
-      // Build per-team season totals per category from player_directory stats
-      const { data: playerStats } = playerIds.length > 0
-        ? await supabase
-            .from('player_directory')
-            .select('player_id, goals, assists, points, plus_minus, shots_on_goal, hits, blocks, pim, power_play_points, short_handed_points, position_code, wins, saves, shutouts, goals_against, save_pct')
-            .in('player_id', playerIds)
-            .eq('season', CURRENT_SEASON)
-        : { data: [] };
-
-      // Map player stats by ID
-      type PlayerStatRow = Record<string, number | string | null> & { player_id: number; position_code: string | null };
-      const playerStatsMap = new Map<string, PlayerStatRow>();
-      (playerStats || []).forEach((p) => playerStatsMap.set(String(p.player_id), p as PlayerStatRow));
+      // Build player stats map using NormalizedPlayer field names
+      type PlayerStatEntry = Record<string, number | string | null> & { position: string };
+      const playerStatsMap = new Map<string, PlayerStatEntry>();
+      players.forEach(p => {
+        playerStatsMap.set(p.id, {
+          position: p.position,
+          goals: p.goals || 0,
+          assists: p.assists || 0,
+          points: p.points || 0,
+          plus_minus: p.plus_minus || 0,
+          shots_on_goal: p.shots || 0,
+          hits: p.hits || 0,
+          blocks: p.blocks || 0,
+          pim: p.pim || 0,
+          power_play_points: p.ppp || 0,
+          short_handed_points: p.shp || 0,
+          wins: p.wins || 0,
+          saves: p.saves || 0,
+          shutouts: p.shutouts || 0,
+          goals_against: p.goals_against || 0,
+          save_pct: p.save_percentage,
+        } as PlayerStatEntry);
+      });
 
       // Build per-team category totals
       const teamCategoryTotals: Record<string, Record<string, number>> = {};
@@ -503,7 +370,6 @@ export const StandingsService = {
         categories.forEach(c => { teamCategoryTotals[t.id][c] = 0; });
       });
 
-      // Map category IDs to player_directory column names
       const catColumnMap: Record<string, string> = {
         goals: 'goals', assists: 'assists', points: 'points',
         plus_minus: 'plus_minus', ppp: 'power_play_points', shp: 'short_handed_points',
@@ -512,37 +378,31 @@ export const StandingsService = {
         save_pct: 'save_pct',
       };
 
-      // Fetch league settings for minGoalieGames
-      const { data: leagueRow } = await supabase
-        .from('leagues')
-        .select('settings')
-        .eq('id', leagueId)
-        .single();
-      const minGoalieGames = (leagueRow?.settings as LeagueSettings)?.minGoalieGames ?? 0;
+      // Fetch league settings for minGoalieGames via API
+      const { leagueApi } = await import('@/api/leagues');
+      const leagueResult = await leagueApi.getLeague(leagueId);
+      const leagueRow = leagueResult.data as { settings?: LeagueSettings } | null;
+      const minGoalieGames = leagueRow?.settings?.minGoalieGames ?? 0;
 
-      // Goalie stat categories (affected by minimum appearances)
       const goalieCategories = new Set(['wins', 'saves', 'shutouts', 'gaa', 'save_pct']);
 
-      (allAssignments || []).forEach(a => {
+      allAssignments.forEach(a => {
         const stats = playerStatsMap.get(String(a.player_id));
         if (!stats || !teamCategoryTotals[a.team_id]) return;
 
-        // Check if player is a goalie below minimum appearances
-        const isGoalie = stats.position_code === 'G';
+        const isGoalie = stats.position === 'G';
         const goalieGames = isGoalie ? Number(stats.wins ?? 0) + (stats.saves ? 1 : 0) : 0;
         const belowMinGoalieGames = isGoalie && minGoalieGames > 0 && goalieGames < minGoalieGames;
 
         categories.forEach(cat => {
-          // Skip goalie stat categories if below minimum appearances (industry standard)
           if (belowMinGoalieGames && goalieCategories.has(cat)) return;
-
           const col = catColumnMap[cat] || cat;
           teamCategoryTotals[a.team_id][cat] += Number(stats[col] ?? 0);
         });
       });
 
       for (const matchup of matchups) {
-        if (!matchup.team2_id) continue; // skip byes
+        if (!matchup.team2_id) continue;
 
         const t1 = matchup.team1_id;
         const t2 = matchup.team2_id;
@@ -554,17 +414,14 @@ export const StandingsService = {
         if (result[t2]) result[t2].pointsFor += s2;
         if (result[t2]) result[t2].pointsAgainst += s1;
 
-        // Compare per-category stats using real data
         const t1Stats = teamCategoryTotals[t1] || {};
         const t2Stats = teamCategoryTotals[t2] || {};
         const catResult = compareCategoryMatchup(t1Stats, t2Stats, categories, categoryMeta);
 
-        // Record per-category W/L/T for each team
         if (result[t1]) {
           result[t1].wins += catResult.team1Wins;
           result[t1].losses += catResult.team2Wins;
           result[t1].ties += catResult.ties;
-          // Per-category detail
           categories.forEach(cat => {
             const detail = catResult.details[cat];
             if (detail === 'team1') result[t1].categoryRecord[cat].wins++;
@@ -611,13 +468,11 @@ export const StandingsService = {
           losses: last5Games.filter(g => g.result === 'loss').length,
           ties: last5Games.filter(g => g.result === 'tie').length,
         };
-
       });
     } catch (err) {
       logger.error('[StandingsService] calculateCategoryStandings error:', err);
     }
 
-    // Strip matchupHistory (internal-only) before returning
     const cleaned: Record<string, Omit<CatStandingsEntry, 'matchupHistory'>> = {};
     Object.entries(result).forEach(([teamId, { matchupHistory: _, ...rest }]) => {
       cleaned[teamId] = rest;
@@ -626,9 +481,7 @@ export const StandingsService = {
   },
 
   /**
-   * Calculate Rotisserie standings. Each team earns ranking points per
-   * category across the entire season. Sum of ranks = roto score.
-   * This wraps calculateRotoStandings from scoringUtils with real DB data.
+   * Calculate Rotisserie standings.
    */
   async calculateRotoStandingsFromDB(
     leagueId: string,
@@ -638,13 +491,9 @@ export const StandingsService = {
     categories: string[],
     categoryMeta: Record<string, { higherIsBetter: boolean }>
   ): Promise<Record<string, {
-    pointsFor: number;
-    pointsAgainst: number;
-    wins: number;
-    losses: number;
-    ties: number;
-    streak: string;
-    last5: { wins: number; losses: number; ties: number };
+    pointsFor: number; pointsAgainst: number;
+    wins: number; losses: number; ties: number;
+    streak: string; last5: { wins: number; losses: number; ties: number };
     gamesPlayed: number;
     rotoPoints: number;
     categoryRanks: Record<string, number>;
@@ -653,9 +502,7 @@ export const StandingsService = {
       pointsFor: number; pointsAgainst: number;
       wins: number; losses: number; ties: number;
       streak: string; last5: { wins: number; losses: number; ties: number };
-      gamesPlayed: number;
-      rotoPoints: number;
-      categoryRanks: Record<string, number>;
+      gamesPlayed: number; rotoPoints: number; categoryRanks: Record<string, number>;
     }> = {};
 
     teams.forEach(t => {
@@ -663,36 +510,62 @@ export const StandingsService = {
         pointsFor: 0, pointsAgainst: 0,
         wins: 0, losses: 0, ties: 0,
         streak: '-', last5: { wins: 0, losses: 0, ties: 0 },
-        gamesPlayed: 0,
-        rotoPoints: 0,
-        categoryRanks: {},
+        gamesPlayed: 0, rotoPoints: 0, categoryRanks: {},
       };
     });
 
     try {
-      // Build player points map
       const playerPointsMap = new Map<string, number>();
       allPlayers.forEach(p => playerPointsMap.set(p.id, p.points || 0));
 
-      // Sum total points per team (used as "pointsFor" display)
       draftPicks.forEach(pick => {
         if (result[pick.team_id]) {
           result[pick.team_id].pointsFor += playerPointsMap.get(pick.player_id) || 0;
         }
       });
 
-      // Build per-team, per-category season totals from roster data
       const { calculateRotoStandings: calcRoto } = await import('@/utils/scoringUtils');
 
-      // Fetch all roster assignments to build per-team category stats
-      const { data: rotoAssignments } = await supabase
-        .from('roster_assignments')
-        .select('team_id, player_id')
-        .eq('league_id', leagueId);
+      // Fetch roster assignments via API
+      const { rosterApi } = await import('@/api/rosters');
+      const assignmentsResult = await rosterApi.getLeagueRosters(leagueId);
+      const rotoAssignments = (assignmentsResult.data ?? []) as Array<{ team_id: string; player_id: string }>;
 
-      const rotoPlayerIds = [...new Set((rotoAssignments || []).map(a => Number(a.player_id)))];
+      // Fetch player stats via PlayerService (API server)
+      const rotoPlayerIds = [...new Set(rotoAssignments.map(a => String(a.player_id)))];
+      const { PlayerService } = await import('@/services/PlayerService');
+      const players = rotoPlayerIds.length > 0 ? await PlayerService.getPlayersByIds(rotoPlayerIds) : [];
 
-      // Map category IDs to player_directory column names
+      // Build player stats map
+      type RotoPlayerEntry = Record<string, number | string | null> & { position: string };
+      const rotoPlayerMap = new Map<string, RotoPlayerEntry>();
+      players.forEach(p => {
+        rotoPlayerMap.set(p.id, {
+          position: p.position,
+          goals: p.goals || 0,
+          assists: p.assists || 0,
+          points: p.points || 0,
+          plus_minus: p.plus_minus || 0,
+          shots_on_goal: p.shots || 0,
+          hits: p.hits || 0,
+          blocks: p.blocks || 0,
+          pim: p.pim || 0,
+          power_play_points: p.ppp || 0,
+          short_handed_points: p.shp || 0,
+          wins: p.wins || 0,
+          saves: p.saves || 0,
+          shutouts: p.shutouts || 0,
+          goals_against: p.goals_against || 0,
+          save_pct: p.save_percentage,
+        } as RotoPlayerEntry);
+      });
+
+      // Fetch league settings for minGoalieGames via API
+      const { leagueApi } = await import('@/api/leagues');
+      const leagueResult = await leagueApi.getLeague(leagueId);
+      const leagueRow = leagueResult.data as { settings?: LeagueSettings } | null;
+      const rotoMinGoalieGames = leagueRow?.settings?.minGoalieGames ?? 0;
+
       const catColumnMap: Record<string, string> = {
         goals: 'goals', assists: 'assists', points: 'points',
         plus_minus: 'plus_minus', ppp: 'power_play_points', shp: 'short_handed_points',
@@ -701,42 +574,19 @@ export const StandingsService = {
         save_pct: 'save_pct',
       };
 
-      const { data: rotoPlayerStats } = rotoPlayerIds.length > 0
-        ? await supabase
-            .from('player_directory')
-            .select('player_id, goals, assists, points, plus_minus, shots_on_goal, hits, blocks, pim, power_play_points, short_handed_points, position_code, wins, saves, shutouts, goals_against, save_pct')
-            .in('player_id', rotoPlayerIds)
-            .eq('season', CURRENT_SEASON)
-        : { data: [] };
-
-      type RotoPlayerRow = Record<string, number | string | null> & { player_id: number; position_code: string | null };
-      const rotoPlayerMap = new Map<string, RotoPlayerRow>();
-      (rotoPlayerStats || []).forEach((p) => rotoPlayerMap.set(String(p.player_id), p as RotoPlayerRow));
-
-      // Fetch league settings for minGoalieGames
-      const { data: rotoLeagueRow } = await supabase
-        .from('leagues')
-        .select('settings')
-        .eq('id', leagueId)
-        .single();
-      const rotoMinGoalieGames = (rotoLeagueRow?.settings as LeagueSettings)?.minGoalieGames ?? 0;
-
-      // Goalie stat categories (affected by minimum appearances)
       const rotoGoalieCategories = new Set(['wins', 'saves', 'shutouts', 'gaa', 'save_pct']);
 
-      // Build team category stats
       const teamStats: Record<string, Partial<Record<string, number>>> = {};
       teams.forEach(t => {
         teamStats[t.id] = {};
         categories.forEach(cat => { teamStats[t.id][cat] = 0; });
       });
 
-      (rotoAssignments || []).forEach(a => {
+      rotoAssignments.forEach(a => {
         const stats = rotoPlayerMap.get(String(a.player_id));
         if (!stats || !teamStats[a.team_id]) return;
 
-        // Check if goalie below minimum appearances (industry standard)
-        const isGoalie = stats.position_code === 'G';
+        const isGoalie = stats.position === 'G';
         const goalieGames = isGoalie ? Number(stats.wins ?? 0) + (stats.saves ? 1 : 0) : 0;
         const belowMinGoalie = isGoalie && rotoMinGoalieGames > 0 && goalieGames < rotoMinGoalieGames;
 
@@ -747,15 +597,12 @@ export const StandingsService = {
         });
       });
 
-      // Use all configured categories (not the broken empty slice)
       const roto = calcRoto(teamStats as Record<string, Partial<CategoryStats>>, categories, categoryMeta);
 
-      // Merge roto results
       Object.entries(roto).forEach(([teamId, rotoResult]) => {
         if (result[teamId]) {
           result[teamId].rotoPoints = rotoResult.rotoPoints;
           result[teamId].categoryRanks = rotoResult.categoryRanks;
-          // For Roto standings, pointsFor = rotoPoints for sorting
           result[teamId].pointsFor = rotoResult.rotoPoints;
         }
       });

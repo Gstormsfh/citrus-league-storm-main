@@ -5,7 +5,7 @@ import { createUserClient } from '../lib/supabase';
 import { PlayerService } from '../services/PlayerService';
 import { AppError } from '../lib/errors';
 import { ok, fail, handleError } from '../lib/responses';
-import { logger } from '@citrus/shared';
+import { logger, CURRENT_SEASON } from '@citrus/shared';
 
 const playerRoutes = new Hono<Env>();
 
@@ -78,6 +78,27 @@ playerRoutes.get('/by-ids', authMiddleware, async (c) => {
   }
 
   return ok(c, players);
+});
+
+// GET /api/players/ros-projections — Get rest-of-season projections (top unrostered)
+playerRoutes.get('/ros-projections', authMiddleware, async (c) => {
+  const supabase = createUserClient(c.get('userToken'));
+  const limit = parseInt(c.req.query('limit') || '200', 10);
+
+  const { data, error } = await supabase
+    .from('player_ros_projections')
+    .select('player_id, player_name, position, team_abbrev, total_projected_points, avg_points_per_game, games_remaining')
+    .eq('season', CURRENT_SEASON)
+    .gt('total_projected_points', 0)
+    .gt('games_remaining', 0)
+    .order('total_projected_points', { ascending: false })
+    .limit(Math.min(limit, 500));
+
+  if (error) {
+    return handleError(c, error, 'Failed to fetch ROS projections');
+  }
+
+  return ok(c, data || []);
 });
 
 // GET /api/players/:playerId — Get a single player

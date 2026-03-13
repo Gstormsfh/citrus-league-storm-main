@@ -1,13 +1,12 @@
 /**
  * StormyService — Client-side service for Citrus Stormy AI assistant.
  *
- * Gathers league / roster / matchup context, sends it to the
- * Supabase edge function (which proxies the Claude API), and
- * returns the AI response with usage tracking.
+ * Gathers league / roster / matchup context via API server (3-tier),
+ * sends it to the Supabase edge function (which proxies the Claude API),
+ * and returns the AI response with usage tracking.
  */
 
 import { supabase } from "@/integrations/supabase/client";
-import { CURRENT_SEASON } from "@/utils/seasonConstants";
 import {
   getFirstWeekStartDate,
   getCurrentWeekNumber,
@@ -59,17 +58,11 @@ export interface StormyResponse {
 // ── Service ──────────────────────────────────────────────────────
 
 class StormyServiceImpl {
-  // Demo/guest users: 1 message per session (client-side enforcement)
-  // Registered users: 3 per matchup week (server-side enforcement)
   private guestMessageCount = 0;
   private static readonly GUEST_LIMIT = 1;
 
   /**
    * Send a message to Stormy and get an AI-powered response.
-   *
-   * @param message        - The user's latest message
-   * @param history        - Previous conversation turns
-   * @param context        - Optional page / league / roster context
    */
   async sendMessage(
     message: string,
@@ -77,7 +70,7 @@ class StormyServiceImpl {
     context?: StormyContext,
   ): Promise<StormyResponse> {
     try {
-      // Client-side guest throttle
+      // Client-side guest throttle (auth calls are acceptable client-side)
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -93,12 +86,11 @@ class StormyServiceImpl {
         }
       }
 
-      // Build compact context string
       const contextString = context
         ? StormyServiceImpl.buildContextString(context)
         : "";
 
-      // Call the edge function
+      // Edge function invocation is acceptable client-side
       const { data, error } = await supabase.functions.invoke("stormy-chat", {
         body: {
           message,
@@ -110,11 +102,6 @@ class StormyServiceImpl {
         },
       });
 
-      // Supabase functions.invoke returns { data, error } where:
-      // - On non-2xx responses (429 rate limit, 500 error), BOTH data and error are populated
-      // - data contains the parsed JSON body with the user-friendly message
-      // - error contains a generic "Edge Function returned a non-2xx status code"
-      // Always check data.error FIRST to surface the real message from the edge function
       if (data?.error) {
         return { response: "", error: data.error };
       }
@@ -137,10 +124,6 @@ class StormyServiceImpl {
     }
   }
 
-  /**
-   * Build a compact plaintext context string that gets appended to the
-   * system prompt in the edge function.  Keep it small to save tokens.
-   */
   static buildContextString(ctx: StormyContext): string {
     const lines: string[] = [];
 
@@ -158,7 +141,6 @@ class StormyServiceImpl {
     return lines.join("\n");
   }
 
-  /** Format a roster array into a brief text summary for the context. */
   static summarizeRoster(
     roster: Array<{
       name: string;
@@ -179,7 +161,6 @@ class StormyServiceImpl {
       .join("\n");
   }
 
-  /** Format a matchup into a brief summary. */
   static summarizeMatchup(matchup: {
     userTeam: string;
     userScore: number;
@@ -196,14 +177,7 @@ class StormyServiceImpl {
   }
 
   /**
-   * Deep-fetch league context for Stormy — the competitive moat.
-   * Gathers EVERYTHING a real Assistant GM would need:
-   * - Full roster with season stats, injury status, lineup status, schedule, projections
-   * - Current matchup + opponent's roster
-   * - League standings (all teams W-L-PF-PA)
-   * - Top available free agents
-   * - League configuration (roster slots, scoring)
-   * - Week/season timeline context
+   * Deep-fetch league context for Stormy via API server (3-tier).
    */
   static async fetchLeagueContext(
     leagueId: string,
@@ -212,23 +186,21 @@ class StormyServiceImpl {
     const ctx: Partial<StormyContext> = {};
 
     try {
-      // ── 1. User's team ───────────────────────────────────────────
-      const { data: team } = await supabase
-        .from("teams")
-        .select("id, team_name")
-        .eq("league_id", leagueId)
-        .eq("owner_id", userId)
-        .maybeSingle();
+      // ── 1. User's team (via API) ─────────────────────────────────
+      const { leagueApi } = await import('@/api/leagues');
+      const teamsResult = await leagueApi.getTeams(leagueId);
+      const allTeams = (teamsResult.data ?? []) as Array<{ id: string; team_name: string; owner_id: string }>;
+      const team = allTeams.find(t => t.owner_id === userId);
 
       if (!team) return ctx;
       ctx.teamName = team.team_name;
 
-      // ── 2. League config + week calculation ──────────────────────
-      const { data: leagueRow } = await supabase
-        .from("leagues")
-        .select("updated_at, draft_status, scoring_settings, roster_slots, league_size, roster_size")
-        .eq("id", leagueId)
-        .maybeSingle();
+      // ── 2. League config + week calculation (via API) ────────────
+      const leagueResult = await leagueApi.getLeague(leagueId);
+      const leagueRow = leagueResult.data as {
+        updated_at?: string; draft_status?: string; scoring_settings?: Record<string, unknown>;
+        roster_slots?: Record<string, number>; league_size?: number; roster_size?: number;
+      } | null;
 
       let weekStart: Date | null = null;
       let weekEnd: Date | null = null;
@@ -236,7 +208,7 @@ class StormyServiceImpl {
       let weekLabel = "";
       let totalWeeks = 0;
 
-      if (leagueRow?.draft_status === "completed") {
+      if (leagueRow?.draft_status === "completed" && leagueRow.updated_at) {
         const draftDate = new Date(leagueRow.updated_at);
         const firstWeekStart = getFirstWeekStartDate(draftDate);
         currentWeek = getCurrentWeekNumber(firstWeekStart);
@@ -246,20 +218,15 @@ class StormyServiceImpl {
         totalWeeks = getScheduleLength(firstWeekStart);
       }
 
-      // ── 3. All teams in league + all roster assignments (parallel) ──
-      const { leagueApi } = await import('@/api/leagues');
+      // ── 3. All roster assignments (via API) ──────────────────────
       const { rosterApi } = await import('@/api/rosters');
-      const [allTeamsResponse, allRosterResponse] = await Promise.all([
-        leagueApi.getTeams(leagueId),
-        rosterApi.getLeagueRosters(leagueId),
-      ]);
-      const allTeams = allTeamsResponse.data ?? [];
-      const allRosters = allRosterResponse.data ?? [];
+      const allRosterResponse = await rosterApi.getLeagueRosters(leagueId);
+      const allRosters = (allRosterResponse.data ?? []) as Array<{ team_id: string; player_id: string }>;
 
       // User's roster IDs
       const userRosterRows = allRosters.filter(r => r.team_id === team.id);
       const playerIds = userRosterRows
-        .map((p: { player_id: string }) => {
+        .map(p => {
           const n = parseInt(String(p.player_id));
           return isNaN(n) ? null : n;
         })
@@ -270,21 +237,25 @@ class StormyServiceImpl {
         allRosters.map(r => parseInt(String(r.player_id))).filter(n => !isNaN(n) && n > 0),
       );
 
-      // ── 4. Find opponent team ID from latest matchup ─────────────
-      const { data: matchups } = await supabase
-        .from("matchups")
-        .select("week_number, team1_id, team2_id, team1_score, team2_score, status")
-        .eq("league_id", leagueId)
-        .or(`team1_id.eq.${team.id},team2_id.eq.${team.id}`)
-        .order("week_number", { ascending: false })
-        .limit(1);
+      // ── 4. Find opponent team ID from latest matchup (via API) ───
+      const { matchupApi } = await import('@/api/matchups');
+      const matchupsResult = await matchupApi.getLeagueMatchups(leagueId);
+      const allMatchupsData = (matchupsResult.data ?? []) as Array<{
+        week_number: number; team1_id: string; team2_id: string;
+        team1_score: number | null; team2_score: number | null; status: string;
+      }>;
+
+      // Find user's latest matchup
+      const userMatchups = allMatchupsData
+        .filter(m => m.team1_id === team.id || m.team2_id === team.id)
+        .sort((a, b) => b.week_number - a.week_number);
 
       let opponentTeamId: string | null = null;
       let opponentName = "Bye";
-      let currentMatchup: { week_number: number; team1_id: string; team2_id: string; team1_score: number | null; team2_score: number | null; status: string } | null = null;
+      let currentMatchup: typeof userMatchups[0] | null = null;
 
-      if (matchups?.length) {
-        currentMatchup = matchups[0];
+      if (userMatchups.length) {
+        currentMatchup = userMatchups[0];
         const isTeam1 = currentMatchup.team1_id === team.id;
         opponentTeamId = isTeam1 ? currentMatchup.team2_id : currentMatchup.team1_id;
         const oppTeam = allTeams.find(t => t.id === opponentTeamId);
@@ -299,107 +270,28 @@ class StormyServiceImpl {
             .filter(n => !isNaN(n) && n > 0)
         : [];
 
-      // Combine all player IDs we need directory info for
+      // Combine all player IDs we need
       const allNeededPlayerIds = [...new Set([...playerIds, ...opponentPlayerIds])];
 
       if (allNeededPlayerIds.length > 0) {
-        // ── 6. Parallel batch queries for ALL needed data ──────────
-        type DirRow = {
-          player_id: number;
-          full_name: string;
-          position_code: string | null;
-          team_abbrev: string | null;
-        };
-        type SeasonStatRow = {
-          player_id: number;
-          games_played: number;
-          nhl_goals: number;
-          nhl_assists: number;
-          nhl_points: number;
-          nhl_shots_on_goal: number;
-          nhl_hits: number;
-          nhl_blocks: number;
-          nhl_pim: number;
-          nhl_ppp: number;
-          nhl_shp: number;
-          goalie_gp: number;
-          nhl_wins: number;
-          nhl_saves: number;
-          nhl_goals_against: number;
-          nhl_shutouts: number;
-          nhl_save_pct: number | null;
-        };
-        type TalentRow = {
-          player_id: number;
-          roster_status: string | null;
-          is_ir_eligible: boolean | null;
-          vopa_score: number | null;
-        };
+        // ── 6. Fetch player data + lineup via API (parallel) ──────
+        const { PlayerService } = await import('@/services/PlayerService');
+        const { playerApi } = await import('@/api/players');
 
-        const parallelQueries = [
-          // 6a. Player directory (names/positions)
-          supabase
-            .from("player_directory")
-            .select("player_id, full_name, position_code, team_abbrev")
-            .in("player_id", allNeededPlayerIds)
-            .eq("season", CURRENT_SEASON),
-          // 6b. User lineup status
-          supabase
-            .from("team_lineups")
-            .select("starters, bench, ir")
-            .eq("team_id", team.id)
-            .eq("league_id", leagueId)
-            .maybeSingle(),
-          // 6c. Season stats for all needed players
-          supabase
-            .from("player_season_stats")
-            .select("player_id, games_played, nhl_goals, nhl_assists, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_ppp, nhl_shp, goalie_gp, nhl_wins, nhl_saves, nhl_goals_against, nhl_shutouts, nhl_save_pct")
-            .in("player_id", allNeededPlayerIds)
-            .eq("season", CURRENT_SEASON),
-          // 6d. Injury/talent status for roster players
-          supabase
-            .from("player_talent_metrics")
-            .select("player_id, roster_status, is_ir_eligible, vopa_score")
-            .in("player_id", playerIds)
-            .eq("season", CURRENT_SEASON),
-          // 6e. All matchups for standings calculation
-          supabase
-            .from("matchups")
-            .select("week_number, team1_id, team2_id, team1_score, team2_score, status")
-            .eq("league_id", leagueId)
-            .in("status", ["completed", "in_progress"]),
-          // 6f. Top free agents (ROS projections, top 10 unrostered)
-          supabase
-            .from("player_ros_projections")
-            .select("player_id, player_name, position, team_abbrev, total_projected_points, avg_points_per_game, games_remaining")
-            .eq("season", CURRENT_SEASON)
-            .gt("total_projected_points", 0)
-            .gt("games_remaining", 0)
-            .order("total_projected_points", { ascending: false })
-            .limit(200),  // Fetch more to filter out rostered ones
-        ];
+        const [playersData, lineupResult, rosProjectionsResult] = await Promise.allSettled([
+          PlayerService.getPlayersByIds(allNeededPlayerIds.map(String)),
+          rosterApi.getLineup(leagueId, team.id),
+          playerApi.getRosProjections(200),
+        ]);
 
-        // Weekly projections: get_weekly_projections RPC does not exist;
-        // use get_daily_projections or player_projected_stats table instead.
-        // Omitted until the RPC is implemented.
+        // Build player lookup maps
+        const playerMap = new Map(
+          (playersData.status === 'fulfilled' ? playersData.value : []).map(p => [Number(p.id), p])
+        );
 
-        const results = await Promise.allSettled(parallelQueries);
-
-        // Helper to safely extract .data from a fulfilled Promise.allSettled result
-        const getFulfilledData = <T>(r: PromiseSettledResult<{ data: T; error: unknown }>): T | null =>
-          r.status === "fulfilled" ? r.value?.data ?? null : null;
-
-        const dirData = (getFulfilledData(results[0] as PromiseSettledResult<{ data: DirRow[] | null; error: unknown }>) ?? []) as DirRow[];
-        const lineupData = getFulfilledData(results[1] as PromiseSettledResult<{ data: { starters: string[]; bench: string[]; ir: string[] } | null; error: unknown }>);
-        const seasonStatsData = (getFulfilledData(results[2] as PromiseSettledResult<{ data: SeasonStatRow[] | null; error: unknown }>) ?? []) as SeasonStatRow[];
-        const talentData = (getFulfilledData(results[3] as PromiseSettledResult<{ data: TalentRow[] | null; error: unknown }>) ?? []) as TalentRow[];
-        const allMatchupsData = getFulfilledData(results[4] as PromiseSettledResult<{ data: Array<{ week_number: number; team1_id: string; team2_id: string; team1_score: number | null; team2_score: number | null; status: string }> | null; error: unknown }>) ?? [];
-        const rosProjectionsData = getFulfilledData(results[5] as PromiseSettledResult<{ data: Array<{ player_id: number; player_name: string; position: string; team_abbrev: string; total_projected_points: number; avg_points_per_game: number; games_remaining: number }> | null; error: unknown }>) ?? [];
-
-        // Build lookup maps
-        const dirMap = new Map(dirData.map(p => [p.player_id, p]));
-        const statsMap = new Map(seasonStatsData.map(s => [s.player_id, s]));
-        const talentMap = new Map(talentData.map(t => [t.player_id, t]));
+        const lineupData = lineupResult.status === 'fulfilled'
+          ? lineupResult.value.data as { starters?: string[]; bench?: string[]; ir?: string[] } | null
+          : null;
 
         const starterIds = new Set(((lineupData?.starters as string[]) ?? []).map(String));
         const irIds = new Set(((lineupData?.ir as string[]) ?? []).map(String));
@@ -411,7 +303,7 @@ class StormyServiceImpl {
 
         if (weekStart && weekEnd) {
           const uniqueTeams = [...new Set(
-            dirData.filter(p => playerIds.includes(p.player_id)).map(p => p.team_abbrev).filter((t): t is string => !!t),
+            playerIds.map(pid => playerMap.get(pid)?.team).filter((t): t is string => !!t),
           )];
 
           const [projResult, gamesResult] = await Promise.allSettled([
@@ -429,57 +321,53 @@ class StormyServiceImpl {
           }
         }
 
-        // ── 8. Build enriched roster summary (with season stats + injury) ──
-        const userPlayers = dirData.filter(p => playerIds.includes(p.player_id));
+        // ── 8. Build enriched roster summary ────────────────────────
+        const userPlayers = playerIds.map(pid => playerMap.get(pid)).filter(Boolean);
         if (userPlayers.length) {
           interface RosterLine { sortOrder: number; line: string; }
           const rosterLines: RosterLine[] = userPlayers.map((p) => {
-            const pid = String(p.player_id);
+            if (!p) return { sortOrder: 3, line: '' };
+            const pid = String(p.id);
             const isStarter = starterIds.has(pid);
             const isIR = irIds.has(pid);
             const status = isStarter ? "START" : isIR ? "IR" : "BENCH";
             const sortOrder = isStarter ? 0 : isIR ? 2 : 1;
 
-            let line = `${status} ${p.position_code ?? "?"} ${p.full_name} (${p.team_abbrev ?? "?"})`;
+            let line = `${status} ${p.position ?? "?"} ${p.full_name} (${p.team ?? "?"})`;
 
-            // Season stats
-            const ss = statsMap.get(p.player_id);
-            if (ss) {
-              const isGoalie = (p.position_code === "G");
-              if (isGoalie && ss.goalie_gp > 0) {
-                line += ` ${ss.goalie_gp}GP ${ss.nhl_wins}W ${ss.nhl_saves}SV ${ss.nhl_goals_against}GA ${ss.nhl_shutouts}SO`;
-                if (ss.nhl_save_pct != null) line += ` ${Number(ss.nhl_save_pct).toFixed(3)}SV%`;
-              } else if (ss.games_played > 0) {
-                line += ` ${ss.games_played}GP ${ss.nhl_goals}G ${ss.nhl_assists}A ${ss.nhl_points}PTS`;
-                const ppg = (ss.nhl_points / ss.games_played).toFixed(1);
-                line += ` ${ppg}PPG`;
-                if (ss.nhl_ppp > 0) line += ` ${ss.nhl_ppp}PPP`;
-                if (ss.nhl_shp > 0) line += ` ${ss.nhl_shp}SHP`;
-                // Include peripheral stats used in fantasy scoring
-                line += ` ${ss.nhl_shots_on_goal}SOG ${ss.nhl_hits}HIT ${ss.nhl_blocks}BLK ${ss.nhl_pim}PIM`;
-              }
+            // Season stats (from NormalizedPlayer via API)
+            const isGoalie = p.position === "G";
+            if (isGoalie && (p.goalie_gp || 0) > 0) {
+              line += ` ${p.goalie_gp}GP ${p.wins}W ${p.saves}SV ${p.goals_against}GA ${p.shutouts}SO`;
+              if (p.save_percentage != null) line += ` ${Number(p.save_percentage).toFixed(3)}SV%`;
+            } else if (p.games_played > 0) {
+              line += ` ${p.games_played}GP ${p.goals}G ${p.assists}A ${p.points}PTS`;
+              const ppg = (p.points / p.games_played).toFixed(1);
+              line += ` ${ppg}PPG`;
+              if ((p.ppp || 0) > 0) line += ` ${p.ppp}PPP`;
+              if ((p.shp || 0) > 0) line += ` ${p.shp}SHP`;
+              line += ` ${p.shots}SOG ${p.hits}HIT ${p.blocks}BLK ${p.pim}PIM`;
             }
 
             // Injury status
-            const talent = talentMap.get(p.player_id);
-            if (talent?.roster_status && talent.roster_status !== "ACT") {
-              line += ` [${talent.roster_status}]`;
+            if (p.roster_status && p.roster_status !== "ACT") {
+              line += ` [${p.roster_status}]`;
             }
 
             // Weekly schedule
-            const gp = teamGamesCountMap.get(p.team_abbrev ?? "");
-            const days = teamGameDaysMap.get(p.team_abbrev ?? "");
+            const gp = teamGamesCountMap.get(p.team ?? "");
+            const days = teamGameDaysMap.get(p.team ?? "");
             if (gp != null) {
               line += ` ${gp}GP/wk`;
               if (days?.length) line += `[${days.join(",")}]`;
             }
 
             // Weekly projection
-            const proj = weeklyProjMap.get(p.player_id);
+            const proj = weeklyProjMap.get(Number(p.id));
             if (proj != null) line += ` wkProj:${proj.toFixed(1)}`;
 
             return { sortOrder, line };
-          });
+          }).filter(r => r.line);
 
           rosterLines.sort((a, b) => a.sortOrder - b.sortOrder);
           ctx.rosterSummary = rosterLines.map(r => r.line).join("\n");
@@ -497,22 +385,19 @@ class StormyServiceImpl {
             `${opponentName}: ${oppScore} pts`,
           ];
 
-          // Opponent's roster
           if (opponentPlayerIds.length > 0) {
-            const oppPlayers = dirData.filter(p => opponentPlayerIds.includes(p.player_id));
+            const oppPlayers = opponentPlayerIds.map(pid => playerMap.get(pid)).filter(Boolean);
             if (oppPlayers.length > 0) {
               matchupLines.push(`\nOpponent Roster (${opponentName}):`);
               oppPlayers.forEach(p => {
-                const ss = statsMap.get(p.player_id);
-                let line = `  ${p.position_code ?? "?"} ${p.full_name} (${p.team_abbrev ?? "?"})`;
-                if (ss) {
-                  const isGoalie = (p.position_code === "G");
-                  if (isGoalie && ss.goalie_gp > 0) {
-                    line += ` ${ss.goalie_gp}GP ${ss.nhl_wins}W`;
-                    if (ss.nhl_save_pct != null) line += ` ${Number(ss.nhl_save_pct).toFixed(3)}SV%`;
-                  } else if (ss.games_played > 0) {
-                    line += ` ${ss.games_played}GP ${ss.nhl_points}PTS ${(ss.nhl_points / ss.games_played).toFixed(1)}PPG`;
-                  }
+                if (!p) return;
+                let line = `  ${p.position ?? "?"} ${p.full_name} (${p.team ?? "?"})`;
+                const isGoalie = p.position === "G";
+                if (isGoalie && (p.goalie_gp || 0) > 0) {
+                  line += ` ${p.goalie_gp}GP ${p.wins}W`;
+                  if (p.save_percentage != null) line += ` ${Number(p.save_percentage).toFixed(3)}SV%`;
+                } else if (p.games_played > 0) {
+                  line += ` ${p.games_played}GP ${p.points}PTS ${(p.points / p.games_played).toFixed(1)}PPG`;
                 }
                 matchupLines.push(line);
               });
@@ -523,11 +408,12 @@ class StormyServiceImpl {
         }
 
         // ── 10. League standings ──────────────────────────────────
-        if (allMatchupsData.length > 0 && allTeams.length > 0) {
+        const completedMatchups = allMatchupsData.filter(m => m.status === 'completed' || m.status === 'in_progress');
+        if (completedMatchups.length > 0 && allTeams.length > 0) {
           const teamStandings: Record<string, { w: number; l: number; pf: number; pa: number }> = {};
           allTeams.forEach(t => { teamStandings[t.id] = { w: 0, l: 0, pf: 0, pa: 0 }; });
 
-          for (const m of allMatchupsData) {
+          for (const m of completedMatchups) {
             if (!m.team1_id || !m.team2_id) continue;
             const s1 = Number(m.team1_score) || 0;
             const s2 = Number(m.team2_score) || 0;
@@ -545,7 +431,6 @@ class StormyServiceImpl {
             }
           }
 
-          // Sort by wins desc, then PF desc
           const ranked = allTeams
             .map(t => ({ name: t.team_name, id: t.id, ...teamStandings[t.id] }))
             .sort((a, b) => b.w - a.w || b.pf - a.pf);
@@ -557,24 +442,24 @@ class StormyServiceImpl {
           ctx.standingsSummary = standingsLines.join("\n");
         }
 
-        // ── 11. Top free agents ──────────────────────────────────
+        // ── 11. Top free agents (via API) ──────────────────────────
         type RosProjectionRow = {
-          player_id: number;
-          player_name: string;
-          position: string | null;
-          team_abbrev: string | null;
-          total_projected_points: number;
-          avg_points_per_game: number;
-          games_remaining: number;
+          player_id: number; player_name: string; position: string | null;
+          team_abbrev: string | null; total_projected_points: number;
+          avg_points_per_game: number; games_remaining: number;
         };
 
+        const rosProjectionsData = rosProjectionsResult.status === 'fulfilled'
+          ? (rosProjectionsResult.value.data ?? []) as RosProjectionRow[]
+          : [];
+
         if (rosProjectionsData.length > 0) {
-          const freeAgents = (rosProjectionsData as RosProjectionRow[])
-            .filter((p: RosProjectionRow) => !allRosteredIds.has(p.player_id))
-            .slice(0, 8);  // Top 8 unrostered
+          const freeAgents = rosProjectionsData
+            .filter(p => !allRosteredIds.has(p.player_id))
+            .slice(0, 8);
 
           if (freeAgents.length > 0) {
-            const faLines = freeAgents.map((p: RosProjectionRow) =>
+            const faLines = freeAgents.map(p =>
               `${p.position ?? "?"} ${p.player_name} (${p.team_abbrev ?? "?"}) ROS:${Number(p.total_projected_points).toFixed(1)}pts ${Number(p.avg_points_per_game).toFixed(1)}PPG ${p.games_remaining}GR`
             );
             ctx.extra = (ctx.extra ? ctx.extra + "\n\n" : "") + "Top Available Free Agents:\n" + faLines.join("\n");
