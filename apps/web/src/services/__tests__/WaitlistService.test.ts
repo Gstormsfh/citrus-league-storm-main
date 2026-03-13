@@ -1,30 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // =============================================================================
-// Mock Supabase client
+// Mock API client
 // =============================================================================
 
-function createChainMock() {
-  const chain: Record<string, any> = {};
-  const chainMethods = ['select', 'insert', 'update', 'delete', 'eq', 'is', 'in', 'order', 'limit', 'filter'];
-  chainMethods.forEach(m => {
-    chain[m] = vi.fn().mockReturnValue(chain);
-  });
-  chain.single = vi.fn().mockResolvedValue({ data: null, error: null });
-  chain.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
-  return chain;
-}
+const mockPost = vi.fn();
 
-let defaultChain = createChainMock();
-
-vi.mock('@/integrations/supabase/client', () => ({
-  supabase: {
-    from: vi.fn(() => defaultChain),
-    rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
-    auth: {
-      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }),
-      getSession: vi.fn().mockResolvedValue({ data: { session: { access_token: 'mock-token' } } }),
-    },
+vi.mock('@/api/client', () => ({
+  apiClient: {
+    post: (...args: unknown[]) => mockPost(...args),
   },
 }));
 
@@ -43,7 +27,6 @@ vi.mock('@/utils/logger', () => ({
 // =============================================================================
 
 import { WaitlistService } from '../WaitlistService';
-import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
 
 // =============================================================================
@@ -53,8 +36,6 @@ import { logger } from '@/utils/logger';
 describe('WaitlistService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    defaultChain = createChainMock();
-    (supabase.from as ReturnType<typeof vi.fn>).mockReturnValue(defaultChain);
   });
 
   // ---------------------------------------------------------------------------
@@ -66,7 +47,7 @@ describe('WaitlistService', () => {
 
       expect(result.success).toBe(false);
       expect(result.message).toContain('valid email');
-      expect(supabase.from).not.toHaveBeenCalled();
+      expect(mockPost).not.toHaveBeenCalled();
     });
 
     it('rejects empty string', async () => {
@@ -82,102 +63,83 @@ describe('WaitlistService', () => {
       expect(result.success).toBe(false);
     });
 
-    it('inserts valid email into waitlist table', async () => {
-      defaultChain.insert.mockResolvedValue({ error: null });
+    it('posts valid email to the API waitlist endpoint', async () => {
+      mockPost.mockResolvedValue({
+        data: { success: true, message: 'Successfully added to waitlist!' },
+      });
 
       const result = await WaitlistService.addToWaitlist('user@example.com');
 
-      expect(supabase.from).toHaveBeenCalledWith('waitlist');
-      expect(defaultChain.insert).toHaveBeenCalledWith({
+      expect(mockPost).toHaveBeenCalledWith('/api/public/waitlist', {
         email: 'user@example.com',
         source: 'landing_page',
-        user_agent: expect.any(String),
       });
       expect(result.success).toBe(true);
       expect(result.message).toContain('Successfully added');
     });
 
     it('normalizes email to lowercase and trims whitespace', async () => {
-      defaultChain.insert.mockResolvedValue({ error: null });
+      mockPost.mockResolvedValue({
+        data: { success: true, message: 'Successfully added to waitlist!' },
+      });
 
-      // Note: the regex validation rejects leading/trailing spaces,
-      // so we test with a valid email that has mixed case
       await WaitlistService.addToWaitlist('User@Example.COM');
 
-      expect(defaultChain.insert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          email: 'user@example.com',
-        })
-      );
+      expect(mockPost).toHaveBeenCalledWith('/api/public/waitlist', expect.objectContaining({
+        email: 'user@example.com',
+      }));
     });
 
     it('uses provided source parameter', async () => {
-      defaultChain.insert.mockResolvedValue({ error: null });
+      mockPost.mockResolvedValue({
+        data: { success: true, message: 'OK' },
+      });
 
       await WaitlistService.addToWaitlist('user@example.com', 'hero_section');
 
-      expect(defaultChain.insert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          source: 'hero_section',
-        })
-      );
+      expect(mockPost).toHaveBeenCalledWith('/api/public/waitlist', expect.objectContaining({
+        source: 'hero_section',
+      }));
     });
 
     it('defaults source to landing_page when not provided', async () => {
-      defaultChain.insert.mockResolvedValue({ error: null });
+      mockPost.mockResolvedValue({
+        data: { success: true, message: 'OK' },
+      });
 
       await WaitlistService.addToWaitlist('user@example.com');
 
-      expect(defaultChain.insert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          source: 'landing_page',
-        })
-      );
+      expect(mockPost).toHaveBeenCalledWith('/api/public/waitlist', expect.objectContaining({
+        source: 'landing_page',
+      }));
     });
 
-    it('returns specific message for duplicate email (code 23505)', async () => {
-      defaultChain.insert.mockResolvedValue({
-        error: { code: '23505', message: 'unique constraint violation' },
-      });
-
-      const result = await WaitlistService.addToWaitlist('existing@example.com');
-
-      expect(result.success).toBe(false);
-      expect(result.message).toContain('already on the waitlist');
-    });
-
-    it('returns specific message for duplicate email (message contains "duplicate")', async () => {
-      defaultChain.insert.mockResolvedValue({
-        error: { code: 'other', message: 'duplicate key value violates unique constraint' },
-      });
-
-      const result = await WaitlistService.addToWaitlist('existing@example.com');
-
-      expect(result.success).toBe(false);
-      expect(result.message).toContain('already on the waitlist');
-    });
-
-    it('returns generic error for non-duplicate insert failures', async () => {
-      defaultChain.insert.mockResolvedValue({
-        error: { code: '42P01', message: 'table not found' },
-      });
+    it('returns success with default message when API returns no data', async () => {
+      mockPost.mockResolvedValue({ data: undefined });
 
       const result = await WaitlistService.addToWaitlist('user@example.com');
 
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('Successfully added');
+    });
+
+    it('returns error message from API when call fails', async () => {
+      mockPost.mockRejectedValue(new Error('Duplicate email'));
+
+      const result = await WaitlistService.addToWaitlist('existing@example.com');
+
       expect(result.success).toBe(false);
-      expect(result.message).toContain('Failed to add email');
+      expect(result.message).toContain('Duplicate email');
       expect(logger.error).toHaveBeenCalled();
     });
 
     it('catches unexpected exceptions', async () => {
-      (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
-        throw new Error('Unexpected failure');
-      });
+      mockPost.mockRejectedValue(new Error('Unexpected failure'));
 
       const result = await WaitlistService.addToWaitlist('user@example.com');
 
       expect(result.success).toBe(false);
-      expect(result.message).toContain('unexpected error');
+      expect(result.message).toContain('Unexpected failure');
       expect(logger.error).toHaveBeenCalled();
     });
   });
@@ -186,7 +148,7 @@ describe('WaitlistService', () => {
   // isEmailInWaitlist
   // ---------------------------------------------------------------------------
   describe('isEmailInWaitlist', () => {
-    it('always returns false (relies on insert error for duplicate detection)', async () => {
+    it('always returns false (relies on server-side duplicate detection)', async () => {
       const result = await WaitlistService.isEmailInWaitlist('user@example.com');
 
       expect(result).toBe(false);
