@@ -64,6 +64,10 @@ vi.mock('@/services/PlayerService', () => ({
 import { LineupService } from '../LineupService';
 import { MatchupService } from '../MatchupService';
 import { RosterCacheService } from '../RosterCacheService';
+import { rosterApi } from '@/api/rosters';
+
+// Cast to access mock methods
+const mockRosterApi = rosterApi as unknown as Record<string, ReturnType<typeof vi.fn>>;
 
 // Mock localStorage
 const localStorageMock = (() => {
