@@ -1,7 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
-import { withTimeout } from '@/utils/promiseUtils';
 import { getTodayMST, getTodayMSTDate } from '@/utils/timezoneUtils';
-import { COLUMNS } from '@/utils/queryColumns';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { DEFAULT_TEST_DATE } from '@/utils/seasonConstants';
 import { logger } from '@/utils/logger';

@@ -40,8 +40,11 @@ import { GameLockService } from '@/services/GameLockService';
 import { WaiverService } from '@/services/WaiverService';
 import { getPlayerWithSeasonStats } from '@/utils/playerStatsHelper';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { supabase } from '@/integrations/supabase/client';
-import { COLUMNS } from '@/utils/queryColumns';
+import { leagueApi } from '@/api/leagues';
+import { playerApi } from '@/api/players';
+import { publicApi } from '@/api/public';
+import { rosterApi } from '@/api/rosters';
+import { matchupApi } from '@/api/matchups';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { MatchupScheduleSelector } from "@/components/matchup/MatchupScheduleSelector";
 import { WeeklySchedule } from "@/components/matchup/WeeklySchedule";
@@ -445,35 +448,23 @@ const Roster = () => {
         // Use the same approach as Matchup page - load from real demo league
         // ═══════════════════════════════════════════════════════════════════
         if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
-          // Import DEMO_LEAGUE_ID_FOR_GUESTS
-          const { DEMO_LEAGUE_ID_FOR_GUESTS } = await import('@/services/DemoLeagueService');
-          
-          // Get the demo league
-          const { data: demoLeagueData, error: leagueError } = await supabase
-            .from('leagues')
-            .select(COLUMNS.LEAGUE)
-            .eq('id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
-            .maybeSingle();
-          
-          if (leagueError || !demoLeagueData) {
-            logger.error('[Roster] Error loading demo league:', leagueError);
+          // Get the demo league via public API (no auth required)
+          const leagueResponse = await publicApi.getLeague(DEMO_LEAGUE_ID_FOR_GUESTS);
+
+          if (!leagueResponse.data) {
+            logger.error('[Roster] Error loading demo league: no data returned');
             setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
             setLoading(false);
             return;
           }
-          const demoLeague = demoLeagueData as any;
+          const demoLeague = leagueResponse.data as any;
           
-          // Get the first team from the demo league (or a specific team)
-          // For now, get team 1 (we can make this configurable later)
-          const { data: demoTeamsData, error: teamsError } = await supabase
-            .from('teams')
-            .select(COLUMNS.TEAM)
-            .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
-            .order('created_at', { ascending: true })
-            .limit(1);
-          
-          if (teamsError || !demoTeamsData || demoTeamsData.length === 0) {
-            logger.error('[Roster] Error loading demo team:', teamsError);
+          // Get the first team from the demo league via public API (no auth required)
+          const teamsResponse = await publicApi.getTeams(DEMO_LEAGUE_ID_FOR_GUESTS);
+          const demoTeamsData = (teamsResponse.data || []) as any[];
+
+          if (demoTeamsData.length === 0) {
+            logger.error('[Roster] Error loading demo team: no teams returned');
             setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
             setLoading(false);
             return;
@@ -489,25 +480,16 @@ const Roster = () => {
             team_name: demoTeamData.team_name
           });
           
-          // Get roster from draft picks (same as MatchupService.getTeamRoster)
-          const { data: teamDraftPicksData, error: picksError } = await supabase
-            .from('draft_picks')
-            .select(COLUMNS.DRAFT_PICK)
-            .eq('league_id' as any, DEMO_LEAGUE_ID_FOR_GUESTS as any)
-            .eq('team_id' as any, demoTeamData.id as any)
-            .is('deleted_at', null)
-            .order('pick_number', { ascending: true });
-          
-          if (picksError) {
-            logger.error('[Roster] Error loading demo roster:', picksError);
+          // Get roster player IDs via public API (no auth required)
+          const playerIdsResponse = await publicApi.getPlayerIds(DEMO_LEAGUE_ID_FOR_GUESTS, demoTeamData.id);
+          const playerIds = (playerIdsResponse.data || []) as string[];
+
+          if (!playerIds) {
+            logger.error('[Roster] Error loading demo roster: no player IDs returned');
             setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
             setLoading(false);
             return;
           }
-          
-          // Map draft picks to players
-          const teamDraftPicks = (teamDraftPicksData || []) as any[];
-          const playerIds = teamDraftPicks.map((p: any) => p.player_id);
           // CRITICAL FIX: playerIds are STRINGS from DB, but p.id is a NUMBER
           const playerIdsAsNumbers = playerIds.map((id: any) => typeof id === 'string' ? parseInt(id) : id);
           const teamPlayers = allPlayers.filter(p => playerIdsAsNumbers.includes(p.id));
@@ -522,22 +504,11 @@ const Roster = () => {
           // Transform to HockeyPlayer format (will be done later in the function)
           dbPlayers = teamPlayers;
         } else if (userLeagueState === 'active-user' && user) {
-          // Logged-in users with leagues: Get their actual team from Supabase
-          // If activeLeagueId is set, prefer that league's team, otherwise get any team
-          let teamQuery = supabase
-            .from('teams')
-            .select('id, league_id, team_name')
-            .eq('owner_id' as any, user.id as any);
-          
-          // If we have an active league, prefer that team
-          if (activeLeagueId) {
-            teamQuery = teamQuery.eq('league_id' as any, activeLeagueId as any);
-          }
-          
-          const { data: teamDataResult, error: teamError } = await teamQuery.maybeSingle();
-
-          if (teamError || !teamDataResult) {
-            // User doesn't have a team yet - show empty roster
+          // Logged-in users with leagues: Get their actual team via API
+          // If activeLeagueId is set, prefer that league's team
+          const targetLeagueId = activeLeagueId;
+          if (!targetLeagueId) {
+            // No active league - show empty roster
             setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
             setUserTeamId(null);
             setUserTeam(null);
@@ -545,7 +516,28 @@ const Roster = () => {
             return;
           }
 
-          userTeamData = teamDataResult as { id: string; league_id: string; team_name: string };
+          try {
+            const myTeamResponse = await leagueApi.getMyTeam(targetLeagueId);
+            const teamDataResult = myTeamResponse.data as { id: string; league_id: string; team_name: string } | null;
+
+            if (!teamDataResult) {
+              // User doesn't have a team yet - show empty roster
+              setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
+              setUserTeamId(null);
+              setUserTeam(null);
+              setLoading(false);
+              return;
+            }
+
+            userTeamData = teamDataResult;
+          } catch {
+            // User doesn't have a team yet - show empty roster
+            setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
+            setUserTeamId(null);
+            setUserTeam(null);
+            setLoading(false);
+            return;
+          }
 
           // Check if draft is completed before loading roster
           const { league: leagueData, error: leagueError } = await LeagueService.getLeague(userTeamData.league_id, user.id);
@@ -566,29 +558,23 @@ const Roster = () => {
           teamId = userTeamData.id;
           setUserTeamId(teamId);
           setUserTeam(userTeamData);
-          // Draft is completed - get roster from roster_assignments (Source of Truth)
-          const { data: rosterAssignmentsData, error: rosterError } = await supabase
-            .from('roster_assignments')
-            .select(COLUMNS.ROSTER_ASSIGNMENT_SLIM)
-            .eq('league_id' as any, userTeamData.league_id as any)
-            .eq('team_id' as any, userTeamData.id as any);
-          
-          if (rosterError) {
-            logger.error('[Roster] Error fetching roster_assignments:', rosterError);
-            // Last resort: empty roster
-            dbPlayers = [];
-          } else {
-            const rosterAssignments = (rosterAssignmentsData || []) as any[];
-            const playerIds = rosterAssignments.map((r: any) => r.player_id);
-            
+          // Draft is completed - get roster player IDs via API (Source of Truth)
+          try {
+            const rosterResponse = await rosterApi.getPlayerIds(userTeamData.league_id, userTeamData.id);
+            const playerIds = (rosterResponse.data || []) as string[];
+
             // CRITICAL: player_id is TEXT in DB, and p.id is STRING in allPlayers (PlayerService line 287)
             // Compare strings to strings directly — ensure both sides are strings
             dbPlayers = allPlayers.filter(p => playerIds.includes(String(p.id)));
-            
-            if (dbPlayers.length < rosterAssignments.length) {
+
+            if (dbPlayers.length < playerIds.length) {
               // Some players in roster_assignments were not found in PlayerService.getAllPlayers()
               // Possible causes: player_directory missing entries, player_season_stats missing entries, or Supabase row limit truncation
             }
+          } catch (rosterError) {
+            logger.error('[Roster] Error fetching roster_assignments:', rosterError);
+            // Last resort: empty roster
+            dbPlayers = [];
           }
         }
         
@@ -1254,22 +1240,14 @@ const Roster = () => {
       if (!userTeamId || !userTeam?.league_id || !selectedWeek) return;
 
       try {
-        const { data: matchups, error } = await supabase
-          .from('matchups')
-          .select('id, week_start_date, week_end_date, team1_id, team2_id, week_number')
-          .eq('league_id', userTeam.league_id)
-          .eq('week_number', selectedWeek)
-          .or(`team1_id.eq.${userTeamId},team2_id.eq.${userTeamId}`)
-          .limit(1);
+        const matchupsResponse = await matchupApi.getLeagueMatchups(userTeam.league_id, selectedWeek);
+        const allMatchups = (matchupsResponse.data || []) as any[];
+        // Filter for the user's team client-side
+        const matchups = allMatchups.filter(
+          (m: any) => m.team1_id === userTeamId || m.team2_id === userTeamId
+        );
 
-        if (error) {
-          logger.error('[Roster] Error fetching matchup for week:', error);
-          setCurrentMatchup(null);
-          setMatchupWeekDates([]);
-          return;
-        }
-
-        if (!matchups || matchups.length === 0) {
+        if (matchups.length === 0) {
           setCurrentMatchup(null);
           setMatchupWeekDates([]);
           return;
@@ -1860,15 +1838,13 @@ const Roster = () => {
 
             if (allPlayerIds.length > 0) {
                 // Fetch all future projections for these players (all 8 stat categories to match matchup system)
-                const { data: projectionsData, error: projError } = await supabase
-                    .from('player_projected_stats')
-                    .select('player_id, projected_goals, projected_assists, projected_sog, projected_blocks, projected_ppp, projected_shp, projected_hits, projected_pim, total_projected_points')
-                    .in('player_id' as any, allPlayerIds as any)
-                    .gte('projection_date', todayStr)
-                    .order('player_id', { ascending: true })
-                    .order('projection_date', { ascending: true });
+                const projResponse = await playerApi.getBatchProjections(
+                  allPlayerIds.map(String),
+                  { startDate: todayStr, season: CURRENT_SEASON }
+                );
+                const projectionsData = projResponse.data as any[] | null;
 
-                if (!projError && projectionsData) {
+                if (projectionsData) {
                     // Aggregate projections by player_id (all 8 stat categories)
                     const aggregatedProjections = new Map<number, {
                         goals: number;
@@ -3358,21 +3334,13 @@ const Roster = () => {
               // CRITICAL FIX: Use roster_assignments (source of truth), NOT draft_picks
               // draft_picks can have cross-session duplicates; roster_assignments is atomic
               const allPlayers = await PlayerService.getAllPlayers();
-              const { data: rosterData } = await supabase
-                .from('roster_assignments')
-                .select('player_id')
-                .eq('league_id', userTeam.league_id)
-                .eq('team_id', userTeam.id);
-              const playerIds = (rosterData || []).map((r: any) => r.player_id);
-              const dbPlayers = allPlayers.filter(p => playerIds.includes(p.id));
-              
-              // Get lineup from database
-              const { data: lineupDataResult } = await supabase
-                .from('team_lineups')
-                .select('starters, bench, ir, slot_assignments')
-                .eq('team_id' as any, userTeam.id as any)
-                .single();
-              const lineupData = lineupDataResult as any;
+              const rosterIdsResponse = await rosterApi.getPlayerIds(userTeam.league_id, userTeam.id);
+              const playerIds = (rosterIdsResponse.data || []) as string[];
+              const dbPlayers = allPlayers.filter(p => playerIds.includes(String(p.id)));
+
+              // Get lineup via API
+              const lineupResponse = await rosterApi.getLineup(userTeam.league_id, userTeam.id);
+              const lineupData = lineupResponse.data as any;
 
               // Transform players to HockeyPlayer format (same logic as in loadRoster)
               const transformedPlayers: HockeyPlayer[] = dbPlayers.map((p) => ({
@@ -3458,12 +3426,9 @@ const Roster = () => {
                     
                     // Check draft status FIRST - must complete draft before adding players
                     try {
-                      const { data: leagueData } = await supabase
-                        .from('leagues')
-                        .select('draft_status')
-                        .eq('id', userTeam.league_id)
-                        .single();
-                      
+                      const leagueResponse = await leagueApi.getLeague(userTeam.league_id);
+                      const leagueData = leagueResponse.data as { draft_status?: string } | null;
+
                       if (leagueData && leagueData.draft_status !== 'completed') {
                         toast({
                           title: "Draft Required",

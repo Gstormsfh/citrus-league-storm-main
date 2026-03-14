@@ -19,6 +19,23 @@ export const accountApi = {
       updated_at: string;
     }>('/api/account/profile');
   },
+  /** Check if a username is already taken. Returns { available: boolean }. */
+  checkUsername(username: string) {
+    return apiClient.get<{ available: boolean }>(`/api/account/check-username/${encodeURIComponent(username)}`);
+  },
+  /** Update the authenticated user's profile fields. */
+  updateProfile(fields: {
+    username?: string;
+    first_name?: string;
+    last_name?: string;
+    phone?: string;
+    location?: string;
+    bio?: string;
+    default_team_name?: string;
+    timezone?: string;
+  }) {
+    return apiClient.put('/api/account/profile', fields);
+  },
   exportUserData() {
     return apiClient.post('/api/account/export');
   },

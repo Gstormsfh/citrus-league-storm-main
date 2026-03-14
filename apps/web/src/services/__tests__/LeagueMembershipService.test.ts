@@ -1,40 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { supabase } from '@/integrations/supabase/client';
 
 // =============================================================================
-// Mock Supabase client
+// Mock API client modules
 // =============================================================================
 
-function createChainableMock() {
-  const chain: Record<string, any> = {};
-  chain.select = vi.fn().mockReturnValue(chain);
-  chain.insert = vi.fn().mockReturnValue(chain);
-  chain.update = vi.fn().mockReturnValue(chain);
-  chain.delete = vi.fn().mockReturnValue(chain);
-  chain.upsert = vi.fn().mockReturnValue(chain);
-  chain.eq = vi.fn().mockReturnValue(chain);
-  chain.is = vi.fn().mockReturnValue(chain);
-  chain.in = vi.fn().mockReturnValue(chain);
-  chain.or = vi.fn().mockReturnValue(chain);
-  chain.order = vi.fn().mockReturnValue(chain);
-  chain.limit = vi.fn().mockReturnValue(chain);
-  chain.gte = vi.fn().mockReturnValue(chain);
-  chain.lte = vi.fn().mockReturnValue(chain);
-  chain.single = vi.fn().mockResolvedValue({ data: null, error: null });
-  chain.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
-  return chain;
-}
+const mockGetLeague = vi.fn();
+const mockGetTeams = vi.fn();
 
-let mockChain = createChainableMock();
-
-vi.mock('@/integrations/supabase/client', () => ({
-  supabase: {
-    from: vi.fn(() => mockChain),
-    rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
-    auth: {
-      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }),
-      getSession: vi.fn().mockResolvedValue({ data: { session: { access_token: 'mock-token' } } }),
-    },
+vi.mock('@/api/leagues', () => ({
+  leagueApi: {
+    getLeague: (...args: unknown[]) => mockGetLeague(...args),
+    getTeams: (...args: unknown[]) => mockGetTeams(...args),
   },
 }));
 
@@ -55,7 +31,6 @@ let clearMembershipCache: typeof import('../LeagueMembershipService').clearMembe
 
 beforeEach(async () => {
   vi.clearAllMocks();
-  mockChain = createChainableMock();
 
   const mod = await import('../LeagueMembershipService');
   LeagueMembershipService = mod.LeagueMembershipService;
@@ -63,8 +38,6 @@ beforeEach(async () => {
 
   // Always clear cache before each test to avoid stale results
   clearMembershipCache();
-
-  (supabase.from as ReturnType<typeof vi.fn>).mockReturnValue(mockChain);
 });
 
 // =============================================================================
@@ -72,35 +45,23 @@ beforeEach(async () => {
 // =============================================================================
 
 /**
- * Set up from() mock to return different chains for leagues and teams tables.
+ * Set up API mocks to return appropriate league and teams data.
  */
 function mockMembershipQueries(options: {
   isCommissioner: boolean;
   hasTeam: boolean;
   teamId?: string;
 }) {
-  // supabase is imported at module level (mocked via vi.mock)
+  mockGetLeague.mockResolvedValue({
+    data: options.isCommissioner
+      ? { commissioner_id: 'user-1' }
+      : { commissioner_id: 'other-user' },
+  });
 
-  (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
-    const chain = createChainableMock();
-
-    if (table === 'leagues') {
-      chain.single.mockResolvedValue({
-        data: options.isCommissioner
-          ? { commissioner_id: 'user-1' }
-          : { commissioner_id: 'other-user' },
-        error: null,
-      });
-    } else if (table === 'teams') {
-      chain.maybeSingle.mockResolvedValue({
-        data: options.hasTeam
-          ? { id: options.teamId || 'team-1' }
-          : null,
-        error: null,
-      });
-    }
-
-    return chain;
+  mockGetTeams.mockResolvedValue({
+    data: options.hasTeam
+      ? [{ id: options.teamId || 'team-1', owner_id: 'user-1' }]
+      : [{ id: 'team-other', owner_id: 'other-user' }],
   });
 }
 
@@ -133,7 +94,12 @@ describe('LeagueMembershipService', () => {
     });
 
     it('returns isMember=false for non-member', async () => {
-      mockMembershipQueries({ isCommissioner: false, hasTeam: false });
+      mockGetLeague.mockResolvedValue({
+        data: { commissioner_id: 'other-user' },
+      });
+      mockGetTeams.mockResolvedValue({
+        data: [{ id: 'team-other', owner_id: 'other-user' }],
+      });
 
       const result = await LeagueMembershipService.checkMembership('league-1', 'user-1');
 
@@ -155,11 +121,8 @@ describe('LeagueMembershipService', () => {
     });
 
     it('fails closed (denies access) on unexpected error', async () => {
-      // supabase is imported at module level (mocked via vi.mock)
-
-      (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
-        throw new Error('Unexpected database failure');
-      });
+      mockGetLeague.mockRejectedValue(new Error('Unexpected API failure'));
+      mockGetTeams.mockRejectedValue(new Error('Unexpected API failure'));
 
       const result = await LeagueMembershipService.checkMembership('league-1', 'user-1');
 
@@ -170,18 +133,16 @@ describe('LeagueMembershipService', () => {
     it('uses cached result on second call within TTL', async () => {
       mockMembershipQueries({ isCommissioner: false, hasTeam: true });
 
-      // supabase is imported at module level (mocked via vi.mock)
-
       const result1 = await LeagueMembershipService.checkMembership('league-1', 'user-1');
       expect(result1.isMember).toBe(true);
 
       // Second call should use cache
-      const callCountBefore = (supabase.from as ReturnType<typeof vi.fn>).mock.calls.length;
+      const callCountBefore = mockGetLeague.mock.calls.length;
       const result2 = await LeagueMembershipService.checkMembership('league-1', 'user-1');
-      const callCountAfter = (supabase.from as ReturnType<typeof vi.fn>).mock.calls.length;
+      const callCountAfter = mockGetLeague.mock.calls.length;
 
       expect(result2.isMember).toBe(true);
-      expect(callCountAfter).toBe(callCountBefore); // No additional DB calls
+      expect(callCountAfter).toBe(callCountBefore); // No additional API calls
     });
   });
 
@@ -197,7 +158,8 @@ describe('LeagueMembershipService', () => {
     });
 
     it('returns false for a non-member', async () => {
-      mockMembershipQueries({ isCommissioner: false, hasTeam: false });
+      mockGetLeague.mockResolvedValue({ data: { commissioner_id: 'other-user' } });
+      mockGetTeams.mockResolvedValue({ data: [{ id: 'team-other', owner_id: 'other-user' }] });
 
       const result = await LeagueMembershipService.verifyMembership('league-1', 'user-1');
       expect(result).toBe(false);
@@ -217,7 +179,8 @@ describe('LeagueMembershipService', () => {
     });
 
     it('throws Access denied for a non-member', async () => {
-      mockMembershipQueries({ isCommissioner: false, hasTeam: false });
+      mockGetLeague.mockResolvedValue({ data: { commissioner_id: 'other-user' } });
+      mockGetTeams.mockResolvedValue({ data: [{ id: 'team-other', owner_id: 'other-user' }] });
 
       await expect(
         LeagueMembershipService.requireMembership('league-1', 'user-1')
@@ -265,7 +228,8 @@ describe('LeagueMembershipService', () => {
     });
 
     it('returns none for a non-member', async () => {
-      mockMembershipQueries({ isCommissioner: false, hasTeam: false });
+      mockGetLeague.mockResolvedValue({ data: { commissioner_id: 'other-user' } });
+      mockGetTeams.mockResolvedValue({ data: [{ id: 'team-other', owner_id: 'other-user' }] });
 
       const role = await LeagueMembershipService.getUserRole('league-1', 'user-1');
       expect(role).toBe('none');
@@ -314,21 +278,19 @@ describe('LeagueMembershipService', () => {
   // clearMembershipCache
   // ---------------------------------------------------------------------------
   describe('clearMembershipCache', () => {
-    it('clears cache for a specific user/league so next call hits DB', async () => {
+    it('clears cache for a specific user/league so next call hits API', async () => {
       mockMembershipQueries({ isCommissioner: false, hasTeam: true });
-
-      // supabase is imported at module level (mocked via vi.mock)
 
       // Populate cache
       await LeagueMembershipService.checkMembership('league-1', 'user-1');
-      const callCount1 = (supabase.from as ReturnType<typeof vi.fn>).mock.calls.length;
+      const callCount1 = mockGetLeague.mock.calls.length;
 
       // Clear cache
       clearMembershipCache('league-1', 'user-1');
 
-      // Next call should hit DB again
+      // Next call should hit API again
       await LeagueMembershipService.checkMembership('league-1', 'user-1');
-      const callCount2 = (supabase.from as ReturnType<typeof vi.fn>).mock.calls.length;
+      const callCount2 = mockGetLeague.mock.calls.length;
 
       expect(callCount2).toBeGreaterThan(callCount1);
     });

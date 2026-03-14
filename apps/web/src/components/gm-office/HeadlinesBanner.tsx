@@ -2,12 +2,11 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import { MatchupService } from '@/services/MatchupService';
-import { LeagueService } from '@/services/LeagueService';
 import { getCurrentWeekNumber, getFirstWeekStartDate, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
-import { supabase } from '@/integrations/supabase/client';
+import { leagueApi } from '@/api/leagues';
+import { matchupApi } from '@/api/matchups';
 import { AlertCircle, Clock, TrendingUp, TrendingDown } from 'lucide-react';
 import { CitrusSparkle, CitrusWedge } from '@/components/icons/CitrusIcons';
-import { COLUMNS } from '@/utils/queryColumns';
 import { logger } from '@/utils/logger';
 
 interface HeadlineItem {
@@ -32,19 +31,17 @@ export const HeadlinesBanner = () => {
       try {
         const headlines: HeadlineItem[] = [];
 
+        // Fetch user's team and all league teams once upfront
+        const { data: userTeam } = await leagueApi.getMyTeam(activeLeagueId) as { data: { id: string; team_name: string } | null };
+        const { data: allTeams } = await leagueApi.getTeams(activeLeagueId) as { data: Array<{ id: string; team_name: string }> | null };
+        const teamsMap = new Map<string, string>();
+        (allTeams || []).forEach((t: { id: string; team_name: string }) => teamsMap.set(t.id, t.team_name));
+
         // 1. Check for upcoming matchup
         try {
           const draftCompletionDate = activeLeague.updated_at ? new Date(activeLeague.updated_at) : new Date();
           const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
           const currentWeek = getCurrentWeekNumber(firstWeekStart);
-          
-          // Get user's team
-          const { data: userTeam } = await (supabase
-            .from('teams')
-            .select('id, team_name') as any)
-            .eq('league_id', activeLeagueId)
-            .eq('owner_id', user.id)
-            .maybeSingle() as { data: { id: string; team_name: string } | null };
 
           if (userTeam) {
             // Get current week matchup
@@ -65,13 +62,7 @@ export const HeadlinesBanner = () => {
                 const opponentId = matchup.team1_id === userTeam.id ? matchup.team2_id : matchup.team1_id;
 
                 if (opponentId) {
-                  const { data: opponentTeam } = await (supabase
-                    .from('teams')
-                    .select('team_name') as any)
-                    .eq('id', opponentId)
-                    .maybeSingle() as { data: { team_name: string } | null };
-
-                  const opponentName = opponentTeam?.team_name || 'Opponent';
+                  const opponentName = teamsMap.get(opponentId) || 'Opponent';
                   headlines.push({
                     type: 'matchup',
                     message: `Next Matchup: vs. ${opponentName} (Starts in ${daysUntil} day${daysUntil !== 1 ? 's' : ''})`,
@@ -82,13 +73,7 @@ export const HeadlinesBanner = () => {
                 // Matchup is active
                 const opponentId = matchup.team1_id === userTeam.id ? matchup.team2_id : matchup.team1_id;
                 if (opponentId) {
-                  const { data: opponentTeam } = await (supabase
-                    .from('teams')
-                    .select('team_name') as any)
-                    .eq('id', opponentId)
-                    .maybeSingle() as { data: { team_name: string } | null };
-
-                  const opponentName = opponentTeam?.team_name || 'Opponent';
+                  const opponentName = teamsMap.get(opponentId) || 'Opponent';
                   headlines.push({
                     type: 'matchup',
                     message: `Matchup in Progress: vs. ${opponentName}`,
@@ -104,35 +89,28 @@ export const HeadlinesBanner = () => {
 
         // 2. Calculate team streak
         try {
-          const { data: userTeam } = await (supabase
-            .from('teams')
-            .select('id') as any)
-            .eq('league_id', activeLeagueId)
-            .eq('owner_id', user.id)
-            .maybeSingle() as { data: { id: string } | null };
-
           if (userTeam) {
             const record = await MatchupService.getTeamRecord(userTeam.id, activeLeagueId, user.id);
 
-            // Get recent matchups to calculate streak
-            const { data: recentMatchups } = await (supabase
-              .from('matchups')
-              .select(COLUMNS.MATCHUP) as any)
-              .eq('league_id', activeLeagueId)
-              .eq('status', 'completed')
-              .or(`team1_id.eq.${userTeam.id},team2_id.eq.${userTeam.id}`)
-              .order('week_number', { ascending: false })
-              .limit(7);
+            // Get all league matchups and filter client-side for completed ones involving this team
+            const { data: allMatchups } = await matchupApi.getLeagueMatchups(activeLeagueId);
+            const recentMatchups = ((allMatchups || []) as any[])
+              .filter((m: any) =>
+                m.status === 'completed' &&
+                (m.team1_id === userTeam.id || m.team2_id === userTeam.id)
+              )
+              .sort((a: any, b: any) => (b.week_number || 0) - (a.week_number || 0))
+              .slice(0, 7);
 
-            if (recentMatchups && recentMatchups.length > 0) {
+            if (recentMatchups.length > 0) {
               let streak = 0;
               let isWinStreak = true;
-              
+
               for (const matchup of recentMatchups) {
                 const isTeam1 = matchup.team1_id === userTeam.id;
                 const myScore = isTeam1 ? matchup.team1_score : matchup.team2_score;
                 const oppScore = isTeam1 ? matchup.team2_score : matchup.team1_score;
-                
+
                 if (streak === 0) {
                   isWinStreak = myScore > oppScore;
                   streak = 1;

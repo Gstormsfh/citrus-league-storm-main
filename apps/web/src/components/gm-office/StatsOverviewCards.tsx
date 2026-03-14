@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import { LeagueService, type Team } from '@/services/LeagueService';
 import { PlayerService } from '@/services/PlayerService';
-import { supabase } from '@/integrations/supabase/client';
+import { draftApi } from '@/api/draft';
 import { Trophy, TrendingUp, Shield } from 'lucide-react';
 import { CitrusSparkle, CitrusBurst, CitrusLeaf } from '@/components/icons/CitrusIcons';
 import { logger } from '@/utils/logger';
@@ -47,10 +47,7 @@ export const StatsOverviewCards = () => {
         }
 
         // Fetch draft picks and players for standings calculation
-        const { data: draftPicksData } = await (supabase as any)
-          .from('draft_picks')
-          .select('team_id, player_id')
-          .eq('league_id', activeLeagueId);
+        const { data: draftPicksData } = await draftApi.getDraftPicks(activeLeagueId);
         const draftPicks = (draftPicksData || []) as Array<{ team_id: string; player_id: string }>;
         const allPlayers = await PlayerService.getAllPlayers();
 

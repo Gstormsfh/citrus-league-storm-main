@@ -3,7 +3,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { LeagueService, League, Team } from '@/services/LeagueService';
 import { WaiverService } from '@/services/WaiverService';
-import { supabase } from '@/integrations/supabase/client';
+import { leagueApi } from '@/api/leagues';
+import { rosterApi } from '@/api/rosters';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
@@ -328,15 +329,11 @@ const LeagueDashboard = () => {
         const counts: Record<string, number> = {};
         
         for (const team of teams) {
-          const { count, error } = await supabase
-            .from('roster_assignments')
-            .select('*', { count: 'exact', head: true })
-            .eq('league_id', leagueId)
-            .eq('team_id', team.id);
-          
-          if (!error && count !== null) {
-            counts[team.id] = count;
-          } else {
+          try {
+            const response = await rosterApi.getPlayerIds(leagueId, team.id);
+            const playerIds = (response.data || []) as unknown[];
+            counts[team.id] = playerIds.length;
+          } catch {
             counts[team.id] = 0;
           }
         }
@@ -372,19 +369,13 @@ const LeagueDashboard = () => {
         // Also persist transaction limits into JSONB settings column
         if (saved) {
           const { weeklyAddLimit = 0, seasonAddLimit = 0 } = waiverSettings;
-          const { data: currentLeague } = await supabase
-            .from('leagues')
-            .select('settings')
-            .eq('id', leagueId)
-            .single();
+          const leagueResponse = await leagueApi.getLeague(leagueId);
+          const currentLeague = leagueResponse.data as Record<string, unknown> | undefined;
           if (currentLeague) {
             const currentSettings = (currentLeague.settings as LeagueSettings) || {};
-            await supabase
-              .from('leagues')
-              .update({
-                settings: { ...currentSettings, weeklyAddLimit, seasonAddLimit },
-              })
-              .eq('id', leagueId);
+            await leagueApi.updateSettings(leagueId, {
+              settings: { ...currentSettings, weeklyAddLimit, seasonAddLimit },
+            });
           }
         }
       } else if (activeSettingsTab === 'scoring') {
@@ -518,13 +509,13 @@ const LeagueDashboard = () => {
     setSyncingRosters(true);
     try {
       // Step 1: Sync roster_assignments from draft_picks
-      const { data: syncResult, error: syncError } = await (supabase
-        .rpc as any)('sync_roster_assignments_for_league', { p_league_id: leagueId });
+      const syncResponse = await rosterApi.syncRosters(leagueId);
+      const syncResult = syncResponse.data;
 
-      if (syncError) {
+      if (!syncResult) {
         toast({
           title: 'Error',
-          description: syncError.message || 'Failed to sync rosters',
+          description: 'Failed to sync rosters',
           variant: 'destructive',
         });
         return;

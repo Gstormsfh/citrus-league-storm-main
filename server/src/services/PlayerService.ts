@@ -32,19 +32,26 @@ interface PlayerStatsRow {
   nhl_ppp: number;
   nhl_shp: number;
   nhl_plus_minus: number;
+  nhl_toi_seconds: number;
   goalie_gp: number;
   nhl_wins: number;
   nhl_losses: number;
+  nhl_ot_losses: number;
   nhl_saves: number;
   nhl_save_pct: number;
   nhl_gaa: number;
   nhl_shutouts: number;
+  nhl_shots_faced: number;
+  nhl_goals_against: number;
+  x_goals: number;
 }
 
 interface TalentMetricsRow {
   player_id: number;
   xg_per_60: number | null;
   xg_rating: string | null;
+  roster_status: string | null;
+  is_ir_eligible: boolean | null;
 }
 
 interface GoalieGsaxRow {
@@ -61,6 +68,8 @@ interface NormalizedPlayer {
   headshot_url: string | null;
   is_goalie: boolean;
   status: string;
+  roster_status: string | null;
+  is_ir_eligible: boolean;
   eligible_positions: string[];
   games_played: number;
   goals: number;
@@ -73,10 +82,15 @@ interface NormalizedPlayer {
   ppp: number;
   shp: number;
   plus_minus: number;
+  icetime_seconds: number;
+  x_goals: number;
   goalie_gp: number;
   wins: number;
   losses: number;
+  ot_losses: number;
   saves: number;
+  shots_faced: number;
+  goals_against: number;
   save_pct: number;
   gaa: number;
   shutouts: number;
@@ -90,6 +104,8 @@ let playersCache: { data: NormalizedPlayer[]; timestamp: number } | null = null;
 const CACHE_TTL = 5 * 60 * 1000;
 
 function buildPlayer(p: PlayerDirectoryRow, stat: Partial<PlayerStatsRow>, talent?: Partial<TalentMetricsRow>, goalieGsax?: GoalieGsaxRow): NormalizedPlayer {
+  // Prefer talent metrics roster_status (from player_talent_metrics) over directory roster_status
+  const rosterStatus = talent?.roster_status ?? p.roster_status ?? null;
   return {
     id: p.player_id,
     full_name: p.full_name,
@@ -98,12 +114,14 @@ function buildPlayer(p: PlayerDirectoryRow, stat: Partial<PlayerStatsRow>, talen
     jersey_number: p.sweater_number,
     headshot_url: p.headshot_url,
     is_goalie: p.position_code === 'G',
-    status: p.roster_status === 'IR' || p.roster_status === 'LTIR' ? 'injured' : 'active',
+    status: rosterStatus === 'IR' || rosterStatus === 'LTIR' ? 'injured' : 'active',
+    roster_status: rosterStatus,
+    is_ir_eligible: talent?.is_ir_eligible || false,
     eligible_positions: p.eligible_positions || [p.position_code],
     games_played: stat.games_played || 0,
     goals: stat.nhl_goals || 0,
     assists: stat.nhl_assists || 0,
-    points: stat.nhl_points || 0,
+    points: (stat.nhl_goals || 0) + (stat.nhl_assists || 0),
     shots: stat.nhl_shots_on_goal || 0,
     hits: stat.nhl_hits || 0,
     blocks: stat.nhl_blocks || 0,
@@ -111,10 +129,15 @@ function buildPlayer(p: PlayerDirectoryRow, stat: Partial<PlayerStatsRow>, talen
     ppp: stat.nhl_ppp || 0,
     shp: stat.nhl_shp || 0,
     plus_minus: stat.nhl_plus_minus || 0,
+    icetime_seconds: stat.nhl_toi_seconds || 0,
+    x_goals: stat.x_goals || 0,
     goalie_gp: stat.goalie_gp || 0,
     wins: stat.nhl_wins || 0,
     losses: stat.nhl_losses || 0,
+    ot_losses: stat.nhl_ot_losses || 0,
     saves: stat.nhl_saves || 0,
+    shots_faced: stat.nhl_shots_faced || 0,
+    goals_against: stat.nhl_goals_against || 0,
     save_pct: stat.nhl_save_pct || 0,
     gaa: stat.nhl_gaa || 0,
     shutouts: stat.nhl_shutouts || 0,
@@ -202,16 +225,30 @@ export class PlayerService {
 
     const dirIds = ((directory || []) as unknown as PlayerDirectoryRow[]).map((p) => p.player_id);
 
-    const { data: stats } = await this.supabase
-      .from('player_season_stats')
-      .select(COLUMNS.PLAYER_STATS)
-      .in('player_id', dirIds);
+    const [{ data: stats }, { data: talents }, { data: gsax }] = await Promise.all([
+      this.supabase
+        .from('player_season_stats')
+        .select(COLUMNS.PLAYER_STATS)
+        .in('player_id', dirIds),
+      this.supabase
+        .from('player_talent_metrics')
+        .select(COLUMNS.PLAYER_TALENT_METRICS)
+        .in('player_id', dirIds),
+      this.supabase
+        .from('goalie_gsax_primary')
+        .select(COLUMNS.GOALIE_GSAX)
+        .in('player_id', dirIds),
+    ]);
 
     const statsMap = new Map(((stats || []) as unknown as PlayerStatsRow[]).map((s) => [s.player_id, s]));
+    const talentMap = new Map(((talents || []) as unknown as TalentMetricsRow[]).map((t) => [t.player_id, t]));
+    const gsaxMap = new Map(((gsax || []) as unknown as GoalieGsaxRow[]).map((g) => [g.player_id, g]));
 
     const players = ((directory || []) as unknown as PlayerDirectoryRow[]).map((p) => {
       const stat = statsMap.get(p.player_id) || {};
-      return buildPlayer(p, stat);
+      const talent = talentMap.get(p.player_id) || {};
+      const goalieGsax = gsaxMap.get(p.player_id);
+      return buildPlayer(p, stat, talent, goalieGsax);
     });
 
     return { players, error: null };

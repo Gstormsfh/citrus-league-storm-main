@@ -213,6 +213,35 @@ waiverRoutes.post('/league/:leagueId/drop-player', membershipMiddleware, validat
   return ok(c, { success: true });
 });
 
+// POST /api/waivers/league/:leagueId/initialize-priority — Initialize waiver priority
+waiverRoutes.post('/league/:leagueId/initialize-priority', membershipMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+
+  try {
+    const body = await c.req.json();
+    const teamId = body.teamId;
+    if (!teamId) {
+      return fail(c, AppError.badRequest('teamId is required'));
+    }
+
+    const supabase = createUserClient(c.get('userToken'));
+    const { error } = await supabase.rpc('create_waiver_priority_for_team', {
+      p_league_id: leagueId,
+      p_team_id: teamId,
+    });
+
+    if (error) {
+      const msg = getErrorMessage(error);
+      logger.error('[waivers] Failed to initialize waiver priority:', msg);
+      return handleError(c, error, 'Failed to initialize waiver priority');
+    }
+
+    return ok(c, { success: true });
+  } catch (err) {
+    return handleError(c, err, 'Failed to initialize waiver priority');
+  }
+});
+
 // DELETE /api/waivers/:claimId — Cancel a waiver claim
 waiverRoutes.delete('/:claimId', async (c) => {
   const claimId = c.req.param('claimId');

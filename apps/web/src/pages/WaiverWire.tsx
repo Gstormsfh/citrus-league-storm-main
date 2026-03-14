@@ -16,7 +16,9 @@ import { CitrusSparkle, CitrusLeaf, CitrusWedge } from '@/components/icons/Citru
 import { WaiverService, type WaiverClaim, type WaiverPriority } from '@/services/WaiverService';
 import { PlayerService, type Player } from '@/services/PlayerService';
 import { LeagueService } from '@/services/LeagueService';
-import { supabase } from '@/integrations/supabase/client';
+import { leagueApi } from '@/api/leagues';
+import { rosterApi } from '@/api/rosters';
+import { waiverApi } from '@/api/waivers';
 import { useToast } from '@/hooks/use-toast';
 import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
@@ -58,12 +60,7 @@ const WaiverWire = () => {
     setLoading(true);
     try {
       // Get user's team
-      const { data: team } = await supabase
-        .from('teams')
-        .select('id')
-        .eq('league_id', activeLeagueId)
-        .eq('owner_id', user.id)
-        .maybeSingle();
+      const { data: team } = await leagueApi.getMyTeam(activeLeagueId) as { data?: { id: string } };
 
       if (team) {
         setMyTeamId(team.id);
@@ -98,12 +95,7 @@ const WaiverWire = () => {
         }
 
         // Load roster for drop selection (team_lineups uses JSONB arrays)
-        const { data: lineup } = await supabase
-          .from('team_lineups')
-          .select('starters, bench, ir')
-          .eq('team_id', team.id)
-          .eq('league_id', activeLeagueId)
-          .maybeSingle();
+        const { data: lineup } = await rosterApi.getLineup(activeLeagueId, team.id) as { data?: { starters: string[]; bench: string[]; ir: string[] } };
         
         if (lineup) {
           // Get all player IDs from JSONB arrays
@@ -137,11 +129,8 @@ const WaiverWire = () => {
       const maxTeams = league?.settings?.teamsCount || 12;
 
       // Get actual team count from teams table (more reliable than waiver_priority length)
-      const { data: teams, error: teamsError } = await supabase
-        .from('teams')
-        .select('id')
-        .eq('league_id', activeLeagueId);
-      const actualTeamCount = teams?.length || 0;
+      const { data: teams } = await leagueApi.getTeams(activeLeagueId) as { data?: { id: string }[] };
+      const actualTeamCount = Array.isArray(teams) ? teams.length : 0;
       setTeamCount(actualTeamCount);
 
       // Load waiver priority
@@ -154,15 +143,10 @@ const WaiverWire = () => {
       // If no priority record exists, create one (for existing teams that predate the trigger)
       if (team && !myPrio && actualTeamCount > 0) {
         try {
-          // Use RPC function to create priority (bypasses RLS)
-          const { data: rpcResult, error: rpcError } = await supabase
-            .rpc('create_waiver_priority_for_team', {
-              p_league_id: activeLeagueId,
-              p_team_id: team.id
-            });
-          
+          // Use API to create priority
+          const { data: rpcResult } = await waiverApi.initializePriority(activeLeagueId, team.id);
 
-          if (!rpcError && rpcResult && rpcResult.length > 0) {
+          if (rpcResult && Array.isArray(rpcResult) && rpcResult.length > 0) {
             const result = rpcResult[0];
 
             if (result.success && result.priority) {
@@ -181,7 +165,7 @@ const WaiverWire = () => {
               setMyPriority(null);
             }
           } else {
-            logger.error('Error calling create_waiver_priority_for_team:', rpcError);
+            logger.error('Error calling initialize-priority: unexpected response', rpcResult);
             setMyPriority(null);
           }
         } catch (error) {
@@ -248,12 +232,8 @@ const WaiverWire = () => {
 
     // Check draft status FIRST - must complete draft before adding players
     try {
-      const { data: leagueData } = await supabase
-        .from('leagues')
-        .select('draft_status')
-        .eq('id', activeLeagueId)
-        .single();
-      
+      const { data: leagueData } = await leagueApi.getLeague(activeLeagueId) as { data?: { draft_status: string } };
+
       if (leagueData && leagueData.draft_status !== 'completed') {
         toast({
           title: "Draft Required",

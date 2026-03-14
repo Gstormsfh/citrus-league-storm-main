@@ -417,6 +417,84 @@ export class LeagueService {
     return { transactions: data || [], error };
   }
 
+  /** Update keeper/dynasty settings (commissioner only, locked after draft) */
+  async updateKeeperSettings(
+    leagueId: string,
+    userId: string,
+    keeperSettings: { keeperEnabled: boolean; keeperCount: number; keeperPenalty: string; dynastyMode: boolean },
+  ) {
+    await this.membership.requireCommissioner(leagueId, userId);
+
+    const { data: league } = await this.supabase
+      .from('leagues')
+      .select('settings, draft_status')
+      .eq('id', leagueId)
+      .single();
+
+    if (league?.draft_status === 'completed') {
+      return { success: false, error: 'Keeper settings cannot be changed after the draft is completed' };
+    }
+
+    const currentSettings = league?.settings || {};
+    const { error } = await this.supabase
+      .from('leagues')
+      .update({
+        settings: {
+          ...currentSettings,
+          keeperEnabled: keeperSettings.keeperEnabled,
+          keeperCount: keeperSettings.keeperCount,
+          keeperPenalty: keeperSettings.keeperPenalty,
+          dynastyMode: keeperSettings.dynastyMode,
+        },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', leagueId);
+
+    if (!error) {
+      await this.notifyLeagueMembers(leagueId, 'Commissioner updated keeper/dynasty settings.');
+    }
+
+    return { success: !error, error };
+  }
+
+  /** Update category settings (commissioner only, locked after draft) */
+  async updateCategorySettings(
+    leagueId: string,
+    userId: string,
+    categories: string[],
+  ) {
+    await this.membership.requireCommissioner(leagueId, userId);
+
+    if (!categories || categories.length < 2) {
+      return { success: false, error: 'At least 2 categories are required' };
+    }
+
+    const { data: league } = await this.supabase
+      .from('leagues')
+      .select('settings, draft_status')
+      .eq('id', leagueId)
+      .single();
+
+    if (league?.draft_status === 'completed') {
+      return { success: false, error: 'Category settings cannot be changed after the draft is completed' };
+    }
+
+    const currentSettings = league?.settings || {};
+    const { error } = await this.supabase
+      .from('leagues')
+      .update({
+        settings: { ...currentSettings, categories },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', leagueId);
+
+    if (!error) {
+      await this.notifyLeagueMembers(leagueId, `Commissioner updated stat categories (${categories.length} categories).`);
+    }
+
+    return { success: !error, error };
+  }
+
   /** Notify all league members via RPC (with fallback) */
   async notifyLeagueMembers(leagueId: string, message: string, title?: string) {
     try {

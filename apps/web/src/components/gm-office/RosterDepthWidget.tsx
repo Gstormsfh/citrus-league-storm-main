@@ -2,9 +2,9 @@ import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { supabase } from '@/integrations/supabase/client';
+import { leagueApi } from '@/api/leagues';
+import { rosterApi } from '@/api/rosters';
 import { PlayerService, Player } from '@/services/PlayerService';
-import { LeagueService } from '@/services/LeagueService';
 import { Loader2 } from 'lucide-react';
 import { logger } from '@/utils/logger';
 
@@ -93,14 +93,9 @@ export const RosterDepthWidget = () => {
         setLoading(true);
 
         // Get user's team
-        const { data: userTeam, error: teamError } = await supabase
-          .from('teams')
-          .select('id, league_id')
-          .eq('league_id' as any, activeLeagueId as any)
-          .eq('owner_id' as any, user.id as any)
-          .maybeSingle();
+        const { data: userTeam } = await leagueApi.getMyTeam(activeLeagueId) as { data: { id: string; league_id: string } | null };
 
-        if (teamError || !userTeam) {
+        if (!userTeam) {
           setLoading(false);
           return;
         }
@@ -115,27 +110,17 @@ export const RosterDepthWidget = () => {
         const allPlayers = await PlayerService.getAllPlayers();
 
         // Use roster_assignments (source of truth) instead of draft_picks
-        const { data: rosterAssignments, error: picksError } = await supabase
-          .from('roster_assignments')
-          .select('player_id')
-          .eq('league_id' as any, activeLeagueId as any)
-          .eq('team_id' as any, (userTeam as any).id as any);
+        const { data: rosterPlayerIds } = await rosterApi.getPlayerIds(activeLeagueId, userTeam.id) as { data: string[] | null };
 
         let rosterPlayers: Player[] = [];
 
-        if (picksError) {
-          logger.error('Error fetching roster assignments:', picksError);
+        if (!rosterPlayerIds || rosterPlayerIds.length === 0) {
           setLoading(false);
           return;
-        } else {
-          if (!rosterAssignments || rosterAssignments.length === 0) {
-            setLoading(false);
-            return;
-          }
-
-          const playerIds = (rosterAssignments as any[]).map((r: { player_id: string }) => String(r.player_id));
-          rosterPlayers = allPlayers.filter(p => playerIds.includes(String(p.id)));
         }
+
+        const playerIds = (rosterPlayerIds as any[]).map((id: unknown) => String(id));
+        rosterPlayers = allPlayers.filter(p => playerIds.includes(String(p.id)));
 
         if (rosterPlayers.length === 0) {
           setLoading(false);

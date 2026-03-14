@@ -1,39 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // =============================================================================
-// Mock Supabase client
+// Mock schedule API client
 // =============================================================================
 
-function createChainableMock() {
-  const chain: Record<string, any> = {};
-  chain.select = vi.fn().mockReturnValue(chain);
-  chain.insert = vi.fn().mockReturnValue(chain);
-  chain.update = vi.fn().mockReturnValue(chain);
-  chain.delete = vi.fn().mockReturnValue(chain);
-  chain.upsert = vi.fn().mockReturnValue(chain);
-  chain.eq = vi.fn().mockReturnValue(chain);
-  chain.is = vi.fn().mockReturnValue(chain);
-  chain.in = vi.fn().mockReturnValue(chain);
-  chain.or = vi.fn().mockReturnValue(chain);
-  chain.order = vi.fn().mockReturnValue(chain);
-  chain.limit = vi.fn().mockReturnValue(chain);
-  chain.gte = vi.fn().mockReturnValue(chain);
-  chain.lte = vi.fn().mockReturnValue(chain);
-  chain.single = vi.fn().mockResolvedValue({ data: null, error: null });
-  chain.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
-  return chain;
-}
+const mockGetGames = vi.fn();
+const mockGetGamesForTeams = vi.fn();
 
-let mockChain = createChainableMock();
-
-vi.mock('@/integrations/supabase/client', () => ({
-  supabase: {
-    from: vi.fn(() => mockChain),
-    rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
-    auth: {
-      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }),
-      getSession: vi.fn().mockResolvedValue({ data: { session: { access_token: 'mock-token' } } }),
-    },
+vi.mock('@/api/schedule', () => ({
+  scheduleApi: {
+    getGames: (...args: unknown[]) => mockGetGames(...args),
+    getGamesForTeams: (...args: unknown[]) => mockGetGamesForTeams(...args),
+    getNextGame: vi.fn(),
+    getFantasyWeeks: vi.fn(),
+    clearCache: vi.fn(),
   },
 }));
 
@@ -62,13 +42,9 @@ let GameLockService: typeof import('../GameLockService').GameLockService;
 
 beforeEach(async () => {
   vi.clearAllMocks();
-  mockChain = createChainableMock();
 
   const mod = await import('../GameLockService');
   GameLockService = mod.GameLockService;
-
-  const { supabase } = await import('@/integrations/supabase/client');
-  (supabase.from as ReturnType<typeof vi.fn>).mockReturnValue(mockChain);
 });
 
 // =============================================================================
@@ -81,7 +57,7 @@ describe('GameLockService', () => {
   // ---------------------------------------------------------------------------
   describe('isPlayerLocked', () => {
     it('returns unlocked when no game is scheduled', async () => {
-      mockChain.maybeSingle.mockResolvedValue({ data: null, error: null });
+      mockGetGames.mockResolvedValue({ data: [] });
 
       const result = await GameLockService.isPlayerLocked('player-1', 'EDM');
 
@@ -90,13 +66,16 @@ describe('GameLockService', () => {
     });
 
     it('returns locked when game status is final', async () => {
-      mockChain.maybeSingle.mockResolvedValue({
-        data: {
-          game_time: '2026-01-15T02:00:00Z',
-          status: 'final',
-          game_date: '2026-01-15',
-        },
-        error: null,
+      mockGetGames.mockResolvedValue({
+        data: [
+          {
+            game_time: '2026-01-15T02:00:00Z',
+            status: 'final',
+            home_team: 'EDM',
+            away_team: 'CGY',
+            game_date: '2026-01-15',
+          },
+        ],
       });
 
       const result = await GameLockService.isPlayerLocked('player-1', 'EDM');
@@ -108,13 +87,16 @@ describe('GameLockService', () => {
     });
 
     it('returns locked when game status is live', async () => {
-      mockChain.maybeSingle.mockResolvedValue({
-        data: {
-          game_time: '2026-01-15T00:00:00Z',
-          status: 'live',
-          game_date: '2026-01-15',
-        },
-        error: null,
+      mockGetGames.mockResolvedValue({
+        data: [
+          {
+            game_time: '2026-01-15T00:00:00Z',
+            status: 'live',
+            home_team: 'TOR',
+            away_team: 'MTL',
+            game_date: '2026-01-15',
+          },
+        ],
       });
 
       const result = await GameLockService.isPlayerLocked('player-1', 'TOR');
@@ -124,15 +106,17 @@ describe('GameLockService', () => {
     });
 
     it('returns locked when game is scheduled but game_time has passed', async () => {
-      // Use a time that is definitely in the past
       const pastTime = new Date(Date.now() - 3600000).toISOString(); // 1 hour ago
-      mockChain.maybeSingle.mockResolvedValue({
-        data: {
-          game_time: pastTime,
-          status: 'scheduled',
-          game_date: '2026-01-15',
-        },
-        error: null,
+      mockGetGames.mockResolvedValue({
+        data: [
+          {
+            game_time: pastTime,
+            status: 'scheduled',
+            home_team: 'EDM',
+            away_team: 'CGY',
+            game_date: '2026-01-15',
+          },
+        ],
       });
 
       const result = await GameLockService.isPlayerLocked('player-1', 'EDM');
@@ -142,15 +126,17 @@ describe('GameLockService', () => {
     });
 
     it('returns unlocked when game is scheduled and game_time has not passed', async () => {
-      // Use a time that is definitely in the future
       const futureTime = new Date(Date.now() + 3600000).toISOString(); // 1 hour from now
-      mockChain.maybeSingle.mockResolvedValue({
-        data: {
-          game_time: futureTime,
-          status: 'scheduled',
-          game_date: '2026-01-15',
-        },
-        error: null,
+      mockGetGames.mockResolvedValue({
+        data: [
+          {
+            game_time: futureTime,
+            status: 'scheduled',
+            home_team: 'EDM',
+            away_team: 'CGY',
+            game_date: '2026-01-15',
+          },
+        ],
       });
 
       const result = await GameLockService.isPlayerLocked('player-1', 'EDM');
@@ -160,11 +146,8 @@ describe('GameLockService', () => {
       expect(result.gameTime).toBe(futureTime);
     });
 
-    it('fails open (returns unlocked) on database error', async () => {
-      mockChain.maybeSingle.mockResolvedValue({
-        data: null,
-        error: { message: 'Database error', code: '500' },
-      });
+    it('fails open (returns unlocked) on API error', async () => {
+      mockGetGames.mockRejectedValue(new Error('Network error'));
 
       const result = await GameLockService.isPlayerLocked('player-1', 'EDM');
 
@@ -173,13 +156,12 @@ describe('GameLockService', () => {
     });
 
     it('accepts a custom target date', async () => {
-      mockChain.maybeSingle.mockResolvedValue({ data: null, error: null });
+      mockGetGames.mockResolvedValue({ data: [] });
 
       const customDate = new Date('2026-02-20T00:00:00');
       await GameLockService.isPlayerLocked('player-1', 'EDM', customDate);
 
-      // Verify .eq was called with the custom date string
-      expect(mockChain.eq).toHaveBeenCalledWith('game_date', '2026-02-20');
+      expect(mockGetGames).toHaveBeenCalledWith({ date: '2026-02-20', team: 'EDM' });
     });
   });
 
@@ -203,8 +185,7 @@ describe('GameLockService', () => {
     });
 
     it('returns locked player IDs for teams with live games', async () => {
-      // Mock the batch fetch — returns resolved array (no maybeSingle terminal)
-      mockChain.in.mockResolvedValue({
+      mockGetGamesForTeams.mockResolvedValue({
         data: [
           {
             game_time: '2026-01-15T00:00:00Z',
@@ -214,7 +195,6 @@ describe('GameLockService', () => {
             game_date: '2026-01-15',
           },
         ],
-        error: null,
       });
 
       const players = [
@@ -229,7 +209,7 @@ describe('GameLockService', () => {
     });
 
     it('returns locked player IDs for teams with final games', async () => {
-      mockChain.in.mockResolvedValue({
+      mockGetGamesForTeams.mockResolvedValue({
         data: [
           {
             game_time: '2026-01-15T00:00:00Z',
@@ -239,7 +219,6 @@ describe('GameLockService', () => {
             game_date: '2026-01-15',
           },
         ],
-        error: null,
       });
 
       const players = [
@@ -253,11 +232,8 @@ describe('GameLockService', () => {
       expect(result.has('202')).toBe(true);
     });
 
-    it('returns empty set on database error', async () => {
-      mockChain.in.mockResolvedValue({
-        data: null,
-        error: { message: 'Database error' },
-      });
+    it('returns empty set on API error', async () => {
+      mockGetGamesForTeams.mockRejectedValue(new Error('Network error'));
 
       const players = [{ id: '1', teamAbbreviation: 'EDM' }];
       const result = await GameLockService.getLockedPlayerIds(players);
@@ -265,7 +241,7 @@ describe('GameLockService', () => {
     });
 
     it('uses teamAbbreviation falling back to team property', async () => {
-      mockChain.in.mockResolvedValue({
+      mockGetGamesForTeams.mockResolvedValue({
         data: [
           {
             game_time: '2026-01-15T00:00:00Z',
@@ -275,7 +251,6 @@ describe('GameLockService', () => {
             game_date: '2026-01-15',
           },
         ],
-        error: null,
       });
 
       const players = [
@@ -286,6 +261,33 @@ describe('GameLockService', () => {
 
       expect(result.has('301')).toBe(true);
     });
+
+    it('handles record-based response format from API', async () => {
+      mockGetGamesForTeams.mockResolvedValue({
+        data: {
+          EDM: [
+            {
+              game_time: '2026-01-15T00:00:00Z',
+              status: 'live',
+              home_team: 'EDM',
+              away_team: 'CGY',
+              game_date: '2026-01-15',
+            },
+          ],
+          TOR: [],
+        },
+      });
+
+      const players = [
+        { id: '401', teamAbbreviation: 'EDM' },
+        { id: '402', teamAbbreviation: 'TOR' },
+      ];
+
+      const result = await GameLockService.getLockedPlayerIds(players);
+
+      expect(result.has('401')).toBe(true);
+      expect(result.has('402')).toBe(false);
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -293,13 +295,16 @@ describe('GameLockService', () => {
   // ---------------------------------------------------------------------------
   describe('getPlayerGameStatus', () => {
     it('returns game status for a team', async () => {
-      mockChain.maybeSingle.mockResolvedValue({
-        data: {
-          game_time: '2026-01-15T00:00:00Z',
-          status: 'live',
-          game_date: '2026-01-15',
-        },
-        error: null,
+      mockGetGames.mockResolvedValue({
+        data: [
+          {
+            game_time: '2026-01-15T00:00:00Z',
+            status: 'live',
+            home_team: 'EDM',
+            away_team: 'CGY',
+            game_date: '2026-01-15',
+          },
+        ],
       });
 
       const result = await GameLockService.getPlayerGameStatus('EDM');
@@ -308,7 +313,7 @@ describe('GameLockService', () => {
     });
 
     it('returns not_started when no game scheduled', async () => {
-      mockChain.maybeSingle.mockResolvedValue({ data: null, error: null });
+      mockGetGames.mockResolvedValue({ data: [] });
 
       const result = await GameLockService.getPlayerGameStatus('EDM');
 

@@ -1,4 +1,6 @@
-import { supabase } from '@/integrations/supabase/client';
+import { apiClient } from '@/api/client';
+import { leagueApi } from '@/api/leagues';
+import { rosterApi } from '@/api/rosters';
 import { CURRENT_SEASON } from '@/utils/seasonConstants';
 import { logger } from '@/utils/logger';
 
@@ -29,23 +31,17 @@ export async function getWeeklyProjections(
       current.setDate(current.getDate() + 1);
     }
 
-    // Query projections for all days in the week
-    const { data, error } = await supabase
-      .from('player_projected_stats')
-      .select('player_id, total_projected_points, projection_date')
-      .in('player_id', playerIds)
-      .in('projection_date', dates)
-      .eq('season', CURRENT_SEASON);
-
-    if (error) {
-      logger.error('Error fetching weekly projections:', error);
-      return new Map();
-    }
+    // Query projections via API client
+    const startDate = dates[0];
+    const endDate = dates[dates.length - 1];
+    const { data } = await apiClient.get(
+      `/api/players/projections/batch?ids=${playerIds.join(',')}&startDate=${startDate}&endDate=${endDate}&season=${CURRENT_SEASON}`
+    );
 
     // Sum projections per player across all days
     const weeklyTotals = new Map<number, number>();
-    
-    (data || []).forEach((projection: Record<string, unknown>) => {
+
+    ((data || []) as Record<string, unknown>[]).forEach((projection) => {
       const playerId = Number(projection.player_id);
       const points = Number(projection.total_projected_points) || 0;
       const current = weeklyTotals.get(playerId) || 0;
@@ -70,28 +66,22 @@ export async function getLeagueAverageProjections(
 ): Promise<Map<string, number>> {
   try {
     // Get all teams in the league
-    const { data: teams, error: teamsError } = await supabase
-      .from('teams')
-      .select('id')
-      .eq('league_id', leagueId);
+    const { data: teams } = await leagueApi.getTeams(leagueId);
 
-    if (teamsError || !teams || teams.length === 0) {
+    if (!teams || (teams as any[]).length === 0) {
       return new Map();
     }
 
-    // Get all roster players from all teams
-    const { data: lineups, error: lineupsError } = await supabase
-      .from('team_lineups')
-      .select('starters, bench')
-      .eq('league_id', leagueId);
+    // Get all roster players from all teams via league rosters
+    const { data: lineups } = await rosterApi.getLeagueRosters(leagueId);
 
-    if (lineupsError || !lineups) {
+    if (!lineups) {
       return new Map();
     }
 
     // Collect all player IDs
     const allPlayerIds = new Set<number>();
-    lineups.forEach(lineup => {
+    ((lineups as any[]) || []).forEach(lineup => {
       const starters = (lineup.starters as unknown[]) || [];
       const bench = (lineup.bench as unknown[]) || [];
       [...starters, ...bench].forEach(id => {
@@ -110,25 +100,24 @@ export async function getLeagueAverageProjections(
       weekEnd
     );
 
-    // Get player positions to group by position
-    const { data: players, error: playersError } = await supabase
-      .from('player_directory')
-      .select('player_id, position_code')
-      .eq('season', CURRENT_SEASON)
-      .in('player_id', Array.from(allPlayerIds));
+    // Get player positions to group by position via API client
+    const playerIdsArray = Array.from(allPlayerIds);
+    const { data: players } = await apiClient.get(
+      `/api/players/directory?ids=${playerIdsArray.join(',')}&season=${CURRENT_SEASON}`
+    );
 
-    if (playersError || !players) {
+    if (!players) {
       return new Map();
     }
 
     // Group projections by position and calculate average
     const positionTotals = new Map<string, { total: number; count: number }>();
-    
-    players.forEach((player: Record<string, unknown>) => {
+
+    ((players as Record<string, unknown>[]) || []).forEach((player) => {
       const playerId = Number(player.player_id);
-      const position = player.position_code || '';
+      const position = String(player.position_code || '');
       const normalizedPos = normalizePosition(position);
-      
+
       if (!normalizedPos) return;
 
       const projectedPoints = weeklyProjections.get(playerId) || 0;

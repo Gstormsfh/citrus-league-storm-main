@@ -25,3 +25,4 @@ export { keeperApi } from './keepers';
 export { playoffApi } from './playoffs';
 export { bestballApi } from './bestball';
 export { accountApi } from './account';
+export { poolApi } from './pools';

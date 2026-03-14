@@ -1,30 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // =============================================================================
-// Mock Supabase client
+// Mock playerApi from @/api/players
 // =============================================================================
 
-function createChainMock() {
-  const chain: Record<string, any> = {};
-  const chainMethods = ['select', 'insert', 'update', 'delete', 'eq', 'in', 'order', 'limit', 'filter'];
-  chainMethods.forEach(m => {
-    chain[m] = vi.fn().mockReturnValue(chain);
-  });
-  chain.single = vi.fn().mockResolvedValue({ data: null, error: null });
-  chain.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
-  return chain;
-}
+const mockSearchPlayers = vi.fn();
+const mockGetPlayersByIds = vi.fn();
 
-const mockFrom = vi.fn();
-
-vi.mock('@/integrations/supabase/client', () => ({
-  supabase: {
-    from: (...args: unknown[]) => mockFrom(...args),
-    rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
-    auth: {
-      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }),
-      getSession: vi.fn().mockResolvedValue({ data: { session: { access_token: 'mock-token' } } }),
-    },
+vi.mock('@/api/players', () => ({
+  playerApi: {
+    searchPlayers: (...args: unknown[]) => mockSearchPlayers(...args),
+    getPlayersByIds: (...args: unknown[]) => mockGetPlayersByIds(...args),
   },
 }));
 
@@ -53,88 +39,38 @@ import { logger } from '@/utils/logger';
 // Helpers
 // =============================================================================
 
-const makeMockStats = (overrides: Record<string, any> = {}) => ({
-  season: 2025,
-  player_id: 8478402,
-  team_abbrev: 'EDM',
-  position_code: 'C',
+/** Creates a mock ServerPlayer (NormalizedPlayer shape returned by the API) */
+const makeMockServerPlayer = (overrides: Record<string, any> = {}) => ({
+  id: 8478402,
+  full_name: 'Connor McDavid',
+  position: 'C',
+  team: 'EDM',
   is_goalie: false,
   games_played: 40,
-  icetime_seconds: 50000,
-  nhl_toi_seconds: 48000,
-  goals: 20,
-  primary_assists: 15,
-  secondary_assists: 10,
-  points: 45,
-  shots_on_goal: 150,
-  hits: 30,
-  blocks: 20,
-  pim: 12,
-  ppp: 10,
-  shp: 2,
-  plus_minus: 15,
-  nhl_plus_minus: 14,
-  nhl_goals: 22,
-  nhl_assists: 28,
-  nhl_points: 50,
-  nhl_shots_on_goal: 155,
-  nhl_hits: 32,
-  nhl_blocks: 18,
-  nhl_pim: 10,
-  nhl_ppp: 12,
-  nhl_shp: 1,
+  goals: 22,
+  assists: 28,
+  points: 50,
+  shots: 155,
+  hits: 32,
+  blocks: 18,
+  pim: 10,
+  ppp: 12,
+  shp: 1,
+  plus_minus: 14,
+  icetime_seconds: 48000,
   x_goals: 18.5,
-  x_assists: 22.3,
   goalie_gp: 0,
   wins: 0,
+  losses: 0,
+  ot_losses: 0,
   saves: 0,
   shots_faced: 0,
   goals_against: 0,
+  save_pct: 0,
+  gaa: 0,
   shutouts: 0,
-  save_pct: null,
-  nhl_wins: 0,
-  nhl_losses: 0,
-  nhl_ot_losses: 0,
-  nhl_saves: 0,
-  nhl_shots_faced: 0,
-  nhl_goals_against: 0,
-  nhl_shutouts: 0,
-  nhl_save_pct: null,
-  nhl_gaa: 0,
   ...overrides,
 });
-
-const makeMockDirectory = (overrides: Record<string, any> = {}) => ({
-  season: 2025,
-  player_id: 8478402,
-  full_name: 'Connor McDavid',
-  team_abbrev: 'EDM',
-  position_code: 'C',
-  is_goalie: false,
-  ...overrides,
-});
-
-// Helper to create a chain that resolves as a Promise (for queries not using .single())
-function createThenableChain(resolveData: any, resolveError: any = null) {
-  const chain = createChainMock();
-  // Make the chain thenable for Promise.all usage
-  const promiseResult = { data: resolveData, error: resolveError };
-  Object.defineProperty(chain, 'then', {
-    value: (onFulfilled?: (val: any) => any, onRejected?: (err: any) => any) => {
-      return Promise.resolve(promiseResult).then(onFulfilled, onRejected);
-    },
-    writable: true,
-    configurable: true,
-  });
-  Object.defineProperty(chain, 'catch', {
-    value: (onRejected?: (err: any) => any) => {
-      return Promise.resolve(promiseResult).catch(onRejected);
-    },
-    writable: true,
-    configurable: true,
-  });
-  return chain;
-}
 
 // =============================================================================
 // Tests
@@ -143,7 +79,6 @@ function createThenableChain(resolveData: any, resolveError: any = null) {
 describe('CitrusPuckService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFrom.mockImplementation(() => createChainMock());
   });
 
   // ---------------------------------------------------------------------------
@@ -151,17 +86,8 @@ describe('CitrusPuckService', () => {
   // ---------------------------------------------------------------------------
   describe('getAllAnalytics', () => {
     it('returns a Map of aggregated player data on success', async () => {
-      const statsData = [makeMockStats()];
-      const dirData = [makeMockDirectory()];
-
-      let callCount = 0;
-      mockFrom.mockImplementation(() => {
-        callCount++;
-        if (callCount === 1) {
-          return createThenableChain(statsData);
-        }
-        return createThenableChain(dirData);
-      });
+      const players = [makeMockServerPlayer()];
+      mockSearchPlayers.mockResolvedValue({ data: players });
 
       const result = await CitrusPuckService.getAllAnalytics(2025);
 
@@ -172,17 +98,13 @@ describe('CitrusPuckService', () => {
       expect(player?.name).toBe('Connor McDavid');
       expect(player?.team).toBe('EDM');
       expect(player?.position).toBe('C');
+      expect(player?.allSituation.I_F_goals).toBe(22);
+      expect(player?.allSituation.I_F_points).toBe(50);
+      expect(player?.allSituation.I_F_shotsOnGoal).toBe(155);
     });
 
-    it('returns empty Map when stats query fails', async () => {
-      let callCount = 0;
-      mockFrom.mockImplementation(() => {
-        callCount++;
-        if (callCount === 1) {
-          return createThenableChain(null, { message: 'DB error' });
-        }
-        return createThenableChain([]);
-      });
+    it('returns empty Map when API call throws', async () => {
+      mockSearchPlayers.mockRejectedValue(new Error('Network error'));
 
       const result = await CitrusPuckService.getAllAnalytics(2025);
 
@@ -191,38 +113,45 @@ describe('CitrusPuckService', () => {
       expect(logger.error).toHaveBeenCalled();
     });
 
-    it('returns empty Map when directory query fails', async () => {
-      let callCount = 0;
-      mockFrom.mockImplementation(() => {
-        callCount++;
-        if (callCount === 1) {
-          return createThenableChain([makeMockStats()]);
-        }
-        return createThenableChain(null, { message: 'Dir error' });
-      });
+    it('returns empty Map when response data is null', async () => {
+      mockSearchPlayers.mockResolvedValue({ data: null });
 
       const result = await CitrusPuckService.getAllAnalytics(2025);
 
+      expect(result).toBeInstanceOf(Map);
       expect(result.size).toBe(0);
-      expect(logger.error).toHaveBeenCalled();
     });
 
-    it('handles players without directory entries', async () => {
-      let callCount = 0;
-      mockFrom.mockImplementation(() => {
-        callCount++;
-        if (callCount === 1) {
-          return createThenableChain([makeMockStats()]);
-        }
-        return createThenableChain([]); // Empty directory
-      });
+    it('handles multiple players correctly', async () => {
+      const players = [
+        makeMockServerPlayer(),
+        makeMockServerPlayer({
+          id: 8479318,
+          full_name: 'Leon Draisaitl',
+          position: 'C',
+          team: 'EDM',
+          goals: 30,
+          points: 60,
+        }),
+      ];
+      mockSearchPlayers.mockResolvedValue({ data: players });
 
       const result = await CitrusPuckService.getAllAnalytics(2025);
 
-      expect(result.size).toBe(1);
+      expect(result.size).toBe(2);
+      expect(result.get(8478402)?.name).toBe('Connor McDavid');
+      expect(result.get(8479318)?.name).toBe('Leon Draisaitl');
+    });
+
+    it('approximates primary/secondary assists with 60/40 split', async () => {
+      const players = [makeMockServerPlayer({ assists: 30 })];
+      mockSearchPlayers.mockResolvedValue({ data: players });
+
+      const result = await CitrusPuckService.getAllAnalytics(2025);
+
       const player = result.get(8478402);
-      expect(player?.name).toBe(''); // No directory = empty name
-      expect(player?.team).toBe('EDM'); // Comes from stats
+      expect(player?.allSituation.I_F_primaryAssists).toBe(18); // Math.round(30 * 0.6)
+      expect(player?.allSituation.I_F_secondaryAssists).toBe(12); // 30 - 18
     });
   });
 
@@ -231,39 +160,20 @@ describe('CitrusPuckService', () => {
   // ---------------------------------------------------------------------------
   describe('getPlayerAnalytics', () => {
     it('returns array with single player data on success', async () => {
-      let callCount = 0;
-      mockFrom.mockImplementation(() => {
-        callCount++;
-        const chain = createChainMock();
-        if (callCount === 1) {
-          chain.single.mockResolvedValue({ data: makeMockStats(), error: null });
-        } else {
-          chain.single.mockResolvedValue({ data: makeMockDirectory(), error: null });
-        }
-        return chain;
-      });
+      const players = [makeMockServerPlayer()];
+      mockGetPlayersByIds.mockResolvedValue({ data: players });
 
       const result = await CitrusPuckService.getPlayerAnalytics(8478402, 2025);
 
       expect(result).toHaveLength(1);
       expect(result[0].playerId).toBe(8478402);
       expect(result[0].situation).toBe('all');
-      expect(result[0].I_F_goals).toBe(22); // Uses NHL stats
+      expect(result[0].I_F_goals).toBe(22);
       expect(result[0].I_F_points).toBe(50);
     });
 
-    it('returns empty array when stats query fails', async () => {
-      let callCount = 0;
-      mockFrom.mockImplementation(() => {
-        callCount++;
-        const chain = createChainMock();
-        if (callCount === 1) {
-          chain.single.mockResolvedValue({ data: null, error: { message: 'Not found' } });
-        } else {
-          chain.single.mockResolvedValue({ data: null, error: null });
-        }
-        return chain;
-      });
+    it('returns empty array when API call throws', async () => {
+      mockGetPlayersByIds.mockRejectedValue(new Error('Not found'));
 
       const result = await CitrusPuckService.getPlayerAnalytics(99999, 2025);
 
@@ -271,53 +181,50 @@ describe('CitrusPuckService', () => {
       expect(logger.error).toHaveBeenCalled();
     });
 
-    it('returns empty array when stats data is null (no error)', async () => {
-      mockFrom.mockImplementation(() => {
-        const chain = createChainMock();
-        chain.single.mockResolvedValue({ data: null, error: null });
-        return chain;
-      });
+    it('returns empty array when player is not in response', async () => {
+      mockGetPlayersByIds.mockResolvedValue({ data: [] });
 
       const result = await CitrusPuckService.getPlayerAnalytics(99999, 2025);
 
       expect(result).toEqual([]);
     });
 
+    it('returns empty array when response data is null', async () => {
+      mockGetPlayersByIds.mockResolvedValue({ data: null });
+
+      const result = await CitrusPuckService.getPlayerAnalytics(99999, 2025);
+
+      expect(result).toEqual([]);
+    });
+
+    it('passes player ID as string to getPlayersByIds', async () => {
+      mockGetPlayersByIds.mockResolvedValue({ data: [] });
+
+      await CitrusPuckService.getPlayerAnalytics(8478402, 2025);
+
+      expect(mockGetPlayersByIds).toHaveBeenCalledWith(['8478402']);
+    });
+
     it('maps goalie stats correctly', async () => {
-      const goalieStats = makeMockStats({
-        player_id: 8479361,
-        position_code: 'G',
+      const goaliePlayer = makeMockServerPlayer({
+        id: 8479361,
+        full_name: 'Igor Shesterkin',
+        position: 'G',
         is_goalie: true,
         goalie_gp: 30,
-        nhl_wins: 20,
-        nhl_saves: 800,
-        nhl_goals_against: 60,
-        nhl_shutouts: 3,
-        nhl_save_pct: 0.930,
+        wins: 20,
+        saves: 800,
+        goals_against: 60,
+        shutouts: 3,
+        save_pct: 0.930,
       });
-      const goalieDir = makeMockDirectory({
-        player_id: 8479361,
-        full_name: 'Igor Shesterkin',
-        position_code: 'G',
-        is_goalie: true,
-      });
-
-      let callCount = 0;
-      mockFrom.mockImplementation(() => {
-        callCount++;
-        const chain = createChainMock();
-        if (callCount === 1) {
-          chain.single.mockResolvedValue({ data: goalieStats, error: null });
-        } else {
-          chain.single.mockResolvedValue({ data: goalieDir, error: null });
-        }
-        return chain;
-      });
+      mockGetPlayersByIds.mockResolvedValue({ data: [goaliePlayer] });
 
       const result = await CitrusPuckService.getPlayerAnalytics(8479361, 2025);
 
       expect(result[0].I_F_savedShotsOnGoal).toBe(800);
       expect(result[0].position).toBe('G');
+      expect(result[0].name).toBe('Igor Shesterkin');
     });
   });
 
@@ -326,17 +233,8 @@ describe('CitrusPuckService', () => {
   // ---------------------------------------------------------------------------
   describe('getAggregatedPlayerData', () => {
     it('returns aggregated data with allSituation', async () => {
-      let callCount = 0;
-      mockFrom.mockImplementation(() => {
-        callCount++;
-        const chain = createChainMock();
-        if (callCount === 1) {
-          chain.single.mockResolvedValue({ data: makeMockStats(), error: null });
-        } else {
-          chain.single.mockResolvedValue({ data: makeMockDirectory(), error: null });
-        }
-        return chain;
-      });
+      const players = [makeMockServerPlayer()];
+      mockGetPlayersByIds.mockResolvedValue({ data: players });
 
       const result = await CitrusPuckService.getAggregatedPlayerData(8478402, 2025);
 
@@ -348,11 +246,7 @@ describe('CitrusPuckService', () => {
     });
 
     it('returns null when no data is found', async () => {
-      mockFrom.mockImplementation(() => {
-        const chain = createChainMock();
-        chain.single.mockResolvedValue({ data: null, error: { message: 'not found' } });
-        return chain;
-      });
+      mockGetPlayersByIds.mockResolvedValue({ data: [] });
 
       const result = await CitrusPuckService.getAggregatedPlayerData(99999, 2025);
 

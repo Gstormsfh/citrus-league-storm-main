@@ -847,8 +847,8 @@ export const MatchupService = {
       let playerIds: string[];
       try {
         if (leagueId === DEMO_LEAGUE_ID_FOR_GUESTS) {
-          const { apiClient } = await import('@/api/client');
-          const response = await apiClient.get(`/api/public/leagues/${leagueId}/teams/${teamId}/player-ids`);
+          const { publicApi } = await import('@/api/public');
+          const response = await publicApi.getPlayerIds(leagueId, teamId);
           playerIds = (response.data as string[]) || [];
         } else {
           const { rosterApi } = await import('@/api/rosters');
@@ -1470,8 +1470,8 @@ export const MatchupService = {
       const isDemoLeague = matchup.league_id === DEMO_LEAGUE_ID_FOR_GUESTS;
       if (isDemoLeague && !userId) {
         // Guest viewing demo league - use public API (no auth required)
-        const { apiClient } = await import('@/api/client');
-        const response = await apiClient.get(`/api/public/leagues/${matchup.league_id}`);
+        const { publicApi } = await import('@/api/public');
+        const response = await publicApi.getLeague(matchup.league_id);
         league = (response.data as League) || null;
         if (!league) throw new Error('League not found');
       } else if (userId) {

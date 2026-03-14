@@ -4,11 +4,32 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Mock modules
 // =============================================================================
 
-const mockSupabaseFrom = vi.fn();
+const mockGetLeagueMatchups = vi.fn();
+const mockGetLeagueRosters = vi.fn();
+const mockGetLeague = vi.fn();
+const mockGetPlayersByIds = vi.fn();
 
-vi.mock('@/integrations/supabase/client', () => ({
-  supabase: {
-    from: (...args: unknown[]) => mockSupabaseFrom(...args),
+vi.mock('@/api/matchups', () => ({
+  matchupApi: {
+    getLeagueMatchups: (...args: unknown[]) => mockGetLeagueMatchups(...args),
+  },
+}));
+
+vi.mock('@/api/rosters', () => ({
+  rosterApi: {
+    getLeagueRosters: (...args: unknown[]) => mockGetLeagueRosters(...args),
+  },
+}));
+
+vi.mock('@/api/leagues', () => ({
+  leagueApi: {
+    getLeague: (...args: unknown[]) => mockGetLeague(...args),
+  },
+}));
+
+vi.mock('@/services/PlayerService', () => ({
+  PlayerService: {
+    getPlayersByIds: (...args: unknown[]) => mockGetPlayersByIds(...args),
   },
 }));
 
@@ -30,18 +51,6 @@ vi.mock('@/utils/seasonConstants', () => ({
   CURRENT_SEASON: '20252026',
 }));
 
-vi.mock('@/api/matchups', () => ({
-  matchupApi: {
-    getLeagueMatchups: vi.fn().mockResolvedValue({ data: [] }),
-  },
-}));
-
-vi.mock('@/api/rosters', () => ({
-  rosterApi: {
-    getLeagueRosters: vi.fn().mockResolvedValue({ data: [] }),
-  },
-}));
-
 vi.mock('@/utils/scoringUtils', () => ({
   compareCategoryMatchup: vi.fn().mockReturnValue({
     team1Wins: 0,
@@ -60,6 +69,12 @@ import { StandingsService } from '../StandingsService';
 
 beforeEach(() => {
   vi.clearAllMocks();
+
+  // Default mock return values
+  mockGetLeagueMatchups.mockResolvedValue({ data: [] });
+  mockGetLeagueRosters.mockResolvedValue({ data: [] });
+  mockGetLeague.mockResolvedValue({ data: { settings: {} } });
+  mockGetPlayersByIds.mockResolvedValue([]);
 });
 
 // =============================================================================
@@ -68,45 +83,13 @@ beforeEach(() => {
 
 const makeTeams = (ids: string[]) => ids.map(id => ({ id, name: `Team ${id}` }));
 
-/**
- * Helper: builds a deeply chainable Supabase mock.
- * Every method returns the chain itself, except the chain is also a thenable
- * that resolves to `resolveValue`.
- */
-function buildChain(resolveValue: any) {
-  const chain: any = {};
-  const handler = {
-    get(_target: any, prop: string) {
-      if (prop === 'then') {
-        // Make the chain thenable so `await` resolves to resolveValue
-        return (resolve: (v: any) => void, reject: (e: any) => void) =>
-          Promise.resolve(resolveValue).then(resolve, reject);
-      }
-      // Every other property call returns the proxy itself
-      return vi.fn().mockReturnValue(new Proxy(chain, handler));
-    },
-  };
-  return new Proxy(chain, handler);
-}
-
-function mockMatchupQueries(completedMatchups: any[], pastMatchups: any[] = []) {
-  let callCount = 0;
-  mockSupabaseFrom.mockImplementation(() => {
-    callCount++;
-    if (callCount === 1) {
-      return buildChain({ data: completedMatchups, error: null });
-    }
-    return buildChain({ data: pastMatchups, error: null });
-  });
-}
-
 // =============================================================================
 // calculateTeamStandings
 // =============================================================================
 
 describe('StandingsService.calculateTeamStandings', () => {
   it('returns initialized stats when no matchups exist', async () => {
-    mockMatchupQueries([], []);
+    mockGetLeagueMatchups.mockResolvedValue({ data: [] });
 
     const teams = makeTeams(['team-1', 'team-2']);
     const result = await StandingsService.calculateTeamStandings('league-1', teams, [], []);
@@ -144,7 +127,7 @@ describe('StandingsService.calculateTeamStandings', () => {
         week_end_date: '2026-03-07',
       },
     ];
-    mockMatchupQueries(matchups, []);
+    mockGetLeagueMatchups.mockResolvedValue({ data: matchups });
 
     const teams = makeTeams(['team-1', 'team-2']);
     const result = await StandingsService.calculateTeamStandings('league-wl', teams, [], []);
@@ -173,7 +156,7 @@ describe('StandingsService.calculateTeamStandings', () => {
         week_end_date: '2026-03-01',
       },
     ];
-    mockMatchupQueries(matchups, []);
+    mockGetLeagueMatchups.mockResolvedValue({ data: matchups });
 
     const teams = makeTeams(['team-1', 'team-2']);
     const result = await StandingsService.calculateTeamStandings('league-tie', teams, [], []);
@@ -197,7 +180,7 @@ describe('StandingsService.calculateTeamStandings', () => {
         week_end_date: '2026-03-01',
       },
     ];
-    mockMatchupQueries(matchups, []);
+    mockGetLeagueMatchups.mockResolvedValue({ data: matchups });
 
     const teams = makeTeams(['team-1', 'team-2']);
     const result = await StandingsService.calculateTeamStandings('league-bye', teams, [], []);
@@ -213,7 +196,7 @@ describe('StandingsService.calculateTeamStandings', () => {
       { id: 'm2', team1_id: 'team-1', team2_id: 'team-2', team1_score: 130, team2_score: 100, week_number: 2, status: 'completed', week_end_date: '2026-02-22' },
       { id: 'm3', team1_id: 'team-1', team2_id: 'team-2', team1_score: 140, team2_score: 100, week_number: 3, status: 'completed', week_end_date: '2026-03-01' },
     ];
-    mockMatchupQueries(matchups, []);
+    mockGetLeagueMatchups.mockResolvedValue({ data: matchups });
 
     const teams = makeTeams(['team-1', 'team-2']);
     const result = await StandingsService.calculateTeamStandings('league-streak', teams, [], []);
@@ -236,7 +219,7 @@ describe('StandingsService.calculateTeamStandings', () => {
         week_end_date: `2026-02-${String(i * 7).padStart(2, '0')}`,
       });
     }
-    mockMatchupQueries(matchups, []);
+    mockGetLeagueMatchups.mockResolvedValue({ data: matchups });
 
     const teams = makeTeams(['team-1', 'team-2']);
     const result = await StandingsService.calculateTeamStandings('league-last5', teams, [], []);
@@ -246,12 +229,8 @@ describe('StandingsService.calculateTeamStandings', () => {
     expect(result['team-1'].last5.losses).toBe(2);
   });
 
-  it('returns empty stats on query error', async () => {
-    let callCount = 0;
-    mockSupabaseFrom.mockImplementation(() => {
-      callCount++;
-      return buildChain({ data: null, error: { message: 'DB error' } });
-    });
+  it('returns empty stats on API error', async () => {
+    mockGetLeagueMatchups.mockRejectedValue(new Error('API error'));
 
     const teams = makeTeams(['team-1']);
     const result = await StandingsService.calculateTeamStandings('league-error', teams, [], []);
@@ -260,7 +239,7 @@ describe('StandingsService.calculateTeamStandings', () => {
     expect(result['team-1'].losses).toBe(0);
   });
 
-  it('deduplicates matchups from completed and past queries', async () => {
+  it('deduplicates matchups by id', async () => {
     const matchup = {
       id: 'm1',
       team1_id: 'team-1',
@@ -271,8 +250,8 @@ describe('StandingsService.calculateTeamStandings', () => {
       status: 'completed',
       week_end_date: '2026-03-01',
     };
-    // Same matchup appears in both completed and past queries
-    mockMatchupQueries([matchup], [matchup]);
+    // Same matchup appears twice in API response
+    mockGetLeagueMatchups.mockResolvedValue({ data: [matchup, matchup] });
 
     const teams = makeTeams(['team-1', 'team-2']);
     const result = await StandingsService.calculateTeamStandings('league-dedup', teams, [], []);
@@ -289,35 +268,8 @@ describe('StandingsService.calculateTeamStandings', () => {
 
 describe('StandingsService.calculateSeasonPointsStandings', () => {
   it('returns initialized stats for all teams', async () => {
-    // Mock roster_assignments, daily_scores, matchups
-    let callCount = 0;
-    mockSupabaseFrom.mockImplementation(() => {
-      callCount++;
-      if (callCount === 1) {
-        // roster_assignments
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        };
-      }
-      if (callCount === 2) {
-        // daily_scores
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        };
-      }
-      // matchups fallback
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            lt: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        }),
-      };
-    });
+    mockGetLeagueRosters.mockResolvedValue({ data: [] });
+    mockGetLeagueMatchups.mockResolvedValue({ data: [] });
 
     const teams = makeTeams(['team-1', 'team-2']);
     const result = await StandingsService.calculateSeasonPointsStandings('league-1', teams, [], []);
@@ -329,31 +281,14 @@ describe('StandingsService.calculateSeasonPointsStandings', () => {
   });
 
   it('sums player points per team from roster assignments', async () => {
-    let callCount = 0;
-    mockSupabaseFrom.mockImplementation(() => {
-      callCount++;
-      if (callCount === 1) {
-        // roster_assignments
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({
-              data: [
-                { player_id: '101', team_id: 'team-1' },
-                { player_id: '102', team_id: 'team-1' },
-                { player_id: '201', team_id: 'team-2' },
-              ],
-              error: null,
-            }),
-          }),
-        };
-      }
-      // daily_scores
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-        }),
-      };
+    mockGetLeagueRosters.mockResolvedValue({
+      data: [
+        { player_id: '101', team_id: 'team-1' },
+        { player_id: '102', team_id: 'team-1' },
+        { player_id: '201', team_id: 'team-2' },
+      ],
     });
+    mockGetLeagueMatchups.mockResolvedValue({ data: [] });
 
     const teams = makeTeams(['team-1', 'team-2']);
     const allPlayers = [
@@ -367,27 +302,9 @@ describe('StandingsService.calculateSeasonPointsStandings', () => {
     expect(result['team-2'].pointsFor).toBe(70);
   });
 
-  it('falls back to draftPicks when roster_assignments errors', async () => {
-    let callCount = 0;
-    mockSupabaseFrom.mockImplementation(() => {
-      callCount++;
-      if (callCount === 1) {
-        // roster_assignments -> error
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({
-              data: null,
-              error: { message: 'Permission denied' },
-            }),
-          }),
-        };
-      }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-        }),
-      };
-    });
+  it('falls back to draftPicks when roster API returns empty', async () => {
+    mockGetLeagueRosters.mockResolvedValue({ data: [] });
+    mockGetLeagueMatchups.mockResolvedValue({ data: [] });
 
     const teams = makeTeams(['team-1']);
     const draftPicks = [{ team_id: 'team-1', player_id: '101' }];
@@ -397,37 +314,14 @@ describe('StandingsService.calculateSeasonPointsStandings', () => {
     expect(result['team-1'].pointsFor).toBe(42);
   });
 
-  it('counts games played from daily_scores', async () => {
-    let callCount = 0;
-    mockSupabaseFrom.mockImplementation(() => {
-      callCount++;
-      if (callCount === 1) {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        };
-      }
-      if (callCount === 2) {
-        // daily_scores with unique dates
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({
-              data: [
-                { team_id: 'team-1', score_date: '2026-03-01' },
-                { team_id: 'team-1', score_date: '2026-03-02' },
-                { team_id: 'team-1', score_date: '2026-03-03' },
-              ],
-              error: null,
-            }),
-          }),
-        };
-      }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-        }),
-      };
+  it('counts games played from past matchup weeks', async () => {
+    mockGetLeagueRosters.mockResolvedValue({ data: [] });
+    mockGetLeagueMatchups.mockResolvedValue({
+      data: [
+        { week_number: 1, week_end_date: '2026-03-01' },
+        { week_number: 2, week_end_date: '2026-03-07' },
+        { week_number: 3, week_end_date: '2026-03-07' },
+      ],
     });
 
     const teams = makeTeams(['team-1']);
@@ -443,18 +337,10 @@ describe('StandingsService.calculateSeasonPointsStandings', () => {
 
 describe('StandingsService.calculateCategoryStandings', () => {
   it('returns initialized stats for all teams with category records', async () => {
-    // Mock all supabase calls to return empty
-    mockSupabaseFrom.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({ data: { settings: {} }, error: null }),
-          in: vi.fn().mockResolvedValue({ data: [], error: null }),
-        }),
-        in: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-        }),
-      }),
-    });
+    mockGetLeagueMatchups.mockResolvedValue({ data: [] });
+    mockGetLeagueRosters.mockResolvedValue({ data: [] });
+    mockGetLeague.mockResolvedValue({ data: { settings: {} } });
+    mockGetPlayersByIds.mockResolvedValue([]);
 
     const teams = makeTeams(['team-1', 'team-2']);
     const categories = ['goals', 'assists'];
@@ -484,17 +370,9 @@ describe('StandingsService.calculateCategoryStandings', () => {
 
 describe('StandingsService.calculateRotoStandingsFromDB', () => {
   it('returns initialized stats with roto-specific fields', async () => {
-    mockSupabaseFrom.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({ data: { settings: {} }, error: null }),
-          in: vi.fn().mockResolvedValue({ data: [], error: null }),
-        }),
-        in: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-        }),
-      }),
-    });
+    mockGetLeagueRosters.mockResolvedValue({ data: [] });
+    mockGetLeague.mockResolvedValue({ data: { settings: {} } });
+    mockGetPlayersByIds.mockResolvedValue([]);
 
     const teams = makeTeams(['team-1']);
     const categories = ['goals', 'assists'];
@@ -519,17 +397,9 @@ describe('StandingsService.calculateRotoStandingsFromDB', () => {
   });
 
   it('sums points for from draft picks', async () => {
-    mockSupabaseFrom.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({ data: { settings: {} }, error: null }),
-          in: vi.fn().mockResolvedValue({ data: [], error: null }),
-        }),
-        in: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-        }),
-      }),
-    });
+    mockGetLeagueRosters.mockResolvedValue({ data: [] });
+    mockGetLeague.mockResolvedValue({ data: { settings: {} } });
+    mockGetPlayersByIds.mockResolvedValue([]);
 
     const teams = makeTeams(['team-1']);
     const draftPicks = [

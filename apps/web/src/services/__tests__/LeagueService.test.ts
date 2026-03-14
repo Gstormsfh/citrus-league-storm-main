@@ -12,6 +12,7 @@ const mockGetUserLeagues = vi.fn();
 const mockGetTeams = vi.fn();
 const mockGetMyTeam = vi.fn();
 const mockDeleteTeam = vi.fn();
+const mockUpdateScoringSettings = vi.fn();
 
 vi.mock('@/api/leagues', () => ({
   leagueApi: {
@@ -23,7 +24,7 @@ vi.mock('@/api/leagues', () => ({
     getMyTeam: (...args: unknown[]) => mockGetMyTeam(...args),
     deleteTeam: (...args: unknown[]) => mockDeleteTeam(...args),
     updateSettings: vi.fn(),
-    updateScoringSettings: vi.fn(),
+    updateScoringSettings: (...args: unknown[]) => mockUpdateScoringSettings(...args),
   },
 }));
 
@@ -71,6 +72,10 @@ vi.mock('@/utils/timezoneUtils', () => ({
 
 vi.mock('@/utils/seasonConstants', () => ({
   CURRENT_SEASON: '20252026',
+}));
+
+vi.mock('@/utils/queryColumns', () => ({
+  COLUMNS: {},
 }));
 
 vi.mock('@/utils/scoringUtils', () => ({
@@ -557,66 +562,39 @@ describe('getLeagueFormat', () => {
 });
 
 // =============================================================================
-// updateScoringSettings (still uses supabase directly — not yet migrated)
+// updateScoringSettings (delegates to LeagueSettingsService → leagueApi)
 // =============================================================================
 
 describe('LeagueService.updateScoringSettings', () => {
-  it('updates scoring settings when draft is not completed', async () => {
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { draft_status: 'not_started' },
-      error: null,
-    });
-
-    const updateChain = createChainMock();
-    updateChain.eq.mockResolvedValue({ data: null, error: null });
-
-    let leagueCallCount = 0;
-    (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'leagues') {
-        leagueCallCount++;
-        if (leagueCallCount === 1) return leagueChain;  // select draft_status
-        return updateChain;  // update scoring_settings
-      }
-      return defaultChain;
-    });
-
-    // Mock the notify RPC
-    (supabase.rpc as any).mockResolvedValue({ data: { success: true }, error: null });
+  it('updates scoring settings successfully via API', async () => {
+    mockUpdateScoringSettings.mockResolvedValue({ data: { success: true } });
 
     const scoring = { skater: { goals: 3, assists: 2 }, goalie: { wins: 4 } };
     const result = await LeagueService.updateScoringSettings('league-1', 'user-1', scoring);
 
     expect(result.success).toBe(true);
     expect(result.error).toBeNull();
-    expect(LeagueMembershipService.requireCommissioner).toHaveBeenCalledWith('league-1', 'user-1');
+    expect(mockUpdateScoringSettings).toHaveBeenCalledWith('league-1', scoring);
   });
 
-  it('blocks scoring changes when games have started', async () => {
-    const leagueChain = createChainMock();
-    leagueChain.single.mockResolvedValue({
-      data: { draft_status: 'completed' },
-      error: null,
-    });
-
-    // The daily rosters count query: select('*', { count: 'exact', head: true }).eq()
-    const rosterChain = createChainMock();
-    rosterChain.eq.mockResolvedValue({ data: null, error: null, count: 5 });
-
-    let leagueCallCount = 0;
-    (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'leagues') {
-        leagueCallCount++;
-        return leagueChain;
-      }
-      if (table === 'fantasy_daily_rosters') return rosterChain;
-      return defaultChain;
-    });
+  it('returns error when API rejects the update', async () => {
+    const apiError = new Error('Scoring settings cannot be changed after games have started');
+    mockUpdateScoringSettings.mockRejectedValue(apiError);
 
     const result = await LeagueService.updateScoringSettings('league-1', 'user-1', { skater: { goals: 5 } });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBeInstanceOf(Error);
-    expect((result.error as Error).message).toContain('cannot be changed after games have started');
+    expect(result.error).toBe(apiError);
+  });
+
+  it('returns error when API call fails with network error', async () => {
+    const networkError = new Error('Network error');
+    mockUpdateScoringSettings.mockRejectedValue(networkError);
+
+    const scoring = { skater: { goals: 3 }, goalie: { wins: 4 } };
+    const result = await LeagueService.updateScoringSettings('league-1', 'user-1', scoring);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe(networkError);
   });
 });

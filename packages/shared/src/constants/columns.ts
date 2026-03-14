@@ -78,7 +78,7 @@ export const NHL_GAME_COLUMNS_MINIMAL = 'home_team, away_team';
 // PLAYER SEASON STATS COLUMNS
 // ============================================================================
 // Full stats for player display
-export const PLAYER_STATS_DISPLAY = 'player_id, games_played, nhl_goals, nhl_assists, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_ppp, nhl_shp, nhl_plus_minus, nhl_toi_seconds, goalie_gp, nhl_wins, nhl_losses, nhl_ot_losses, nhl_saves, nhl_save_pct, nhl_gaa, nhl_shutouts';
+export const PLAYER_STATS_DISPLAY = 'player_id, games_played, nhl_goals, nhl_assists, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_ppp, nhl_shp, nhl_plus_minus, nhl_toi_seconds, goalie_gp, nhl_wins, nhl_losses, nhl_ot_losses, nhl_saves, nhl_save_pct, nhl_gaa, nhl_shutouts, nhl_shots_faced, nhl_goals_against, x_goals';
 
 // Projection-related stats only
 export const PLAYER_STATS_PROJECTIONS = 'player_id, projected_goals, projected_assists, projected_sog, projected_blocks, projected_ppp, projected_shp, projected_hits, projected_pim, total_projected_points';
@@ -172,7 +172,7 @@ export const PLAYER_DIRECTORY_COLUMNS = 'player_id, full_name, position_code, cu
 // ============================================================================
 // PLAYER TALENT METRICS COLUMNS
 // ============================================================================
-export const PLAYER_TALENT_METRICS_COLUMNS = 'player_id, xg_per_60, xg_rating';
+export const PLAYER_TALENT_METRICS_COLUMNS = 'player_id, xg_per_60, xg_rating, roster_status, is_ir_eligible';
 
 // ============================================================================
 // GOALIE GSAX COLUMNS

@@ -26,7 +26,7 @@ accountRoutes.get('/profile', async (c) => {
 });
 
 // POST /api/account/export
-accountRoutes.post('/export', validateBody(schemas.accountExport), async (c) => {
+accountRoutes.post('/export', async (c) => {
   const supabase = createUserClient(c.get('userToken'));
   const service = new AccountService(supabase);
   const result = await service.exportUserData();
@@ -39,7 +39,7 @@ accountRoutes.post('/export', validateBody(schemas.accountExport), async (c) => 
 });
 
 // POST /api/account/delete
-accountRoutes.post('/delete', validateBody(schemas.accountDelete), async (c) => {
+accountRoutes.post('/delete', async (c) => {
   const supabase = createUserClient(c.get('userToken'));
   const service = new AccountService(supabase);
 
@@ -68,6 +68,65 @@ accountRoutes.post('/audit-log', validateBody(schemas.auditLog), async (c) => {
   const service = new AccountService(supabase);
   await service.logSecurityEvent(body.eventType, body.leagueId || null, body.details || {}, body.severity || 'INFO');
   return ok(c, { success: true });
+});
+
+// PUT /api/account/profile — Update profile fields
+accountRoutes.put('/profile', async (c) => {
+  try {
+    const userId = c.get('userId');
+    const body = await c.req.json();
+
+    // Only allow known profile fields
+    const allowedFields = ['username', 'first_name', 'last_name', 'phone', 'location', 'bio', 'default_team_name', 'timezone'];
+    const fields: Record<string, unknown> = {};
+    for (const key of allowedFields) {
+      if (key in body) {
+        fields[key] = body[key];
+      }
+    }
+
+    if (Object.keys(fields).length === 0) {
+      return fail(c, AppError.badRequest('No valid fields provided'));
+    }
+
+    const supabase = createUserClient(c.get('userToken'));
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(fields)
+      .eq('id', userId)
+      .select()
+      .single();
+
+    if (error) {
+      return handleError(c, error, 'Failed to update profile');
+    }
+
+    return ok(c, data);
+  } catch (err) {
+    return handleError(c, err, 'Failed to update profile');
+  }
+});
+
+// GET /api/account/check-username/:username — Check username availability
+accountRoutes.get('/check-username/:username', async (c) => {
+  try {
+    const username = c.req.param('username');
+    const supabase = createUserClient(c.get('userToken'));
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('username', username)
+      .maybeSingle();
+
+    if (error) {
+      return handleError(c, error, 'Failed to check username');
+    }
+
+    return ok(c, { available: !data });
+  } catch (err) {
+    return handleError(c, err, 'Failed to check username');
+  }
 });
 
 export { accountRoutes };

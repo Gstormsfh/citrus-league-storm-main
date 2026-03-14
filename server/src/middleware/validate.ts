@@ -334,6 +334,8 @@ export const schemas = {
     bench: z.array(z.unknown()).optional(),
     ir: z.array(z.unknown()).optional(),
     slot_assignments: z.record(z.unknown()).optional(),
+    target_date: z.string().optional(),
+    allow_player_removal: z.boolean().optional(),
   }),
 
   // Trade respond schema

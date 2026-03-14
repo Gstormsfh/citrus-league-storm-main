@@ -20,6 +20,7 @@ import { playoffRoutes } from './routes/playoffs';
 import { bestballRoutes } from './routes/bestball';
 import { accountRoutes } from './routes/account';
 import { publicRoutes } from './routes/public';
+import { poolRoutes } from './routes/pools';
 import { standardRateLimit, strictRateLimit } from './middleware/rateLimit';
 import { requestContextMiddleware } from './middleware/requestContext';
 import { metricsMiddleware, metrics } from './middleware/metrics';
@@ -218,6 +219,7 @@ app.route('/api/playoffs', playoffRoutes);
 app.route('/api/bestball', bestballRoutes);
 app.route('/api/account', accountRoutes);
 app.route('/api/public', publicRoutes);
+app.route('/api/pools', poolRoutes);
 
 // ── 404 handler ──────────────────────────────────────────────────────
 app.notFound((c) => {

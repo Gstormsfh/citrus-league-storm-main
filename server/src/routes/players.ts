@@ -5,7 +5,7 @@ import { createUserClient } from '../lib/supabase';
 import { PlayerService } from '../services/PlayerService';
 import { AppError } from '../lib/errors';
 import { ok, fail, handleError } from '../lib/responses';
-import { logger } from '@citrus/shared';
+import { logger, CURRENT_SEASON } from '@citrus/shared';
 
 const playerRoutes = new Hono<Env>();
 
@@ -78,6 +78,109 @@ playerRoutes.get('/by-ids', authMiddleware, async (c) => {
   }
 
   return ok(c, players);
+});
+
+// GET /api/players/ros-projections — Get rest-of-season projections (top unrostered)
+playerRoutes.get('/ros-projections', authMiddleware, async (c) => {
+  const supabase = createUserClient(c.get('userToken'));
+  const limit = parseInt(c.req.query('limit') || '200', 10);
+
+  const { data, error } = await supabase
+    .from('player_ros_projections')
+    .select('player_id, player_name, position, team_abbrev, total_projected_points, avg_points_per_game, games_remaining')
+    .eq('season', CURRENT_SEASON)
+    .gt('total_projected_points', 0)
+    .gt('games_remaining', 0)
+    .order('total_projected_points', { ascending: false })
+    .limit(Math.min(limit, 500));
+
+  if (error) {
+    return handleError(c, error, 'Failed to fetch ROS projections');
+  }
+
+  return ok(c, data || []);
+});
+
+// GET /api/players/projections/batch — Batch player projections
+playerRoutes.get('/projections/batch', authMiddleware, async (c) => {
+  const ids = c.req.query('ids');
+  if (!ids) {
+    return fail(c, AppError.badRequest('ids query parameter required'));
+  }
+
+  const playerIds = ids.split(',').map((id) => parseInt(id.trim(), 10)).filter((id) => !isNaN(id));
+  if (playerIds.length === 0) {
+    return fail(c, AppError.badRequest('No valid player IDs provided'));
+  }
+
+  const startDate = c.req.query('startDate');
+  const endDate = c.req.query('endDate');
+  const season = c.req.query('season');
+  const supabase = createUserClient(c.get('userToken'));
+
+  try {
+    let query = supabase
+      .from('player_projected_stats')
+      .select('player_id, total_projected_points, projection_date, projected_goals, projected_assists, projected_points, projected_shots, projected_blocks, projected_hits, projected_pim, projected_wins, projected_saves, projected_goals_against')
+      .in('player_id', playerIds);
+
+    if (startDate) {
+      query = query.gte('projection_date', startDate);
+    }
+    if (endDate) {
+      query = query.lte('projection_date', endDate);
+    }
+    if (season) {
+      query = query.eq('season', parseInt(season, 10));
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      return handleError(c, error, 'Failed to fetch batch projections');
+    }
+
+    return ok(c, data || []);
+  } catch (err) {
+    return handleError(c, err, 'Failed to fetch batch projections');
+  }
+});
+
+// GET /api/players/directory — Get player directory entries
+playerRoutes.get('/directory', authMiddleware, async (c) => {
+  const ids = c.req.query('ids');
+  if (!ids) {
+    return fail(c, AppError.badRequest('ids query parameter required'));
+  }
+
+  const playerIds = ids.split(',').map((id) => parseInt(id.trim(), 10)).filter((id) => !isNaN(id));
+  if (playerIds.length === 0) {
+    return fail(c, AppError.badRequest('No valid player IDs provided'));
+  }
+
+  const season = c.req.query('season');
+  const supabase = createUserClient(c.get('userToken'));
+
+  try {
+    let query = supabase
+      .from('player_directory')
+      .select('player_id, position_code')
+      .in('player_id', playerIds);
+
+    if (season) {
+      query = query.eq('season', parseInt(season, 10));
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      return handleError(c, error, 'Failed to fetch player directory');
+    }
+
+    return ok(c, data || []);
+  } catch (err) {
+    return handleError(c, err, 'Failed to fetch player directory');
+  }
 });
 
 // GET /api/players/:playerId — Get a single player
