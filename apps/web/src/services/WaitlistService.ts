@@ -1,4 +1,4 @@
-import { apiClient } from '@/api/client';
+import { publicApi } from '@/api/public';
 import { logger } from '@/utils/logger';
 
 export interface WaitlistEntry {
@@ -20,10 +20,10 @@ export const WaitlistService = {
     }
 
     try {
-      const response = await apiClient.post('/api/public/waitlist', {
-        email: email.toLowerCase().trim(),
-        source: source || 'landing_page',
-      });
+      const response = await publicApi.joinWaitlist(
+        email.toLowerCase().trim(),
+        source || 'landing_page',
+      );
 
       const result = response.data as { success: boolean; message: string } | undefined;
       return result || { success: true, message: "Successfully added to waitlist!" };

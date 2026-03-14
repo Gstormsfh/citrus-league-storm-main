@@ -9,7 +9,7 @@ import { PlayerService, Player } from '@/services/PlayerService';
 import { AuctionDraftService } from '@/services/AuctionDraftService';
 import { supabase } from '@/integrations/supabase/client';
 import { leagueApi } from '@/api/leagues';
-import { apiClient } from '@/api/client';
+import { publicApi } from '@/api/public';
 import { logger } from '@/utils/logger';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import Navbar from '@/components/Navbar';
@@ -252,7 +252,7 @@ const DraftRoom = () => {
         const { DEMO_LEAGUE_ID_FOR_GUESTS } = await import('@/services/DemoLeagueService');
 
         // Get the demo league via public API (no auth required)
-        const leagueResponse = await apiClient.get(`/api/public/leagues/${DEMO_LEAGUE_ID_FOR_GUESTS}`);
+        const leagueResponse = await publicApi.getLeague(DEMO_LEAGUE_ID_FOR_GUESTS);
 
         if (!leagueResponse.data) {
           logger.error('[DraftRoom] Error loading demo league: no data returned');
@@ -267,7 +267,7 @@ const DraftRoom = () => {
         setIsCommissioner(false); // Guests are never commissioners
 
         // Get teams from the demo league via public API (no auth required)
-        const teamsResponse = await apiClient.get(`/api/public/leagues/${DEMO_LEAGUE_ID_FOR_GUESTS}/teams`);
+        const teamsResponse = await publicApi.getTeams(DEMO_LEAGUE_ID_FOR_GUESTS);
         const demoTeamsData = teamsResponse.data as unknown[] | null;
 
         if (!demoTeamsData || (demoTeamsData as unknown[]).length === 0) {

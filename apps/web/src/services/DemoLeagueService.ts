@@ -15,7 +15,7 @@ import { DraftService } from './DraftService';
 import { MatchupService } from './MatchupService';
 import { COLUMNS } from '@/utils/queryColumns';
 import { logger } from '@/utils/logger';
-import { apiClient } from '@/api/client';
+import { publicApi } from '@/api/public';
 import type { PostgrestError } from '@supabase/supabase-js';
 
 /** Shape of a row from the `teams` table, used for demo league operations. */
@@ -50,7 +50,7 @@ export const DemoLeagueService = {
    */
   async getDemoLeague() {
     try {
-      const response = await apiClient.get(`/api/public/leagues/${DEMO_LEAGUE_ID_FOR_GUESTS}`);
+      const response = await publicApi.getLeague(DEMO_LEAGUE_ID_FOR_GUESTS);
       return { data: response.data, error: null };
     } catch (error) {
       logger.error('[DemoLeagueService] getDemoLeague error:', error);
@@ -63,7 +63,7 @@ export const DemoLeagueService = {
    */
   async getDemoTeams() {
     try {
-      const response = await apiClient.get(`/api/public/leagues/${DEMO_LEAGUE_ID_FOR_GUESTS}/teams`);
+      const response = await publicApi.getTeams(DEMO_LEAGUE_ID_FOR_GUESTS);
       return { data: response.data || [], error: null };
     } catch (error) {
       logger.error('[DemoLeagueService] getDemoTeams error:', error);
@@ -79,16 +79,16 @@ export const DemoLeagueService = {
     try {
       if (teamId) {
         // Use the public player-ids endpoint for team-specific queries
-        const response = await apiClient.get(`/api/public/leagues/${DEMO_LEAGUE_ID_FOR_GUESTS}/teams/${teamId}/player-ids`);
+        const response = await publicApi.getPlayerIds(DEMO_LEAGUE_ID_FOR_GUESTS, teamId);
         const playerIds = (response.data || []) as string[];
         return { data: playerIds.map(pid => ({ player_id: pid })), error: null };
       }
       // For all picks, get all teams then fetch each team's player IDs
-      const teamsResponse = await apiClient.get(`/api/public/leagues/${DEMO_LEAGUE_ID_FOR_GUESTS}/teams`);
+      const teamsResponse = await publicApi.getTeams(DEMO_LEAGUE_ID_FOR_GUESTS);
       const teams = (teamsResponse.data || []) as Array<{ id: string }>;
       const allPicks: Array<{ team_id: string; player_id: string }> = [];
       await Promise.all(teams.map(async (t) => {
-        const resp = await apiClient.get(`/api/public/leagues/${DEMO_LEAGUE_ID_FOR_GUESTS}/teams/${t.id}/player-ids`);
+        const resp = await publicApi.getPlayerIds(DEMO_LEAGUE_ID_FOR_GUESTS, t.id);
         const pids = (resp.data || []) as string[];
         pids.forEach(pid => allPicks.push({ team_id: t.id, player_id: pid }));
       }));

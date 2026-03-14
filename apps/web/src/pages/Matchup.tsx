@@ -42,7 +42,7 @@ import { logger } from '@/utils/logger';
 import { matchupApi } from '@/api/matchups';
 import { leagueApi } from '@/api/leagues';
 import { playerApi } from '@/api/players';
-import { apiClient } from '@/api/client';
+import { publicApi } from '@/api/public';
 
 // ============================================================
 // Local type definitions for data used throughout this file
@@ -714,7 +714,7 @@ const Matchup = () => {
         // ===================================================================
 
         // Get the league data directly (using maybeSingle to avoid single() coercion error)
-        const demoLeagueResp = await apiClient.get(`/api/public/leagues/${DEMO_LEAGUE_ID_FOR_GUESTS}`);
+        const demoLeagueResp = await publicApi.getLeague(DEMO_LEAGUE_ID_FOR_GUESTS);
         const demoLeagueData = demoLeagueResp.data;
 
         if (!demoLeagueData) {
@@ -773,7 +773,7 @@ const Matchup = () => {
         });
 
         // Get all matchups for this week via API
-        const weekMatchupsResp = await apiClient.get(`/api/public/matchups/league/${DEMO_LEAGUE_ID_FOR_GUESTS}?week=${weekToShow}`);
+        const weekMatchupsResp = await publicApi.getLeagueMatchups(DEMO_LEAGUE_ID_FOR_GUESTS, weekToShow);
         let weekMatchups = (weekMatchupsResp.data || []) as any[];
 
         // If no matchups found for calculated week, try to find ANY matchup
@@ -781,7 +781,7 @@ const Matchup = () => {
           log(' No matchups found for week', weekToShow, '- trying to find any matchup in demo league');
 
           // Get ANY matchup from the demo league (fallback)
-          const anyMatchupsResp = await apiClient.get(`/api/public/matchups/league/${DEMO_LEAGUE_ID_FOR_GUESTS}`);
+          const anyMatchupsResp = await publicApi.getLeagueMatchups(DEMO_LEAGUE_ID_FOR_GUESTS);
           const anyMatchupsData = (anyMatchupsResp.data || []) as any[];
 
           if (anyMatchupsData.length > 0) {
@@ -864,7 +864,7 @@ const Matchup = () => {
 
         // Get teams via API (parallel)
         const [team1Resp, team2Resp] = await Promise.all([
-          apiClient.get(`/api/public/leagues/${guestMatchup.league_id}/teams`),
+          publicApi.getTeams(guestMatchup.league_id),
           Promise.resolve(null), // Teams come in one call
         ]);
 
@@ -937,7 +937,7 @@ const Matchup = () => {
         let team1DailyPoints: number[] = [];
         let team2DailyPoints: number[] = [];
         try {
-          const response = await apiClient.get(`/api/public/matchups/${guestMatchup.id}/daily-scores`);
+          const response = await publicApi.getDailyScores(guestMatchup.id);
           const dailyScoresData = response.data;
           if (dailyScoresData && Array.isArray(dailyScoresData)) {
             const parseDailyScores = (teamId: string) => {

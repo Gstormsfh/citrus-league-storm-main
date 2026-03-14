@@ -40,9 +40,9 @@ import { GameLockService } from '@/services/GameLockService';
 import { WaiverService } from '@/services/WaiverService';
 import { getPlayerWithSeasonStats } from '@/utils/playerStatsHelper';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { apiClient } from '@/api/client';
 import { leagueApi } from '@/api/leagues';
 import { playerApi } from '@/api/players';
+import { publicApi } from '@/api/public';
 import { rosterApi } from '@/api/rosters';
 import { matchupApi } from '@/api/matchups';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
@@ -449,7 +449,7 @@ const Roster = () => {
         // ═══════════════════════════════════════════════════════════════════
         if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
           // Get the demo league via public API (no auth required)
-          const leagueResponse = await apiClient.get(`/api/public/leagues/${DEMO_LEAGUE_ID_FOR_GUESTS}`);
+          const leagueResponse = await publicApi.getLeague(DEMO_LEAGUE_ID_FOR_GUESTS);
 
           if (!leagueResponse.data) {
             logger.error('[Roster] Error loading demo league: no data returned');
@@ -460,7 +460,7 @@ const Roster = () => {
           const demoLeague = leagueResponse.data as any;
           
           // Get the first team from the demo league via public API (no auth required)
-          const teamsResponse = await apiClient.get(`/api/public/leagues/${DEMO_LEAGUE_ID_FOR_GUESTS}/teams`);
+          const teamsResponse = await publicApi.getTeams(DEMO_LEAGUE_ID_FOR_GUESTS);
           const demoTeamsData = (teamsResponse.data || []) as any[];
 
           if (demoTeamsData.length === 0) {
@@ -481,7 +481,7 @@ const Roster = () => {
           });
           
           // Get roster player IDs via public API (no auth required)
-          const playerIdsResponse = await apiClient.get(`/api/public/leagues/${DEMO_LEAGUE_ID_FOR_GUESTS}/teams/${demoTeamData.id}/player-ids`);
+          const playerIdsResponse = await publicApi.getPlayerIds(DEMO_LEAGUE_ID_FOR_GUESTS, demoTeamData.id);
           const playerIds = (playerIdsResponse.data || []) as string[];
 
           if (!playerIds) {
