@@ -861,7 +861,8 @@ export const MatchupService = {
       }
 
       // FALLBACK: If roster_assignments is empty, try draft_picks via API
-      if (playerIds.length === 0) {
+      // SKIP for demo league — draftApi requires auth, and demo guests have no token
+      if (playerIds.length === 0 && leagueId !== DEMO_LEAGUE_ID_FOR_GUESTS) {
         logger.warn(`[MatchupService.getTeamRoster] roster_assignments empty for team ${teamId} in league ${leagueId}, falling back to draft_picks`);
         try {
           const { draftApi } = await import('@/api/draft');
@@ -1895,12 +1896,15 @@ export const MatchupService = {
       ].filter(id => id > 0);
 
       // NEW: Fetch pre-calculated matchup lines (with graceful degradation)
+      // Skip for demo league guests — requires auth, and page renders fine without lines
       let matchupLines = new Map<number, MatchupLineRow>();
-      try {
-        matchupLines = await this.getMatchupLines(matchup.id);
-      } catch (error: unknown) {
-        logger.warn('[MatchupService] Failed to fetch matchup lines, continuing with empty data:', error);
-        // Continue with empty Map - page should still load
+      if (!(isDemoLeague && !userId)) {
+        try {
+          matchupLines = await this.getMatchupLines(matchup.id);
+        } catch (error: unknown) {
+          logger.warn('[MatchupService] Failed to fetch matchup lines, continuing with empty data:', error);
+          // Continue with empty Map - page should still load
+        }
       }
 
       // Fetch matchup stats for the week (with graceful degradation)
@@ -1920,7 +1924,7 @@ export const MatchupService = {
         const weekStartStr = weekStart.toISOString().split('T')[0];
         const weekEndStr = weekEnd.toISOString().split('T')[0];
         
-        matchupStatsMap = await this.fetchMatchupStatsForPlayers(allPlayerIds, weekStart, weekEnd);
+        matchupStatsMap = await this.fetchMatchupStatsForPlayers(allPlayerIds, weekStart, weekEnd, isDemoLeague && !userId);
         
         if (matchupStatsMap.size > 0) {
           const sampleEntry = Array.from(matchupStatsMap.entries())[0];
@@ -1955,12 +1959,15 @@ export const MatchupService = {
       // Fetch daily projections for TODAY only (initial roster load)
       // Per-date projections are loaded on-demand when user selects a date in Matchup.tsx
       // This reduces API calls from 7 (one per weekday) to 1 per load
+      // Skip for demo league guests — requires auth, projections are supplementary
       const todayMST = getTodayMST();
       let dailyProjectionsMap = new Map<number, DailyProjectionRow>();
-      try {
-        dailyProjectionsMap = await this.getDailyProjectionsForMatchup(allPlayerIds, todayMST);
-      } catch (error: unknown) {
-        logger.warn('[MatchupService] Failed to fetch daily projections, continuing without them:', error);
+      if (!(isDemoLeague && !userId)) {
+        try {
+          dailyProjectionsMap = await this.getDailyProjectionsForMatchup(allPlayerIds, todayMST);
+        } catch (error: unknown) {
+          logger.warn('[MatchupService] Failed to fetch daily projections, continuing without them:', error);
+        }
       }
       
       const garMap = new Map<number, number>();
@@ -2680,15 +2687,23 @@ export const MatchupService = {
   async fetchMatchupStatsForPlayers(
     playerIds: number[],
     startDate: Date,
-    endDate: Date
+    endDate: Date,
+    usePublicApi: boolean = false
   ): Promise<Map<number, { goals: number; assists: number; sog: number; blocks: number; ppp: number; shp: number; hits: number; pim: number; plus_minus: number; xGoals: number; wins?: number; saves?: number; shutouts?: number; goals_against?: number }>> {
     try {
       // Use local timezone formatting to avoid UTC shift from toISOString()
       const formatLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       const startDateStr = formatLocal(startDate);
       const endDateStr = formatLocal(endDate);
-      
-      const response = await matchupApi.getMatchupStats(playerIds, startDateStr, endDateStr);
+
+      // Use public API for demo league guests (no auth required)
+      let response;
+      if (usePublicApi) {
+        const { publicApi } = await import('@/api/public');
+        response = await publicApi.getMatchupStats(playerIds, startDateStr, endDateStr);
+      } else {
+        response = await matchupApi.getMatchupStats(playerIds, startDateStr, endDateStr);
+      }
       const data = response.data ? Object.values(response.data) : [];
 
       const statsMap = new Map<number, {

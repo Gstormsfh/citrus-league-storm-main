@@ -167,7 +167,7 @@ export const PLAYOFF_SERIES_COLUMNS = 'id, bracket_id, round_number, match_numbe
 // ============================================================================
 // PLAYER DIRECTORY COLUMNS
 // ============================================================================
-export const PLAYER_DIRECTORY_COLUMNS = 'player_id, full_name, position_code, current_team_abbrev, sweater_number, headshot_url, roster_status, eligible_positions';
+export const PLAYER_DIRECTORY_COLUMNS = 'player_id, full_name, position_code, team_abbrev, jersey_number, headshot_url';
 
 // ============================================================================
 // PLAYER TALENT METRICS COLUMNS

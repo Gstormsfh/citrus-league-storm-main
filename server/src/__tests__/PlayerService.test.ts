@@ -15,13 +15,16 @@ describe('PlayerService', () => {
   describe('getAllPlayers', () => {
     it('fetches and merges player data from multiple tables', async () => {
       const directory = [
-        { player_id: 1, full_name: 'Connor McDavid', position_code: 'C', current_team_abbrev: 'EDM', sweater_number: 97, headshot_url: '', roster_status: 'active' },
-        { player_id: 2, full_name: 'Auston Matthews', position_code: 'C', current_team_abbrev: 'TOR', sweater_number: 34, headshot_url: '', roster_status: 'IR' },
+        { player_id: 1, full_name: 'Connor McDavid', position_code: 'C', team_abbrev: 'EDM', jersey_number: '97', headshot_url: '' },
+        { player_id: 2, full_name: 'Auston Matthews', position_code: 'C', team_abbrev: 'TOR', jersey_number: '34', headshot_url: '' },
       ];
       const stats = [
         { player_id: 1, games_played: 50, nhl_goals: 30, nhl_assists: 45, nhl_points: 75, nhl_shots_on_goal: 200, nhl_hits: 10, nhl_blocks: 5, nhl_pim: 12, nhl_ppp: 10, nhl_shp: 1, nhl_plus_minus: 15 },
       ];
-      const talents = [{ player_id: 1, xg_per_60: 1.5, xg_rating: 95 }];
+      const talents = [
+        { player_id: 1, xg_per_60: 1.5, xg_rating: 95 },
+        { player_id: 2, roster_status: 'IR' },
+      ];
 
       mockSupabase.from = vi.fn((table: string) => {
         if (table === 'player_directory') return createChain({ data: directory, error: null });
@@ -84,8 +87,8 @@ describe('PlayerService', () => {
         if (table === 'player_directory') {
           return createChain({
             data: [
-              { player_id: 1, full_name: 'Connor McDavid', position_code: 'C', current_team_abbrev: 'EDM' },
-              { player_id: 2, full_name: 'Leon Draisaitl', position_code: 'C', current_team_abbrev: 'EDM' },
+              { player_id: 1, full_name: 'Connor McDavid', position_code: 'C', team_abbrev: 'EDM' },
+              { player_id: 2, full_name: 'Leon Draisaitl', position_code: 'C', team_abbrev: 'EDM' },
             ],
             error: null,
           });
