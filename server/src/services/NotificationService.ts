@@ -19,13 +19,13 @@ export class NotificationService {
 
     let query = this.supabase
       .from('notifications')
-      .select('id, user_id, type, title, message, read, league_id, data, created_at')
+      .select('id, user_id, type, title, message, read_status, league_id, metadata, created_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(limit);
 
     if (options?.unreadOnly) {
-      query = query.eq('read', false);
+      query = query.eq('read_status', false);
     }
 
     const { data, error } = await query;
@@ -38,7 +38,7 @@ export class NotificationService {
       .from('notifications')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
-      .eq('read', false);
+      .eq('read_status', false);
 
     if (leagueId) {
       query = query.eq('league_id', leagueId);
@@ -52,7 +52,7 @@ export class NotificationService {
   async markAsRead(notificationId: string, userId: string) {
     const { error } = await this.supabase
       .from('notifications')
-      .update({ read: true, read_at: new Date().toISOString() })
+      .update({ read_status: true, read_at: new Date().toISOString() })
       .eq('id', notificationId)
       .eq('user_id', userId);
 
@@ -63,9 +63,9 @@ export class NotificationService {
   async markAllAsRead(userId: string, leagueId?: string) {
     let query = this.supabase
       .from('notifications')
-      .update({ read: true, read_at: new Date().toISOString() })
+      .update({ read_status: true, read_at: new Date().toISOString() })
       .eq('user_id', userId)
-      .eq('read', false);
+      .eq('read_status', false);
 
     if (leagueId) {
       query = query.eq('league_id', leagueId);

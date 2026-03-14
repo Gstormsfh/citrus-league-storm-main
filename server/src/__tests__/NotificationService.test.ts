@@ -14,8 +14,8 @@ describe('NotificationService', () => {
   describe('getNotifications', () => {
     it('returns notifications for a user', async () => {
       const notifications = [
-        { id: 'n1', title: 'Trade Offer', read: false },
-        { id: 'n2', title: 'Draft Started', read: true },
+        { id: 'n1', title: 'Trade Offer', read_status: false },
+        { id: 'n2', title: 'Draft Started', read_status: true },
       ];
       mockSupabase.from = vi.fn(() => createChain({ data: notifications, error: null }));
 
@@ -28,7 +28,7 @@ describe('NotificationService', () => {
       mockSupabase.from = vi.fn(() => chain);
 
       await service.getNotifications('user-1', { unreadOnly: true });
-      expect(chain.eq).toHaveBeenCalledWith('read', false);
+      expect(chain.eq).toHaveBeenCalledWith('read_status', false);
     });
 
     it('respects custom limit', async () => {

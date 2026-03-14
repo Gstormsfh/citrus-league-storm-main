@@ -12,11 +12,9 @@ interface PlayerDirectoryRow {
   player_id: number;
   full_name: string;
   position_code: string;
-  current_team_abbrev: string;
-  sweater_number: number | null;
+  team_abbrev: string;
+  jersey_number: string | null;
   headshot_url: string | null;
-  roster_status: string | null;
-  eligible_positions: string[] | null;
 }
 
 interface PlayerStatsRow {
@@ -104,20 +102,19 @@ let playersCache: { data: NormalizedPlayer[]; timestamp: number } | null = null;
 const CACHE_TTL = 5 * 60 * 1000;
 
 function buildPlayer(p: PlayerDirectoryRow, stat: Partial<PlayerStatsRow>, talent?: Partial<TalentMetricsRow>, goalieGsax?: GoalieGsaxRow): NormalizedPlayer {
-  // Prefer talent metrics roster_status (from player_talent_metrics) over directory roster_status
-  const rosterStatus = talent?.roster_status ?? p.roster_status ?? null;
+  const rosterStatus = talent?.roster_status ?? null;
   return {
     id: p.player_id,
     full_name: p.full_name,
     position: p.position_code,
-    team: p.current_team_abbrev,
-    jersey_number: p.sweater_number,
+    team: p.team_abbrev,
+    jersey_number: p.jersey_number ? parseInt(p.jersey_number, 10) : null,
     headshot_url: p.headshot_url,
     is_goalie: p.position_code === 'G',
     status: rosterStatus === 'IR' || rosterStatus === 'LTIR' ? 'injured' : 'active',
     roster_status: rosterStatus,
     is_ir_eligible: talent?.is_ir_eligible || false,
-    eligible_positions: p.eligible_positions || [p.position_code],
+    eligible_positions: [p.position_code],
     games_played: stat.games_played || 0,
     goals: stat.nhl_goals || 0,
     assists: stat.nhl_assists || 0,
