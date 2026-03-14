@@ -158,6 +158,35 @@ publicRoutes.get('/matchups/:matchupId', async (c) => {
   return ok(c, { ...matchup, lines });
 });
 
+// POST /api/public/matchups/matchup-stats — Get weekly matchup stats (demo league only)
+publicRoutes.post('/matchups/matchup-stats', async (c) => {
+  let body: { playerIds?: number[]; startDate?: string; endDate?: string };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: { code: 'BAD_REQUEST', message: 'Invalid JSON body' } }, 400);
+  }
+
+  if (!body.playerIds?.length || !body.startDate || !body.endDate) {
+    return fail(c, AppError.badRequest('playerIds, startDate, and endDate are required'));
+  }
+
+  const supabase = getSupabaseAdmin();
+  const service = new MatchupService(supabase);
+
+  const { statsMap, error } = await service.getMatchupStats(body.playerIds, body.startDate, body.endDate);
+  if (error) {
+    return handleError(c, error, 'Failed to fetch matchup stats');
+  }
+
+  const stats: Record<string, unknown> = {};
+  statsMap.forEach((value, key) => {
+    stats[String(key)] = value;
+  });
+
+  return ok(c, stats);
+});
+
 // POST /api/public/waitlist — Add email to waitlist (no auth required)
 publicRoutes.post('/waitlist', async (c) => {
   let body: { email?: string; source?: string };

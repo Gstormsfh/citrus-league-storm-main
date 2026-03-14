@@ -355,7 +355,8 @@ const Matchup = () => {
       }
       
       // Step 2: Calculate and store matchup scores
-      if (currentMatchup.status === 'in_progress' || currentMatchup.status === 'scheduled') {
+      // SKIP for demo league - guests have no auth token, and score jobs are server-side
+      if (!isDemoLeague && (currentMatchup.status === 'in_progress' || currentMatchup.status === 'scheduled')) {
         log(' Triggering background score calculation job for league:', currentMatchup.league_id);
         try {
           const result = await MatchupScoreJobService.runJob(currentMatchup.league_id);

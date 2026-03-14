@@ -64,6 +64,11 @@ export const publicApi = {
     );
   },
 
+  /** Get matchup stats for players in a date range (no auth required) */
+  getMatchupStats(playerIds: number[], startDate: string, endDate: string) {
+    return apiClient.post('/api/public/matchups/matchup-stats', { playerIds, startDate, endDate });
+  },
+
   // ── Waitlist ─────────────────────────────────────────────────────────────
 
   /** Submit a waitlist signup (no auth required, not cached) */
