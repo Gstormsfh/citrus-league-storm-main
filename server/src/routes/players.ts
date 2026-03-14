@@ -121,7 +121,7 @@ playerRoutes.get('/projections/batch', authMiddleware, async (c) => {
   try {
     let query = supabase
       .from('player_projected_stats')
-      .select('player_id, total_projected_points, projection_date, projected_goals, projected_assists, projected_points, projected_shots, projected_blocks, projected_hits, projected_pim, projected_wins, projected_saves, projected_goals_against')
+      .select('player_id, total_projected_points, projection_date, projected_goals, projected_assists, projected_sog, projected_blocks, projected_hits, projected_pim, projected_wins, projected_saves, projected_goals_against')
       .in('player_id', playerIds);
 
     if (startDate) {
