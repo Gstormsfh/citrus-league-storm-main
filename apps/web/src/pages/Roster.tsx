@@ -42,6 +42,7 @@ import { getPlayerWithSeasonStats } from '@/utils/playerStatsHelper';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { apiClient } from '@/api/client';
 import { leagueApi } from '@/api/leagues';
+import { playerApi } from '@/api/players';
 import { rosterApi } from '@/api/rosters';
 import { matchupApi } from '@/api/matchups';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
@@ -1837,10 +1838,10 @@ const Roster = () => {
 
             if (allPlayerIds.length > 0) {
                 // Fetch all future projections for these players (all 8 stat categories to match matchup system)
-                // Fetch projections via API client
-                // TODO: Use playerApi.getBatchProjections() once it's available
-                const idsParam = allPlayerIds.join(',');
-                const projResponse = await apiClient.get(`/api/players/projections/batch?ids=${idsParam}&startDate=${todayStr}&season=${CURRENT_SEASON}`);
+                const projResponse = await playerApi.getBatchProjections(
+                  allPlayerIds.map(String),
+                  { startDate: todayStr, season: CURRENT_SEASON }
+                );
                 const projectionsData = projResponse.data as any[] | null;
 
                 if (projectionsData) {

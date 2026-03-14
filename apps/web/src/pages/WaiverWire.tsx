@@ -18,7 +18,7 @@ import { PlayerService, type Player } from '@/services/PlayerService';
 import { LeagueService } from '@/services/LeagueService';
 import { leagueApi } from '@/api/leagues';
 import { rosterApi } from '@/api/rosters';
-import { apiClient } from '@/api/client';
+import { waiverApi } from '@/api/waivers';
 import { useToast } from '@/hooks/use-toast';
 import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
@@ -144,7 +144,7 @@ const WaiverWire = () => {
       if (team && !myPrio && actualTeamCount > 0) {
         try {
           // Use API to create priority
-          const { data: rpcResult } = await apiClient.post(`/api/waivers/league/${activeLeagueId}/initialize-priority`, { teamId: team.id });
+          const { data: rpcResult } = await waiverApi.initializePriority(activeLeagueId, team.id);
 
           if (rpcResult && Array.isArray(rpcResult) && rpcResult.length > 0) {
             const result = rpcResult[0];
