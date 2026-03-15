@@ -1210,13 +1210,13 @@ const FreeAgents = () => {
 
                         {/* Desktop Table View */}
                         <div className="hidden md:block">
-                          <Table>
+                          <Table className="[&_th]:px-2 [&_th]:py-2 [&_th]:text-xs [&_td]:px-2 [&_td]:py-1.5">
                             <TableHeader>
                               <TableRow>
                                 <TableHead>Player</TableHead>
-                                <TableHead className="text-right">Pos</TableHead>
-                                <TableHead className="text-right">Adds</TableHead>
-                                <TableHead className="w-[50px]"></TableHead>
+                                <TableHead className="text-right whitespace-nowrap">Pos</TableHead>
+                                <TableHead className="text-right whitespace-nowrap">Adds</TableHead>
+                                <TableHead className="w-[70px]"></TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -1331,14 +1331,14 @@ const FreeAgents = () => {
 
                         {/* Desktop Table View */}
                         <div className="hidden md:block">
-                          <Table>
+                          <Table className="[&_th]:px-2 [&_th]:py-2 [&_th]:text-xs [&_td]:px-2 [&_td]:py-1.5">
                             <TableHeader>
                               <TableRow>
                                 <TableHead>Player</TableHead>
-                                <TableHead className="text-right">Pos</TableHead>
-                                <TableHead className="text-center">Schedule</TableHead>
-                                <TableHead className="text-right">Proj</TableHead>
-                                <TableHead className="w-[80px]"></TableHead>
+                                <TableHead className="text-right whitespace-nowrap">Pos</TableHead>
+                                <TableHead className="text-center whitespace-nowrap">Schedule</TableHead>
+                                <TableHead className="text-right whitespace-nowrap">Proj</TableHead>
+                                <TableHead className="w-[70px]"></TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -1422,11 +1422,11 @@ const FreeAgents = () => {
                     
                     <div className="border rounded-lg overflow-hidden">
                       <div className="overflow-x-auto">
-                        <Table>
+                        <Table className="min-w-[800px] [&_th]:px-2 [&_th]:py-2 [&_th]:text-xs [&_td]:px-2 [&_td]:py-1.5">
                           <TableHeader>
                             <TableRow>
-                              <TableHead 
-                                className="cursor-pointer hover:bg-muted/50 select-none"
+                              <TableHead
+                                className="cursor-pointer hover:bg-muted/50 select-none min-w-[160px]"
                                 onClick={() => handleSort('name')}
                               >
                                 <div className="flex items-center justify-start">
@@ -1434,8 +1434,8 @@ const FreeAgents = () => {
                                   {getSortIcon('name')}
                                 </div>
                               </TableHead>
-                              <TableHead 
-                                className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                              <TableHead
+                                className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
                                 onClick={() => handleSort('position')}
                               >
                                 <div className="flex items-center justify-end">
@@ -1443,8 +1443,8 @@ const FreeAgents = () => {
                                   {getSortIcon('position')}
                                 </div>
                               </TableHead>
-                              <TableHead 
-                                className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                              <TableHead
+                                className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
                                 onClick={() => handleSort('team')}
                               >
                                 <div className="flex items-center justify-end">
@@ -1452,8 +1452,8 @@ const FreeAgents = () => {
                                   {getSortIcon('team')}
                                 </div>
                               </TableHead>
-                              <TableHead 
-                                className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                              <TableHead
+                                className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
                                 onClick={() => handleSort('gp')}
                               >
                                 <div className="flex items-center justify-end">
@@ -1464,8 +1464,8 @@ const FreeAgents = () => {
                               {/* Skater Stats - only show if there are skaters */}
                               {filteredPlayers.some(p => p.position !== 'G') && (
                                 <>
-                                  <TableHead 
-                                    className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                                  <TableHead
+                                    className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
                                     onClick={() => handleSort('goals')}
                                   >
                                     <div className="flex items-center justify-end">
@@ -1473,8 +1473,8 @@ const FreeAgents = () => {
                                       {getSortIcon('goals')}
                                     </div>
                                   </TableHead>
-                                  <TableHead 
-                                    className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                                  <TableHead
+                                    className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
                                     onClick={() => handleSort('assists')}
                                   >
                                     <div className="flex items-center justify-end">
@@ -1482,8 +1482,8 @@ const FreeAgents = () => {
                                       {getSortIcon('assists')}
                                     </div>
                                   </TableHead>
-                                  <TableHead 
-                                    className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                                  <TableHead
+                                    className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
                                     onClick={() => handleSort('points')}
                                   >
                                     <div className="flex items-center justify-end">
@@ -1491,8 +1491,8 @@ const FreeAgents = () => {
                                       {getSortIcon('points')}
                                     </div>
                                   </TableHead>
-                                  <TableHead 
-                                    className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                                  <TableHead
+                                    className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
                                     onClick={() => handleSort('shots')}
                                   >
                                     <div className="flex items-center justify-end">
@@ -1500,8 +1500,8 @@ const FreeAgents = () => {
                                       {getSortIcon('shots')}
                                     </div>
                                   </TableHead>
-                                  <TableHead 
-                                    className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                                  <TableHead
+                                    className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
                                     onClick={() => handleSort('hits')}
                                   >
                                     <div className="flex items-center justify-end">
@@ -1509,8 +1509,8 @@ const FreeAgents = () => {
                                       {getSortIcon('hits')}
                                     </div>
                                   </TableHead>
-                                  <TableHead 
-                                    className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                                  <TableHead
+                                    className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
                                     onClick={() => handleSort('blocks')}
                                   >
                                     <div className="flex items-center justify-end">
@@ -1518,8 +1518,8 @@ const FreeAgents = () => {
                                       {getSortIcon('blocks')}
                                     </div>
                                   </TableHead>
-                                  <TableHead 
-                                    className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                                  <TableHead
+                                    className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
                                     onClick={() => handleSort('xGoals')}
                                   >
                                     <div className="flex items-center justify-end">
@@ -1533,8 +1533,8 @@ const FreeAgents = () => {
                               {/* Goalie Stats - only show if there are goalies */}
                               {filteredPlayers.some(p => p.position === 'G') && (
                                 <>
-                                  <TableHead 
-                                    className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                                  <TableHead
+                                    className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
                                     onClick={() => handleSort('wins')}
                                   >
                                     <div className="flex items-center justify-end">
@@ -1542,8 +1542,8 @@ const FreeAgents = () => {
                                       {getSortIcon('wins')}
                                     </div>
                                   </TableHead>
-                                  <TableHead 
-                                    className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                                  <TableHead
+                                    className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
                                     onClick={() => handleSort('gaa')}
                                   >
                                     <div className="flex items-center justify-end">
@@ -1551,8 +1551,8 @@ const FreeAgents = () => {
                                       {getSortIcon('gaa')}
                                     </div>
                                   </TableHead>
-                                  <TableHead 
-                                    className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                                  <TableHead
+                                    className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
                                     onClick={() => handleSort('savePct')}
                                   >
                                     <div className="flex items-center justify-end">
@@ -1562,7 +1562,7 @@ const FreeAgents = () => {
                                   </TableHead>
                                 </>
                               )}
-                              <TableHead className="w-[120px]"></TableHead>
+                              <TableHead className="w-[100px]"></TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -1570,39 +1570,39 @@ const FreeAgents = () => {
                               const isGoalie = player.position === 'G';
                               return (
                                 <TableRow key={player.id} className="hover:bg-muted/50">
-                                  <TableCell className="font-medium">
+                                  <TableCell className="font-medium whitespace-nowrap">
                                     <div className="flex flex-col">
                                       <span
-                                        className="hover:underline hover:text-primary cursor-pointer"
+                                        className="hover:underline hover:text-primary cursor-pointer text-sm"
                                         onClick={() => handlePlayerClick(player)}
                                       >
                                         {player.full_name}
                                       </span>
-                                      <span className="text-xs text-muted-foreground">{player.status || 'Active'}</span>
+                                      <span className="text-[11px] text-muted-foreground">{player.status || 'Active'}</span>
                                     </div>
                                   </TableCell>
-                                  <TableCell className="text-right">{formatPositionForDisplay(player.position)}</TableCell>
-                                  <TableCell className="text-right">{player.team}</TableCell>
-                                  <TableCell className="text-right">{player.games_played || 0}</TableCell>
+                                  <TableCell className="text-right text-sm whitespace-nowrap">{formatPositionForDisplay(player.position)}</TableCell>
+                                  <TableCell className="text-right text-sm whitespace-nowrap">{player.team}</TableCell>
+                                  <TableCell className="text-right text-sm whitespace-nowrap">{player.games_played || 0}</TableCell>
                                   {/* Skater Stats - only render for skaters */}
                                   {!isGoalie && (
                                     <>
-                                      <TableCell className="text-right">{player.goals || 0}</TableCell>
-                                      <TableCell className="text-right">{player.assists || 0}</TableCell>
-                                      <TableCell className="text-right font-bold">{player.points || 0}</TableCell>
-                                      <TableCell className="text-right">{player.shots || 0}</TableCell>
-                                      <TableCell className="text-right">{player.hits || 0}</TableCell>
-                                      <TableCell className="text-right">{player.blocks || 0}</TableCell>
-                                      <TableCell className="text-right">{typeof player.xGoals === 'number' ? player.xGoals.toFixed(1) : '-'}</TableCell>
+                                      <TableCell className="text-right text-sm whitespace-nowrap">{player.goals || 0}</TableCell>
+                                      <TableCell className="text-right text-sm whitespace-nowrap">{player.assists || 0}</TableCell>
+                                      <TableCell className="text-right text-sm font-bold whitespace-nowrap">{player.points || 0}</TableCell>
+                                      <TableCell className="text-right text-sm whitespace-nowrap">{player.shots || 0}</TableCell>
+                                      <TableCell className="text-right text-sm whitespace-nowrap">{player.hits || 0}</TableCell>
+                                      <TableCell className="text-right text-sm whitespace-nowrap">{player.blocks || 0}</TableCell>
+                                      <TableCell className="text-right text-sm whitespace-nowrap">{typeof player.xGoals === 'number' ? player.xGoals.toFixed(1) : '-'}</TableCell>
                                       {/* Corsi/Fenwick intentionally removed */}
                                     </>
                                   )}
                                   {/* Goalie Stats - only render for goalies */}
                                   {isGoalie && (
                                     <>
-                                      <TableCell className="text-right">{player.wins || 0}</TableCell>
-                                      <TableCell className="text-right">{typeof player.goals_against_average === 'number' ? player.goals_against_average.toFixed(2) : '-'}</TableCell>
-                                      <TableCell className="text-right">{typeof player.save_percentage === 'number' ? (player.save_percentage * 100).toFixed(1) : '-'}%</TableCell>
+                                      <TableCell className="text-right text-sm whitespace-nowrap">{player.wins || 0}</TableCell>
+                                      <TableCell className="text-right text-sm whitespace-nowrap">{typeof player.goals_against_average === 'number' ? player.goals_against_average.toFixed(2) : '-'}</TableCell>
+                                      <TableCell className="text-right text-sm whitespace-nowrap">{typeof player.save_percentage === 'number' ? (player.save_percentage * 100).toFixed(1) : '-'}%</TableCell>
                                     </>
                                   )}
                                   <TableCell>
@@ -1610,15 +1610,15 @@ const FreeAgents = () => {
                                       <Button
                                         size="icon"
                                         variant="ghost"
-                                        className={`h-8 w-8 ${watchlist.has(player.id) ? 'text-yellow-500' : 'text-muted-foreground'}`}
+                                        className={`h-7 w-7 ${watchlist.has(player.id) ? 'text-yellow-500' : 'text-muted-foreground'}`}
                                         onClick={() => toggleWatchlist(player)}
                                       >
-                                        <Star className={`h-4 w-4 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
+                                        <Star className={`h-3.5 w-3.5 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
                                       </Button>
-                                      <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => handlePlayerClick(player)}>
-                                        <Info className="h-4 w-4" />
+                                      <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" onClick={() => handlePlayerClick(player)}>
+                                        <Info className="h-3.5 w-3.5" />
                                       </Button>
-                                      <Button size="default" variant="default" className="h-10 w-10 text-primary font-bold text-xl bg-primary/10 hover:bg-primary/20 border border-primary/30" onClick={() => handleAddPlayer(player)}>
+                                      <Button size="sm" variant="default" className="h-7 w-7 text-primary font-bold text-base bg-primary/10 hover:bg-primary/20 border border-primary/30 p-0" onClick={() => handleAddPlayer(player)}>
                                         +
                                       </Button>
                                     </div>
@@ -1630,7 +1630,7 @@ const FreeAgents = () => {
                         </Table>
                       </div>
                       {/* Infinite scroll sentinel + count */}
-                      <div className="text-center py-3 text-sm text-muted-foreground">
+                      <div className="text-center py-2 text-xs text-muted-foreground">
                         Showing {visiblePlayers.length} of {filteredPlayers.length} players
                       </div>
                       {hasMorePlayers && (
@@ -1683,11 +1683,11 @@ const FreeAgents = () => {
              ) : (
                <div className="border rounded-lg overflow-hidden">
                  <div className="overflow-x-auto">
-                   <Table>
+                   <Table className="min-w-[700px] [&_th]:px-2 [&_th]:py-2 [&_th]:text-xs [&_td]:px-2 [&_td]:py-1.5">
                      <TableHeader>
                        <TableRow className="bg-muted/30">
-                         <TableHead 
-                           className="cursor-pointer hover:bg-muted/50 select-none"
+                         <TableHead
+                           className="cursor-pointer hover:bg-muted/50 select-none min-w-[140px]"
                            onClick={() => handleSort('name')}
                          >
                            <div className="flex items-center justify-start">
@@ -1695,8 +1695,8 @@ const FreeAgents = () => {
                              {getSortIcon('name')}
                            </div>
                          </TableHead>
-                         <TableHead 
-                           className="text-center cursor-pointer hover:bg-muted/50 select-none"
+                         <TableHead
+                           className="text-center cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
                            onClick={() => handleSort('position')}
                          >
                            <div className="flex items-center justify-center">
@@ -1704,13 +1704,13 @@ const FreeAgents = () => {
                              {getSortIcon('position')}
                            </div>
                          </TableHead>
-                         <TableHead className="text-center">
+                         <TableHead className="text-center whitespace-nowrap">
                            <div className="flex items-center justify-center">
                              Schedule
                            </div>
                          </TableHead>
-                        <TableHead 
-                          className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                        <TableHead
+                          className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
                           onClick={() => handleSort('points')}
                         >
                           <div className="flex items-center justify-end text-xs">
@@ -1718,17 +1718,17 @@ const FreeAgents = () => {
                             {getSortIcon('points')}
                           </div>
                         </TableHead>
-                        <TableHead 
-                          className="text-center cursor-pointer hover:bg-muted/50 select-none bg-blue-500/10"
+                        <TableHead
+                          className="text-center cursor-pointer hover:bg-muted/50 select-none bg-blue-500/10 whitespace-nowrap"
                           onClick={() => handleSort('weeklyProjection')}
                         >
                           <div className="flex items-center justify-center gap-1 font-bold text-blue-700">
-                            <TrendingUp className="h-4 w-4" />
+                            <TrendingUp className="h-3.5 w-3.5" />
                             Rest of Week
                             {getSortIcon('weeklyProjection')}
                           </div>
                         </TableHead>
-                        <TableHead className="w-[100px]"></TableHead>
+                        <TableHead className="w-[80px]"></TableHead>
                        </TableRow>
                      </TableHeader>
                     <TableBody>
@@ -1889,15 +1889,15 @@ const FreeAgents = () => {
                               </TableCell>
                                <TableCell>
                                  <div className="flex gap-1 justify-end">
-                                   <Button 
-                                     size="icon" 
-                                     variant="ghost" 
-                                     className={`h-8 w-8 ${watchlist.has(player.id) ? 'text-yellow-500' : 'text-muted-foreground'}`}
+                                   <Button
+                                     size="icon"
+                                     variant="ghost"
+                                     className={`h-7 w-7 ${watchlist.has(player.id) ? 'text-yellow-500' : 'text-muted-foreground'}`}
                                      onClick={() => toggleWatchlist(player)}
                                    >
-                                     <Star className={`h-4 w-4 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
+                                     <Star className={`h-3.5 w-3.5 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
                                    </Button>
-                                   <Button size="sm" variant="default" className="h-8 px-3 text-primary font-bold bg-primary/10 hover:bg-primary/20 border border-primary/30" onClick={() => handleAddPlayer(player)}>
+                                   <Button size="sm" variant="default" className="h-7 px-2 text-xs text-primary font-bold bg-primary/10 hover:bg-primary/20 border border-primary/30" onClick={() => handleAddPlayer(player)}>
                                      + Add
                                    </Button>
                                  </div>
@@ -1948,11 +1948,11 @@ const FreeAgents = () => {
             ) : (
               <div className="border rounded-lg overflow-hidden">
                 <div className="overflow-x-auto">
-                  <Table>
+                  <Table className="min-w-[800px] [&_th]:px-2 [&_th]:py-2 [&_th]:text-xs [&_td]:px-2 [&_td]:py-1.5">
                     <TableHeader>
                       <TableRow>
-                        <TableHead 
-                          className="cursor-pointer hover:bg-muted/50 select-none"
+                        <TableHead
+                          className="cursor-pointer hover:bg-muted/50 select-none min-w-[160px]"
                           onClick={() => handleSort('name')}
                         >
                           <div className="flex items-center justify-start">
@@ -1960,8 +1960,8 @@ const FreeAgents = () => {
                             {getSortIcon('name')}
                           </div>
                         </TableHead>
-                        <TableHead 
-                          className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                        <TableHead
+                          className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
                           onClick={() => handleSort('position')}
                         >
                           <div className="flex items-center justify-end">
@@ -1969,8 +1969,8 @@ const FreeAgents = () => {
                             {getSortIcon('position')}
                           </div>
                         </TableHead>
-                        <TableHead 
-                          className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                        <TableHead
+                          className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
                           onClick={() => handleSort('team')}
                         >
                           <div className="flex items-center justify-end">
@@ -1978,8 +1978,8 @@ const FreeAgents = () => {
                             {getSortIcon('team')}
                           </div>
                         </TableHead>
-                        <TableHead 
-                          className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                        <TableHead
+                          className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
                           onClick={() => handleSort('gp')}
                         >
                           <div className="flex items-center justify-end">
@@ -1990,8 +1990,8 @@ const FreeAgents = () => {
                         {/* Skater Stats - only show if there are skaters */}
                         {players.filter(p => watchlist.has(p.id)).some(p => p.position !== 'G') && (
                           <>
-                            <TableHead 
-                              className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                            <TableHead
+                              className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
                               onClick={() => handleSort('goals')}
                             >
                               <div className="flex items-center justify-end">
@@ -1999,8 +1999,8 @@ const FreeAgents = () => {
                                 {getSortIcon('goals')}
                               </div>
                             </TableHead>
-                            <TableHead 
-                              className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                            <TableHead
+                              className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
                               onClick={() => handleSort('assists')}
                             >
                               <div className="flex items-center justify-end">
@@ -2008,8 +2008,8 @@ const FreeAgents = () => {
                                 {getSortIcon('assists')}
                               </div>
                             </TableHead>
-                            <TableHead 
-                              className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                            <TableHead
+                              className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
                               onClick={() => handleSort('points')}
                             >
                               <div className="flex items-center justify-end">
@@ -2017,8 +2017,8 @@ const FreeAgents = () => {
                                 {getSortIcon('points')}
                               </div>
                             </TableHead>
-                            <TableHead 
-                              className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                            <TableHead
+                              className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
                               onClick={() => handleSort('shots')}
                             >
                               <div className="flex items-center justify-end">
@@ -2026,8 +2026,8 @@ const FreeAgents = () => {
                                 {getSortIcon('shots')}
                               </div>
                             </TableHead>
-                            <TableHead 
-                              className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                            <TableHead
+                              className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
                               onClick={() => handleSort('hits')}
                             >
                               <div className="flex items-center justify-end">
@@ -2035,8 +2035,8 @@ const FreeAgents = () => {
                                 {getSortIcon('hits')}
                               </div>
                             </TableHead>
-                            <TableHead 
-                              className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                            <TableHead
+                              className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
                               onClick={() => handleSort('blocks')}
                             >
                               <div className="flex items-center justify-end">
@@ -2044,8 +2044,8 @@ const FreeAgents = () => {
                                 {getSortIcon('blocks')}
                               </div>
                             </TableHead>
-                            <TableHead 
-                              className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                            <TableHead
+                              className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
                               onClick={() => handleSort('xGoals')}
                             >
                               <div className="flex items-center justify-end">
@@ -2059,8 +2059,8 @@ const FreeAgents = () => {
                         {/* Goalie Stats - only show if there are goalies */}
                         {players.filter(p => watchlist.has(p.id)).some(p => p.position === 'G') && (
                           <>
-                            <TableHead 
-                              className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                            <TableHead
+                              className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
                               onClick={() => handleSort('wins')}
                             >
                               <div className="flex items-center justify-end">
@@ -2068,8 +2068,8 @@ const FreeAgents = () => {
                                 {getSortIcon('wins')}
                               </div>
                             </TableHead>
-                            <TableHead 
-                              className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                            <TableHead
+                              className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
                               onClick={() => handleSort('gaa')}
                             >
                               <div className="flex items-center justify-end">
@@ -2077,8 +2077,8 @@ const FreeAgents = () => {
                                 {getSortIcon('gaa')}
                               </div>
                             </TableHead>
-                            <TableHead 
-                              className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                            <TableHead
+                              className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
                               onClick={() => handleSort('savePct')}
                             >
                               <div className="flex items-center justify-end">
@@ -2088,7 +2088,7 @@ const FreeAgents = () => {
                             </TableHead>
                           </>
                         )}
-                        <TableHead className="w-[120px]"></TableHead>
+                        <TableHead className="w-[100px]"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -2096,57 +2096,57 @@ const FreeAgents = () => {
                         const isGoalie = player.position === 'G';
                         return (
                           <TableRow key={player.id} className="hover:bg-muted/50">
-                            <TableCell className="font-medium">
+                            <TableCell className="font-medium whitespace-nowrap">
                               <div className="flex flex-col">
-                                <span 
-                                  className="hover:underline hover:text-primary cursor-pointer"
+                                <span
+                                  className="hover:underline hover:text-primary cursor-pointer text-sm"
                                   onClick={() => handlePlayerClick(player)}
                                 >
                                   {player.full_name}
                                 </span>
-                                <Badge variant="outline" className="border-yellow-500/30 text-yellow-600 bg-yellow-500/5 w-fit mt-1">
+                                <Badge variant="outline" className="border-yellow-500/30 text-yellow-600 bg-yellow-500/5 w-fit text-[10px] px-1.5 py-0">
                                   Watched
                                 </Badge>
                               </div>
                             </TableCell>
-                            <TableCell className="text-right">{formatPositionForDisplay(player.position)}</TableCell>
-                            <TableCell className="text-right">{player.team}</TableCell>
-                            <TableCell className="text-right">{player.games_played || 0}</TableCell>
+                            <TableCell className="text-right text-sm whitespace-nowrap">{formatPositionForDisplay(player.position)}</TableCell>
+                            <TableCell className="text-right text-sm whitespace-nowrap">{player.team}</TableCell>
+                            <TableCell className="text-right text-sm whitespace-nowrap">{player.games_played || 0}</TableCell>
                             {/* Skater Stats - only render for skaters */}
                             {!isGoalie && (
                               <>
-                                <TableCell className="text-right">{player.goals || 0}</TableCell>
-                                <TableCell className="text-right">{player.assists || 0}</TableCell>
-                                <TableCell className="text-right font-bold">{player.points || 0}</TableCell>
-                                <TableCell className="text-right">{player.shots || 0}</TableCell>
-                                <TableCell className="text-right">{player.hits || 0}</TableCell>
-                                <TableCell className="text-right">{player.blocks || 0}</TableCell>
-                                <TableCell className="text-right">{typeof player.xGoals === 'number' ? player.xGoals.toFixed(1) : '-'}</TableCell>
+                                <TableCell className="text-right text-sm whitespace-nowrap">{player.goals || 0}</TableCell>
+                                <TableCell className="text-right text-sm whitespace-nowrap">{player.assists || 0}</TableCell>
+                                <TableCell className="text-right text-sm font-bold whitespace-nowrap">{player.points || 0}</TableCell>
+                                <TableCell className="text-right text-sm whitespace-nowrap">{player.shots || 0}</TableCell>
+                                <TableCell className="text-right text-sm whitespace-nowrap">{player.hits || 0}</TableCell>
+                                <TableCell className="text-right text-sm whitespace-nowrap">{player.blocks || 0}</TableCell>
+                                <TableCell className="text-right text-sm whitespace-nowrap">{typeof player.xGoals === 'number' ? player.xGoals.toFixed(1) : '-'}</TableCell>
                                 {/* Corsi/Fenwick intentionally removed */}
                               </>
                             )}
                             {/* Goalie Stats - only render for goalies */}
                             {isGoalie && (
                               <>
-                                <TableCell className="text-right">{player.wins || 0}</TableCell>
-                                <TableCell className="text-right">{typeof player.goals_against_average === 'number' ? player.goals_against_average.toFixed(2) : '-'}</TableCell>
-                                <TableCell className="text-right">{typeof player.save_percentage === 'number' ? (player.save_percentage * 100).toFixed(1) : '-'}%</TableCell>
+                                <TableCell className="text-right text-sm whitespace-nowrap">{player.wins || 0}</TableCell>
+                                <TableCell className="text-right text-sm whitespace-nowrap">{typeof player.goals_against_average === 'number' ? player.goals_against_average.toFixed(2) : '-'}</TableCell>
+                                <TableCell className="text-right text-sm whitespace-nowrap">{typeof player.save_percentage === 'number' ? (player.save_percentage * 100).toFixed(1) : '-'}%</TableCell>
                               </>
                             )}
                             <TableCell>
                               <div className="flex gap-1 justify-end">
-                                <Button 
-                                  size="icon" 
-                                  variant="ghost" 
-                                  className="h-8 w-8 text-yellow-500"
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7 text-yellow-500"
                                   onClick={() => toggleWatchlist(player)}
                                 >
-                                  <Star className="h-4 w-4 fill-current" />
+                                  <Star className="h-3.5 w-3.5 fill-current" />
                                 </Button>
-                                <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => handlePlayerClick(player)}>
-                                  <Info className="h-4 w-4" />
+                                <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" onClick={() => handlePlayerClick(player)}>
+                                  <Info className="h-3.5 w-3.5" />
                                 </Button>
-                                <Button size="default" variant="default" className="h-10 w-10 text-primary font-bold text-xl bg-primary/10 hover:bg-primary/20 border border-primary/30" onClick={() => handleAddPlayer(player)}>
+                                <Button size="sm" variant="default" className="h-7 w-7 text-primary font-bold text-base bg-primary/10 hover:bg-primary/20 border border-primary/30 p-0" onClick={() => handleAddPlayer(player)}>
                                   +
                                 </Button>
                               </div>

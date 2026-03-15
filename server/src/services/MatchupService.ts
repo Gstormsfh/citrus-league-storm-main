@@ -901,11 +901,11 @@ export class MatchupService {
     const [matchupResult, lockedResult, recentResult] = await Promise.all([
       this.supabase
         .from('matchups')
-        .select('*', { count: 'exact', head: true })
+        .select(COLUMNS.COUNT, { count: 'exact', head: true })
         .in('status', ['scheduled', 'in_progress']),
       this.supabase
         .from('fantasy_daily_rosters')
-        .select('*', { count: 'exact', head: true })
+        .select(COLUMNS.COUNT, { count: 'exact', head: true })
         .eq('is_locked', true),
       this.supabase
         .from('matchups')

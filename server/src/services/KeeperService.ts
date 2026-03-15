@@ -37,7 +37,7 @@ export class KeeperService {
   async getTeamKeepers(leagueId: string, teamId: string, seasonYear: number) {
     const { data, error } = await this.supabase
       .from('keeper_designations')
-      .select('id, league_id, team_id, player_id, season_year, keeper_round, keeper_penalty_type, original_draft_round, years_kept, designated_at, approved_by, status')
+      .select(COLUMNS.KEEPER_DESIGNATION)
       .eq('league_id', leagueId).eq('team_id', teamId).eq('season_year', seasonYear)
       .in('status', ['designated', 'approved', 'locked'])
       .order('designated_at', { ascending: true });
@@ -47,7 +47,7 @@ export class KeeperService {
   async getLeagueKeepers(leagueId: string, seasonYear: number) {
     const { data, error } = await this.supabase
       .from('keeper_designations')
-      .select('id, league_id, team_id, player_id, season_year, keeper_round, keeper_penalty_type, original_draft_round, years_kept, designated_at, approved_by, status')
+      .select(COLUMNS.KEEPER_DESIGNATION)
       .eq('league_id', leagueId).eq('season_year', seasonYear)
       .in('status', ['designated', 'approved', 'locked'])
       .order('team_id', { ascending: true });

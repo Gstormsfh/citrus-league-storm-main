@@ -236,9 +236,9 @@ export class PoolService {
 
     const userIds = [...map.keys()];
     const { data: profiles } = userIds.length > 0
-      ? await this.supabase.from('profiles').select('id, display_name').in('id', userIds)
+      ? await this.supabase.from('profiles').select('id, username, first_name, last_name').in('id', userIds)
       : { data: [] };
-    const nameMap = new Map((profiles ?? []).map((p: { id: string; display_name: string | null }) => [p.id, p.display_name || 'Unknown']));
+    const nameMap = new Map((profiles ?? []).map((p: { id: string; username: string | null; first_name: string | null; last_name: string | null }) => [p.id, p.username || [p.first_name, p.last_name].filter(Boolean).join(' ') || 'Unknown']));
 
     return [...map.entries()]
       .map(([uid, stats]) => ({
@@ -396,9 +396,9 @@ export class PoolService {
 
     const userIds = [...map.keys()];
     const { data: profiles } = userIds.length > 0
-      ? await this.supabase.from('profiles').select('id, display_name').in('id', userIds)
+      ? await this.supabase.from('profiles').select('id, username, first_name, last_name').in('id', userIds)
       : { data: [] };
-    const nameMap = new Map((profiles ?? []).map((p: { id: string; display_name: string | null }) => [p.id, p.display_name || 'Unknown']));
+    const nameMap = new Map((profiles ?? []).map((p: { id: string; username: string | null; first_name: string | null; last_name: string | null }) => [p.id, p.username || [p.first_name, p.last_name].filter(Boolean).join(' ') || 'Unknown']));
 
     return [...map.entries()]
       .map(([uid, info]) => ({
@@ -570,9 +570,9 @@ export class PoolService {
 
     const userIds = [...map.keys()];
     const { data: profiles } = userIds.length > 0
-      ? await this.supabase.from('profiles').select('id, display_name').in('id', userIds)
+      ? await this.supabase.from('profiles').select('id, username, first_name, last_name').in('id', userIds)
       : { data: [] };
-    const nameMap = new Map((profiles ?? []).map((p: { id: string; display_name: string | null }) => [p.id, p.display_name || 'Unknown']));
+    const nameMap = new Map((profiles ?? []).map((p: { id: string; username: string | null; first_name: string | null; last_name: string | null }) => [p.id, p.username || [p.first_name, p.last_name].filter(Boolean).join(' ') || 'Unknown']));
 
     return [...map.entries()]
       .map(([uid, stats]) => ({

@@ -38,8 +38,9 @@ notificationRoutes.get('/', async (c) => {
 
   const limit = Math.min(parseInt(c.req.query('limit') || '50', 10), 200);
   const unreadOnly = c.req.query('unread') === 'true';
+  const leagueId = c.req.query('leagueId');
 
-  const { notifications, error } = await service.getNotifications(userId, { limit, unreadOnly });
+  const { notifications, error } = await service.getNotifications(userId, { limit, unreadOnly, leagueId });
   if (error) {
     return handleError(c, error, 'Failed to fetch notifications');
   }

@@ -482,15 +482,15 @@ export class DraftService {
   async deleteAllDraftData() {
     const { count: picksCountBefore } = await this.supabase
       .from('draft_picks')
-      .select('*', { count: 'exact', head: true });
+      .select(COLUMNS.COUNT, { count: 'exact', head: true });
 
     const { count: ordersCountBefore } = await this.supabase
       .from('draft_order')
-      .select('*', { count: 'exact', head: true });
+      .select(COLUMNS.COUNT, { count: 'exact', head: true });
 
     const { count: leaguesCount } = await this.supabase
       .from('leagues')
-      .select('*', { count: 'exact', head: true });
+      .select(COLUMNS.COUNT, { count: 'exact', head: true });
 
     const { data: allLeagues } = await this.supabase
       .from('leagues')

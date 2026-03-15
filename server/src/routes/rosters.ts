@@ -71,7 +71,7 @@ rosterRoutes.get('/league/:leagueId/team/:teamId/roster-count', membershipMiddle
 
   const { count, error } = await supabase
     .from('roster_assignments')
-    .select('*', { count: 'exact', head: true })
+    .select(COLUMNS.COUNT, { count: 'exact', head: true })
     .eq('league_id', leagueId)
     .eq('team_id', teamId);
 

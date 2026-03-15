@@ -53,13 +53,13 @@ export class AuctionService {
 
     const { data: budgets } = await this.supabase
       .from('auction_budgets')
-      .select('id, league_id, team_id, initial_budget, remaining_budget, players_won, updated_at')
+      .select(COLUMNS.AUCTION_BUDGET)
       .eq('league_id', leagueId)
       .order('remaining_budget', { ascending: false });
 
     const { data: activeNom } = await this.supabase
       .from('auction_nominations')
-      .select('id, league_id, draft_session_id, nominated_by_team_id, player_id, player_name, minimum_bid, current_high_bid, current_high_bidder_team_id, status, nomination_number, expires_at, created_at')
+      .select(COLUMNS.AUCTION_NOMINATION)
       .eq('league_id', leagueId)
       .eq('draft_session_id', sessionId)
       .eq('status', 'active')
@@ -102,12 +102,12 @@ export class AuctionService {
         current_high_bid: openingBid, current_high_bidder_team_id: teamId,
         status: 'active', nomination_number: state.total_nominations + 1, expires_at: expiresAt,
       })
-      .select('id, league_id, draft_session_id, nominated_by_team_id, player_id, player_name, minimum_bid, current_high_bid, current_high_bidder_team_id, status, nomination_number, expires_at, created_at').single();
+      .select(COLUMNS.AUCTION_NOMINATION).single();
 
     if (error) return { success: false, error: error.message };
 
     await this.supabase.from('auction_bids').insert({
-      league_id: leagueId, nomination_id: nom.id, team_id: teamId, bid_amount: openingBid,
+      league_id: leagueId, nomination_id: (nom as any).id, team_id: teamId, bid_amount: openingBid,
     });
 
     const sessionSettings = (await this.supabase.from('draft_sessions').select('settings').eq('id', sessionId).single()).data?.settings as Record<string, unknown> | null;
@@ -199,7 +199,7 @@ export class AuctionService {
   async getBidHistory(nominationId: string) {
     const { data, error } = await this.supabase
       .from('auction_bids')
-      .select('id, league_id, nomination_id, team_id, bid_amount, created_at')
+      .select(COLUMNS.AUCTION_BID)
       .eq('nomination_id', nominationId)
       .order('bid_amount', { ascending: false });
     return { bids: data ?? [], error };
@@ -208,7 +208,7 @@ export class AuctionService {
   async getAuctionBudgets(leagueId: string) {
     const { data, error } = await this.supabase
       .from('auction_budgets')
-      .select('id, league_id, team_id, initial_budget, remaining_budget, players_won, updated_at')
+      .select(COLUMNS.AUCTION_BUDGET)
       .eq('league_id', leagueId)
       .order('remaining_budget', { ascending: false });
     return { budgets: data ?? [], error };

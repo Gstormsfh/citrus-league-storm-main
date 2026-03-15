@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import { COLUMNS } from '@citrus/shared';
 
 /**
  * NotificationService — Server-side notification management with DI Supabase client.
@@ -14,18 +15,22 @@ export class NotificationService {
   }
 
   /** Get notifications for a user */
-  async getNotifications(userId: string, options?: { limit?: number; unreadOnly?: boolean }) {
+  async getNotifications(userId: string, options?: { limit?: number; unreadOnly?: boolean; leagueId?: string }) {
     const limit = options?.limit || 50;
 
     let query = this.supabase
       .from('notifications')
-      .select('id, user_id, type, title, message, read_status, league_id, metadata, created_at')
+      .select(COLUMNS.NOTIFICATION)
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(limit);
 
     if (options?.unreadOnly) {
       query = query.eq('read_status', false);
+    }
+
+    if (options?.leagueId) {
+      query = query.eq('league_id', options.leagueId);
     }
 
     const { data, error } = await query;

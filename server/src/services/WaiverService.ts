@@ -334,7 +334,7 @@ export class WaiverService {
   async getWaiverPriority(leagueId: string) {
     const { data, error } = await this.supabase
       .from('waiver_priority')
-      .select('*, teams(team_name)')
+      .select(`${COLUMNS.WAIVER_PRIORITY}, teams(team_name)`)
       .eq('league_id', leagueId)
       .order('priority', { ascending: true });
 
