@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { COLUMNS } from '@citrus/shared';
+import { COLUMNS, logger } from '@citrus/shared';
 import { LeagueMembershipService } from './LeagueMembershipService';
 
 /**
@@ -224,33 +224,22 @@ export class DraftService {
       .eq('id', leagueId)
       .in('draft_status', ['not_started', 'queued']);
 
-    // Check if draft is complete
+    // Atomically check completion, update status, and sync rosters in one transaction
     let isComplete = false;
     if (teamsCount) {
-      const { data: league } = await this.supabase
-        .from('leagues')
-        .select('draft_rounds')
-        .eq('id', leagueId)
-        .single();
-
-      const totalPicks = teamsCount * (league?.draft_rounds || 21);
-      const { count } = await this.supabase
-        .from('draft_picks')
-        .select('id', { count: 'exact', head: true })
-        .eq('league_id', leagueId)
-        .is('deleted_at', null);
-
-      if (count && count >= totalPicks) {
-        isComplete = true;
-        await this.supabase
-          .from('leagues')
-          .update({ draft_status: 'completed' })
-          .eq('id', leagueId);
-
-        // Sync roster assignments
-        await this.supabase.rpc('sync_roster_assignments_for_league', {
+      const { data: completionResult, error: completionError } = await this.supabase.rpc(
+        'complete_draft_and_sync',
+        {
           p_league_id: leagueId,
-        });
+          p_draft_session_id: sessionId || null,
+          p_teams_count: teamsCount,
+        },
+      );
+
+      if (completionError) {
+        logger.error('Draft completion check failed', { leagueId, error: completionError.message });
+      } else {
+        isComplete = completionResult?.is_complete ?? false;
       }
     }
 
@@ -407,10 +396,14 @@ export class DraftService {
       return { picks: [], error };
     }
 
-    // Sync roster assignments
-    await this.supabase.rpc('sync_roster_assignments_for_league', {
+    // Sync roster assignments after autopick draft
+    const { error: syncError } = await this.supabase.rpc('sync_roster_assignments_for_league', {
       p_league_id: leagueId,
     });
+
+    if (syncError) {
+      logger.error('Roster sync failed after autopick draft', { leagueId, error: syncError.message });
+    }
 
     const picks = (data || []).map((row: { round_number: number; pick_number: number; team_id: string; player_id: number; player_name?: string }) => ({
       round: row.round_number,

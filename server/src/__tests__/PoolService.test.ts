@@ -99,7 +99,7 @@ describe('PoolService', () => {
       const result = await service.getPickemPicks('league-1', 'user-1', 1);
 
       expect(result).toHaveLength(2);
-      expect(result[0].picked_team).toBe('TOR');
+      expect((result as unknown as Array<{ picked_team: string }>)[0].picked_team).toBe('TOR');
     });
 
     it('returns empty array when no picks exist', async () => {
@@ -565,7 +565,7 @@ describe('PoolService', () => {
       const result = await service.getConfidencePicks('league-1', 'user-1', 1);
 
       expect(result).toHaveLength(2);
-      expect(result[0].confidence_points).toBe(3);
+      expect((result as unknown as Array<{ confidence_points: number }>)[0].confidence_points).toBe(3);
     });
 
     it('returns empty array when no picks exist', async () => {
