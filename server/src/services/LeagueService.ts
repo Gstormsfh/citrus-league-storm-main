@@ -409,7 +409,7 @@ export class LeagueService {
   async fetchTransactions(leagueId: string) {
     const { data, error } = await this.supabase
       .from('transaction_ledger')
-      .select('*, teams(team_name), profiles(username, first_name, last_name)')
+      .select(`${COLUMNS.TRANSACTION_LEDGER}, teams(team_name), profiles(username, first_name, last_name)`)
       .eq('league_id', leagueId)
       .order('created_at', { ascending: false })
       .limit(50);

@@ -167,7 +167,7 @@ export const PLAYOFF_SERIES_COLUMNS = 'id, bracket_id, round_number, match_numbe
 // ============================================================================
 // PLAYER DIRECTORY COLUMNS
 // ============================================================================
-export const PLAYER_DIRECTORY_COLUMNS = 'player_id, full_name, position_code, team_abbrev, jersey_number, headshot_url';
+export const PLAYER_DIRECTORY_COLUMNS = 'player_id, full_name, position_code, team_abbrev, jersey_number, headshot_url, eligible_positions';
 
 // ============================================================================
 // PLAYER TALENT METRICS COLUMNS
@@ -198,6 +198,21 @@ export const FANTASY_WEEK_COLUMNS = 'id, week_number, start_date, end_date, seas
 // AUDIT LOG COLUMNS
 // ============================================================================
 export const AUDIT_LOG_COLUMNS = 'id, user_id, event_type, league_id, details, severity, ip_address, user_agent, created_at';
+
+// ============================================================================
+// WAIVER PRIORITY COLUMNS
+// ============================================================================
+export const WAIVER_PRIORITY_COLUMNS = 'id, league_id, team_id, priority, updated_at';
+
+// ============================================================================
+// TRANSACTION LEDGER COLUMNS
+// ============================================================================
+export const TRANSACTION_LEDGER_COLUMNS = 'id, league_id, user_id, team_id, type, player_id, source, created_at';
+
+// ============================================================================
+// NOTIFICATION COLUMNS
+// ============================================================================
+export const NOTIFICATION_COLUMNS = 'id, user_id, type, title, message, read_status, league_id, metadata, created_at';
 
 // ============================================================================
 // COUNT-ONLY QUERIES (use with { count: 'exact', head: true })
@@ -243,6 +258,9 @@ export const COLUMNS = {
   MATCHUP_SIMULATION: MATCHUP_SIMULATION_COLUMNS,
   FANTASY_WEEK: FANTASY_WEEK_COLUMNS,
   AUDIT_LOG: AUDIT_LOG_COLUMNS,
+  WAIVER_PRIORITY: WAIVER_PRIORITY_COLUMNS,
+  TRANSACTION_LEDGER: TRANSACTION_LEDGER_COLUMNS,
+  NOTIFICATION: NOTIFICATION_COLUMNS,
 
   // Slim versions
   MATCHUP_SLIM: MATCHUP_COLUMNS_SLIM,
