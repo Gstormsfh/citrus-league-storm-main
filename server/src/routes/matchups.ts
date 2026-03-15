@@ -88,7 +88,7 @@ matchupRoutes.get('/league/:leagueId/team-record/:teamId', membershipMiddleware,
   const safeTeamId = teamId.replace(/[^a-zA-Z0-9\-_]/g, '');
   const { data: matchups, error } = await supabase
     .from('matchups')
-    .select('team1_id, team2_id, team1_score, team2_score, status')
+    .select(COLUMNS.MATCHUP_SLIM)
     .eq('league_id', leagueId)
     .in('status', ['completed', 'in_progress'])
     .or(`team1_id.eq.${safeTeamId},team2_id.eq.${safeTeamId}`);
@@ -108,7 +108,7 @@ matchupRoutes.get('/league/:leagueId/team-record/:teamId', membershipMiddleware,
     status: string;
   }
 
-  (matchups || []).forEach((m: MatchupRecord) => {
+  ((matchups || []) as unknown as MatchupRecord[]).forEach((m) => {
     if (m.status !== 'completed') return;
     const isTeam1 = m.team1_id === teamId;
     const myScore = parseFloat(String(isTeam1 ? m.team1_score : m.team2_score)) || 0;
