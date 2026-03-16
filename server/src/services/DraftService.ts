@@ -186,7 +186,7 @@ export class DraftService {
     const { data: rpcResult, error: rpcError } = await this.supabase.rpc('make_draft_pick', {
       p_league_id: leagueId,
       p_team_id: teamId,
-      p_player_id: parseInt(String(playerId), 10),
+      p_player_id: String(playerId),
       p_round_number: roundNumber,
       p_pick_number: pickNumber,
       p_draft_session_id: sessionId || null,
@@ -199,7 +199,7 @@ export class DraftService {
         .insert({
           league_id: leagueId,
           team_id: teamId,
-          player_id: parseInt(String(playerId), 10),
+          player_id: String(playerId),
           pick_number: pickNumber,
           round_number: roundNumber,
           draft_session_id: sessionId,
