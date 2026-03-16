@@ -323,7 +323,13 @@ export class LineupService {
     // Get player positions from player_directory
     const { data: players } = await this.supabase
       .from('player_directory')
-      .select('player_id, position, roster_status')
+      .select('player_id, position_code')
+      .in('player_id', playerIds.map((id: string) => parseInt(String(id))));
+
+    // Get roster status from player_talent_metrics (roster_status lives here, not in player_directory)
+    const { data: talentMetrics } = await this.supabase
+      .from('player_talent_metrics')
+      .select('player_id, roster_status')
       .in('player_id', playerIds.map((id: string) => parseInt(String(id))));
 
     if (!players || players.length === 0) {
@@ -334,8 +340,11 @@ export class LineupService {
     const positionMap = new Map<string, string>();
     const statusMap = new Map<string, string>();
     for (const p of players) {
-      positionMap.set(String(p.player_id), p.position || 'UTIL');
-      if (p.roster_status) statusMap.set(String(p.player_id), p.roster_status);
+      positionMap.set(String(p.player_id), p.position_code || 'UTIL');
+    }
+    // Build status map from talent metrics (roster_status is in player_talent_metrics, not player_directory)
+    for (const t of (talentMetrics || [])) {
+      if (t.roster_status) statusMap.set(String(t.player_id), t.roster_status);
     }
 
     const getFantasyPosition = (position: string): string => {

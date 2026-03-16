@@ -816,9 +816,12 @@ const Roster = () => {
           
           // Add any new players (not in saved lineup) to bench
           const savedPlayerIds = new Set([...filteredStarters, ...filteredBench, ...filteredIr]);
+          let newPlayersRecovered = false;
           transformedPlayers.forEach(player => {
             if (!savedPlayerIds.has(String(player.id))) {
               bench.push(player);
+              newPlayersRecovered = true;
+              logger.info(`[Roster] Recovered missing player ${player.name} (${player.id}) from roster_assignments → bench`);
             }
           });
           
@@ -954,6 +957,18 @@ const Roster = () => {
           });
           
           setRoster({ starters, bench, ir, slotAssignments: normalizedSlotAssignments });
+
+          // Persist recovered lineup if new players were added from roster_assignments
+          // This prevents players from disappearing on subsequent saves
+          if (newPlayersRecovered && userTeamId && user && userTeam?.league_id && !isDemoLeague(userTeam.league_id)) {
+            logger.info('[Roster] Persisting recovered lineup with newly added players');
+            await LeagueService.saveLineup(userTeamId, userTeam.league_id, {
+              starters: starters.map(p => p.id),
+              bench: bench.map(p => p.id),
+              ir: ir.map(p => p.id),
+              slotAssignments: normalizedSlotAssignments
+            });
+          }
         } else {
           // No saved lineup - use EXACT SAME LOGIC AS OtherTeam.tsx
           const starters: HockeyPlayer[] = [];
