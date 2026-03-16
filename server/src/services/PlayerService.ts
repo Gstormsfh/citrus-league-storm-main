@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { COLUMNS } from '@citrus/shared';
+import { COLUMNS, CURRENT_SEASON } from '@citrus/shared';
 
 /**
  * PlayerService — Server-side player data with dependency-injected Supabase client.
@@ -158,26 +158,29 @@ export class PlayerService {
       return { players: playersCache.data, error: null };
     }
 
-    // Fetch player directory
+    // Fetch player directory for current season only (avoids multi-season duplicates)
     const { data: directory, error: dirError } = await this.supabase
       .from('player_directory')
       .select(COLUMNS.PLAYER_DIRECTORY)
+      .eq('season', CURRENT_SEASON)
       .range(0, 4999);
 
     if (dirError) {
       return { players: playersCache?.data || [], error: dirError };
     }
 
-    // Fetch season stats
+    // Fetch season stats for current season
     const { data: stats } = await this.supabase
       .from('player_season_stats')
       .select(COLUMNS.PLAYER_STATS)
+      .eq('season', CURRENT_SEASON)
       .range(0, 4999);
 
-    // Fetch talent metrics
+    // Fetch talent metrics for current season
     const { data: talents } = await this.supabase
       .from('player_talent_metrics')
       .select(COLUMNS.PLAYER_TALENT_METRICS)
+      .eq('season', CURRENT_SEASON)
       .range(0, 4999);
 
     // Fetch goalie GSAx
