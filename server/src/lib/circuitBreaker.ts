@@ -8,7 +8,7 @@ import { logger } from '@citrus/shared';
  *
  * Usage:
  *   const breaker = new CircuitBreaker('supabase', { failureThreshold: 5 });
- *   const result = await breaker.execute(() => supabase.from('leagues').select('*'));
+ *   const result = await breaker.execute(() => supabase.from('leagues').select(COLUMNS.LEAGUE));
  */
 
 type CircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
