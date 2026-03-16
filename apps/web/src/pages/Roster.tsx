@@ -569,7 +569,17 @@ const Roster = () => {
 
             if (dbPlayers.length < playerIds.length) {
               // Some players in roster_assignments were not found in PlayerService.getAllPlayers()
-              // Possible causes: player_directory missing entries, player_season_stats missing entries, or Supabase row limit truncation
+              // Fetch missing players individually via getPlayersByIds to prevent roster gaps
+              const foundIds = new Set(dbPlayers.map(p => String(p.id)));
+              const missingIds = playerIds.filter(id => !foundIds.has(id));
+              if (missingIds.length > 0) {
+                logger.info(`[Roster] ${missingIds.length} roster player(s) missing from allPlayers cache, fetching individually: ${missingIds.join(', ')}`);
+                const recovered = await PlayerService.getPlayersByIds(missingIds);
+                if (recovered.length > 0) {
+                  dbPlayers = [...dbPlayers, ...recovered];
+                  logger.info(`[Roster] Recovered ${recovered.length} missing player(s) via getPlayersByIds`);
+                }
+              }
             }
           } catch (rosterError) {
             logger.error('[Roster] Error fetching roster_assignments:', rosterError);

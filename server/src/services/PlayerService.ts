@@ -15,6 +15,7 @@ interface PlayerDirectoryRow {
   team_abbrev: string;
   jersey_number: string | null;
   headshot_url: string | null;
+  eligible_positions: string[] | null;
 }
 
 interface PlayerStatsRow {
@@ -114,7 +115,7 @@ function buildPlayer(p: PlayerDirectoryRow, stat: Partial<PlayerStatsRow>, talen
     status: rosterStatus === 'IR' || rosterStatus === 'LTIR' ? 'injured' : 'active',
     roster_status: rosterStatus,
     is_ir_eligible: talent?.is_ir_eligible || false,
-    eligible_positions: [p.position_code],
+    eligible_positions: (p.eligible_positions && p.eligible_positions.length > 0) ? p.eligible_positions : [p.position_code],
     games_played: stat.games_played || 0,
     goals: stat.nhl_goals || 0,
     assists: stat.nhl_assists || 0,
