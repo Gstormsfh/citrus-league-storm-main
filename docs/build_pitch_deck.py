@@ -609,15 +609,15 @@ def build_deck():
     add_accent_bar(slide, 0.5, 3.05, 4.0, 0.04)
 
     allocations = [
-        ("Marketing & User Acquisition", "$85K", "34%",
+        ("Licensing, Legal & Compliance", "$80K", "32%",
+         "Criminal Code opinion, gaming counsel retainer, contest rules, DFS regulatory filings"),
+        ("Marketing & User Acquisition", "$65K", "26%",
          "Paid channels, influencer/content partnerships, Oct 2026 season push"),
-        ("Team / Engineering Contractors", "$60K", "24%",
+        ("Team / Engineering Contractors", "$50K", "20%",
          "Pull hiring forward to Month 4. Accelerate product velocity."),
-        ("DFS Licensing & Legal (Alberta)", "$40K", "16%",
-         "AGLC compliance, gaming counsel, provincial licensing applications"),
-        ("Infrastructure & Scaling", "$30K", "12%",
+        ("Infrastructure & Scaling", "$25K", "10%",
          "Supabase Team tier, Claude API at scale, proxy rotation"),
-        ("Operating Reserve", "$35K", "14%",
+        ("Operating Reserve", "$30K", "12%",
          "4+ months buffer at peak burn. Never let cash hit zero."),
     ]
 
@@ -640,9 +640,9 @@ def build_deck():
     reasons = [
         ("Capital efficient", "$250K in \u2192 $450K Y2 EBITDA = 1.8x return in 24 months"),
         ("Proven product", "Live alpha with 50+ users, 4 leagues, 2+ min engagement \u2014 zero spend"),
-        ("Massive LTV:CAC", "$2.50 CAC vs DraftKings' $200+. LTV:CAC ratio hits 10x+ in-season"),
+        ("Legally buttoned up", "$80K for gaming counsel, Criminal Code opinion, contest rules \u2014 no shortcuts"),
+        ("Massive LTV:CAC", "$2.50 CAC vs DraftKings\u2019 $200+. LTV:CAC ratio hits 10x+ in-season"),
         ("97% gross margins", "Pure software. Near-zero marginal COGS at scale"),
-        ("No Series A needed", "Model shows self-sustainability. Raise again only from strength"),
         ("Solo founder = lean", "CPA + data scientist + hockey pro. No co-founder bloat"),
     ]
 
