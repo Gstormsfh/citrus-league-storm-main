@@ -235,11 +235,12 @@ ws_g.cell(row=2, column=1, value="Growth gates from Pitch Deck: 1K → 10K → 2
 
 # New user acquisition per month (aligned with pitch deck growth gates)
 # Gate targets: 1K by Q2 2026, 10K by Q4 2026, 25K by Q2 2027, 100K by Q4 2027
+# Comp: Sleeper hit 1,000,000 users in first calendar year (2019) — 100K is very achievable
 new_users_monthly = [
-    150, 180, 200, 220, 250, 300,     # Apr-Sep 2026: Pre-season ramp (→ ~1,300 cumulative)
-    1200, 1800, 2000, 1500, 1200, 1000, # Oct 2026-Mar 2027: Season 1 launch spike (→ ~10,000)
-    800, 600, 500, 700, 900, 1500,      # Apr-Sep 2027: Off-season + marketing ramp
-    8000, 10000, 12000, 10000, 8000, 7000, # Oct 2027-Mar 2028: Season 2 (→ 100K target)
+    150, 200, 250, 300, 400, 500,       # Apr-Sep 2026: Pre-season ramp (→ ~1,800 cumulative)
+    2000, 2500, 2200, 1800, 1500, 1200,  # Oct 2026-Mar 2027: Season 1 launch spike (→ ~13,000)
+    1200, 1000, 900, 1200, 2000, 3500,    # Apr-Sep 2027: Off-season + marketing/influencer ramp
+    17000, 20000, 20000, 18000, 16000, 13000, # Oct 2027-Mar 2028: Season 2 (→ 100K target)
 ]
 
 # Churn rates by segment by month
