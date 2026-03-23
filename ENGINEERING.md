@@ -256,7 +256,93 @@ npm run dev:all      # Both concurrently
 # Pipeline: cd data-pipeline && docker-compose up
 ```
 
-## 9. Key Business Logic
+## 9. End-to-End Data Flow
+
+### How an NHL goal becomes fantasy points on screen
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  1. NHL API (api.nhle.com)                                             │
+│     Live game feed with play-by-play events                            │
+└──────────────────────┬──────────────────────────────────────────────────┘
+                       │ citrus_request() via 100-IP proxy rotation
+                       ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│  2. Data Pipeline (data_scraping_service.py)                           │
+│     Live sync every 5-10s during games                                 │
+│     Writes to: players (nhl_* columns), raw_nhl_data                   │
+└──────────────────────┬──────────────────────────────────────────────────┘
+                       │ service_role_key → Supabase REST API
+                       ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│  3. Supabase PostgreSQL                                                │
+│     players, player_weekly_stats, fantasy_daily_rosters                 │
+└──────────────────────┬──────────────────────────────────────────────────┘
+                       │
+          ┌────────────┴────────────┐
+          ▼                         ▼
+┌──────────────────────┐  ┌──────────────────────────────────────────────┐
+│  4a. Scoring Pipeline │  │  4b. Projection Pipeline                    │
+│  calculate_matchup_   │  │  Daily: run_daily_projections.py            │
+│  scores.py            │  │  Nightly (2AM ET): nightly_projection_      │
+│  Pre-calculates all   │  │  batch.py (6-phase ROS projections)         │
+│  fantasy points per   │  │  Writes to: player_projected_stats,         │
+│  player per matchup   │  │  projection_cache, ros_projections           │
+│  Writes to:           │  └──────────────────────────────────────────────┘
+│  fantasy_matchup_     │
+│  lines                │
+└──────────┬────────────┘
+           │
+           ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│  5. Hono API Server (server/)                                          │
+│     MatchupService reads pre-calculated lines via RLS                  │
+│     JWT auth → membership check → user-scoped Supabase client          │
+└──────────────────────┬──────────────────────────────────────────────────┘
+                       │ JSON over HTTPS
+                       ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│  6. React Frontend (apps/web/)                                         │
+│     API client attaches JWT, auto-refreshes before 5-min expiry        │
+│     ScoringCalculator applies league-specific scoring on display       │
+│     React Query caches + invalidates server state                      │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key insight:** The Python pipeline does all heavy computation (scraping, scoring, projections). The API server reads pre-computed data through RLS. The frontend displays results with league-specific scoring adjustments via `ScoringCalculator`.
+
+### Operational Schedule
+
+| Time | Process | What happens |
+|------|---------|-------------|
+| **Continuous** | `data_scraping_service.py` | Live game sync every 5-10s via 100-IP proxy rotation |
+| **Continuous** | Health check server (:8888) | Exposes pipeline health: `healthy` (<10min stale) → `degraded` (10-30min) → `unhealthy` (>30min) |
+| **Midnight MT** | `fetch_nhl_stats_from_landing.py` | Nightly PPP/SHP stats sync from NHL.com landing pages |
+| **Midnight MT** | `reconcile_player_stats.py` | Audit and fix player stat discrepancies |
+| **Post-midnight** | `calculate_matchup_scores.py` | Refresh pre-calculated matchup lines for all active leagues |
+| **Morning** | `run_daily_projections.py` | Daily player projections (multiprocessing, 600+ players) |
+| **2 AM ET** | `nightly_projection_batch.py` | Full ROS batch: 6 phases, ~15,000 projections, 15-30 min runtime |
+
+### Auth Flow (request lifecycle)
+
+```
+Browser → API Client (client.ts)
+  1. Gets JWT from Supabase auth session
+  2. Checks expiry, auto-refreshes if <5 min remaining (locked to prevent stampede)
+  3. Attaches Authorization: Bearer <token>
+     ↓
+Hono Server → authMiddleware (auth.ts)
+  4. Extracts token from Authorization header
+  5. Validates via supabase.auth.getUser(token) — never trusts client user IDs
+  6. Sets userId + userToken on request context
+  7. membershipMiddleware verifies league access
+     ↓
+Service Layer
+  8. createUserClient(token) creates user-scoped Supabase client
+  9. All queries go through RLS — user can only see data they're authorized for
+```
+
+## 10. Key Business Logic
 
 1. **ScoringCalculator** (`packages/shared/src/utils/scoring.ts`) — Single source of truth for converting NHL stats into fantasy points. Supports league-specific scoring overrides. Default: G=3, A=2, PPP=1, SHP=2, SOG=0.4, BLK=0.5, HIT=0.2, PIM=0.5, W=4, SO=3, SV=0.2, GA=-1.
 
@@ -278,24 +364,79 @@ npm run dev:all      # Both concurrently
 
 10. **PlayoffService** (`server/src/services/PlayoffService.ts`) — Manages fantasy playoff brackets — seeding from regular season standings, matchup generation, and advancement logic.
 
-## 10. Known Gaps / Tech Debt
+## 11. API Migration Status (Audit: 2026-03-23)
 
-1. **Legacy service layer migration** — `apps/web/src/services/` (32 files) still contains direct Supabase calls. Being incrementally migrated to `apps/web/src/api/` client that goes through the Hono server. Dual paths create confusion about which to use.
+The frontend is **~95% migrated** to the API-first architecture. All data operations route through the Hono API server except for one service file. Auth and realtime operations correctly remain client-side.
 
-2. **Duplicate scoring logic** — `ScoringCalculator` exists in both `packages/shared/src/utils/scoring.ts` (canonical) and `apps/web/src/utils/scoringUtils.ts` (legacy). The web copy should be removed once migration is complete.
+### Fully Compliant
+- **All components** (`apps/web/src/components/`) — zero direct Supabase imports
+- **All pages** — use API client or AuthContext (no direct DB calls)
+- **All 18 API client modules** (`apps/web/src/api/`) — properly route through Hono
+- **LeagueContext** — uses API client for data, Supabase only for `auth.onAuthStateChange()`
 
-3. **245 migrations** — The migration history is very large with many iterative fixes (e.g., 14 migrations just for RLS recursion fixes in Jan 2025). Consider squashing into a baseline migration for new environments.
+### Acceptable Client-Side Supabase Usage (by design)
 
-4. **No staging environment** — `.env.example` shows only dev/prod. No mention of a staging Supabase project or staging Cloud Run service for pre-production testing.
+| File | What it does | Why it's correct |
+|------|-------------|-----------------|
+| `AuthContext.tsx` | signIn, signUp, signOut, resetPassword, OAuth | Auth lifecycle is inherently client-side |
+| `AuthCallback.tsx` | OAuth/email verification callback | PKCE flow must be client-side |
+| `UserAccountService.ts` | `auth.updateUser()` for password changes | Auth operation |
+| `StormyService.ts` | `auth.getUser()` + edge function invoke | Edge functions are client-invoked |
+| `DraftService.ts` | `removeChannel()` realtime cleanup | Realtime subscriptions are client-side |
+| `NotificationService.ts` | `.channel()` realtime subscription | Realtime subscriptions are client-side |
+| `usePlayerNews.ts` | `.channel()` realtime subscription | Realtime subscriptions are client-side |
 
-5. **Pipeline observability** — Data pipeline runs in a standalone Docker container with a basic health check server on `:8888`. No centralized logging aggregation or alerting integration beyond custom scripts in `monitoring/`.
+### Needs Migration
 
-6. **Test coverage gaps** — Frontend services under `apps/web/src/services/` have a `__tests__` directory but coverage target is only stated for `utils/` and `services/`. Server tests exist but coverage is [NEEDS CLARIFICATION].
+| File | What it does | Fix Required |
+|------|-------------|-------------|
+| **`DemoLeagueService.ts`** | Direct INSERT/DELETE on `leagues`, `teams`, `draft_picks`, `draft_order`, `matchups`, `team_lineups` (lines 122–732) | Create `POST /api/admin/demo-league/initialize` and `DELETE /api/admin/demo-league` server routes |
 
-7. **Shared package has no runtime deps** — `@citrus/shared` exports raw `.ts` files (no build step). This works with tsx but means the server Dockerfile must maintain a symlink hack (`ln -s ../../packages/shared node_modules/@citrus/shared`).
+## 12. Known Gaps / Tech Debt
 
-8. **Rate limiting is in-memory** — `standardRateLimit` (300/min) and `strictRateLimit` (10/min) use LRU-bounded in-memory stores. Will not work correctly if Cloud Run scales to multiple instances.
+1. **`DemoLeagueService.ts` bypasses API** — The only frontend file making direct database writes. Needs dedicated admin API routes (see Section 10).
+
+2. **Duplicate scoring logic** — `ScoringCalculator` exists in both `packages/shared/src/utils/scoring.ts` (canonical) and `apps/web/src/utils/scoringUtils.ts` (legacy). The web copy should be removed.
+
+3. **245 migrations with no baseline squash** — Many iterative fixes (e.g., 14 migrations just for RLS recursion). New environments must replay all 245. Consider squashing into a baseline.
+
+4. **No staging environment** — `.env.example` shows only dev/prod. No staging Supabase project or staging Cloud Run service for pre-production testing.
+
+5. **Pipeline observability** — Data pipeline runs in a standalone Docker container with a basic health check on `:8888`. No centralized logging aggregation or alerting integration.
+
+6. **Test coverage gaps** — Coverage targets stated for `utils/` and `services/` but actual server-side coverage is unclear. No coverage thresholds enforced in CI.
+
+7. **Shared package symlink hack** — `@citrus/shared` exports raw `.ts` files (no build step). Server Dockerfile must maintain `ln -s ../../packages/shared node_modules/@citrus/shared`.
+
+8. **In-memory rate limiting** — `standardRateLimit` (300/min) and `strictRateLimit` (10/min) use LRU-bounded in-memory stores. Will not distribute correctly if Cloud Run scales to multiple instances.
 
 9. **Hardcoded CORS origins** — Production CORS origins are hardcoded in `server/src/app.ts`. Adding new domains requires a code change and redeploy.
 
-10. **Data pipeline single point of failure** — The pipeline runs as a single Docker container. No redundancy, auto-scaling, or dead-letter queue for failed ingestion jobs.
+10. **Data pipeline single point of failure** — Runs as a single Docker container. No redundancy, auto-scaling, or dead-letter queue for failed ingestion jobs.
+
+11. **Legacy `services/` folder size** — 32 files remain in `apps/web/src/services/`. While most now delegate to the API client, several still contain significant business logic that duplicates server-side services. These should be thinned to pure API wrappers or removed.
+
+## 13. Action Items / TODOs
+
+### P0 — Before next release
+- [ ] Migrate `DemoLeagueService.ts` direct DB writes to admin API routes (`POST/DELETE /api/admin/demo-league`)
+- [ ] Delete duplicate `apps/web/src/utils/scoringUtils.ts` — ensure all imports use `@citrus/shared` `ScoringCalculator`
+
+### P1 — Next sprint
+- [ ] Audit and thin `apps/web/src/services/` — remove files that are pure pass-throughs to `api/` modules, consolidate any remaining business logic server-side
+- [ ] Add test coverage thresholds to CI (`ci.yml`) — fail builds below target
+- [ ] Add a staging environment (Supabase project + Cloud Run service) for pre-production validation
+- [ ] Move CORS origins to environment variable (`ALLOWED_ORIGINS`) instead of hardcoded list
+
+### P2 — Near-term improvements
+- [ ] Squash migrations into a baseline for clean environment setup (keep individual migrations for incremental apply)
+- [ ] Replace in-memory rate limiting with Redis or Cloud Run-compatible distributed store
+- [ ] Build `@citrus/shared` to JS instead of exporting raw `.ts` — eliminates Dockerfile symlink hack
+- [ ] Add structured logging/alerting for data pipeline (forward to Cloud Logging or Datadog)
+- [ ] Add pipeline redundancy — at minimum a health-based restart policy, ideally Cloud Run Jobs or a task queue
+
+### P3 — Long-term
+- [ ] Pipeline dead-letter queue for failed NHL API ingestion jobs
+- [ ] Automated migration validation in CI (currently manual via `scripts/validate-migration.ts`)
+- [ ] Evaluate moving Stormy edge function to Hono API server for unified auth/rate-limiting
+- [ ] PWA offline support audit — verify service worker cache strategy is production-ready
