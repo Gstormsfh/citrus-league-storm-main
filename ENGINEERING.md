@@ -256,7 +256,93 @@ npm run dev:all      # Both concurrently
 # Pipeline: cd data-pipeline && docker-compose up
 ```
 
-## 9. Key Business Logic
+## 9. End-to-End Data Flow
+
+### How an NHL goal becomes fantasy points on screen
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  1. NHL API (api.nhle.com)                                             │
+│     Live game feed with play-by-play events                            │
+└──────────────────────┬──────────────────────────────────────────────────┘
+                       │ citrus_request() via 100-IP proxy rotation
+                       ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│  2. Data Pipeline (data_scraping_service.py)                           │
+│     Live sync every 5-10s during games                                 │
+│     Writes to: players (nhl_* columns), raw_nhl_data                   │
+└──────────────────────┬──────────────────────────────────────────────────┘
+                       │ service_role_key → Supabase REST API
+                       ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│  3. Supabase PostgreSQL                                                │
+│     players, player_weekly_stats, fantasy_daily_rosters                 │
+└──────────────────────┬──────────────────────────────────────────────────┘
+                       │
+          ┌────────────┴────────────┐
+          ▼                         ▼
+┌──────────────────────┐  ┌──────────────────────────────────────────────┐
+│  4a. Scoring Pipeline │  │  4b. Projection Pipeline                    │
+│  calculate_matchup_   │  │  Daily: run_daily_projections.py            │
+│  scores.py            │  │  Nightly (2AM ET): nightly_projection_      │
+│  Pre-calculates all   │  │  batch.py (6-phase ROS projections)         │
+│  fantasy points per   │  │  Writes to: player_projected_stats,         │
+│  player per matchup   │  │  projection_cache, ros_projections           │
+│  Writes to:           │  └──────────────────────────────────────────────┘
+│  fantasy_matchup_     │
+│  lines                │
+└──────────┬────────────┘
+           │
+           ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│  5. Hono API Server (server/)                                          │
+│     MatchupService reads pre-calculated lines via RLS                  │
+│     JWT auth → membership check → user-scoped Supabase client          │
+└──────────────────────┬──────────────────────────────────────────────────┘
+                       │ JSON over HTTPS
+                       ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│  6. React Frontend (apps/web/)                                         │
+│     API client attaches JWT, auto-refreshes before 5-min expiry        │
+│     ScoringCalculator applies league-specific scoring on display       │
+│     React Query caches + invalidates server state                      │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key insight:** The Python pipeline does all heavy computation (scraping, scoring, projections). The API server reads pre-computed data through RLS. The frontend displays results with league-specific scoring adjustments via `ScoringCalculator`.
+
+### Operational Schedule
+
+| Time | Process | What happens |
+|------|---------|-------------|
+| **Continuous** | `data_scraping_service.py` | Live game sync every 5-10s via 100-IP proxy rotation |
+| **Continuous** | Health check server (:8888) | Exposes pipeline health: `healthy` (<10min stale) → `degraded` (10-30min) → `unhealthy` (>30min) |
+| **Midnight MT** | `fetch_nhl_stats_from_landing.py` | Nightly PPP/SHP stats sync from NHL.com landing pages |
+| **Midnight MT** | `reconcile_player_stats.py` | Audit and fix player stat discrepancies |
+| **Post-midnight** | `calculate_matchup_scores.py` | Refresh pre-calculated matchup lines for all active leagues |
+| **Morning** | `run_daily_projections.py` | Daily player projections (multiprocessing, 600+ players) |
+| **2 AM ET** | `nightly_projection_batch.py` | Full ROS batch: 6 phases, ~15,000 projections, 15-30 min runtime |
+
+### Auth Flow (request lifecycle)
+
+```
+Browser → API Client (client.ts)
+  1. Gets JWT from Supabase auth session
+  2. Checks expiry, auto-refreshes if <5 min remaining (locked to prevent stampede)
+  3. Attaches Authorization: Bearer <token>
+     ↓
+Hono Server → authMiddleware (auth.ts)
+  4. Extracts token from Authorization header
+  5. Validates via supabase.auth.getUser(token) — never trusts client user IDs
+  6. Sets userId + userToken on request context
+  7. membershipMiddleware verifies league access
+     ↓
+Service Layer
+  8. createUserClient(token) creates user-scoped Supabase client
+  9. All queries go through RLS — user can only see data they're authorized for
+```
+
+## 10. Key Business Logic
 
 1. **ScoringCalculator** (`packages/shared/src/utils/scoring.ts`) — Single source of truth for converting NHL stats into fantasy points. Supports league-specific scoring overrides. Default: G=3, A=2, PPP=1, SHP=2, SOG=0.4, BLK=0.5, HIT=0.2, PIM=0.5, W=4, SO=3, SV=0.2, GA=-1.
 
@@ -278,7 +364,7 @@ npm run dev:all      # Both concurrently
 
 10. **PlayoffService** (`server/src/services/PlayoffService.ts`) — Manages fantasy playoff brackets — seeding from regular season standings, matchup generation, and advancement logic.
 
-## 10. API Migration Status (Audit: 2026-03-23)
+## 11. API Migration Status (Audit: 2026-03-23)
 
 The frontend is **~95% migrated** to the API-first architecture. All data operations route through the Hono API server except for one service file. Auth and realtime operations correctly remain client-side.
 
@@ -306,7 +392,7 @@ The frontend is **~95% migrated** to the API-first architecture. All data operat
 |------|-------------|-------------|
 | **`DemoLeagueService.ts`** | Direct INSERT/DELETE on `leagues`, `teams`, `draft_picks`, `draft_order`, `matchups`, `team_lineups` (lines 122–732) | Create `POST /api/admin/demo-league/initialize` and `DELETE /api/admin/demo-league` server routes |
 
-## 11. Known Gaps / Tech Debt
+## 12. Known Gaps / Tech Debt
 
 1. **`DemoLeagueService.ts` bypasses API** — The only frontend file making direct database writes. Needs dedicated admin API routes (see Section 10).
 
@@ -330,7 +416,7 @@ The frontend is **~95% migrated** to the API-first architecture. All data operat
 
 11. **Legacy `services/` folder size** — 32 files remain in `apps/web/src/services/`. While most now delegate to the API client, several still contain significant business logic that duplicates server-side services. These should be thinned to pure API wrappers or removed.
 
-## 12. Action Items / TODOs
+## 13. Action Items / TODOs
 
 ### P0 — Before next release
 - [ ] Migrate `DemoLeagueService.ts` direct DB writes to admin API routes (`POST/DELETE /api/admin/demo-league`)
