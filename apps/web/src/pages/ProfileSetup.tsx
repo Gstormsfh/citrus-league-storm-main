@@ -90,6 +90,12 @@ const ProfileSetup = () => {
       if (phone.trim()) profileFields.phone = phone.trim();
       if (location.trim()) profileFields.location = location.trim();
 
+      // Set display_name from first/last name if provided
+      const displayParts = [firstName.trim(), lastName.trim()].filter(Boolean);
+      if (displayParts.length > 0) {
+        profileFields.display_name = displayParts.join(' ');
+      }
+
       await accountApi.updateProfile(profileFields);
 
       // Success - refresh profile and redirect

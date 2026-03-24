@@ -8,6 +8,7 @@ export const accountApi = {
     return apiClient.get<{
       id: string;
       username: string;
+      display_name: string | null;
       first_name: string | null;
       last_name: string | null;
       phone: string | null;
@@ -26,6 +27,7 @@ export const accountApi = {
   /** Update the authenticated user's profile fields. */
   updateProfile(fields: {
     username?: string;
+    display_name?: string;
     first_name?: string;
     last_name?: string;
     phone?: string;

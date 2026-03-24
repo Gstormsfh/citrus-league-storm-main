@@ -77,7 +77,7 @@ accountRoutes.put('/profile', async (c) => {
     const body = await c.req.json();
 
     // Only allow known profile fields
-    const allowedFields = ['username', 'first_name', 'last_name', 'phone', 'location', 'bio', 'default_team_name', 'timezone'];
+    const allowedFields = ['username', 'display_name', 'first_name', 'last_name', 'phone', 'location', 'bio', 'default_team_name', 'timezone'];
     const fields: Record<string, unknown> = {};
     for (const key of allowedFields) {
       if (key in body) {

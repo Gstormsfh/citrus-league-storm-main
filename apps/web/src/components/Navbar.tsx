@@ -63,8 +63,8 @@ const Navbar = () => {
     return location.pathname.startsWith(base);
   };
 
-  const userInitial = profile?.username?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U';
-  const displayName = profile?.username || user?.email?.split('@')[0] || 'User';
+  const displayName = profile?.display_name || profile?.username || user?.email?.split('@')[0] || 'User';
+  const userInitial = displayName.charAt(0).toUpperCase();
 
   // Flat navigation tabs — one click to anywhere
   // All items shown to all users for full feature discovery
@@ -180,7 +180,7 @@ const Navbar = () => {
                       <Link to="/profile"><CircleUser className="h-4 w-4 mr-2" /> Profile</Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <Link to="/settings"><Settings className="h-4 w-4 mr-2" /> Settings</Link>
+                      <Link to="/profile?tab=settings"><Settings className="h-4 w-4 mr-2" /> Settings</Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive">
