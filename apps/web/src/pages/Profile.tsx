@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { leagueApi } from '@/api/leagues';
 import { rosterApi } from '@/api/rosters';
 import { accountApi } from '@/api/account';
+import { UserAccountService } from '@/services/UserAccountService';
 import { LeagueService } from '@/services/LeagueService';
 import { DraftService } from '@/services/DraftService';
 import { WaiverService } from '@/services/WaiverService';
@@ -21,15 +22,16 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { 
-  User, 
-  Settings, 
-  Trophy, 
-  Calendar, 
-  Target, 
-  TrendingUp, 
-  Medal, 
-  Users, 
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import {
+  User,
+  Settings,
+  Trophy,
+  Calendar,
+  Target,
+  TrendingUp,
+  Medal,
+  Users,
   Edit3,
   Camera,
   Mail,
@@ -48,17 +50,58 @@ import {
   Clock,
   RefreshCw,
   Play,
-  Loader2
+  Loader2,
+  Sun,
+  Moon,
+  Monitor,
+  FileText,
+  Download,
+  ExternalLink,
+  Trash2,
+  Pencil
 } from 'lucide-react';
 import { logger } from '@/utils/logger';
 
 const Profile = () => {
-  const { user, profile, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile, signOut } = useAuth();
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [isEditing, setIsEditing] = useState(false);
-  
-  // Active Tab State Management
-  const [activeTab, setActiveTab] = useState('overview');
+
+  // Active Tab State Management — support ?tab= URL param
+  const tabFromUrl = searchParams.get('tab');
+  const validTabs = ['overview', 'stats', 'achievements', 'settings'];
+  const [activeTab, setActiveTab] = useState(
+    tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : 'overview'
+  );
+
+  // Sync tab state with URL
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    if (tab === 'overview') {
+      searchParams.delete('tab');
+    } else {
+      searchParams.set('tab', tab);
+    }
+    setSearchParams(searchParams, { replace: true });
+  };
+
+  // Display name editing state
+  const [isEditingDisplayName, setIsEditingDisplayName] = useState(false);
+  const [displayNameInput, setDisplayNameInput] = useState('');
+  const [savingDisplayName, setSavingDisplayName] = useState(false);
+
+  // Settings state (merged from old Settings page)
+  const [changePasswordLoading, setChangePasswordLoading] = useState(false);
+  const [deleteAccountLoading, setDeleteAccountLoading] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [settingsMessage, setSettingsMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(() => {
+    return (localStorage.getItem('citrus-theme') as 'light' | 'dark' | 'system') || 'light';
+  });
   
   // Animation observer setup
   useEffect(() => {
@@ -85,6 +128,32 @@ const Profile = () => {
     };
   }, [activeTab]);
   
+  // Theme effect
+  useEffect(() => {
+    const root = document.documentElement;
+    localStorage.setItem('citrus-theme', theme);
+
+    const applyTheme = (prefersDark?: boolean) => {
+      if (theme === 'dark') {
+        root.classList.add('dark');
+      } else if (theme === 'system') {
+        const dark = prefersDark ?? window.matchMedia('(prefers-color-scheme: dark)').matches;
+        root.classList.toggle('dark', dark);
+      } else {
+        root.classList.remove('dark');
+      }
+    };
+
+    applyTheme();
+
+    if (theme === 'system') {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      const handler = (e: MediaQueryListEvent) => applyTheme(e.matches);
+      mq.addEventListener('change', handler);
+      return () => mq.removeEventListener('change', handler);
+    }
+  }, [theme]);
+
   // User & Team Data - Initialize from profile
   const [formData, setFormData] = useState({
     firstName: '',
@@ -114,6 +183,7 @@ const Profile = () => {
         favoriteTeam: '',
         teamDescription: ''
       });
+      setDisplayNameInput(profile.display_name || '');
     }
   }, [profile, user]);
 
@@ -467,8 +537,11 @@ const Profile = () => {
     return 'U';
   };
 
-  // Get display name
+  // Get display name — prefer custom display_name, then first/last, then username
   const getDisplayName = () => {
+    if (profile?.display_name) {
+      return profile.display_name;
+    }
     if (profile?.first_name && profile?.last_name) {
       return `${profile.first_name} ${profile.last_name}`;
     }
@@ -590,6 +663,113 @@ const Profile = () => {
     setPasswords({ current: '', new: '', confirm: '' });
   };
 
+  // Display name save handler
+  const handleSaveDisplayName = async () => {
+    if (!user || !profile) return;
+    const trimmed = displayNameInput.trim();
+    if (!trimmed) {
+      toast({ title: 'Error', description: 'Display name cannot be empty.', variant: 'destructive' });
+      return;
+    }
+    setSavingDisplayName(true);
+    try {
+      await accountApi.updateProfile({ display_name: trimmed });
+      await refreshProfile();
+      setIsEditingDisplayName(false);
+      toast({ title: 'Display name updated', description: `Your display name is now "${trimmed}".` });
+    } catch (error: unknown) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to update display name.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingDisplayName(false);
+    }
+  };
+
+  // Real password change handler (from old Settings page)
+  const handleChangePasswordReal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSettingsMessage(null);
+
+    if (newPassword.length < 8) {
+      setSettingsMessage({ type: 'error', text: 'Password must be at least 8 characters' });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setSettingsMessage({ type: 'error', text: 'Passwords do not match' });
+      return;
+    }
+
+    setChangePasswordLoading(true);
+    try {
+      const result = await UserAccountService.changePassword(newPassword);
+      if (!result.success) throw new Error(result.error);
+      setSettingsMessage({ type: 'success', text: 'Password updated successfully!' });
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error: unknown) {
+      logger.error('Password change error:', error);
+      setSettingsMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Failed to update password',
+      });
+    } finally {
+      setChangePasswordLoading(false);
+    }
+  };
+
+  const handleExportData = async () => {
+    setExportLoading(true);
+    setSettingsMessage(null);
+    try {
+      const result = await UserAccountService.exportUserData();
+      if (!result.success || !result.data) throw new Error(result.error || 'Export failed');
+
+      const blob = new Blob([JSON.stringify(result.data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `citrus-fantasy-data-export-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setSettingsMessage({ type: 'success', text: 'Your data has been exported successfully.' });
+    } catch (error: unknown) {
+      logger.error('Data export error:', error);
+      setSettingsMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Failed to export data. Please try again.',
+      });
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmation !== 'DELETE') {
+      setSettingsMessage({ type: 'error', text: 'Please type DELETE to confirm' });
+      return;
+    }
+    setDeleteAccountLoading(true);
+    setSettingsMessage(null);
+    try {
+      const result = await UserAccountService.deleteAccount();
+      if (!result.success) throw new Error(result.error || 'Deletion failed');
+      await signOut();
+    } catch (error: unknown) {
+      logger.error('Account deletion error:', error);
+      setSettingsMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Failed to delete account. Please contact support.',
+      });
+      setDeleteAccountLoading(false);
+    }
+  };
+
   const handleResetLeagueDraft = async (leagueId: string, leagueName: string) => {
     const confirmed = confirm(
       `Are you sure you want to reset the draft for "${leagueName}"?\n\n` +
@@ -669,7 +849,7 @@ const Profile = () => {
       <main className="pt-24 pb-16">
         <div className="container mx-auto px-4">
           <div className="max-w-6xl mx-auto">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
+            <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-8">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div className="flex items-center gap-4 animated-element">
                   <div className="relative group">
@@ -684,7 +864,38 @@ const Profile = () => {
                     </div>
                   </div>
                   <div>
-                    <h1 className="text-3xl font-bold">{getDisplayName()}</h1>
+                    {isEditingDisplayName ? (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={displayNameInput}
+                          onChange={(e) => setDisplayNameInput(e.target.value)}
+                          className="text-xl font-bold h-10 w-64"
+                          placeholder="Your display name"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSaveDisplayName();
+                            if (e.key === 'Escape') { setIsEditingDisplayName(false); setDisplayNameInput(profile?.display_name || ''); }
+                          }}
+                        />
+                        <Button size="sm" onClick={handleSaveDisplayName} disabled={savingDisplayName}>
+                          {savingDisplayName ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => { setIsEditingDisplayName(false); setDisplayNameInput(profile?.display_name || ''); }}>
+                          Cancel
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 group">
+                        <h1 className="text-3xl font-bold">{getDisplayName()}</h1>
+                        <button
+                          onClick={() => { setDisplayNameInput(profile?.display_name || getDisplayName()); setIsEditingDisplayName(true); }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-accent"
+                          title="Edit display name"
+                        >
+                          <Pencil className="h-4 w-4 text-muted-foreground" />
+                        </button>
+                      </div>
+                    )}
                     <p className="text-muted-foreground flex items-center gap-2 mt-1">
                       <Users className="h-4 w-4" />
                       {formData.teamName || 'No team yet'} • League Member since {getMemberSince()}
@@ -1014,78 +1225,136 @@ const Profile = () => {
               </TabsContent>
 
               <TabsContent value="settings" className="space-y-6">
+                {settingsMessage && (
+                  <div className={`p-3 rounded-lg text-sm ${settingsMessage.type === 'success' ? 'bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-300' : 'bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300'}`}>
+                    {settingsMessage.text}
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Account Settings */}
+                  {/* Display Name & Account Info */}
                   <Card className="animated-element lg:col-span-2">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <User className="h-5 w-5" />
-                        Account Settings
+                        Account Information
                       </CardTitle>
-                      <CardDescription>Manage your account details and login</CardDescription>
+                      <CardDescription>Your identity and account details</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-4">
-                          <h3 className="text-sm font-medium">Personal Information</h3>
                           <div className="space-y-2">
-                            <Label htmlFor="account-email">Email Address</Label>
-                            <Input 
-                              id="account-email" 
-                              value={formData.email} 
-                              onChange={(e) => handleInputChange('email', e.target.value)}
-                            />
+                            <Label htmlFor="settings-display-name">Display Name</Label>
+                            <div className="flex gap-2">
+                              <Input
+                                id="settings-display-name"
+                                value={displayNameInput}
+                                onChange={(e) => setDisplayNameInput(e.target.value)}
+                                placeholder="Choose a display name"
+                              />
+                              <Button
+                                onClick={handleSaveDisplayName}
+                                disabled={savingDisplayName || displayNameInput.trim() === (profile?.display_name || '')}
+                                size="sm"
+                                className="shrink-0"
+                              >
+                                {savingDisplayName ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
+                              </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground">This is the name shown to other users across the platform.</p>
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="account-name">Display Name</Label>
-                            <Input 
-                              id="account-name" 
-                              value={`${formData.firstName} ${formData.lastName}`} 
-                              readOnly
-                              className="bg-muted"
-                            />
-                            <p className="text-xs text-muted-foreground">To change your name, please visit the Overview tab.</p>
+                            <Label>Email Address</Label>
+                            <div className="flex items-center gap-2 p-2 rounded-md bg-muted text-sm">
+                              <Mail className="h-4 w-4 text-muted-foreground" />
+                              {user?.email}
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Username</Label>
+                            <div className="flex items-center gap-2 p-2 rounded-md bg-muted text-sm">
+                              <User className="h-4 w-4 text-muted-foreground" />
+                              {profile?.username}
+                            </div>
                           </div>
                         </div>
 
                         <div className="space-y-4">
-                          <h3 className="text-sm font-medium">Security</h3>
-                          <form onSubmit={handlePasswordChange} className="space-y-3">
-                            <div className="space-y-2">
-                              <Label htmlFor="current-password">Current Password</Label>
-                              <Input 
-                                id="current-password" 
-                                type="password" 
-                                value={passwords.current}
-                                onChange={(e) => setPasswords(p => ({...p, current: e.target.value}))}
-                              />
+                          <div className="space-y-2">
+                            <Label className="flex items-center gap-2">
+                              <Sun className="h-4 w-4" />
+                              Appearance
+                            </Label>
+                            <div className="flex gap-2">
+                              {([
+                                { value: 'light' as const, label: 'Light', icon: Sun },
+                                { value: 'dark' as const, label: 'Dark', icon: Moon },
+                                { value: 'system' as const, label: 'System', icon: Monitor },
+                              ]).map(({ value, label, icon: Icon }) => (
+                                <Button
+                                  key={value}
+                                  variant={theme === value ? 'default' : 'outline'}
+                                  onClick={() => setTheme(value)}
+                                  className="flex-1"
+                                  size="sm"
+                                >
+                                  <Icon className="mr-1.5 h-3.5 w-3.5" />
+                                  {label}
+                                </Button>
+                              ))}
                             </div>
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="space-y-2">
-                                <Label htmlFor="new-password">New Password</Label>
-                                <Input 
-                                  id="new-password" 
-                                  type="password"
-                                  value={passwords.new}
-                                  onChange={(e) => setPasswords(p => ({...p, new: e.target.value}))}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="confirm-password">Confirm</Label>
-                                <Input 
-                                  id="confirm-password" 
-                                  type="password"
-                                  value={passwords.confirm}
-                                  onChange={(e) => setPasswords(p => ({...p, confirm: e.target.value}))}
-                                />
-                              </div>
-                            </div>
-                            <Button type="submit" variant="outline" size="sm" className="w-full">
-                              Update Password
-                            </Button>
-                          </form>
+                          </div>
                         </div>
                       </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Change Password */}
+                  <Card className="animated-element">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Lock className="h-5 w-5" />
+                        Change Password
+                      </CardTitle>
+                      <CardDescription>Update your account password</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <form onSubmit={handleChangePasswordReal} className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="settings-newPassword">New Password</Label>
+                          <Input
+                            id="settings-newPassword"
+                            type="password"
+                            placeholder="Min 8 characters"
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            disabled={changePasswordLoading}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="settings-confirmPassword">Confirm New Password</Label>
+                          <Input
+                            id="settings-confirmPassword"
+                            type="password"
+                            placeholder="Confirm new password"
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            disabled={changePasswordLoading}
+                          />
+                        </div>
+                        <Button
+                          type="submit"
+                          disabled={changePasswordLoading || !newPassword || !confirmPassword}
+                          className="w-full"
+                        >
+                          {changePasswordLoading ? (
+                            <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Updating...</>
+                          ) : (
+                            'Update Password'
+                          )}
+                        </Button>
+                      </form>
                     </CardContent>
                   </Card>
 
@@ -1586,6 +1855,61 @@ const Profile = () => {
                     </CardContent>
                   </Card>
 
+                  {/* Legal & Privacy */}
+                  <Card className="animated-element">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <FileText className="h-5 w-5" />
+                        Legal & Privacy
+                      </CardTitle>
+                      <CardDescription>Review our policies and terms</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <a
+                        href="/privacy-policy.html"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-between p-3 rounded-lg hover:bg-accent/50 transition-colors group"
+                      >
+                        <span className="font-medium group-hover:text-primary">Privacy Policy</span>
+                        <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+                      </a>
+                      <Separator />
+                      <a
+                        href="/terms-of-service.html"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-between p-3 rounded-lg hover:bg-accent/50 transition-colors group"
+                      >
+                        <span className="font-medium group-hover:text-primary">Terms of Service</span>
+                        <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+                      </a>
+                    </CardContent>
+                  </Card>
+
+                  {/* Data Export */}
+                  <Card className="animated-element">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Download className="h-5 w-5" />
+                        Your Data
+                      </CardTitle>
+                      <CardDescription>Export a copy of all your data</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Download a JSON file containing all your account data, including your profile, teams, leagues, transactions, and draft history.
+                      </p>
+                      <Button variant="outline" onClick={handleExportData} disabled={exportLoading} className="w-full">
+                        {exportLoading ? (
+                          <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Exporting...</>
+                        ) : (
+                          <><Download className="mr-2 h-4 w-4" />Export My Data</>
+                        )}
+                      </Button>
+                    </CardContent>
+                  </Card>
+
                   {/* Subscription Plan */}
                   <Card className="animated-element lg:col-span-2">
                     <CardHeader>
@@ -1614,7 +1938,7 @@ const Profile = () => {
                           <Button variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10 flex-1 md:flex-none">Cancel</Button>
                         </div>
                       </div>
-                      
+
                       <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                         <div className="flex items-start gap-2 text-sm">
                           <Check className="h-4 w-4 text-primary mt-0.5" />
@@ -1635,6 +1959,80 @@ const Profile = () => {
                       </div>
                     </CardContent>
                   </Card>
+
+                  {/* Delete Account */}
+                  <Card className="animated-element lg:col-span-2 border-destructive/20 bg-destructive/5">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-destructive">
+                        <Trash2 className="h-5 w-5" />
+                        Delete Account
+                      </CardTitle>
+                      <CardDescription className="text-destructive/80">
+                        Permanently delete your account and all associated data
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="bg-background p-4 rounded-lg border border-destructive/20">
+                        <h4 className="font-semibold text-destructive mb-2">This action cannot be undone</h4>
+                        <ul className="text-sm text-destructive/80 space-y-1 ml-4 list-disc">
+                          <li>Your account and authentication credentials will be permanently deleted</li>
+                          <li>All your fantasy teams and league data will be removed</li>
+                          <li>If you're a league commissioner, your leagues may be orphaned</li>
+                          <li>Your draft history and transactions will be anonymized</li>
+                        </ul>
+                      </div>
+
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="destructive" className="w-full">
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete My Account
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                            <AlertDialogDescription className="space-y-4">
+                              <p>
+                                This will permanently delete your account and all associated data.
+                                This action cannot be undone.
+                              </p>
+                              <div>
+                                <Label htmlFor="deleteConfirmation" className="text-sm font-medium">
+                                  Type <span className="font-bold text-destructive">DELETE</span> to confirm:
+                                </Label>
+                                <Input
+                                  id="deleteConfirmation"
+                                  value={deleteConfirmation}
+                                  onChange={(e) => setDeleteConfirmation(e.target.value)}
+                                  placeholder="DELETE"
+                                  className="mt-2"
+                                />
+                              </div>
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel onClick={() => setDeleteConfirmation('')}>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={handleDeleteAccount}
+                              disabled={deleteConfirmation !== 'DELETE' || deleteAccountLoading}
+                              className="bg-destructive hover:bg-destructive/90"
+                            >
+                              {deleteAccountLoading ? (
+                                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Deleting...</>
+                              ) : (
+                                'Delete Account'
+                              )}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </CardContent>
+                  </Card>
+
+                  <div className="lg:col-span-2 text-center text-sm text-muted-foreground">
+                    <p>Need help? Contact us at <a href="mailto:CitrusFantasySports@Gmail.com" className="text-primary hover:underline">CitrusFantasySports@Gmail.com</a></p>
+                  </div>
                 </div>
               </TabsContent>
             </Tabs>

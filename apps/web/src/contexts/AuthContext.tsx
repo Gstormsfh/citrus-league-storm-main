@@ -20,6 +20,7 @@ function isTokenExpired(token: string | undefined): boolean {
 interface Profile {
   id: string;
   username: string;
+  display_name: string | null;
   first_name: string | null;
   last_name: string | null;
   phone: string | null;
