@@ -1271,13 +1271,6 @@ const Profile = () => {
                               {user?.email}
                             </div>
                           </div>
-                          <div className="space-y-2">
-                            <Label>Username</Label>
-                            <div className="flex items-center gap-2 p-2 rounded-md bg-muted text-sm">
-                              <User className="h-4 w-4 text-muted-foreground" />
-                              {profile?.username}
-                            </div>
-                          </div>
                         </div>
 
                         <div className="space-y-4">
