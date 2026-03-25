@@ -4,6 +4,7 @@ import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, closestCenter } 
 import { arrayMove } from '@dnd-kit/sortable';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useProfile } from '@/hooks/useProfile';
 import { useLeague, isDemoLeague } from '@/contexts/LeagueContext';
 import { DEMO_LEAGUE_ID, DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeagueService';
 import Navbar from '@/components/Navbar';
@@ -235,7 +236,8 @@ interface RosterState {
 }
 
 const Roster = () => {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
+  const { data: profile } = useProfile();
   const { userLeagueState, loading: leagueLoading, activeLeagueId, activeLeague, demoLeagueId, isChangingLeague } = useLeague();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();

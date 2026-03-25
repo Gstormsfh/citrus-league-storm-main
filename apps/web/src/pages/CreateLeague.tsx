@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useProfile } from "@/hooks/useProfile";
 import { useLeague } from "@/contexts/LeagueContext";
 import { LeagueService } from "@/services/LeagueService";
 import Navbar from "@/components/Navbar";
@@ -106,7 +107,8 @@ const SectionHeader = ({ title, subtitle, badge }: { title: string; subtitle: st
 const CreateLeague = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
+  const { data: profile } = useProfile();
   const { refreshLeagues } = useLeague();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);

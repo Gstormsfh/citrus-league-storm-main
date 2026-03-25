@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from '@/contexts/AuthContext';
+import { useProfile } from '@/hooks/useProfile';
 import { useLeague } from '@/contexts/LeagueContext';
 import { cn } from '@/lib/utils';
 import Navbar from '@/components/Navbar';
@@ -169,7 +170,8 @@ const DEBUG_MATCHUP = false;
 const log = DEBUG_MATCHUP ? logger.log.bind(logger, '[Matchup]') : () => {};
 
 const Matchup = () => {
-  const { user, profile, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const { data: profile } = useProfile();
   const { userLeagueState, loading: leagueContextLoading, activeLeagueId, isChangingLeague } = useLeague();
   const { leagueId: urlLeagueId, weekId: urlWeekId } = useParams<{ leagueId?: string; weekId?: string }>();
   const navigate = useNavigate();

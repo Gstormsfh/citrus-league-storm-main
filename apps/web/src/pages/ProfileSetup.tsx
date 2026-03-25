@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,7 +12,9 @@ import { accountApi } from '@/api/account';
 
 const ProfileSetup = () => {
   const navigate = useNavigate();
-  const { user, profile, loading: authLoading, refreshProfile } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const { data: profile, isLoading: profileLoading } = useProfile();
+  const updateProfile = useUpdateProfile();
   const [username, setUsername] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -20,11 +23,10 @@ const ProfileSetup = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
-  const retryAttempted = useRef(false);
 
   useEffect(() => {
-    // Wait for auth to finish loading before deciding
-    if (authLoading) return;
+    // Wait for auth + profile to finish loading before deciding
+    if (authLoading || profileLoading) return;
 
     if (!user) {
       navigate('/auth');
@@ -38,17 +40,9 @@ const ProfileSetup = () => {
       return;
     }
 
-    // If profile is null, the fetch may have failed (API error).
-    // Retry once to distinguish "no profile" from "server error".
-    if (!profile && !retryAttempted.current) {
-      retryAttempted.current = true;
-      refreshProfile();
-      return;
-    }
-
     // If user has auto-generated username or no profile, allow them to set it up
     setChecking(false);
-  }, [user, profile, authLoading, navigate, refreshProfile]);
+  }, [user, profile, authLoading, profileLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,10 +90,8 @@ const ProfileSetup = () => {
         profileFields.display_name = displayParts.join(' ');
       }
 
-      await accountApi.updateProfile(profileFields);
-
-      // Success - refresh profile and redirect
-      await refreshProfile();
+      // mutateAsync triggers optimistic update + background refetch
+      await updateProfile.mutateAsync(profileFields);
       navigate('/');
     } catch (err: any) {
       setError(err.message || 'Failed to update profile');
@@ -132,7 +124,7 @@ const ProfileSetup = () => {
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
-              
+
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="username">Username *</Label>
@@ -225,7 +217,7 @@ const ProfileSetup = () => {
                   </div>
                 </div>
               </div>
-              
+
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? (
                   <>
@@ -245,4 +237,3 @@ const ProfileSetup = () => {
 };
 
 export default ProfileSetup;
-
