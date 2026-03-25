@@ -267,7 +267,7 @@ const CreateLeague = () => {
       return;
     }
 
-    if (!profile || profile.username.startsWith('user_')) {
+    if (profile && profile.username.startsWith('user_')) {
       setError("Please complete your profile setup first");
       navigate("/profile-setup");
       return;
@@ -420,7 +420,7 @@ const CreateLeague = () => {
       return;
     }
 
-    if (!profile || profile.username.startsWith('user_')) {
+    if (profile && profile.username.startsWith('user_')) {
       setError("Please complete your profile setup first");
       navigate("/profile-setup");
       return;
