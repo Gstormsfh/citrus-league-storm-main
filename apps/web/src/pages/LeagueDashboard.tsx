@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useProfile } from '@/hooks/useProfile';
 import { LeagueService, League, Team } from '@/services/LeagueService';
 import { WaiverService } from '@/services/WaiverService';
 import { leagueApi } from '@/api/leagues';
@@ -28,7 +29,8 @@ import { logger } from '@/utils/logger';
 const LeagueDashboard = () => {
   const { leagueId } = useParams<{ leagueId: string }>();
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
+  const { data: profile } = useProfile();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [simulating, setSimulating] = useState(false);

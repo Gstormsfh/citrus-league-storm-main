@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useProfile } from '@/hooks/useProfile';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { Clock, UserPlus, UserMinus, MessageSquare, AlertCircle, Loader2, CheckCheck, Send } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -23,7 +24,8 @@ interface TeamInfo {
 }
 
 const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) => {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
+  const { data: profile } = useProfile();
   const navigate = useNavigate();
   const [chatMessage, setChatMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);

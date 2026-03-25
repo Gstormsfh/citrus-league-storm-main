@@ -14,6 +14,7 @@ import { DemoLeagueService } from '@/services/DemoLeagueService';
 import { DraftService } from '@/services/DraftService';
 import { ScheduleService } from '@/services/ScheduleService';
 import { useAuth } from '@/contexts/AuthContext';
+import { useProfile } from '@/hooks/useProfile';
 import { useLeague } from '@/contexts/LeagueContext';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { leagueApi } from '@/api/leagues';
@@ -39,7 +40,8 @@ const getFantasyPosition = (position: string): 'C' | 'LW' | 'RW' | 'D' | 'G' | '
 const OtherTeam = () => {
   const { teamId } = useParams();
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
+  const { data: profile } = useProfile();
   const { userLeagueState, activeLeagueId } = useLeague();
   const [loading, setLoading] = useState(true);
   const [roster, setRoster] = useState<{

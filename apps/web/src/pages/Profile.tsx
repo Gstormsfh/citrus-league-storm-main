@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
 import { Link, useSearchParams } from 'react-router-dom';
 import { leagueApi } from '@/api/leagues';
 import { rosterApi } from '@/api/rosters';
-import { accountApi } from '@/api/account';
 import { UserAccountService } from '@/services/UserAccountService';
 import { LeagueService } from '@/services/LeagueService';
 import { DraftService } from '@/services/DraftService';
@@ -63,7 +63,9 @@ import {
 import { logger } from '@/utils/logger';
 
 const Profile = () => {
-  const { user, profile, refreshProfile, updateProfileLocal, signOut } = useAuth();
+  const { user, signOut } = useAuth();
+  const { data: profile } = useProfile();
+  const updateProfile = useUpdateProfile();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const [isEditing, setIsEditing] = useState(false);
@@ -587,7 +589,7 @@ const Profile = () => {
       if (formData.location.trim()) updateData.location = formData.location.trim();
       if (formData.bio.trim()) updateData.bio = formData.bio.trim();
 
-      await accountApi.updateProfile(updateData);
+      await updateProfile.mutateAsync(updateData);
 
       toast({
         title: "Profile updated",
@@ -596,7 +598,6 @@ const Profile = () => {
       });
 
       setIsEditing(false);
-      await refreshProfile();
     } catch (error: any) {
       toast({
         title: "Error",
@@ -616,7 +617,7 @@ const Profile = () => {
         updateData.default_team_name = formData.teamName.trim();
       }
 
-      await accountApi.updateProfile(updateData);
+      await updateProfile.mutateAsync(updateData);
 
       // Also update all existing teams owned by this user
       if (formData.teamName.trim()) {
@@ -624,7 +625,7 @@ const Profile = () => {
           user.id,
           formData.teamName.trim()
         );
-        
+
         if (teamUpdateError) {
           logger.error('Error updating existing team names:', teamUpdateError);
           toast({
@@ -642,8 +643,6 @@ const Profile = () => {
         description: "Your default team name has been saved and updated across all your existing teams.",
         variant: "default"
       });
-
-      await refreshProfile();
     } catch (error: any) {
       toast({
         title: "Error",
@@ -673,13 +672,9 @@ const Profile = () => {
     }
     setSavingDisplayName(true);
     try {
-      await accountApi.updateProfile({ display_name: trimmed });
-      // Optimistically update local state so Navbar reflects the change instantly
-      updateProfileLocal({ display_name: trimmed });
+      await updateProfile.mutateAsync({ display_name: trimmed });
       setIsEditingDisplayName(false);
       toast({ title: 'Display name updated', description: `Your display name is now "${trimmed}".` });
-      // Background refresh to sync any other server-side changes
-      refreshProfile().catch(() => {});
     } catch (error: unknown) {
       toast({
         title: 'Error',

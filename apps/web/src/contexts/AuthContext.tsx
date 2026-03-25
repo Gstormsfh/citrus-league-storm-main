@@ -1,10 +1,11 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session, AuthError, AuthResponse } from '@supabase/supabase-js';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { accountApi } from '@/api/account';
 import { analyticsService } from '@/services/AnalyticsService';
 import { setSentryUser } from '@/integrations/sentry/config';
 import { logger } from '@/utils/logger';
+import { PROFILE_QUERY_KEY } from '@/hooks/useProfile';
 
 /** Returns true if JWT is expired or within 30s of expiry. */
 function isTokenExpired(token: string | undefined): boolean {
@@ -17,32 +18,14 @@ function isTokenExpired(token: string | undefined): boolean {
   }
 }
 
-interface Profile {
-  id: string;
-  username: string;
-  display_name: string | null;
-  first_name: string | null;
-  last_name: string | null;
-  phone: string | null;
-  location: string | null;
-  bio: string | null;
-  default_team_name: string | null;
-  timezone: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
 interface AuthContextType {
   user: User | null;
-  profile: Profile | null;
   session: Session | null;
+  /** True until the Supabase auth session is resolved (user or guest). */
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signUp: (email: string, password: string) => Promise<AuthResponse>;
   signOut: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
-  /** Optimistically merge partial profile fields into local state (no server call). */
-  updateProfileLocal: (fields: Partial<Profile>) => void;
   resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
   updatePassword: (newPassword: string) => Promise<{ error: AuthError | null }>;
   signInWithOAuth: (provider: 'google' | 'apple') => Promise<{ error: AuthError | null }>;
@@ -53,29 +36,9 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const fetchProfile = async (_userId: string) => {
-    try {
-      const response = await accountApi.getProfile();
-      setProfile(response.data || null);
-    } catch (error) {
-      logger.error('Error fetching profile:', error);
-      setProfile(null);
-    }
-  };
-
-  const refreshProfile = async () => {
-    if (user) {
-      await fetchProfile(user.id);
-    }
-  };
-
-  const updateProfileLocal = (fields: Partial<Profile>) => {
-    setProfile((prev) => (prev ? { ...prev, ...fields } : prev));
-  };
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     let mounted = true;
@@ -89,9 +52,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Register auth listener FIRST so we don't miss SIGNED_IN events
     // that fire during the getSession() call (e.g., OAuth callback redirect)
     let initialSessionHandled = false;
-
-    // Track whether profile fetch succeeded so TOKEN_REFRESHED can retry
-    let profileFetchSucceeded = false;
 
     const {
       data: { subscription },
@@ -116,13 +76,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           clearTimeout(timeout);
           analyticsService.setUserId(session.user.id);
           setSentryUser({ id: session.user.id, email: session.user.email });
-          fetchProfile(session.user.id).then(() => {
-            profileFetchSucceeded = true;
-          }).catch(() => {
-            profileFetchSucceeded = false;
-          }).finally(() => {
-            if (mounted) setLoading(false);
-          });
+          // Profile is fetched automatically by useProfile() via React Query
+          // once `user` is set (enabled: !!user). Prefetch to warm the cache.
+          queryClient.prefetchQuery({ queryKey: PROFILE_QUERY_KEY });
+          if (mounted) setLoading(false);
         } else if (event === 'INITIAL_SESSION') {
           // No session at all (guest) — stop loading
           clearTimeout(timeout);
@@ -130,27 +87,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       } else if (event === 'TOKEN_REFRESHED') {
         // Supabase finished refreshing — token is now valid.
-        // Set user (may have been deferred from INITIAL_SESSION) and fetch profile.
+        // Set user (may have been deferred from INITIAL_SESSION).
         if (session?.user) {
           setUser(session.user);
           clearTimeout(timeout);
           analyticsService.setUserId(session.user.id);
           setSentryUser({ id: session.user.id, email: session.user.email });
-          if (!profileFetchSucceeded) {
-            logger.info('[Auth] Token refreshed, fetching profile');
-            fetchProfile(session.user.id).then(() => {
-              profileFetchSucceeded = true;
-            }).catch(() => {}).finally(() => {
-              if (mounted) setLoading(false);
-            });
-          }
+          // Invalidate profile cache so React Query re-fetches with fresh token
+          queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEY });
+          if (mounted) setLoading(false);
         }
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         analyticsService.setUserId(null);
         setSentryUser(null);
-        setProfile(null);
-        profileFetchSucceeded = false;
+        // Clear profile from React Query cache on sign-out
+        queryClient.removeQueries({ queryKey: PROFILE_QUERY_KEY });
         setLoading(false);
       }
     });
@@ -170,13 +122,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(session?.user ?? null);
       if (session?.user) {
         analyticsService.setUserId(session.user.id);
-        fetchProfile(session.user.id).finally(() => {
-          if (mounted) setLoading(false);
-        });
       } else {
         analyticsService.setUserId(null);
-        setLoading(false);
       }
+      if (mounted) setLoading(false);
     }).catch((error) => {
       if (!mounted || initialSessionHandled) return;
       clearTimeout(timeout);
@@ -188,7 +137,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [queryClient]);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
@@ -199,7 +148,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!error) {
       import('@/services/AuditService').then(({ AuditService }) => AuditService.logLogin()).catch(() => {});
     } else {
-      import('@/services/AuditService').then(({ AuditService }) => 
+      import('@/services/AuditService').then(({ AuditService }) =>
         AuditService.log('AUTH_FAILED', null, { email, error: error.message }, 'WARN')
       ).catch(() => {});
     }
@@ -209,7 +158,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signUp = async (email: string, password: string) => {
     // Get the current origin for redirect URL
     const redirectUrl = `${window.location.origin}/auth/callback`;
-    
+
     const result = await supabase.auth.signUp({
       email,
       password,
@@ -224,7 +173,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // SOC 2 CC7.2: Audit log logout (fire-and-forget, before clearing session)
     import('@/services/AuditService').then(({ AuditService }) => AuditService.logLogout()).catch(() => {});
     await supabase.auth.signOut();
-    setProfile(null);
     // Clear user ID from analytics
     analyticsService.setUserId(null);
   };
@@ -287,14 +235,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     <AuthContext.Provider
       value={{
         user,
-        profile,
         session,
         loading,
         signIn,
         signUp,
         signOut,
-        refreshProfile,
-        updateProfileLocal,
         resetPassword,
         updatePassword,
         signInWithOAuth,
@@ -314,4 +259,3 @@ export const useAuth = () => {
   }
   return context;
 };
-

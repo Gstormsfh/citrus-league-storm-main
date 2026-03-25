@@ -9,6 +9,7 @@ import {
 import { CitrusLogo } from '@/components/icons/CitrusIcons';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useProfile } from '@/hooks/useProfile';
 import { useLeague } from '@/contexts/LeagueContext';
 import {
   DropdownMenu,
@@ -28,8 +29,8 @@ const Navbar = () => {
 
   const auth = useAuth();
   const user = auth?.user ?? null;
-  const profile = auth?.profile ?? null;
   const signOut = auth?.signOut ?? (async () => {});
+  const { data: profile } = useProfile();
 
   const league = useLeague();
   const activeLeagueId = league?.activeLeagueId ?? null;
