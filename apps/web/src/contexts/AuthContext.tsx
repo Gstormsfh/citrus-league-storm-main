@@ -41,6 +41,8 @@ interface AuthContextType {
   signUp: (email: string, password: string) => Promise<AuthResponse>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  /** Optimistically merge partial profile fields into local state (no server call). */
+  updateProfileLocal: (fields: Partial<Profile>) => void;
   resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
   updatePassword: (newPassword: string) => Promise<{ error: AuthError | null }>;
   signInWithOAuth: (provider: 'google' | 'apple') => Promise<{ error: AuthError | null }>;
@@ -69,6 +71,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (user) {
       await fetchProfile(user.id);
     }
+  };
+
+  const updateProfileLocal = (fields: Partial<Profile>) => {
+    setProfile((prev) => (prev ? { ...prev, ...fields } : prev));
   };
 
   useEffect(() => {
@@ -288,6 +294,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         signUp,
         signOut,
         refreshProfile,
+        updateProfileLocal,
         resetPassword,
         updatePassword,
         signInWithOAuth,
