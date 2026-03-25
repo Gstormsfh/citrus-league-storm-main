@@ -109,7 +109,7 @@ export const MATCHUP_LINES_COLUMNS_SLIM = 'id, matchup_id, player_id, team_id, t
 // ============================================================================
 // PROFILE COLUMNS
 // ============================================================================
-export const PROFILE_COLUMNS = 'id, username, first_name, last_name, phone, location, bio, default_team_name, timezone, created_at, updated_at';
+export const PROFILE_COLUMNS = 'id, username, display_name, first_name, last_name, phone, location, bio, default_team_name, timezone, created_at, updated_at';
 
 // ============================================================================
 // DRAFT ORDER COLUMNS
