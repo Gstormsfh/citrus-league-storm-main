@@ -63,7 +63,7 @@ import {
 import { logger } from '@/utils/logger';
 
 const Profile = () => {
-  const { user, profile, refreshProfile, signOut } = useAuth();
+  const { user, profile, refreshProfile, updateProfileLocal, signOut } = useAuth();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const [isEditing, setIsEditing] = useState(false);
@@ -674,9 +674,12 @@ const Profile = () => {
     setSavingDisplayName(true);
     try {
       await accountApi.updateProfile({ display_name: trimmed });
-      await refreshProfile();
+      // Optimistically update local state so Navbar reflects the change instantly
+      updateProfileLocal({ display_name: trimmed });
       setIsEditingDisplayName(false);
       toast({ title: 'Display name updated', description: `Your display name is now "${trimmed}".` });
+      // Background refresh to sync any other server-side changes
+      refreshProfile().catch(() => {});
     } catch (error: unknown) {
       toast({
         title: 'Error',
