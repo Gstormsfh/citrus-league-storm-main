@@ -52,10 +52,17 @@ IS_IN_SEASON = [
     True,  True,  True,  True,  True,  True,
 ]
 NEW_USERS_DEFAULT = [
-    150, 200, 250, 300, 400, 500,
-    2000, 2500, 2200, 1800, 1500, 1200,
-    1200, 1000, 900, 1200, 2000, 3500,
+    500, 1500, 5000, 6000, 8000, 10000,
+    8000, 5000, 3000, 2500, 2000, 1500,
+    1500, 2000, 3000, 5000, 8000, 12000,
     17000, 20000, 20000, 18000, 16000, 13000,
+]
+# Content marketing as lump-sum influencer payments per month
+CONTENT_MKT_DEFAULT = [
+    0, 0, 500, 0, 0, 1500,
+    0, 0, 0, 0, 0, 0,
+    0, 0, 2000, 0, 2500, 3000,
+    3000, 0, 2000, 0, 0, 0,
 ]
 CONFERENCE_COSTS = {
     0: 750, 3: 4500, 5: 3500, 7: 5000, 10: 4000, 11: 5000,
@@ -88,10 +95,11 @@ ASSUMPTIONS = [
     ("ch_free_in", "Free In-Season", 0.06, "%", "", pct_fmt),
     ("ch_free_off", "Free Off-Season", 0.15, "%", "", pct_fmt),
     (None, "", None, None, None, None),
-    (None, "PAY-PER-USE", None, None, None, None),
-    ("ai_price", "Stormy AI Query Pack Price", 1.99, "USD", "Per 50-query pack", usd_cents_fmt),
-    ("ai_attach_free", "AI Pack Attach \u2014 Free Users", 0.02, "%/mo", "", pct_fmt),
-    ("ai_attach_pro", "AI Pack Attach \u2014 Pro Users", 0.10, "%/mo", "", pct_fmt),
+    (None, "PAY-PER-USE (Tiered Query Packs)", None, None, None, None),
+    ("ai_price_free", "Free User Query Pack", 2.99, "USD", "20 queries \u2014 $0.15/q premium", usd_cents_fmt),
+    ("ai_price_paid", "Paid User Query Pack", 1.99, "USD", "50 queries \u2014 $0.04/q subscriber perk", usd_cents_fmt),
+    ("ai_attach_free", "AI Pack Attach \u2014 Free Users", 0.02, "%/mo", "Low — limited free experience", pct_fmt),
+    ("ai_attach_pro", "AI Pack Attach \u2014 Pro/Comm Users", 0.10, "%/mo", "Higher — power users want more", pct_fmt),
     ("dk_price", "Draft Kit Price", 4.99, "USD", "One-time per season", usd_cents_fmt),
     ("dk_attach", "Draft Kit Attach Rate", 0.08, "%", "All users in draft months", pct_fmt),
     (None, "", None, None, None, None),
@@ -134,8 +142,12 @@ ASSUMPTIONS = [
     (None, "MARKETING", None, None, None, None),
     ("mkt_launch", "Marketing Launch Month", 2, "0-based", "Mid-June 2026 app launch", num_fmt),
     ("cac", "Blended CAC Target", 2.50, "USD", "Organic/community-driven", usd_cents_fmt),
-    ("cont_mkt_y1", "Content Marketing Y1", 150, "USD/mo", "Post-launch only", usd_fmt),
-    ("cont_mkt_y2", "Content Marketing Y2", 500, "USD/mo", "", usd_fmt),
+    (None, "", None, None, None, None),
+    (None, "CONTENT / INFLUENCER MARKETING (Monthly Lump Sums)", None, None, None, None),
+] + [
+    (f"cont_mkt_{i}", f"  Influencer Spend \u2014 {MONTHS[i]}", CONTENT_MKT_DEFAULT[i], "USD", "Lump-sum influencer payment", usd_fmt)
+    for i in range(24)
+] + [
     (None, "", None, None, None, None),
     (None, "TEAM", None, None, None, None),
     ("team_1_6", "Months 1-6 (Solo Founder)", 0, "USD/mo", "Bootstrapped", usd_fmt),
@@ -147,12 +159,12 @@ ASSUMPTIONS = [
     ("legal_y1", "Year 1 (Basic)", 100, "USD/mo", "Bookkeeping, tax prep only", usd_fmt),
     ("legal_y2", "Year 2 (Basic)", 300, "USD/mo", "Bookkeeping + general counsel", usd_fmt),
     (None, "", None, None, None, None),
-    (None, "DFS REGULATORY — CANADA (post-100K users)", None, None, None, None),
-    ("dfs_reg_thresh", "DFS Regulatory Threshold", 100000, "users", "Triggers licensing costs", num_fmt),
-    ("dfs_legal_opinion", "Legal Opinion / Skill-Game Defense", 500, "USD/mo", "Criminal Code s.206(1)(d) opinion, amortized", usd_fmt),
-    ("dfs_compliance", "FINTRAC AML Compliance", 1000, "USD/mo", "Reporting obligations for prize pools >$10K", usd_fmt),
-    ("dfs_insurance", "Insurance (E&O + Cyber)", 500, "USD/mo", "Errors & omissions, cyber liability", usd_fmt),
-    ("dfs_player_trust", "Player Fund Segregation / Audit", 500, "USD/mo", "Trust account admin + annual audit", usd_fmt),
+    (None, "DFS COMPLIANCE — CANADA (NO LICENSE REQUIRED)", None, None, None, None),
+    ("dfs_reg_thresh", "Compliance Threshold", 100000, "users", "Prudent compliance at scale", num_fmt),
+    ("dfs_legal_opinion", "Legal Opinion / Skill-Game Defense", 500, "USD/mo", "s.206(1)(d) opinion amortized; NO license needed", usd_fmt),
+    ("dfs_compliance", "FINTRAC AML Compliance", 1000, "USD/mo", "Prize pools >$10K trigger reporting", usd_fmt),
+    ("dfs_insurance", "Insurance (E&O + Cyber)", 500, "USD/mo", "Standard biz insurance", usd_fmt),
+    ("dfs_player_trust", "Player Fund Segregation / Audit", 500, "USD/mo", "Trust account — best practice, not required", usd_fmt),
     (None, "", None, None, None, None),
     (None, "USER GROWTH / ACQUISITION (Monthly New Users)", None, None, None, None),
 ] + [
@@ -525,8 +537,8 @@ def build_workbook():
     write_label(ws3, R_DISC, "  Less: Annual Billing Discount")
     write_label(ws3, R_NET_SUB, "  NET SUBSCRIPTION REVENUE", bold=True)
     write_section(ws3, 11, "PAY-PER-USE REVENUE")
-    write_label(ws3, R_AI_FREE, "  Stormy AI Query Packs (Free)")
-    write_label(ws3, R_AI_PRO, "  Stormy AI Query Packs (Pro)")
+    write_label(ws3, R_AI_FREE, "  Stormy AI Packs (Free @ $2.99)")
+    write_label(ws3, R_AI_PRO, "  Stormy AI Packs (Paid @ $1.99)")
     write_label(ws3, R_DRAFT_KIT, "  Draft Kits (Seasonal)")
     write_label(ws3, R_NET_PPU, "  NET PAY-PER-USE REVENUE", bold=True)
     write_section(ws3, 17, "DFS REVENUE")
@@ -574,11 +586,11 @@ def build_workbook():
         ws3.cell(row=R_NET_SUB, column=col,
                  value=f"={cl}{R_GROSS_SUB}+{cl}{R_DISC}")
 
-        # Pay-per-use
+        # Pay-per-use (tiered pricing: free users pay more per query)
         ws3.cell(row=R_AI_FREE, column=col,
-                 value=f"={ug(UG_END_FREE, col)}*{A['ai_attach_free']}*{A['ai_price']}")
+                 value=f"={ug(UG_END_FREE, col)}*{A['ai_attach_free']}*{A['ai_price_free']}")
         ws3.cell(row=R_AI_PRO, column=col,
-                 value=f"={ug(UG_END_PRO, col)}*{A['ai_attach_pro']}*{A['ai_price']}")
+                 value=f"=({ug(UG_END_PRO, col)}+{ug(UG_END_COMM, col)})*{A['ai_attach_pro']}*{A['ai_price_paid']}")
         # Draft kits: months 5,6,17,18 (0-indexed) = columns 7,8,19,20
         ws3.cell(row=R_DRAFT_KIT, column=col,
                  value=f"=IF(OR(COLUMN()=7,COLUMN()=8,COLUMN()=19,COLUMN()=20),{ug(UG_END_TOTAL, col)}*{A['dk_attach']}*{A['dk_price']},0)")
@@ -677,7 +689,7 @@ def build_workbook():
     write_section(ws4, 13, "OPERATING EXPENSES (OPEX)")
     write_section(ws4, 14, "  SALES & MARKETING")
     write_label(ws4, CE_DIG_MKT, "    Digital Marketing")
-    write_label(ws4, CE_CONT_MKT, "    Content Marketing")
+    write_label(ws4, CE_CONT_MKT, "    Influencer / Content Marketing")
     write_label(ws4, CE_TOTAL_SM, "    Total Sales & Marketing", bold=True)
     write_section(ws4, 19, "  GENERAL & ADMINISTRATIVE")
     write_label(ws4, CE_TEAM, "    Contractors / Team")
@@ -720,7 +732,7 @@ def build_workbook():
         ws4.cell(row=CE_DIG_MKT, column=col,
                  value=f"=IF(COLUMN()-2>={A['mkt_launch']},{ug(UG_NEW, col)}*{A['cac']},0)")
         ws4.cell(row=CE_CONT_MKT, column=col,
-                 value=f"=IF(COLUMN()-2>={A['mkt_launch']},IF(COLUMN()<14,{A['cont_mkt_y1']},{A['cont_mkt_y2']}),0)")
+                 value=f"={A[f'cont_mkt_{m}']}")
         ws4.cell(row=CE_TOTAL_SM, column=col,
                  value=f"={cl}{CE_DIG_MKT}+{cl}{CE_CONT_MKT}")
 
@@ -1148,13 +1160,13 @@ def build_workbook():
         ("Stripe processing fees", "Stripe Pricing", "https://stripe.com/pricing"),
         ("Apple Developer Program $99/yr", "Apple Developer", "https://developer.apple.com/support/enrollment/"),
         ("", "", ""),
-        ("DFS REGULATORY — CANADA", "", ""),
-        ("Criminal Code s.206(1)(d) skill exemption", "DFS legal as contest of skill — key legal basis", "https://laws-lois.justice.gc.ca/eng/acts/c-46/page-46.html"),
-        ("DFS NOT under iGaming Ontario", "iGO covers sports betting/casinos, not DFS skill contests", "https://igamingontario.ca/en/operators"),
-        ("DK/FD DFS operating in Canada w/o iGO", "Precedent — DFS platforms operate under skill exemption", ""),
-        ("FINTRAC AML if handling >$10K prizes", "Reporting entity obligations for large prize pools", "https://fintrac-canafe.canada.ca/re-ed/intro-eng"),
-        ("Player fund segregation best practice", "Industry standard — trust accounts for player deposits", ""),
-        ("Legal opinion cost $3K-8K one-time", "Canadian gaming counsel — one-time s.206 opinion", ""),
+        ("DFS COMPLIANCE — CANADA (NO LICENSE REQUIRED)", "", ""),
+        ("Criminal Code s.206(1)(d) skill exemption", "DFS is LEGAL — contest of skill, no gaming license", "https://laws-lois.justice.gc.ca/eng/acts/c-46/page-46.html"),
+        ("NOT regulated by iGaming Ontario", "iGO = sportsbooks/casinos only, not DFS", "https://igamingontario.ca/en/operators"),
+        ("NOT regulated by AGCO for DFS", "AGCO gaming regs do not cover skill contests", "https://www.agco.ca/igaming"),
+        ("DK/FD DFS precedent in Canada", "Both operate DFS in Canada without gaming license", ""),
+        ("FINTRAC AML if prize pools >$10K", "Reporting obligations — not a license, just compliance", "https://fintrac-canafe.canada.ca/re-ed/intro-eng"),
+        ("Legal opinion $3K-8K one-time", "Confirms s.206(1)(d) applies — amortized in model", ""),
         ("", "", ""),
         ("MARKETING / CAC", "", ""),
         ("DraftKings/FanDuel CAC $200-350", "BusinessOfApps UA Costs", "https://www.businessofapps.com/marketplace/user-acquisition/research/user-acquisition-costs/"),
@@ -1169,11 +1181,11 @@ def build_workbook():
         ("Conversion timing", "In-season 1.8x multiplier, off-season 0.4x", ""),
         ("Churn model", "Monthly churn with seasonal variation (in vs off-season)", ""),
         ("Revenue recognition", "Subscription recognized monthly; annual billing amortized", ""),
-        ("Marketing timing", "No marketing spend pre-launch; starts at configurable launch month", ""),
+        ("Marketing timing", "Digital marketing gated on launch month; influencer spend is lump-sum per month", ""),
         ("Platform fee allocation", "70% mobile (60/40 iOS/Android), 30% web (Stripe)", ""),
         ("COGS scaling", "Supabase upgrades at 50K users; Claude API scales per-query", ""),
         ("Advertising", "Web-only ads (no mobile app ads); 30% web × 80% no ad-blocker = 24% eligible", ""),
-        ("DFS regulatory (Canada)", "Criminal Code s.206 skill defense + FINTRAC AML triggers at 100K users", ""),
+        ("DFS compliance (Canada)", "NO LICENSE REQUIRED — skill contest under Criminal Code s.206(1)(d); prudent compliance at scale", ""),
         ("DFS launch", "Month 19 (Oct 2027) per product roadmap", ""),
         ("", "", ""),
         ("DYNAMIC MODEL NOTE", "", ""),
