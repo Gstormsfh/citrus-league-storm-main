@@ -5164,31 +5164,33 @@ const Matchup = () => {
         <Navbar />
       </div>
       
-      {/* MOBILE: Compact sticky header with matchup context */}
+      {/* MOBILE: Sticky scoreboard header — ESPN/Yahoo style */}
       <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-between h-12 px-4">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-sm font-varsity font-bold text-citrus-forest truncate">
-              {(() => {
-                const myName = userLeagueState === 'active-user' ? (userTeam?.team_name || 'My Team') : 'Citrus Crushers';
-                const oppName = userLeagueState === 'active-user' ? (opponentTeam?.team_name || 'Opponent') : 'Thunder Titans';
-                return `${myName} vs ${oppName}`;
-              })()}
-            </h1>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-            <span className="text-xs font-varsity font-black text-citrus-sage">
+        <div className="flex items-center justify-between h-14 px-3">
+          {/* My team score */}
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <span className="text-lg font-varsity font-black text-citrus-forest tabular-nums">
               {parseFloat(myTeamPoints || '0').toFixed(1)}
             </span>
-            <span className="text-[10px] text-citrus-charcoal/40">-</span>
-            <span className="text-xs font-varsity font-black text-citrus-orange">
+            <span className="text-xs font-display font-semibold text-citrus-forest/70 truncate">
+              {userLeagueState === 'active-user' ? (userTeam?.team_name || 'My Team') : 'Citrus Crushers'}
+            </span>
+          </div>
+          {/* Week badge */}
+          <div className="flex flex-col items-center px-2 flex-shrink-0">
+            <span className="text-[10px] font-display font-bold text-citrus-charcoal/50 uppercase tracking-wider">
+              {currentMatchup ? `Wk ${selectedWeek}` : 'VS'}
+            </span>
+            <span className="text-xs text-citrus-charcoal/30 font-bold">—</span>
+          </div>
+          {/* Opponent score */}
+          <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
+            <span className="text-xs font-display font-semibold text-citrus-orange/70 truncate text-right">
+              {userLeagueState === 'active-user' ? (opponentTeam?.team_name || 'Opponent') : 'Thunder Titans'}
+            </span>
+            <span className="text-lg font-varsity font-black text-citrus-orange tabular-nums">
               {parseFloat(opponentTeamPoints || '0').toFixed(1)}
             </span>
-            {currentMatchup && (
-              <span className="text-[10px] font-display text-citrus-charcoal/50 ml-1">
-                Wk {selectedWeek}
-              </span>
-            )}
           </div>
         </div>
       </div>

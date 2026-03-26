@@ -25,7 +25,7 @@ const HeroSection = () => {
             <span className="font-display font-bold text-xs uppercase tracking-wider text-citrus-forest">Live Fantasy Hockey • {CURRENT_SEASON}</span>
           </div>
           
-          <h1 className="text-5xl md:text-6xl lg:text-7xl font-varsity font-black leading-none uppercase mb-6 text-citrus-forest tracking-tight drop-shadow-[0_2px_2px_rgba(255,255,255,0.3)]">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-varsity font-black leading-none uppercase mb-6 text-citrus-forest tracking-tight drop-shadow-[0_2px_2px_rgba(255,255,255,0.3)]">
             Leave Your<br/>
             <span className="text-citrus-green-dark drop-shadow-[0_2px_4px_rgba(255,255,255,0.5)]">Parents' Apps</span><br/>
             Behind
@@ -64,7 +64,7 @@ const HeroSection = () => {
           </div>
           
           {/* Data-driven stats showcase */}
-          <div className="grid grid-cols-3 gap-4 max-w-lg">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 max-w-lg">
             <div className="bg-[#E8EED9]/80 backdrop-blur-sm border-2 border-citrus-green-dark/40 rounded-xl p-4 text-center shadow-md">
               <div className="font-varsity text-2xl font-black text-citrus-green-dark drop-shadow-[0_1px_2px_rgba(255,255,255,0.5)] mb-1">98.7%</div>
               <div className="text-xs text-citrus-forest font-display uppercase tracking-wide font-bold">Accuracy</div>

@@ -474,7 +474,7 @@ const Standings = () => {
         <div className="flex items-center justify-between h-12 px-4">
           <h1 className="text-lg font-varsity font-bold text-citrus-forest">Standings</h1>
           {(activeLeague?.name || leagueTeams.length > 0) && (
-            <span className="text-[11px] font-display text-citrus-charcoal/50 truncate max-w-[160px] ml-2">
+            <span className="text-xs font-display text-citrus-charcoal/50 truncate max-w-[160px] ml-2">
               {activeLeague?.name}{leagueTeams.length > 0 ? ` \u2022 ${leagueTeams.length} teams` : ''}
             </span>
           )}
@@ -597,8 +597,8 @@ const Standings = () => {
                     )}
                     {hasMatchups && (
                       <>
-                        <th className="px-3 sm:px-6 py-3 sm:py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Streak</th>
-                        <th className="px-3 sm:px-6 py-3 sm:py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Last 5</th>
+                        <th className="hidden sm:table-cell px-3 sm:px-6 py-3 sm:py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Streak</th>
+                        <th className="hidden sm:table-cell px-3 sm:px-6 py-3 sm:py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Last 5</th>
                       </>
                     )}
                   </tr>
@@ -630,23 +630,23 @@ const Standings = () => {
                             {hasMatchups && index < leagueFormat.playoffTeams && (() => {
                               const ppTeam = playoffPictureTeams.find(p => p.team_id === team.id);
                               if (ppTeam?.clinch_status === 'clinched') {
-                                return <span className="text-[10px] font-bold text-green-600 tracking-tight" title="Clinched playoff berth">x</span>;
+                                return <span className="text-xs font-bold text-green-600 tracking-tight" title="Clinched playoff berth">x</span>;
                               }
-                              return <span className="text-[10px] font-bold text-primary tracking-tight">PO</span>;
+                              return <span className="text-xs font-bold text-primary tracking-tight">PO</span>;
                             })()}
                             {hasMatchups && index >= leagueFormat.playoffTeams && (() => {
                               const ppTeam = playoffPictureTeams.find(p => p.team_id === team.id);
                               if (ppTeam?.clinch_status === 'eliminated') {
-                                return <span className="text-[10px] font-bold text-red-500 tracking-tight" title="Eliminated from playoff contention">e</span>;
+                                return <span className="text-xs font-bold text-red-500 tracking-tight" title="Eliminated from playoff contention">e</span>;
                               }
                               return null;
                             })()}
                             {/* Roto: Co-champion label when tied at 1st */}
                             {isRoto && index === 0 && sortedTeams.length > 1 && sortedTeams[1].points === team.points && (
-                              <span className="text-[9px] font-bold text-amber-600 bg-amber-100 dark:bg-amber-900/30 px-1 py-0.5 rounded">CO-CHAMP</span>
+                              <span className="text-[10px] font-bold text-amber-600 bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded">CO-CHAMP</span>
                             )}
                             {isRoto && index > 0 && sortedTeams[0].points === team.points && (
-                              <span className="text-[9px] font-bold text-amber-600 bg-amber-100 dark:bg-amber-900/30 px-1 py-0.5 rounded">CO-CHAMP</span>
+                              <span className="text-[10px] font-bold text-amber-600 bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded">CO-CHAMP</span>
                             )}
                           </div>
                         </td>
@@ -658,7 +658,7 @@ const Standings = () => {
                             <div style={{ visibility: 'visible', opacity: 1 }}>
                               <div className={`font-semibold ${isUserTeam ? 'text-primary' : 'text-foreground'}`} style={{ visibility: 'visible', opacity: 1, color: isUserTeam ? undefined : 'inherit' }}>
                                 {team.name}
-                                {isUserTeam && <span className="ml-2 text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-bold">YOU</span>}
+                                {isUserTeam && <span className="ml-2 text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-bold">YOU</span>}
                               </div>
                               <div className="text-xs text-muted-foreground" style={{ visibility: 'visible', opacity: 1 }}>{team.owner}</div>
                             </div>
@@ -691,8 +691,8 @@ const Standings = () => {
                         )}
                         {hasMatchups && (
                           <>
-                            <td className="px-3 sm:px-6 py-3 sm:py-4 text-center" style={{ visibility: 'visible', opacity: 1 }}>
-                              <span className={`inline-flex px-2.5 py-1 text-[10px] font-bold rounded-full border ${
+                            <td className="hidden sm:table-cell px-3 sm:px-6 py-3 sm:py-4 text-center" style={{ visibility: 'visible', opacity: 1 }}>
+                              <span className={`inline-flex px-2.5 py-1 text-xs font-bold rounded-full border ${
                                 team.streak.startsWith('W')
                                   ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800'
                                   : team.streak.startsWith('L')
@@ -702,7 +702,7 @@ const Standings = () => {
                                 {team.streak}
                               </span>
                             </td>
-                            <td className="px-3 sm:px-6 py-3 sm:py-4 text-center text-muted-foreground font-medium" style={{ visibility: 'visible', opacity: 1 }}>
+                            <td className="hidden sm:table-cell px-3 sm:px-6 py-3 sm:py-4 text-center text-muted-foreground font-medium" style={{ visibility: 'visible', opacity: 1 }}>
                               {team.last5.wins}-{team.last5.losses}{team.last5.ties > 0 ? `-${team.last5.ties}` : ''}
                             </td>
                           </>

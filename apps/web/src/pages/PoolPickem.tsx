@@ -193,7 +193,7 @@ const PoolPickem = () => {
                             <div className="text-center">
                               <span className="text-xs text-muted-foreground font-medium">@</span>
                               {game.game_time && (
-                                <div className="text-[10px] text-muted-foreground">
+                                <div className="text-xs text-muted-foreground">
                                   {locked ? (
                                     <span className="flex items-center gap-1"><Lock className="w-3 h-3" /> {isPostponed ? 'PPD' : game.status === 'final' ? 'Final' : game.status === 'live' ? 'Live' : 'Locked'}</span>
                                   ) : (
@@ -202,7 +202,7 @@ const PoolPickem = () => {
                                 </div>
                               )}
                               {game.status === 'final' && (
-                                <div className="text-[10px] font-bold">{game.away_score}-{game.home_score}</div>
+                                <div className="text-xs font-bold">{game.away_score}-{game.home_score}</div>
                               )}
                             </div>
 
@@ -279,7 +279,7 @@ const PoolPickem = () => {
                               </TableCell>
                               <TableCell className="font-medium">
                                 {s.display_name}
-                                {s.user_id === user?.id && <Badge variant="outline" className="ml-2 text-[10px]">YOU</Badge>}
+                                {s.user_id === user?.id && <Badge variant="outline" className="ml-2 text-xs">YOU</Badge>}
                               </TableCell>
                               <TableCell className="text-center font-bold text-amber-600">{weekCorrect}</TableCell>
                               <TableCell className="text-center font-bold text-primary">{s.correct_picks}</TableCell>

@@ -77,7 +77,7 @@ const MatchupCard: React.FC<MatchupCardProps> = ({
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {seedNum && (
             <span className={cn(
-              'w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0',
+              'w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0',
               isCompleted && isWinner
                 ? 'bg-green-500 text-white'
                 : 'bg-muted text-muted-foreground'
@@ -120,7 +120,7 @@ const MatchupCard: React.FC<MatchupCardProps> = ({
     )}>
       {/* Status badge */}
       <div className={cn(
-        'px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-center',
+        'px-3 py-1 text-xs font-bold uppercase tracking-wider text-center',
         series.status === 'active' && 'bg-primary/10 text-primary',
         series.status === 'completed' && 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400',
         series.status === 'pending' && 'bg-muted/50 text-muted-foreground',
@@ -178,7 +178,7 @@ const RoundColumn: React.FC<RoundColumnProps> = ({
   const isChampionship = roundNumber === totalRounds;
 
   return (
-    <div className="flex flex-col min-w-[200px] lg:min-w-[240px]">
+    <div className="flex flex-col min-w-[140px] sm:min-w-[200px] lg:min-w-[240px]">
       {/* Round header */}
       <div className={cn(
         'text-center mb-4 pb-2 border-b-2',
@@ -436,7 +436,7 @@ const SeedList: React.FC<{
             return (
               <div key={seed.id} className="flex items-center gap-2 px-4 py-2 text-sm">
                 <span className={cn(
-                  'w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0',
+                  'w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0',
                   seed.seed_number <= 2 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground',
                 )}>
                   {seed.seed_number}

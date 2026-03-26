@@ -534,7 +534,7 @@ const TradeAnalyzer = () => {
             <TabsTrigger value="offers" className="flex items-center gap-2 relative text-citrus-forest font-semibold data-[state=active]:bg-white data-[state=active]:text-citrus-forest data-[state=active]:shadow">
               <History className="h-4 w-4" /> Trade Offers
               {tradeOffers.filter(o => o.status === 'pending').length > 0 && (
-                <Badge className="ml-1 h-5 min-w-[20px] px-1 text-[10px] bg-destructive text-destructive-foreground">
+                <Badge className="ml-1 h-5 min-w-[20px] px-1 text-[11px] bg-destructive text-destructive-foreground">
                   {tradeOffers.filter(o => o.status === 'pending').length}
                 </Badge>
               )}
@@ -672,7 +672,7 @@ const TradeAnalyzer = () => {
                       theirAssets.map(p => (
                         <div key={p.id} className="flex items-center justify-between p-2 rounded-md bg-green-500/10 border border-green-500/20">
                           <div className="flex items-center gap-2">
-                             <Badge variant="outline" className="h-5 px-1 text-[10px]">{p.position}</Badge>
+                             <Badge variant="outline" className="h-5 px-1 text-[11px]">{p.position}</Badge>
                              <span className="text-sm font-medium cursor-pointer hover:underline" onClick={(e) => handlePlayerClick(e, p)}>{p.full_name}</span>
                           </div>
                           <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-destructive touch-manipulation" onClick={() => toggleTheirPlayer(p.id)}>
@@ -701,7 +701,7 @@ const TradeAnalyzer = () => {
                       myAssets.map(p => (
                         <div key={p.id} className="flex items-center justify-between p-2 rounded-md bg-red-500/10 border border-red-500/20">
                           <div className="flex items-center gap-2">
-                             <Badge variant="outline" className="h-5 px-1 text-[10px]">{p.position}</Badge>
+                             <Badge variant="outline" className="h-5 px-1 text-[11px]">{p.position}</Badge>
                              <span className="text-sm font-medium cursor-pointer hover:underline" onClick={(e) => handlePlayerClick(e, p)}>{p.full_name}</span>
                           </div>
                           <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-destructive touch-manipulation" onClick={() => toggleMyPlayer(p.id)}>
@@ -729,7 +729,7 @@ const TradeAnalyzer = () => {
                   </p>
                   
                   {(myAssets.length > 0 || theirAssets.length > 0) && (
-                    <div className="grid grid-cols-3 gap-4 pt-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
                       <div className="text-center p-2 bg-white/5 rounded-lg">
                          <div className="text-xs text-slate-400 uppercase tracking-wider">Goals Diff</div>
                          <div className={`text-lg font-bold ${(theirAssets.reduce((s,p)=>s+(p.goals||0),0) - myAssets.reduce((s,p)=>s+(p.goals||0),0)) > 0 ? 'text-green-400' : 'text-slate-200'}`}>
@@ -900,7 +900,7 @@ const TradeAnalyzer = () => {
                                     <p className="text-xs font-semibold text-green-600 mb-1">You Receive</p>
                                     {offer.offered_players.map(p => (
                                       <div key={p.player_id} className="text-sm flex items-center gap-1">
-                                        <Badge variant="outline" className="h-4 px-1 text-[10px]">{p.position_code}</Badge>
+                                        <Badge variant="outline" className="h-4 px-1 text-[11px]">{p.position_code}</Badge>
                                         {p.full_name}
                                       </div>
                                     ))}
@@ -909,7 +909,7 @@ const TradeAnalyzer = () => {
                                     <p className="text-xs font-semibold text-red-500 mb-1">You Send</p>
                                     {offer.requested_players.map(p => (
                                       <div key={p.player_id} className="text-sm flex items-center gap-1">
-                                        <Badge variant="outline" className="h-4 px-1 text-[10px]">{p.position_code}</Badge>
+                                        <Badge variant="outline" className="h-4 px-1 text-[11px]">{p.position_code}</Badge>
                                         {p.full_name}
                                       </div>
                                     ))}
@@ -957,7 +957,7 @@ const TradeAnalyzer = () => {
                                     <p className="text-xs font-semibold text-red-500 mb-1">You Send</p>
                                     {offer.offered_players.map(p => (
                                       <div key={p.player_id} className="text-sm flex items-center gap-1">
-                                        <Badge variant="outline" className="h-4 px-1 text-[10px]">{p.position_code}</Badge>
+                                        <Badge variant="outline" className="h-4 px-1 text-[11px]">{p.position_code}</Badge>
                                         {p.full_name}
                                       </div>
                                     ))}
@@ -966,7 +966,7 @@ const TradeAnalyzer = () => {
                                     <p className="text-xs font-semibold text-green-600 mb-1">You Receive</p>
                                     {offer.requested_players.map(p => (
                                       <div key={p.player_id} className="text-sm flex items-center gap-1">
-                                        <Badge variant="outline" className="h-4 px-1 text-[10px]">{p.position_code}</Badge>
+                                        <Badge variant="outline" className="h-4 px-1 text-[11px]">{p.position_code}</Badge>
                                         {p.full_name}
                                       </div>
                                     ))}

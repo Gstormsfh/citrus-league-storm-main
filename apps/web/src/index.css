@@ -1524,50 +1524,52 @@
     grid-template-columns: 50% 50% !important;
     padding: 0 !important;
     margin: 0 !important;
-    width: 100vw !important;
-    max-width: 100vw !important;
+    width: 100% !important;
+    max-width: 100% !important;
     gap: 0 !important;
     box-sizing: border-box !important;
   }
-  
+
   /* HIDE the center column */
   .matchup-center-column {
     display: none !important;
   }
-  
+
   /* Total row 50/50 */
   .matchup-total-row {
     grid-template-columns: 50% 50% !important;
-    width: 100vw !important;
+    width: 100% !important;
     gap: 0 !important;
   }
   .matchup-total-center {
     display: none !important;
   }
-  
-  /* Smaller total scores on mobile */
+
+  /* Total scores on mobile — readable but compact */
   .matchup-total-score {
-    font-size: 0.875rem !important;
+    font-size: 1.125rem !important;
+    font-weight: 800 !important;
   }
-  
+
   .matchup-total-label {
-    font-size: 0.5rem !important;
+    font-size: 0.6875rem !important;
   }
-  
-  /* Position groups - full viewport width */
+
+  /* Position groups - full width */
   .matchup-position-group {
     padding: 0 !important;
     margin: 0 !important;
-    width: 100vw !important;
-    max-width: 100vw !important;
+    width: 100% !important;
+    max-width: 100% !important;
   }
-  
-  /* Matchup wrapper - full viewport width */
+
+  /* Matchup wrapper - full width */
   .matchup-wrapper {
     padding: 0 !important;
     margin: 0 !important;
-    width: 100vw !important;
-    max-width: 100vw !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
   }
   
   /* Player cards - compact with CONSISTENT HEIGHT and CITRUS COLORS */
@@ -1595,15 +1597,18 @@
   
   /* Player name - BIGGER and more prominent on mobile */
   .player-card .player-name {
-    font-size: 0.8125rem !important;
+    font-size: 0.875rem !important; /* 14px */
     font-weight: 700 !important;
     color: #1B3022 !important;
     line-height: 1.2 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
   }
-  
+
   /* Team name styling */
   .player-card .player-team-name {
-    font-size: 0.625rem !important;
+    font-size: 0.6875rem !important; /* 11px */
     color: #789561 !important;
     font-weight: 600 !important;
   }
@@ -1635,7 +1640,7 @@
     top: 50% !important;
     right: 8px !important;
     transform: translateY(-50%) !important;
-    font-size: 0.6875rem !important;
+    font-size: 0.75rem !important; /* 12px */
     font-weight: 800 !important;
     color: #F9A436 !important;
     background: rgba(249, 164, 54, 0.15) !important;

@@ -571,7 +571,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                               {gp.gameTime && <span className="text-[10px] text-citrus-charcoal/40 font-display">{gp.gameTime}</span>}
                             </div>
                             {gp.isToday && (
-                              <Badge className="mt-0.5 bg-citrus-orange/90 text-white border-0 text-[8px] font-varsity font-black tracking-wider h-4 px-1.5">
+                              <Badge className="mt-0.5 bg-citrus-orange/90 text-white border-0 text-[10px] font-varsity font-black tracking-wider h-4 px-1.5">
                                 TODAY
                               </Badge>
                             )}
@@ -583,7 +583,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                             )}>
                               {gp.projectedPoints > 0 ? gp.projectedPoints.toFixed(1) : '—'}
                             </div>
-                            <div className="text-[8px] text-citrus-charcoal/40 font-display uppercase">proj pts</div>
+                            <div className="text-[10px] text-citrus-charcoal/40 font-display uppercase">proj pts</div>
                           </div>
                         </div>
 
@@ -601,7 +601,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                                   { label: 'SV%', value: gp.projection.projected_save_pct ? `${(Number(gp.projection.projected_save_pct) * 100).toFixed(1)}` : '—' },
                                 ].map((s, i) => (
                                   <div key={i} className="flex flex-col items-center py-1 bg-[#E8EED9]/40 rounded border border-citrus-sage/10">
-                                    <span className="text-[7px] font-display font-semibold text-citrus-charcoal/40 uppercase">{s.label}</span>
+                                    <span className="text-[9px] font-display font-semibold text-citrus-charcoal/40 uppercase">{s.label}</span>
                                     <span className="text-[10px] font-varsity font-black text-citrus-forest">{s.value ?? '—'}</span>
                                   </div>
                                 ))}
@@ -619,7 +619,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                                   { label: 'PIM', value: (gp.projection.projected_pim as number | undefined)?.toFixed(1) },
                                 ].map((s, i) => (
                                   <div key={i} className="flex flex-col items-center py-1 bg-[#E8EED9]/40 rounded border border-citrus-sage/10">
-                                    <span className="text-[7px] font-display font-semibold text-citrus-charcoal/40 uppercase">{s.label}</span>
+                                    <span className="text-[9px] font-display font-semibold text-citrus-charcoal/40 uppercase">{s.label}</span>
                                     <span className="text-[10px] font-varsity font-black text-citrus-forest">{s.value ?? '—'}</span>
                                   </div>
                                 ))}
@@ -628,7 +628,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                             {/* Likely Range (50% CI from MC engine) */}
                             {gp.projection?.likely_low != null && gp.projection?.likely_high != null && (
                               <div className="flex items-center justify-between mt-1.5 px-1">
-                                <span className="text-[8px] font-display text-citrus-charcoal/40">Likely Range</span>
+                                <span className="text-[10px] font-display text-citrus-charcoal/40">Likely Range</span>
                                 <span className="text-[9px] font-varsity font-black text-citrus-forest">
                                   {Number(gp.projection.likely_low).toFixed(1)} – {Number(gp.projection.likely_high).toFixed(1)} pts
                                 </span>
@@ -637,7 +637,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                             {/* Confidence bar (MC-derived or computed from temporal + opponent factors) */}
                             {gp.computedConfidence > 0 && (
                               <div className="flex items-center gap-2 mt-1">
-                                <span className="text-[8px] font-display text-citrus-charcoal/40">Confidence</span>
+                                <span className="text-[10px] font-display text-citrus-charcoal/40">Confidence</span>
                                 <div className="flex-1 h-1.5 bg-citrus-sage/10 rounded-full overflow-hidden">
                                   <div
                                     className="h-full bg-gradient-to-r from-citrus-sage to-citrus-orange rounded-full"
@@ -648,7 +648,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                                   {Math.round(gp.computedConfidence * 100)}%
                                 </span>
                                 {gp.projection?.confidence_label && (
-                                  <span className={`text-[8px] px-1 py-0 rounded font-bold ${
+                                  <span className={`text-[10px] px-1 py-0 rounded font-bold ${
                                     gp.projection.confidence_label === 'High' ? 'bg-green-500/20 text-green-700' :
                                     gp.projection.confidence_label === 'Medium' ? 'bg-blue-500/20 text-blue-700' :
                                     'bg-orange-500/20 text-orange-700'

@@ -167,23 +167,23 @@ export const DraftBoard = ({ teams, draftHistory, currentPick, currentRound, tot
                                 {nameParts?.firstName || pick.playerName}
                               </div>
                               {nameParts?.lastName && (
-                                <div className="text-[8px] font-medium leading-tight truncate" style={{ fontSize: 'clamp(6px, 0.9vw, 9px)' }}>
+                                <div className="text-[10px] font-medium leading-tight truncate" style={{ fontSize: 'clamp(6px, 0.9vw, 9px)' }}>
                                   {nameParts.lastName}
                                 </div>
                               )}
-                              <div className="text-[7px] text-muted-foreground leading-tight mt-0.5" style={{ fontSize: 'clamp(6px, 0.8vw, 8px)' }}>
+                              <div className="text-[9px] text-muted-foreground leading-tight mt-0.5" style={{ fontSize: 'clamp(6px, 0.8vw, 8px)' }}>
                                 {normalizePosition(pick.position)} • R{pick.round}
                               </div>
                             </div>
                           ) : isPending ? (
                             <div className="space-y-0.5">
                               <Clock className="h-3 w-3 text-primary mx-auto" />
-                              <div className="text-[8px] text-primary font-medium">
+                              <div className="text-[10px] text-primary font-medium">
                                 On Clock
                               </div>
                             </div>
                           ) : (
-                            <div className="text-[8px] text-muted-foreground">
+                            <div className="text-[10px] text-muted-foreground">
                               #{pickNumber}
                             </div>
                           )}

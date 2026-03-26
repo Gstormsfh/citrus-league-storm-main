@@ -250,6 +250,11 @@ const Roster = () => {
   const [activeId, setActiveId] = useState<string | number | null>(null);
   const [tapSelectedPlayerId, setTapSelectedPlayerId] = useState<string | number | null>(null);
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 1024);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 1024);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   const [loading, setLoading] = useState(true);
   
   // Tab reset mechanism - reset to default tab when league changes
@@ -2748,7 +2753,7 @@ const Roster = () => {
               {userLeagueState === 'guest' ? 'Citrus Crushers' : (userTeam?.team_name || 'My Roster')}
             </h1>
             {activeLeague?.name && (
-              <div className="text-[10px] font-display text-citrus-charcoal/40 truncate -mt-0.5">
+              <div className="text-xs font-display text-citrus-charcoal/40 truncate -mt-0.5">
                 {activeLeague.name}
               </div>
             )}
@@ -3263,7 +3268,7 @@ const Roster = () => {
                             <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
                                {Object.entries(posStats[pos as 'C'|'LW'|'RW'|'D']).map(([key, value]) => (
                                   <div key={key} className="flex flex-col p-3 bg-muted/30 rounded-lg border text-center">
-                                     <span className="text-muted-foreground uppercase text-[10px] font-bold tracking-wider">{key}</span>
+                                     <span className="text-muted-foreground uppercase text-xs font-bold tracking-wider">{key}</span>
                                      <span className="text-xl font-bold mt-1 text-foreground">{value}</span>
                                   </div>
                                ))}
@@ -3297,7 +3302,7 @@ const Roster = () => {
                            <div className="flex md:hidden justify-between items-start mb-1">
                                <div className="text-muted-foreground text-xs">{tx.date}</div>
                                <div className="text-right">
-                                 <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                                 <span className={`text-xs px-2 py-0.5 rounded-full ${
                                    tx.status === 'processed' ? 'bg-green-100 text-green-700' : 
                                    (tx.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700')
                                  }`}>

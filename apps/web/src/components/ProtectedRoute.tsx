@@ -10,7 +10,10 @@ interface ProtectedRouteProps {
 
 export const ProtectedRoute = ({ children, requireProfile = false }: ProtectedRouteProps) => {
   const { user, loading: authLoading } = useAuth();
-  const { data: profile, isLoading: profileLoading } = useProfile();
+  // isPending = true until the query has successfully returned data at least once.
+  // isLoading (isPending && isFetching) is false when the query is enabled but
+  // hasn't started fetching yet, which caused a false redirect to /profile-setup.
+  const { data: profile, isPending: profilePending } = useProfile();
 
   if (authLoading) {
     return (
@@ -26,7 +29,7 @@ export const ProtectedRoute = ({ children, requireProfile = false }: ProtectedRo
 
   // If this route requires a complete profile, wait for the profile query
   if (requireProfile) {
-    if (profileLoading) {
+    if (profilePending) {
       return (
         <div className="min-h-screen flex items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin" />
