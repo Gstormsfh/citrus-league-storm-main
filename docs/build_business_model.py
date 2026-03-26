@@ -51,8 +51,9 @@ IS_IN_SEASON = [
     False, False, False, False, False, False,
     True,  True,  True,  True,  True,  True,
 ]
+# Growth story: 200 waitlist → June launch (50% invite 12 leaguemates) → draft explosion
 NEW_USERS_DEFAULT = [
-    500, 1500, 5000, 6000, 8000, 10000,
+    100, 100, 1500, 3000, 6000, 10000,
     8000, 5000, 3000, 2500, 2000, 1500,
     1500, 2000, 3000, 5000, 8000, 12000,
     17000, 20000, 20000, 18000, 16000, 13000,
@@ -80,6 +81,7 @@ ASSUMPTIONS = [
     ("monthly_pct", "Monthly Billing %", 0.70, "%", "", pct_fmt),
     (None, "", None, None, None, None),
     (None, "CONVERSION RATES", None, None, None, None),
+    ("premium_thresh", "Premium Features Launch Threshold", 10000, "users", "No paid tiers until user base hits this", num_fmt),
     ("conv_pro_y1", "Free \u2192 Pro Y1", 0.025, "%", "RevenueCat median 2.18%; niche premium", pct_fmt),
     ("conv_pro_y2", "Free \u2192 Pro Y2", 0.055, "%", "Product maturation + mobile", pct_fmt),
     ("conv_comm_y1", "Free \u2192 Commissioner Y1", 0.008, "%", "Power-user tier", pct_fmt),
@@ -464,12 +466,15 @@ def build_workbook():
         prev_pro = f"{pcl}{UG_END_PRO}" if m > 0 else "0"
         prev_comm = f"{pcl}{UG_END_COMM}" if m > 0 else "0"
 
-        # Effective conversion rate to Pro
+        # Effective conversion rate to Pro (0 until user base hits premium threshold)
+        prev_total = f"{pcl}{UG_END_TOTAL}" if m > 0 else "0"
+        base_conv_pro = f"IF(COLUMN()<14,{A['conv_pro_y1']},{A['conv_pro_y2']})*IF({cl}{UG_SEASON}=\"IN-SEASON\",{A['mult_in']},{A['mult_off']})"
         ws2.cell(row=UG_EFF_CONV_PRO, column=col,
-                 value=f"=IF(COLUMN()<14,{A['conv_pro_y1']},{A['conv_pro_y2']})*IF({cl}{UG_SEASON}=\"IN-SEASON\",{A['mult_in']},{A['mult_off']})")
-        # Effective conversion rate to Commissioner
+                 value=f"=IF({prev_total}>={A['premium_thresh']},{base_conv_pro},0)")
+        # Effective conversion rate to Commissioner (same gate)
+        base_conv_comm = f"IF(COLUMN()<14,{A['conv_comm_y1']},{A['conv_comm_y2']})*IF({cl}{UG_SEASON}=\"IN-SEASON\",{A['mult_in']},{A['mult_off']})"
         ws2.cell(row=UG_EFF_CONV_COMM, column=col,
-                 value=f"=IF(COLUMN()<14,{A['conv_comm_y1']},{A['conv_comm_y2']})*IF({cl}{UG_SEASON}=\"IN-SEASON\",{A['mult_in']},{A['mult_off']})")
+                 value=f"=IF({prev_total}>={A['premium_thresh']},{base_conv_comm},0)")
         # Churn rates
         ws2.cell(row=UG_CH_FREE_RATE, column=col,
                  value=f"=IF({cl}{UG_SEASON}=\"IN-SEASON\",{A['ch_free_in']},{A['ch_free_off']})")
