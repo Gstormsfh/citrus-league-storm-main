@@ -639,13 +639,14 @@ def build_workbook():
         cl = c(col)
         pcl = c(col - 1) if m > 0 else None
 
-        # Subscription revenue
+        # Subscription revenue — monthly billing is $0 in off-season (users pause/cancel)
+        season_check = f'{ug(UG_SEASON, col)}="IN-SEASON"'
         ws3.cell(row=R_PRO_MO, column=col,
-                 value=f"={ug(UG_END_PRO, col)}*{A['monthly_pct']}*{A['pro_price']}")
+                 value=f"=IF({season_check},{ug(UG_END_PRO, col)}*{A['monthly_pct']}*{A['pro_price']},0)")
         ws3.cell(row=R_PRO_AN, column=col,
                  value=f"={ug(UG_END_PRO, col)}*{A['annual_pct']}*{A['pro_price']}")
         ws3.cell(row=R_COMM_MO, column=col,
-                 value=f"={ug(UG_END_COMM, col)}*{A['monthly_pct']}*{A['comm_price']}")
+                 value=f"=IF({season_check},{ug(UG_END_COMM, col)}*{A['monthly_pct']}*{A['comm_price']},0)")
         ws3.cell(row=R_COMM_AN, column=col,
                  value=f"={ug(UG_END_COMM, col)}*{A['annual_pct']}*{A['comm_price']}")
         ws3.cell(row=R_GROSS_SUB, column=col,
@@ -666,9 +667,9 @@ def build_workbook():
         ws3.cell(row=R_NET_PPU, column=col,
                  value=f"={cl}{R_AI_FREE}+{cl}{R_AI_PRO}+{cl}{R_DRAFT_KIT}")
 
-        # DFS
+        # DFS — only in-season AND after DFS launch month
         ws3.cell(row=R_DFS_GROSS, column=col,
-                 value=f"=IF(COLUMN()-2>={A['dfs_launch']},{ug(UG_END_TOTAL, col)}*{A['dfs_part']}*{A['dfs_entries']}*{A['dfs_entry']},0)")
+                 value=f"=IF(AND(COLUMN()-2>={A['dfs_launch']},{season_check}),{ug(UG_END_TOTAL, col)}*{A['dfs_part']}*{A['dfs_entries']}*{A['dfs_entry']},0)")
         ws3.cell(row=R_DFS_RAKE, column=col,
                  value=f"={cl}{R_DFS_GROSS}*{A['dfs_rake']}")
         ws3.cell(row=R_NET_DFS, column=col,
