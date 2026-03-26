@@ -97,11 +97,16 @@ ASSUMPTIONS = [
     ("ch_free_in", "Free In-Season", 0.06, "%", "", pct_fmt),
     ("ch_free_off", "Free Off-Season", 0.15, "%", "", pct_fmt),
     (None, "", None, None, None, None),
-    (None, "PAY-PER-USE (Tiered Query Packs)", None, None, None, None),
-    ("ai_price_free", "Free User Query Pack", 2.99, "USD", "20 queries \u2014 $0.15/q premium", usd_cents_fmt),
-    ("ai_price_paid", "Paid User Query Pack", 1.99, "USD", "50 queries \u2014 $0.04/q subscriber perk", usd_cents_fmt),
-    ("ai_attach_free", "AI Pack Attach \u2014 Free Users", 0.02, "%/mo", "Low — limited free experience", pct_fmt),
-    ("ai_attach_pro", "AI Pack Attach \u2014 Pro/Comm Users", 0.10, "%/mo", "Higher — power users want more", pct_fmt),
+    (None, "STORMY AI — TOKEN BUDGETS (per tier)", None, None, None, None),
+    ("tok_free", "Free Tier Tokens/mo", 5000, "tokens", "~2-3 short questions", num_fmt),
+    ("tok_pro", "Pro Tier Tokens/mo", 50000, "tokens", "~25 questions/mo", num_fmt),
+    ("tok_comm", "Commissioner Tier Tokens/mo", 150000, "tokens", "~75 questions/mo", num_fmt),
+    (None, "", None, None, None, None),
+    (None, "PAY-PER-USE (Token Top-Up Packs)", None, None, None, None),
+    ("topup_price_free", "Free User Token Pack", 2.99, "USD", "25K tokens \u2014 $0.12/1K (premium)", usd_cents_fmt),
+    ("topup_price_paid", "Paid User Token Pack", 1.99, "USD", "100K tokens \u2014 $0.02/1K (subscriber perk)", usd_cents_fmt),
+    ("topup_attach_free", "Top-Up Attach \u2014 Free Users", 0.03, "%/mo", "Hit limit, want more", pct_fmt),
+    ("topup_attach_paid", "Top-Up Attach \u2014 Pro/Comm", 0.08, "%/mo", "Power users exceeding budget", pct_fmt),
     ("dk_price", "Draft Kit Price", 4.99, "USD", "One-time per season", usd_cents_fmt),
     ("dk_attach", "Draft Kit Attach Rate", 0.08, "%", "All users in draft months", pct_fmt),
     (None, "", None, None, None, None),
@@ -124,9 +129,7 @@ ASSUMPTIONS = [
     ("sb_thresh", "Supabase User Threshold", 50000, "users", "", num_fmt),
     ("fb_base", "Firebase Base Cost", 5, "USD/mo", "firebase.google.com", usd_fmt),
     ("fb_scale", "Firebase Scaling per User", 0.001, "USD/user", "Rough estimate", "0.0000"),
-    ("cl_cost", "Claude API Cost per Query", 0.008, "USD", "Sonnet + prompt caching", "0.0000"),
-    ("cl_q_pro", "Claude Queries \u2014 Pro Users", 8, "#/mo", "", num_fmt),
-    ("cl_q_comm", "Claude Queries \u2014 Commissioner", 20, "#/mo", "", num_fmt),
+    ("cl_cost_per_m", "Claude API Cost per 1M Tokens", 5.00, "USD/1M tok", "Blended Sonnet: $3 in + $15 out + caching", usd_cents_fmt),
     ("proxy", "Proxy Rotation", 100, "USD/mo", "", usd_fmt),
     ("domain", "Domain / SSL / Misc", 20, "USD/mo", "", usd_fmt),
     (None, "", None, None, None, None),
@@ -542,8 +545,8 @@ def build_workbook():
     write_label(ws3, R_DISC, "  Less: Annual Billing Discount")
     write_label(ws3, R_NET_SUB, "  NET SUBSCRIPTION REVENUE", bold=True)
     write_section(ws3, 11, "PAY-PER-USE REVENUE")
-    write_label(ws3, R_AI_FREE, "  Stormy AI Packs (Free @ $2.99)")
-    write_label(ws3, R_AI_PRO, "  Stormy AI Packs (Paid @ $1.99)")
+    write_label(ws3, R_AI_FREE, "  Token Top-Ups (Free @ $2.99)")
+    write_label(ws3, R_AI_PRO, "  Token Top-Ups (Paid @ $1.99)")
     write_label(ws3, R_DRAFT_KIT, "  Draft Kits (Seasonal)")
     write_label(ws3, R_NET_PPU, "  NET PAY-PER-USE REVENUE", bold=True)
     write_section(ws3, 17, "DFS REVENUE")
@@ -591,11 +594,11 @@ def build_workbook():
         ws3.cell(row=R_NET_SUB, column=col,
                  value=f"={cl}{R_GROSS_SUB}+{cl}{R_DISC}")
 
-        # Pay-per-use (tiered pricing: free users pay more per query)
+        # Pay-per-use (token top-up packs)
         ws3.cell(row=R_AI_FREE, column=col,
-                 value=f"={ug(UG_END_FREE, col)}*{A['ai_attach_free']}*{A['ai_price_free']}")
+                 value=f"={ug(UG_END_FREE, col)}*{A['topup_attach_free']}*{A['topup_price_free']}")
         ws3.cell(row=R_AI_PRO, column=col,
-                 value=f"=({ug(UG_END_PRO, col)}+{ug(UG_END_COMM, col)})*{A['ai_attach_pro']}*{A['ai_price_paid']}")
+                 value=f"=({ug(UG_END_PRO, col)}+{ug(UG_END_COMM, col)})*{A['topup_attach_paid']}*{A['topup_price_paid']}")
         # Draft kits: months 5,6,17,18 (0-indexed) = columns 7,8,19,20
         ws3.cell(row=R_DRAFT_KIT, column=col,
                  value=f"=IF(OR(COLUMN()=7,COLUMN()=8,COLUMN()=19,COLUMN()=20),{ug(UG_END_TOTAL, col)}*{A['dk_attach']}*{A['dk_price']},0)")
@@ -629,7 +632,7 @@ def build_workbook():
                  value=f"={cl}{R_NET_SUB}*{A['mobile_pct']}*{A['android_split']}*{A['google_comm']}")
         # Stripe: web subs + PPU + DFS rake
         stripe_elig = f"({cl}{R_NET_SUB}*(1-{A['mobile_pct']})+{cl}{R_NET_PPU}+{cl}{R_NET_DFS})"
-        n_txns = f"MAX(1,({ug(UG_END_PRO, col)}+{ug(UG_END_COMM, col)})*0.3+{ug(UG_END_FREE, col)}*{A['ai_attach_free']}+{ug(UG_END_PRO, col)}*{A['ai_attach_pro']})"
+        n_txns = f"MAX(1,({ug(UG_END_PRO, col)}+{ug(UG_END_COMM, col)})*0.3+{ug(UG_END_FREE, col)}*{A['topup_attach_free']}+({ug(UG_END_PRO, col)}+{ug(UG_END_COMM, col)})*{A['topup_attach_paid']})"
         ws3.cell(row=R_STRIPE_FEE, column=col,
                  value=f"=IF({stripe_elig}>0,{stripe_elig}*{A['stripe_pct']}+{n_txns}*{A['stripe_flat']},0)")
         ws3.cell(row=R_TOTAL_PF, column=col,
@@ -720,8 +723,9 @@ def build_workbook():
                  value=f"=IF({ug(UG_END_TOTAL, col)}>{A['sb_thresh']},{A['sb_team']},{A['sb_pro']})")
         ws4.cell(row=CE_FIREBASE, column=col,
                  value=f"={A['fb_base']}+MAX(0,{ug(UG_END_TOTAL, col)}-1000)*{A['fb_scale']}")
+        # Claude API cost = (users × tokens/mo per tier) × cost per 1M tokens / 1,000,000
         ws4.cell(row=CE_CLAUDE, column=col,
-                 value=f"=({ug(UG_END_PRO, col)}*{A['cl_q_pro']}+{ug(UG_END_COMM, col)}*{A['cl_q_comm']})*{A['cl_cost']}")
+                 value=f"=({ug(UG_END_FREE, col)}*{A['tok_free']}+{ug(UG_END_PRO, col)}*{A['tok_pro']}+{ug(UG_END_COMM, col)}*{A['tok_comm']})/1000000*{A['cl_cost_per_m']}")
         ws4.cell(row=CE_PROXY, column=col, value=f"={A['proxy']}")
         ws4.cell(row=CE_DOMAIN, column=col, value=f"={A['domain']}")
         ws4.cell(row=CE_TOTAL_COGS, column=col,
