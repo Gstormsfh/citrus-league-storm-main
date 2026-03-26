@@ -76,9 +76,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           clearTimeout(timeout);
           analyticsService.setUserId(session.user.id);
           setSentryUser({ id: session.user.id, email: session.user.email });
-          // Profile is fetched automatically by useProfile() via React Query
-          // once `user` is set (enabled: !!user). Prefetch to warm the cache.
-          queryClient.prefetchQuery({ queryKey: PROFILE_QUERY_KEY });
+          // Profile is fetched automatically by useProfile() hooks (enabled: !!user).
+          // Invalidate any stale cache so hooks re-fetch with the new session.
+          queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEY });
           if (mounted) setLoading(false);
         } else if (event === 'INITIAL_SESSION') {
           // No session at all (guest) — stop loading

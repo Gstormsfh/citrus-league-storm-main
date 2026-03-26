@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,7 +17,7 @@ import { Separator } from '@/components/ui/separator';
 
 const Auth = () => {
   const navigate = useNavigate();
-  const { signIn, signUp, resetPassword, signInWithOAuth } = useAuth();
+  const { user, loading: authLoading, signIn, signUp, resetPassword, signInWithOAuth } = useAuth();
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +29,14 @@ const Auth = () => {
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
   const [tosAccepted, setTosAccepted] = useState(false);
+
+  // Reactive redirect: once AuthContext commits user state, navigate away.
+  // This replaces imperative navigate('/') calls which raced with setUser.
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate('/', { replace: true });
+    }
+  }, [user, authLoading, navigate]);
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -79,10 +87,10 @@ const Auth = () => {
     if (error) {
       setError(getBetterErrorMessage(error.message));
       setLoading(false);
-    } else {
-      // Navigate to home — if profile setup is needed, the app will redirect
-      navigate('/');
     }
+    // On success: don't navigate here — the useEffect watching `user` handles
+    // redirection after React commits the auth state update. This prevents
+    // the race where navigate fires before setUser is committed.
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -143,7 +151,7 @@ const Auth = () => {
         setConfirmPassword('');
         setLoading(false);
       } else if (data?.session) {
-        navigate('/');
+        // useEffect watching `user` will redirect once auth state is committed
       } else {
         setError('Account created! Please check your email to verify, then sign in.');
         setLoading(false);
