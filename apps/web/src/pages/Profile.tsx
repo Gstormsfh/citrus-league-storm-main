@@ -814,8 +814,8 @@ const Profile = () => {
     return (
       <div className="min-h-screen">
         <Navbar />
-        <main className="pt-24 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-16">
-          <div className="container mx-auto px-4">
+        <main className="pt-16 lg:pt-24 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-16">
+          <div className="container mx-auto px-3 sm:px-4">
             <div className="max-w-2xl mx-auto">
               <Card>
                 <CardHeader>
@@ -844,14 +844,14 @@ const Profile = () => {
   return (
     <div className="min-h-screen">
       <Navbar />
-      <main className="pt-24 pb-16">
-        <div className="container mx-auto px-4">
+      <main className="pt-16 lg:pt-24 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-16">
+        <div className="container mx-auto px-3 sm:px-4">
           <div className="max-w-6xl mx-auto">
-            <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-8">
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                <div className="flex items-center gap-4 animated-element">
+            <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6 lg:space-y-8">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 lg:gap-4">
+                <div className="flex items-center gap-3 lg:gap-4 animated-element">
                   <div className="relative group">
-                    <Avatar className="h-24 w-24 border-4 border-primary/20">
+                    <Avatar className="h-16 w-16 lg:h-24 lg:w-24 border-4 border-primary/20">
                       <AvatarImage src="" alt={getDisplayName()} />
                       <AvatarFallback className="text-2xl font-bold bg-primary/10 text-primary">
                         {getInitials()}
@@ -884,7 +884,7 @@ const Profile = () => {
                       </div>
                     ) : (
                       <div className="flex items-center gap-2 group">
-                        <h1 className="text-3xl font-bold">{getDisplayName()}</h1>
+                        <h1 className="text-xl lg:text-3xl font-bold">{getDisplayName()}</h1>
                         <button
                           onClick={() => { setDisplayNameInput(profile?.display_name || getDisplayName()); setIsEditingDisplayName(true); }}
                           className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-accent"
@@ -894,9 +894,9 @@ const Profile = () => {
                         </button>
                       </div>
                     )}
-                    <p className="text-muted-foreground flex items-center gap-2 mt-1">
-                      <Users className="h-4 w-4" />
-                      {formData.teamName || 'No team yet'} • League Member since {getMemberSince()}
+                    <p className="text-xs lg:text-sm text-muted-foreground flex items-center gap-2 mt-1">
+                      <Users className="h-3.5 w-3.5 lg:h-4 lg:w-4 flex-shrink-0" />
+                      <span className="truncate">{formData.teamName || 'No team yet'} • Since {getMemberSince()}</span>
                     </p>
                     {userStats.championships > 0 && (
                       <div className="flex items-center gap-2 mt-2">

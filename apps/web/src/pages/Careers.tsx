@@ -39,7 +39,7 @@ const Careers = () => {
   return (
     <div className="min-h-screen bg-[#D4E8B8] flex flex-col">
       <Navbar />
-      <main className="flex-grow pt-24 px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">
+      <main className="flex-grow pt-16 lg:pt-24 px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">
         <div className="container mx-auto max-w-5xl py-12">
           <div className="text-center mb-16">
             <h1 className="text-4xl md:text-5xl font-bold mb-6 citrus-gradient-text">Join the Team</h1>

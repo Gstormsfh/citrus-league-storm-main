@@ -8,7 +8,7 @@ const Guides = () => {
   return (
     <div className="min-h-screen">
       <Navbar />
-      <main className="pt-24 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-16">
+      <main className="pt-16 lg:pt-24 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-16">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-10 animated-element">
             <h1 className="text-4xl md:text-5xl font-bold mb-4 vibrant-gradient-1 bg-clip-text text-transparent">

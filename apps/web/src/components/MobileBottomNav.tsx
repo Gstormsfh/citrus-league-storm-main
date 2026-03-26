@@ -64,7 +64,7 @@ const MobileBottomNav = () => {
       {/* iOS-style blur overlay */}
       <div className="absolute inset-0 bg-gradient-to-t from-[#E8EED9] to-[#E8EED9]/90 -z-10" />
 
-      <div className="flex items-center justify-around px-2 h-[4.5rem]">
+      <div className="flex items-center justify-around px-1 h-16">
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.path);
@@ -74,27 +74,24 @@ const MobileBottomNav = () => {
               key={item.label}
               to={item.path}
               className={cn(
-                "flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] rounded-2xl transition-all duration-200",
-                "ios-pressable",
+                "flex flex-col items-center justify-center gap-0.5 py-1.5 px-2 min-w-[56px] min-h-[48px] rounded-xl transition-all duration-200",
+                "ios-pressable touch-target",
                 active && "bg-citrus-sage/20",
               )}
             >
               <div className={cn(
-                "relative flex items-center justify-center w-8 h-8 rounded-xl transition-all duration-300",
+                "relative flex items-center justify-center w-7 h-7 rounded-lg transition-all duration-300",
                 active && "bg-citrus-sage shadow-sm"
               )}>
                 <Icon
                   className={cn(
-                    "w-5 h-5 transition-colors duration-200",
+                    "w-[18px] h-[18px] transition-colors duration-200",
                     active ? "text-[#E8EED9]" : "text-citrus-charcoal/70"
                   )}
                 />
-                {active && (
-                  <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-citrus-orange" />
-                )}
               </div>
               <span className={cn(
-                "text-[10px] font-display font-semibold tracking-tight transition-colors duration-200",
+                "text-[11px] font-display font-semibold leading-tight transition-colors duration-200",
                 active ? "text-citrus-forest" : "text-citrus-charcoal/60"
               )}>
                 {item.label}
@@ -102,11 +99,6 @@ const MobileBottomNav = () => {
             </Link>
           );
         })}
-      </div>
-
-      {/* Home indicator line (iPhone style) */}
-      <div className="flex justify-center pb-1">
-        <div className="w-32 h-1 rounded-full bg-citrus-charcoal/20" />
       </div>
     </nav>
   );

@@ -105,7 +105,7 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
     >
       {/* Position badge */}
       <div className={cn(
-        "w-9 h-9 flex-shrink-0 rounded-lg flex items-center justify-center text-white font-varsity text-xs font-black tracking-wide shadow-sm",
+        "w-10 h-10 flex-shrink-0 rounded-lg flex items-center justify-center text-white font-varsity text-xs font-black tracking-wide shadow-sm",
         "ring-2",
         posColor[slotPosition] || 'bg-citrus-charcoal/40',
         posRingColor[slotPosition] || 'ring-citrus-charcoal/20',
@@ -148,7 +148,7 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-1.5 text-[10px] text-citrus-charcoal/60 font-display">
+            <div className="flex items-center gap-1.5 text-[11px] text-citrus-charcoal/60 font-display">
               <span className="font-semibold">{teamAbbr}</span>
               <span className="text-citrus-charcoal/30">|</span>
               <span>#{player.number}</span>
@@ -170,7 +170,7 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
                 <span className="font-varsity text-base font-black text-citrus-orange leading-none">
                   {projPts.toFixed(1)}
                 </span>
-                <span className="text-[8px] text-citrus-charcoal/50 font-display font-medium uppercase">proj</span>
+                <span className="text-[10px] text-citrus-charcoal/50 font-display font-medium uppercase">proj</span>
               </div>
             ) : (
               <span className="text-[11px] text-citrus-charcoal/30 font-display italic">No game</span>

@@ -5,7 +5,7 @@ const Privacy = () => {
   return (
     <div className="min-h-screen bg-[#D4E8B8] flex flex-col">
       <Navbar />
-      <main className="flex-grow pt-24 px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">
+      <main className="flex-grow pt-16 lg:pt-24 px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">
         <div className="container mx-auto max-w-3xl py-12">
           <h1 className="text-3xl md:text-4xl font-bold mb-2">Privacy Policy</h1>
           <p className="text-sm text-muted-foreground mb-8">Last Updated: February 18, 2026</p>

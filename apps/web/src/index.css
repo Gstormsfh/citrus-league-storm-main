@@ -1545,13 +1545,14 @@
     display: none !important;
   }
   
-  /* Smaller total scores on mobile */
+  /* Total scores on mobile — readable but compact */
   .matchup-total-score {
-    font-size: 0.875rem !important;
+    font-size: 1.125rem !important;
+    font-weight: 800 !important;
   }
-  
+
   .matchup-total-label {
-    font-size: 0.5rem !important;
+    font-size: 0.625rem !important;
   }
   
   /* Position groups - full viewport width */
