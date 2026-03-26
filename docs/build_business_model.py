@@ -73,7 +73,7 @@ ASSUMPTIONS = [
     ("monthly_pct", "Monthly Billing %", 0.70, "%", "", pct_fmt),
     (None, "", None, None, None, None),
     (None, "CONVERSION RATES", None, None, None, None),
-    ("conv_pro_y1", "Free \u2192 Pro Y1", 0.035, "%", "OpenView/Lenny's Newsletter", pct_fmt),
+    ("conv_pro_y1", "Free \u2192 Pro Y1", 0.025, "%", "RevenueCat median 2.18%; niche premium", pct_fmt),
     ("conv_pro_y2", "Free \u2192 Pro Y2", 0.055, "%", "Product maturation + mobile", pct_fmt),
     ("conv_comm_y1", "Free \u2192 Commissioner Y1", 0.008, "%", "Power-user tier", pct_fmt),
     ("conv_comm_y2", "Free \u2192 Commissioner Y2", 0.015, "%", "", pct_fmt),
@@ -98,15 +98,15 @@ ASSUMPTIONS = [
     (None, "DFS", None, None, None, None),
     ("dfs_rake", "DFS Rake", 0.12, "%", "DK/FD range 10-16%", pct_fmt),
     ("dfs_entry", "Average Entry Fee", 5.00, "USD", "", usd_cents_fmt),
-    ("dfs_part", "Participation Rate", 0.10, "%", "Of total users", pct_fmt),
+    ("dfs_part", "Participation Rate", 0.05, "%", "Hockey-only; DK ~10% all sports", pct_fmt),
     ("dfs_entries", "Entries per User per Month", 5, "#", "", num_fmt),
     ("dfs_launch", "DFS Launch Month Index", 18, "0-based", "Oct 2027", num_fmt),
     (None, "", None, None, None, None),
-    (None, "ADVERTISING", None, None, None, None),
-    ("ecpm", "Blended eCPM", 6.00, "USD", "BusinessOfApps/Appodeal", usd_cents_fmt),
+    (None, "ADVERTISING (web only — no mobile app ads)", None, None, None, None),
+    ("ecpm", "Blended eCPM", 6.00, "USD", "BusinessOfApps/Appodeal — web display", usd_cents_fmt),
     ("pv_in", "Pageviews/Free User In-Season", 100, "#/mo", "", num_fmt),
     ("pv_off", "Pageviews/Free User Off-Season", 50, "#/mo", "", num_fmt),
-    ("ad_elig", "Ad-Eligible %", 0.80, "%", "Excluding ad-blockers", pct_fmt),
+    ("ad_elig", "Ad-Eligible % (web users only)", 0.24, "%", "30% web × 80% no ad-blocker", pct_fmt),
     (None, "", None, None, None, None),
     (None, "INFRASTRUCTURE", None, None, None, None),
     ("sb_pro", "Supabase Pro", 25, "USD/mo", "supabase.com/pricing", usd_fmt),
@@ -114,7 +114,7 @@ ASSUMPTIONS = [
     ("sb_thresh", "Supabase User Threshold", 50000, "users", "", num_fmt),
     ("fb_base", "Firebase Base Cost", 5, "USD/mo", "firebase.google.com", usd_fmt),
     ("fb_scale", "Firebase Scaling per User", 0.001, "USD/user", "Rough estimate", "0.0000"),
-    ("cl_cost", "Claude API Cost per Query", 0.0135, "USD", "Sonnet pricing", "0.0000"),
+    ("cl_cost", "Claude API Cost per Query", 0.008, "USD", "Sonnet + prompt caching", "0.0000"),
     ("cl_q_pro", "Claude Queries \u2014 Pro Users", 8, "#/mo", "", num_fmt),
     ("cl_q_comm", "Claude Queries \u2014 Commissioner", 20, "#/mo", "", num_fmt),
     ("proxy", "Proxy Rotation", 100, "USD/mo", "", usd_fmt),
@@ -132,8 +132,9 @@ ASSUMPTIONS = [
     ("google_reg", "Google Play Registration", 25, "USD", "One-time", usd_fmt),
     (None, "", None, None, None, None),
     (None, "MARKETING", None, None, None, None),
+    ("mkt_launch", "Marketing Launch Month", 2, "0-based", "Mid-June 2026 app launch", num_fmt),
     ("cac", "Blended CAC Target", 2.50, "USD", "Organic/community-driven", usd_cents_fmt),
-    ("cont_mkt_y1", "Content Marketing Y1", 200, "USD/mo", "", usd_fmt),
+    ("cont_mkt_y1", "Content Marketing Y1", 150, "USD/mo", "Post-launch only", usd_fmt),
     ("cont_mkt_y2", "Content Marketing Y2", 500, "USD/mo", "", usd_fmt),
     (None, "", None, None, None, None),
     (None, "TEAM", None, None, None, None),
@@ -143,8 +144,15 @@ ASSUMPTIONS = [
     ("team_19_24", "Months 19-24 (Small Team)", 6000, "USD/mo", "", usd_fmt),
     (None, "", None, None, None, None),
     (None, "LEGAL / ACCOUNTING", None, None, None, None),
-    ("legal_y1", "Year 1", 200, "USD/mo", "Bookkeeping, tax prep", usd_fmt),
-    ("legal_y2", "Year 2", 500, "USD/mo", "DFS compliance added", usd_fmt),
+    ("legal_y1", "Year 1 (Basic)", 100, "USD/mo", "Bookkeeping, tax prep only", usd_fmt),
+    ("legal_y2", "Year 2 (Basic)", 300, "USD/mo", "Bookkeeping + general counsel", usd_fmt),
+    (None, "", None, None, None, None),
+    (None, "DFS REGULATORY — CANADA (post-100K users)", None, None, None, None),
+    ("dfs_reg_thresh", "DFS Regulatory Threshold", 100000, "users", "Triggers licensing costs", num_fmt),
+    ("dfs_legal_opinion", "Legal Opinion / Skill-Game Defense", 500, "USD/mo", "Criminal Code s.206(1)(d) opinion, amortized", usd_fmt),
+    ("dfs_compliance", "FINTRAC AML Compliance", 1000, "USD/mo", "Reporting obligations for prize pools >$10K", usd_fmt),
+    ("dfs_insurance", "Insurance (E&O + Cyber)", 500, "USD/mo", "Errors & omissions, cyber liability", usd_fmt),
+    ("dfs_player_trust", "Player Fund Segregation / Audit", 500, "USD/mo", "Trust account admin + annual audit", usd_fmt),
     (None, "", None, None, None, None),
     (None, "USER GROWTH / ACQUISITION (Monthly New Users)", None, None, None, None),
 ] + [
@@ -238,15 +246,16 @@ CE_CONT_MKT = 16
 CE_TOTAL_SM = 17
 CE_TEAM = 20
 CE_LEGAL = 21
-CE_APPLE_DEV = 22
-CE_GOOGLE_REG = 23
-CE_TOTAL_GA = 24
-CE_CONF = 27
-CE_TOTAL_CONF = 28
-CE_TOTAL_OPEX = 30
-CE_EBITDA = 32
-CE_EBITDA_MARGIN = 33
-CE_NET_INCOME = 35
+CE_DFS_REG = 22
+CE_APPLE_DEV = 23
+CE_GOOGLE_REG = 24
+CE_TOTAL_GA = 25
+CE_CONF = 28
+CE_TOTAL_CONF = 29
+CE_TOTAL_OPEX = 31
+CE_EBITDA = 33
+CE_EBITDA_MARGIN = 34
+CE_NET_INCOME = 36
 
 # ── Unit Economics row assignments ──
 UE_ARPU_TOTAL = 2
@@ -672,11 +681,12 @@ def build_workbook():
     write_label(ws4, CE_TOTAL_SM, "    Total Sales & Marketing", bold=True)
     write_section(ws4, 19, "  GENERAL & ADMINISTRATIVE")
     write_label(ws4, CE_TEAM, "    Contractors / Team")
-    write_label(ws4, CE_LEGAL, "    Legal & Accounting")
+    write_label(ws4, CE_LEGAL, "    Legal & Accounting (Basic)")
+    write_label(ws4, CE_DFS_REG, "    DFS Regulatory / Licensing")
     write_label(ws4, CE_APPLE_DEV, "    Apple Developer Program")
     write_label(ws4, CE_GOOGLE_REG, "    Google Play Registration")
     write_label(ws4, CE_TOTAL_GA, "    Total G&A", bold=True)
-    write_section(ws4, 26, "  CONFERENCE & TRAVEL")
+    write_section(ws4, 27, "  CONFERENCE & TRAVEL")
     write_label(ws4, CE_CONF, "    Conference Costs", bold=True)
     write_label(ws4, CE_TOTAL_CONF, "    Total Conference & Travel", bold=True)
     write_label(ws4, CE_TOTAL_OPEX, "  TOTAL OPEX", bold=True)
@@ -706,11 +716,11 @@ def build_workbook():
         ws4.cell(row=CE_GROSS_MARGIN, column=col,
                  value=f"=IF({rev(R_NET_REV, col)}<>0,{cl}{CE_GROSS_PROFIT}/{rev(R_NET_REV, col)},0)")
 
-        # OPEX - Sales & Marketing
+        # OPEX - Sales & Marketing (gated on marketing launch month)
         ws4.cell(row=CE_DIG_MKT, column=col,
-                 value=f"={ug(UG_NEW, col)}*{A['cac']}")
+                 value=f"=IF(COLUMN()-2>={A['mkt_launch']},{ug(UG_NEW, col)}*{A['cac']},0)")
         ws4.cell(row=CE_CONT_MKT, column=col,
-                 value=f"=IF(COLUMN()<14,{A['cont_mkt_y1']},{A['cont_mkt_y2']})")
+                 value=f"=IF(COLUMN()-2>={A['mkt_launch']},IF(COLUMN()<14,{A['cont_mkt_y1']},{A['cont_mkt_y2']}),0)")
         ws4.cell(row=CE_TOTAL_SM, column=col,
                  value=f"={cl}{CE_DIG_MKT}+{cl}{CE_CONT_MKT}")
 
@@ -720,12 +730,15 @@ def build_workbook():
                  value=f"=IF(COLUMN()-2<6,{A['team_1_6']},IF(COLUMN()-2<12,{A['team_7_12']},IF(COLUMN()-2<18,{A['team_13_18']},{A['team_19_24']})))")
         ws4.cell(row=CE_LEGAL, column=col,
                  value=f"=IF(COLUMN()<14,{A['legal_y1']},{A['legal_y2']})")
+        # DFS Regulatory (Canada): $0 until total users exceed threshold
+        ws4.cell(row=CE_DFS_REG, column=col,
+                 value=f"=IF({ug(UG_END_TOTAL, col)}>={A['dfs_reg_thresh']},{A['dfs_legal_opinion']}+{A['dfs_compliance']}+{A['dfs_insurance']}+{A['dfs_player_trust']},0)")
         ws4.cell(row=CE_APPLE_DEV, column=col,
                  value=f"={A['apple_dev']}/12")
         ws4.cell(row=CE_GOOGLE_REG, column=col,
                  value=f"=IF(COLUMN()=2,{A['google_reg']},0)")
         ws4.cell(row=CE_TOTAL_GA, column=col,
-                 value=f"={cl}{CE_TEAM}+{cl}{CE_LEGAL}+{cl}{CE_APPLE_DEV}+{cl}{CE_GOOGLE_REG}")
+                 value=f"={cl}{CE_TEAM}+{cl}{CE_LEGAL}+{cl}{CE_DFS_REG}+{cl}{CE_APPLE_DEV}+{cl}{CE_GOOGLE_REG}")
 
         # Conference costs (INPUT — yellow editable cells)
         conf_val = CONFERENCE_COSTS.get(m, 0)
@@ -748,7 +761,7 @@ def build_workbook():
 
     # Apply formats to COGS
     for r in [CE_SUPABASE, CE_PROXY, CE_DOMAIN, CE_DIG_MKT, CE_CONT_MKT,
-              CE_TEAM, CE_LEGAL, CE_GOOGLE_REG, CE_CONF]:
+              CE_TEAM, CE_LEGAL, CE_DFS_REG, CE_GOOGLE_REG, CE_CONF]:
         style_formula_row(ws4, r, 2, 25, usd_fmt)
     for r in [CE_FIREBASE, CE_CLAUDE, CE_APPLE_DEV]:
         style_formula_row(ws4, r, 2, 25, usd_cents_fmt)
@@ -944,6 +957,8 @@ def build_workbook():
     annual_row(ws7, r, "Total COGS", cogs, CE_TOTAL_COGS); r += 1
     annual_row(ws7, r, "Gross Profit", cogs, CE_GROSS_PROFIT); r += 1
     gp_row = r - 1
+    annual_row(ws7, r, "Sales & Marketing", cogs, CE_TOTAL_SM); r += 1
+    annual_row(ws7, r, "DFS Regulatory / Licensing", cogs, CE_DFS_REG); r += 1
     annual_row(ws7, r, "Total OPEX", cogs, CE_TOTAL_OPEX); r += 1
     annual_row(ws7, r, "EBITDA / Net Income", cogs, CE_EBITDA); r += 1
     ebitda_row = r - 1
@@ -1124,7 +1139,7 @@ def build_workbook():
         ("Supabase pricing tiers", "Supabase Pricing", "https://supabase.com/pricing"),
         ("Supabase true cost analysis", "Metacto Blog", "https://www.metacto.com/blogs/the-true-cost-of-supabase-a-comprehensive-guide-to-pricing-integration-and-maintenance"),
         ("Firebase Hosting pricing", "Firebase Docs", "https://firebase.google.com/docs/hosting/usage-quotas-pricing"),
-        ("Claude API pricing", "Anthropic Platform Pricing", "https://platform.claude.com/docs/en/about-claude/pricing"),
+        ("Claude API pricing (Sonnet)", "Anthropic Pricing — $3/M in, $15/M out, $0.30/M cached", "https://docs.anthropic.com/en/docs/about-claude/models"),
         ("", "", ""),
         ("PLATFORM FEES", "", ""),
         ("Apple Small Business Program (15%)", "Apple Developer", "https://developer.apple.com/app-store/small-business-program/"),
@@ -1132,6 +1147,14 @@ def build_workbook():
         ("Google Play reduced fee (15%)", "Google Play Console", "https://play.google.com/console/about/programs/reducedservicefee/"),
         ("Stripe processing fees", "Stripe Pricing", "https://stripe.com/pricing"),
         ("Apple Developer Program $99/yr", "Apple Developer", "https://developer.apple.com/support/enrollment/"),
+        ("", "", ""),
+        ("DFS REGULATORY — CANADA", "", ""),
+        ("Criminal Code s.206(1)(d) skill exemption", "DFS legal as contest of skill — key legal basis", "https://laws-lois.justice.gc.ca/eng/acts/c-46/page-46.html"),
+        ("DFS NOT under iGaming Ontario", "iGO covers sports betting/casinos, not DFS skill contests", "https://igamingontario.ca/en/operators"),
+        ("DK/FD DFS operating in Canada w/o iGO", "Precedent — DFS platforms operate under skill exemption", ""),
+        ("FINTRAC AML if handling >$10K prizes", "Reporting entity obligations for large prize pools", "https://fintrac-canafe.canada.ca/re-ed/intro-eng"),
+        ("Player fund segregation best practice", "Industry standard — trust accounts for player deposits", ""),
+        ("Legal opinion cost $3K-8K one-time", "Canadian gaming counsel — one-time s.206 opinion", ""),
         ("", "", ""),
         ("MARKETING / CAC", "", ""),
         ("DraftKings/FanDuel CAC $200-350", "BusinessOfApps UA Costs", "https://www.businessofapps.com/marketplace/user-acquisition/research/user-acquisition-costs/"),
@@ -1146,8 +1169,11 @@ def build_workbook():
         ("Conversion timing", "In-season 1.8x multiplier, off-season 0.4x", ""),
         ("Churn model", "Monthly churn with seasonal variation (in vs off-season)", ""),
         ("Revenue recognition", "Subscription recognized monthly; annual billing amortized", ""),
+        ("Marketing timing", "No marketing spend pre-launch; starts at configurable launch month", ""),
         ("Platform fee allocation", "70% mobile (60/40 iOS/Android), 30% web (Stripe)", ""),
         ("COGS scaling", "Supabase upgrades at 50K users; Claude API scales per-query", ""),
+        ("Advertising", "Web-only ads (no mobile app ads); 30% web × 80% no ad-blocker = 24% eligible", ""),
+        ("DFS regulatory (Canada)", "Criminal Code s.206 skill defense + FINTRAC AML triggers at 100K users", ""),
         ("DFS launch", "Month 19 (Oct 2027) per product roadmap", ""),
         ("", "", ""),
         ("DYNAMIC MODEL NOTE", "", ""),
@@ -1185,4 +1211,4 @@ if __name__ == "__main__":
     print("Edit any yellow input cell -> entire model recalculates instantly.")
     print("\nInput locations:")
     print("  - Assumptions tab: pricing, rates, costs, AND monthly new user targets (column B)")
-    print("  - COGS tab: monthly conference costs (row 27)")
+    print("  - COGS tab: monthly conference costs (row 28)")
