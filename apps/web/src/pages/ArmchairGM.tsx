@@ -59,7 +59,7 @@ const ArmchairGM = () => {
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#E8EED9] via-[#F0F4E8] to-[#E8EED9]">
       <Navbar />
 
-      <main className="flex-1 w-full pt-[var(--header-height)] pb-24 lg:pb-12">
+      <main className="flex-1 w-full pt-[var(--header-height)] pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-12">
         {/* Hero Header */}
         <div className="w-full bg-gradient-to-r from-citrus-forest via-citrus-forest/95 to-citrus-forest relative isolate overflow-visible">
           <div className="absolute inset-0 opacity-5 pointer-events-none z-0" aria-hidden="true"
@@ -115,7 +115,7 @@ const ArmchairGM = () => {
                 >
                   {tab.icon}
                   <span className="hidden md:inline">{tab.label}</span>
-                  <span className="inline md:hidden text-[10px] sm:text-xs">{tab.shortLabel}</span>
+                  <span className="inline md:hidden text-xs sm:text-xs">{tab.shortLabel}</span>
                 </button>
               ))}
             </div>
@@ -179,7 +179,7 @@ const ArmchairGM = () => {
                       <RosterLineupView data={teamCapData} />
 
                       <div className="text-center py-4">
-                        <p className="text-[10px] text-citrus-charcoal/40 font-display">
+                        <p className="text-xs text-citrus-charcoal/40 font-display">
                           Contract data is based on publicly available information and may not reflect the most recent transactions.
                           <br />
                           Salary cap for 2025-26: {formatCap(SALARY_CAP_2025_26)} &middot; Roster data from NHL.com
@@ -217,7 +217,7 @@ const ArmchairGM = () => {
 function HeroBadge({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-white/10 border border-white/20 flex-shrink-0">
-      <span className="text-[8px] sm:text-[10px] text-white/70 font-display uppercase tracking-wider">{label}</span>
+      <span className="text-[10px] sm:text-xs text-white/70 font-display uppercase tracking-wider">{label}</span>
       <span className="font-varsity text-xs sm:text-sm text-white">{value}</span>
     </div>
   );

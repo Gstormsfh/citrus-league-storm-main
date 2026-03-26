@@ -246,7 +246,7 @@ const PoolConfidence = () => {
                               </Button>
                               <div className="text-center">
                                 <span className="text-xs text-muted-foreground">@</span>
-                                {locked && <div className="text-[10px] text-muted-foreground flex items-center gap-0.5"><Lock className="w-3 h-3" />{game.status === 'final' ? 'Final' : 'Locked'}</div>}
+                                {locked && <div className="text-xs text-muted-foreground flex items-center gap-0.5"><Lock className="w-3 h-3" />{game.status === 'final' ? 'Final' : 'Locked'}</div>}
                               </div>
                               <Button
                                 variant={pick?.picked_team === game.home_team ? 'default' : 'outline'}
@@ -360,7 +360,7 @@ const PoolConfidence = () => {
                             </TableCell>
                             <TableCell className="font-medium">
                               {s.display_name}
-                              {s.user_id === user?.id && <Badge variant="outline" className="ml-2 text-[10px]">YOU</Badge>}
+                              {s.user_id === user?.id && <Badge variant="outline" className="ml-2 text-xs">YOU</Badge>}
                             </TableCell>
                             <TableCell className="text-center font-bold text-primary">{s.total_points}</TableCell>
                             <TableCell className="text-center text-muted-foreground">{s.possible_points}</TableCell>

@@ -1179,7 +1179,7 @@ const FreeAgents = () => {
                           <TrendingUp className="h-5 w-5 text-green-500" />
                           Top Trending
                           {trendingData.size > 0 && (
-                            <Badge className="text-[10px] ml-2 bg-citrus-sage text-citrus-forest">
+                            <Badge className="text-[11px] ml-2 bg-citrus-sage text-citrus-forest">
                               Live
                             </Badge>
                           )}
@@ -1198,7 +1198,7 @@ const FreeAgents = () => {
                               <div className="flex items-center gap-3">
                                 <div className="text-right">
                                   <div className="font-bold text-green-600">{player.adds.toLocaleString()}</div>
-                                  <div className="text-[10px] text-muted-foreground">Adds</div>
+                                  <div className="text-[11px] text-muted-foreground">Adds</div>
                                 </div>
                                 <Button size="default" variant="default" className="h-10 w-10 text-primary font-bold text-xl bg-primary/10 hover:bg-primary/20 border border-primary/30" onClick={() => handleAddPlayer(player)}>
                                   +
@@ -1267,12 +1267,12 @@ const FreeAgents = () => {
                           <Calendar className="h-5 w-5 text-blue-500" />
                           Top Projected (Remaining Week)
                           {weeklyProjections.size === 0 && (
-                            <Badge variant="outline" className="text-[10px] ml-2 bg-citrus-cream text-citrus-forest border-citrus-sage">
+                            <Badge variant="outline" className="text-[11px] ml-2 bg-citrus-cream text-citrus-forest border-citrus-sage">
                               Loading...
                             </Badge>
                           )}
                           {weeklyProjections.size > 0 && (
-                            <Badge className="text-[10px] ml-2 bg-citrus-sage text-citrus-forest">
+                            <Badge className="text-[11px] ml-2 bg-citrus-sage text-citrus-forest">
                               Live Data
                             </Badge>
                           )}
@@ -1287,7 +1287,7 @@ const FreeAgents = () => {
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
                                   <span className="font-medium text-sm truncate">{player.full_name}</span>
-                                  <span className="text-[10px] text-muted-foreground shrink-0">{formatPositionForDisplay(player.position)}</span>
+                                  <span className="text-[11px] text-muted-foreground shrink-0">{formatPositionForDisplay(player.position)}</span>
                                 </div>
                                 {/* Schedule Icons Row */}
                                 {player.games && player.games.length > 0 && (
@@ -1301,7 +1301,7 @@ const FreeAgents = () => {
                                         const opponentAbbrev = isHome ? game.away_team : game.home_team;
                                         return (
                                           <div key={idx} className="flex items-center gap-0.5 bg-muted/50 rounded px-1 py-0.5">
-                                            <span className="text-[8px] text-muted-foreground">{isHome ? 'vs' : '@'}</span>
+                                            <span className="text-[10px] text-muted-foreground">{isHome ? 'vs' : '@'}</span>
                                             <img 
                                               src={`https://assets.nhle.com/logos/nhl/svg/${opponentAbbrev}_light.svg`}
                                               alt={opponentAbbrev}
@@ -1319,7 +1319,7 @@ const FreeAgents = () => {
                                   <div className="font-bold text-blue-600 text-sm">
                                     {(player.weeklyProjection || 0).toFixed(1)}
                                   </div>
-                                  <div className="text-[9px] text-muted-foreground">{player.gamesThisWeek || 0}G</div>
+                                  <div className="text-[10px] text-muted-foreground">{player.gamesThisWeek || 0}G</div>
                                 </div>
                                 <Button size="sm" variant="default" className="h-8 w-8 text-primary font-bold bg-primary/10 hover:bg-primary/20 border border-primary/30 p-0" onClick={() => handleAddPlayer(player)}>
                                   +
@@ -1367,7 +1367,7 @@ const FreeAgents = () => {
                                           const opponentAbbrev = isHome ? game.away_team : game.home_team;
                                           return (
                                             <div key={idx} className="flex items-center gap-0.5 bg-muted/30 rounded px-1.5 py-0.5">
-                                              <span className="text-[9px] text-muted-foreground">{isHome ? 'vs' : '@'}</span>
+                                              <span className="text-[10px] text-muted-foreground">{isHome ? 'vs' : '@'}</span>
                                               <img 
                                                 src={`https://assets.nhle.com/logos/nhl/svg/${opponentAbbrev}_light.svg`}
                                                 alt={opponentAbbrev}
@@ -1385,7 +1385,7 @@ const FreeAgents = () => {
                                 <TableCell className="text-right">
                                   <div className="flex flex-col items-end">
                                     <span className="font-bold text-blue-600">{(player.weeklyProjection || 0).toFixed(1)}</span>
-                                    <span className="text-[10px] text-muted-foreground">{player.gamesThisWeek || 0} games</span>
+                                    <span className="text-[11px] text-muted-foreground">{player.gamesThisWeek || 0} games</span>
                                   </div>
                                 </TableCell>
                                 <TableCell>
@@ -1422,11 +1422,11 @@ const FreeAgents = () => {
                     
                     <div className="border rounded-lg overflow-hidden">
                       <div className="overflow-x-auto">
-                        <Table className="min-w-[800px] [&_th]:px-2 [&_th]:py-2 [&_th]:text-xs [&_td]:px-2 [&_td]:py-1.5">
+                        <Table className="min-w-[600px] [&_th]:px-2 [&_th]:py-2 [&_th]:text-xs [&_td]:px-2 [&_td]:py-1.5">
                           <TableHeader>
                             <TableRow>
                               <TableHead
-                                className="cursor-pointer hover:bg-muted/50 select-none min-w-[160px]"
+                                className="cursor-pointer hover:bg-muted/50 select-none min-w-[100px] md:min-w-[160px]"
                                 onClick={() => handleSort('name')}
                               >
                                 <div className="flex items-center justify-start">
@@ -1683,11 +1683,11 @@ const FreeAgents = () => {
              ) : (
                <div className="border rounded-lg overflow-hidden">
                  <div className="overflow-x-auto">
-                   <Table className="min-w-[700px] [&_th]:px-2 [&_th]:py-2 [&_th]:text-xs [&_td]:px-2 [&_td]:py-1.5">
+                   <Table className="min-w-[500px] [&_th]:px-2 [&_th]:py-2 [&_th]:text-xs [&_td]:px-2 [&_td]:py-1.5">
                      <TableHeader>
                        <TableRow className="bg-muted/30">
                          <TableHead
-                           className="cursor-pointer hover:bg-muted/50 select-none min-w-[140px]"
+                           className="cursor-pointer hover:bg-muted/50 select-none min-w-[90px] md:min-w-[140px]"
                            onClick={() => handleSort('name')}
                          >
                            <div className="flex items-center justify-start">
@@ -1882,7 +1882,7 @@ const FreeAgents = () => {
                                   }`}>
                                     {player.weeklyProjection.toFixed(1)}
                                   </span>
-                                  <span className="text-[10px] text-muted-foreground">
+                                  <span className="text-[11px] text-muted-foreground">
                                     {player.gamesThisWeek || 0} game{(player.gamesThisWeek || 0) !== 1 ? 's' : ''} left
                                   </span>
                                 </div>
@@ -1948,11 +1948,11 @@ const FreeAgents = () => {
             ) : (
               <div className="border rounded-lg overflow-hidden">
                 <div className="overflow-x-auto">
-                  <Table className="min-w-[800px] [&_th]:px-2 [&_th]:py-2 [&_th]:text-xs [&_td]:px-2 [&_td]:py-1.5">
+                  <Table className="min-w-[600px] [&_th]:px-2 [&_th]:py-2 [&_th]:text-xs [&_td]:px-2 [&_td]:py-1.5">
                     <TableHeader>
                       <TableRow>
                         <TableHead
-                          className="cursor-pointer hover:bg-muted/50 select-none min-w-[160px]"
+                          className="cursor-pointer hover:bg-muted/50 select-none min-w-[100px] md:min-w-[160px]"
                           onClick={() => handleSort('name')}
                         >
                           <div className="flex items-center justify-start">
@@ -2104,7 +2104,7 @@ const FreeAgents = () => {
                                 >
                                   {player.full_name}
                                 </span>
-                                <Badge variant="outline" className="border-yellow-500/30 text-yellow-600 bg-yellow-500/5 w-fit text-[10px] px-1.5 py-0">
+                                <Badge variant="outline" className="border-yellow-500/30 text-yellow-600 bg-yellow-500/5 w-fit text-[11px] px-1.5 py-0">
                                   Watched
                                 </Badge>
                               </div>

@@ -143,7 +143,7 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
                 {player.name}
               </span>
               {statusBadge && (
-                <span className={cn("text-[7px] font-bold px-1 py-0 rounded-sm leading-none", statusBadge.cls)}>
+                <span className={cn("text-[9px] font-bold px-1 py-0.5 rounded-sm leading-none", statusBadge.cls)}>
                   {statusBadge.label}
                 </span>
               )}
@@ -173,7 +173,7 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
                 <span className="text-[10px] text-citrus-charcoal/50 font-display font-medium uppercase">proj</span>
               </div>
             ) : (
-              <span className="text-[11px] text-citrus-charcoal/30 font-display italic">No game</span>
+              <span className="text-xs text-citrus-charcoal/40 font-display italic">No game</span>
             )}
           </div>
         </>
@@ -202,7 +202,7 @@ const SectionHeader = ({ label, count, icon }: { label: string; count: number; i
   <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-citrus-sage/20 via-citrus-sage/10 to-transparent border-b border-citrus-sage/25">
     {icon}
     <span className="text-sm font-varsity font-black text-citrus-forest uppercase tracking-wide">{label}</span>
-    <Badge variant="outline" className="text-[9px] font-display h-4 px-1.5 ml-auto border-citrus-sage/30 text-citrus-charcoal/60">
+    <Badge variant="outline" className="text-[10px] font-display h-4 px-1.5 ml-auto border-citrus-sage/30 text-citrus-charcoal/60">
       {count}
     </Badge>
   </div>

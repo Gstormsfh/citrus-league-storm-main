@@ -201,7 +201,7 @@ const StormyAssistant = () => {
 
                   {/* ── Chat Tab ─────────────────────────────────── */}
                   <TabsContent value="chat" className="mt-0">
-                    <Card className="h-[600px] flex flex-col shadow-[0_8px_0_rgba(27,48,34,0.2)] border-4 border-citrus-forest rounded-[2rem] overflow-hidden corduroy-texture bg-citrus-cream">
+                    <Card className="h-[60vh] sm:h-[600px] flex flex-col shadow-[0_8px_0_rgba(27,48,34,0.2)] border-4 border-citrus-forest rounded-[2rem] overflow-hidden corduroy-texture bg-citrus-cream">
                       <CardHeader className="border-b-4 border-citrus-sage bg-gradient-to-r from-citrus-sage/20 to-citrus-orange/20 px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="h-12 w-12 rounded-varsity bg-gradient-to-br from-citrus-sage to-citrus-orange border-2 border-citrus-forest flex items-center justify-center shadow-patch">
@@ -298,7 +298,7 @@ const StormyAssistant = () => {
                             </Button>
                           </form>
                           <div className="text-center mt-2">
-                            <p className="text-[10px] font-display text-citrus-charcoal/70">
+                            <p className="text-xs font-display text-citrus-charcoal/70">
                               Stormy can make mistakes. Consider checking important stats.
                             </p>
                           </div>

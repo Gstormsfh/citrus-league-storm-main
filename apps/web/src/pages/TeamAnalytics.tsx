@@ -397,7 +397,7 @@ const TeamAnalytics = () => {
                                  <div>
                                    <div className="font-medium text-sm">{player.name}</div>
                                    <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                      <Badge variant="outline" className="h-4 px-1 text-[9px]">{player.position}</Badge>
+                                      <Badge variant="outline" className="h-4 px-1 text-[11px]">{player.position}</Badge>
                                    </div>
                                  </div>
                                </div>
@@ -405,7 +405,7 @@ const TeamAnalytics = () => {
                                  <div className={`text-xs font-bold flex items-center justify-end gap-1 ${player.gamesThisWeek >= 4 ? 'text-green-600' : 'text-muted-foreground'}`}>
                                    <Calendar className="h-3 w-3" /> {player.gamesThisWeek} Gms
                                  </div>
-                                 <div className="text-[10px] text-muted-foreground">{player.pointsPerGame.toFixed(1)} Pts/Gm</div>
+                                 <div className="text-[11px] text-muted-foreground">{player.pointsPerGame.toFixed(1)} Pts/Gm</div>
                                </div>
                             </div>
                           ))}
