@@ -51,11 +51,19 @@ IS_IN_SEASON = [
     False, False, False, False, False, False,
     True,  True,  True,  True,  True,  True,
 ]
+# Growth story: 200 waitlist → June launch (50% invite 12 leaguemates) → draft explosion
 NEW_USERS_DEFAULT = [
-    150, 200, 250, 300, 400, 500,
-    2000, 2500, 2200, 1800, 1500, 1200,
-    1200, 1000, 900, 1200, 2000, 3500,
+    100, 100, 1500, 3000, 6000, 10000,
+    8000, 5000, 3000, 2500, 2000, 1500,
+    1500, 2000, 3000, 5000, 8000, 12000,
     17000, 20000, 20000, 18000, 16000, 13000,
+]
+# Content marketing as lump-sum influencer payments per month
+CONTENT_MKT_DEFAULT = [
+    0, 0, 500, 0, 0, 1500,
+    0, 0, 0, 0, 0, 0,
+    0, 0, 2000, 0, 2500, 3000,
+    3000, 0, 2000, 0, 0, 0,
 ]
 CONFERENCE_COSTS = {
     0: 750, 3: 4500, 5: 3500, 7: 5000, 10: 4000, 11: 5000,
@@ -73,6 +81,7 @@ ASSUMPTIONS = [
     ("monthly_pct", "Monthly Billing %", 0.70, "%", "", pct_fmt),
     (None, "", None, None, None, None),
     (None, "CONVERSION RATES", None, None, None, None),
+    ("premium_thresh", "Premium Features Launch Threshold", 10000, "users", "No paid tiers until user base hits this", num_fmt),
     ("conv_pro_y1", "Free \u2192 Pro Y1", 0.025, "%", "RevenueCat median 2.18%; niche premium", pct_fmt),
     ("conv_pro_y2", "Free \u2192 Pro Y2", 0.055, "%", "Product maturation + mobile", pct_fmt),
     ("conv_comm_y1", "Free \u2192 Commissioner Y1", 0.008, "%", "Power-user tier", pct_fmt),
@@ -88,10 +97,16 @@ ASSUMPTIONS = [
     ("ch_free_in", "Free In-Season", 0.06, "%", "", pct_fmt),
     ("ch_free_off", "Free Off-Season", 0.15, "%", "", pct_fmt),
     (None, "", None, None, None, None),
-    (None, "PAY-PER-USE", None, None, None, None),
-    ("ai_price", "Stormy AI Query Pack Price", 1.99, "USD", "Per 50-query pack", usd_cents_fmt),
-    ("ai_attach_free", "AI Pack Attach \u2014 Free Users", 0.02, "%/mo", "", pct_fmt),
-    ("ai_attach_pro", "AI Pack Attach \u2014 Pro Users", 0.10, "%/mo", "", pct_fmt),
+    (None, "STORMY AI — TOKEN BUDGETS (per tier)", None, None, None, None),
+    ("tok_free", "Free Tier Tokens/mo", 5000, "tokens", "~2-3 short questions", num_fmt),
+    ("tok_pro", "Pro Tier Tokens/mo", 50000, "tokens", "~25 questions/mo", num_fmt),
+    ("tok_comm", "Commissioner Tier Tokens/mo", 150000, "tokens", "~75 questions/mo", num_fmt),
+    (None, "", None, None, None, None),
+    (None, "PAY-PER-USE (Token Top-Up Packs)", None, None, None, None),
+    ("topup_price_free", "Free User Token Pack", 2.99, "USD", "25K tokens \u2014 $0.12/1K (premium)", usd_cents_fmt),
+    ("topup_price_paid", "Paid User Token Pack", 1.99, "USD", "100K tokens \u2014 $0.02/1K (subscriber perk)", usd_cents_fmt),
+    ("topup_attach_free", "Top-Up Attach \u2014 Free Users", 0.03, "%/mo", "Hit limit, want more", pct_fmt),
+    ("topup_attach_paid", "Top-Up Attach \u2014 Pro/Comm", 0.08, "%/mo", "Power users exceeding budget", pct_fmt),
     ("dk_price", "Draft Kit Price", 4.99, "USD", "One-time per season", usd_cents_fmt),
     ("dk_attach", "Draft Kit Attach Rate", 0.08, "%", "All users in draft months", pct_fmt),
     (None, "", None, None, None, None),
@@ -114,9 +129,7 @@ ASSUMPTIONS = [
     ("sb_thresh", "Supabase User Threshold", 50000, "users", "", num_fmt),
     ("fb_base", "Firebase Base Cost", 5, "USD/mo", "firebase.google.com", usd_fmt),
     ("fb_scale", "Firebase Scaling per User", 0.001, "USD/user", "Rough estimate", "0.0000"),
-    ("cl_cost", "Claude API Cost per Query", 0.008, "USD", "Sonnet + prompt caching", "0.0000"),
-    ("cl_q_pro", "Claude Queries \u2014 Pro Users", 8, "#/mo", "", num_fmt),
-    ("cl_q_comm", "Claude Queries \u2014 Commissioner", 20, "#/mo", "", num_fmt),
+    ("cl_cost_per_m", "Claude API Cost per 1M Tokens", 5.00, "USD/1M tok", "Blended Sonnet: $3 in + $15 out + caching", usd_cents_fmt),
     ("proxy", "Proxy Rotation", 100, "USD/mo", "", usd_fmt),
     ("domain", "Domain / SSL / Misc", 20, "USD/mo", "", usd_fmt),
     (None, "", None, None, None, None),
@@ -134,8 +147,12 @@ ASSUMPTIONS = [
     (None, "MARKETING", None, None, None, None),
     ("mkt_launch", "Marketing Launch Month", 2, "0-based", "Mid-June 2026 app launch", num_fmt),
     ("cac", "Blended CAC Target", 2.50, "USD", "Organic/community-driven", usd_cents_fmt),
-    ("cont_mkt_y1", "Content Marketing Y1", 150, "USD/mo", "Post-launch only", usd_fmt),
-    ("cont_mkt_y2", "Content Marketing Y2", 500, "USD/mo", "", usd_fmt),
+    (None, "", None, None, None, None),
+    (None, "CONTENT / INFLUENCER MARKETING (Monthly Lump Sums)", None, None, None, None),
+] + [
+    (f"cont_mkt_{i}", f"  Influencer Spend \u2014 {MONTHS[i]}", CONTENT_MKT_DEFAULT[i], "USD", "Lump-sum influencer payment", usd_fmt)
+    for i in range(24)
+] + [
     (None, "", None, None, None, None),
     (None, "TEAM", None, None, None, None),
     ("team_1_6", "Months 1-6 (Solo Founder)", 0, "USD/mo", "Bootstrapped", usd_fmt),
@@ -147,12 +164,12 @@ ASSUMPTIONS = [
     ("legal_y1", "Year 1 (Basic)", 100, "USD/mo", "Bookkeeping, tax prep only", usd_fmt),
     ("legal_y2", "Year 2 (Basic)", 300, "USD/mo", "Bookkeeping + general counsel", usd_fmt),
     (None, "", None, None, None, None),
-    (None, "DFS REGULATORY — CANADA (post-100K users)", None, None, None, None),
-    ("dfs_reg_thresh", "DFS Regulatory Threshold", 100000, "users", "Triggers licensing costs", num_fmt),
-    ("dfs_legal_opinion", "Legal Opinion / Skill-Game Defense", 500, "USD/mo", "Criminal Code s.206(1)(d) opinion, amortized", usd_fmt),
-    ("dfs_compliance", "FINTRAC AML Compliance", 1000, "USD/mo", "Reporting obligations for prize pools >$10K", usd_fmt),
-    ("dfs_insurance", "Insurance (E&O + Cyber)", 500, "USD/mo", "Errors & omissions, cyber liability", usd_fmt),
-    ("dfs_player_trust", "Player Fund Segregation / Audit", 500, "USD/mo", "Trust account admin + annual audit", usd_fmt),
+    (None, "DFS COMPLIANCE — CANADA (NO LICENSE REQUIRED)", None, None, None, None),
+    ("dfs_reg_thresh", "Compliance Threshold", 100000, "users", "Prudent compliance at scale", num_fmt),
+    ("dfs_legal_opinion", "Legal Opinion / Skill-Game Defense", 500, "USD/mo", "s.206(1)(d) opinion amortized; NO license needed", usd_fmt),
+    ("dfs_compliance", "FINTRAC AML Compliance", 1000, "USD/mo", "Prize pools >$10K trigger reporting", usd_fmt),
+    ("dfs_insurance", "Insurance (E&O + Cyber)", 500, "USD/mo", "Standard biz insurance", usd_fmt),
+    ("dfs_player_trust", "Player Fund Segregation / Audit", 500, "USD/mo", "Trust account — best practice, not required", usd_fmt),
     (None, "", None, None, None, None),
     (None, "USER GROWTH / ACQUISITION (Monthly New Users)", None, None, None, None),
 ] + [
@@ -452,12 +469,15 @@ def build_workbook():
         prev_pro = f"{pcl}{UG_END_PRO}" if m > 0 else "0"
         prev_comm = f"{pcl}{UG_END_COMM}" if m > 0 else "0"
 
-        # Effective conversion rate to Pro
+        # Effective conversion rate to Pro (0 until user base hits premium threshold)
+        prev_total = f"{pcl}{UG_END_TOTAL}" if m > 0 else "0"
+        base_conv_pro = f"IF(COLUMN()<14,{A['conv_pro_y1']},{A['conv_pro_y2']})*IF({cl}{UG_SEASON}=\"IN-SEASON\",{A['mult_in']},{A['mult_off']})"
         ws2.cell(row=UG_EFF_CONV_PRO, column=col,
-                 value=f"=IF(COLUMN()<14,{A['conv_pro_y1']},{A['conv_pro_y2']})*IF({cl}{UG_SEASON}=\"IN-SEASON\",{A['mult_in']},{A['mult_off']})")
-        # Effective conversion rate to Commissioner
+                 value=f"=IF({prev_total}>={A['premium_thresh']},{base_conv_pro},0)")
+        # Effective conversion rate to Commissioner (same gate)
+        base_conv_comm = f"IF(COLUMN()<14,{A['conv_comm_y1']},{A['conv_comm_y2']})*IF({cl}{UG_SEASON}=\"IN-SEASON\",{A['mult_in']},{A['mult_off']})"
         ws2.cell(row=UG_EFF_CONV_COMM, column=col,
-                 value=f"=IF(COLUMN()<14,{A['conv_comm_y1']},{A['conv_comm_y2']})*IF({cl}{UG_SEASON}=\"IN-SEASON\",{A['mult_in']},{A['mult_off']})")
+                 value=f"=IF({prev_total}>={A['premium_thresh']},{base_conv_comm},0)")
         # Churn rates
         ws2.cell(row=UG_CH_FREE_RATE, column=col,
                  value=f"=IF({cl}{UG_SEASON}=\"IN-SEASON\",{A['ch_free_in']},{A['ch_free_off']})")
@@ -525,8 +545,8 @@ def build_workbook():
     write_label(ws3, R_DISC, "  Less: Annual Billing Discount")
     write_label(ws3, R_NET_SUB, "  NET SUBSCRIPTION REVENUE", bold=True)
     write_section(ws3, 11, "PAY-PER-USE REVENUE")
-    write_label(ws3, R_AI_FREE, "  Stormy AI Query Packs (Free)")
-    write_label(ws3, R_AI_PRO, "  Stormy AI Query Packs (Pro)")
+    write_label(ws3, R_AI_FREE, "  Token Top-Ups (Free @ $2.99)")
+    write_label(ws3, R_AI_PRO, "  Token Top-Ups (Paid @ $1.99)")
     write_label(ws3, R_DRAFT_KIT, "  Draft Kits (Seasonal)")
     write_label(ws3, R_NET_PPU, "  NET PAY-PER-USE REVENUE", bold=True)
     write_section(ws3, 17, "DFS REVENUE")
@@ -574,11 +594,11 @@ def build_workbook():
         ws3.cell(row=R_NET_SUB, column=col,
                  value=f"={cl}{R_GROSS_SUB}+{cl}{R_DISC}")
 
-        # Pay-per-use
+        # Pay-per-use (token top-up packs)
         ws3.cell(row=R_AI_FREE, column=col,
-                 value=f"={ug(UG_END_FREE, col)}*{A['ai_attach_free']}*{A['ai_price']}")
+                 value=f"={ug(UG_END_FREE, col)}*{A['topup_attach_free']}*{A['topup_price_free']}")
         ws3.cell(row=R_AI_PRO, column=col,
-                 value=f"={ug(UG_END_PRO, col)}*{A['ai_attach_pro']}*{A['ai_price']}")
+                 value=f"=({ug(UG_END_PRO, col)}+{ug(UG_END_COMM, col)})*{A['topup_attach_paid']}*{A['topup_price_paid']}")
         # Draft kits: months 5,6,17,18 (0-indexed) = columns 7,8,19,20
         ws3.cell(row=R_DRAFT_KIT, column=col,
                  value=f"=IF(OR(COLUMN()=7,COLUMN()=8,COLUMN()=19,COLUMN()=20),{ug(UG_END_TOTAL, col)}*{A['dk_attach']}*{A['dk_price']},0)")
@@ -612,7 +632,7 @@ def build_workbook():
                  value=f"={cl}{R_NET_SUB}*{A['mobile_pct']}*{A['android_split']}*{A['google_comm']}")
         # Stripe: web subs + PPU + DFS rake
         stripe_elig = f"({cl}{R_NET_SUB}*(1-{A['mobile_pct']})+{cl}{R_NET_PPU}+{cl}{R_NET_DFS})"
-        n_txns = f"MAX(1,({ug(UG_END_PRO, col)}+{ug(UG_END_COMM, col)})*0.3+{ug(UG_END_FREE, col)}*{A['ai_attach_free']}+{ug(UG_END_PRO, col)}*{A['ai_attach_pro']})"
+        n_txns = f"MAX(1,({ug(UG_END_PRO, col)}+{ug(UG_END_COMM, col)})*0.3+{ug(UG_END_FREE, col)}*{A['topup_attach_free']}+({ug(UG_END_PRO, col)}+{ug(UG_END_COMM, col)})*{A['topup_attach_paid']})"
         ws3.cell(row=R_STRIPE_FEE, column=col,
                  value=f"=IF({stripe_elig}>0,{stripe_elig}*{A['stripe_pct']}+{n_txns}*{A['stripe_flat']},0)")
         ws3.cell(row=R_TOTAL_PF, column=col,
@@ -677,7 +697,7 @@ def build_workbook():
     write_section(ws4, 13, "OPERATING EXPENSES (OPEX)")
     write_section(ws4, 14, "  SALES & MARKETING")
     write_label(ws4, CE_DIG_MKT, "    Digital Marketing")
-    write_label(ws4, CE_CONT_MKT, "    Content Marketing")
+    write_label(ws4, CE_CONT_MKT, "    Influencer / Content Marketing")
     write_label(ws4, CE_TOTAL_SM, "    Total Sales & Marketing", bold=True)
     write_section(ws4, 19, "  GENERAL & ADMINISTRATIVE")
     write_label(ws4, CE_TEAM, "    Contractors / Team")
@@ -703,8 +723,9 @@ def build_workbook():
                  value=f"=IF({ug(UG_END_TOTAL, col)}>{A['sb_thresh']},{A['sb_team']},{A['sb_pro']})")
         ws4.cell(row=CE_FIREBASE, column=col,
                  value=f"={A['fb_base']}+MAX(0,{ug(UG_END_TOTAL, col)}-1000)*{A['fb_scale']}")
+        # Claude API cost = (users × tokens/mo per tier) × cost per 1M tokens / 1,000,000
         ws4.cell(row=CE_CLAUDE, column=col,
-                 value=f"=({ug(UG_END_PRO, col)}*{A['cl_q_pro']}+{ug(UG_END_COMM, col)}*{A['cl_q_comm']})*{A['cl_cost']}")
+                 value=f"=({ug(UG_END_FREE, col)}*{A['tok_free']}+{ug(UG_END_PRO, col)}*{A['tok_pro']}+{ug(UG_END_COMM, col)}*{A['tok_comm']})/1000000*{A['cl_cost_per_m']}")
         ws4.cell(row=CE_PROXY, column=col, value=f"={A['proxy']}")
         ws4.cell(row=CE_DOMAIN, column=col, value=f"={A['domain']}")
         ws4.cell(row=CE_TOTAL_COGS, column=col,
@@ -720,7 +741,7 @@ def build_workbook():
         ws4.cell(row=CE_DIG_MKT, column=col,
                  value=f"=IF(COLUMN()-2>={A['mkt_launch']},{ug(UG_NEW, col)}*{A['cac']},0)")
         ws4.cell(row=CE_CONT_MKT, column=col,
-                 value=f"=IF(COLUMN()-2>={A['mkt_launch']},IF(COLUMN()<14,{A['cont_mkt_y1']},{A['cont_mkt_y2']}),0)")
+                 value=f"={A[f'cont_mkt_{m}']}")
         ws4.cell(row=CE_TOTAL_SM, column=col,
                  value=f"={cl}{CE_DIG_MKT}+{cl}{CE_CONT_MKT}")
 
@@ -1148,13 +1169,13 @@ def build_workbook():
         ("Stripe processing fees", "Stripe Pricing", "https://stripe.com/pricing"),
         ("Apple Developer Program $99/yr", "Apple Developer", "https://developer.apple.com/support/enrollment/"),
         ("", "", ""),
-        ("DFS REGULATORY — CANADA", "", ""),
-        ("Criminal Code s.206(1)(d) skill exemption", "DFS legal as contest of skill — key legal basis", "https://laws-lois.justice.gc.ca/eng/acts/c-46/page-46.html"),
-        ("DFS NOT under iGaming Ontario", "iGO covers sports betting/casinos, not DFS skill contests", "https://igamingontario.ca/en/operators"),
-        ("DK/FD DFS operating in Canada w/o iGO", "Precedent — DFS platforms operate under skill exemption", ""),
-        ("FINTRAC AML if handling >$10K prizes", "Reporting entity obligations for large prize pools", "https://fintrac-canafe.canada.ca/re-ed/intro-eng"),
-        ("Player fund segregation best practice", "Industry standard — trust accounts for player deposits", ""),
-        ("Legal opinion cost $3K-8K one-time", "Canadian gaming counsel — one-time s.206 opinion", ""),
+        ("DFS COMPLIANCE — CANADA (NO LICENSE REQUIRED)", "", ""),
+        ("Criminal Code s.206(1)(d) skill exemption", "DFS is LEGAL — contest of skill, no gaming license", "https://laws-lois.justice.gc.ca/eng/acts/c-46/page-46.html"),
+        ("NOT regulated by iGaming Ontario", "iGO = sportsbooks/casinos only, not DFS", "https://igamingontario.ca/en/operators"),
+        ("NOT regulated by AGCO for DFS", "AGCO gaming regs do not cover skill contests", "https://www.agco.ca/igaming"),
+        ("DK/FD DFS precedent in Canada", "Both operate DFS in Canada without gaming license", ""),
+        ("FINTRAC AML if prize pools >$10K", "Reporting obligations — not a license, just compliance", "https://fintrac-canafe.canada.ca/re-ed/intro-eng"),
+        ("Legal opinion $3K-8K one-time", "Confirms s.206(1)(d) applies — amortized in model", ""),
         ("", "", ""),
         ("MARKETING / CAC", "", ""),
         ("DraftKings/FanDuel CAC $200-350", "BusinessOfApps UA Costs", "https://www.businessofapps.com/marketplace/user-acquisition/research/user-acquisition-costs/"),
@@ -1169,11 +1190,11 @@ def build_workbook():
         ("Conversion timing", "In-season 1.8x multiplier, off-season 0.4x", ""),
         ("Churn model", "Monthly churn with seasonal variation (in vs off-season)", ""),
         ("Revenue recognition", "Subscription recognized monthly; annual billing amortized", ""),
-        ("Marketing timing", "No marketing spend pre-launch; starts at configurable launch month", ""),
+        ("Marketing timing", "Digital marketing gated on launch month; influencer spend is lump-sum per month", ""),
         ("Platform fee allocation", "70% mobile (60/40 iOS/Android), 30% web (Stripe)", ""),
         ("COGS scaling", "Supabase upgrades at 50K users; Claude API scales per-query", ""),
         ("Advertising", "Web-only ads (no mobile app ads); 30% web × 80% no ad-blocker = 24% eligible", ""),
-        ("DFS regulatory (Canada)", "Criminal Code s.206 skill defense + FINTRAC AML triggers at 100K users", ""),
+        ("DFS compliance (Canada)", "NO LICENSE REQUIRED — skill contest under Criminal Code s.206(1)(d); prudent compliance at scale", ""),
         ("DFS launch", "Month 19 (Oct 2027) per product roadmap", ""),
         ("", "", ""),
         ("DYNAMIC MODEL NOTE", "", ""),
