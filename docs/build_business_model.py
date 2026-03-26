@@ -51,7 +51,7 @@ IS_IN_SEASON = [
     False, False, False, False, False, False,
     True,  True,  True,  True,  True,  True,
 ]
-NEW_USERS = [
+NEW_USERS_DEFAULT = [
     150, 200, 250, 300, 400, 500,
     2000, 2500, 2200, 1800, 1500, 1200,
     1200, 1000, 900, 1200, 2000, 3500,
@@ -145,6 +145,12 @@ ASSUMPTIONS = [
     (None, "LEGAL / ACCOUNTING", None, None, None, None),
     ("legal_y1", "Year 1", 200, "USD/mo", "Bookkeeping, tax prep", usd_fmt),
     ("legal_y2", "Year 2", 500, "USD/mo", "DFS compliance added", usd_fmt),
+    (None, "", None, None, None, None),
+    (None, "USER GROWTH / ACQUISITION (Monthly New Users)", None, None, None, None),
+] + [
+    (f"new_users_{i}", f"  New Users — {MONTHS[i]}", NEW_USERS_DEFAULT[i], "users", "Monthly new user target", num_fmt)
+    for i in range(24)
+] + [
     (None, "", None, None, None, None),
     (None, "CASH", None, None, None, None),
     ("start_cash", "Starting Cash", 1000, "USD", "", usd_fmt),
@@ -401,13 +407,11 @@ def build_workbook():
         cell.alignment = Alignment(horizontal="center")
         cell.font = Font(size=9)
 
-    # New Users row (INPUT — yellow editable cells)
+    # New Users row (FORMULA — references Assumptions tab inputs)
     write_label(ws2, UG_NEW, "New Users Acquired", bold=True)
     for m in range(24):
         col = m + 2
-        cell = ws2.cell(row=UG_NEW, column=col, value=NEW_USERS[m])
-        cell.fill = input_fill
-        cell.font = input_font
+        cell = ws2.cell(row=UG_NEW, column=col, value=f"={A[f'new_users_{m}']}")
         cell.number_format = num_fmt
         cell.alignment = Alignment(horizontal="right")
 
@@ -1148,8 +1152,7 @@ def build_workbook():
         ("", "", ""),
         ("DYNAMIC MODEL NOTE", "", ""),
         ("All computed cells use Excel formulas", "Change any yellow input cell to recalculate instantly", ""),
-        ("Input cells on Assumptions tab", "Scalar model inputs (pricing, rates, costs)", ""),
-        ("Input cells on User Growth tab", "Monthly new user acquisition targets", ""),
+        ("Input cells on Assumptions tab", "All model inputs: pricing, rates, costs, AND monthly new user targets", ""),
         ("Input cells on COGS tab", "Monthly conference/travel costs", ""),
     ]
 
@@ -1181,6 +1184,5 @@ if __name__ == "__main__":
     print("All computed cells use Excel formulas.")
     print("Edit any yellow input cell -> entire model recalculates instantly.")
     print("\nInput locations:")
-    print("  - Assumptions tab: pricing, rates, costs (column B)")
-    print("  - User Growth tab: monthly new user targets (row 3)")
+    print("  - Assumptions tab: pricing, rates, costs, AND monthly new user targets (column B)")
     print("  - COGS tab: monthly conference costs (row 27)")
