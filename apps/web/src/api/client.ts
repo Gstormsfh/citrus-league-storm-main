@@ -119,7 +119,15 @@ async function doFetch(
     signal: options?.signal,
   });
 
-  const json = await response.json();
+  // Safely parse JSON — if the response is HTML (e.g. a proxy 404 page,
+  // CDN error page, or Vite dev server fallback), avoid the cryptic
+  // "Unexpected token '<'" error and surface a clear message instead.
+  let json: any;
+  try {
+    json = await response.json();
+  } catch {
+    json = { error: `Server returned non-JSON response (${response.status} ${response.statusText})` };
+  }
   return { response, json };
 }
 
