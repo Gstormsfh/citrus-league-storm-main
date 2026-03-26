@@ -97,6 +97,17 @@ const Navbar = () => {
             </Link>
 
             {/* League switcher */}
+            {user && userLeagues.length === 0 && (
+              <button
+                onClick={() => navigate('/create-league')}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors"
+              >
+                <UserPlus className="h-4 w-4 text-citrus-orange" />
+                <span className="text-sm font-display font-semibold text-citrus-cream">
+                  Create / Join League
+                </span>
+              </button>
+            )}
             {userLeagues.length > 0 && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -298,6 +309,19 @@ const Navbar = () => {
         <div className="lg:hidden fixed inset-0 top-[56px] z-50 bg-white/95 backdrop-blur-xl animate-in fade-in slide-in-from-top duration-200 shadow-2xl border-t border-citrus-sage/20">
           <div className="flex flex-col h-[calc(100dvh-56px-env(safe-area-inset-bottom)-4.5rem)] px-4 py-3 bg-gradient-to-b from-white to-[#F5F8ED]">
             {/* League context + switcher */}
+            {user && userLeagues.length === 0 && (
+              <div className="mb-3">
+                <button
+                  onClick={() => { navigate('/create-league'); closeMobileMenu(); }}
+                  className="flex items-center gap-3 px-3 py-2.5 bg-citrus-sage/10 rounded-xl w-full hover:bg-citrus-sage/20 transition-colors"
+                >
+                  <UserPlus className="h-4 w-4 text-citrus-sage flex-shrink-0" />
+                  <span className="text-sm font-display font-semibold text-citrus-forest">
+                    Create / Join League
+                  </span>
+                </button>
+              </div>
+            )}
             {userLeagues.length > 0 && (
               <div className="mb-3">
                 <DropdownMenu>
