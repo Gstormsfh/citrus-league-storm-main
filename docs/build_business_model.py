@@ -147,11 +147,12 @@ ASSUMPTIONS = [
     ("legal_y1", "Year 1 (Basic)", 100, "USD/mo", "Bookkeeping, tax prep only", usd_fmt),
     ("legal_y2", "Year 2 (Basic)", 300, "USD/mo", "Bookkeeping + general counsel", usd_fmt),
     (None, "", None, None, None, None),
-    (None, "DFS REGULATORY (post-100K users)", None, None, None, None),
+    (None, "DFS REGULATORY — CANADA (post-100K users)", None, None, None, None),
     ("dfs_reg_thresh", "DFS Regulatory Threshold", 100000, "users", "Triggers licensing costs", num_fmt),
-    ("dfs_state_licenses", "State Licensing (amortized)", 8000, "USD/mo", "10-15 states @ $5K-50K each / 12mo", usd_fmt),
-    ("dfs_compliance", "Compliance & Legal Counsel", 4000, "USD/mo", "Ongoing regulatory, audits", usd_fmt),
-    ("dfs_insurance", "Regulatory Insurance / Bond", 1500, "USD/mo", "Surety bonds, E&O insurance", usd_fmt),
+    ("dfs_ont_igaming", "Ontario iGaming Registration", 2000, "USD/mo", "iGaming Ontario reg + annual fees amortized", usd_fmt),
+    ("dfs_compliance", "Gaming Compliance Counsel", 2500, "USD/mo", "Canadian gaming law, FINTRAC AML", usd_fmt),
+    ("dfs_insurance", "Insurance / Bonding", 800, "USD/mo", "E&O, player fund segregation", usd_fmt),
+    ("dfs_prov_fees", "Provincial Registration Fees", 500, "USD/mo", "AB/BC/QC nominal fees amortized", usd_fmt),
     (None, "", None, None, None, None),
     (None, "USER GROWTH / ACQUISITION (Monthly New Users)", None, None, None, None),
 ] + [
@@ -729,9 +730,9 @@ def build_workbook():
                  value=f"=IF(COLUMN()-2<6,{A['team_1_6']},IF(COLUMN()-2<12,{A['team_7_12']},IF(COLUMN()-2<18,{A['team_13_18']},{A['team_19_24']})))")
         ws4.cell(row=CE_LEGAL, column=col,
                  value=f"=IF(COLUMN()<14,{A['legal_y1']},{A['legal_y2']})")
-        # DFS Regulatory: $0 until total users exceed threshold, then full regulatory cost
+        # DFS Regulatory (Canada): $0 until total users exceed threshold
         ws4.cell(row=CE_DFS_REG, column=col,
-                 value=f"=IF({ug(UG_END_TOTAL, col)}>={A['dfs_reg_thresh']},{A['dfs_state_licenses']}+{A['dfs_compliance']}+{A['dfs_insurance']},0)")
+                 value=f"=IF({ug(UG_END_TOTAL, col)}>={A['dfs_reg_thresh']},{A['dfs_ont_igaming']}+{A['dfs_compliance']}+{A['dfs_insurance']}+{A['dfs_prov_fees']},0)")
         ws4.cell(row=CE_APPLE_DEV, column=col,
                  value=f"={A['apple_dev']}/12")
         ws4.cell(row=CE_GOOGLE_REG, column=col,
@@ -1147,11 +1148,12 @@ def build_workbook():
         ("Stripe processing fees", "Stripe Pricing", "https://stripe.com/pricing"),
         ("Apple Developer Program $99/yr", "Apple Developer", "https://developer.apple.com/support/enrollment/"),
         ("", "", ""),
-        ("DFS REGULATORY", "", ""),
-        ("State-by-state DFS licensing", "Legal Sports Report — State DFS Laws", "https://www.legalsportsreport.com/dfs-bill-tracker/"),
-        ("DFS compliance requirements", "NYDFS DFS Regulations (example)", "https://www.dfs.ny.gov/industry_guidance/fantasy_sports"),
-        ("Surety bond / insurance requirements", "State gaming commission requirements", ""),
-        ("Typical state license cost $5K-$50K+", "Varies by state — NY, MA, VA most expensive", ""),
+        ("DFS REGULATORY — CANADA", "", ""),
+        ("Canadian Criminal Code s.206 skill exemption", "Criminal Code of Canada — Contest provisions", "https://laws-lois.justice.gc.ca/eng/acts/c-46/page-46.html"),
+        ("Ontario iGaming framework (2022+)", "iGaming Ontario — Operator Registration", "https://igamingontario.ca/en/operators"),
+        ("AGCO gaming registration requirements", "Alcohol & Gaming Commission of Ontario", "https://www.agco.ca/igaming"),
+        ("FINTRAC AML obligations for gaming", "FINTRAC — Reporting Entity Requirements", "https://fintrac-canafe.canada.ca/re-ed/intro-eng"),
+        ("Provincial gaming oversight (AB/BC/QC)", "Varies by province — nominal registration fees", ""),
         ("", "", ""),
         ("MARKETING / CAC", "", ""),
         ("DraftKings/FanDuel CAC $200-350", "BusinessOfApps UA Costs", "https://www.businessofapps.com/marketplace/user-acquisition/research/user-acquisition-costs/"),
@@ -1169,7 +1171,7 @@ def build_workbook():
         ("Marketing timing", "No marketing spend pre-launch; starts at configurable launch month", ""),
         ("Platform fee allocation", "70% mobile (60/40 iOS/Android), 30% web (Stripe)", ""),
         ("COGS scaling", "Supabase upgrades at 50K users; Claude API scales per-query", ""),
-        ("DFS regulatory", "State licensing + compliance + insurance triggers at 100K users", ""),
+        ("DFS regulatory (Canada)", "Ontario iGaming + provincial fees + FINTRAC AML triggers at 100K users", ""),
         ("DFS launch", "Month 19 (Oct 2027) per product roadmap", ""),
         ("", "", ""),
         ("DYNAMIC MODEL NOTE", "", ""),
