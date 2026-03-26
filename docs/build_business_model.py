@@ -69,6 +69,11 @@ CONFERENCE_COSTS = {
     0: 750, 3: 4500, 5: 3500, 7: 5000, 10: 4000, 11: 5000,
     12: 500, 14: 6000, 15: 6000, 17: 5000, 19: 8000, 22: 5000, 23: 6000,
 }
+# US states with DFS licensing — (state_key, label) for formula building
+US_DFS_STATES = [
+    "ny", "ma", "va", "tn", "in", "pa", "ct", "co", "il", "mo",
+    "or", "md", "ks", "vt", "ar", "ms", "nh", "de", "ri",
+]
 
 # Assumption layout: (ref_key, label, value, unit, source, cell_format)
 # ref_key=None for section headers / blanks (not referenced by formulas)
@@ -171,6 +176,59 @@ ASSUMPTIONS = [
     ("dfs_insurance", "Insurance (E&O + Cyber)", 500, "USD/mo", "Standard biz insurance", usd_fmt),
     ("dfs_player_trust", "Player Fund Segregation / Audit", 500, "USD/mo", "Trust account — best practice, not required", usd_fmt),
     (None, "", None, None, None, None),
+    (None, "US DFS EXPANSION (Toggle)", None, None, None, None),
+    ("us_expand_month", "US Expansion Launch Month", 99, "0-based", "Set to 99 = OFF; e.g. 18 = Oct-27", num_fmt),
+    (None, "", None, None, None, None),
+    (None, "  STATE-BY-STATE LICENSING FEES (Year 1 / Annual)", None, None, None, None),
+    ("us_ny_y1", "  New York — Year 1", 500000, "USD", "NY Gaming Commission — most expensive state", usd_fmt),
+    ("us_ny_ann", "  New York — Annual Renewal", 50000, "USD/yr", "NY Gaming Commission", usd_fmt),
+    ("us_ma_y1", "  Massachusetts — Year 1", 50000, "USD", "MA Gaming Commission", usd_fmt),
+    ("us_ma_ann", "  Massachusetts — Annual Renewal", 50000, "USD/yr", "MA Gaming Commission", usd_fmt),
+    ("us_va_y1", "  Virginia — Year 1", 50000, "USD", "VA Lottery", usd_fmt),
+    ("us_va_ann", "  Virginia — Annual Renewal", 50000, "USD/yr", "VA Lottery", usd_fmt),
+    ("us_tn_y1", "  Tennessee — Year 1", 50000, "USD", "TN Secretary of State", usd_fmt),
+    ("us_tn_ann", "  Tennessee — Annual Renewal", 50000, "USD/yr", "TN Secretary of State", usd_fmt),
+    ("us_in_y1", "  Indiana — Year 1", 50000, "USD", "IN Gaming Commission", usd_fmt),
+    ("us_in_ann", "  Indiana — Annual Renewal", 5000, "USD/yr", "IN Gaming Commission", usd_fmt),
+    ("us_pa_y1", "  Pennsylvania — Year 1", 50000, "USD", "PA Gaming Control Board", usd_fmt),
+    ("us_pa_ann", "  Pennsylvania — Annual Renewal", 10000, "USD/yr", "PA Gaming Control Board", usd_fmt),
+    ("us_ct_y1", "  Connecticut — Year 1", 15000, "USD", "CT Dept Consumer Protection", usd_fmt),
+    ("us_ct_ann", "  Connecticut — Annual Renewal", 15000, "USD/yr", "CT Dept Consumer Protection", usd_fmt),
+    ("us_co_y1", "  Colorado — Year 1", 10000, "USD", "CO Dept of Revenue", usd_fmt),
+    ("us_co_ann", "  Colorado — Annual Renewal", 10000, "USD/yr", "CO Dept of Revenue", usd_fmt),
+    ("us_il_y1", "  Illinois — Year 1", 10000, "USD", "IL Gaming Board", usd_fmt),
+    ("us_il_ann", "  Illinois — Annual Renewal", 10000, "USD/yr", "IL Gaming Board", usd_fmt),
+    ("us_mo_y1", "  Missouri — Year 1", 10000, "USD", "MO Gaming Commission", usd_fmt),
+    ("us_mo_ann", "  Missouri — Annual Renewal", 10000, "USD/yr", "MO Gaming Commission", usd_fmt),
+    ("us_or_y1", "  Oregon — Year 1", 10000, "USD", "OR Dept of Justice", usd_fmt),
+    ("us_or_ann", "  Oregon — Annual Renewal", 10000, "USD/yr", "OR Dept of Justice", usd_fmt),
+    ("us_md_y1", "  Maryland — Year 1", 5000, "USD", "MD Lottery & Gaming", usd_fmt),
+    ("us_md_ann", "  Maryland — Annual Renewal", 5000, "USD/yr", "MD Lottery & Gaming", usd_fmt),
+    ("us_ks_y1", "  Kansas — Year 1", 5000, "USD", "KS Attorney General", usd_fmt),
+    ("us_ks_ann", "  Kansas — Annual Renewal", 5000, "USD/yr", "KS Attorney General", usd_fmt),
+    ("us_vt_y1", "  Vermont — Year 1", 5000, "USD", "VT Attorney General", usd_fmt),
+    ("us_vt_ann", "  Vermont — Annual Renewal", 5000, "USD/yr", "VT Attorney General", usd_fmt),
+    ("us_ar_y1", "  Arkansas — Year 1", 5000, "USD", "AR Dept Finance & Admin", usd_fmt),
+    ("us_ar_ann", "  Arkansas — Annual Renewal", 5000, "USD/yr", "AR Dept Finance & Admin", usd_fmt),
+    ("us_ms_y1", "  Mississippi — Year 1", 5000, "USD", "MS Gaming Commission", usd_fmt),
+    ("us_ms_ann", "  Mississippi — Annual Renewal", 5000, "USD/yr", "MS Gaming Commission", usd_fmt),
+    ("us_nh_y1", "  New Hampshire — Year 1", 5000, "USD", "NH Lottery Commission", usd_fmt),
+    ("us_nh_ann", "  New Hampshire — Annual Renewal", 5000, "USD/yr", "NH Lottery Commission", usd_fmt),
+    ("us_de_y1", "  Delaware — Year 1", 5000, "USD", "DE Dept of Finance", usd_fmt),
+    ("us_de_ann", "  Delaware — Annual Renewal", 5000, "USD/yr", "DE Dept of Finance", usd_fmt),
+    ("us_ri_y1", "  Rhode Island — Year 1", 5000, "USD", "RI DBR", usd_fmt),
+    ("us_ri_ann", "  Rhode Island — Annual Renewal", 5000, "USD/yr", "RI DBR", usd_fmt),
+    (None, "", None, None, None, None),
+    (None, "  US COMPLIANCE OVERHEAD (Annual)", None, None, None, None),
+    ("us_legal_counsel", "  Multi-State Legal Counsel", 150000, "USD/yr", "DFS compliance firm", usd_fmt),
+    ("us_geolocation", "  Geolocation Vendor (GeoComply etc.)", 50000, "USD/yr", "Block banned states, verify regulated", usd_fmt),
+    ("us_audit", "  Independent Financial Audit", 35000, "USD/yr", "Required by most regulated states", usd_fmt),
+    ("us_responsible_gaming", "  Responsible Gaming Program", 20000, "USD/yr", "Self-exclusion, limits, reporting", usd_fmt),
+    ("us_reporting", "  State Reporting & Filings", 20000, "USD/yr", "Annual filings, revenue reports", usd_fmt),
+    ("us_bg_checks", "  Background Checks (Key Personnel)", 10000, "USD/yr", "Required for all licensed states", usd_fmt),
+    ("us_ny_rev_tax", "  NY Revenue Tax Rate", 0.15, "%", "~15% of DFS revenue from NY users", pct_fmt),
+    ("us_ny_rev_share", "  Est. NY Revenue Share (% of total)", 0.12, "%", "NY ~12% of US DFS market", pct_fmt),
+    (None, "", None, None, None, None),
     (None, "USER GROWTH / ACQUISITION (Monthly New Users)", None, None, None, None),
 ] + [
     (f"new_users_{i}", f"  New Users — {MONTHS[i]}", NEW_USERS_DEFAULT[i], "users", "Monthly new user target", num_fmt)
@@ -264,15 +322,18 @@ CE_TOTAL_SM = 17
 CE_TEAM = 20
 CE_LEGAL = 21
 CE_DFS_REG = 22
-CE_APPLE_DEV = 23
-CE_GOOGLE_REG = 24
-CE_TOTAL_GA = 25
-CE_CONF = 28
-CE_TOTAL_CONF = 29
-CE_TOTAL_OPEX = 31
-CE_EBITDA = 33
-CE_EBITDA_MARGIN = 34
-CE_NET_INCOME = 36
+CE_US_DFS_LIC = 23
+CE_US_DFS_COMPLY = 24
+CE_US_DFS_TOTAL = 25
+CE_APPLE_DEV = 26
+CE_GOOGLE_REG = 27
+CE_TOTAL_GA = 28
+CE_CONF = 31
+CE_TOTAL_CONF = 32
+CE_TOTAL_OPEX = 34
+CE_EBITDA = 36
+CE_EBITDA_MARGIN = 37
+CE_NET_INCOME = 39
 
 # ── Unit Economics row assignments ──
 UE_ARPU_TOTAL = 2
@@ -702,11 +763,14 @@ def build_workbook():
     write_section(ws4, 19, "  GENERAL & ADMINISTRATIVE")
     write_label(ws4, CE_TEAM, "    Contractors / Team")
     write_label(ws4, CE_LEGAL, "    Legal & Accounting (Basic)")
-    write_label(ws4, CE_DFS_REG, "    DFS Regulatory / Licensing")
+    write_label(ws4, CE_DFS_REG, "    DFS Regulatory — Canada")
+    write_label(ws4, CE_US_DFS_LIC, "    US DFS Licensing (State-by-State)")
+    write_label(ws4, CE_US_DFS_COMPLY, "    US DFS Compliance Overhead")
+    write_label(ws4, CE_US_DFS_TOTAL, "    Total US DFS Expansion", bold=True)
     write_label(ws4, CE_APPLE_DEV, "    Apple Developer Program")
     write_label(ws4, CE_GOOGLE_REG, "    Google Play Registration")
     write_label(ws4, CE_TOTAL_GA, "    Total G&A", bold=True)
-    write_section(ws4, 27, "  CONFERENCE & TRAVEL")
+    write_section(ws4, 30, "  CONFERENCE & TRAVEL")
     write_label(ws4, CE_CONF, "    Conference Costs", bold=True)
     write_label(ws4, CE_TOTAL_CONF, "    Total Conference & Travel", bold=True)
     write_label(ws4, CE_TOTAL_OPEX, "  TOTAL OPEX", bold=True)
@@ -754,12 +818,46 @@ def build_workbook():
         # DFS Regulatory (Canada): $0 until total users exceed threshold
         ws4.cell(row=CE_DFS_REG, column=col,
                  value=f"=IF({ug(UG_END_TOTAL, col)}>={A['dfs_reg_thresh']},{A['dfs_legal_opinion']}+{A['dfs_compliance']}+{A['dfs_insurance']}+{A['dfs_player_trust']},0)")
+
+        # US DFS Expansion: state-by-state licensing (toggle on us_expand_month)
+        # Month 0 of expansion = Year 1 fees; subsequent months = annual/12
+        expand_active = f"COLUMN()-2>={A['us_expand_month']}"
+        months_since = f"COLUMN()-2-{A['us_expand_month']}"
+        # Build state licensing sum: IF first 12 months → Y1/12, ELSE → annual/12
+        y1_monthly_parts = []
+        ann_monthly_parts = []
+        for st in US_DFS_STATES:
+            y1_monthly_parts.append(f"{A[f'us_{st}_y1']}/12")
+            ann_monthly_parts.append(f"{A[f'us_{st}_ann']}/12")
+        y1_sum = "+".join(y1_monthly_parts)
+        ann_sum = "+".join(ann_monthly_parts)
+        ws4.cell(row=CE_US_DFS_LIC, column=col,
+                 value=f"=IF({expand_active},IF({months_since}<12,{y1_sum},{ann_sum}),0)")
+
+        # US compliance overhead (annual costs / 12, only when expansion active)
+        comply_parts = "+".join([
+            f"{A['us_legal_counsel']}/12",
+            f"{A['us_geolocation']}/12",
+            f"{A['us_audit']}/12",
+            f"{A['us_responsible_gaming']}/12",
+            f"{A['us_reporting']}/12",
+            f"{A['us_bg_checks']}/12",
+        ])
+        # NY revenue tax: DFS rake revenue * NY share * NY tax rate
+        ny_rev_tax = f"{rev(R_NET_DFS, col)}*{A['us_ny_rev_share']}*{A['us_ny_rev_tax']}"
+        ws4.cell(row=CE_US_DFS_COMPLY, column=col,
+                 value=f"=IF({expand_active},{comply_parts}+{ny_rev_tax},0)")
+
+        # Total US DFS
+        ws4.cell(row=CE_US_DFS_TOTAL, column=col,
+                 value=f"={cl}{CE_US_DFS_LIC}+{cl}{CE_US_DFS_COMPLY}")
+
         ws4.cell(row=CE_APPLE_DEV, column=col,
                  value=f"={A['apple_dev']}/12")
         ws4.cell(row=CE_GOOGLE_REG, column=col,
                  value=f"=IF(COLUMN()=2,{A['google_reg']},0)")
         ws4.cell(row=CE_TOTAL_GA, column=col,
-                 value=f"={cl}{CE_TEAM}+{cl}{CE_LEGAL}+{cl}{CE_DFS_REG}+{cl}{CE_APPLE_DEV}+{cl}{CE_GOOGLE_REG}")
+                 value=f"={cl}{CE_TEAM}+{cl}{CE_LEGAL}+{cl}{CE_DFS_REG}+{cl}{CE_US_DFS_TOTAL}+{cl}{CE_APPLE_DEV}+{cl}{CE_GOOGLE_REG}")
 
         # Conference costs (INPUT — yellow editable cells)
         conf_val = CONFERENCE_COSTS.get(m, 0)
@@ -782,11 +880,11 @@ def build_workbook():
 
     # Apply formats to COGS
     for r in [CE_SUPABASE, CE_PROXY, CE_DOMAIN, CE_DIG_MKT, CE_CONT_MKT,
-              CE_TEAM, CE_LEGAL, CE_DFS_REG, CE_GOOGLE_REG, CE_CONF]:
+              CE_TEAM, CE_LEGAL, CE_DFS_REG, CE_US_DFS_LIC, CE_US_DFS_COMPLY, CE_GOOGLE_REG, CE_CONF]:
         style_formula_row(ws4, r, 2, 25, usd_fmt)
     for r in [CE_FIREBASE, CE_CLAUDE, CE_APPLE_DEV]:
         style_formula_row(ws4, r, 2, 25, usd_cents_fmt)
-    for r in [CE_TOTAL_COGS, CE_TOTAL_SM, CE_TOTAL_GA, CE_TOTAL_CONF, CE_TOTAL_OPEX]:
+    for r in [CE_TOTAL_COGS, CE_TOTAL_SM, CE_US_DFS_TOTAL, CE_TOTAL_GA, CE_TOTAL_CONF, CE_TOTAL_OPEX]:
         style_formula_row(ws4, r, 2, 25, usd_fmt, is_total=True)
     for r in [CE_GROSS_PROFIT, CE_EBITDA, CE_NET_INCOME]:
         style_formula_row(ws4, r, 2, 25, usd_fmt, is_total=True)
@@ -979,7 +1077,8 @@ def build_workbook():
     annual_row(ws7, r, "Gross Profit", cogs, CE_GROSS_PROFIT); r += 1
     gp_row = r - 1
     annual_row(ws7, r, "Sales & Marketing", cogs, CE_TOTAL_SM); r += 1
-    annual_row(ws7, r, "DFS Regulatory / Licensing", cogs, CE_DFS_REG); r += 1
+    annual_row(ws7, r, "DFS Regulatory — Canada", cogs, CE_DFS_REG); r += 1
+    annual_row(ws7, r, "US DFS Expansion (Total)", cogs, CE_US_DFS_TOTAL); r += 1
     annual_row(ws7, r, "Total OPEX", cogs, CE_TOTAL_OPEX); r += 1
     annual_row(ws7, r, "EBITDA / Net Income", cogs, CE_EBITDA); r += 1
     ebitda_row = r - 1
@@ -1196,6 +1295,18 @@ def build_workbook():
         ("Advertising", "Web-only ads (no mobile app ads); 30% web × 80% no ad-blocker = 24% eligible", ""),
         ("DFS compliance (Canada)", "NO LICENSE REQUIRED — skill contest under Criminal Code s.206(1)(d); prudent compliance at scale", ""),
         ("DFS launch", "Month 19 (Oct 2027) per product roadmap", ""),
+        ("", "", ""),
+        ("US DFS EXPANSION (TOGGLE — SET TO 99 = OFF)", "", ""),
+        ("NY Gaming Commission — $500K Y1", "Most expensive US state for DFS", "https://www.gaming.ny.gov/fantasysports"),
+        ("State-by-state licensing fees", "19 states with DFS registration/licensing", "https://www.legalsportsreport.com/dfs-bill-tracker/"),
+        ("GeoComply geolocation vendor", "Required for multi-state compliance", "https://www.geocomply.com"),
+        ("NY DFS revenue tax ~15%", "Tax on DFS revenue from NY users", "https://www.gaming.ny.gov/fantasysports"),
+        ("Estimated all-state Y1 cost ~$850K", "Licensing fees only; +$285K/yr compliance", ""),
+        ("", "", ""),
+        ("METHODOLOGY NOTES (continued)", "", ""),
+        ("US DFS expansion toggle", "Set month index on Assumptions tab (99 = OFF); Y1 fees amortized /12, then annual renewal /12", ""),
+        ("US DFS states modeled (19)", "NY, MA, VA, TN, IN, PA, CT, CO, IL, MO, OR, MD, KS, VT, AR, MS, NH, DE, RI", ""),
+        ("US banned states", "Idaho, Hawaii banned; Nevada requires full gaming license (~$500K+)", ""),
         ("", "", ""),
         ("DYNAMIC MODEL NOTE", "", ""),
         ("All computed cells use Excel formulas", "Change any yellow input cell to recalculate instantly", ""),
