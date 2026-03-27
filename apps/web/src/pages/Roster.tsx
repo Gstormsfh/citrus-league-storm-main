@@ -502,7 +502,7 @@ const Roster = () => {
           const teamPlayers = allPlayers.filter(p => playerIdsAsNumbers.includes(p.id));
           
           if (teamPlayers.length === 0) {
-            logger.error('[Roster] Demo team has no players in roster');
+            logger.warn('[Roster] Demo team has no players in roster — expected for new/demo users');
             setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
             setLoading(false);
             return;
@@ -1270,6 +1270,8 @@ const Roster = () => {
   useEffect(() => {
     const fetchMatchupForWeek = async () => {
       if (!userTeamId || !userTeam?.league_id || !selectedWeek) return;
+      // Skip matchup fetch for demo/guest users — they're not league members
+      if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') return;
 
       try {
         const matchupsResponse = await matchupApi.getLeagueMatchups(userTeam.league_id, selectedWeek);
