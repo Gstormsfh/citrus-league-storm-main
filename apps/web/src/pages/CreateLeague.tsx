@@ -295,55 +295,68 @@ const CreateLeague = () => {
     try {
       const enabledStats = leagueStats.filter(s => s.enabled);
 
-      // Build comprehensive settings object - this is the single source of truth
+      // Build settings object — ONLY include fields relevant to this league type
       const settings: Record<string, unknown> = {
-        // Core format identifiers
         leagueType,
-        scoringFormat,
-        draftType: isFantasy ? draftType : 'none',
         teamsCount: parseInt(teamsCount),
-        stats: enabledStats,
-        pickTimeLimit: parseInt(pickTimeLimit),
+      };
 
-        // Auction settings (persisted regardless, only used if draftType === 'auction')
-        auctionBudget: parseInt(auctionBudget),
-        auctionMinBid: parseInt(auctionMinBid),
-        auctionNominationTime: parseInt(auctionNominationTime),
+      if (isFantasy) {
+        // Fantasy-specific settings
+        settings.scoringFormat = scoringFormat;
+        settings.draftType = draftType;
+        settings.stats = enabledStats;
+        settings.pickTimeLimit = parseInt(pickTimeLimit);
+        settings.rosterSlots = rosterSlots;
 
         // Season settings
-        playoffTeams: parseInt(playoffTeams),
-        playoffWeeks: parseInt(playoffWeeks),
-        tradeDeadlineWeek: parseInt(tradeDeadlineWeek),
+        settings.playoffTeams = parseInt(playoffTeams);
+        settings.playoffWeeks = parseInt(playoffWeeks);
+        settings.tradeDeadlineWeek = parseInt(tradeDeadlineWeek);
 
         // Keeper / Dynasty
-        keeperEnabled,
-        keeperCount: parseInt(keeperCount),
-        keeperPenalty,
-        dynastyMode,
+        settings.keeperEnabled = keeperEnabled;
+        if (keeperEnabled) {
+          settings.keeperCount = parseInt(keeperCount);
+          settings.keeperPenalty = keeperPenalty;
+          settings.dynastyMode = dynastyMode;
+        }
 
         // Best Ball
-        bestBallEnabled,
+        settings.bestBallEnabled = bestBallEnabled;
 
-        // Category / Roto settings
-        categories: selectedCategories,
-        minGoalieGames: parseInt(minGoalieGames),
+        // Category / Roto settings (only for category-based formats)
+        if (showCategories) {
+          settings.categories = selectedCategories;
+          settings.minGoalieGames = parseInt(minGoalieGames);
+        }
 
-        // Pool settings
-        pickemFormat,
-        picksPerWeek: parseInt(picksPerWeek),
-        survivorLives: parseInt(survivorLives),
-        confidenceMaxPoints: parseInt(confidenceMaxPoints),
+        // Auction settings (only for auction drafts)
+        if (draftType === 'auction') {
+          settings.auctionBudget = parseInt(auctionBudget);
+          settings.auctionMinBid = parseInt(auctionMinBid);
+          settings.auctionNominationTime = parseInt(auctionNominationTime);
+        }
 
-        // Roster slot configuration
-        rosterSlots: isFantasy ? rosterSlots : undefined,
+        // Waiver/transaction settings
+        settings.faabBudget = waiverSettings.faab_budget;
+        settings.weeklyAddLimit = parseInt(weeklyAddLimit) || 0;
+        settings.seasonAddLimit = parseInt(seasonAddLimit) || 0;
+      } else {
+        // Pool-specific settings — only what this pool type needs
+        settings.scoringFormat = 'total-points';
+        settings.draftType = 'none';
 
-        // FAAB budget (persisted so SQL RPCs can read it)
-        faabBudget: waiverSettings.faab_budget,
-
-        // Transaction limits (industry standard: ESPN/Yahoo/Sleeper)
-        weeklyAddLimit: parseInt(weeklyAddLimit) || 0,
-        seasonAddLimit: parseInt(seasonAddLimit) || 0,
-      };
+        if (leagueType === 'pickem') {
+          settings.pickemFormat = pickemFormat;
+          settings.picksPerWeek = parseInt(picksPerWeek);
+        } else if (leagueType === 'survivor') {
+          settings.survivorLives = parseInt(survivorLives);
+        } else if (leagueType === 'confidence-pool') {
+          settings.picksPerWeek = parseInt(picksPerWeek);
+          settings.confidenceMaxPoints = parseInt(confidenceMaxPoints);
+        }
+      }
 
       // Build scoring_settings JSONB (for points-based formats)
       const scoringSettings = showPointValues ? {
