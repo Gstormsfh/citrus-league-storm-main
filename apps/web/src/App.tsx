@@ -172,7 +172,7 @@ const App = () => {
                 <Route path="/news" element={<News />} />
                 <Route path="/draft-room" element={<ProtectedRoute><ErrorBoundary><DraftRoom /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/draft" element={<ProtectedRoute><ErrorBoundary><DraftRoom /></ErrorBoundary></ProtectedRoute>} /> {/* Fallback route */}
-                <Route path="/create-league" element={<ProtectedRoute requireProfile><CreateLeague /></ProtectedRoute>} />
+                <Route path="/create-league" element={<ProtectedRoute><CreateLeague /></ProtectedRoute>} />
                 <Route path="/league/:leagueId" element={<ProtectedRoute><ErrorBoundary><LeagueDashboard /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute><ErrorBoundary><Profile /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/team-analytics" element={<ProtectedRoute><ErrorBoundary><TeamAnalytics /></ErrorBoundary></ProtectedRoute>} />

@@ -57,19 +57,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
-      console.log('[AuthContext] onAuthStateChange:', event, { hasSession: !!session, hasUser: !!session?.user });
       setSession(session);
 
       if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'USER_UPDATED') {
         if (session?.user) {
-          const tokenExpired = isTokenExpired(session.access_token);
-          console.log('[AuthContext]', event, '→ user present, tokenExpired:', tokenExpired);
-          if (tokenExpired) {
+          if (isTokenExpired(session.access_token)) {
             logger.info('[Auth] Stale token on', event, '— deferring until TOKEN_REFRESHED');
-            initialSessionHandled = true; // prevent getSession() fallback from also running
+            initialSessionHandled = true;
             return;
           }
-          console.log('[AuthContext]', event, '→ setting user + loading=false');
           setUser(session.user);
           initialSessionHandled = true;
           clearTimeout(timeout);
@@ -78,15 +74,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEY });
           if (mounted) setLoading(false);
         } else if (event === 'INITIAL_SESSION') {
-          console.log('[AuthContext] INITIAL_SESSION → no user (guest), setting loading=false');
           clearTimeout(timeout);
           if (mounted) setLoading(false);
         }
       } else if (event === 'TOKEN_REFRESHED') {
-        // Supabase finished refreshing — token is now valid.
-        // Set user (may have been deferred from INITIAL_SESSION).
         if (session?.user) {
-          console.log('[AuthContext] TOKEN_REFRESHED → setting user + loading=false');
           setUser(session.user);
           clearTimeout(timeout);
           analyticsService.setUserId(session.user.id);
@@ -95,7 +87,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (mounted) setLoading(false);
         }
       } else if (event === 'SIGNED_OUT') {
-        console.log('[AuthContext] SIGNED_OUT → clearing user');
         setUser(null);
         analyticsService.setUserId(null);
         setSentryUser(null);
@@ -108,17 +99,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Now get the initial session — if the listener already handled it
     // (e.g., OAuth SIGNED_IN fired), skip duplicate work
     supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('[AuthContext] getSession fallback:', { initialSessionHandled, hasSession: !!session, hasUser: !!session?.user });
       if (!mounted || initialSessionHandled) return;
       setSession(session);
       if (session?.user && isTokenExpired(session.access_token)) {
-        console.log('[AuthContext] getSession → stale token, deferring');
         logger.info('[Auth] Stale token in getSession fallback — deferring');
         initialSessionHandled = true;
         return;
       }
       clearTimeout(timeout);
-      console.log('[AuthContext] getSession → setting user:', session?.user ? 'present' : 'null', '+ loading=false');
       setUser(session?.user ?? null);
       if (session?.user) {
         analyticsService.setUserId(session.user.id);
