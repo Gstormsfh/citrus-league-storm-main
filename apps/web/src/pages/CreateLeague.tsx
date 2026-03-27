@@ -267,14 +267,14 @@ const CreateLeague = () => {
       return;
     }
 
-    if (profile && profile.username.startsWith('user_')) {
-      setError("Please complete your profile setup first");
-      navigate("/profile-setup");
+    if (!leagueName.trim()) {
+      setError("League name is required");
       return;
     }
 
-    if (!leagueName.trim()) {
-      setError("League name is required");
+    const count = parseInt(teamsCount);
+    if (isNaN(count) || count < 2 || count > 100) {
+      setError("Number of teams/participants must be between 2 and 100");
       return;
     }
 
@@ -417,12 +417,6 @@ const CreateLeague = () => {
     if (!user) {
       setError("You must be logged in to join a league");
       navigate("/auth");
-      return;
-    }
-
-    if (profile && profile.username.startsWith('user_')) {
-      setError("Please complete your profile setup first");
-      navigate("/profile-setup");
       return;
     }
 
@@ -602,34 +596,19 @@ const CreateLeague = () => {
                         <Label htmlFor="teams-count" className="text-base">
                           {isPool ? 'Max Participants' : 'Number of Teams'}
                         </Label>
-                        <Select value={teamsCount} onValueChange={setTeamsCount}>
-                          <SelectTrigger id="teams-count" className="h-12">
-                            <SelectValue placeholder="Select" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {isPool ? (
-                              <>
-                                <SelectItem value="10">10 Players</SelectItem>
-                                <SelectItem value="20">20 Players</SelectItem>
-                                <SelectItem value="30">30 Players</SelectItem>
-                                <SelectItem value="50">50 Players</SelectItem>
-                                <SelectItem value="100">100 Players</SelectItem>
-                              </>
-                            ) : (
-                              <>
-                                <SelectItem value="4">4 Teams</SelectItem>
-                                <SelectItem value="6">6 Teams</SelectItem>
-                                <SelectItem value="8">8 Teams</SelectItem>
-                                <SelectItem value="10">10 Teams</SelectItem>
-                                <SelectItem value="12">12 Teams</SelectItem>
-                                <SelectItem value="14">14 Teams</SelectItem>
-                                <SelectItem value="16">16 Teams</SelectItem>
-                                <SelectItem value="18">18 Teams</SelectItem>
-                                <SelectItem value="20">20 Teams</SelectItem>
-                              </>
-                            )}
-                          </SelectContent>
-                        </Select>
+                        <Input
+                          id="teams-count"
+                          type="number"
+                          min={isPool ? 2 : 2}
+                          max={isPool ? 100 : 50}
+                          value={teamsCount}
+                          onChange={(e) => setTeamsCount(e.target.value)}
+                          className="h-12"
+                          placeholder={isPool ? '2–100' : '2–50'}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          {isPool ? 'Any number from 2 to 100' : 'Any number from 2 to 50'}
+                        </p>
                       </div>
 
                       {/* Scoring Format - Fantasy only */}
