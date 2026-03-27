@@ -80,19 +80,31 @@ export class LeagueService {
     // Pools don't need drafts
     const effectiveDraftStatus = isPool ? 'completed' : 'not_started';
 
+    // Build the insert row — include waiver columns if provided
+    const insertRow: Record<string, unknown> = {
+      name,
+      commissioner_id: commissionerId,
+      roster_size: effectiveRosterSize,
+      draft_rounds: effectiveDraftRounds,
+      draft_status: effectiveDraftStatus,
+      league_size: teamsCount,
+      settings: settings || {},
+      scoring_settings: scoringSettings || null,
+    };
+
+    // Write waiver settings to dedicated columns (fantasy leagues)
+    // These come merged into settings from the client, or via waiverSettings param
+    const ws = waiverSettings || settings;
+    if (ws?.waiver_type) insertRow.waiver_type = ws.waiver_type;
+    if (ws?.waiver_process_time) insertRow.waiver_process_time = ws.waiver_process_time;
+    if (ws?.waiver_period_hours) insertRow.waiver_period_hours = ws.waiver_period_hours;
+    if (ws?.waiver_game_lock !== undefined) insertRow.waiver_game_lock = ws.waiver_game_lock;
+    if (ws?.allow_trades_during_games !== undefined) insertRow.allow_trades_during_games = ws.allow_trades_during_games;
+
     // Create league
     const { data: leagueData, error: leagueError } = await this.supabase
       .from('leagues')
-      .insert({
-        name,
-        commissioner_id: commissionerId,
-        roster_size: effectiveRosterSize,
-        draft_rounds: effectiveDraftRounds,
-        draft_status: effectiveDraftStatus,
-        league_size: teamsCount,
-        settings: settings || {},
-        scoring_settings: scoringSettings || null,
-      })
+      .insert(insertRow)
       .select(COLUMNS.LEAGUE)
       .single();
 
