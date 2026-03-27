@@ -22,11 +22,13 @@ import { waiverApi } from '@/api/waivers';
 import { useToast } from '@/hooks/use-toast';
 import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
+import { Navigate } from 'react-router-dom';
 import { logger } from '@/utils/logger';
+import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 
 const WaiverWire = () => {
   const { user } = useAuth();
-  const { userLeagueState, activeLeagueId } = useLeague();
+  const { userLeagueState, activeLeagueId, activeLeagueFormat } = useLeague();
   const { toast } = useToast();
   
   const [loading, setLoading] = useState(true);
@@ -208,6 +210,12 @@ const WaiverWire = () => {
       setLoading(false);
     }
   }, [user, activeLeagueId, loadWaiverData]);
+
+  // Redirect pool leagues to their pool page
+  const _leagueType = activeLeagueFormat?.leagueType;
+  if (isPoolLeague(_leagueType) && activeLeagueId) {
+    return <Navigate to={getPoolRoute(_leagueType!, activeLeagueId)} replace />;
+  }
 
   const searchPlayers = async () => {
     if (!activeLeagueId) return;

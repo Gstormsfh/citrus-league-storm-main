@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import { LeagueService, League, Team, LEAGUE_TEAMS_DATA } from '@/services/LeagueService';
@@ -51,6 +51,7 @@ import { ScoringCalculator } from '@/utils/scoringUtils';
 import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { useToast } from '@/hooks/use-toast';
+import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 
 // DraftPick interface is now imported from DraftService
 // Team interface is now imported from LeagueService
@@ -74,7 +75,7 @@ const DraftRoom = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const { userLeagueState, activeLeagueId } = useLeague();
+  const { userLeagueState, activeLeagueId, activeLeagueFormat } = useLeague();
   const { toast } = useToast();
   const leagueId = searchParams.get('league');
 
@@ -2774,6 +2775,12 @@ const DraftRoom = () => {
       picks: [] as unknown[],
     }));
   }, [teams]);
+
+  // Redirect pool leagues to their pool page
+  const _leagueType = activeLeagueFormat?.leagueType;
+  if (isPoolLeague(_leagueType) && activeLeagueId) {
+    return <Navigate to={getPoolRoute(_leagueType!, activeLeagueId)} replace />;
+  }
 
   // ALWAYS render something - never return null
   return (

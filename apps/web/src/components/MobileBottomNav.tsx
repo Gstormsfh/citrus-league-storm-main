@@ -1,9 +1,10 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Swords, Users, BarChart3, User, Search } from 'lucide-react';
+import { Swords, Users, BarChart3, User, Search, Target, Newspaper } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect } from 'react';
 import { useLeague } from '@/contexts/LeagueContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 
 const MobileBottomNav = () => {
   const location = useLocation();
@@ -25,14 +26,24 @@ const MobileBottomNav = () => {
     };
   }, []);
 
-  // Build paths: only Matchup needs the league ID in its route
-  const navItems = [
-    { icon: Swords, label: 'Matchup', path: activeLeagueId ? `/matchup/${activeLeagueId}` : '/matchup' },
-    { icon: Users, label: 'Roster', path: '/roster' },
-    { icon: Search, label: 'Players', path: '/free-agents' },
-    { icon: BarChart3, label: 'Standings', path: '/standings' },
-    { icon: User, label: user ? 'Profile' : 'Sign In', path: user ? '/profile' : '/auth' },
-  ];
+  // Build paths: adapt for pool vs fantasy leagues
+  const leagueType = league?.activeLeagueFormat?.leagueType;
+  const isPool = isPoolLeague(leagueType) && !!activeLeagueId;
+
+  const navItems = isPool
+    ? [
+        { icon: Target, label: 'Picks', path: getPoolRoute(leagueType!, activeLeagueId!) },
+        { icon: BarChart3, label: 'Standings', path: getPoolRoute(leagueType!, activeLeagueId!, 'standings') },
+        { icon: Newspaper, label: 'News', path: '/news' },
+        { icon: User, label: user ? 'Profile' : 'Sign In', path: user ? '/profile' : '/auth' },
+      ]
+    : [
+        { icon: Swords, label: 'Matchup', path: activeLeagueId ? `/matchup/${activeLeagueId}` : '/matchup' },
+        { icon: Users, label: 'Roster', path: '/roster' },
+        { icon: Search, label: 'Players', path: '/free-agents' },
+        { icon: BarChart3, label: 'Standings', path: '/standings' },
+        { icon: User, label: user ? 'Profile' : 'Sign In', path: user ? '/profile' : '/auth' },
+      ];
 
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';

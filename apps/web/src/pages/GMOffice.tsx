@@ -4,9 +4,10 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeftRight, Users, TrendingUp, Calendar, FileText, BarChart3, ListChecks, Bell } from 'lucide-react';
+import { ArrowLeftRight, Users, TrendingUp, Calendar, FileText, BarChart3, ListChecks, Bell, Target, History, Trophy } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Narwhal } from '@/components/icons/Narwhal';
+import { isPoolLeague, getPoolRoute, getPoolLabel } from '@/utils/leagueTypeHelpers';
 import { HeadlinesBanner } from '@/components/gm-office/HeadlinesBanner';
 import { TeamIntelHub } from '@/components/gm-office/TeamIntelHub';
 import { isGuestMode } from '@/utils/guestHelpers';
@@ -68,8 +69,38 @@ const gmActions = [
   }
 ];
 
+const getPoolActions = (leagueType: string, leagueId: string) => [
+  {
+    title: "Make Picks",
+    description: `Submit your ${getPoolLabel(leagueType)} picks for this week`,
+    icon: Target,
+    citrusIcon: CitrusSparkle,
+    gradient: "from-citrus-sage to-citrus-green-medium",
+    link: getPoolRoute(leagueType, leagueId),
+  },
+  {
+    title: "Standings",
+    description: "See how you stack up against the competition",
+    icon: Trophy,
+    citrusIcon: CitrusBurst,
+    gradient: "from-citrus-green-light to-citrus-sage",
+    link: getPoolRoute(leagueType, leagueId, 'standings'),
+  },
+  {
+    title: "Stormy AI Assistant",
+    description: "Get personalized advice and insights from your AI GM",
+    icon: Narwhal,
+    citrusIcon: CitrusSparkle,
+    gradient: "from-citrus-sage to-citrus-green-medium",
+    link: "/gm-office/stormy",
+  },
+];
+
 const GMOffice = () => {
-  const { userLeagueState, activeLeagueId } = useLeague();
+  const { userLeagueState, activeLeagueId, activeLeagueFormat } = useLeague();
+  const leagueType = activeLeagueFormat?.leagueType;
+  const isPool = isPoolLeague(leagueType) && !!activeLeagueId;
+  const actions = isPool ? getPoolActions(leagueType!, activeLeagueId!) : gmActions;
   return (
     <div className="min-h-screen bg-[#D4E8B8] text-foreground relative">
       {/* Desktop Navbar - Hidden on mobile */}
@@ -96,8 +127,12 @@ const GMOffice = () => {
             <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2">
               {/* Compact page header */}
               <div className="hidden lg:block max-w-5xl mx-auto mb-4">
-                <h1 className="text-2xl font-varsity font-black text-citrus-forest uppercase tracking-tight">GM's Office</h1>
-                <p className="text-sm font-display text-citrus-charcoal/70">Your command center for team management and strategy</p>
+                <h1 className="text-2xl font-varsity font-black text-citrus-forest uppercase tracking-tight">
+                  {isPool ? `${getPoolLabel(leagueType!)} Pool Hub` : "GM's Office"}
+                </h1>
+                <p className="text-sm font-display text-citrus-charcoal/70">
+                  {isPool ? 'Your pool command center' : 'Your command center for team management and strategy'}
+                </p>
               </div>
               
               {/* Demo Mode Banner */}
@@ -118,7 +153,7 @@ const GMOffice = () => {
               <CitrusSectionDivider />
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto mt-4">
-                {gmActions.map((action, index) => (
+                {actions.map((action, index) => (
                   <Link 
                     key={action.title} 
                     to={action.link}

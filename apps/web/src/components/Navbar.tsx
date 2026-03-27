@@ -4,13 +4,15 @@ import { Button } from '@/components/ui/button';
 import {
   Menu, X, Bell, Search, Users, LogOut, CircleUser,
   Trophy, ChevronDown, UserPlus, Calendar, BarChart3,
-  Swords, Newspaper, Sparkles, Settings, DollarSign
+  Swords, Newspaper, Sparkles, Settings, DollarSign,
+  Target, Shield, TrendingUp
 } from 'lucide-react';
 import { CitrusLogo } from '@/components/icons/CitrusIcons';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useLeague } from '@/contexts/LeagueContext';
+import { isPoolLeague, getPoolRoute, getPoolLabel, getLeagueTypeFromSettings } from '@/utils/leagueTypeHelpers';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -67,20 +69,27 @@ const Navbar = () => {
   const displayName = profile?.display_name || profile?.username || user?.email?.split('@')[0] || 'User';
   const userInitial = displayName.charAt(0).toUpperCase();
 
-  // Flat navigation tabs — one click to anywhere
-  // All items shown to all users for full feature discovery
-  // GM Office and Draft redirect to /auth via ProtectedRoute if not logged in
-  // Armchair GM is fully public (read-only NHL data)
-  const navTabs = [
-    { label: 'Matchup', path: activeLeagueId ? `/matchup/${activeLeagueId}` : '/matchup', icon: Swords },
-    { label: 'Roster', path: '/roster', icon: Users },
-    { label: 'Standings', path: '/standings', icon: BarChart3 },
-    ...(activeLeagueId ? [{ label: 'Playoffs', path: `/league/${activeLeagueId}/playoffs`, icon: Trophy }] : []),
-    { label: 'Players', path: '/free-agents', icon: Search },
-    { label: 'GM Office', path: '/gm-office', icon: Settings },
-    { label: 'Draft', path: '/draft-room', icon: Sparkles },
-    { label: 'Armchair GM', path: '/armchair-gm', icon: DollarSign },
-  ];
+  // Navigation tabs — adapt based on league type (fantasy vs pool)
+  const leagueType = league?.activeLeagueFormat?.leagueType;
+  const isPool = isPoolLeague(leagueType);
+
+  const navTabs = isPool && activeLeagueId
+    ? [
+        { label: 'Picks', path: getPoolRoute(leagueType!, activeLeagueId), icon: Target },
+        { label: 'Standings', path: getPoolRoute(leagueType!, activeLeagueId, 'standings'), icon: BarChart3 },
+        { label: 'News', path: '/news', icon: Newspaper },
+        { label: 'Armchair GM', path: '/armchair-gm', icon: DollarSign },
+      ]
+    : [
+        { label: 'Matchup', path: activeLeagueId ? `/matchup/${activeLeagueId}` : '/matchup', icon: Swords },
+        { label: 'Roster', path: '/roster', icon: Users },
+        { label: 'Standings', path: '/standings', icon: BarChart3 },
+        ...(activeLeagueId ? [{ label: 'Playoffs', path: `/league/${activeLeagueId}/playoffs`, icon: Trophy }] : []),
+        { label: 'Players', path: '/free-agents', icon: Search },
+        { label: 'GM Office', path: '/gm-office', icon: Settings },
+        { label: 'Draft', path: '/draft-room', icon: Sparkles },
+        { label: 'Armchair GM', path: '/armchair-gm', icon: DollarSign },
+      ];
 
   return (
     <header className="fixed top-0 left-0 right-0 w-full z-50 lg:block max-lg:py-2 max-lg:pt-[calc(0.5rem+env(safe-area-inset-top))] max-lg:bg-[#D4E8B8]/95 max-lg:dark:bg-citrus-forest/95 max-lg:backdrop-blur-lg max-lg:border-b max-lg:border-citrus-sage/20">
@@ -124,12 +133,17 @@ const Navbar = () => {
                     My Leagues ({userLeagues.length})
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  {userLeagues.map((l) => (
+                  {userLeagues.map((l) => {
+                    const lType = getLeagueTypeFromSettings(l.settings as Record<string, unknown>);
+                    return (
                     <DropdownMenuItem
                       key={l.id}
                       onClick={() => {
                         setActiveLeagueId(l.id);
-                        if (location.pathname.startsWith('/matchup')) {
+                        // Navigate to the correct page for this league type
+                        if (isPoolLeague(lType)) {
+                          navigate(getPoolRoute(lType, l.id));
+                        } else if (location.pathname.startsWith('/matchup')) {
                           navigate(`/matchup/${l.id}`);
                         }
                       }}
@@ -142,11 +156,11 @@ const Navbar = () => {
                       <div className="flex-1">
                         <div className="font-medium truncate">{l.name}</div>
                         <div className="text-xs text-muted-foreground">
-                          {l.draft_status === 'completed' ? 'Season Active' : 'Draft Pending'}
+                          {isPoolLeague(lType) ? getPoolLabel(lType) + ' Pool' : (l.draft_status === 'completed' ? 'Season Active' : 'Draft Pending')}
                         </div>
                       </div>
                     </DropdownMenuItem>
-                  ))}
+                  );})}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => navigate('/create-league')} className="text-citrus-sage font-medium">
                     <UserPlus className="h-4 w-4 mr-2" /> Create / Join League
@@ -339,12 +353,16 @@ const Navbar = () => {
                       My Leagues ({userLeagues.length})
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    {userLeagues.map((l) => (
+                    {userLeagues.map((l) => {
+                      const lType = getLeagueTypeFromSettings(l.settings as Record<string, unknown>);
+                      return (
                       <DropdownMenuItem
                         key={l.id}
                         onClick={() => {
                           setActiveLeagueId(l.id);
-                          if (location.pathname.startsWith('/matchup')) {
+                          if (isPoolLeague(lType)) {
+                            navigate(getPoolRoute(lType, l.id));
+                          } else if (location.pathname.startsWith('/matchup')) {
                             navigate(`/matchup/${l.id}`);
                           }
                           closeMobileMenu();
@@ -358,11 +376,11 @@ const Navbar = () => {
                         <div className="flex-1">
                           <div className="font-medium truncate">{l.name}</div>
                           <div className="text-xs text-muted-foreground">
-                            {l.draft_status === 'completed' ? 'Season Active' : 'Draft Pending'}
+                            {isPoolLeague(lType) ? getPoolLabel(lType) + ' Pool' : (l.draft_status === 'completed' ? 'Season Active' : 'Draft Pending')}
                           </div>
                         </div>
                       </DropdownMenuItem>
-                    ))}
+                    );})}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => { navigate('/create-league'); closeMobileMenu(); }} className="text-citrus-sage font-medium">
                       <UserPlus className="h-4 w-4 mr-2" /> Create / Join League
