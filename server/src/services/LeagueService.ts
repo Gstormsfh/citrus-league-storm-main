@@ -68,14 +68,28 @@ export class LeagueService {
     scoringSettings?: Record<string, number>,
     waiverSettings?: Record<string, any>,
   ) {
+    // Determine league type from settings
+    const leagueType = settings?.leagueType || 'fantasy';
+    const isPool = leagueType !== 'fantasy';
+    const teamsCount = settings?.teamsCount || null;
+
+    // For pools: roster_size and draft_rounds should be 0
+    // Use nullish coalescing (??) instead of || to preserve 0 values
+    const effectiveRosterSize = rosterSize ?? (isPool ? 0 : 21);
+    const effectiveDraftRounds = draftRounds ?? (isPool ? 0 : 21);
+    // Pools don't need drafts
+    const effectiveDraftStatus = isPool ? 'completed' : 'not_started';
+
     // Create league
     const { data: leagueData, error: leagueError } = await this.supabase
       .from('leagues')
       .insert({
         name,
         commissioner_id: commissionerId,
-        roster_size: rosterSize || 21,
-        draft_rounds: draftRounds || 21,
+        roster_size: effectiveRosterSize,
+        draft_rounds: effectiveDraftRounds,
+        draft_status: effectiveDraftStatus,
+        league_size: teamsCount,
         settings: settings || {},
         scoring_settings: scoringSettings || null,
       })
