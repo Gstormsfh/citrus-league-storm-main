@@ -1126,10 +1126,18 @@ const FreeAgents = () => {
           </div>
         </div>
 
-        {/* Demo Mode Banner */}
-        {isGuestMode(userLeagueState) && (
+        {/* Demo Mode Banner / No League CTA */}
+        {userLeagueState === 'logged-in-no-league' && (
           <div className="mb-6">
-            <LeagueCreationCTA 
+            <LeagueCreationCTA
+              title="Your Free Agent Pool Awaits"
+              description="Create your league to start adding players to your roster and building your team."
+            />
+          </div>
+        )}
+        {userLeagueState === 'guest' && (
+          <div className="mb-6">
+            <LeagueCreationCTA
               title="You're viewing demo data"
               description="Sign up to add players to your roster and start managing your team."
               variant="compact"
