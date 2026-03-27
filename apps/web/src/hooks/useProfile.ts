@@ -49,8 +49,11 @@ export function useProfile() {
   return useQuery<Profile | null>({
     queryKey: PROFILE_QUERY_KEY,
     queryFn: async () => {
+      console.log('[useProfile] fetching profile…');
       const response = await accountApi.getProfile();
-      return response.data ?? null;
+      const profile = response.data ?? null;
+      console.log('[useProfile] result:', profile ? `username="${profile.username}"` : 'null');
+      return profile;
     },
     enabled: !!user,
   });
