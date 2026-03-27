@@ -7,16 +7,16 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { PoolService, ConfidencePick, ConfidenceStanding } from '@/services/PoolService';
 import { NHLGame } from '@/services/ScheduleService';
-import { Loader2, BarChart3, CheckCircle2, XCircle, ChevronLeft, ChevronRight, Lock, Calendar } from 'lucide-react';
+import { Loader2, BarChart3, CheckCircle2, XCircle, ChevronLeft, ChevronRight, Lock, Calendar, Target, Check } from 'lucide-react';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import LoadingScreen from '@/components/LoadingScreen';
 import { logger } from '@/utils/logger';
-import { getTeamColor } from '@/utils/teamColors';
+import { getTeamInfo, type NHLTeamInfo } from '@/types/captracker';
 
 interface PickWithConfidence {
   game_id: string;
@@ -24,44 +24,39 @@ interface PickWithConfidence {
   confidence_points: number;
 }
 
-/** Parse game_time (full ISO timestamp) */
+function getInfo(abbrev: string): NHLTeamInfo {
+  return getTeamInfo(abbrev) || { abbrev, name: abbrev, fullName: abbrev, conference: 'Eastern' as const, division: '', primaryColor: '#666', secondaryColor: '#999', logoUrl: '' };
+}
+
 function parseGameTime(game: NHLGame): Date | null {
   try {
-    if (game.game_time) {
-      const dt = new Date(game.game_time);
-      if (!isNaN(dt.getTime())) return dt;
-    }
-    if (game.game_date && game.game_date.includes('T')) {
-      const dt = new Date(game.game_date);
-      if (!isNaN(dt.getTime()) && dt.getHours() !== 0) return dt;
-    }
+    if (game.game_time) { const dt = new Date(game.game_time); if (!isNaN(dt.getTime())) return dt; }
+    if (game.game_date?.includes('T')) { const dt = new Date(game.game_date); if (!isNaN(dt.getTime()) && dt.getHours() !== 0) return dt; }
     return null;
   } catch { return null; }
 }
-
 function formatTime(game: NHLGame): string {
   const dt = parseGameTime(game);
-  if (!dt) return 'TBD';
-  return dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+  return dt ? dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }) : 'TBD';
 }
-
 function formatDateHeader(dateKey: string): string {
-  try {
-    const dt = new Date(dateKey + 'T12:00:00');
-    if (isNaN(dt.getTime())) return dateKey;
-    return dt.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
-  } catch { return dateKey; }
+  try { const dt = new Date(dateKey + 'T12:00:00'); return isNaN(dt.getTime()) ? dateKey : dt.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }); }
+  catch { return dateKey; }
+}
+function groupGamesByDate(games: NHLGame[]): Map<string, NHLGame[]> {
+  const g = new Map<string, NHLGame[]>();
+  for (const game of games) { const k = game.game_date.split('T')[0]; g.set(k, [...(g.get(k) || []), game]); }
+  return g;
 }
 
-function groupGamesByDate(games: NHLGame[]): Map<string, NHLGame[]> {
-  const grouped = new Map<string, NHLGame[]>();
-  for (const game of games) {
-    const dateKey = game.game_date.split('T')[0];
-    const existing = grouped.get(dateKey) || [];
-    existing.push(game);
-    grouped.set(dateKey, existing);
-  }
-  return grouped;
+function TeamMonogram({ abbrev, size = 36 }: { abbrev: string; size?: number }) {
+  const info = getInfo(abbrev);
+  return (
+    <div className="rounded-lg flex items-center justify-center font-varsity font-black text-white tracking-wide shadow-sm"
+      style={{ width: size, height: size, background: info.primaryColor, fontSize: size * 0.32 }}>
+      {abbrev}
+    </div>
+  );
 }
 
 const PoolConfidence = () => {
@@ -88,75 +83,56 @@ const PoolConfidence = () => {
         const pickMap = new Map<string, PickWithConfidence>();
         userPicks.forEach(p => pickMap.set(p.game_id, { game_id: p.game_id, picked_team: p.picked_team, confidence_points: p.confidence_points }));
         setPicks(pickMap);
-        const standingsData = await PoolService.getConfidenceStandings(activeLeagueId);
-        setStandings(standingsData);
-      } catch (err) {
-        logger.error('[PoolConfidence] Error:', err);
-      } finally {
-        setLoading(false);
-      }
+        setStandings(await PoolService.getConfidenceStandings(activeLeagueId));
+      } catch (err) { logger.error('[PoolConfidence] Error:', err); }
+      finally { setLoading(false); }
     };
     loadData();
   }, [activeLeagueId, user, currentWeek]);
 
   const handleTeamPick = (gameId: string, team: string) => {
-    const newPicks = new Map(picks);
-    const existing = newPicks.get(gameId);
-    if (existing) {
-      newPicks.set(gameId, { ...existing, picked_team: team });
-    } else {
-      const usedPoints = new Set(Array.from(newPicks.values()).map(p => p.confidence_points));
-      let nextPoint = games.length;
-      while (usedPoints.has(nextPoint) && nextPoint > 0) nextPoint--;
-      newPicks.set(gameId, { game_id: gameId, picked_team: team, confidence_points: nextPoint });
+    const m = new Map(picks);
+    const ex = m.get(gameId);
+    if (ex) { m.set(gameId, { ...ex, picked_team: team }); }
+    else {
+      const used = new Set(Array.from(m.values()).map(p => p.confidence_points));
+      let next = games.length; while (used.has(next) && next > 0) next--;
+      m.set(gameId, { game_id: gameId, picked_team: team, confidence_points: next });
     }
-    setPicks(newPicks);
+    setPicks(m);
   };
 
-  const handleConfidenceChange = (gameId: string, points: number) => {
-    const newPicks = new Map(picks);
-    const existing = newPicks.get(gameId);
-    if (existing) {
-      newPicks.set(gameId, { ...existing, confidence_points: points });
-    }
-    setPicks(newPicks);
+  const handleConfidenceChange = (gameId: string, pts: number) => {
+    const m = new Map(picks);
+    const ex = m.get(gameId);
+    if (ex) m.set(gameId, { ...ex, confidence_points: pts });
+    setPicks(m);
   };
 
   const handleSubmitPicks = async () => {
     if (!activeLeagueId || !user) return;
-    const picksArray = Array.from(picks.values());
-    if (picksArray.length === 0) {
-      toast({ title: 'Error', description: 'Make at least one pick.', variant: 'destructive' });
-      return;
-    }
-    const points = picksArray.map(p => p.confidence_points);
-    if (new Set(points).size !== points.length) {
-      toast({ title: 'Error', description: 'Each pick needs a unique confidence value.', variant: 'destructive' });
-      return;
+    const arr = Array.from(picks.values());
+    if (!arr.length) { toast({ title: 'Error', description: 'Make at least one pick.', variant: 'destructive' }); return; }
+    if (new Set(arr.map(p => p.confidence_points)).size !== arr.length) {
+      toast({ title: 'Error', description: 'Each pick needs a unique confidence value.', variant: 'destructive' }); return;
     }
     setSubmitting(true);
     try {
-      const result = await PoolService.submitConfidencePicks(activeLeagueId, user.id, currentWeek, picksArray);
-      if (result.success) {
-        toast({ title: 'Picks Submitted', description: `${picksArray.length} confidence picks saved.` });
-      } else {
-        toast({ title: 'Error', description: result.error || 'Failed to submit', variant: 'destructive' });
-      }
-    } catch {
-      toast({ title: 'Error', description: 'Failed to submit picks', variant: 'destructive' });
-    } finally {
-      setSubmitting(false);
-    }
+      const r = await PoolService.submitConfidencePicks(activeLeagueId, user.id, currentWeek, arr);
+      if (r.success) toast({ title: 'Picks Submitted', description: `${arr.length} picks saved.` });
+      else toast({ title: 'Error', description: r.error || 'Failed', variant: 'destructive' });
+    } catch { toast({ title: 'Error', description: 'Failed', variant: 'destructive' }); }
+    finally { setSubmitting(false); }
   };
 
-  const usedConfidencePoints = new Set(Array.from(picks.values()).map(p => p.confidence_points));
-  const maxPoints = Math.max(games.length, 1);
+  const usedPts = new Set(Array.from(picks.values()).map(p => p.confidence_points));
+  const maxPts = Math.max(games.length, 1);
 
   if (loading) return <LoadingScreen character="narwhal" message="Loading Confidence Pool..." />;
 
   const gamesByDate = groupGamesByDate(games);
-  const weekPoints = existingPicks.reduce((sum, p) => sum + (p.is_correct ? (p.confidence_points || 0) : 0), 0);
-  const weekPossible = existingPicks.reduce((sum, p) => sum + (p.confidence_points || 0), 0);
+  const weekEarned = existingPicks.reduce((s, p) => s + (p.is_correct ? (p.confidence_points || 0) : 0), 0);
+  const weekPossible = existingPicks.reduce((s, p) => s + (p.confidence_points || 0), 0);
 
   return (
     <div className="min-h-screen bg-[#D4E8B8] relative">
@@ -171,13 +147,13 @@ const PoolConfidence = () => {
         <div className="w-full px-3 sm:px-4 lg:px-6 xl:px-8">
           {userLeagueState === 'logged-in-no-league' && (
             <div className="mb-8 max-w-3xl mx-auto">
-              <LeagueCreationCTA title="Join a Confidence Pool" description="Rank your picks by confidence — earn more points for high-confidence correct picks!" />
+              <LeagueCreationCTA title="Join a Confidence Pool" description="Rank your picks by confidence — earn more points for correct high-confidence picks!" />
             </div>
           )}
 
           {/* Header */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-5">
+            <div className="flex items-center gap-2 flex-wrap">
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentWeek(w => Math.max(1, w - 1))} disabled={currentWeek <= 1}>
                 <ChevronLeft className="w-4 h-4" />
               </Button>
@@ -185,9 +161,9 @@ const PoolConfidence = () => {
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentWeek(w => w + 1)}>
                 <ChevronRight className="w-4 h-4" />
               </Button>
-              <Badge variant="secondary" className="text-xs ml-2">{picks.size}/{games.length} picked</Badge>
-              {existingPicks.some(p => p.is_correct !== null) && (
-                <Badge className="text-xs bg-citrus-forest border-0 text-white ml-1">{weekPoints}/{weekPossible} pts</Badge>
+              <Badge variant="secondary" className="text-xs">{picks.size}/{games.length} picked</Badge>
+              {weekPossible > 0 && (
+                <Badge className="text-xs bg-citrus-forest border-0 text-white">{weekEarned}/{weekPossible} pts</Badge>
               )}
             </div>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
@@ -198,110 +174,115 @@ const PoolConfidence = () => {
             </Tabs>
           </div>
 
+          {/* ── Picks tab ── */}
           {activeTab === 'picks' && (
             <>
               {games.length === 0 ? (
-                <Card className="border-none shadow-lg max-w-xl mx-auto">
-                  <CardContent className="py-16 text-center text-muted-foreground">
+                <Card className="border-none shadow-lg max-w-xl mx-auto bg-white">
+                  <CardContent className="py-16 text-center text-slate-400">
                     <BarChart3 className="w-12 h-12 mx-auto mb-4 opacity-30" />
                     <p className="font-medium text-lg">No games this week</p>
                   </CardContent>
                 </Card>
               ) : (
-                <div className="space-y-6">
+                <div className="space-y-8">
                   {Array.from(gamesByDate.entries()).map(([dateKey, dateGames]) => (
                     <div key={dateKey}>
                       <div className="flex items-center gap-3 mb-3">
-                        <Calendar className="w-4 h-4 text-citrus-sage" />
+                        <Calendar className="w-4 h-4 text-citrus-forest/50" />
                         <span className="text-sm font-display font-bold text-citrus-forest uppercase tracking-wide">{formatDateHeader(dateKey)}</span>
                         <div className="flex-1 h-px bg-citrus-sage/20" />
                       </div>
 
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                         {dateGames.map(game => {
                           const gameId = String(game.id);
                           const pick = picks.get(gameId);
-                          const existingPick = existingPicks.find(p => p.game_id === gameId);
-                          const gameDateTime = parseGameTime(game);
-                          const locked = game.status === 'live' || game.status === 'final' || (gameDateTime && new Date() >= gameDateTime);
+                          const ep = existingPicks.find(p => p.game_id === gameId);
+                          const dt = parseGameTime(game);
+                          const locked = game.status === 'live' || game.status === 'final' || (dt && new Date() >= dt);
                           const isFinal = game.status === 'final';
                           const isLive = game.status === 'live';
-                          const awayColor = getTeamColor(game.away_team);
-                          const homeColor = getTeamColor(game.home_team);
+                          const awayInfo = getInfo(game.away_team);
+                          const homeInfo = getInfo(game.home_team);
+                          const awayWon = isFinal && game.away_score > game.home_score;
+                          const homeWon = isFinal && game.home_score > game.away_score;
 
                           return (
-                            <div
-                              key={gameId}
-                              className={`rounded-xl border overflow-hidden transition-all ${locked ? 'opacity-70' : 'hover:shadow-md'} ${pick ? 'ring-2 ring-citrus-sage/40' : ''}`}
-                              style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.8), rgba(232,238,217,0.5))' }}
-                            >
-                              {/* Status bar */}
-                              <div className="flex items-center justify-between px-3 py-1 text-[10px] font-display uppercase tracking-widest"
-                                style={{ background: isFinal ? '#1B3022' : isLive ? '#dc2626' : 'rgba(120,149,97,0.15)', color: isFinal || isLive ? '#fff' : '#789561' }}
-                              >
+                            <div key={gameId} className={`rounded-2xl border-2 overflow-hidden transition-all duration-200 bg-white ${
+                              isLive ? 'border-red-400/40 shadow-[0_0_12px_rgba(239,68,68,0.15)]'
+                              : pick ? 'border-citrus-sage/30 shadow-md' : 'border-slate-200/60 hover:border-slate-300 hover:shadow-md'
+                            }`}>
+                              {/* Status bar with confidence */}
+                              <div className={`flex items-center justify-between px-3 py-1.5 text-[11px] font-display font-semibold uppercase tracking-wider ${
+                                isFinal ? 'bg-slate-700 text-white' : isLive ? 'bg-red-500 text-white' : locked ? 'bg-slate-200 text-slate-500' : 'bg-slate-100 text-slate-500'
+                              }`}>
                                 <span>
-                                  {isFinal ? `Final · ${game.away_score}–${game.home_score}` :
-                                   isLive ? `Live · ${game.away_score}–${game.home_score}` :
-                                   locked ? '🔒 Locked' : formatTime(game)}
+                                  {isFinal ? 'Final' : isLive ? (
+                                    <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-white animate-pulse" />Live</span>
+                                  ) : locked ? (
+                                    <span className="flex items-center gap-1"><Lock className="w-3 h-3" />Locked</span>
+                                  ) : formatTime(game)}
                                 </span>
-                                {/* Confidence selector inline */}
-                                {pick && (
-                                  <span className="font-bold text-xs" style={{ color: isFinal || isLive ? '#FFB81C' : '#1B3022' }}>
-                                    {pick.confidence_points} pts
-                                  </span>
-                                )}
+                                {/* Confidence badge */}
+                                <div className="flex items-center gap-1.5">
+                                  {pick && (
+                                    <Select
+                                      value={pick.confidence_points?.toString() || ''}
+                                      onValueChange={(v) => handleConfidenceChange(gameId, parseInt(v))}
+                                      disabled={!pick.picked_team || !!locked}
+                                    >
+                                      <SelectTrigger className={`h-6 w-16 text-[10px] border-0 font-varsity font-bold rounded-full px-2 ${
+                                        isFinal || isLive ? 'bg-white/20 text-white' : 'bg-citrus-sage/20 text-citrus-forest'
+                                      }`}>
+                                        <SelectValue placeholder="Pts" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {Array.from({ length: maxPts }, (_, i) => maxPts - i).map(pts => (
+                                          <SelectItem key={pts} value={pts.toString()} disabled={usedPts.has(pts) && pick.confidence_points !== pts}>
+                                            {pts} pts
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  )}
+                                </div>
                               </div>
 
-                              {/* Teams + confidence */}
+                              {/* Teams */}
                               <div className="flex items-stretch">
-                                {/* Away */}
                                 <button
-                                  className="flex-1 py-3 px-2 text-center font-varsity text-sm uppercase tracking-wide transition-all border-r border-citrus-sage/10 disabled:cursor-not-allowed"
-                                  style={pick?.picked_team === game.away_team ? { background: awayColor, color: '#fff' } : {}}
-                                  onClick={() => handleTeamPick(gameId, game.away_team)}
-                                  disabled={!!locked}
+                                  className={`flex-1 flex flex-col items-center gap-1.5 py-3.5 px-2 transition-all relative ${locked ? 'cursor-default' : 'cursor-pointer'} ${isFinal && !awayWon ? 'opacity-40' : ''}`}
+                                  style={{ borderLeft: `4px solid ${awayInfo.primaryColor}`, background: pick?.picked_team === game.away_team ? `${awayInfo.primaryColor}14` : undefined }}
+                                  onClick={() => !locked && handleTeamPick(gameId, game.away_team)} disabled={!!locked}
                                 >
-                                  <div className="flex items-center justify-center gap-1.5">
-                                    {(!pick || pick.picked_team !== game.away_team) && <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: awayColor }} />}
-                                    <span className="font-bold">{game.away_team}</span>
-                                    {existingPick?.is_correct === true && existingPick.picked_team === game.away_team && <CheckCircle2 className="w-4 h-4 text-green-400" />}
-                                    {existingPick?.is_correct === false && existingPick.picked_team === game.away_team && <XCircle className="w-4 h-4 text-red-400" />}
-                                  </div>
+                                  <TeamMonogram abbrev={game.away_team} size={34} />
+                                  <span className="font-varsity font-bold text-xs uppercase" style={{ color: awayInfo.primaryColor }}>{awayInfo.name}</span>
+                                  {isFinal && <span className="text-lg font-varsity font-black text-slate-700">{game.away_score}</span>}
+                                  {pick?.picked_team === game.away_team && !isFinal && (
+                                    <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-citrus-sage flex items-center justify-center"><Check className="w-2.5 h-2.5 text-white" /></div>
+                                  )}
+                                  {ep?.is_correct === true && ep.picked_team === game.away_team && <CheckCircle2 className="w-4 h-4 text-green-500 absolute top-1.5 right-1.5" />}
+                                  {ep?.is_correct === false && ep.picked_team === game.away_team && <XCircle className="w-4 h-4 text-red-500 absolute top-1.5 right-1.5" />}
+                                  {pick && pick.picked_team !== game.away_team && !isFinal && <div className="absolute inset-0 bg-white/55 pointer-events-none" />}
                                 </button>
 
-                                {/* Confidence selector */}
-                                <div className="flex items-center justify-center w-20 shrink-0 bg-citrus-cream/30">
-                                  <Select
-                                    value={pick?.confidence_points?.toString() || ''}
-                                    onValueChange={(val) => handleConfidenceChange(gameId, parseInt(val))}
-                                    disabled={!pick?.picked_team || !!locked}
-                                  >
-                                    <SelectTrigger className="h-8 w-16 text-xs border-0 bg-transparent font-varsity font-bold text-center">
-                                      <SelectValue placeholder="—" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {Array.from({ length: maxPoints }, (_, i) => maxPoints - i).map(pts => (
-                                        <SelectItem key={pts} value={pts.toString()} disabled={usedConfidencePoints.has(pts) && pick?.confidence_points !== pts}>
-                                          {pts} pts
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
+                                <div className="flex items-center justify-center w-8 bg-slate-50/80 text-[10px] text-slate-300 font-bold shrink-0">@</div>
 
-                                {/* Home */}
                                 <button
-                                  className="flex-1 py-3 px-2 text-center font-varsity text-sm uppercase tracking-wide transition-all border-l border-citrus-sage/10 disabled:cursor-not-allowed"
-                                  style={pick?.picked_team === game.home_team ? { background: homeColor, color: '#fff' } : {}}
-                                  onClick={() => handleTeamPick(gameId, game.home_team)}
-                                  disabled={!!locked}
+                                  className={`flex-1 flex flex-col items-center gap-1.5 py-3.5 px-2 transition-all relative ${locked ? 'cursor-default' : 'cursor-pointer'} ${isFinal && !homeWon ? 'opacity-40' : ''}`}
+                                  style={{ borderRight: `4px solid ${homeInfo.primaryColor}`, background: pick?.picked_team === game.home_team ? `${homeInfo.primaryColor}14` : undefined }}
+                                  onClick={() => !locked && handleTeamPick(gameId, game.home_team)} disabled={!!locked}
                                 >
-                                  <div className="flex items-center justify-center gap-1.5">
-                                    <span className="font-bold">{game.home_team}</span>
-                                    {(!pick || pick.picked_team !== game.home_team) && <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: homeColor }} />}
-                                    {existingPick?.is_correct === true && existingPick.picked_team === game.home_team && <CheckCircle2 className="w-4 h-4 text-green-400" />}
-                                    {existingPick?.is_correct === false && existingPick.picked_team === game.home_team && <XCircle className="w-4 h-4 text-red-400" />}
-                                  </div>
+                                  <TeamMonogram abbrev={game.home_team} size={34} />
+                                  <span className="font-varsity font-bold text-xs uppercase" style={{ color: homeInfo.primaryColor }}>{homeInfo.name}</span>
+                                  {isFinal && <span className="text-lg font-varsity font-black text-slate-700">{game.home_score}</span>}
+                                  {pick?.picked_team === game.home_team && !isFinal && (
+                                    <div className="absolute top-1.5 left-1.5 w-4 h-4 rounded-full bg-citrus-sage flex items-center justify-center"><Check className="w-2.5 h-2.5 text-white" /></div>
+                                  )}
+                                  {ep?.is_correct === true && ep.picked_team === game.home_team && <CheckCircle2 className="w-4 h-4 text-green-500 absolute top-1.5 left-1.5" />}
+                                  {ep?.is_correct === false && ep.picked_team === game.home_team && <XCircle className="w-4 h-4 text-red-500 absolute top-1.5 left-1.5" />}
+                                  {pick && pick.picked_team !== game.home_team && !isFinal && <div className="absolute inset-0 bg-white/55 pointer-events-none" />}
                                 </button>
                               </div>
                             </div>
@@ -311,10 +292,10 @@ const PoolConfidence = () => {
                     </div>
                   ))}
 
-                  {/* Submit bar */}
-                  <div className="sticky bottom-20 lg:bottom-4 bg-[#D4E8B8]/95 backdrop-blur-sm border border-citrus-sage/20 rounded-xl py-3 px-4 flex items-center justify-between shadow-lg">
-                    <span className="text-sm font-display text-citrus-charcoal/60">
-                      {picks.size === 0 ? 'Pick a team, then assign confidence points' : `${picks.size} of ${games.length} games picked`}
+                  {/* Submit */}
+                  <div className="sticky bottom-20 lg:bottom-4 bg-white/90 backdrop-blur-md border border-slate-200 rounded-2xl py-3 px-4 flex items-center justify-between shadow-xl">
+                    <span className="text-sm font-display text-slate-500">
+                      {picks.size === 0 ? 'Pick a team, then assign confidence' : `${picks.size} of ${games.length} picked`}
                     </span>
                     <Button onClick={handleSubmitPicks} disabled={picks.size === 0 || submitting} className="font-varsity uppercase">
                       {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
@@ -326,11 +307,12 @@ const PoolConfidence = () => {
             </>
           )}
 
+          {/* ── Standings ── */}
           {activeTab === 'standings' && (
-            <Card className="border-none shadow-lg overflow-hidden max-w-4xl mx-auto">
+            <Card className="border-none shadow-lg overflow-hidden max-w-4xl mx-auto bg-white">
               <CardContent className="p-0">
                 {standings.length === 0 ? (
-                  <div className="text-center py-16 text-muted-foreground">
+                  <div className="text-center py-16 text-slate-400">
                     <BarChart3 className="w-12 h-12 mx-auto mb-4 opacity-30" />
                     <p className="font-medium">No standings yet</p>
                   </div>
@@ -338,30 +320,28 @@ const PoolConfidence = () => {
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
-                        <TableRow className="bg-muted/30">
+                        <TableRow className="bg-slate-50">
                           <TableHead className="w-12 text-center">#</TableHead>
                           <TableHead>Player</TableHead>
                           <TableHead className="text-center">Pts</TableHead>
                           <TableHead className="text-center hidden sm:table-cell">Possible</TableHead>
-                          <TableHead className="text-center hidden sm:table-cell">Weeks</TableHead>
                           <TableHead className="text-right">Efficiency</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {standings.map((s, i) => (
-                          <TableRow key={s.user_id} className={s.user_id === user?.id ? 'bg-primary/5' : ''}>
+                          <TableRow key={s.user_id} className={s.user_id === user?.id ? 'bg-citrus-sage/5' : ''}>
                             <TableCell className="text-center">
-                              <span className={`inline-flex w-6 h-6 rounded-full items-center justify-center text-xs font-bold ${
-                                i === 0 ? 'bg-amber-400 text-white' : i === 1 ? 'bg-gray-300 text-gray-700' : i === 2 ? 'bg-amber-600 text-white' : 'text-muted-foreground'
+                              <span className={`inline-flex w-7 h-7 rounded-full items-center justify-center text-xs font-bold ${
+                                i === 0 ? 'bg-amber-400 text-white' : i === 1 ? 'bg-slate-300 text-slate-700' : i === 2 ? 'bg-amber-600 text-white' : 'text-slate-400'
                               }`}>{i + 1}</span>
                             </TableCell>
                             <TableCell className="font-medium">
                               {s.display_name}
                               {s.user_id === user?.id && <Badge variant="outline" className="ml-2 text-xs">YOU</Badge>}
                             </TableCell>
-                            <TableCell className="text-center font-bold text-primary">{s.total_points}</TableCell>
-                            <TableCell className="text-center text-muted-foreground hidden sm:table-cell">{s.possible_points}</TableCell>
-                            <TableCell className="text-center hidden sm:table-cell">{s.weeks_played}</TableCell>
+                            <TableCell className="text-center font-bold text-citrus-forest">{s.total_points}</TableCell>
+                            <TableCell className="text-center text-slate-400 hidden sm:table-cell">{s.possible_points}</TableCell>
                             <TableCell className="text-right font-semibold">
                               {s.possible_points > 0 ? ((s.total_points / s.possible_points) * 100).toFixed(1) : '0.0'}%
                             </TableCell>
