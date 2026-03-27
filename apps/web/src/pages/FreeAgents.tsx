@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import { leagueApi } from '@/api/leagues';
@@ -37,6 +37,7 @@ import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { GameLogosBar } from '@/components/matchup/GameLogosBar';
 import { logger } from '@/utils/logger';
 import { ScoringCalculator } from '@/utils/scoringUtils';
+import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 
 // Helper function to format position for display (L -> LW, R -> RW)
 const formatPositionForDisplay = (position: string): string => {
@@ -54,7 +55,7 @@ const formatPositionForDisplay = (position: string): string => {
 const FreeAgents = () => {
   const { toast } = useToast();
   const { user } = useAuth();
-  const { userLeagueState, activeLeagueId, isChangingLeague } = useLeague();
+  const { userLeagueState, activeLeagueId, activeLeagueFormat, isChangingLeague } = useLeague();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
@@ -1095,6 +1096,12 @@ const FreeAgents = () => {
     .slice(0, 10); // Show top 10 instead of 5
 
   const positions = ['ALL', 'C', 'LW', 'RW', 'W', 'D', 'G'];
+
+  // Redirect pool leagues to their pool page
+  const _leagueType = activeLeagueFormat?.leagueType;
+  if (isPoolLeague(_leagueType) && activeLeagueId) {
+    return <Navigate to={getPoolRoute(_leagueType!, activeLeagueId)} replace />;
+  }
 
   return (
     <div className="min-h-screen bg-[#D4E8B8] relative">

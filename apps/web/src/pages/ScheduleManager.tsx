@@ -16,6 +16,8 @@ import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { format } from 'date-fns';
 import { logger } from '@/utils/logger';
+import { Navigate } from 'react-router-dom';
+import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { getTodayMST, getTodayMSTDate, formatDateToString } from '@/utils/timezoneUtils';
 
 interface NhlGame {
@@ -29,7 +31,7 @@ interface NhlGame {
 
 const ScheduleManager = () => {
   const { user } = useAuth();
-  const { activeLeagueId, userLeagueState } = useLeague();
+  const { activeLeagueId, userLeagueState, activeLeagueFormat } = useLeague();
   const [viewMode, setViewMode] = useState<'summary' | 'full'>('summary');
   const [nhlGames, setNhlGames] = useState<NhlGame[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,6 +71,12 @@ const ScheduleManager = () => {
   useEffect(() => {
     loadScheduleData();
   }, [loadScheduleData]);
+
+  // Redirect pool leagues to their pool page
+  const _poolType = activeLeagueFormat?.leagueType;
+  if (isPoolLeague(_poolType) && activeLeagueId) {
+    return <Navigate to={getPoolRoute(_poolType!, activeLeagueId)} replace />;
+  }
 
   // Matchup data is loaded dynamically from Matchup/Standings pages.
   // This page focuses on the NHL schedule for lineup planning.

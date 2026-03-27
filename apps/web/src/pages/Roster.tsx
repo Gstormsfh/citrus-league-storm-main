@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, closestCenter } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
-import { useSearchParams, useLocation } from 'react-router-dom';
+import { useSearchParams, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useLeague, isDemoLeague } from '@/contexts/LeagueContext';
@@ -54,6 +54,7 @@ import { CURRENT_SEASON } from '@/utils/seasonConstants';
 import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
 import { Matchup as MatchupType } from '@/services/MatchupService';
 import { logger } from '@/utils/logger';
+import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 
 // Helper function to transform position to fantasy slot
 const getFantasyPosition = (position: string): 'C' | 'LW' | 'RW' | 'D' | 'G' | 'UTIL' => {
@@ -238,7 +239,7 @@ interface RosterState {
 const Roster = () => {
   const { user } = useAuth();
   const { data: profile } = useProfile();
-  const { userLeagueState, loading: leagueLoading, activeLeagueId, activeLeague, demoLeagueId, isChangingLeague } = useLeague();
+  const { userLeagueState, loading: leagueLoading, activeLeagueId, activeLeague, activeLeagueFormat, demoLeagueId, isChangingLeague } = useLeague();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
@@ -2724,6 +2725,12 @@ const Roster = () => {
 
   // Determine if we should show a loading overlay (but don't unmount the component)
   const showLoadingOverlay = isChangingLeague || (leagueLoading && userLeagueState === 'active-user');
+
+  // Redirect pool leagues to their pool page
+  const _leagueType = activeLeagueFormat?.leagueType;
+  if (isPoolLeague(_leagueType) && activeLeagueId) {
+    return <Navigate to={getPoolRoute(_leagueType!, activeLeagueId)} replace />;
+  }
 
   return (
     <div className="min-h-screen bg-[#D4E8B8] text-foreground relative">

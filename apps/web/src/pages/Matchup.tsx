@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useLeague } from '@/contexts/LeagueContext';
@@ -40,6 +40,7 @@ import { CitrusSectionDivider } from '@/components/CitrusSectionDivider';
 import { calculateEligibleGamesRemaining } from '@/utils/rosterUtils';
 import { ScoringCalculator } from '@/utils/scoringUtils';
 import { logger } from '@/utils/logger';
+import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { matchupApi } from '@/api/matchups';
 import { leagueApi } from '@/api/leagues';
 import { playerApi } from '@/api/players';
@@ -172,7 +173,7 @@ const log = DEBUG_MATCHUP ? logger.log.bind(logger, '[Matchup]') : () => {};
 const Matchup = () => {
   const { user, loading: authLoading } = useAuth();
   const { data: profile } = useProfile();
-  const { userLeagueState, loading: leagueContextLoading, activeLeagueId, isChangingLeague } = useLeague();
+  const { userLeagueState, loading: leagueContextLoading, activeLeagueId, activeLeagueFormat, isChangingLeague } = useLeague();
   const { leagueId: urlLeagueId, weekId: urlWeekId } = useParams<{ leagueId?: string; weekId?: string }>();
   const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -5138,6 +5139,12 @@ const Matchup = () => {
   // This ensures a single, smooth loading screen without cycling
   const shouldShowLoading = useMinimumLoadingTime(actualLoading, 1000);
   
+  // Redirect pool leagues to their pool page
+  const _leagueType = activeLeagueFormat?.leagueType;
+  if (isPoolLeague(_leagueType) && activeLeagueId) {
+    return <Navigate to={getPoolRoute(_leagueType!, activeLeagueId)} replace />;
+  }
+
   // Early return for loading - must be after all hooks are declared
   if (shouldShowLoading) {
     return (

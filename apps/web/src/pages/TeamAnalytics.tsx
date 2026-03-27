@@ -21,6 +21,8 @@ import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import LoadingScreen from '@/components/LoadingScreen';
 import { logger } from '@/utils/logger';
+import { Navigate } from 'react-router-dom';
+import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 
 interface PositionStats {
   position: string;
@@ -47,7 +49,7 @@ interface FreeAgentRec {
 
 const TeamAnalytics = () => {
   const { user } = useAuth();
-  const { userLeagueState, activeLeagueId, isChangingLeague } = useLeague();
+  const { userLeagueState, activeLeagueId, isChangingLeague, activeLeagueFormat } = useLeague();
   const [freeAgentTargets, setFreeAgentTargets] = useState<FreeAgentRec[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -178,6 +180,12 @@ const TeamAnalytics = () => {
     if (isChangingLeague) return;
     loadScheduleMaximizers();
   }, [isChangingLeague, loadScheduleMaximizers]);
+
+  // Redirect pool leagues to their pool page
+  const _poolType = activeLeagueFormat?.leagueType;
+  if (isPoolLeague(_poolType) && activeLeagueId) {
+    return <Navigate to={getPoolRoute(_poolType!, activeLeagueId)} replace />;
+  }
 
   // Mock Analysis Data
   const positionalAnalysis: PositionStats[] = [

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
@@ -41,11 +41,12 @@ import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { logger } from '@/utils/logger';
 import { ScoringCalculator } from '@/utils/scoringUtils';
+import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 
 const TradeAnalyzer = () => {
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
-  const { userLeagueState, activeLeagueId } = useLeague();
+  const { userLeagueState, activeLeagueId, activeLeagueFormat } = useLeague();
   const { toast } = useToast();
   
   const [selectedTeamId, setSelectedTeamId] = useState<string | number>("");
@@ -306,10 +307,16 @@ const TradeAnalyzer = () => {
   const [searchMyTeam, setSearchMyTeam] = useState("");
   const [searchTheirTeam, setSearchTheirTeam] = useState("");
 
-  const selectedPartnerTeam = useMemo(() => 
-    opponentTeams.find(t => String(t.id) === String(selectedTeamId)), 
+  const selectedPartnerTeam = useMemo(() =>
+    opponentTeams.find(t => String(t.id) === String(selectedTeamId)),
     [selectedTeamId, opponentTeams]
   );
+
+  // Redirect pool leagues to their pool page
+  const _poolType = activeLeagueFormat?.leagueType;
+  if (isPoolLeague(_poolType) && activeLeagueId) {
+    return <Navigate to={getPoolRoute(_poolType!, activeLeagueId)} replace />;
+  }
 
   const toggleMyPlayer = (id: string) => {
     setMySelectedPlayers(prev => 

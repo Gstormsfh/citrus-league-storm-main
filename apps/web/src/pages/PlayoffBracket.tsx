@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
@@ -28,6 +28,7 @@ import { LeagueMembershipService } from '@/services/LeagueMembershipService';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { logger } from '@/utils/logger';
+import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 
 // ============================================================================
 // BRACKET MATCHUP CARD - Individual series matchup in the bracket
@@ -470,7 +471,7 @@ const PlayoffBracket = () => {
   const { leagueId } = useParams<{ leagueId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { userLeagueState, activeLeagueId } = useLeague();
+  const { userLeagueState, activeLeagueId, activeLeagueFormat } = useLeague();
   const { toast } = useToast();
 
   const [loading, setLoading] = useState(true);
@@ -624,6 +625,12 @@ const PlayoffBracket = () => {
   consolationByRound.forEach(roundSeries => roundSeries.sort((a, b) => a.match_number - b.match_number));
 
   const displayLoading = useMinimumLoadingTime(loading, 800);
+
+  // Redirect pool leagues to their pool page
+  const _poolType = activeLeagueFormat?.leagueType;
+  if (isPoolLeague(_poolType) && activeLeagueId) {
+    return <Navigate to={getPoolRoute(_poolType!, activeLeagueId)} replace />;
+  }
 
   if (displayLoading) {
     return <LoadingScreen character="lemon" message="Loading Playoff Bracket..." />;

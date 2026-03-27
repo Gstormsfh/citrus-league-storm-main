@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
+import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
@@ -78,7 +79,7 @@ const Standings = () => {
   const isSeasonPoints = leagueFormat.scoringFormat === 'total-points' || isPPG;
   const isPool = leagueFormat.leagueType !== 'fantasy';
   const isCategories = leagueFormat.scoringFormat === 'h2h-categories';
-  
+
   // Auto-complete matchups and load standings
   useEffect(() => {
     // Skip if league is changing
@@ -448,6 +449,11 @@ const Standings = () => {
   
   // Apply minimum display time to prevent flash
   const displayLoading = useMinimumLoadingTime(shouldShowLoadingScreen, 800);
+
+  // Redirect pool leagues to their pool page's standings tab
+  if (isPool && activeLeagueId && leagueFormat.leagueType) {
+    return <Navigate to={getPoolRoute(leagueFormat.leagueType, activeLeagueId, 'standings')} replace />;
+  }
   
   if (displayLoading) {
     return (
