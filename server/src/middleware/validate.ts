@@ -63,8 +63,8 @@ export function validateQuery<T extends ZodSchema>(schema: T) {
 export const schemas = {
   createLeague: z.object({
     name: z.string().min(1, 'League name is required').max(100),
-    roster_size: z.number().int().min(1).max(30).optional(),
-    draft_rounds: z.number().int().min(1).max(30).optional(),
+    roster_size: z.number().int().min(0).max(30).optional(),
+    draft_rounds: z.number().int().min(0).max(30).optional(),
     settings: z.record(z.unknown()).optional(),
     scoring_settings: z.record(z.unknown()).optional(),
     waiver_settings: z.record(z.unknown()).optional(),
