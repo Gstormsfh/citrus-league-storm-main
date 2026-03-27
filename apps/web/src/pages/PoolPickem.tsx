@@ -16,15 +16,23 @@ import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import LoadingScreen from '@/components/LoadingScreen';
 import { logger } from '@/utils/logger';
 
-/** Safely parse a game date + optional time into a Date object */
+/** Safely parse a game date + optional time into a Date object.
+ *  game_date can be a full ISO timestamp like "2026-03-27T19:00:00+00:00"
+ *  or just a date "2026-03-27". game_time may be null. */
 function parseGameDateTime(gameDate: string, gameTime: string | null): Date | null {
   try {
+    // If game_time is provided explicitly, use it
     if (gameTime) {
       const dt = new Date(`${gameDate.split('T')[0]}T${gameTime}`);
       return isNaN(dt.getTime()) ? null : dt;
     }
-    const dt = new Date(gameDate.split('T')[0] + 'T00:00:00');
-    return isNaN(dt.getTime()) ? null : dt;
+    // Try parsing the full game_date (might contain time in ISO format)
+    const dt = new Date(gameDate);
+    if (!isNaN(dt.getTime()) && gameDate.includes('T')) {
+      return dt;
+    }
+    // Date-only string — no time info available
+    return null;
   } catch {
     return null;
   }
@@ -44,7 +52,9 @@ function formatGameDate(gameDate: string): string {
 /** Format a game time for display: "7:00 PM" */
 function formatGameTime(gameDate: string, gameTime: string | null): string {
   const dt = parseGameDateTime(gameDate, gameTime);
-  if (!dt || !gameTime) return 'TBD';
+  if (!dt) return 'TBD';
+  // Check if the time is midnight (00:00) — likely means no real time data
+  if (dt.getHours() === 0 && dt.getMinutes() === 0 && !gameTime) return 'TBD';
   return dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
@@ -160,7 +170,7 @@ const PoolPickem = () => {
       </div>
 
       <main className="w-full pt-16 lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
-        <div className="max-w-3xl mx-auto px-3 sm:px-4">
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 lg:px-6">
           {userLeagueState === 'logged-in-no-league' && (
             <div className="mb-8">
               <LeagueCreationCTA
@@ -206,16 +216,17 @@ const PoolPickem = () => {
                   {Array.from(gamesByDate.entries()).map(([dateKey, dateGames]) => (
                     <div key={dateKey}>
                       {/* Date header */}
-                      <div className="flex items-center gap-2 mb-2 px-1">
+                      <div className="flex items-center gap-2 mb-3 px-1">
                         <Calendar className="w-3.5 h-3.5 text-citrus-sage" />
                         <span className="text-xs font-display font-bold text-citrus-forest/70 uppercase tracking-wider">
                           {formatGameDate(dateKey)}
                         </span>
                         <div className="flex-1 h-px bg-citrus-sage/20" />
+                        <span className="text-xs text-citrus-charcoal/40">{dateGames.length} games</span>
                       </div>
 
-                      {/* Games for this date */}
-                      <div className="space-y-2">
+                      {/* Games grid: 2 columns on desktop, 1 on mobile */}
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
                         {dateGames.map(game => {
                           const gameId = String(game.id);
                           const picked = picks.get(gameId);
@@ -229,12 +240,12 @@ const PoolPickem = () => {
                           return (
                             <div
                               key={gameId}
-                              className={`flex items-center gap-2 sm:gap-4 p-3 sm:p-4 rounded-xl border-2 transition-all ${
+                              className={`flex items-center gap-1.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl border-2 transition-all ${
                                 locked
                                   ? 'bg-citrus-cream/50 border-citrus-sage/10 opacity-70'
                                   : picked
-                                    ? 'bg-citrus-sage/10 border-citrus-sage/30'
-                                    : 'bg-white/60 border-transparent hover:border-citrus-sage/20'
+                                    ? 'bg-citrus-sage/10 border-citrus-sage/30 shadow-sm'
+                                    : 'bg-white/60 border-transparent hover:border-citrus-sage/20 hover:shadow-sm'
                               } ${isPostponed ? 'line-through opacity-40' : ''}`}
                             >
                               {/* Away team */}
