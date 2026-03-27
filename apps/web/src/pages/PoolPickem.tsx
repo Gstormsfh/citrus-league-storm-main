@@ -118,9 +118,9 @@ function TeamSide({
 // ── Game Card ────────────────────────────────────────────────────────
 
 function GameCard({
-  game, gameNumber, totalGames, picked, existingPick, onPick,
+  game, picked, existingPick, onPick,
 }: {
-  game: NHLGame; gameNumber: number; totalGames: number;
+  game: NHLGame;
   picked: string | undefined; existingPick: PickemPick | undefined;
   onPick: (id: string, team: string) => void;
 }) {
@@ -150,7 +150,7 @@ function GameCard({
         'bg-gradient-to-r from-citrus-sage/10 to-citrus-peach/5 text-citrus-forest/70'
       }`}>
         <span className="font-display font-semibold">
-          Game {gameNumber} of {totalGames}
+          {getInfo(game.away_team).fullName.split(' ').slice(0, -1).join(' ')} @ {getInfo(game.home_team).fullName.split(' ').slice(0, -1).join(' ')}
         </span>
         <span className="font-display flex items-center gap-1.5">
           {isFinal ? (
@@ -218,7 +218,7 @@ function GameCard({
 
 const PoolPickem = () => {
   const { user } = useAuth();
-  const { userLeagueState, activeLeagueId } = useLeague();
+  const { userLeagueState, activeLeagueId, activeLeague } = useLeague();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -274,8 +274,12 @@ const PoolPickem = () => {
   const gamesByDate = groupGamesByDate(games);
   const totalGames = games.length;
   const pickedCount = picks.size;
-  const progress = totalGames > 0 ? (pickedCount / totalGames) * 100 : 0;
-  let gameCounter = 0;
+
+  // Respect league's picksPerWeek setting (0 or undefined = all games)
+  const leagueSettings = activeLeague?.settings as Record<string, unknown> | undefined;
+  const picksPerWeek = leagueSettings?.picksPerWeek as number | undefined;
+  const requiredPicks = (picksPerWeek && picksPerWeek > 0) ? Math.min(picksPerWeek, totalGames) : totalGames;
+  const progress = requiredPicks > 0 ? Math.min((pickedCount / requiredPicks) * 100, 100) : 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#D4E8B8] to-[#C8DEB0] relative">
@@ -315,7 +319,7 @@ const PoolPickem = () => {
                 <div className="w-20 h-2 rounded-full bg-slate-200 overflow-hidden">
                   <div className="h-full bg-citrus-sage rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
                 </div>
-                <span className="text-xs font-display font-semibold text-citrus-forest">{pickedCount}/{totalGames}</span>
+                <span className="text-xs font-display font-semibold text-citrus-forest">{pickedCount}/{requiredPicks}</span>
               </div>
             </div>
 
@@ -354,20 +358,15 @@ const PoolPickem = () => {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                          {dateGames.map(game => {
-                            gameCounter++;
-                            return (
-                              <GameCard
-                                key={String(game.id)}
-                                game={game}
-                                gameNumber={gameCounter}
-                                totalGames={totalGames}
-                                picked={picks.get(String(game.id))}
-                                existingPick={existingPicks.find(p => p.game_id === String(game.id))}
-                                onPick={handlePick}
-                              />
-                            );
-                          })}
+                          {dateGames.map(game => (
+                            <GameCard
+                              key={String(game.id)}
+                              game={game}
+                              picked={picks.get(String(game.id))}
+                              existingPick={existingPicks.find(p => p.game_id === String(game.id))}
+                              onPick={handlePick}
+                            />
+                          ))}
                         </div>
                       </div>
                     );
@@ -380,7 +379,7 @@ const PoolPickem = () => {
                         <div className="h-full bg-citrus-sage rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
                       </div>
                       <span className="text-sm font-display text-slate-500">
-                        {pickedCount === 0 ? 'Tap a team to pick' : `${pickedCount} of ${totalGames} picked`}
+                        {pickedCount === 0 ? 'Tap a team to pick' : `${pickedCount} of ${requiredPicks} picked`}
                       </span>
                     </div>
                     <Button onClick={handleSubmitPicks} disabled={pickedCount === 0 || submitting} size="lg" className="font-varsity uppercase">
