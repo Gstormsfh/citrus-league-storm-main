@@ -30,13 +30,43 @@ const MobileBottomNav = () => {
   const leagueType = league?.activeLeagueFormat?.leagueType;
   const isPool = isPoolLeague(leagueType) && !!activeLeagueId;
 
+  // Pool-type-specific mobile tabs
+  const getPoolNavItems = () => {
+    if (!activeLeagueId || !leagueType) return [];
+    const poolRoute = getPoolRoute(leagueType, activeLeagueId);
+    const standingsRoute = getPoolRoute(leagueType, activeLeagueId, 'standings');
+
+    const profileTab = { icon: User, label: user ? 'Profile' : 'Sign In', path: user ? '/profile' : '/auth' };
+
+    switch (leagueType) {
+      case 'pickem':
+        return [
+          { icon: Target, label: 'Picks', path: poolRoute },
+          { icon: BarChart3, label: 'Standings', path: standingsRoute },
+          { icon: Newspaper, label: 'News', path: '/news' },
+          profileTab,
+        ];
+      case 'survivor':
+        return [
+          { icon: Target, label: 'My Pick', path: poolRoute },
+          { icon: BarChart3, label: 'Standings', path: standingsRoute },
+          { icon: Newspaper, label: 'News', path: '/news' },
+          profileTab,
+        ];
+      case 'confidence-pool':
+        return [
+          { icon: Target, label: 'Rank', path: poolRoute },
+          { icon: BarChart3, label: 'Standings', path: standingsRoute },
+          { icon: Newspaper, label: 'News', path: '/news' },
+          profileTab,
+        ];
+      default:
+        return [profileTab];
+    }
+  };
+
   const navItems = isPool
-    ? [
-        { icon: Target, label: 'Picks', path: getPoolRoute(leagueType!, activeLeagueId!) },
-        { icon: BarChart3, label: 'Standings', path: getPoolRoute(leagueType!, activeLeagueId!, 'standings') },
-        { icon: Newspaper, label: 'News', path: '/news' },
-        { icon: User, label: user ? 'Profile' : 'Sign In', path: user ? '/profile' : '/auth' },
-      ]
+    ? getPoolNavItems()
     : [
         { icon: Swords, label: 'Matchup', path: activeLeagueId ? `/matchup/${activeLeagueId}` : '/matchup' },
         { icon: Users, label: 'Roster', path: '/roster' },
