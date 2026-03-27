@@ -152,6 +152,10 @@ const CreateLeague = () => {
   const [picksPerWeek, setPicksPerWeek] = useState("10");
   const [survivorLives, setSurvivorLives] = useState("1");
   const [confidenceMaxPoints, setConfidenceMaxPoints] = useState("10");
+  const [pickDeadline, setPickDeadline] = useState<'per-game' | 'first-game'>('per-game');
+  const [tiebreaker, setTiebreaker] = useState<'none' | 'total-points' | 'most-upsets'>('none');
+  const [allowRepeatTeams, setAllowRepeatTeams] = useState(false);
+  const [poolVisibility, setPoolVisibility] = useState<'private' | 'public'>('private');
 
   // ---- Waiver Settings ----
   const [waiverSettings, setWaiverSettings] = useState({
@@ -338,7 +342,12 @@ const CreateLeague = () => {
           settings.auctionNominationTime = parseInt(auctionNominationTime);
         }
 
-        // Waiver/transaction settings
+        // Waiver/transaction settings (persisted in settings AND dedicated columns)
+        settings.waiver_type = waiverSettings.waiver_type;
+        settings.waiver_process_time = waiverSettings.waiver_process_time;
+        settings.waiver_period_hours = waiverSettings.waiver_period_hours;
+        settings.waiver_game_lock = waiverSettings.waiver_game_lock;
+        settings.allow_trades_during_games = waiverSettings.allow_trades_during_games;
         settings.faabBudget = waiverSettings.faab_budget;
         settings.weeklyAddLimit = parseInt(weeklyAddLimit) || 0;
         settings.seasonAddLimit = parseInt(seasonAddLimit) || 0;
@@ -346,12 +355,16 @@ const CreateLeague = () => {
         // Pool-specific settings — only what this pool type needs
         settings.scoringFormat = 'total-points';
         settings.draftType = 'none';
+        settings.poolVisibility = poolVisibility;
+        settings.pickDeadline = pickDeadline;
+        settings.tiebreaker = tiebreaker;
 
         if (leagueType === 'pickem') {
           settings.pickemFormat = pickemFormat;
           settings.picksPerWeek = parseInt(picksPerWeek);
         } else if (leagueType === 'survivor') {
           settings.survivorLives = parseInt(survivorLives);
+          settings.allowRepeatTeams = allowRepeatTeams;
         } else if (leagueType === 'confidence-pool') {
           settings.picksPerWeek = parseInt(picksPerWeek);
           settings.confidenceMaxPoints = parseInt(confidenceMaxPoints);
@@ -681,14 +694,42 @@ const CreateLeague = () => {
                           <Select value={picksPerWeek} onValueChange={setPicksPerWeek}>
                             <SelectTrigger><SelectValue /></SelectTrigger>
                             <SelectContent>
+                              <SelectItem value="0">All games</SelectItem>
                               <SelectItem value="5">5 games</SelectItem>
                               <SelectItem value="10">10 games</SelectItem>
-                              <SelectItem value="15">15 games (all games)</SelectItem>
+                              <SelectItem value="15">15 games</SelectItem>
                             </SelectContent>
                           </Select>
                           <p className="text-xs text-muted-foreground">
-                            Number of games participants pick each week.
+                            {picksPerWeek === '0' ? 'Pick every game on the schedule each week.' : `Select ${picksPerWeek} games to pick each week.`}
                           </p>
+                        </div>
+                        <div className="space-y-3">
+                          <Label>Pick Deadline</Label>
+                          <Select value={pickDeadline} onValueChange={(v) => setPickDeadline(v as 'per-game' | 'first-game')}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="per-game">Lock at each game's start time</SelectItem>
+                              <SelectItem value="first-game">Lock all picks at first game of the week</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            {pickDeadline === 'per-game'
+                              ? 'Each pick locks when that game starts. Make late picks up until puck drop.'
+                              : 'All picks lock when the first game of the week starts. Plan ahead.'
+                            }
+                          </p>
+                        </div>
+                        <div className="space-y-3">
+                          <Label>Tiebreaker</Label>
+                          <Select value={tiebreaker} onValueChange={(v) => setTiebreaker(v as 'none' | 'total-points' | 'most-upsets')}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">No tiebreaker</SelectItem>
+                              <SelectItem value="total-points">Total combined score prediction</SelectItem>
+                              <SelectItem value="most-upsets">Most upsets picked correctly</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
                     </div>
@@ -715,13 +756,35 @@ const CreateLeague = () => {
                             In classic survivor, one wrong pick eliminates you. Extra lives give second chances.
                           </p>
                         </div>
-                        <div className="space-y-3 flex items-start pt-8">
+                        <div className="space-y-3">
+                          <Label>Pick Deadline</Label>
+                          <Select value={pickDeadline} onValueChange={(v) => setPickDeadline(v as 'per-game' | 'first-game')}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="per-game">Lock at your picked game's start time</SelectItem>
+                              <SelectItem value="first-game">Lock all picks at first game of the week</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-3">
+                          <Label>Team Repeat Rule</Label>
+                          <Select value={allowRepeatTeams ? 'allow' : 'no-repeat'} onValueChange={(v) => setAllowRepeatTeams(v === 'allow')}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="no-repeat">No repeats all season (classic)</SelectItem>
+                              <SelectItem value="allow">Allow repeats after mid-season</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            Classic: once you pick a team, you can never pick them again. Allow repeats: teams reset at mid-season.
+                          </p>
+                        </div>
+                        <div className="space-y-3 flex items-start pt-2">
                           <div className="bg-muted/30 rounded-lg p-4">
                             <div className="flex items-start gap-2">
                               <Info className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
                               <p className="text-sm text-muted-foreground">
-                                Each week, pick one NHL team to win. You cannot pick the same team more than once all season.
-                                Last person standing wins!
+                                Each week, pick one NHL team to win. Last person standing wins!
                               </p>
                             </div>
                           </div>
@@ -742,9 +805,10 @@ const CreateLeague = () => {
                           <Select value={picksPerWeek} onValueChange={setPicksPerWeek}>
                             <SelectTrigger><SelectValue /></SelectTrigger>
                             <SelectContent>
+                              <SelectItem value="0">All games</SelectItem>
                               <SelectItem value="5">5 games</SelectItem>
                               <SelectItem value="10">10 games</SelectItem>
-                              <SelectItem value="15">15 games (all games)</SelectItem>
+                              <SelectItem value="15">15 games</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -758,6 +822,27 @@ const CreateLeague = () => {
                             Assign confidence points 1 through {confidenceMaxPoints} to each pick. Higher confidence = more points if correct.
                             Each value can only be used once per week. This is always equal to your picks per week.
                           </p>
+                        </div>
+                        <div className="space-y-3">
+                          <Label>Pick Deadline</Label>
+                          <Select value={pickDeadline} onValueChange={(v) => setPickDeadline(v as 'per-game' | 'first-game')}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="per-game">Lock at each game's start time</SelectItem>
+                              <SelectItem value="first-game">Lock all picks at first game of the week</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-3">
+                          <Label>Tiebreaker</Label>
+                          <Select value={tiebreaker} onValueChange={(v) => setTiebreaker(v as 'none' | 'total-points' | 'most-upsets')}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">No tiebreaker</SelectItem>
+                              <SelectItem value="total-points">Total combined score prediction</SelectItem>
+                              <SelectItem value="most-upsets">Most upsets picked correctly</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
                     </div>
