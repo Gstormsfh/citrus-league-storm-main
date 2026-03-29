@@ -221,16 +221,33 @@ const PoolPickem = () => {
     const loadData = async () => {
       if (!activeLeagueId || !user) { setLoading(false); return; }
       try {
-        const [wg, up, sd, tr] = await Promise.all([
+        const [wg, up, sd] = await Promise.all([
           PoolService.getWeekGames(currentWeek),
           PoolService.getPickemPicks(activeLeagueId, user.id, currentWeek),
           PoolService.getPickemStandings(activeLeagueId),
-          PoolService.getTeamRecords(),
         ]);
-        setGames(wg || []); setExistingPicks(up); setStandings(sd); setRecords(tr);
+        setGames(wg || []); setExistingPicks(up); setStandings(sd);
         const pm = new Map<string, string>();
         up.forEach(p => pm.set(p.game_id, p.picked_team));
         setPicks(pm);
+
+        // Build team records from all final games across the season
+        // Use the season's worth of games we can get from the schedule
+        try {
+          const { ScheduleService } = await import('@/services/ScheduleService');
+          const seasonStart = new Date('2025-10-01');
+          const today = new Date();
+          const { games: allGames } = await ScheduleService.getGamesForDateRange(seasonStart, today);
+          const recs: Record<string, { w: number; l: number; otl: number }> = {};
+          for (const g of allGames) {
+            if (g.status !== 'final') continue;
+            if (!recs[g.home_team]) recs[g.home_team] = { w: 0, l: 0, otl: 0 };
+            if (!recs[g.away_team]) recs[g.away_team] = { w: 0, l: 0, otl: 0 };
+            if (g.home_score > g.away_score) { recs[g.home_team].w++; recs[g.away_team].l++; }
+            else { recs[g.away_team].w++; recs[g.home_team].l++; }
+          }
+          setRecords(recs);
+        } catch { /* records are supplementary, not critical */ }
       } catch (err) { logger.error('[PoolPickem]', err); }
       finally { setLoading(false); }
     };
