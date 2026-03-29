@@ -66,7 +66,7 @@ export const DRAFT_PICK_COLUMNS_SLIM = 'id, player_id, team_id, pick_number';
 // NHL GAMES TABLE COLUMNS
 // ============================================================================
 // Full columns for game display - kept as * since most are needed
-export const NHL_GAME_COLUMNS = 'id, game_id, game_date, game_time, home_team, away_team, home_score, away_score, status, period, period_time, venue, season, game_type';
+export const NHL_GAME_COLUMNS = 'id, game_id, game_date, game_time, home_team, away_team, home_score, away_score, status, period, period_time, venue, season, game_type, moneyline_home, moneyline_away, implied_win_probability_home, implied_win_probability_away';
 
 // Slim version for schedule checks
 export const NHL_GAME_COLUMNS_SLIM = 'game_id, game_date, home_team, away_team, status';

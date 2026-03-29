@@ -17,6 +17,11 @@ export const poolApi = {
     return apiClient.get(`/api/pools/week/${weekNumber}/games`);
   },
 
+  /** Get all NHL team records (W-L-OTL) for the current season. */
+  getTeamRecords() {
+    return apiClient.get<Record<string, { w: number; l: number; otl: number }>>('/api/pools/team-records');
+  },
+
   // ── Pick'em ──────────────────────────────────────────────────────────
 
   /** Submit or update Pick'em picks for a week. */

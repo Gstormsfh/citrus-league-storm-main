@@ -43,9 +43,10 @@ function groupByDate(games: NHLGame[]): Map<string, NHLGame[]> {
 
 // ── The matchup row — single horizontal row per game ─────────────────
 
-function MatchupRow({ game, picked, existingPick, onPick }: {
+function MatchupRow({ game, picked, existingPick, onPick, records }: {
   game: NHLGame; picked?: string; existingPick?: PickemPick;
   onPick: (id: string, team: string) => void;
+  records: Record<string, { w: number; l: number; otl: number }>;
 }) {
   const gid = String(game.id);
   const dt = parseGameTime(game);
@@ -85,7 +86,20 @@ function MatchupRow({ game, picked, existingPick, onPick }: {
           <div className={`font-display font-bold text-sm truncate ${awayWon ? 'text-slate-900' : isFinal ? 'text-slate-400' : 'text-slate-700'}`}>
             {away.name}
           </div>
-          <div className="text-[11px] font-display text-slate-400 truncate">{away.fullName}</div>
+          <div className="flex items-center gap-1.5 text-[11px] font-display text-slate-400">
+            {records[game.away_team] ? (
+              <span className="font-semibold">{records[game.away_team].w}-{records[game.away_team].l}{records[game.away_team].otl ? `-${records[game.away_team].otl}` : ''}</span>
+            ) : (
+              <span className="truncate">{away.fullName}</span>
+            )}
+            {records[game.away_team] && records[game.home_team] && !isFinal && (() => {
+              const aw = records[game.away_team].w; const al = records[game.away_team].l;
+              const hw = records[game.home_team].w; const hl = records[game.home_team].l;
+              const awp = aw / Math.max(aw + al, 1); const hwp = hw / Math.max(hw + hl, 1);
+              const pct = Math.round((awp / Math.max(awp + hwp, 0.01)) * 100);
+              return <span className={`text-[10px] px-1 py-0 rounded font-bold ${pct >= 50 ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400'}`}>{pct}%</span>;
+            })()}
+          </div>
         </div>
         {/* Score for final */}
         {isFinal && (
@@ -151,7 +165,20 @@ function MatchupRow({ game, picked, existingPick, onPick }: {
           <div className={`font-display font-bold text-sm truncate ${homeWon ? 'text-slate-900' : isFinal ? 'text-slate-400' : 'text-slate-700'}`}>
             {home.name}
           </div>
-          <div className="text-[11px] font-display text-slate-400 truncate">{home.fullName}</div>
+          <div className="flex items-center gap-1.5 justify-end text-[11px] font-display text-slate-400">
+            {records[game.home_team] && records[game.away_team] && !isFinal && (() => {
+              const aw = records[game.away_team].w; const al = records[game.away_team].l;
+              const hw = records[game.home_team].w; const hl = records[game.home_team].l;
+              const awp = aw / Math.max(aw + al, 1); const hwp = hw / Math.max(hw + hl, 1);
+              const pct = Math.round((hwp / Math.max(awp + hwp, 0.01)) * 100);
+              return <span className={`text-[10px] px-1 py-0 rounded font-bold ${pct >= 50 ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400'}`}>{pct}%</span>;
+            })()}
+            {records[game.home_team] ? (
+              <span className="font-semibold">{records[game.home_team].w}-{records[game.home_team].l}{records[game.home_team].otl ? `-${records[game.home_team].otl}` : ''}</span>
+            ) : (
+              <span className="truncate">{home.fullName}</span>
+            )}
+          </div>
         </div>
         {isFinal && (
           <span className={`mr-auto font-varsity text-xl shrink-0 ${homeWon ? 'text-slate-900' : 'text-slate-300'}`}>
@@ -187,18 +214,20 @@ const PoolPickem = () => {
   const [picks, setPicks] = useState<Map<string, string>>(new Map());
   const [existingPicks, setExistingPicks] = useState<PickemPick[]>([]);
   const [standings, setStandings] = useState<PickemStanding[]>([]);
+  const [records, setRecords] = useState<Record<string, { w: number; l: number; otl: number }>>({});
   const [activeTab, setActiveTab] = useState('picks');
 
   useEffect(() => {
     const loadData = async () => {
       if (!activeLeagueId || !user) { setLoading(false); return; }
       try {
-        const [wg, up, sd] = await Promise.all([
+        const [wg, up, sd, tr] = await Promise.all([
           PoolService.getWeekGames(currentWeek),
           PoolService.getPickemPicks(activeLeagueId, user.id, currentWeek),
           PoolService.getPickemStandings(activeLeagueId),
+          PoolService.getTeamRecords(),
         ]);
-        setGames(wg || []); setExistingPicks(up); setStandings(sd);
+        setGames(wg || []); setExistingPicks(up); setStandings(sd); setRecords(tr);
         const pm = new Map<string, string>();
         up.forEach(p => pm.set(p.game_id, p.picked_team));
         setPicks(pm);
@@ -317,6 +346,7 @@ const PoolPickem = () => {
                             picked={picks.get(String(game.id))}
                             existingPick={existingPicks.find(p => p.game_id === String(game.id))}
                             onPick={handlePick}
+                            records={records}
                           />
                         ))}
                       </div>

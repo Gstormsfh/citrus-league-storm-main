@@ -90,6 +90,40 @@ poolRoutes.get('/current-week', (c) => {
   return ok(c, { week: service.getCurrentWeek() });
 });
 
+// GET /api/pools/team-records — All NHL team records (W-L-OTL) for the current season
+poolRoutes.get('/team-records', async (c) => {
+  try {
+    const supabase = createUserClient(c.get('userToken'));
+    // Calculate records from completed games: count wins as home and away separately
+    const { data, error } = await supabase.rpc('get_nhl_team_records');
+    if (error) {
+      // Fallback: calculate from nhl_games directly
+      const { data: games } = await supabase
+        .from('nhl_games')
+        .select('home_team, away_team, home_score, away_score, status')
+        .eq('status', 'final')
+        .eq('season', 2025);
+
+      const records: Record<string, { w: number; l: number; otl: number }> = {};
+      for (const g of (games || [])) {
+        if (!records[g.home_team]) records[g.home_team] = { w: 0, l: 0, otl: 0 };
+        if (!records[g.away_team]) records[g.away_team] = { w: 0, l: 0, otl: 0 };
+        if (g.home_score > g.away_score) {
+          records[g.home_team].w++;
+          records[g.away_team].l++;
+        } else {
+          records[g.away_team].w++;
+          records[g.home_team].l++;
+        }
+      }
+      return ok(c, records);
+    }
+    return ok(c, data);
+  } catch (err) {
+    return handleError(c, err, 'Failed to fetch team records');
+  }
+});
+
 // GET /api/pools/week/:weekNumber/games
 poolRoutes.get('/week/:weekNumber/games', async (c) => {
   try {

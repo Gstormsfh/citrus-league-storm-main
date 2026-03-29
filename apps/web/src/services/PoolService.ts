@@ -135,6 +135,16 @@ export class PoolService {
     return games.filter(g => !isGameLocked(g));
   }
 
+  /** Get all NHL team records for the current season. */
+  static async getTeamRecords(): Promise<Record<string, { w: number; l: number; otl: number }>> {
+    try {
+      const response = await poolApi.getTeamRecords();
+      return (response.data || {}) as Record<string, { w: number; l: number; otl: number }>;
+    } catch {
+      return {};
+    }
+  }
+
   // ── Pick'em Pool ────────────────────────────────────────────────────
 
   static async submitPickemPicks(
