@@ -16,6 +16,7 @@ import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import LoadingScreen from '@/components/LoadingScreen';
 import { logger } from '@/utils/logger';
 import { getTeamInfo } from '@/types/captracker';
+import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 
 function getInfo(a: string) {
   return getTeamInfo(a) || { abbrev: a, name: a, fullName: a, primaryColor: '#666', secondaryColor: '#999' };
@@ -99,11 +100,17 @@ function MatchupRow({ game, picked, existingPick, onPick, records, seasonGames }
         'bg-slate-50 text-slate-400'
       }`}>
         <span className="truncate">
-          {game.venue || `${home.fullName}`}
-          {h2h.length > 0 && !isFinal && (
-            <span className="ml-2 font-semibold text-slate-500">
-              Season Series: {awayH2HWins}-{homeH2HWins}
-            </span>
+          {game.venue || home.fullName}
+          {!isFinal && (
+            h2h.length > 0 ? (
+              <span className="ml-2 font-semibold text-slate-500">
+                Season Series: {awayH2HWins}-{homeH2HWins}
+              </span>
+            ) : (
+              <span className="ml-2 font-semibold text-amber-600">
+                ★ First Meeting
+              </span>
+            )
           )}
         </span>
         <span className="font-semibold shrink-0 ml-2">
@@ -143,21 +150,6 @@ function MatchupRow({ game, picked, existingPick, onPick, records, seasonGames }
               {ar ? <span className="font-semibold">{ar.w}-{ar.l}{ar.otl ? `-${ar.otl}` : ''}</span> : away.fullName}
             </div>
           </div>
-          {/* Win probability — LARGE */}
-          {!isFinal && !isLive && ar && hr && (
-            <div className={`text-right shrink-0 mr-1 ${awayPct >= 50 ? 'text-emerald-600' : 'text-slate-400'}`}>
-              <div className="text-lg font-varsity font-black leading-none">{awayPct}%</div>
-              <div className="text-[9px] font-display uppercase tracking-wider">{awayPct >= 50 ? 'Fav' : ''}</div>
-            </div>
-          )}
-          {isFinal && (
-            <span className={`font-varsity text-2xl shrink-0 ml-auto ${awayWon ? 'text-slate-900' : 'text-slate-300'}`}>
-              {game.away_score}
-            </span>
-          )}
-          {isLive && (
-            <span className="font-varsity text-xl shrink-0 ml-auto text-red-600">{game.away_score}</span>
-          )}
           {pickedAway && !isFinal && !isLive && (
             <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ background: away.primaryColor }}>
               <Check className="w-3.5 h-3.5 text-white" />
@@ -171,9 +163,35 @@ function MatchupRow({ game, picked, existingPick, onPick, records, seasonGames }
           )}
         </button>
 
-        {/* Center divider */}
-        <div className="flex items-center justify-center w-8 bg-slate-50/80 shrink-0 border-x border-slate-100">
-          <span className="text-[9px] font-display text-slate-300 font-bold">@</span>
+        {/* Center — odds side by side, perfectly aligned */}
+        <div className="flex items-center justify-center shrink-0 bg-slate-50/80 border-x border-slate-100 px-1">
+          {!isFinal && !isLive && ar && hr ? (
+            <div className="flex items-center gap-0.5">
+              <div className={`w-12 text-right font-varsity font-black text-base leading-none ${awayPct >= 50 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                {awayPct}%
+              </div>
+              <div className="flex flex-col items-center w-4">
+                <span className="text-[7px] text-slate-300">•</span>
+              </div>
+              <div className={`w-12 text-left font-varsity font-black text-base leading-none ${homePct >= 50 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                {homePct}%
+              </div>
+            </div>
+          ) : isFinal ? (
+            <div className="flex items-center gap-1 px-1">
+              <span className={`font-varsity text-lg ${awayWon ? 'text-slate-900 font-black' : 'text-slate-300'}`}>{game.away_score}</span>
+              <span className="text-[8px] text-slate-300">-</span>
+              <span className={`font-varsity text-lg ${homeWon ? 'text-slate-900 font-black' : 'text-slate-300'}`}>{game.home_score}</span>
+            </div>
+          ) : isLive ? (
+            <div className="flex items-center gap-1 px-1">
+              <span className="font-varsity text-lg text-red-600">{game.away_score}</span>
+              <span className="text-[8px] text-red-300">-</span>
+              <span className="font-varsity text-lg text-red-600">{game.home_score}</span>
+            </div>
+          ) : (
+            <span className="text-[9px] font-display text-slate-300 font-bold px-2">@</span>
+          )}
         </div>
 
         {/* Home team */}
@@ -200,20 +218,6 @@ function MatchupRow({ game, picked, existingPick, onPick, records, seasonGames }
               {hr ? <span className="font-semibold">{hr.w}-{hr.l}{hr.otl ? `-${hr.otl}` : ''}</span> : home.fullName}
             </div>
           </div>
-          {!isFinal && !isLive && ar && hr && (
-            <div className={`text-left shrink-0 ml-1 ${homePct >= 50 ? 'text-emerald-600' : 'text-slate-400'}`}>
-              <div className="text-lg font-varsity font-black leading-none">{homePct}%</div>
-              <div className="text-[9px] font-display uppercase tracking-wider">{homePct >= 50 ? 'Fav' : ''}</div>
-            </div>
-          )}
-          {isFinal && (
-            <span className={`font-varsity text-2xl shrink-0 mr-auto ${homeWon ? 'text-slate-900' : 'text-slate-300'}`}>
-              {game.home_score}
-            </span>
-          )}
-          {isLive && (
-            <span className="font-varsity text-xl shrink-0 mr-auto text-red-600">{game.home_score}</span>
-          )}
           {pickedHome && !isFinal && !isLive && (
             <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ background: home.primaryColor }}>
               <Check className="w-3.5 h-3.5 text-white" />
@@ -321,7 +325,9 @@ const PoolPickem = () => {
       </div>
 
       <main className="w-full pt-16 lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
-        <div className="max-w-4xl mx-auto px-3 sm:px-4 lg:px-6">
+        <div className="flex gap-6 px-3 sm:px-4 lg:px-6 max-w-7xl mx-auto">
+        {/* Main picks column */}
+        <div className="flex-1 min-w-0">
           {userLeagueState === 'logged-in-no-league' && (
             <div className="mb-8">
               <LeagueCreationCTA title="Join a Pick'em Pool" description="Predict NHL game winners each week." />
@@ -467,6 +473,16 @@ const PoolPickem = () => {
               </CardContent>
             </Card>
           )}
+        </div>
+
+        {/* Chat sidebar — desktop only */}
+        {activeLeagueId && (
+          <div className="hidden xl:block w-80 shrink-0">
+            <div className="sticky top-24">
+              <LeagueNotifications leagueId={activeLeagueId} />
+            </div>
+          </div>
+        )}
         </div>
       </main>
       <div className="hidden lg:block"><Footer /></div>
