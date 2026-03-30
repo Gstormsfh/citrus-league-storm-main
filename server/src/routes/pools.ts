@@ -341,4 +341,95 @@ poolRoutes.post('/confidence/:leagueId/score', membershipMiddleware, validateBod
   }
 });
 
+// ── Commissioner: Declare Pool Winner ─────────────────────────────
+
+poolRoutes.post('/:leagueId/declare-winner', async (c) => {
+  try {
+    const leagueId = c.req.param('leagueId');
+    const userId = c.get('userId');
+    const body = await c.req.json();
+    const winnerId = body.winnerId;
+    if (!winnerId) {
+      return c.json({ error: { code: 'BAD_REQUEST', message: 'winnerId is required' } }, 400);
+    }
+    const supabase = createUserClient(c.get('userToken'));
+
+    // Verify commissioner
+    const { data: league } = await supabase
+      .from('leagues')
+      .select('commissioner_id')
+      .eq('id', leagueId)
+      .single();
+    if (!league || league.commissioner_id !== userId) {
+      return c.json({ error: { code: 'FORBIDDEN', message: 'Only the commissioner can declare a winner' } }, 403);
+    }
+
+    const { error } = await supabase
+      .from('leagues')
+      .update({
+        pool_status: 'completed',
+        pool_winner_id: winnerId,
+        pool_winner_declared_at: new Date().toISOString(),
+      })
+      .eq('id', leagueId);
+
+    if (error) throw error;
+    return ok(c, { success: true, winnerId });
+  } catch (err) {
+    return handleError(c, err, 'Failed to declare winner');
+  }
+});
+
+// ── Weekly Standings (all pool types) ─────────────────────────────
+
+poolRoutes.get('/pickem/:leagueId/standings/weekly', async (c) => {
+  try {
+    const leagueId = c.req.param('leagueId');
+    const weekNumber = parseInt(c.req.query('week') || '0', 10);
+    const supabase = createUserClient(c.get('userToken'));
+
+    const query = supabase
+      .from('pool_picks')
+      .select('user_id, is_correct')
+      .eq('league_id', leagueId);
+
+    if (weekNumber > 0) {
+      query.eq('week_number', weekNumber);
+    }
+
+    const { data: picks, error } = await query;
+    if (error) throw error;
+
+    // Aggregate by user
+    const map = new Map<string, { correct: number; total: number }>();
+    for (const p of (picks ?? [])) {
+      if (!map.has(p.user_id)) map.set(p.user_id, { correct: 0, total: 0 });
+      const e = map.get(p.user_id)!;
+      e.total++;
+      if (p.is_correct === true) e.correct++;
+    }
+
+    // Get display names
+    const userIds = [...map.keys()];
+    const { data: profiles } = userIds.length > 0
+      ? await supabase.from('profiles').select('id, username, first_name, last_name').in('id', userIds)
+      : { data: [] };
+    const nameMap = new Map((profiles ?? []).map((p: any) => [p.id, p.username || [p.first_name, p.last_name].filter(Boolean).join(' ') || 'Unknown']));
+
+    const standings = [...map.entries()]
+      .map(([uid, stats]) => ({
+        user_id: uid,
+        display_name: nameMap.get(uid) || 'Unknown',
+        correct_picks: stats.correct,
+        total_picks: stats.total,
+        accuracy: stats.total > 0 ? (stats.correct / stats.total) * 100 : 0,
+      }))
+      .sort((a, b) => b.correct_picks - a.correct_picks || b.accuracy - a.accuracy);
+
+    return ok(c, standings);
+  } catch (err) {
+    return handleError(c, err, 'Failed to fetch weekly standings');
+  }
+});
+
 export { poolRoutes };

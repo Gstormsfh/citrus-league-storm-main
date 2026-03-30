@@ -559,13 +559,17 @@ export class PoolService {
 
     if (error) throw AppError.internal(error.message);
 
-    const map = new Map<string, { totalPoints: number; possiblePoints: number; weeks: Set<number> }>();
+    const currentWeek = this.getCurrentWeek();
+    const map = new Map<string, { totalPoints: number; possiblePoints: number; weeks: Set<number>; currentWeekPoints: number }>();
     for (const p of (picks ?? [])) {
-      if (!map.has(p.user_id)) map.set(p.user_id, { totalPoints: 0, possiblePoints: 0, weeks: new Set() });
+      if (!map.has(p.user_id)) map.set(p.user_id, { totalPoints: 0, possiblePoints: 0, weeks: new Set(), currentWeekPoints: 0 });
       const entry = map.get(p.user_id)!;
       entry.totalPoints += p.points_earned ?? 0;
       entry.possiblePoints += p.confidence_points;
       entry.weeks.add(p.week_number);
+      if (p.week_number === currentWeek) {
+        entry.currentWeekPoints += p.points_earned ?? 0;
+      }
     }
 
     const userIds = [...map.keys()];
@@ -580,7 +584,7 @@ export class PoolService {
         display_name: nameMap.get(uid) || 'Unknown',
         total_points: stats.totalPoints,
         possible_points: stats.possiblePoints,
-        current_week_points: 0,
+        current_week_points: stats.currentWeekPoints,
         weeks_played: stats.weeks.size,
       }))
       .sort((a, b) => {
