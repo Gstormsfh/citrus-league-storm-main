@@ -47,6 +47,7 @@ function MatchupRow({ game, picked, existingPick, onPick, records }: {
   game: NHLGame; picked?: string; existingPick?: PickemPick;
   onPick: (id: string, team: string) => void;
   records: Record<string, { w: number; l: number; otl: number }>;
+  seasonGames: NHLGame[]; // all season games for head-to-head calc
 }) {
   const gid = String(game.id);
   const dt = parseGameTime(game);
@@ -60,143 +61,172 @@ function MatchupRow({ game, picked, existingPick, onPick, records }: {
   const pickedAway = picked === game.away_team;
   const pickedHome = picked === game.home_team;
 
+  // Calculate win probabilities from records
+  const ar = records[game.away_team];
+  const hr = records[game.home_team];
+  let awayPct = 50, homePct = 50;
+  if (ar && hr) {
+    const awp = ar.w / Math.max(ar.w + ar.l, 1);
+    const hwp = hr.w / Math.max(hr.w + hr.l, 1);
+    awayPct = Math.round((awp / Math.max(awp + hwp, 0.01)) * 100);
+    homePct = 100 - awayPct;
+  }
+
+  // Season series between these two teams
+  const h2h = seasonGames.filter(g =>
+    g.status === 'final' &&
+    ((g.home_team === game.home_team && g.away_team === game.away_team) ||
+     (g.home_team === game.away_team && g.away_team === game.home_team))
+  );
+  const awayH2HWins = h2h.filter(g =>
+    (g.home_team === game.away_team && g.home_score > g.away_score) ||
+    (g.away_team === game.away_team && g.away_score > g.home_score)
+  ).length;
+  const homeH2HWins = h2h.filter(g =>
+    (g.home_team === game.home_team && g.home_score > g.away_score) ||
+    (g.away_team === game.home_team && g.away_score > g.home_score)
+  ).length;
+
   return (
-    <div className={`flex items-center rounded-xl transition-all duration-150 ${
+    <div className={`rounded-xl overflow-hidden transition-all duration-150 ${
       locked && !isLive ? 'opacity-60' : ''
-    } ${picked ? 'bg-white shadow-sm' : 'bg-white/70 hover:bg-white hover:shadow-sm'}`}>
+    } ${picked ? 'bg-white shadow-md' : 'bg-white/70 hover:bg-white hover:shadow-md'}`}>
 
-      {/* Away team button */}
-      <button
-        className={`flex items-center gap-3 flex-1 py-3 pl-4 pr-3 rounded-l-xl transition-all ${
-          locked ? 'cursor-default' : 'cursor-pointer'
-        } ${pickedAway ? '' : picked ? 'opacity-40' : ''}`}
-        style={pickedAway ? { background: `${away.primaryColor}12` } : {}}
-        onClick={() => !locked && onPick(gid, game.away_team)}
-        disabled={!!locked}
-      >
-        {/* Team color bar */}
-        <div className="w-1 h-10 rounded-full shrink-0" style={{ background: away.primaryColor }} />
-        {/* Team badge */}
-        <div className="w-9 h-9 rounded-lg flex items-center justify-center font-varsity font-black text-white text-[11px] shrink-0 shadow-sm"
-          style={{ background: away.primaryColor }}>
-          {game.away_team}
-        </div>
-        {/* Team info */}
-        <div className="min-w-0 text-left">
-          <div className={`font-display font-bold text-sm truncate ${awayWon ? 'text-slate-900' : isFinal ? 'text-slate-400' : 'text-slate-700'}`}>
-            {away.name}
-          </div>
-          <div className="flex items-center gap-1.5 text-[11px] font-display text-slate-400">
-            {records[game.away_team] ? (
-              <span className="font-semibold">{records[game.away_team].w}-{records[game.away_team].l}{records[game.away_team].otl ? `-${records[game.away_team].otl}` : ''}</span>
-            ) : (
-              <span className="truncate">{away.fullName}</span>
-            )}
-            {records[game.away_team] && records[game.home_team] && !isFinal && (() => {
-              const aw = records[game.away_team].w; const al = records[game.away_team].l;
-              const hw = records[game.home_team].w; const hl = records[game.home_team].l;
-              const awp = aw / Math.max(aw + al, 1); const hwp = hw / Math.max(hw + hl, 1);
-              const pct = Math.round((awp / Math.max(awp + hwp, 0.01)) * 100);
-              return <span className={`text-[10px] px-1 py-0 rounded font-bold ${pct >= 50 ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400'}`}>{pct}%</span>;
-            })()}
-          </div>
-        </div>
-        {/* Score for final */}
-        {isFinal && (
-          <span className={`ml-auto font-varsity text-xl shrink-0 ${awayWon ? 'text-slate-900' : 'text-slate-300'}`}>
-            {game.away_score}
-          </span>
-        )}
-        {/* Pick indicators */}
-        {pickedAway && !isFinal && (
-          <div className="ml-auto w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ background: away.primaryColor }}>
-            <Check className="w-3.5 h-3.5 text-white" />
-          </div>
-        )}
-        {existingPick?.picked_team === game.away_team && existingPick.is_correct === true && (
-          <CheckCircle2 className="ml-auto w-5 h-5 text-emerald-500 shrink-0" />
-        )}
-        {existingPick?.picked_team === game.away_team && existingPick.is_correct === false && (
-          <XCircle className="ml-auto w-5 h-5 text-red-500 shrink-0" />
-        )}
-      </button>
-
-      {/* Center — time / score / status */}
-      <div className={`flex flex-col items-center justify-center w-20 sm:w-24 py-2 shrink-0 border-x ${
-        isLive ? 'bg-red-50 border-red-100' : 'bg-slate-50/50 border-slate-100'
+      {/* Top bar — venue, h2h, time */}
+      <div className={`flex items-center justify-between px-4 py-1.5 text-[11px] font-display ${
+        isFinal ? 'bg-slate-100 text-slate-400' :
+        isLive ? 'bg-red-50 text-red-500' :
+        'bg-slate-50 text-slate-400'
       }`}>
-        {isFinal ? (
-          <>
-            <span className="text-[9px] font-display font-bold text-slate-400 uppercase">Final</span>
-            <span className="font-varsity text-sm text-slate-500">{game.away_score} - {game.home_score}</span>
-          </>
-        ) : isLive ? (
-          <>
-            <span className="flex items-center gap-1 text-[9px] font-display font-bold text-red-500 uppercase">
+        <span className="truncate">
+          {game.venue || `${home.fullName}`}
+          {h2h.length > 0 && !isFinal && (
+            <span className="ml-2 font-semibold text-slate-500">
+              Season Series: {awayH2HWins}-{homeH2HWins}
+            </span>
+          )}
+        </span>
+        <span className="font-semibold shrink-0 ml-2">
+          {isFinal ? 'Final' : isLive ? (
+            <span className="flex items-center gap-1 text-red-500">
               <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" /> Live
             </span>
-            <span className="font-varsity text-sm text-red-600">{game.away_score} - {game.home_score}</span>
-          </>
-        ) : locked ? (
-          <Lock className="w-4 h-4 text-slate-300" />
-        ) : (
-          <>
-            <span className="text-xs font-display font-semibold text-slate-600">{fmtTime(game)}</span>
-            <span className="text-[9px] font-display text-slate-300 uppercase">vs</span>
-          </>
-        )}
+          ) : locked ? (
+            <span className="flex items-center gap-1"><Lock className="w-3 h-3" /> Locked</span>
+          ) : fmtTime(game)}
+        </span>
       </div>
 
-      {/* Home team button */}
-      <button
-        className={`flex items-center gap-3 flex-1 py-3 pr-4 pl-3 rounded-r-xl transition-all flex-row-reverse ${
-          locked ? 'cursor-default' : 'cursor-pointer'
-        } ${pickedHome ? '' : picked ? 'opacity-40' : ''}`}
-        style={pickedHome ? { background: `${home.primaryColor}12` } : {}}
-        onClick={() => !locked && onPick(gid, game.home_team)}
-        disabled={!!locked}
-      >
-        <div className="w-1 h-10 rounded-full shrink-0" style={{ background: home.primaryColor }} />
-        <div className="w-9 h-9 rounded-lg flex items-center justify-center font-varsity font-black text-white text-[11px] shrink-0 shadow-sm"
-          style={{ background: home.primaryColor }}>
-          {game.home_team}
+      {/* Matchup row */}
+      <div className="flex items-stretch">
+        {/* Away team */}
+        <button
+          className={`flex items-center gap-2.5 flex-1 py-3 pl-3 pr-2 transition-all ${
+            locked ? 'cursor-default' : 'cursor-pointer'
+          } ${pickedAway ? '' : picked ? 'opacity-35' : ''}`}
+          style={{
+            borderLeft: `4px solid ${away.primaryColor}`,
+            background: pickedAway ? `${away.primaryColor}12` : undefined,
+          }}
+          onClick={() => !locked && onPick(gid, game.away_team)}
+          disabled={!!locked}
+        >
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center font-varsity font-black text-white text-xs shrink-0 shadow-sm"
+            style={{ background: away.primaryColor }}>
+            {game.away_team}
+          </div>
+          <div className="min-w-0 text-left flex-1">
+            <div className={`font-display font-bold text-sm truncate ${awayWon ? 'text-slate-900' : isFinal ? 'text-slate-400' : 'text-slate-700'}`}>
+              {away.name}
+            </div>
+            <div className="text-[11px] font-display text-slate-400">
+              {ar ? <span className="font-semibold">{ar.w}-{ar.l}{ar.otl ? `-${ar.otl}` : ''}</span> : away.fullName}
+            </div>
+          </div>
+          {/* Win probability — LARGE */}
+          {!isFinal && !isLive && ar && hr && (
+            <div className={`text-right shrink-0 mr-1 ${awayPct >= 50 ? 'text-emerald-600' : 'text-slate-400'}`}>
+              <div className="text-lg font-varsity font-black leading-none">{awayPct}%</div>
+              <div className="text-[9px] font-display uppercase tracking-wider">{awayPct >= 50 ? 'Fav' : ''}</div>
+            </div>
+          )}
+          {isFinal && (
+            <span className={`font-varsity text-2xl shrink-0 ml-auto ${awayWon ? 'text-slate-900' : 'text-slate-300'}`}>
+              {game.away_score}
+            </span>
+          )}
+          {isLive && (
+            <span className="font-varsity text-xl shrink-0 ml-auto text-red-600">{game.away_score}</span>
+          )}
+          {pickedAway && !isFinal && !isLive && (
+            <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ background: away.primaryColor }}>
+              <Check className="w-3.5 h-3.5 text-white" />
+            </div>
+          )}
+          {existingPick?.picked_team === game.away_team && existingPick.is_correct === true && (
+            <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+          )}
+          {existingPick?.picked_team === game.away_team && existingPick.is_correct === false && (
+            <XCircle className="w-5 h-5 text-red-500 shrink-0" />
+          )}
+        </button>
+
+        {/* Center divider */}
+        <div className="flex items-center justify-center w-8 bg-slate-50/80 shrink-0 border-x border-slate-100">
+          <span className="text-[9px] font-display text-slate-300 font-bold">@</span>
         </div>
-        <div className="min-w-0 text-right">
-          <div className={`font-display font-bold text-sm truncate ${homeWon ? 'text-slate-900' : isFinal ? 'text-slate-400' : 'text-slate-700'}`}>
-            {home.name}
+
+        {/* Home team */}
+        <button
+          className={`flex items-center gap-2.5 flex-1 py-3 pr-3 pl-2 transition-all flex-row-reverse ${
+            locked ? 'cursor-default' : 'cursor-pointer'
+          } ${pickedHome ? '' : picked ? 'opacity-35' : ''}`}
+          style={{
+            borderRight: `4px solid ${home.primaryColor}`,
+            background: pickedHome ? `${home.primaryColor}12` : undefined,
+          }}
+          onClick={() => !locked && onPick(gid, game.home_team)}
+          disabled={!!locked}
+        >
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center font-varsity font-black text-white text-xs shrink-0 shadow-sm"
+            style={{ background: home.primaryColor }}>
+            {game.home_team}
           </div>
-          <div className="flex items-center gap-1.5 justify-end text-[11px] font-display text-slate-400">
-            {records[game.home_team] && records[game.away_team] && !isFinal && (() => {
-              const aw = records[game.away_team].w; const al = records[game.away_team].l;
-              const hw = records[game.home_team].w; const hl = records[game.home_team].l;
-              const awp = aw / Math.max(aw + al, 1); const hwp = hw / Math.max(hw + hl, 1);
-              const pct = Math.round((hwp / Math.max(awp + hwp, 0.01)) * 100);
-              return <span className={`text-[10px] px-1 py-0 rounded font-bold ${pct >= 50 ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400'}`}>{pct}%</span>;
-            })()}
-            {records[game.home_team] ? (
-              <span className="font-semibold">{records[game.home_team].w}-{records[game.home_team].l}{records[game.home_team].otl ? `-${records[game.home_team].otl}` : ''}</span>
-            ) : (
-              <span className="truncate">{home.fullName}</span>
-            )}
+          <div className="min-w-0 text-right flex-1">
+            <div className={`font-display font-bold text-sm truncate ${homeWon ? 'text-slate-900' : isFinal ? 'text-slate-400' : 'text-slate-700'}`}>
+              {home.name}
+            </div>
+            <div className="text-[11px] font-display text-slate-400">
+              {hr ? <span className="font-semibold">{hr.w}-{hr.l}{hr.otl ? `-${hr.otl}` : ''}</span> : home.fullName}
+            </div>
           </div>
-        </div>
-        {isFinal && (
-          <span className={`mr-auto font-varsity text-xl shrink-0 ${homeWon ? 'text-slate-900' : 'text-slate-300'}`}>
-            {game.home_score}
-          </span>
-        )}
-        {pickedHome && !isFinal && (
-          <div className="mr-auto w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ background: home.primaryColor }}>
-            <Check className="w-3.5 h-3.5 text-white" />
-          </div>
-        )}
-        {existingPick?.picked_team === game.home_team && existingPick.is_correct === true && (
-          <CheckCircle2 className="mr-auto w-5 h-5 text-emerald-500 shrink-0" />
-        )}
-        {existingPick?.picked_team === game.home_team && existingPick.is_correct === false && (
-          <XCircle className="mr-auto w-5 h-5 text-red-500 shrink-0" />
-        )}
-      </button>
+          {!isFinal && !isLive && ar && hr && (
+            <div className={`text-left shrink-0 ml-1 ${homePct >= 50 ? 'text-emerald-600' : 'text-slate-400'}`}>
+              <div className="text-lg font-varsity font-black leading-none">{homePct}%</div>
+              <div className="text-[9px] font-display uppercase tracking-wider">{homePct >= 50 ? 'Fav' : ''}</div>
+            </div>
+          )}
+          {isFinal && (
+            <span className={`font-varsity text-2xl shrink-0 mr-auto ${homeWon ? 'text-slate-900' : 'text-slate-300'}`}>
+              {game.home_score}
+            </span>
+          )}
+          {isLive && (
+            <span className="font-varsity text-xl shrink-0 mr-auto text-red-600">{game.home_score}</span>
+          )}
+          {pickedHome && !isFinal && !isLive && (
+            <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ background: home.primaryColor }}>
+              <Check className="w-3.5 h-3.5 text-white" />
+            </div>
+          )}
+          {existingPick?.picked_team === game.home_team && existingPick.is_correct === true && (
+            <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+          )}
+          {existingPick?.picked_team === game.home_team && existingPick.is_correct === false && (
+            <XCircle className="w-5 h-5 text-red-500 shrink-0" />
+          )}
+        </button>
+      </div>
     </div>
   );
 }
@@ -215,6 +245,7 @@ const PoolPickem = () => {
   const [existingPicks, setExistingPicks] = useState<PickemPick[]>([]);
   const [standings, setStandings] = useState<PickemStanding[]>([]);
   const [records, setRecords] = useState<Record<string, { w: number; l: number; otl: number }>>({});
+  const [seasonGames, setSeasonGames] = useState<NHLGame[]>([]);
   const [activeTab, setActiveTab] = useState('picks');
 
   useEffect(() => {
@@ -231,13 +262,13 @@ const PoolPickem = () => {
         up.forEach(p => pm.set(p.game_id, p.picked_team));
         setPicks(pm);
 
-        // Build team records from all final games across the season
-        // Use the season's worth of games we can get from the schedule
+        // Build team records + cache season games for head-to-head
         try {
           const { ScheduleService } = await import('@/services/ScheduleService');
           const seasonStart = new Date('2025-10-01');
           const today = new Date();
           const { games: allGames } = await ScheduleService.getGamesForDateRange(seasonStart, today);
+          setSeasonGames(allGames);
           const recs: Record<string, { w: number; l: number; otl: number }> = {};
           for (const g of allGames) {
             if (g.status !== 'final') continue;
@@ -247,7 +278,7 @@ const PoolPickem = () => {
             else { recs[g.away_team].w++; recs[g.home_team].l++; }
           }
           setRecords(recs);
-        } catch { /* records are supplementary, not critical */ }
+        } catch { /* records are supplementary */ }
       } catch (err) { logger.error('[PoolPickem]', err); }
       finally { setLoading(false); }
     };
@@ -364,6 +395,7 @@ const PoolPickem = () => {
                             existingPick={existingPicks.find(p => p.game_id === String(game.id))}
                             onPick={handlePick}
                             records={records}
+                            seasonGames={seasonGames}
                           />
                         ))}
                       </div>
