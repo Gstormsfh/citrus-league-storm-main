@@ -43,7 +43,7 @@ function groupByDate(games: NHLGame[]): Map<string, NHLGame[]> {
 
 // ── The matchup row — single horizontal row per game ─────────────────
 
-function MatchupRow({ game, picked, existingPick, onPick, records }: {
+function MatchupRow({ game, picked, existingPick, onPick, records, seasonGames }: {
   game: NHLGame; picked?: string; existingPick?: PickemPick;
   onPick: (id: string, team: string) => void;
   records: Record<string, { w: number; l: number; otl: number }>;
