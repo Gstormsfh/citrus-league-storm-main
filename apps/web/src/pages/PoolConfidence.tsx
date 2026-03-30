@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -144,7 +145,8 @@ const PoolConfidence = () => {
       </div>
 
       <main className="w-full pt-16 lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
-        <div className="w-full px-3 sm:px-4 lg:px-6 xl:px-8">
+        <div className="flex gap-6 px-3 sm:px-4 lg:px-6 xl:px-8 max-w-7xl mx-auto">
+        <div className="flex-1 min-w-0">
           {userLeagueState === 'logged-in-no-league' && (
             <div className="mb-8 max-w-3xl mx-auto">
               <LeagueCreationCTA title="Join a Confidence Pool" description="Rank your picks by confidence — earn more points for correct high-confidence picks!" />
@@ -354,6 +356,16 @@ const PoolConfidence = () => {
               </CardContent>
             </Card>
           )}
+        </div>
+
+        {/* Chat sidebar */}
+        {activeLeagueId && (
+          <div className="hidden lg:block w-80 xl:w-96 shrink-0">
+            <div className="sticky top-24 h-[calc(100vh-7rem)] flex flex-col">
+              <LeagueNotifications leagueId={activeLeagueId} />
+            </div>
+          </div>
+        )}
         </div>
       </main>
       <div className="hidden lg:block"><Footer /></div>
