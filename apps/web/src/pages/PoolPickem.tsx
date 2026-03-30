@@ -188,34 +188,32 @@ function MatchupRow({ game, picked, existingPick, onPick, records, seasonGames }
           )}
         </button>
 
-        {/* Center — odds side by side, perfectly aligned */}
-        <div className="flex items-center justify-center shrink-0 bg-slate-50/80 border-x border-slate-100 px-1">
+        {/* Center — odds or score, perfectly aligned */}
+        <div className="flex items-center justify-center shrink-0 bg-slate-50/60 border-x border-slate-100 w-32 sm:w-36">
           {!isFinal && !isLive && ar && hr ? (
-            <div className="flex items-center gap-0.5">
-              <div className={`w-12 text-right font-varsity font-black text-base leading-none ${awayPct >= 50 ? 'text-emerald-600' : 'text-slate-400'}`}>
+            <div className="flex items-center">
+              <div className={`w-14 text-right font-varsity font-black text-lg leading-none ${awayPct >= 50 ? 'text-emerald-600' : 'text-slate-400'}`}>
                 {awayPct}%
               </div>
-              <div className="flex flex-col items-center w-4">
-                <span className="text-[7px] text-slate-300">•</span>
-              </div>
-              <div className={`w-12 text-left font-varsity font-black text-base leading-none ${homePct >= 50 ? 'text-emerald-600' : 'text-slate-400'}`}>
+              <div className="w-4 text-center text-slate-200 text-xs">vs</div>
+              <div className={`w-14 text-left font-varsity font-black text-lg leading-none ${homePct >= 50 ? 'text-emerald-600' : 'text-slate-400'}`}>
                 {homePct}%
               </div>
             </div>
           ) : isFinal ? (
-            <div className="flex items-center gap-1 px-1">
-              <span className={`font-varsity text-lg ${awayWon ? 'text-slate-900 font-black' : 'text-slate-300'}`}>{game.away_score}</span>
-              <span className="text-[8px] text-slate-300">-</span>
-              <span className={`font-varsity text-lg ${homeWon ? 'text-slate-900 font-black' : 'text-slate-300'}`}>{game.home_score}</span>
+            <div className="flex items-center">
+              <span className={`w-10 text-right font-varsity text-2xl ${awayWon ? 'text-slate-900 font-black' : 'text-slate-300'}`}>{game.away_score}</span>
+              <span className="w-4 text-center text-xs text-slate-300">–</span>
+              <span className={`w-10 text-left font-varsity text-2xl ${homeWon ? 'text-slate-900 font-black' : 'text-slate-300'}`}>{game.home_score}</span>
             </div>
           ) : isLive ? (
-            <div className="flex items-center gap-1 px-1">
-              <span className="font-varsity text-lg text-red-600">{game.away_score}</span>
-              <span className="text-[8px] text-red-300">-</span>
-              <span className="font-varsity text-lg text-red-600">{game.home_score}</span>
+            <div className="flex items-center">
+              <span className="w-10 text-right font-varsity text-2xl text-red-600 font-black">{game.away_score}</span>
+              <span className="w-4 text-center text-xs text-red-300">–</span>
+              <span className="w-10 text-left font-varsity text-2xl text-red-600 font-black">{game.home_score}</span>
             </div>
           ) : (
-            <span className="text-[9px] font-display text-slate-300 font-bold px-2">@</span>
+            <span className="text-xs font-display text-slate-300 font-bold">@</span>
           )}
         </div>
 
@@ -510,8 +508,8 @@ const PoolPickem = () => {
 
         {/* Chat sidebar — desktop only */}
         {activeLeagueId && (
-          <div className="hidden xl:block w-80 shrink-0">
-            <div className="sticky top-24">
+          <div className="hidden lg:block w-80 xl:w-96 shrink-0">
+            <div className="sticky top-24 h-[calc(100vh-7rem)] flex flex-col">
               <LeagueNotifications leagueId={activeLeagueId} />
             </div>
           </div>
