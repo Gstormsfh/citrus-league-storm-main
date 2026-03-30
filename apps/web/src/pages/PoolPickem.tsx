@@ -99,16 +99,33 @@ function MatchupRow({ game, picked, existingPick, onPick, records, seasonGames }
         isLive ? 'bg-red-50 text-red-500' :
         'bg-slate-50 text-slate-400'
       }`}>
-        <span className="truncate">
+        <span className="truncate flex items-center gap-1.5">
           {game.venue || home.fullName}
           {!isFinal && (
             h2h.length > 0 ? (
-              <span className="ml-2 font-semibold text-slate-500">
-                Season Series: {awayH2HWins}-{homeH2HWins}
+              <span className="inline-flex items-center gap-1 ml-1">
+                <span className="text-slate-300">·</span>
+                <span className="font-bold" style={{ color: awayH2HWins > homeH2HWins ? away.primaryColor : awayH2HWins === homeH2HWins ? '#64748b' : '#94a3b8' }}>
+                  {game.away_team} {awayH2HWins}
+                </span>
+                <span className="text-slate-300">-</span>
+                <span className="font-bold" style={{ color: homeH2HWins > awayH2HWins ? home.primaryColor : homeH2HWins === awayH2HWins ? '#64748b' : '#94a3b8' }}>
+                  {homeH2HWins} {game.home_team}
+                </span>
+                {awayH2HWins !== homeH2HWins && (
+                  <span className="text-[9px] px-1 py-0 rounded font-bold text-white"
+                    style={{ background: awayH2HWins > homeH2HWins ? away.primaryColor : home.primaryColor }}>
+                    {awayH2HWins > homeH2HWins ? game.away_team : game.home_team} leads
+                  </span>
+                )}
+                {awayH2HWins === homeH2HWins && (
+                  <span className="text-[9px] px-1 py-0 rounded bg-slate-200 text-slate-500 font-bold">Tied</span>
+                )}
               </span>
             ) : (
-              <span className="ml-2 font-semibold text-amber-600">
-                ★ First Meeting
+              <span className="ml-1 inline-flex items-center gap-1">
+                <span className="text-slate-300">·</span>
+                <span className="font-semibold text-amber-600">★ First Meeting This Season</span>
               </span>
             )
           )}
@@ -146,8 +163,16 @@ function MatchupRow({ game, picked, existingPick, onPick, records, seasonGames }
             <div className={`font-display font-bold text-sm truncate ${awayWon ? 'text-slate-900' : isFinal ? 'text-slate-400' : 'text-slate-700'}`}>
               {away.name}
             </div>
-            <div className="text-[11px] font-display text-slate-400">
-              {ar ? <span className="font-semibold">{ar.w}-{ar.l}{ar.otl ? `-${ar.otl}` : ''}</span> : away.fullName}
+            <div className="text-[11px] font-display text-slate-400 flex items-center gap-1">
+              {ar ? (
+                <>
+                  <span className={`font-semibold ${ar.w > ar.l ? 'text-emerald-600' : ar.w < ar.l ? 'text-red-500' : 'text-slate-500'}`}>
+                    {ar.w}-{ar.l}{ar.otl ? `-${ar.otl}` : ''}
+                  </span>
+                  {ar.w > ar.l && <span className="text-[9px] text-emerald-500">▲</span>}
+                  {ar.w < ar.l && <span className="text-[9px] text-red-400">▼</span>}
+                </>
+              ) : <span className="truncate">{away.fullName}</span>}
             </div>
           </div>
           {pickedAway && !isFinal && !isLive && (
@@ -214,8 +239,16 @@ function MatchupRow({ game, picked, existingPick, onPick, records, seasonGames }
             <div className={`font-display font-bold text-sm truncate ${homeWon ? 'text-slate-900' : isFinal ? 'text-slate-400' : 'text-slate-700'}`}>
               {home.name}
             </div>
-            <div className="text-[11px] font-display text-slate-400">
-              {hr ? <span className="font-semibold">{hr.w}-{hr.l}{hr.otl ? `-${hr.otl}` : ''}</span> : home.fullName}
+            <div className="text-[11px] font-display text-slate-400 flex items-center gap-1 justify-end">
+              {hr ? (
+                <>
+                  {hr.w > hr.l && <span className="text-[9px] text-emerald-500">▲</span>}
+                  {hr.w < hr.l && <span className="text-[9px] text-red-400">▼</span>}
+                  <span className={`font-semibold ${hr.w > hr.l ? 'text-emerald-600' : hr.w < hr.l ? 'text-red-500' : 'text-slate-500'}`}>
+                    {hr.w}-{hr.l}{hr.otl ? `-${hr.otl}` : ''}
+                  </span>
+                </>
+              ) : <span className="truncate">{home.fullName}</span>}
             </div>
           </div>
           {pickedHome && !isFinal && !isLive && (
