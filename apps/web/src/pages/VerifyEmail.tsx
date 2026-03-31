@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,15 +8,19 @@ import { Mail, CheckCircle2, Loader2 } from 'lucide-react';
 
 const VerifyEmail = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { resendVerificationEmail, user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const email = user?.email || '';
+
+  // Prefer email from navigation state (set during signup before session exists),
+  // fall back to the authenticated user's email if they're already signed in.
+  const email = (location.state as { email?: string } | null)?.email || user?.email || '';
 
   const handleResend = async () => {
     if (!email) {
-      setError('No email address found. Please sign in again.');
+      setError('No email address found. Please sign up again.');
       return;
     }
 
@@ -40,71 +44,83 @@ const VerifyEmail = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#D4E8B8] p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold flex items-center gap-2">
-            <Mail className="h-6 w-6" />
-            Verify Your Email
-          </CardTitle>
-          <CardDescription>
-            We've sent a verification email to <strong>{email}</strong>
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {success && (
-            <Alert>
-              <CheckCircle2 className="h-4 w-4" />
-              <AlertDescription>
-                Verification email sent! Please check your inbox and click the link to verify your account.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">
-              Click the verification link in the email to activate your account. The link will expire after 24 hours.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Didn't receive the email? Check your spam folder or click below to resend.
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Button
-              onClick={handleResend}
-              disabled={loading || success}
-              className="w-full"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Sending...
-                </>
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-muted/20">
+      <main className="flex-1 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+              <Mail className="h-6 w-6 text-primary" />
+            </div>
+            <CardTitle className="text-2xl font-bold">Check Your Email</CardTitle>
+            <CardDescription>
+              {email ? (
+                <>We've sent a verification link to <strong className="text-foreground">{email}</strong></>
               ) : (
-                <>
-                  <Mail className="mr-2 h-4 w-4" />
-                  Resend Verification Email
-                </>
+                'We\'ve sent you a verification link'
               )}
-            </Button>
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {success && (
+              <Alert>
+                <CheckCircle2 className="h-4 w-4" />
+                <AlertDescription>
+                  Verification email sent! Check your inbox and click the link to verify your account.
+                </AlertDescription>
+              </Alert>
+            )}
 
-            <Button
-              variant="outline"
-              onClick={() => navigate('/auth')}
-              className="w-full"
-            >
-              Back to Sign In
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            <div className="space-y-2 text-center">
+              <p className="text-sm text-muted-foreground">
+                Click the verification link in the email to activate your Citrus Fantasy Sports account. The link expires after 24 hours.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Didn't receive it? Check your spam folder or click below to resend.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Button
+                onClick={handleResend}
+                disabled={loading || success}
+                variant="outline"
+                className="w-full"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Sending...
+                  </>
+                ) : success ? (
+                  <>
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    Email Sent
+                  </>
+                ) : (
+                  <>
+                    <Mail className="mr-2 h-4 w-4" />
+                    Resend Verification Email
+                  </>
+                )}
+              </Button>
+
+              <Button
+                variant="ghost"
+                onClick={() => navigate('/auth')}
+                className="w-full"
+              >
+                Back to Sign In
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </main>
     </div>
   );
 };

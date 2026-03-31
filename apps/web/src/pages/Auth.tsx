@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, Mail, Lock, HelpCircle, Chrome, Apple } from 'lucide-react';
+import { Loader2, Mail, Lock, HelpCircle, Chrome, Apple, CheckCircle2 } from 'lucide-react';
 import { PasswordStrength } from '@/components/auth/PasswordStrength';
 import { Separator } from '@/components/ui/separator';
 
@@ -143,18 +143,13 @@ const Auth = () => {
         UserAccountService.recordConsent('privacy_policy', '2026-01-13');
       }
 
-      // If email confirmation is required (no session), show verify message
+      // If email confirmation is required (no session), navigate to verify page
       if (data?.user && !data?.session) {
-        setError('Please check your email to verify your account, then sign in.');
-        setEmail('');
-        setPassword('');
-        setConfirmPassword('');
-        setLoading(false);
+        navigate('/verify-email', { state: { email }, replace: true });
       } else if (data?.session) {
         // useEffect watching `user` will redirect once auth state is committed
       } else {
-        setError('Account created! Please check your email to verify, then sign in.');
-        setLoading(false);
+        navigate('/verify-email', { state: { email }, replace: true });
       }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.';
