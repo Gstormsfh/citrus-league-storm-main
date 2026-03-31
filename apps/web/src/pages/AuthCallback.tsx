@@ -113,7 +113,7 @@ const AuthCallback = () => {
   }, []);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#D4E8B8] p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted/20 p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
