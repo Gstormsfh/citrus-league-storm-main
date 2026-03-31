@@ -346,8 +346,9 @@ const PoolPickem = () => {
             </div>
           )}
 
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
+          {/* Header — STICKY below navbar */}
+          <div className="sticky top-[92px] z-30 bg-[#D4E8B8]/95 backdrop-blur-sm py-3 mb-4 -mx-3 sm:-mx-4 lg:-mx-8 xl:-mx-12 px-3 sm:px-4 lg:px-8 xl:px-12 border-b border-citrus-sage/15">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex items-center bg-white/80 rounded-xl border border-citrus-sage/20 overflow-hidden">
                 <Button variant="ghost" size="icon" className="h-10 w-10 rounded-none" onClick={() => setCurrentWeek(w => Math.max(1, w - 1))} disabled={currentWeek <= 1}>
@@ -377,6 +378,7 @@ const PoolPickem = () => {
                 <TabsTrigger value="standings">Standings</TabsTrigger>
               </TabsList>
             </Tabs>
+          </div>
           </div>
 
           {/* ── Picks ── */}
