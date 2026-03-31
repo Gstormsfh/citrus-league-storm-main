@@ -93,8 +93,8 @@ const PoolSurvivor = () => {
       </div>
 
       <main className="w-full pt-16 lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
-        <div className="flex gap-6 px-3 sm:px-4 lg:px-6 xl:px-8 max-w-7xl mx-auto">
-        <div className="flex-1 min-w-0">
+        <div className="flex lg:gap-0">
+        <div className="flex-1 min-w-0 px-3 sm:px-4 lg:px-8 xl:px-12">
           {userLeagueState === 'logged-in-no-league' && (
             <div className="mb-8 max-w-3xl mx-auto">
               <LeagueCreationCTA title="Join a Survivor Pool" description="Pick one team to win each week — get it wrong and you're out!" />
@@ -319,10 +319,10 @@ const PoolSurvivor = () => {
           )}
         </div>
 
-        {/* Chat sidebar */}
+        {/* Chat sidebar — pinned to right edge */}
         {activeLeagueId && (
-          <div className="hidden lg:block w-80 xl:w-96 shrink-0">
-            <div className="sticky top-24 h-[calc(100vh-7rem)] flex flex-col">
+          <div className="hidden lg:block w-72 xl:w-80 shrink-0 border-l border-citrus-sage/15 bg-white/40">
+            <div className="sticky top-24 h-[calc(100vh-6rem)] flex flex-col">
               <LeagueNotifications leagueId={activeLeagueId} />
             </div>
           </div>
