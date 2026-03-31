@@ -16,6 +16,7 @@ import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import LoadingScreen from '@/components/LoadingScreen';
 import { logger } from '@/utils/logger';
 import { getTeamInfo, type NHLTeamInfo } from '@/types/captracker';
+import { InvitePlayersButton } from '@/components/InvitePlayersButton';
 
 const NHL_TEAMS = [
   'ANA','BOS','BUF','CGY','CAR','CHI','COL','CBJ','DAL','DET','EDM','FLA',
@@ -29,7 +30,7 @@ function getInfo(abbrev: string): NHLTeamInfo {
 
 const PoolSurvivor = () => {
   const { user } = useAuth();
-  const { userLeagueState, activeLeagueId } = useLeague();
+  const { userLeagueState, activeLeagueId, activeLeague } = useLeague();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -113,13 +114,18 @@ const PoolSurvivor = () => {
               </Button>
               {isEliminated && <Badge variant="destructive" className="ml-2"><Skull className="w-3 h-3 mr-1" /> Eliminated</Badge>}
             </div>
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
-              <TabsList>
-                <TabsTrigger value="pick">My Pick</TabsTrigger>
-                <TabsTrigger value="standings">Standings</TabsTrigger>
-                <TabsTrigger value="history">History</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <div className="flex items-center gap-2">
+              {activeLeague?.join_code && (
+                <InvitePlayersButton joinCode={activeLeague.join_code} leagueName={activeLeague.name} />
+              )}
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
+                <TabsList>
+                  <TabsTrigger value="pick">My Pick</TabsTrigger>
+                  <TabsTrigger value="standings">Standings</TabsTrigger>
+                  <TabsTrigger value="history">History</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
           </div>
 
           {/* ── Pick tab ── */}

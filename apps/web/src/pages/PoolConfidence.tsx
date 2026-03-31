@@ -18,6 +18,7 @@ import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import LoadingScreen from '@/components/LoadingScreen';
 import { logger } from '@/utils/logger';
 import { getTeamInfo, type NHLTeamInfo } from '@/types/captracker';
+import { InvitePlayersButton } from '@/components/InvitePlayersButton';
 
 interface PickWithConfidence {
   game_id: string;
@@ -62,7 +63,7 @@ function TeamMonogram({ abbrev, size = 36 }: { abbrev: string; size?: number }) 
 
 const PoolConfidence = () => {
   const { user } = useAuth();
-  const { userLeagueState, activeLeagueId } = useLeague();
+  const { userLeagueState, activeLeagueId, activeLeague } = useLeague();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -168,12 +169,17 @@ const PoolConfidence = () => {
                 <Badge className="text-xs bg-citrus-forest border-0 text-white">{weekEarned}/{weekPossible} pts</Badge>
               )}
             </div>
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
-              <TabsList>
-                <TabsTrigger value="picks">Rank Picks</TabsTrigger>
-                <TabsTrigger value="standings">Standings</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <div className="flex items-center gap-2">
+              {activeLeague?.join_code && (
+                <InvitePlayersButton joinCode={activeLeague.join_code} leagueName={activeLeague.name} />
+              )}
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
+                <TabsList>
+                  <TabsTrigger value="picks">Rank Picks</TabsTrigger>
+                  <TabsTrigger value="standings">Standings</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
           </div>
 
           {/* ── Picks tab ── */}

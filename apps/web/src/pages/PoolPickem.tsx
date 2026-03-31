@@ -17,6 +17,7 @@ import LoadingScreen from '@/components/LoadingScreen';
 import { logger } from '@/utils/logger';
 import { getTeamInfo } from '@/types/captracker';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
+import { InvitePlayersButton } from '@/components/InvitePlayersButton';
 
 function getInfo(a: string) {
   return getTeamInfo(a) || { abbrev: a, name: a, fullName: a, primaryColor: '#666', secondaryColor: '#999' };
@@ -372,12 +373,17 @@ const PoolPickem = () => {
               </div>
             </div>
 
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="bg-white/80">
-                <TabsTrigger value="picks">Picks</TabsTrigger>
-                <TabsTrigger value="standings">Standings</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <div className="flex items-center gap-2">
+              {activeLeague?.join_code && (
+                <InvitePlayersButton joinCode={activeLeague.join_code} leagueName={activeLeague.name} />
+              )}
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className="bg-white/80">
+                  <TabsTrigger value="picks">Picks</TabsTrigger>
+                  <TabsTrigger value="standings">Standings</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
           </div>
           </div>
 
