@@ -94,31 +94,31 @@ poolRoutes.get('/current-week', (c) => {
 poolRoutes.get('/team-records', async (c) => {
   try {
     const supabase = createUserClient(c.get('userToken'));
-    // Calculate records from completed games: count wins as home and away separately
-    const { data, error } = await supabase.rpc('get_nhl_team_records');
-    if (error) {
-      // Fallback: calculate from nhl_games directly
-      const { data: games } = await supabase
-        .from('nhl_games')
-        .select('home_team, away_team, home_score, away_score, status')
-        .eq('status', 'final')
-        .eq('season', 2025);
+    // Single SQL query to calculate W-L-OTL for all teams
+    const { data, error } = await supabase.rpc('get_nhl_team_records_v2');
+    if (!error && data) return ok(c, data);
 
-      const records: Record<string, { w: number; l: number; otl: number }> = {};
-      for (const g of (games || [])) {
-        if (!records[g.home_team]) records[g.home_team] = { w: 0, l: 0, otl: 0 };
-        if (!records[g.away_team]) records[g.away_team] = { w: 0, l: 0, otl: 0 };
-        if (g.home_score > g.away_score) {
-          records[g.home_team].w++;
-          records[g.away_team].l++;
-        } else {
-          records[g.away_team].w++;
-          records[g.home_team].l++;
-        }
+    // Fallback: calculate from nhl_games directly
+    const { data: games } = await supabase
+      .from('nhl_games')
+      .select('home_team, away_team, home_score, away_score, status, period')
+      .eq('status', 'final')
+      .eq('season', 2025);
+
+    const records: Record<string, { w: number; l: number; otl: number }> = {};
+    for (const g of (games || [])) {
+      if (!records[g.home_team]) records[g.home_team] = { w: 0, l: 0, otl: 0 };
+      if (!records[g.away_team]) records[g.away_team] = { w: 0, l: 0, otl: 0 };
+      const isOT = g.period === 'OT' || g.period === 'SO';
+      if (g.home_score > g.away_score) {
+        records[g.home_team].w++;
+        if (isOT) records[g.away_team].otl++; else records[g.away_team].l++;
+      } else {
+        records[g.away_team].w++;
+        if (isOT) records[g.home_team].otl++; else records[g.home_team].l++;
       }
-      return ok(c, records);
     }
-    return ok(c, data);
+    return ok(c, records);
   } catch (err) {
     return handleError(c, err, 'Failed to fetch team records');
   }

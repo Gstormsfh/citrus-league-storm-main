@@ -309,29 +309,20 @@ const PoolPickem = () => {
         up.forEach(p => pm.set(p.game_id, p.picked_team));
         setPicks(pm);
 
-        // Build team records + cache season games for head-to-head
+        // Fetch records from server API (one call, no downloading 1300+ games)
+        try {
+          const tr = await PoolService.getTeamRecords();
+          setRecords(tr);
+        } catch { /* records are supplementary */ }
+
+        // Fetch season H2H games (filtered to just teams playing this week)
         try {
           const { ScheduleService } = await import('@/services/ScheduleService');
           const seasonStart = new Date('2025-10-01');
           const today = new Date();
           const { games: allGames } = await ScheduleService.getGamesForDateRange(seasonStart, today);
-          setSeasonGames(allGames);
-          const recs: Record<string, { w: number; l: number; otl: number }> = {};
-          for (const g of allGames) {
-            if (g.status !== 'final') continue;
-            if (!recs[g.home_team]) recs[g.home_team] = { w: 0, l: 0, otl: 0 };
-            if (!recs[g.away_team]) recs[g.away_team] = { w: 0, l: 0, otl: 0 };
-            const isOT = g.period === 'OT' || g.period === 'SO';
-            if (g.home_score > g.away_score) {
-              recs[g.home_team].w++;
-              if (isOT) recs[g.away_team].otl++; else recs[g.away_team].l++;
-            } else {
-              recs[g.away_team].w++;
-              if (isOT) recs[g.home_team].otl++; else recs[g.home_team].l++;
-            }
-          }
-          setRecords(recs);
-        } catch { /* records are supplementary */ }
+          setSeasonGames(allGames.filter((g: NHLGame) => g.status === 'final'));
+        } catch { /* h2h is supplementary */ }
       } catch (err) { logger.error('[PoolPickem]', err); }
       finally { setLoading(false); }
     };
