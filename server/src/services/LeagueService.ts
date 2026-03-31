@@ -168,7 +168,12 @@ export class LeagueService {
     }
 
     // Parse RPC response
-    const result = typeof data === 'string' ? JSON.parse(data) : data;
+    let result;
+    try {
+      result = typeof data === 'string' ? JSON.parse(data) : data;
+    } catch {
+      return { league: null, team: null, error: 'Invalid response from join league' };
+    }
     return {
       league: result?.league || null,
       team: result?.team || null,

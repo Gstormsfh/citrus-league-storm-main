@@ -49,7 +49,13 @@ describe('PoolService', () => {
 
   describe('submitPickemPicks', () => {
     it('submits picks for unlocked games', async () => {
-      // Schedule returns no games (all open)
+      // Schedule returns games that match the pick game_ids
+      mockGetGamesForDateRange.mockResolvedValueOnce({
+        games: [
+          { id: 'g1', home_team: 'TOR', away_team: 'MTL', status: 'scheduled', game_date: '2099-01-01', game_time: '2099-01-01T23:00:00Z' },
+          { id: 'g2', home_team: 'BOS', away_team: 'NYR', status: 'scheduled', game_date: '2099-01-01', game_time: '2099-01-01T23:00:00Z' },
+        ],
+      });
       const upsertChain = createChain({ error: null });
       mockSupabase.from = vi.fn(() => upsertChain);
 
@@ -78,6 +84,12 @@ describe('PoolService', () => {
     });
 
     it('returns error when upsert fails', async () => {
+      // Provide a matching scheduled game so the pick passes the filter
+      mockGetGamesForDateRange.mockResolvedValueOnce({
+        games: [
+          { id: 'g1', home_team: 'TOR', away_team: 'MTL', status: 'scheduled', game_date: '2099-01-01', game_time: '2099-01-01T23:00:00Z' },
+        ],
+      });
       mockSupabase.from = vi.fn(() => createChain({ error: { message: 'DB error' } }));
 
       await expect(

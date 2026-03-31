@@ -83,10 +83,11 @@ export class PoolService {
     const weekGames = await this.getWeekGames(weekNumber);
     const gameMap = new Map(weekGames.map((g: any) => [String(g.id), g]));
 
-    // Filter out locked games
+    // Filter out locked games and validate game existence
     const picks = inputPicks.filter(p => {
       const game = gameMap.get(p.game_id);
-      return !game || !this.isGameLocked(game);
+      if (!game) return false; // Skip picks for non-existent games
+      return !this.isGameLocked(game);
     });
 
     if (picks.length === 0 && inputPicks.length > 0) {

@@ -416,6 +416,8 @@ const CreateLeague = () => {
         description: `${league.name} has been created successfully.`,
       });
 
+      setLoading(false);
+
       // Route to the appropriate page based on league type
       if (leagueType === 'pickem') {
         navigate(`/pool/pickem?league=${league.id}`);
@@ -470,6 +472,8 @@ const CreateLeague = () => {
         title: "Joined League!",
         description: `Welcome to ${league.name}! Your team "${team.team_name}" has been created.`,
       });
+
+      setLoading(false);
 
       // Route to the appropriate page based on the joined league's type
       const joinedLeagueType = (league.settings as Record<string, unknown>)?.leagueType;
