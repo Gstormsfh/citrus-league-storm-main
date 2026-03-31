@@ -142,7 +142,7 @@ function MatchupRow({ game, picked, existingPick, onPick, records, seasonGames }
           <div className="text-[11px] font-display text-slate-400 flex items-center gap-1.5 justify-end">
             {ar && (
               <span className={`font-semibold ${ar.w > ar.l ? 'text-emerald-600' : ar.w < ar.l ? 'text-red-500' : 'text-slate-500'}`}>
-                {ar.w}-{ar.l}
+                {ar.w}-{ar.l}-{ar.otl}
               </span>
             )}
             {awayStreak !== '-' && (
@@ -211,29 +211,10 @@ function MatchupRow({ game, picked, existingPick, onPick, records, seasonGames }
           </div>
         )}
 
-        {/* Row 4: KPI chips — horizontal stack */}
-        {!isFinal && ar && hr && (
-          <div className="flex items-center gap-1 mt-1">
-            {/* Home ice indicator */}
-            <span className="text-[8px] px-1 py-0 rounded bg-slate-100 text-slate-400 font-display font-bold">
-              🏠 {game.home_team}
-            </span>
-            {/* Goal differential */}
-            {(() => {
-              const awayGD = ar.w - ar.l;
-              const homeGD = hr.w - hr.l;
-              return (
-                <>
-                  <span className={`text-[8px] px-1 py-0 rounded font-display font-bold ${awayGD > 0 ? 'bg-emerald-50 text-emerald-600' : awayGD < 0 ? 'bg-red-50 text-red-500' : 'bg-slate-100 text-slate-400'}`}>
-                    {awayGD > 0 ? '+' : ''}{awayGD}
-                  </span>
-                  <span className="text-[7px] text-slate-300">vs</span>
-                  <span className={`text-[8px] px-1 py-0 rounded font-display font-bold ${homeGD > 0 ? 'bg-emerald-50 text-emerald-600' : homeGD < 0 ? 'bg-red-50 text-red-500' : 'bg-slate-100 text-slate-400'}`}>
-                    {homeGD > 0 ? '+' : ''}{homeGD}
-                  </span>
-                </>
-              );
-            })()}
+        {/* Row 4: Home ice */}
+        {!isFinal && (
+          <div className="text-[9px] font-display text-slate-400 mt-0.5">
+            @ {home.fullName}
           </div>
         )}
       </div>
@@ -270,7 +251,7 @@ function MatchupRow({ game, picked, existingPick, onPick, records, seasonGames }
             )}
             {hr && (
               <span className={`font-semibold ${hr.w > hr.l ? 'text-emerald-600' : hr.w < hr.l ? 'text-red-500' : 'text-slate-500'}`}>
-                {hr.w}-{hr.l}
+                {hr.w}-{hr.l}-{hr.otl}
               </span>
             )}
           </div>
@@ -340,8 +321,14 @@ const PoolPickem = () => {
             if (g.status !== 'final') continue;
             if (!recs[g.home_team]) recs[g.home_team] = { w: 0, l: 0, otl: 0 };
             if (!recs[g.away_team]) recs[g.away_team] = { w: 0, l: 0, otl: 0 };
-            if (g.home_score > g.away_score) { recs[g.home_team].w++; recs[g.away_team].l++; }
-            else { recs[g.away_team].w++; recs[g.home_team].l++; }
+            const isOT = g.period === 'OT' || g.period === 'SO';
+            if (g.home_score > g.away_score) {
+              recs[g.home_team].w++;
+              if (isOT) recs[g.away_team].otl++; else recs[g.away_team].l++;
+            } else {
+              recs[g.away_team].w++;
+              if (isOT) recs[g.home_team].otl++; else recs[g.home_team].l++;
+            }
           }
           setRecords(recs);
         } catch { /* records are supplementary */ }
