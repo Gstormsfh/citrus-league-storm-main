@@ -135,13 +135,23 @@ export class PoolService {
     return games.filter(g => !isGameLocked(g));
   }
 
-  /** Get all NHL team records for the current season. */
-  static async getTeamRecords(): Promise<Record<string, { w: number; l: number; otl: number }>> {
+  /** Get all NHL team records + streaks for the current season. */
+  static async getTeamRecords(): Promise<Record<string, { w: number; l: number; otl: number; streak: string }>> {
     try {
       const response = await poolApi.getTeamRecords();
-      return (response.data || {}) as Record<string, { w: number; l: number; otl: number }>;
+      return (response.data || {}) as Record<string, { w: number; l: number; otl: number; streak: string }>;
     } catch {
       return {};
+    }
+  }
+
+  /** Get head-to-head record between two teams. */
+  static async getH2H(team1: string, team2: string): Promise<{ team1Wins: number; team2Wins: number; games: number }> {
+    try {
+      const response = await poolApi.getH2H(team1, team2);
+      return (response.data || { team1Wins: 0, team2Wins: 0, games: 0 }) as { team1Wins: number; team2Wins: number; games: number };
+    } catch {
+      return { team1Wins: 0, team2Wins: 0, games: 0 };
     }
   }
 

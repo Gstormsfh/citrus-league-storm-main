@@ -13,7 +13,7 @@ export class ScheduleService {
     this.supabase = supabase;
   }
 
-  /** Get NHL games for a date range */
+  /** Get NHL games for a date range (supports up to 2000 games per query) */
   async getGamesForDateRange(startDate: string, endDate: string) {
     const { data, error } = await this.supabase
       .from('nhl_games')
@@ -21,7 +21,8 @@ export class ScheduleService {
       .gte('game_date', startDate)
       .lte('game_date', endDate)
       .order('game_date', { ascending: true })
-      .order('game_time', { ascending: true });
+      .order('game_time', { ascending: true })
+      .range(0, 1999); // Override default 1000-row limit
 
     return { games: data || [], error };
   }

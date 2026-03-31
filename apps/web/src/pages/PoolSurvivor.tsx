@@ -42,6 +42,7 @@ const PoolSurvivor = () => {
   const [isEliminated, setIsEliminated] = useState(false);
   const [standings, setStandings] = useState<SurvivorStanding[]>([]);
   const [lockedTeams, setLockedTeams] = useState<Set<string>>(new Set());
+  const [records, setRecords] = useState<Record<string, { w: number; l: number; otl: number }>>({});
   const [activeTab, setActiveTab] = useState('pick');
 
   useEffect(() => {

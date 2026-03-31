@@ -90,37 +90,96 @@ poolRoutes.get('/current-week', (c) => {
   return ok(c, { week: service.getCurrentWeek() });
 });
 
-// GET /api/pools/team-records — All NHL team records (W-L-OTL) for the current season
+// GET /api/pools/team-records — All NHL team records (W-L-OTL) + streaks for the current season
 poolRoutes.get('/team-records', async (c) => {
   try {
     const supabase = createUserClient(c.get('userToken'));
-    // Single SQL query to calculate W-L-OTL for all teams
-    const { data, error } = await supabase.rpc('get_nhl_team_records_v2');
-    if (!error && data) return ok(c, data);
 
-    // Fallback: calculate from nhl_games directly
-    const { data: games } = await supabase
+    // Fetch ALL final games — use .range() to bypass 1000-row default limit
+    const { data: games, error } = await supabase
       .from('nhl_games')
-      .select('home_team, away_team, home_score, away_score, status, period')
+      .select('home_team, away_team, home_score, away_score, period, game_date, game_time')
       .eq('status', 'final')
-      .eq('season', 2025);
+      .eq('season', 2025)
+      .order('game_date', { ascending: false })
+      .order('game_time', { ascending: false })
+      .range(0, 1999); // Cover entire season (max ~1312 games)
 
-    const records: Record<string, { w: number; l: number; otl: number }> = {};
+    if (error) throw error;
+
+    // Build W-L-OTL records
+    const records: Record<string, { w: number; l: number; otl: number; streak: string }> = {};
+    // Track most recent games per team for streak calculation
+    const recentByTeam: Record<string, Array<{ won: boolean }>> = {};
+
     for (const g of (games || [])) {
-      if (!records[g.home_team]) records[g.home_team] = { w: 0, l: 0, otl: 0 };
-      if (!records[g.away_team]) records[g.away_team] = { w: 0, l: 0, otl: 0 };
+      if (!records[g.home_team]) records[g.home_team] = { w: 0, l: 0, otl: 0, streak: '' };
+      if (!records[g.away_team]) records[g.away_team] = { w: 0, l: 0, otl: 0, streak: '' };
+      if (!recentByTeam[g.home_team]) recentByTeam[g.home_team] = [];
+      if (!recentByTeam[g.away_team]) recentByTeam[g.away_team] = [];
+
       const isOT = g.period === 'OT' || g.period === 'SO';
-      if (g.home_score > g.away_score) {
+      const homeWon = g.home_score > g.away_score;
+
+      if (homeWon) {
         records[g.home_team].w++;
         if (isOT) records[g.away_team].otl++; else records[g.away_team].l++;
       } else {
         records[g.away_team].w++;
         if (isOT) records[g.home_team].otl++; else records[g.home_team].l++;
       }
+
+      // Games are sorted most recent first — build streak arrays
+      recentByTeam[g.home_team].push({ won: homeWon });
+      recentByTeam[g.away_team].push({ won: !homeWon });
     }
+
+    // Calculate streaks from most recent games
+    for (const [team, recent] of Object.entries(recentByTeam)) {
+      if (recent.length === 0) continue;
+      const firstWon = recent[0].won;
+      let count = 0;
+      for (const r of recent) {
+        if (r.won === firstWon) count++;
+        else break;
+      }
+      records[team].streak = `${firstWon ? 'W' : 'L'}${count}`;
+    }
+
     return ok(c, records);
   } catch (err) {
     return handleError(c, err, 'Failed to fetch team records');
+  }
+});
+
+// GET /api/pools/h2h — Head-to-head record between two teams
+poolRoutes.get('/h2h', async (c) => {
+  try {
+    const team1 = c.req.query('team1')?.toUpperCase();
+    const team2 = c.req.query('team2')?.toUpperCase();
+    if (!team1 || !team2) return c.json({ error: { message: 'team1 and team2 required' } }, 400);
+
+    const supabase = createUserClient(c.get('userToken'));
+    const { data: games, error } = await supabase
+      .from('nhl_games')
+      .select('home_team, away_team, home_score, away_score, game_date, period')
+      .eq('status', 'final')
+      .eq('season', 2025)
+      .or(`and(home_team.eq.${team1},away_team.eq.${team2}),and(home_team.eq.${team2},away_team.eq.${team1})`)
+      .order('game_date', { ascending: true });
+
+    if (error) throw error;
+
+    let team1Wins = 0, team2Wins = 0;
+    for (const g of (games || [])) {
+      const winner = g.home_score > g.away_score ? g.home_team : g.away_team;
+      if (winner === team1) team1Wins++;
+      else team2Wins++;
+    }
+
+    return ok(c, { team1, team2, team1Wins, team2Wins, games: games?.length || 0 });
+  } catch (err) {
+    return handleError(c, err, 'Failed to fetch H2H');
   }
 });
 

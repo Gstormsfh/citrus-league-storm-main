@@ -17,9 +17,16 @@ export const poolApi = {
     return apiClient.get(`/api/pools/week/${weekNumber}/games`);
   },
 
-  /** Get all NHL team records (W-L-OTL) for the current season. */
+  /** Get all NHL team records (W-L-OTL + streaks) for the current season. */
   getTeamRecords() {
-    return apiClient.get<Record<string, { w: number; l: number; otl: number }>>('/api/pools/team-records');
+    return apiClient.get<Record<string, { w: number; l: number; otl: number; streak: string }>>('/api/pools/team-records');
+  },
+
+  /** Get head-to-head record between two teams. */
+  getH2H(team1: string, team2: string) {
+    return apiClient.get<{ team1: string; team2: string; team1Wins: number; team2Wins: number; games: number }>(
+      `/api/pools/h2h?team1=${team1}&team2=${team2}`
+    );
   },
 
   // ── Pick'em ──────────────────────────────────────────────────────────

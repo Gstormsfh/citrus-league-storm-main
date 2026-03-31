@@ -49,7 +49,7 @@ function groupByDate(games: NHLGame[]): Map<string, NHLGame[]> {
 function MatchupRow({ game, picked, existingPick, onPick, records, seasonGames }: {
   game: NHLGame; picked?: string; existingPick?: PickemPick;
   onPick: (id: string, team: string) => void;
-  records: Record<string, { w: number; l: number; otl: number }>;
+  records: Record<string, { w: number; l: number; otl: number; streak?: string }>;
   seasonGames: NHLGame[];
 }) {
   const gid = String(game.id);
@@ -89,26 +89,9 @@ function MatchupRow({ game, picked, existingPick, onPick, records, seasonGames }
     (g.away_team === game.home_team && g.away_score > g.home_score)
   ).length;
 
-  // Win streaks from recent games
-  const getStreak = (team: string): string => {
-    const teamGames = seasonGames
-      .filter(g => g.status === 'final' && (g.home_team === team || g.away_team === team))
-      .sort((a, b) => b.game_date.localeCompare(a.game_date));
-    if (teamGames.length === 0) return '-';
-    let streak = 0;
-    const firstWin = (teamGames[0].home_team === team && teamGames[0].home_score > teamGames[0].away_score) ||
-                     (teamGames[0].away_team === team && teamGames[0].away_score > teamGames[0].home_score);
-    const prefix = firstWin ? 'W' : 'L';
-    for (const g of teamGames) {
-      const won = (g.home_team === team && g.home_score > g.away_score) || (g.away_team === team && g.away_score > g.home_score);
-      if ((firstWin && won) || (!firstWin && !won)) streak++;
-      else break;
-    }
-    return `${prefix}${streak}`;
-  };
-
-  const awayStreak = getStreak(game.away_team);
-  const homeStreak = getStreak(game.home_team);
+  // Streaks from server-side records (calculated from ALL games, no 1000-row limit)
+  const awayStreak = ar?.streak || '-';
+  const homeStreak = hr?.streak || '-';
 
   return (
     <div className={`grid grid-cols-[1fr_auto_1fr] rounded-xl overflow-hidden transition-all duration-150 ${
@@ -291,7 +274,7 @@ const PoolPickem = () => {
   const [picks, setPicks] = useState<Map<string, string>>(new Map());
   const [existingPicks, setExistingPicks] = useState<PickemPick[]>([]);
   const [standings, setStandings] = useState<PickemStanding[]>([]);
-  const [records, setRecords] = useState<Record<string, { w: number; l: number; otl: number }>>({});
+  const [records, setRecords] = useState<Record<string, { w: number; l: number; otl: number; streak?: string }>>({});
   const [seasonGames, setSeasonGames] = useState<NHLGame[]>([]);
   const [activeTab, setActiveTab] = useState('picks');
 
