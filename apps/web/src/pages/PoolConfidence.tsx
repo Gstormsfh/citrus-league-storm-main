@@ -19,6 +19,7 @@ import LoadingScreen from '@/components/LoadingScreen';
 import { logger } from '@/utils/logger';
 import { getTeamInfo, type NHLTeamInfo } from '@/types/captracker';
 import { InvitePlayersButton } from '@/components/InvitePlayersButton';
+import { PoolLeagueHub } from '@/components/PoolLeagueHub';
 
 interface PickWithConfidence {
   game_id: string;
@@ -177,6 +178,7 @@ const PoolConfidence = () => {
                 <TabsList>
                   <TabsTrigger value="picks">Rank Picks</TabsTrigger>
                   <TabsTrigger value="standings">Standings</TabsTrigger>
+                  <TabsTrigger value="league">League</TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
@@ -361,6 +363,11 @@ const PoolConfidence = () => {
                 )}
               </CardContent>
             </Card>
+          )}
+
+          {/* ── League tab ── */}
+          {activeTab === 'league' && activeLeague && (
+            <PoolLeagueHub leagueId={activeLeagueId!} league={activeLeague as any} />
           )}
         </div>
 

@@ -17,6 +17,7 @@ import LoadingScreen from '@/components/LoadingScreen';
 import { logger } from '@/utils/logger';
 import { getTeamInfo, type NHLTeamInfo } from '@/types/captracker';
 import { InvitePlayersButton } from '@/components/InvitePlayersButton';
+import { PoolLeagueHub } from '@/components/PoolLeagueHub';
 
 const NHL_TEAMS = [
   'ANA','BOS','BUF','CGY','CAR','CHI','COL','CBJ','DAL','DET','EDM','FLA',
@@ -123,6 +124,7 @@ const PoolSurvivor = () => {
                   <TabsTrigger value="pick">My Pick</TabsTrigger>
                   <TabsTrigger value="standings">Standings</TabsTrigger>
                   <TabsTrigger value="history">History</TabsTrigger>
+                  <TabsTrigger value="league">League</TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
@@ -322,6 +324,11 @@ const PoolSurvivor = () => {
                 </div>
               )}
             </div>
+          )}
+
+          {/* ── League tab ── */}
+          {activeTab === 'league' && activeLeague && (
+            <PoolLeagueHub leagueId={activeLeagueId!} league={activeLeague as any} />
           )}
         </div>
 

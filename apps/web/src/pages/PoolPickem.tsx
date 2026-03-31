@@ -18,6 +18,7 @@ import { logger } from '@/utils/logger';
 import { getTeamInfo } from '@/types/captracker';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { InvitePlayersButton } from '@/components/InvitePlayersButton';
+import { PoolLeagueHub } from '@/components/PoolLeagueHub';
 
 function getInfo(a: string) {
   return getTeamInfo(a) || { abbrev: a, name: a, fullName: a, primaryColor: '#666', secondaryColor: '#999' };
@@ -381,6 +382,7 @@ const PoolPickem = () => {
                 <TabsList className="bg-white/80">
                   <TabsTrigger value="picks">Picks</TabsTrigger>
                   <TabsTrigger value="standings">Standings</TabsTrigger>
+                  <TabsTrigger value="league">League</TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
@@ -492,6 +494,11 @@ const PoolPickem = () => {
                 )}
               </CardContent>
             </Card>
+          )}
+
+          {/* ── League tab ── */}
+          {activeTab === 'league' && activeLeague && (
+            <PoolLeagueHub leagueId={activeLeagueId!} league={activeLeague as any} />
           )}
         </div>
 
