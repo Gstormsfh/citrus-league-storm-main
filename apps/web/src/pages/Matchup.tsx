@@ -5313,11 +5313,25 @@ const Matchup = () => {
                 </div>
               </div>
           
-          {/* Error State - Only show if fully initialized and NOT loading (prevents flash during demo load) */}
+          {/* Error State - Show friendly message for demo/guest, retry for logged-in users */}
           {!loading && hasInitializedRef.current && !shouldShowLoading && error && (
-            <div className="text-center py-20">
-              <p className="text-destructive text-lg mb-4">{error}</p>
-              <Button onClick={() => window.location.reload()}>Retry</Button>
+            <div className="text-center py-12 max-w-lg mx-auto">
+              {userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league' ? (
+                <div>
+                  <p className="text-muted-foreground text-base mb-6">
+                    {error}
+                  </p>
+                  <LeagueCreationCTA
+                    title="Start Your Fantasy League"
+                    description="Create your league, draft players, and compete in weekly matchups."
+                  />
+                </div>
+              ) : (
+                <div>
+                  <p className="text-destructive text-base mb-4">{error}</p>
+                  <Button onClick={() => window.location.reload()}>Retry</Button>
+                </div>
+              )}
             </div>
           )}
           

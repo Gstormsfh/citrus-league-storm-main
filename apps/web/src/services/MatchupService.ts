@@ -1681,8 +1681,8 @@ export const MatchupService = {
       if (team1Lineup) {
         // Team1 lineup loaded successfully
       } else {
-        const error = new Error(`Team ${matchup.team1_id} has no saved lineup and roster is empty.`);
-        logger.error('[MatchupService] No lineup found for team1:', error);
+        const error = new Error('This team has no saved lineup yet. Create a league and draft players to get started!');
+        logger.warn('[MatchupService] No lineup found for team1:', matchup.team1_id);
         return {
           team1Roster: [],
           team2Roster: [],
@@ -1693,8 +1693,8 @@ export const MatchupService = {
       }
 
       if (matchup.team2_id && !team2Lineup) {
-        const error = new Error(`Opponent team ${matchup.team2_id} has no saved lineup and roster is empty.`);
-        logger.error('[MatchupService] No lineup found for team2:', error);
+        const error = new Error('The opponent team has no saved lineup yet. Lineups will appear once the draft is completed.');
+        logger.warn('[MatchupService] No lineup found for team2:', matchup.team2_id);
         return {
           team1Roster: [],
           team2Roster: [],
