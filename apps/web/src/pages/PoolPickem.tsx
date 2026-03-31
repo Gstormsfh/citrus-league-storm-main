@@ -74,6 +74,7 @@ function MatchupRow({ game, picked, existingPick, onPick, records, seasonGames }
     homePct = 100 - awayPct;
   }
 
+  // Season series
   const h2h = seasonGames.filter(g =>
     g.status === 'final' &&
     ((g.home_team === game.home_team && g.away_team === game.away_team) ||
@@ -88,163 +89,210 @@ function MatchupRow({ game, picked, existingPick, onPick, records, seasonGames }
     (g.away_team === game.home_team && g.away_score > g.home_score)
   ).length;
 
+  // Win streaks from recent games
+  const getStreak = (team: string): string => {
+    const teamGames = seasonGames
+      .filter(g => g.status === 'final' && (g.home_team === team || g.away_team === team))
+      .sort((a, b) => b.game_date.localeCompare(a.game_date));
+    if (teamGames.length === 0) return '-';
+    let streak = 0;
+    const firstWin = (teamGames[0].home_team === team && teamGames[0].home_score > teamGames[0].away_score) ||
+                     (teamGames[0].away_team === team && teamGames[0].away_score > teamGames[0].home_score);
+    const prefix = firstWin ? 'W' : 'L';
+    for (const g of teamGames) {
+      const won = (g.home_team === team && g.home_score > g.away_score) || (g.away_team === team && g.away_score > g.home_score);
+      if ((firstWin && won) || (!firstWin && !won)) streak++;
+      else break;
+    }
+    return `${prefix}${streak}`;
+  };
+
+  const awayStreak = getStreak(game.away_team);
+  const homeStreak = getStreak(game.home_team);
+
   return (
-    <div className={`rounded-xl overflow-hidden transition-all duration-150 ${
+    <div className={`grid grid-cols-[1fr_auto_1fr] rounded-xl overflow-hidden transition-all duration-150 ${
       locked && !isLive ? 'opacity-60' : ''
-    } ${picked ? 'bg-white shadow-md' : 'bg-white/70'}`}>
+    } ${picked ? 'shadow-md' : 'hover:shadow-md'} bg-white`}>
 
-      {/* Matchup row */}
-      <div className="flex items-stretch">
-        {/* Away team — name aligned RIGHT (inward) */}
-        <button
-          className={`flex items-center gap-2.5 flex-1 py-3 pl-3 pr-2 transition-all rounded-l-xl ${
-            locked ? 'cursor-default' : 'cursor-pointer'
-          } ${pickedAway ? '' : picked ? 'opacity-35' : ''}`}
-          style={{
-            borderLeft: `4px solid ${away.primaryColor}`,
-            background: pickedAway ? `${away.primaryColor}15` : undefined,
-          }}
-          onMouseEnter={(e) => { if (!locked && !pickedAway) e.currentTarget.style.background = `${away.primaryColor}0a`; }}
-          onMouseLeave={(e) => { if (!locked && !pickedAway) e.currentTarget.style.background = ''; }}
-          onClick={() => !locked && onPick(gid, game.away_team)}
-          disabled={!!locked}
-        >
-          <div className="w-9 h-9 rounded-lg flex items-center justify-center font-varsity font-black text-white text-[10px] shrink-0 shadow-sm"
-            style={{ background: away.primaryColor }}>
-            {game.away_team}
+      {/* ═══ COLUMN 1: AWAY TEAM ═══ */}
+      <button
+        className={`flex items-center gap-3 py-3 px-4 transition-all ${
+          locked ? 'cursor-default' : 'cursor-pointer'
+        } ${pickedAway ? '' : picked ? 'opacity-30' : ''}`}
+        style={{
+          borderLeft: `4px solid ${away.primaryColor}`,
+          background: pickedAway ? `${away.primaryColor}15` : undefined,
+        }}
+        onMouseEnter={(e) => { if (!locked && !pickedAway) e.currentTarget.style.background = `${away.primaryColor}0a`; }}
+        onMouseLeave={(e) => { if (!locked && !pickedAway) e.currentTarget.style.background = ''; }}
+        onClick={() => !locked && onPick(gid, game.away_team)}
+        disabled={!!locked}
+      >
+        {/* Monogram */}
+        <div className="w-10 h-10 rounded-full flex items-center justify-center font-varsity font-black text-white text-[10px] shrink-0 shadow"
+          style={{ background: away.primaryColor }}>
+          {game.away_team}
+        </div>
+        {/* Name + record — RIGHT aligned toward center */}
+        <div className="flex-1 text-right min-w-0">
+          <div className={`font-display font-bold text-sm truncate ${awayWon ? 'text-slate-900' : isFinal ? 'text-slate-400' : 'text-slate-700'}`}>
+            {away.name}
           </div>
-          {/* Name + record — RIGHT aligned to push toward center */}
-          <div className="min-w-0 text-right flex-1">
-            <div className={`font-display font-bold text-sm truncate ${awayWon ? 'text-slate-900' : isFinal ? 'text-slate-400' : 'text-slate-700'}`}>
-              {away.name}
-            </div>
-            <div className="text-[11px] font-display text-slate-400 flex items-center gap-1 justify-end">
-              {ar ? (
-                <>
-                  <span className={`font-semibold ${ar.w > ar.l ? 'text-emerald-600' : ar.w < ar.l ? 'text-red-500' : 'text-slate-500'}`}>
-                    {ar.w}-{ar.l}
-                  </span>
-                  {ar.w > ar.l && <span className="text-[9px] text-emerald-500">▲</span>}
-                  {ar.w < ar.l && <span className="text-[9px] text-red-400">▼</span>}
-                </>
-              ) : <span className="truncate">{away.fullName}</span>}
-            </div>
-          </div>
-          {pickedAway && !isFinal && !isLive && (
-            <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0" style={{ background: away.primaryColor }}>
-              <Check className="w-3 h-3 text-white" />
-            </div>
-          )}
-          {existingPick?.picked_team === game.away_team && existingPick.is_correct === true && (
-            <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
-          )}
-          {existingPick?.picked_team === game.away_team && existingPick.is_correct === false && (
-            <XCircle className="w-5 h-5 text-red-500 shrink-0" />
-          )}
-        </button>
-
-        {/* CENTER — all info consolidated: odds/score + H2H + time */}
-        <div className="flex flex-col items-center justify-center shrink-0 bg-slate-50/60 border-x border-slate-100 w-36 sm:w-44 py-1.5">
-          {/* Row 1: Odds or Score */}
-          {!isFinal && !isLive && ar && hr ? (
-            <div className="flex items-center">
-              <span className={`w-12 text-right font-varsity font-black text-base leading-none ${awayPct >= 50 ? 'text-emerald-600' : 'text-slate-400'}`}>{awayPct}%</span>
-              <span className="w-4 text-center text-slate-200 text-[10px]">vs</span>
-              <span className={`w-12 text-left font-varsity font-black text-base leading-none ${homePct >= 50 ? 'text-emerald-600' : 'text-slate-400'}`}>{homePct}%</span>
-            </div>
-          ) : isFinal ? (
-            <div className="flex items-center">
-              <span className={`w-8 text-right font-varsity text-xl ${awayWon ? 'text-slate-900 font-black' : 'text-slate-300'}`}>{game.away_score}</span>
-              <span className="w-4 text-center text-[10px] text-slate-300">–</span>
-              <span className={`w-8 text-left font-varsity text-xl ${homeWon ? 'text-slate-900 font-black' : 'text-slate-300'}`}>{game.home_score}</span>
-            </div>
-          ) : isLive ? (
-            <div className="flex items-center">
-              <span className="w-8 text-right font-varsity text-xl text-red-600 font-black">{game.away_score}</span>
-              <span className="w-4 text-center text-[10px] text-red-300">–</span>
-              <span className="w-8 text-left font-varsity text-xl text-red-600 font-black">{game.home_score}</span>
-            </div>
-          ) : null}
-
-          {/* Row 2: H2H record or time or status */}
-          <div className="text-[9px] font-display text-slate-400 leading-tight mt-0.5">
-            {isFinal ? (
-              <span className="uppercase font-bold">Final</span>
-            ) : isLive ? (
-              <span className="flex items-center gap-1 text-red-500 font-bold">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" /> Live
+          <div className="text-[11px] font-display text-slate-400 flex items-center gap-1.5 justify-end">
+            {ar && (
+              <span className={`font-semibold ${ar.w > ar.l ? 'text-emerald-600' : ar.w < ar.l ? 'text-red-500' : 'text-slate-500'}`}>
+                {ar.w}-{ar.l}
               </span>
-            ) : locked ? (
-              <span className="flex items-center gap-0.5"><Lock className="w-2.5 h-2.5" /> Locked</span>
-            ) : (
-              <span className="font-semibold text-slate-500 text-[10px]">{fmtTime(game)}</span>
+            )}
+            {awayStreak !== '-' && (
+              <span className={`text-[10px] font-bold ${awayStreak.startsWith('W') ? 'text-emerald-500' : 'text-red-400'}`}>
+                {awayStreak}
+              </span>
             )}
           </div>
+        </div>
+        {/* Odds */}
+        {!isFinal && !isLive && ar && hr && (
+          <div className={`font-varsity font-black text-xl leading-none shrink-0 ${awayPct >= 50 ? 'text-emerald-600' : 'text-slate-400'}`}>
+            {awayPct}%
+          </div>
+        )}
+        {/* Score for final/live */}
+        {isFinal && (
+          <span className={`font-varsity text-2xl shrink-0 ${awayWon ? 'text-slate-900 font-black' : 'text-slate-300'}`}>{game.away_score}</span>
+        )}
+        {isLive && <span className="font-varsity text-xl shrink-0 text-red-600 font-black">{game.away_score}</span>}
+        {/* Pick indicator */}
+        {pickedAway && !isFinal && !isLive && (
+          <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0" style={{ background: away.primaryColor }}>
+            <Check className="w-3 h-3 text-white" />
+          </div>
+        )}
+        {existingPick?.picked_team === game.away_team && existingPick.is_correct === true && <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />}
+        {existingPick?.picked_team === game.away_team && existingPick.is_correct === false && <XCircle className="w-5 h-5 text-red-500 shrink-0" />}
+      </button>
 
-          {/* Row 3: Season series */}
-          {!isFinal && (
-            <div className="text-[8px] font-display text-slate-300 mt-0.5">
-              {h2h.length > 0 ? (
-                <span>
-                  H2H: <span className="font-bold" style={{ color: awayH2HWins > homeH2HWins ? away.primaryColor : awayH2HWins === homeH2HWins ? '#94a3b8' : '#cbd5e1' }}>{awayH2HWins}</span>
-                  -
-                  <span className="font-bold" style={{ color: homeH2HWins > awayH2HWins ? home.primaryColor : homeH2HWins === awayH2HWins ? '#94a3b8' : '#cbd5e1' }}>{homeH2HWins}</span>
-                </span>
-              ) : (
-                <span className="text-amber-500">★ 1st meeting</span>
-              )}
-            </div>
+      {/* ═══ COLUMN 2: CENTER STATS ═══ */}
+      <div className="flex flex-col items-center justify-center w-36 sm:w-44 bg-slate-50/70 border-x border-slate-100 py-2 px-2">
+        {/* Row 1: Time or Score */}
+        <div className="text-center">
+          {isFinal ? (
+            <span className="text-[10px] font-display font-bold text-slate-400 uppercase">Final</span>
+          ) : isLive ? (
+            <span className="flex items-center gap-1 text-[10px] font-display font-bold text-red-500">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" /> Live
+            </span>
+          ) : locked ? (
+            <span className="flex items-center gap-0.5 text-[10px] text-slate-400"><Lock className="w-2.5 h-2.5" /> Locked</span>
+          ) : (
+            <span className="text-xs font-display font-bold text-citrus-forest">{fmtTime(game)}</span>
           )}
         </div>
 
-        {/* Home team — name aligned LEFT (inward) */}
-        <button
-          className={`flex items-center gap-2.5 flex-1 py-3 pr-3 pl-2 transition-all flex-row-reverse rounded-r-xl ${
-            locked ? 'cursor-default' : 'cursor-pointer'
-          } ${pickedHome ? '' : picked ? 'opacity-35' : ''}`}
-          style={{
-            borderRight: `4px solid ${home.primaryColor}`,
-            background: pickedHome ? `${home.primaryColor}15` : undefined,
-          }}
-          onMouseEnter={(e) => { if (!locked && !pickedHome) e.currentTarget.style.background = `${home.primaryColor}0a`; }}
-          onMouseLeave={(e) => { if (!locked && !pickedHome) e.currentTarget.style.background = ''; }}
-          onClick={() => !locked && onPick(gid, game.home_team)}
-          disabled={!!locked}
-        >
-          <div className="w-9 h-9 rounded-lg flex items-center justify-center font-varsity font-black text-white text-[10px] shrink-0 shadow-sm"
-            style={{ background: home.primaryColor }}>
-            {game.home_team}
+        {/* Row 2: H2H */}
+        <div className="text-[9px] font-display text-slate-400 mt-0.5">
+          {h2h.length > 0 ? (
+            <span>
+              H2H:{' '}
+              <span className="font-bold" style={{ color: awayH2HWins > homeH2HWins ? away.primaryColor : '#94a3b8' }}>{awayH2HWins}</span>
+              {'-'}
+              <span className="font-bold" style={{ color: homeH2HWins > awayH2HWins ? home.primaryColor : '#94a3b8' }}>{homeH2HWins}</span>
+            </span>
+          ) : (
+            <span className="text-amber-500">★ 1st meeting</span>
+          )}
+        </div>
+
+        {/* Row 3: Venue */}
+        {game.venue && (
+          <div className="text-[8px] font-display text-slate-300 mt-0.5 truncate max-w-full">
+            {game.venue}
           </div>
-          {/* Name + record — LEFT aligned to push toward center */}
-          <div className="min-w-0 text-left flex-1">
-            <div className={`font-display font-bold text-sm truncate ${homeWon ? 'text-slate-900' : isFinal ? 'text-slate-400' : 'text-slate-700'}`}>
-              {home.name}
-            </div>
-            <div className="text-[11px] font-display text-slate-400 flex items-center gap-1">
-              {hr ? (
+        )}
+
+        {/* Row 4: KPI chips — horizontal stack */}
+        {!isFinal && ar && hr && (
+          <div className="flex items-center gap-1 mt-1">
+            {/* Home ice indicator */}
+            <span className="text-[8px] px-1 py-0 rounded bg-slate-100 text-slate-400 font-display font-bold">
+              🏠 {game.home_team}
+            </span>
+            {/* Goal differential */}
+            {(() => {
+              const awayGD = ar.w - ar.l;
+              const homeGD = hr.w - hr.l;
+              return (
                 <>
-                  {hr.w > hr.l && <span className="text-[9px] text-emerald-500">▲</span>}
-                  {hr.w < hr.l && <span className="text-[9px] text-red-400">▼</span>}
-                  <span className={`font-semibold ${hr.w > hr.l ? 'text-emerald-600' : hr.w < hr.l ? 'text-red-500' : 'text-slate-500'}`}>
-                    {hr.w}-{hr.l}
+                  <span className={`text-[8px] px-1 py-0 rounded font-display font-bold ${awayGD > 0 ? 'bg-emerald-50 text-emerald-600' : awayGD < 0 ? 'bg-red-50 text-red-500' : 'bg-slate-100 text-slate-400'}`}>
+                    {awayGD > 0 ? '+' : ''}{awayGD}
+                  </span>
+                  <span className="text-[7px] text-slate-300">vs</span>
+                  <span className={`text-[8px] px-1 py-0 rounded font-display font-bold ${homeGD > 0 ? 'bg-emerald-50 text-emerald-600' : homeGD < 0 ? 'bg-red-50 text-red-500' : 'bg-slate-100 text-slate-400'}`}>
+                    {homeGD > 0 ? '+' : ''}{homeGD}
                   </span>
                 </>
-              ) : <span className="truncate">{home.fullName}</span>}
-            </div>
+              );
+            })()}
           </div>
-          {pickedHome && !isFinal && !isLive && (
-            <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0" style={{ background: home.primaryColor }}>
-              <Check className="w-3 h-3 text-white" />
-            </div>
-          )}
-          {existingPick?.picked_team === game.home_team && existingPick.is_correct === true && (
-            <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
-          )}
-          {existingPick?.picked_team === game.home_team && existingPick.is_correct === false && (
-            <XCircle className="w-5 h-5 text-red-500 shrink-0" />
-          )}
-        </button>
+        )}
       </div>
+
+      {/* ═══ COLUMN 3: HOME TEAM ═══ */}
+      <button
+        className={`flex items-center gap-3 py-3 px-4 transition-all flex-row-reverse ${
+          locked ? 'cursor-default' : 'cursor-pointer'
+        } ${pickedHome ? '' : picked ? 'opacity-30' : ''}`}
+        style={{
+          borderRight: `4px solid ${home.primaryColor}`,
+          background: pickedHome ? `${home.primaryColor}15` : undefined,
+        }}
+        onMouseEnter={(e) => { if (!locked && !pickedHome) e.currentTarget.style.background = `${home.primaryColor}0a`; }}
+        onMouseLeave={(e) => { if (!locked && !pickedHome) e.currentTarget.style.background = ''; }}
+        onClick={() => !locked && onPick(gid, game.home_team)}
+        disabled={!!locked}
+      >
+        {/* Monogram */}
+        <div className="w-10 h-10 rounded-full flex items-center justify-center font-varsity font-black text-white text-[10px] shrink-0 shadow"
+          style={{ background: home.primaryColor }}>
+          {game.home_team}
+        </div>
+        {/* Name + record — LEFT aligned toward center */}
+        <div className="flex-1 text-left min-w-0">
+          <div className={`font-display font-bold text-sm truncate ${homeWon ? 'text-slate-900' : isFinal ? 'text-slate-400' : 'text-slate-700'}`}>
+            {home.name}
+          </div>
+          <div className="text-[11px] font-display text-slate-400 flex items-center gap-1.5">
+            {homeStreak !== '-' && (
+              <span className={`text-[10px] font-bold ${homeStreak.startsWith('W') ? 'text-emerald-500' : 'text-red-400'}`}>
+                {homeStreak}
+              </span>
+            )}
+            {hr && (
+              <span className={`font-semibold ${hr.w > hr.l ? 'text-emerald-600' : hr.w < hr.l ? 'text-red-500' : 'text-slate-500'}`}>
+                {hr.w}-{hr.l}
+              </span>
+            )}
+          </div>
+        </div>
+        {/* Odds */}
+        {!isFinal && !isLive && ar && hr && (
+          <div className={`font-varsity font-black text-xl leading-none shrink-0 ${homePct >= 50 ? 'text-emerald-600' : 'text-slate-400'}`}>
+            {homePct}%
+          </div>
+        )}
+        {isFinal && (
+          <span className={`font-varsity text-2xl shrink-0 ${homeWon ? 'text-slate-900 font-black' : 'text-slate-300'}`}>{game.home_score}</span>
+        )}
+        {isLive && <span className="font-varsity text-xl shrink-0 text-red-600 font-black">{game.home_score}</span>}
+        {pickedHome && !isFinal && !isLive && (
+          <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0" style={{ background: home.primaryColor }}>
+            <Check className="w-3 h-3 text-white" />
+          </div>
+        )}
+        {existingPick?.picked_team === game.home_team && existingPick.is_correct === true && <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />}
+        {existingPick?.picked_team === game.home_team && existingPick.is_correct === false && <XCircle className="w-5 h-5 text-red-500 shrink-0" />}
+      </button>
     </div>
   );
 }
