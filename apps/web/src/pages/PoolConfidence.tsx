@@ -73,6 +73,7 @@ const PoolConfidence = () => {
   const [picks, setPicks] = useState<Map<string, PickWithConfidence>>(new Map());
   const [existingPicks, setExistingPicks] = useState<ConfidencePick[]>([]);
   const [standings, setStandings] = useState<ConfidenceStanding[]>([]);
+  const [records, setRecords] = useState<Record<string, { w: number; l: number; otl: number; streak?: string }>>({});
   const [activeTab, setActiveTab] = useState('picks');
 
   useEffect(() => {
@@ -87,6 +88,12 @@ const PoolConfidence = () => {
         userPicks.forEach(p => pickMap.set(p.game_id, { game_id: p.game_id, picked_team: p.picked_team, confidence_points: p.confidence_points }));
         setPicks(pickMap);
         setStandings(await PoolService.getConfidenceStandings(activeLeagueId));
+
+        // Fetch team records
+        try {
+          const tr = await PoolService.getTeamRecords();
+          setRecords(tr);
+        } catch { /* supplementary */ }
       } catch (err) { logger.error('[PoolConfidence] Error:', err); }
       finally { setLoading(false); }
     };
@@ -268,6 +275,11 @@ const PoolConfidence = () => {
                                 >
                                   <TeamMonogram abbrev={game.away_team} size={34} />
                                   <span className="font-varsity font-bold text-xs uppercase" style={{ color: awayInfo.primaryColor }}>{awayInfo.name}</span>
+                                  {records[game.away_team] && (
+                                    <span className={`text-[10px] font-display ${records[game.away_team].w > records[game.away_team].l ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                      {records[game.away_team].w}-{records[game.away_team].l}-{records[game.away_team].otl}
+                                    </span>
+                                  )}
                                   {isFinal && <span className="text-lg font-varsity font-black text-slate-700">{game.away_score}</span>}
                                   {pick?.picked_team === game.away_team && !isFinal && (
                                     <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-citrus-sage flex items-center justify-center"><Check className="w-2.5 h-2.5 text-white" /></div>
@@ -286,6 +298,11 @@ const PoolConfidence = () => {
                                 >
                                   <TeamMonogram abbrev={game.home_team} size={34} />
                                   <span className="font-varsity font-bold text-xs uppercase" style={{ color: homeInfo.primaryColor }}>{homeInfo.name}</span>
+                                  {records[game.home_team] && (
+                                    <span className={`text-[10px] font-display ${records[game.home_team].w > records[game.home_team].l ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                      {records[game.home_team].w}-{records[game.home_team].l}-{records[game.home_team].otl}
+                                    </span>
+                                  )}
                                   {isFinal && <span className="text-lg font-varsity font-black text-slate-700">{game.home_score}</span>}
                                   {pick?.picked_team === game.home_team && !isFinal && (
                                     <div className="absolute top-1.5 left-1.5 w-4 h-4 rounded-full bg-citrus-sage flex items-center justify-center"><Check className="w-2.5 h-2.5 text-white" /></div>

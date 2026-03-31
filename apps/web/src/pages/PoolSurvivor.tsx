@@ -66,6 +66,11 @@ const PoolSurvivor = () => {
           }
           setLockedTeams(locked);
         } catch { /* non-critical */ }
+        // Fetch team records
+        try {
+          const tr = await PoolService.getTeamRecords();
+          setRecords(tr);
+        } catch { /* supplementary */ }
       } catch (err) { logger.error('[PoolSurvivor] Error:', err); } finally { setLoading(false); }
     };
     loadData();
@@ -179,12 +184,19 @@ const PoolSurvivor = () => {
                           >
                             {team}
                           </div>
-                          {/* Team name */}
+                          {/* Team name + record */}
                           <span className={`text-[10px] font-display font-semibold leading-tight ${
                             isSelected ? 'text-white/90' : isUsed ? 'text-slate-400 line-through' : 'text-slate-600'
                           }`}>
                             {info.name}
                           </span>
+                          {records[team] && !isUsed && (
+                            <span className={`text-[8px] font-display leading-none ${
+                              isSelected ? 'text-white/60' : 'text-slate-400'
+                            }`}>
+                              {records[team].w}-{records[team].l}-{records[team].otl}
+                            </span>
+                          )}
                           {isLocked && !isUsed && <Lock className="w-3 h-3 absolute top-1 right-1 text-red-400" />}
                           {isSelected && <Check className="w-3.5 h-3.5 absolute top-1 right-1 text-white" />}
                         </button>
