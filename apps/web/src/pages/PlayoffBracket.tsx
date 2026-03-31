@@ -645,7 +645,7 @@ const PlayoffBracket = () => {
           <h1 className="text-lg font-varsity font-bold text-citrus-forest">Playoffs</h1>
         </div>
       </div>
-      <main className="w-full lg:pt-20 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
+      <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
         <div className="w-full m-0 p-0">
           <div className={cn(
             "flex flex-col lg:grid lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2",

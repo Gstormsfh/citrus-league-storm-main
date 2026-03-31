@@ -487,7 +487,7 @@ const Standings = () => {
         </div>
       </div>
 
-      <main className="w-full lg:pt-20 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
+      <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
         <div className="w-full m-0 p-0">
           {/* Desktop: Grid / Mobile: Single column */}
           <div className={cn(
