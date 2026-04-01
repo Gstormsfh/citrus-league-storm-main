@@ -84,7 +84,16 @@ export class LineupService {
       }
     }
 
-    // 3. Upsert lineup
+    // 3. Save lineup
+    // If targetDate is set, ONLY write to fantasy_daily_rosters for that date —
+    // do NOT overwrite team_lineups (the default/week-level lineup).
+    // Only update team_lineups when no targetDate (changing the default lineup).
+    if (targetDate) {
+      await this.createDailyRosterSnapshots(teamId, leagueId, lineup, targetDate);
+      return { success: true, data: { ...lineup, league_id: leagueId, team_id: teamId } };
+    }
+
+    // No targetDate — update the default lineup in team_lineups
     const { error, data } = await this.supabase
       .from('team_lineups')
       .upsert({
@@ -102,11 +111,6 @@ export class LineupService {
     if (error) {
       logger.error('[LineupService.saveLineup] Upsert failed:', error);
       return { success: false, error: error.message };
-    }
-
-    // 4. Create daily roster snapshots if targetDate is set
-    if (targetDate) {
-      await this.createDailyRosterSnapshots(teamId, leagueId, lineup, targetDate);
     }
 
     return { success: true, data };
