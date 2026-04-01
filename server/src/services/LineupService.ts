@@ -84,16 +84,27 @@ export class LineupService {
       }
     }
 
-    // 3. Save lineup
-    // If targetDate is set, ONLY write to fantasy_daily_rosters for that date —
-    // do NOT overwrite team_lineups (the default/week-level lineup).
-    // Only update team_lineups when no targetDate (changing the default lineup).
+    // 3. Per-day isolation: when targetDate is provided, read the OLD default
+    //    BEFORE writing so we can snapshot other dates with the pre-edit lineup.
+    let previousLineup: typeof lineup | null = null;
     if (targetDate) {
-      await this.createDailyRosterSnapshots(teamId, leagueId, lineup, targetDate);
-      return { success: true, data: { ...lineup, league_id: leagueId, team_id: teamId } };
+      const { data: prev } = await this.supabase
+        .from('team_lineups')
+        .select('starters, bench, ir, slot_assignments')
+        .eq('team_id', teamId)
+        .eq('league_id', leagueId)
+        .maybeSingle();
+      if (prev) {
+        previousLineup = {
+          starters: (prev.starters as string[]) || [],
+          bench: (prev.bench as string[]) || [],
+          ir: (prev.ir as string[]) || [],
+          slot_assignments: (prev.slot_assignments as Record<string, string>) || {},
+        };
+      }
     }
 
-    // No targetDate — update the default lineup in team_lineups
+    // 4. ALWAYS update team_lineups (the canonical "latest" lineup).
     const { error, data } = await this.supabase
       .from('team_lineups')
       .upsert({
@@ -111,6 +122,14 @@ export class LineupService {
     if (error) {
       logger.error('[LineupService.saveLineup] Upsert failed:', error);
       return { success: false, error: error.message };
+    }
+
+    // 5. Create per-day snapshots: targetDate gets NEW lineup, other dates
+    //    without existing snapshots get the PREVIOUS default lineup.
+    if (targetDate) {
+      await this.createDailyRosterSnapshotsIsolated(
+        teamId, leagueId, lineup, previousLineup || lineup, targetDate
+      );
     }
 
     return { success: true, data };
@@ -589,6 +608,75 @@ export class LineupService {
       if (error) {
         logger.error('[LineupService.createDailyRosterSnapshots] Upsert error:', error);
       }
+    }
+  }
+
+  /**
+   * Per-day lineup isolation: when a user edits a specific date's lineup,
+   * snapshot ALL remaining dates in the matchup week. The targetDate gets
+   * the NEW lineup; other dates without existing snapshots get the
+   * PREVIOUS default (pre-edit state) so they remain unchanged.
+   */
+  private async createDailyRosterSnapshotsIsolated(
+    teamId: string,
+    leagueId: string,
+    newLineup: { starters: string[]; bench: string[]; ir: string[]; slot_assignments: Record<string, string> },
+    previousLineup: { starters: string[]; bench: string[]; ir: string[]; slot_assignments: Record<string, string> },
+    targetDate: string,
+  ) {
+    const todayStr = getTodayMST();
+    const { data: matchups } = await this.supabase
+      .from('matchups')
+      .select('id, week_start_date, week_end_date')
+      .eq('league_id', leagueId)
+      .or(`team1_id.eq.${teamId},team2_id.eq.${teamId}`)
+      .gte('week_end_date', todayStr)
+      .order('week_start_date', { ascending: true })
+      .limit(1);
+
+    if (!matchups || matchups.length === 0) return;
+
+    const matchup = matchups[0];
+    const weekStart = new Date(matchup.week_start_date + 'T00:00:00');
+    const weekEnd = new Date(matchup.week_end_date + 'T00:00:00');
+    const todayDate = getTodayMSTDate();
+    todayDate.setHours(0, 0, 0, 0);
+
+    // Generate dates from today through end of week
+    const allDates: string[] = [];
+    const cur = new Date(weekStart);
+    while (cur <= weekEnd) {
+      const d = new Date(cur);
+      d.setHours(0, 0, 0, 0);
+      if (d >= todayDate) {
+        allDates.push(d.toISOString().split('T')[0]);
+      }
+      cur.setDate(cur.getDate() + 1);
+    }
+
+    if (allDates.length === 0) return;
+
+    // Check which dates already have snapshots (don't overwrite those)
+    const { data: existingSnapshots } = await this.supabase
+      .from('fantasy_daily_rosters')
+      .select('roster_date')
+      .eq('team_id', teamId)
+      .eq('matchup_id', matchup.id)
+      .in('roster_date', allDates);
+
+    const datesWithSnapshots = new Set(
+      (existingSnapshots || []).map((r: { roster_date: string }) => r.roster_date)
+    );
+
+    // targetDate: always write the NEW lineup
+    await this.createDailyRosterSnapshots(teamId, leagueId, newLineup, targetDate);
+
+    // Other dates without snapshots: write the PREVIOUS (pre-edit) lineup
+    // so they remain at the original state before the user's change
+    const datesToFill = allDates.filter(d => d !== targetDate && !datesWithSnapshots.has(d));
+
+    for (const date of datesToFill) {
+      await this.createDailyRosterSnapshots(teamId, leagueId, previousLineup, date);
     }
   }
 }
