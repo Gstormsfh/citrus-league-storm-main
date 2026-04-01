@@ -145,13 +145,13 @@ export class PoolService {
     }
   }
 
-  /** Get head-to-head record between two teams. */
-  static async getH2H(team1: string, team2: string): Promise<{ team1Wins: number; team2Wins: number; games: number }> {
+  /** Get all H2H records for matchups in a given week (single API call). */
+  static async getWeekH2H(weekNumber: number): Promise<Record<string, { awayWins: number; homeWins: number; games: number }>> {
     try {
-      const response = await poolApi.getH2H(team1, team2);
-      return (response.data || { team1Wins: 0, team2Wins: 0, games: 0 }) as { team1Wins: number; team2Wins: number; games: number };
+      const response = await poolApi.getH2H(weekNumber);
+      return (response.data || {}) as Record<string, { awayWins: number; homeWins: number; games: number }>;
     } catch {
-      return { team1Wins: 0, team2Wins: 0, games: 0 };
+      return {};
     }
   }
 

@@ -22,10 +22,10 @@ export const poolApi = {
     return apiClient.get<Record<string, { w: number; l: number; otl: number; streak: string }>>('/api/pools/team-records');
   },
 
-  /** Get head-to-head record between two teams. */
-  getH2H(team1: string, team2: string) {
-    return apiClient.get<{ team1: string; team2: string; team1Wins: number; team2Wins: number; games: number }>(
-      `/api/pools/h2h?team1=${team1}&team2=${team2}`
+  /** Get all H2H records for matchups in a given week. */
+  getH2H(weekNumber: number) {
+    return apiClient.get<Record<string, { awayWins: number; homeWins: number; games: number }>>(
+      `/api/pools/h2h?week=${weekNumber}`
     );
   },
 

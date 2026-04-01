@@ -154,32 +154,59 @@ poolRoutes.get('/team-records', async (c) => {
   }
 });
 
-// GET /api/pools/h2h — Head-to-head record between two teams
+// GET /api/pools/h2h — Head-to-head records for ALL matchups in a given week
 poolRoutes.get('/h2h', async (c) => {
   try {
-    const team1 = c.req.query('team1')?.toUpperCase();
-    const team2 = c.req.query('team2')?.toUpperCase();
-    if (!team1 || !team2) return c.json({ error: { message: 'team1 and team2 required' } }, 400);
-
+    const weekNumber = parseInt(c.req.query('week') || '0', 10);
     const supabase = createUserClient(c.get('userToken'));
-    const { data: games, error } = await supabase
-      .from('nhl_games')
-      .select('home_team, away_team, home_score, away_score, game_date, period')
-      .eq('status', 'final')
-      .eq('season', 2025)
-      .or(`and(home_team.eq.${team1},away_team.eq.${team2}),and(home_team.eq.${team2},away_team.eq.${team1})`)
-      .order('game_date', { ascending: true });
+    const service = createPoolService(c);
 
-    if (error) throw error;
+    // Get all games for the week to know which team pairs to check
+    const weekGames = weekNumber > 0 ? await service.getGamesForWeek(weekNumber) : [];
 
-    let team1Wins = 0, team2Wins = 0;
-    for (const g of (games || [])) {
-      const winner = g.home_score > g.away_score ? g.home_team : g.away_team;
-      if (winner === team1) team1Wins++;
-      else team2Wins++;
+    // Get all unique team pairs from this week's games
+    const pairs = new Set<string>();
+    const pairTeams: Array<[string, string]> = [];
+    for (const g of weekGames) {
+      const key = [g.home_team, g.away_team].sort().join('-');
+      if (!pairs.has(key)) {
+        pairs.add(key);
+        pairTeams.push([g.away_team, g.home_team]);
+      }
     }
 
-    return ok(c, { team1, team2, team1Wins, team2Wins, games: games?.length || 0 });
+    if (pairTeams.length === 0) return ok(c, {});
+
+    // Fetch all final games for the season involving any of these teams
+    const allTeams = [...new Set(pairTeams.flat())];
+    const orConditions = allTeams.flatMap(t => [`home_team.eq.${t}`, `away_team.eq.${t}`]).join(',');
+
+    const { data: games } = await supabase
+      .from('nhl_games')
+      .select('home_team, away_team, home_score, away_score')
+      .eq('status', 'final')
+      .eq('season', 2025)
+      .or(orConditions)
+      .range(0, 1999);
+
+    // Build H2H for each pair
+    const result: Record<string, { awayWins: number; homeWins: number; games: number }> = {};
+    for (const [away, home] of pairTeams) {
+      const key = [away, home].sort().join('-');
+      const matchups = (games || []).filter(g =>
+        (g.home_team === away && g.away_team === home) ||
+        (g.home_team === home && g.away_team === away)
+      );
+      let awayWins = 0, homeWins = 0;
+      for (const g of matchups) {
+        const winner = g.home_score > g.away_score ? g.home_team : g.away_team;
+        if (winner === away) awayWins++;
+        else homeWins++;
+      }
+      result[key] = { awayWins, homeWins, games: matchups.length };
+    }
+
+    return ok(c, result);
   } catch (err) {
     return handleError(c, err, 'Failed to fetch H2H');
   }
