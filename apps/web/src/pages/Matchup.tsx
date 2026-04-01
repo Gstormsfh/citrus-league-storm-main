@@ -3857,7 +3857,7 @@ const Matchup = () => {
         // Check if draft is completed
         if (currentLeague.draft_status !== 'completed') {
           log(' Draft not completed, cannot view matchups');
-          setError(`Draft must be completed before viewing matchups. Current status: ${currentLeague.draft_status}. League: ${currentLeague.name}`);
+          setError('draft_not_completed');
           setLoading(false);
           loadingRef.current = false;
           return;
@@ -5326,10 +5326,23 @@ const Matchup = () => {
                     description="Create your league, draft players, and compete in weekly matchups."
                   />
                 </div>
+              ) : error === 'draft_not_completed' ? (
+                <div className="max-w-md mx-auto text-center">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-citrus-sage/20 flex items-center justify-center">
+                    <span className="text-2xl">🏒</span>
+                  </div>
+                  <h3 className="text-lg font-bold text-citrus-forest mb-2">Draft Your Team First</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Complete your league's draft to unlock weekly matchups and start competing.
+                  </p>
+                  <Button onClick={() => navigate(`/draft-room?league=${activeLeagueId}`)}>
+                    Go to Draft Room
+                  </Button>
+                </div>
               ) : (
-                <div>
-                  <p className="text-destructive text-base mb-4">{error}</p>
-                  <Button onClick={() => window.location.reload()}>Retry</Button>
+                <div className="max-w-md mx-auto text-center">
+                  <p className="text-muted-foreground text-base mb-4">{error}</p>
+                  <Button variant="outline" onClick={() => window.location.reload()}>Retry</Button>
                 </div>
               )}
             </div>

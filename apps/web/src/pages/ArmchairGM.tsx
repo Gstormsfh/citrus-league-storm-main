@@ -158,14 +158,14 @@ const ArmchairGM = () => {
                   )}
 
                   {error && (
-                    <div className="flex flex-col items-center justify-center py-12 gap-3 bg-red-50/50 rounded-2xl border-2 border-red-200">
-                      <AlertCircle className="w-8 h-8 text-red-400" />
-                      <span className="text-sm text-red-600 font-display">
-                        Failed to load team data. Please try again.
+                    <div className="flex flex-col items-center justify-center py-12 gap-3 bg-slate-50/50 rounded-2xl border-2 border-slate-200">
+                      <AlertCircle className="w-8 h-8 text-slate-400" />
+                      <span className="text-sm text-slate-600 font-display">
+                        Unable to load team data. Please try again.
                       </span>
                       <button
                         onClick={() => setSelectedTeam(selectedTeam)}
-                        className="px-4 py-2 rounded-lg bg-red-100 text-red-700 text-sm font-display font-bold hover:bg-red-200 transition-colors"
+                        className="px-4 py-2 rounded-lg bg-citrus-sage/20 text-citrus-forest text-sm font-display font-bold hover:bg-citrus-sage/30 transition-colors"
                       >
                         Retry
                       </button>

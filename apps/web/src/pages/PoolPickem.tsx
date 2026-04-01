@@ -139,7 +139,7 @@ function MatchupRow({ game, picked, existingPick, onPick, records, h2hData }: {
       </button>
 
       {/* ═══ COLUMN 2: CENTER STATS ═══ */}
-      <div className="flex flex-col items-center justify-center w-24 sm:w-28 2xl:w-24 bg-slate-50/70 border-x border-slate-100 py-1.5 px-1">
+      <div className="flex flex-col items-center justify-center w-16 sm:w-24 md:w-28 2xl:w-24 bg-slate-50/70 border-x border-slate-100 py-1.5 px-0.5 sm:px-1">
         {/* Row 1: Time or Score */}
         <div className="text-center">
           {isFinal ? (
@@ -329,18 +329,18 @@ const PoolPickem = () => {
           )}
 
           {/* Header — STICKY below navbar */}
-          <div className="sticky top-[92px] z-30 bg-[#D4E8B8]/95 backdrop-blur-sm py-3 mb-4 -mx-3 sm:-mx-4 lg:-mx-8 xl:-mx-12 px-3 sm:px-4 lg:px-8 xl:px-12 border-b border-citrus-sage/15">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className="sticky top-12 sm:top-[92px] z-30 bg-[#D4E8B8]/95 backdrop-blur-sm py-2 sm:py-3 mb-4 -mx-3 sm:-mx-4 lg:-mx-8 xl:-mx-12 px-3 sm:px-4 lg:px-8 xl:px-12 border-b border-citrus-sage/15">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 sm:gap-3">
               <div className="flex items-center bg-white/80 rounded-xl border border-citrus-sage/20 overflow-hidden">
-                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-none" onClick={() => setCurrentWeek(w => Math.max(1, w - 1))} disabled={currentWeek <= 1}>
+                <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10 rounded-none" onClick={() => setCurrentWeek(w => Math.max(1, w - 1))} disabled={currentWeek <= 1}>
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
-                <div className="px-3 text-center border-x border-citrus-sage/10">
-                  <div className="text-[9px] font-display text-citrus-charcoal/40 uppercase tracking-widest leading-none">Week</div>
-                  <div className="text-lg font-varsity font-black text-citrus-forest leading-none">{currentWeek}</div>
+                <div className="px-2 sm:px-3 text-center border-x border-citrus-sage/10">
+                  <div className="text-[8px] sm:text-[9px] font-display text-citrus-charcoal/40 uppercase tracking-widest leading-none">Week</div>
+                  <div className="text-base sm:text-lg font-varsity font-black text-citrus-forest leading-none">{currentWeek}</div>
                 </div>
-                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-none" onClick={() => setCurrentWeek(w => w + 1)}>
+                <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10 rounded-none" onClick={() => setCurrentWeek(w => w + 1)}>
                   <ChevronRight className="w-4 h-4" />
                 </Button>
               </div>
@@ -354,15 +354,15 @@ const PoolPickem = () => {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               {activeLeague?.join_code && (
-                <InvitePlayersButton joinCode={activeLeague.join_code} leagueName={activeLeague.name} />
+                <span className="hidden sm:inline-flex"><InvitePlayersButton joinCode={activeLeague.join_code} leagueName={activeLeague.name} /></span>
               )}
               <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="bg-white/80">
-                  <TabsTrigger value="picks">Picks</TabsTrigger>
-                  <TabsTrigger value="standings">Standings</TabsTrigger>
-                  <TabsTrigger value="league">League</TabsTrigger>
+                <TabsList className="bg-white/80 h-8 sm:h-9">
+                  <TabsTrigger value="picks" className="text-xs sm:text-sm px-2 sm:px-3">Picks</TabsTrigger>
+                  <TabsTrigger value="standings" className="text-xs sm:text-sm px-2 sm:px-3">Standings</TabsTrigger>
+                  <TabsTrigger value="league" className="text-xs sm:text-sm px-2 sm:px-3">League</TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>

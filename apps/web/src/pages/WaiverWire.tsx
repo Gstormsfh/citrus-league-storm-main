@@ -57,8 +57,11 @@ const WaiverWire = () => {
   const [faabBidAmount, setFaabBidAmount] = useState(0);
 
   const loadWaiverData = useCallback(async () => {
-    if (!user || !activeLeagueId) return;
-    
+    if (!user || !activeLeagueId) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       // Get user's team
