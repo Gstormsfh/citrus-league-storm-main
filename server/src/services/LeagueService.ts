@@ -2,6 +2,12 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { COLUMNS } from '@citrus/shared';
 import { LeagueMembershipService } from './LeagueMembershipService';
 
+// Demo league IDs that should never appear in user league lists
+const DEMO_LEAGUE_IDS = new Set([
+  '00000000-0000-0000-0000-000000000001',
+  '750f4e1a-92ae-44cf-a798-2f3e06d0d5c9',
+]);
+
 /**
  * LeagueService — Server-side league management with dependency-injected Supabase client.
  *
@@ -42,7 +48,9 @@ export class LeagueService {
 
     const allLeagues = [...(commissionerLeagues || []), ...memberLeagues];
     const unique = Array.from(new Map(allLeagues.map((l: Record<string, unknown>) => [l.id, l])).values());
-    return { leagues: unique, error: null };
+    // Exclude demo leagues — they should only be visible to guests via public API
+    const filtered = unique.filter((l: Record<string, unknown>) => !DEMO_LEAGUE_IDS.has(l.id as string));
+    return { leagues: filtered, error: null };
   }
 
   /** Get a specific league (membership-gated) */
