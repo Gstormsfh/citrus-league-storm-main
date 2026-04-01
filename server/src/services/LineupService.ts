@@ -588,32 +588,32 @@ export class LineupService {
 
     if (rosterRecords.length === 0) return;
 
-    // Query locked records to avoid overwriting
-    const { data: existingLocked } = await this.supabase
-      .from('fantasy_daily_rosters')
-      .select('player_id, roster_date')
-      .eq('team_id', teamId)
-      .eq('matchup_id', matchup.id)
-      .eq('is_locked', true);
-
-    const lockedSet = new Set(
-      (existingLocked || []).map((r: { player_id: number; roster_date: string }) => `${r.player_id}_${r.roster_date}`),
-    );
-
-    const recordsToUpsert = rosterRecords.filter(record =>
-      !lockedSet.has(`${record.player_id}_${record.roster_date}`),
-    );
-
-    if (recordsToUpsert.length > 0) {
-      const { error } = await this.supabase
+    // Delete existing non-locked rows for these dates first, then insert fresh.
+    // This prevents stale player rows from accumulating when lineup composition changes.
+    const datesToClear = [...new Set(rosterRecords.map(r => r.roster_date as string))];
+    for (const dateStr of datesToClear) {
+      const { error: deleteError } = await this.supabase
         .from('fantasy_daily_rosters')
-        .upsert(recordsToUpsert, {
-          onConflict: 'team_id,matchup_id,player_id,roster_date',
-          ignoreDuplicates: false,
-        });
-      if (error) {
-        logger.error('[LineupService.createDailyRosterSnapshots] Upsert error:', error);
+        .delete()
+        .eq('team_id', teamId)
+        .eq('matchup_id', matchup.id)
+        .eq('roster_date', dateStr)
+        .eq('is_locked', false);
+
+      if (deleteError) {
+        logger.error('[LineupService.createDailyRosterSnapshots] Delete error for', dateStr, deleteError);
       }
+    }
+
+    // Insert all records fresh (locked rows were preserved by the delete filter above)
+    const { error: insertError } = await this.supabase
+      .from('fantasy_daily_rosters')
+      .upsert(rosterRecords, {
+        onConflict: 'team_id,matchup_id,player_id,roster_date',
+        ignoreDuplicates: false,
+      });
+    if (insertError) {
+      logger.error('[LineupService.createDailyRosterSnapshots] Upsert error:', insertError);
     }
   }
 
