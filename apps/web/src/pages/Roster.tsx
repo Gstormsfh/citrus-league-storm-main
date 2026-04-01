@@ -2144,13 +2144,16 @@ const Roster = () => {
       // Yahoo-style: If selectedDate is set, only save to that date; otherwise cascade
       if (userTeamId && user && userTeam?.league_id && !isDemoLeague(userTeam.league_id)) {
         LeagueService.saveLineup(userTeamId, userTeam.league_id, {
-          starters: newStarters.map(p => p.id),
-          bench: newBench.map(p => p.id),
-          ir: prev.ir.map(p => p.id),
+          starters: newStarters.map(p => String(p.id)),
+          bench: newBench.map(p => String(p.id)),
+          ir: prev.ir.map(p => String(p.id)),
           slotAssignments: newAssignments
-        }, selectedDate || undefined).catch(err => logger.error('Failed to save lineup:', err));
+        }, selectedDate || undefined).catch(err => {
+          logger.error('Failed to save auto lineup:', err);
+          toast({ title: 'Save Failed', description: 'Lineup optimized locally but failed to save. Try again.', variant: 'destructive' });
+        });
       }
-      
+
       return updatedRoster;
     });
 

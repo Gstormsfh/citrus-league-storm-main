@@ -58,6 +58,7 @@ export class LineupService {
     }
 
     // 2. Roster protection — check for accidentally lost players
+    //    Normalize all IDs to strings to prevent type mismatch (DB may store numbers)
     if (!allowPlayerRemoval) {
       const { data: existingLineup } = await this.supabase
         .from('team_lineups')
@@ -70,15 +71,20 @@ export class LineupService {
 
       if (existingLineup) {
         const currentPlayerIds = new Set([
-          ...((existingLineup.starters as string[]) || []),
-          ...((existingLineup.bench as string[]) || []),
-          ...((existingLineup.ir as string[]) || []),
+          ...((existingLineup.starters as unknown[]) || []).map(String),
+          ...((existingLineup.bench as unknown[]) || []).map(String),
+          ...((existingLineup.ir as unknown[]) || []).map(String),
         ]);
-        const newPlayerIds = new Set([...lineup.starters, ...lineup.bench, ...lineup.ir]);
+        const newPlayerIds = new Set([
+          ...lineup.starters.map(String),
+          ...lineup.bench.map(String),
+          ...lineup.ir.map(String),
+        ]);
         const removedPlayers = Array.from(currentPlayerIds).filter(id => !newPlayerIds.has(id));
 
         if (removedPlayers.length > 0) {
-          logger.error('[ROSTER PROTECTION] Save blocked — players would be removed:', removedPlayers);
+          logger.error('[ROSTER PROTECTION] Save blocked — players would be removed:', removedPlayers,
+            'current:', currentPlayerIds.size, 'new:', newPlayerIds.size);
           return { success: false, error: 'Players would be removed without allowPlayerRemoval flag' };
         }
       }
