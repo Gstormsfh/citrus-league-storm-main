@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
@@ -6,7 +6,6 @@ import Footer from '@/components/Footer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
@@ -52,7 +51,6 @@ const PoolConfidence = () => {
         );
         setExistingPicks(userPicks);
 
-        // Populate picks map
         const pickMap = new Map<string, PickWithConfidence>();
         userPicks.forEach(p => pickMap.set(p.game_id, {
           game_id: p.game_id,
@@ -79,7 +77,6 @@ const PoolConfidence = () => {
     if (existing) {
       newPicks.set(gameId, { ...existing, picked_team: team });
     } else {
-      // Assign next available confidence value
       const usedPoints = new Set(Array.from(newPicks.values()).map(p => p.confidence_points));
       let nextPoint = games.length;
       while (usedPoints.has(nextPoint) && nextPoint > 0) nextPoint--;
@@ -100,7 +97,6 @@ const PoolConfidence = () => {
   const handleSubmitPicks = async () => {
     if (!activeLeagueId || !user) return;
 
-    // Validate all pickable games have picks (industry standard: must pick ALL games)
     const picksArray = Array.from(picks.values());
     const pickableGames = games.filter(g => {
       const locked = g.status === 'live' || g.status === 'final' || (g.game_time && new Date(`${g.game_date}T${g.game_time}`) <= new Date());
@@ -112,7 +108,6 @@ const PoolConfidence = () => {
       return;
     }
 
-    // Count picks for unlocked games only
     const unlockedPicks = picksArray.filter(p => {
       const game = games.find(g => String(g.id) === p.game_id);
       if (!game) return true;
@@ -129,7 +124,6 @@ const PoolConfidence = () => {
       return;
     }
 
-    // Validate unique confidence points (1 to N sequential)
     const points = picksArray.map(p => p.confidence_points);
     const uniquePoints = new Set(points);
     if (uniquePoints.size !== points.length) {
@@ -155,7 +149,6 @@ const PoolConfidence = () => {
     }
   };
 
-  // Available confidence point values
   const usedConfidencePoints = new Set(Array.from(picks.values()).map(p => p.confidence_points));
   const maxPoints = Math.max(games.length, 1);
 
@@ -174,57 +167,58 @@ const PoolConfidence = () => {
       </div>
 
       <main className="w-full lg:pt-20 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
-        <div className="max-w-4xl mx-auto px-4">
+        <div className="max-w-4xl mx-auto px-2 sm:px-4">
           {userLeagueState === 'logged-in-no-league' && (
-            <div className="mb-8">
+            <div className="mb-6">
               <LeagueCreationCTA
                 title="Join a Confidence Pool"
-                description="Create or join a Confidence pool. Rank your picks by how confident you are — earn more points for high-confidence correct picks!"
+                description="Create or join a Confidence pool. Rank your picks by how confident you are!"
               />
             </div>
           )}
 
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-2xl font-bold flex items-center gap-2">
-                <BarChart3 className="w-6 h-6 text-primary" />
-                Confidence Pool
-              </h2>
-              <p className="text-muted-foreground text-sm">Pick winners and rank by confidence. Higher confidence = more points.</p>
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4 sm:mb-6">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-primary shrink-0" />
+              <div>
+                <h2 className="text-lg sm:text-2xl font-bold leading-tight">Confidence Pool</h2>
+                <p className="text-muted-foreground text-xs sm:text-sm hidden sm:block">Rank by confidence — higher = more points</p>
+              </div>
             </div>
-            <div className="flex items-center gap-1">
-              <Button variant="ghost" size="sm" onClick={() => setCurrentWeek(w => Math.max(1, w - 1))} disabled={currentWeek <= 1}>
+            <div className="flex items-center gap-1 self-end sm:self-auto">
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setCurrentWeek(w => Math.max(1, w - 1))} disabled={currentWeek <= 1}>
                 <ChevronLeft className="w-4 h-4" />
               </Button>
-              <Badge variant="outline" className="text-sm">Week {currentWeek}</Badge>
-              <Button variant="ghost" size="sm" onClick={() => setCurrentWeek(w => w + 1)}>
+              <Badge variant="outline" className="text-xs sm:text-sm whitespace-nowrap">Week {currentWeek}</Badge>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setCurrentWeek(w => w + 1)}>
                 <ChevronRight className="w-4 h-4" />
               </Button>
             </div>
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="mb-6">
-              <TabsTrigger value="picks">Make Picks</TabsTrigger>
-              <TabsTrigger value="standings">Standings</TabsTrigger>
+            <TabsList className="mb-4 sm:mb-6 w-full sm:w-auto">
+              <TabsTrigger value="picks" className="flex-1 sm:flex-none text-xs sm:text-sm">Rank Picks</TabsTrigger>
+              <TabsTrigger value="standings" className="flex-1 sm:flex-none text-xs sm:text-sm">Standings</TabsTrigger>
             </TabsList>
 
             <TabsContent value="picks">
               <Card className="card-citrus border-none shadow-lg">
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
+                <CardHeader className="px-3 sm:px-6 py-3 sm:py-4">
+                  <CardTitle className="text-base sm:text-lg flex items-center gap-2">
                     Week {currentWeek} Games
                     <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-2 sm:px-6 pb-4">
                   {games.length === 0 ? (
                     <div className="text-center py-12 text-muted-foreground">
                       <BarChart3 className="w-12 h-12 mx-auto mb-4 opacity-30" />
                       <p className="font-medium">No games available for this week</p>
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       {games.map(game => {
                         const gameId = String(game.id);
                         const pick = picks.get(gameId);
@@ -232,67 +226,76 @@ const PoolConfidence = () => {
                         const locked = game.status === 'live' || game.status === 'final' || (game.game_time && new Date(`${game.game_date}T${game.game_time}`) <= new Date());
 
                         return (
-                          <div key={gameId} className={`flex items-center gap-3 p-4 rounded-xl bg-muted/20 border border-transparent hover:border-primary/10 transition-colors ${locked ? 'opacity-60' : ''}`}>
-                            {/* Team selection */}
-                            <div className="flex items-center gap-2 flex-1">
-                              <Button
-                                variant={pick?.picked_team === game.away_team ? 'default' : 'outline'}
-                                size="sm"
-                                className="min-w-[80px] text-xs"
-                                onClick={() => handleTeamPick(gameId, game.away_team)}
-                                disabled={!!locked}
-                              >
-                                {game.away_team}
-                              </Button>
-                              <div className="text-center">
-                                <span className="text-xs text-muted-foreground">@</span>
-                                {locked && <div className="text-xs text-muted-foreground flex items-center gap-0.5"><Lock className="w-3 h-3" />{game.status === 'final' ? 'Final' : 'Locked'}</div>}
+                          <div
+                            key={gameId}
+                            className={`p-2 sm:p-3 rounded-xl bg-muted/20 border border-transparent hover:border-primary/10 transition-colors ${locked ? 'opacity-60' : ''}`}
+                          >
+                            {/* Mobile: stack team buttons + confidence; Desktop: single row */}
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                              {/* Team pick row */}
+                              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1 sm:gap-2 flex-1">
+                                <Button
+                                  variant={pick?.picked_team === game.away_team ? 'default' : 'outline'}
+                                  size="sm"
+                                  className="w-full h-8 sm:h-9 text-xs sm:text-sm font-bold"
+                                  onClick={() => handleTeamPick(gameId, game.away_team)}
+                                  disabled={!!locked}
+                                >
+                                  {game.away_team}
+                                </Button>
+                                <div className="text-center px-0.5 min-w-[36px]">
+                                  <span className="text-[10px] sm:text-xs text-muted-foreground">@</span>
+                                  {locked && (
+                                    <div className="text-[10px] text-muted-foreground flex items-center justify-center gap-0.5">
+                                      <Lock className="w-2.5 h-2.5" />{game.status === 'final' ? 'F' : 'L'}
+                                    </div>
+                                  )}
+                                </div>
+                                <Button
+                                  variant={pick?.picked_team === game.home_team ? 'default' : 'outline'}
+                                  size="sm"
+                                  className="w-full h-8 sm:h-9 text-xs sm:text-sm font-bold"
+                                  onClick={() => handleTeamPick(gameId, game.home_team)}
+                                  disabled={!!locked}
+                                >
+                                  {game.home_team}
+                                </Button>
                               </div>
-                              <Button
-                                variant={pick?.picked_team === game.home_team ? 'default' : 'outline'}
-                                size="sm"
-                                className="min-w-[80px] text-xs"
-                                onClick={() => handleTeamPick(gameId, game.home_team)}
-                                disabled={!!locked}
-                              >
-                                {game.home_team}
-                              </Button>
-                            </div>
 
-                            {/* Confidence selector */}
-                            <div className="w-24">
-                              <Select
-                                value={pick?.confidence_points?.toString() || ''}
-                                onValueChange={(val) => handleConfidenceChange(gameId, parseInt(val))}
-                                disabled={!pick?.picked_team || !!locked}
-                              >
-                                <SelectTrigger className="h-8 text-xs">
-                                  <SelectValue placeholder="Pts" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {Array.from({ length: maxPoints }, (_, i) => maxPoints - i).map(pts => (
-                                    <SelectItem
-                                      key={pts}
-                                      value={pts.toString()}
-                                      disabled={usedConfidencePoints.has(pts) && pick?.confidence_points !== pts}
-                                    >
-                                      {pts} pts
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
+                              {/* Confidence + result */}
+                              <div className="flex items-center gap-2 justify-end sm:justify-start">
+                                <Select
+                                  value={pick?.confidence_points?.toString() || ''}
+                                  onValueChange={(val) => handleConfidenceChange(gameId, parseInt(val))}
+                                  disabled={!pick?.picked_team || !!locked}
+                                >
+                                  <SelectTrigger className="h-8 w-20 sm:w-24 text-xs">
+                                    <SelectValue placeholder="Pts" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {Array.from({ length: maxPoints }, (_, i) => maxPoints - i).map(pts => (
+                                      <SelectItem
+                                        key={pts}
+                                        value={pts.toString()}
+                                        disabled={usedConfidencePoints.has(pts) && pick?.confidence_points !== pts}
+                                      >
+                                        {pts} pts
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
 
-                            {/* Result indicator */}
-                            {existingPick?.is_correct !== null && existingPick?.is_correct !== undefined && (
-                              <div className="w-6">
-                                {existingPick.is_correct ? (
-                                  <CheckCircle className="w-5 h-5 text-green-500" />
-                                ) : (
-                                  <XCircle className="w-5 h-5 text-red-500" />
+                                {existingPick?.is_correct !== null && existingPick?.is_correct !== undefined && (
+                                  <div className="w-5">
+                                    {existingPick.is_correct ? (
+                                      <CheckCircle className="w-4 h-4 text-green-500" />
+                                    ) : (
+                                      <XCircle className="w-4 h-4 text-red-500" />
+                                    )}
+                                  </div>
                                 )}
                               </div>
-                            )}
+                            </div>
                           </div>
                         );
                       })}
@@ -300,15 +303,14 @@ const PoolConfidence = () => {
                   )}
 
                   {games.length > 0 && (
-                    <div className="mt-6 flex items-center justify-between pt-4 border-t">
-                      {/* Current-week points earned (live display) */}
-                      <div className="flex items-center gap-4">
-                        <span className="text-sm text-muted-foreground">
-                          {picks.size} of {games.length} games picked
+                    <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-3 border-t">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs sm:text-sm">
+                        <span className="text-muted-foreground">
+                          {picks.size}/{games.length} picked
                         </span>
                         {existingPicks.some(p => p.is_correct !== null) && (
-                          <span className="text-sm font-bold text-primary">
-                            This week: {existingPicks.reduce((sum, p) => sum + (p.is_correct ? (p.confidence_points || 0) : 0), 0)} pts
+                          <span className="font-bold text-primary">
+                            {existingPicks.reduce((sum, p) => sum + (p.is_correct ? (p.confidence_points || 0) : 0), 0)} pts
                             <span className="text-muted-foreground font-normal ml-1">
                               / {existingPicks.reduce((sum, p) => sum + (p.confidence_points || 0), 0)} possible
                             </span>
@@ -318,8 +320,10 @@ const PoolConfidence = () => {
                       <Button
                         onClick={handleSubmitPicks}
                         disabled={picks.size === 0 || submitting}
+                        size="sm"
+                        className="text-xs sm:text-sm self-end sm:self-auto"
                       >
-                        {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                        {submitting && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
                         Submit Picks
                       </Button>
                     </div>
@@ -330,48 +334,50 @@ const PoolConfidence = () => {
 
             <TabsContent value="standings">
               <Card className="card-citrus border-none shadow-lg">
-                <CardHeader>
-                  <CardTitle className="text-lg">Confidence Pool Standings</CardTitle>
+                <CardHeader className="px-3 sm:px-6 py-3 sm:py-4">
+                  <CardTitle className="text-base sm:text-lg">Confidence Pool Standings</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-0 sm:px-6">
                   {standings.length === 0 ? (
-                    <div className="text-center py-12 text-muted-foreground">
+                    <div className="text-center py-12 text-muted-foreground px-4">
                       <p>No standings data yet.</p>
                     </div>
                   ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-12">Rank</TableHead>
-                          <TableHead>Player</TableHead>
-                          <TableHead className="text-center">Total Pts</TableHead>
-                          <TableHead className="text-center">Possible</TableHead>
-                          <TableHead className="text-center">Weeks</TableHead>
-                          <TableHead className="text-right">Efficiency</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {standings.map((s, i) => (
-                          <TableRow key={s.user_id} className={s.user_id === user?.id ? 'bg-primary/5' : ''}>
-                            <TableCell>
-                              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${i < 3 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'}`}>
-                                {i + 1}
-                              </span>
-                            </TableCell>
-                            <TableCell className="font-medium">
-                              {s.display_name}
-                              {s.user_id === user?.id && <Badge variant="outline" className="ml-2 text-xs">YOU</Badge>}
-                            </TableCell>
-                            <TableCell className="text-center font-bold text-primary">{s.total_points}</TableCell>
-                            <TableCell className="text-center text-muted-foreground">{s.possible_points}</TableCell>
-                            <TableCell className="text-center">{s.weeks_played}</TableCell>
-                            <TableCell className="text-right font-medium">
-                              {s.possible_points > 0 ? ((s.total_points / s.possible_points) * 100).toFixed(1) : '0.0'}%
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs sm:text-sm">
+                        <thead>
+                          <tr className="border-b text-muted-foreground">
+                            <th className="text-left py-2 px-2 w-8">#</th>
+                            <th className="text-left py-2 px-2">Player</th>
+                            <th className="text-center py-2 px-2">Pts</th>
+                            <th className="text-center py-2 px-2 hidden sm:table-cell">Possible</th>
+                            <th className="text-center py-2 px-2 hidden sm:table-cell">Wks</th>
+                            <th className="text-right py-2 px-2">Eff</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {standings.map((s, i) => (
+                            <tr key={s.user_id} className={`border-b last:border-0 ${s.user_id === user?.id ? 'bg-primary/5' : ''}`}>
+                              <td className="py-2 px-2">
+                                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${i < 3 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'}`}>
+                                  {i + 1}
+                                </span>
+                              </td>
+                              <td className="py-2 px-2 font-medium truncate max-w-[100px] sm:max-w-none">
+                                {s.display_name}
+                                {s.user_id === user?.id && <Badge variant="outline" className="ml-1 text-[8px] px-1 hidden sm:inline-flex">YOU</Badge>}
+                              </td>
+                              <td className="py-2 px-2 text-center font-bold text-primary">{s.total_points}</td>
+                              <td className="py-2 px-2 text-center text-muted-foreground hidden sm:table-cell">{s.possible_points}</td>
+                              <td className="py-2 px-2 text-center hidden sm:table-cell">{s.weeks_played}</td>
+                              <td className="py-2 px-2 text-right font-medium">
+                                {s.possible_points > 0 ? ((s.total_points / s.possible_points) * 100).toFixed(0) : '0'}%
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   )}
                 </CardContent>
               </Card>
