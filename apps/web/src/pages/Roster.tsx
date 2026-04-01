@@ -734,12 +734,26 @@ const Roster = () => {
           );
           
           if (dailyRoster) {
-            
+
             // Transform to HockeyPlayer format with starter flag
             const starters = dailyRoster.starters.map(p => ({ ...p, starter: true }));
             const bench = [...dailyRoster.bench];
             const ir = dailyRoster.ir;
-            
+
+            // Recover players in roster_assignments but missing from daily snapshot
+            // (e.g. newly added via trade/waiver after snapshot was created)
+            const snapshotPlayerIds = new Set([
+              ...starters.map(p => String(p.id)),
+              ...bench.map(p => String(p.id)),
+              ...ir.map(p => String(p.id)),
+            ]);
+            transformedPlayers.forEach(player => {
+              if (!snapshotPlayerIds.has(String(player.id))) {
+                bench.push(player);
+                logger.info(`[Roster] Recovered missing player ${player.name} (${player.id}) from roster_assignments → bench (daily roster)`);
+              }
+            });
+
             setRoster({
               starters,
               bench,
