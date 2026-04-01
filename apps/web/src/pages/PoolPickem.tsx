@@ -285,20 +285,16 @@ const PoolPickem = () => {
         setPicks(pm);
 
         // Fetch records from server API (one call, no downloading 1300+ games)
+        // Fetch records + H2H in ONE call
         try {
-          const tr = await PoolService.getTeamRecords();
+          const { records: tr, h2h: h2hRaw } = await PoolService.getTeamRecordsAndH2H(currentWeek);
           setRecords(tr);
-        } catch { /* records are supplementary */ }
-
-        // Fetch ALL H2H data in one call
-        try {
-          const h2hRaw = await PoolService.getWeekH2H(currentWeek);
           const h2hMap = new Map<string, { awayWins: number; homeWins: number; games: number }>();
           for (const [key, val] of Object.entries(h2hRaw)) {
             h2hMap.set(key, val);
           }
           setH2hData(h2hMap);
-        } catch { /* h2h is supplementary */ }
+        } catch { /* records + h2h are supplementary */ }
       } catch (err) { logger.error('[PoolPickem]', err); }
       finally { setLoading(false); }
     };
@@ -419,7 +415,7 @@ const PoolPickem = () => {
                       </div>
 
                       {/* Game rows — 2 columns on xl to reduce empty space */}
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-1.5">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-1.5">
                         {dateGames.map(game => (
                           <MatchupRow
                             key={String(game.id)}

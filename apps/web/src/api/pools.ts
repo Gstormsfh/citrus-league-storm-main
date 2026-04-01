@@ -17,9 +17,13 @@ export const poolApi = {
     return apiClient.get(`/api/pools/week/${weekNumber}/games`);
   },
 
-  /** Get all NHL team records (W-L-OTL + streaks) for the current season. */
-  getTeamRecords() {
-    return apiClient.get<Record<string, { w: number; l: number; otl: number; streak: string }>>('/api/pools/team-records');
+  /** Get all NHL team records + H2H for a given week. */
+  getTeamRecords(weekNumber?: number) {
+    const qs = weekNumber ? `?week=${weekNumber}` : '';
+    return apiClient.get<{
+      records: Record<string, { w: number; l: number; otl: number; streak: string }>;
+      h2h: Record<string, { awayWins: number; homeWins: number; games: number }>;
+    }>(`/api/pools/team-records${qs}`);
   },
 
   /** Get all H2H records for matchups in a given week. */

@@ -135,23 +135,20 @@ export class PoolService {
     return games.filter(g => !isGameLocked(g));
   }
 
-  /** Get all NHL team records + streaks for the current season. */
-  static async getTeamRecords(): Promise<Record<string, { w: number; l: number; otl: number; streak: string }>> {
+  /** Get all NHL team records + H2H for a given week (single API call). */
+  static async getTeamRecordsAndH2H(weekNumber?: number): Promise<{
+    records: Record<string, { w: number; l: number; otl: number; streak: string }>;
+    h2h: Record<string, { awayWins: number; homeWins: number; games: number }>;
+  }> {
     try {
-      const response = await poolApi.getTeamRecords();
-      return (response.data || {}) as Record<string, { w: number; l: number; otl: number; streak: string }>;
+      const response = await poolApi.getTeamRecords(weekNumber);
+      const data = response.data as any;
+      return {
+        records: data?.records || {},
+        h2h: data?.h2h || {},
+      };
     } catch {
-      return {};
-    }
-  }
-
-  /** Get all H2H records for matchups in a given week (single API call). */
-  static async getWeekH2H(weekNumber: number): Promise<Record<string, { awayWins: number; homeWins: number; games: number }>> {
-    try {
-      const response = await poolApi.getH2H(weekNumber);
-      return (response.data || {}) as Record<string, { awayWins: number; homeWins: number; games: number }>;
-    } catch {
-      return {};
+      return { records: {}, h2h: {} };
     }
   }
 
