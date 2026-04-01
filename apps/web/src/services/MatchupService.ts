@@ -1496,12 +1496,12 @@ export const MatchupService = {
       // =============================================================================
       // YAHOO/SLEEPER FROZEN ROSTER LOGIC: Use daily lineup for past dates
       // =============================================================================
-      // If targetDate is provided and is a past date, use frozen roster from fantasy_daily_rosters
-      // Otherwise, use current lineup from team_lineups (today/future dates)
+      // If targetDate is provided, check fantasy_daily_rosters first (per-day lineups).
+      // Fall back to team_lineups (default lineup) if no daily roster exists.
       // =============================================================================
       const todayStr = getTodayMST();
       // CRITICAL: Ensure targetDate exists before using it
-      let useFrozenRoster = targetDate !== undefined && targetDate !== null && targetDate < todayStr;
+      let useFrozenRoster = targetDate !== undefined && targetDate !== null;
       
       if (useFrozenRoster && targetDate) {
         // Using frozen roster for past date

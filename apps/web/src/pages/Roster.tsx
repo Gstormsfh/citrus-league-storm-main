@@ -717,20 +717,20 @@ const Roster = () => {
         // CRITICAL: Use userTeamData (local var) not userTeam (state) because setUserTeam is async!
         const leagueIdForLineup = userTeamData?.league_id;
         
-        // CRITICAL: Only load from fantasy_daily_rosters for PAST dates
-        // For TODAY/FUTURE, skip frozen roster and use saved lineup from team_lineups instead
-        // This prevents stale frozen roster data from showing dropped players
+        // Check fantasy_daily_rosters for per-day lineups when a date is selected.
+        // This handles both past dates (frozen) and today/future (user-set daily lineups).
+        // Falls back to team_lineups (default) if no daily roster exists for that date.
         const todayStr = getTodayMST();
         const isPastDate = selectedDate && selectedDate < todayStr;
         const matchupForLoading = currentMatchup; // Use from closure
-        
-        if (isPastDate && matchupForLoading && teamId && leagueIdForLineup && !isDemoLeague(leagueIdForLineup)) {
+
+        if (selectedDate && matchupForLoading && teamId && leagueIdForLineup && !isDemoLeague(leagueIdForLineup)) {
           const dailyRoster = await LeagueService.loadDailyRoster(
             String(teamId),
             matchupForLoading.id,
             selectedDate,
             transformedPlayers,
-            true  // Fetch missing players for past dates (Yahoo/Sleeper behavior)
+            !!isPastDate  // Only fetch missing/dropped players for past dates
           );
           
           if (dailyRoster) {
