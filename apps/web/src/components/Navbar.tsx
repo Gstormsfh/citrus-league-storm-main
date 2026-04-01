@@ -115,7 +115,7 @@ const Navbar = () => {
         ...(activeLeagueId ? [{ label: 'Playoffs', path: `/league/${activeLeagueId}/playoffs`, icon: Trophy }] : []),
         { label: 'Players', path: '/free-agents', icon: Search },
         { label: 'GM Office', path: '/gm-office', icon: Settings },
-        { label: 'Draft', path: '/draft-room', icon: Sparkles },
+        { label: 'Draft', path: activeLeagueId ? `/draft-room?league=${activeLeagueId}` : '/draft-room', icon: Sparkles },
         { label: 'Armchair GM', path: '/armchair-gm', icon: DollarSign },
       ];
 

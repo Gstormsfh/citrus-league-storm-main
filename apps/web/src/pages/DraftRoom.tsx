@@ -2776,6 +2776,11 @@ const DraftRoom = () => {
     }));
   }, [teams]);
 
+  // If no league param in URL but we have an active league, redirect with the league param
+  if (!leagueId && activeLeagueId) {
+    return <Navigate to={`/draft-room?league=${activeLeagueId}`} replace />;
+  }
+
   // Redirect pool leagues to their pool page
   const _leagueType = activeLeagueFormat?.leagueType;
   if (isPoolLeague(_leagueType) && activeLeagueId) {
