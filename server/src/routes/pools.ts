@@ -95,7 +95,9 @@ poolRoutes.get('/team-records', async (c) => {
   try {
     // Use the official NHL standings API for accurate W-L-OTL
     // This avoids issues with missing period data in our nhl_games table
-    const response = await fetch('https://api-web.nhle.com/v1/standings/now');
+    const response = await fetch('https://api-web.nhle.com/v1/standings/now', {
+      headers: { 'User-Agent': 'CitrusFantasySports/1.0' },
+    });
     if (!response.ok) throw new Error(`NHL API returned ${response.status}`);
 
     const data = await response.json() as { standings?: Array<{
@@ -123,8 +125,9 @@ poolRoutes.get('/team-records', async (c) => {
     }
 
     return ok(c, records);
-  } catch (err) {
-    // Fallback: calculate from our nhl_games if NHL API is down
+  } catch (nhlErr) {
+    // NHL API failed — fallback to our nhl_games data
+    console.error('[team-records] NHL API failed, using fallback:', nhlErr instanceof Error ? nhlErr.message : nhlErr);
     try {
       const supabase = createUserClient(c.get('userToken'));
       const { data: games } = await supabase
@@ -134,22 +137,39 @@ poolRoutes.get('/team-records', async (c) => {
         .eq('season', 2025)
         .range(0, 1999);
 
+      // Fallback: W and total non-wins (L + OTL combined since period data is incomplete)
       const records: Record<string, { w: number; l: number; otl: number; streak: string }> = {};
-      for (const g of (games || [])) {
+      // Sort by date desc for streak calculation
+      const sorted = (games || []).sort((a: any, b: any) => (b.game_date || '').localeCompare(a.game_date || ''));
+      const streakTracker: Record<string, { first?: boolean; count: number }> = {};
+
+      for (const g of sorted) {
         if (!records[g.home_team]) records[g.home_team] = { w: 0, l: 0, otl: 0, streak: '' };
         if (!records[g.away_team]) records[g.away_team] = { w: 0, l: 0, otl: 0, streak: '' };
+        const homeWon = g.home_score > g.away_score;
         const isOT = g.period === 'OT' || g.period === 'SO';
-        if (g.home_score > g.away_score) {
+        if (homeWon) {
           records[g.home_team].w++;
+          // When period is NULL, count as regulation loss (imperfect but wins are accurate)
           if (isOT) records[g.away_team].otl++; else records[g.away_team].l++;
         } else {
           records[g.away_team].w++;
           if (isOT) records[g.home_team].otl++; else records[g.home_team].l++;
         }
+        // Streak tracking (games sorted most recent first)
+        for (const [team, won] of [[g.home_team, homeWon], [g.away_team, !homeWon]] as [string, boolean][]) {
+          if (!streakTracker[team]) { streakTracker[team] = { first: won, count: 1 }; }
+          else if (streakTracker[team].count > 0 && streakTracker[team].first === won) { streakTracker[team].count++; }
+          // Once streak breaks, set count to -1 to stop counting
+          else if (streakTracker[team].count > 0) { streakTracker[team].count = -1; }
+        }
+      }
+      for (const [team, st] of Object.entries(streakTracker)) {
+        if (records[team] && st.count > 0) records[team].streak = `${st.first ? 'W' : 'L'}${st.count}`;
       }
       return ok(c, records);
-    } catch {
-      return handleError(c, err, 'Failed to fetch team records');
+    } catch (fallbackErr) {
+      return handleError(c, fallbackErr, 'Failed to fetch team records');
     }
   }
 });
