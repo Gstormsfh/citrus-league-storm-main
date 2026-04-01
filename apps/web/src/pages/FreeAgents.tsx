@@ -128,8 +128,8 @@ const FreeAgents = () => {
     }
     fetchPlayers();
     setWatchlist(new Set(LeagueService.getWatchlist()));
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchPlayers/setWatchlist are stable; searchParams triggers re-fetch only when URL params change
-  }, [searchParams, activeLeagueId, isChangingLeague]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchPlayers/setWatchlist are stable; triggers: URL params, league change, state resolution
+  }, [searchParams, activeLeagueId, isChangingLeague, userLeagueState]);
 
   // Load schedule maximizers when players are loaded (needed for Top Projected combined view)
   useEffect(() => {

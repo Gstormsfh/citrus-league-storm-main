@@ -132,10 +132,10 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       // 3. Otherwise null
       let selectedLeagueId: string | null = null;
       
-      if (urlLeagueId && leagues?.some(l => l.id === urlLeagueId)) {
+      if (urlLeagueId && filteredLeagues.some(l => l.id === urlLeagueId)) {
         selectedLeagueId = urlLeagueId;
-      } else if (leagues && leagues.length > 0) {
-        selectedLeagueId = leagues[0].id;
+      } else if (filteredLeagues.length > 0) {
+        selectedLeagueId = filteredLeagues[0].id;
         // Update URL if no league param but we have leagues
         if (!urlLeagueId) {
           const newParams = new URLSearchParams(searchParams);
@@ -145,10 +145,10 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       }
 
       setActiveLeagueIdState(selectedLeagueId);
-      
+
       // Load full league details
       if (selectedLeagueId) {
-        const selectedLeague = leagues?.find(l => l.id === selectedLeagueId);
+        const selectedLeague = filteredLeagues.find(l => l.id === selectedLeagueId);
         setActiveLeague(selectedLeague || null);
       } else {
         setActiveLeague(null);

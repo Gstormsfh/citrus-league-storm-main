@@ -697,7 +697,7 @@ const PlayoffBracket = () => {
     return (
       <PageLayout>
         <div className="text-center py-20">
-          <p className="text-destructive text-lg mb-4">{error}</p>
+          <p className="text-muted-foreground text-lg mb-4">{error}</p>
           <Button onClick={() => effectiveLeagueId && navigate(`/standings`)}>
             Back to Standings
           </Button>
