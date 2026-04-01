@@ -46,11 +46,11 @@ function groupByDate(games: NHLGame[]): Map<string, NHLGame[]> {
 
 // ── The matchup row — single horizontal row per game ─────────────────
 
-function MatchupRow({ game, picked, existingPick, onPick, records, seasonGames }: {
+function MatchupRow({ game, picked, existingPick, onPick, records, h2hData }: {
   game: NHLGame; picked?: string; existingPick?: PickemPick;
   onPick: (id: string, team: string) => void;
   records: Record<string, { w: number; l: number; otl: number; streak?: string }>;
-  seasonGames: NHLGame[];
+  h2hData: Map<string, { team1Wins: number; team2Wins: number; games: number }>;
 }) {
   const gid = String(game.id);
   const dt = parseGameTime(game);
@@ -74,20 +74,23 @@ function MatchupRow({ game, picked, existingPick, onPick, records, seasonGames }
     homePct = 100 - awayPct;
   }
 
-  // Season series
-  const h2h = seasonGames.filter(g =>
-    g.status === 'final' &&
-    ((g.home_team === game.home_team && g.away_team === game.away_team) ||
-     (g.home_team === game.away_team && g.away_team === game.home_team))
-  );
-  const awayH2HWins = h2h.filter(g =>
-    (g.home_team === game.away_team && g.home_score > g.away_score) ||
-    (g.away_team === game.away_team && g.away_score > g.home_score)
-  ).length;
-  const homeH2HWins = h2h.filter(g =>
-    (g.home_team === game.home_team && g.home_score > g.away_score) ||
-    (g.away_team === game.home_team && g.away_score > g.home_score)
-  ).length;
+  // Season series from server-side H2H data (no 1000-row limit)
+  const h2hKey = [game.away_team, game.home_team].sort().join('-');
+  const h2hResult = h2hData.get(h2hKey);
+  const h2hGames = h2hResult?.games || 0;
+  // Map the server response back to away/home wins
+  let awayH2HWins = 0, homeH2HWins = 0;
+  if (h2hResult) {
+    // Server returns team1/team2 sorted alphabetically — match to away/home
+    const sorted = [game.away_team, game.home_team].sort();
+    if (sorted[0] === game.away_team) {
+      awayH2HWins = h2hResult.team1Wins;
+      homeH2HWins = h2hResult.team2Wins;
+    } else {
+      awayH2HWins = h2hResult.team2Wins;
+      homeH2HWins = h2hResult.team1Wins;
+    }
+  }
 
   // Streaks from server-side records (calculated from ALL games, no 1000-row limit)
   const awayStreak = ar?.streak || '-';
@@ -175,7 +178,7 @@ function MatchupRow({ game, picked, existingPick, onPick, records, seasonGames }
 
         {/* Row 2: H2H */}
         <div className="text-[9px] font-display text-slate-400 mt-0.5">
-          {h2h.length > 0 ? (
+          {h2hGames > 0 ? (
             <span>
               H2H:{' '}
               <span className="font-bold" style={{ color: awayH2HWins > homeH2HWins ? away.primaryColor : '#94a3b8' }}>{awayH2HWins}</span>
@@ -275,7 +278,7 @@ const PoolPickem = () => {
   const [existingPicks, setExistingPicks] = useState<PickemPick[]>([]);
   const [standings, setStandings] = useState<PickemStanding[]>([]);
   const [records, setRecords] = useState<Record<string, { w: number; l: number; otl: number; streak?: string }>>({});
-  const [seasonGames, setSeasonGames] = useState<NHLGame[]>([]);
+  const [h2hData, setH2hData] = useState<Map<string, { team1Wins: number; team2Wins: number; games: number }>>(new Map());
   const [activeTab, setActiveTab] = useState('picks');
 
   useEffect(() => {
@@ -298,13 +301,26 @@ const PoolPickem = () => {
           setRecords(tr);
         } catch { /* records are supplementary */ }
 
-        // Fetch season H2H games (filtered to just teams playing this week)
+        // Fetch H2H for each matchup pair from server (no 1000-row limit issue)
         try {
-          const { ScheduleService } = await import('@/services/ScheduleService');
-          const seasonStart = new Date('2025-10-01');
-          const today = new Date();
-          const { games: allGames } = await ScheduleService.getGamesForDateRange(seasonStart, today);
-          setSeasonGames(allGames.filter((g: NHLGame) => g.status === 'final'));
+          const pairs = (wg || []).map(g => ({ away: g.away_team, home: g.home_team }));
+          const uniquePairs = Array.from(new Map(pairs.map(p => {
+            const key = [p.away, p.home].sort().join('-');
+            return [key, p];
+          })).values());
+
+          const h2hResults = await Promise.all(
+            uniquePairs.map(p => PoolService.getH2H(p.away, p.home))
+          );
+
+          // Build a map of h2h results keyed by team pair
+          const h2hMap = new Map<string, { team1Wins: number; team2Wins: number; games: number }>();
+          uniquePairs.forEach((p, i) => {
+            const key = [p.away, p.home].sort().join('-');
+            h2hMap.set(key, h2hResults[i]);
+          });
+
+          setH2hData(h2hMap);
         } catch { /* h2h is supplementary */ }
       } catch (err) { logger.error('[PoolPickem]', err); }
       finally { setLoading(false); }
@@ -432,7 +448,7 @@ const PoolPickem = () => {
                             existingPick={existingPicks.find(p => p.game_id === String(game.id))}
                             onPick={handlePick}
                             records={records}
-                            seasonGames={seasonGames}
+                            h2hData={h2hData}
                           />
                         ))}
                       </div>
