@@ -2,11 +2,11 @@
  * InvitePlayersButton — share join code via copy, email, or SMS
  * Used on pool pages and league dashboards for commissioners.
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Copy, Mail, MessageSquare, Share2, X } from 'lucide-react';
+import { Copy, Mail, MessageSquare, Share2, X, Smartphone } from 'lucide-react';
 
 interface InvitePlayersButtonProps {
   joinCode: string;
@@ -16,10 +16,25 @@ interface InvitePlayersButtonProps {
 export const InvitePlayersButton = ({ joinCode, leagueName }: InvitePlayersButtonProps) => {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    // Detect mobile/tablet via touch support + screen width
+    const checkMobile = () => {
+      setIsMobile(
+        'ontouchstart' in window ||
+        navigator.maxTouchPoints > 0 ||
+        window.innerWidth < 768
+      );
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const inviteLink = `${window.location.origin}/create-league?tab=join&code=${joinCode}`;
 
-  const inviteText = `Join my league "${leagueName}" on Citrus Fantasy Sports!\n\nJoin Code: ${joinCode}\n\n1. Go to: ${inviteLink}\n2. Paste the code and click Join`;
+  const inviteText = `Join my league "${leagueName}" on Citrus Fantasy Sports!\n\nJoin Code: ${joinCode}\n\nJoin here: ${inviteLink}`;
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(joinCode);
@@ -34,13 +49,28 @@ export const InvitePlayersButton = ({ joinCode, leagueName }: InvitePlayersButto
   const handleEmail = () => {
     const subject = encodeURIComponent(`Join ${leagueName} on Citrus Fantasy Sports`);
     const body = encodeURIComponent(inviteText);
-    window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
   };
 
   const handleSMS = () => {
     const body = encodeURIComponent(inviteText);
-    // sms: URI works on both iOS and Android
-    window.open(`sms:?body=${body}`, '_blank');
+    // iOS requires sms:&body= while Android uses sms:?body=
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const separator = isIOS ? '&' : '?';
+    window.location.href = `sms:${separator}body=${body}`;
+  };
+
+  const handleNativeShare = async () => {
+    try {
+      await navigator.share({
+        title: `Join ${leagueName} on Citrus Fantasy Sports`,
+        text: inviteText,
+        url: inviteLink,
+      });
+    } catch {
+      // User cancelled or share failed — fall back to copy
+      handleCopyLink();
+    }
   };
 
   if (!open) {
@@ -80,10 +110,18 @@ export const InvitePlayersButton = ({ joinCode, leagueName }: InvitePlayersButto
           <Mail className="w-3.5 h-3.5" />
           Send via Email
         </Button>
-        <Button variant="outline" size="sm" className="w-full justify-start gap-2 text-xs" onClick={handleSMS}>
-          <MessageSquare className="w-3.5 h-3.5" />
-          Send via SMS
-        </Button>
+        {isMobile && (
+          <Button variant="outline" size="sm" className="w-full justify-start gap-2 text-xs" onClick={handleSMS}>
+            <MessageSquare className="w-3.5 h-3.5" />
+            Send via SMS
+          </Button>
+        )}
+        {isMobile && typeof navigator.share === 'function' && (
+          <Button variant="outline" size="sm" className="w-full justify-start gap-2 text-xs" onClick={handleNativeShare}>
+            <Smartphone className="w-3.5 h-3.5" />
+            Share...
+          </Button>
+        )}
       </div>
     </div>
   );
