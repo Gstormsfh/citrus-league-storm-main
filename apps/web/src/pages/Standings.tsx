@@ -110,7 +110,7 @@ const Standings = () => {
           // Get teams from the demo league
           const { data: demoTeamsData, error: teamsError } = await DemoLeagueService.getDemoTeams();
 
-          if (teamsError || demoTeamsData.length === 0) {
+          if (teamsError || (demoTeamsData as unknown[]).length === 0) {
             logger.error('[Standings] Error loading demo teams:', teamsError);
             setTeams([]);
             setLoading(false);

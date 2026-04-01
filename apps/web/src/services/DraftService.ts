@@ -127,7 +127,7 @@ export const DraftService = {
   async getDraftOrder(leagueId: string, _userId: string, roundNumber: number, sessionId?: string): Promise<{ order: DraftOrder | null; error: unknown }> {
     try {
       const response = await draftApi.getDraftOrder(leagueId, roundNumber, sessionId);
-      return { order: response.data || null, error: null };
+      return { order: (response.data as DraftOrder | undefined) || null, error: null };
     } catch (error: unknown) {
       return { order: null, error };
     }
@@ -448,7 +448,7 @@ export const DraftService = {
       logger.log(`Initializing rosters for all teams in league ${leagueId}...`);
 
       const teamsResponse = await leagueApi.getTeams(leagueId);
-      const teams = teamsResponse.data;
+      const teams = teamsResponse.data as Team[] | undefined;
 
       if (!teams || teams.length === 0) {
         logger.log('No teams found in league');
@@ -533,7 +533,7 @@ export const DraftService = {
   async getDraftSnapshot(leagueId: string): Promise<{ snapshot: DraftSnapshot | null; error: unknown }> {
     try {
       const response = await draftApi.getSnapshot(leagueId);
-      return { snapshot: response.data || null, error: null };
+      return { snapshot: (response.data as DraftSnapshot | undefined) || null, error: null };
     } catch (error: unknown) {
       logger.error('Error getting draft snapshot:', error);
       return { snapshot: null, error };
@@ -619,7 +619,7 @@ export const DraftService = {
   ): Promise<{ rankings: Array<{ playerId: number; rank: number; positionCode: string; tier: number }>; error: unknown }> {
     try {
       const response = await draftApi.getRankings(leagueId, teamId);
-      return { rankings: response.data || [], error: null };
+      return { rankings: (response.data || []) as Array<{ playerId: number; rank: number; positionCode: string; tier: number }>, error: null };
     } catch (error: unknown) {
       logger.error('Error fetching autopick rankings:', error);
       return { rankings: [], error };

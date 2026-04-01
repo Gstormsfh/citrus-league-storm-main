@@ -197,16 +197,12 @@ poolRoutes.get('/h2h', async (c) => {
 
     if (pairTeams.length === 0) return ok(c, {});
 
-    // Fetch all final games for the season involving any of these teams
-    const allTeams = [...new Set(pairTeams.flat())];
-    const orConditions = allTeams.flatMap(t => [`home_team.eq.${t}`, `away_team.eq.${t}`]).join(',');
-
+    // Fetch ALL final season games (small payload: 4 columns, ~1200 rows)
     const { data: games } = await supabase
       .from('nhl_games')
       .select('home_team, away_team, home_score, away_score')
       .eq('status', 'final')
       .eq('season', 2025)
-      .or(orConditions)
       .range(0, 1999);
 
     // Build H2H for each pair

@@ -130,7 +130,12 @@ export class BestBallService {
     try {
       // Fetch all data from the API server
       const response = await bestballApi.getWeeklyData(leagueId, teamId, weekNumber);
-      const bbData = response.data;
+      const bbData = response.data as {
+        lineup?: { starters?: string[]; bench?: string[]; ir?: string[] };
+        playerIds?: number[];
+        players?: Array<{ player_id: number; position_code: string | null; eligible_positions: string | null }>;
+        weeklyStats?: Array<Record<string, unknown>>;
+      } | undefined;
       if (!bbData) return emptyResult;
 
       const { lineup, playerIds, players, weeklyStats } = bbData;
@@ -199,7 +204,7 @@ export class BestBallService {
     try {
       // Get all teams in the league via API
       const teamsResponse = await bestballApi.getLeagueTeams(leagueId);
-      const teams = teamsResponse.data;
+      const teams = teamsResponse.data as Array<{ id: string }> | undefined;
 
       if (!teams || teams.length === 0) return [];
 

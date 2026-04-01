@@ -2901,7 +2901,7 @@ export const MatchupService = {
       }
 
       const response = await matchupApi.updateScores(leagueId);
-      const data = response.data;
+      const data = response.data as Array<{ matchup_id: string; team1_score: number; team2_score: number; updated: boolean }> | undefined;
       const error = null;
       
       if (error) {

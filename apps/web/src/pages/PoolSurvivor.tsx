@@ -170,7 +170,6 @@ const PoolSurvivor = () => {
                           style={isSelected ? {
                             background: info.primaryColor,
                             borderColor: info.secondaryColor,
-                            ringColor: info.secondaryColor,
                           } : {}}
                           disabled={isDisabled}
                           onClick={() => setSelectedTeam(isSelected ? null : team)}

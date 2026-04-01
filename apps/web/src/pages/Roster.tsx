@@ -1325,7 +1325,7 @@ const Roster = () => {
     if (userTeamId && userTeam?.league_id && selectedWeek) {
       fetchMatchupForWeek();
     }
-  }, [userTeamId, userTeam?.league_id, selectedWeek]);
+  }, [userTeamId, userTeam?.league_id, selectedWeek, userLeagueState]);
 
   // Defensive State Management: Multiple reload triggers to ensure fresh data
   

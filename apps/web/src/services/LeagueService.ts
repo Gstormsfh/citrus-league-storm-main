@@ -445,7 +445,7 @@ async joinLeagueByCode(
   async getLeagueTeamsWithOwners(leagueId: string): Promise<{ teams: (Team & { owner_name?: string })[]; error: unknown }> {
     try {
       const response = await leagueApi.getTeams(leagueId, true);
-      return { teams: response.data || [], error: null };
+      return { teams: (response.data || []) as (Team & { owner_name?: string })[], error: null };
     } catch (error) {
       logger.error('Exception in getLeagueTeamsWithOwners:', error);
       return { teams: [], error };

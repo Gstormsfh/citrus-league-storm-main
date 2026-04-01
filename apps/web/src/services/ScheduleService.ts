@@ -220,10 +220,10 @@ export const ScheduleService = {
     return getCachedOrFetch(cacheKey, async () => {
       try {
         const response = await scheduleApi.getGames({ startDate: startStr, endDate: endStr });
-        return { games: response.data || [], error: null };
+        return { games: (response.data || []) as NHLGame[], error: null };
       } catch (error) {
         logger.error('Error fetching games for date range:', error);
-        return { games: [], error: error as PostgrestError };
+        return { games: [] as NHLGame[], error: error as PostgrestError };
       }
     });
   },
@@ -335,10 +335,10 @@ export const ScheduleService = {
           startDate: startStr || undefined,
           endDate: endStr || undefined,
         });
-        return { games: response.data || [], error: null };
+        return { games: (response.data || []) as NHLGame[], error: null };
       } catch (error) {
         logger.error('Error fetching games for team:', error);
-        return { games: [], error: error as PostgrestError };
+        return { games: [] as NHLGame[], error: error as PostgrestError };
       }
     });
   },
@@ -349,7 +349,7 @@ export const ScheduleService = {
   async getNextGameForTeam(teamAbbrev: string): Promise<{ game: NHLGame | null; error: PostgrestError | null }> {
     try {
       const response = await scheduleApi.getNextGame(teamAbbrev);
-      return { game: response.data || null, error: null };
+      return { game: (response.data as NHLGame | undefined) || null, error: null };
     } catch (error) {
       logger.error('Error fetching next game:', error);
       return { game: null, error: error as PostgrestError };

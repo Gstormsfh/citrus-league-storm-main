@@ -117,7 +117,7 @@ export class WaiverService {
         teamId,
       });
 
-      return data ?? { success: true };
+      return (data as { success: boolean; error?: string }) ?? { success: true };
     } catch (error: unknown) {
       logger.error('Error adding free agent:', error);
       accountApi.logSecurityEvent('ROSTER_MOVE_FAILED', leagueId, {
@@ -149,11 +149,12 @@ export class WaiverService {
         dropPlayerId: dropPlayerId ? String(dropPlayerId) : null,
       });
 
+      const result = data as { success: boolean; error?: string; claimId?: string } | undefined;
       accountApi.logSecurityEvent('WAIVER_CLAIM', leagueId, {
-        claimId: data?.claimId, teamId, playerId, dropPlayerId
+        claimId: result?.claimId, teamId, playerId, dropPlayerId
       });
 
-      return data ?? { success: true };
+      return result ?? { success: true };
     } catch (error: unknown) {
       logger.error('Error submitting waiver claim:', error);
       return {
@@ -232,7 +233,7 @@ export class WaiverService {
   static async getWaiverPriority(leagueId: string): Promise<WaiverPriority[]> {
     try {
       const { data } = await waiverApi.getWaiverPriority(leagueId);
-      return data || [];
+      return (data || []) as WaiverPriority[];
     } catch (error: unknown) {
       logger.error('Error fetching waiver priority:', error);
       return [];
@@ -248,7 +249,7 @@ export class WaiverService {
   ): Promise<WaiverClaim[]> {
     try {
       const { data } = await waiverApi.getTeamWaivers(leagueId, teamId);
-      return data || [];
+      return (data || []) as WaiverClaim[];
     } catch (error: unknown) {
       logger.error('Error fetching team waiver claims:', error);
       return [];
@@ -409,7 +410,7 @@ export class WaiverService {
         isConditionalDrop,
       });
 
-      return data ?? { success: true };
+      return (data as { success: boolean; error?: string; claimId?: string }) ?? { success: true };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       logger.error('[WaiverService] submitFAABBid error:', msg);
@@ -445,7 +446,7 @@ export class WaiverService {
   ): Promise<Array<{ team_id: string; team_name: string; remaining_budget: number; total_spent: number }>> {
     try {
       const { data } = await waiverApi.getFAABBudgets(leagueId);
-      return data || [];
+      return (data || []) as Array<{ team_id: string; team_name: string; remaining_budget: number; total_spent: number }>;
     } catch (err) {
       logger.error('[WaiverService] getAllFAABBudgets error:', err);
       return [];
@@ -462,7 +463,7 @@ export class WaiverService {
     try {
       const { data } = await apiClient.post(`/api/waivers/league/${leagueId}/process-faab`);
 
-      return data ?? { processed: 0, results: [] };
+      return (data as { processed: number; results: Array<{ player_id: number; winner_team_id: string; bid: number }>; error?: string }) ?? { processed: 0, results: [] };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       logger.error('[WaiverService] processFAABWaivers error:', msg);
@@ -483,7 +484,7 @@ export class WaiverService {
   ): Promise<{ success: boolean; error?: string }> {
     try {
       const { data } = await apiClient.post(`/api/waivers/league/${leagueId}/recalculate-priority`);
-      return data ?? { success: true };
+      return (data as { success: boolean; error?: string }) ?? { success: true };
     } catch (error: unknown) {
       logger.error('[WaiverService] recalculateReverseStandingsPriority error:', error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -501,7 +502,7 @@ export class WaiverService {
   ): Promise<{ success: boolean; error?: string }> {
     try {
       const { data } = await apiClient.put(`/api/waivers/league/${leagueId}/settings`, settings);
-      return data ?? { success: true };
+      return (data as { success: boolean; error?: string }) ?? { success: true };
     } catch (error: unknown) {
       logger.error('[WaiverService] updateWaiverSettings error:', error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };

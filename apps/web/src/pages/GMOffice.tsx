@@ -17,7 +17,17 @@ import { CitrusSlice, CitrusSparkle, CitrusLeaf, CitrusWedge, CitrusBurst } from
 import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 
-const gmActions = [
+interface GMAction {
+  title: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  citrusIcon: React.ComponentType<{ className?: string; color?: string }>;
+  gradient: string;
+  link: string;
+  hasNewInsight?: boolean;
+}
+
+const gmActions: GMAction[] = [
   {
     title: "Stormy AI Assistant",
     description: "Get personalized advice and insights from your AI GM",
@@ -69,7 +79,7 @@ const gmActions = [
   }
 ];
 
-const getPoolActions = (leagueType: string, leagueId: string) => [
+const getPoolActions = (leagueType: string, leagueId: string): GMAction[] => [
   {
     title: "Make Picks",
     description: `Submit your ${getPoolLabel(leagueType)} picks for this week`,
