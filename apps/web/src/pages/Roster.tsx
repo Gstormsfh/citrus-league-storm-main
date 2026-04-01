@@ -2780,8 +2780,8 @@ const Roster = () => {
           <div className={cn(
             "flex flex-col lg:grid lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2",
             userLeagueState === 'active-user' && userTeam?.league_id
-              ? "lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px]"
-              : "lg:grid-cols-[200px_1fr] xl:grid-cols-[220px_1fr]"
+              ? "lg:grid-cols-[260px_1fr_260px] xl:grid-cols-[280px_1fr_280px]"
+              : "lg:grid-cols-[260px_1fr] xl:grid-cols-[280px_1fr]"
           )}>
             {/* Main Content - MOBILE: Full width / DESKTOP: Scrollable panel */}
             <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto px-3 lg:px-0 order-1 lg:order-2">
