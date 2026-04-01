@@ -348,7 +348,7 @@ export const TeamIntelHub = () => {
       if (day.rosterGames === 0 && day.totalGames > 0) {
         insights.push({
           type: 'empty_roster_day',
-          message: `You have 0 players playing on ${day.dayLabel} - consider streaming`,
+          message: `No players on ${day.dayLabel} — stream a pickup`,
           action: 'Find Streamer',
           actionUrl: '/waiver-wire'
         });
@@ -360,9 +360,9 @@ export const TeamIntelHub = () => {
       if (depth.strength === 'Weak') {
         insights.push({
           type: 'position_need',
-          message: `Your ${depth.position} position is weak (${depth.grade} grade) - consider trades or waivers`,
+          message: `${depth.position} is weak (${depth.grade}) — upgrade via trade or waivers`,
           action: `Find ${depth.position}`,
-          actionUrl: `/trade-analyzer?position=${depth.position}`
+          actionUrl: `/free-agents?position=${depth.position}`
         });
       }
     });
@@ -372,9 +372,9 @@ export const TeamIntelHub = () => {
       if (day.totalGames <= 3 && day.totalGames > 0) {
         insights.push({
           type: 'streaming_opportunity',
-          message: `${day.dayLabel} is an off-night (${day.totalGames} games) - good streaming day`,
+          message: `${day.dayLabel}: only ${day.totalGames} games — stream a hot pickup`,
           action: 'Find Streamer',
-          actionUrl: '/waiver-wire'
+          actionUrl: '/free-agents'
         });
       }
     });
@@ -599,41 +599,39 @@ export const TeamIntelHub = () => {
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <h3 className="text-sm font-semibold text-foreground">Games This Week</h3>
               </div>
-              <div className="grid grid-cols-7 gap-2">
+              <div className="grid grid-cols-7 gap-1">
                 {calendarDays.map((day, idx) => {
                 const isOffNight = day.totalGames <= 3;
                 const heatColor = getHeatMapColor(day.totalGames);
                 const isToday = day.dateStr === new Date().toISOString().split('T')[0];
-                
+
                 return (
                   <div
                     key={idx}
                     className={`
-                      text-center p-3 rounded-lg border transition-all
+                      text-center py-1.5 px-0.5 rounded-md border transition-all
                       ${isToday ? 'ring-2 ring-citrus-orange/50 shadow-sm' : ''}
-                      ${isOffNight 
-                        ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800' 
+                      ${isOffNight
+                        ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800'
                         : 'bg-muted/30 border-border hover:bg-muted/50'
                       }
                     `}
                   >
-                    <div className="text-[10px] font-medium text-muted-foreground mb-1.5 uppercase tracking-wide">
-                      {day.dayLabel}
+                    <div className="text-[9px] font-semibold text-muted-foreground uppercase leading-none mb-1">
+                      {day.dayLabel.slice(0, 3)}
                     </div>
-                    <div 
-                      className="text-2xl font-bold mb-1.5"
+                    <div
+                      className="text-lg font-bold leading-none"
                       style={{ color: heatColor }}
                     >
                       {day.totalGames}
                     </div>
-                    <div className="text-[11px] text-muted-foreground font-medium">
-                      {day.rosterGames} on roster
+                    <div className="text-[9px] text-muted-foreground mt-0.5 leading-none">
+                      {day.rosterGames} yours
                     </div>
                     {isOffNight && (
-                      <div className="mt-2 pt-1.5 border-t border-red-200 dark:border-red-800">
-                        <span className="text-[10px] font-semibold text-red-600 dark:text-red-400 uppercase tracking-wide">
-                          Off-Night
-                        </span>
+                      <div className="text-[8px] font-bold text-red-500 uppercase mt-0.5 leading-none">
+                        Off
                       </div>
                     )}
                   </div>
@@ -650,18 +648,20 @@ export const TeamIntelHub = () => {
                 <AlertCircle className="h-4 w-4 text-citrus-orange" />
                 Actionable Insights
               </h3>
-              <div className="space-y-2 max-h-48 overflow-y-auto">
-                {actionableInsights.slice(0, 5).map((insight, idx) => (
+              <div className="space-y-1.5">
+                {actionableInsights.slice(0, 4).map((insight, idx) => (
                   <div
                     key={idx}
-                    className="p-2 rounded-lg border-2 bg-citrus-sage/5 border-citrus-sage/30"
+                    className="flex items-start gap-2 p-2 rounded-lg bg-citrus-sage/5 border border-citrus-sage/20"
                   >
-                    <div className="text-xs font-medium mb-1">{insight.message}</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] leading-snug text-foreground/80">{insight.message}</p>
+                    </div>
                     {insight.action && insight.actionUrl && (
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-6 px-2 text-[10px] mt-1"
+                        className="h-6 px-2 text-[10px] shrink-0"
                         onClick={() => navigate(insight.actionUrl!)}
                       >
                         {insight.action}
