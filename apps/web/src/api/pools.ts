@@ -26,13 +26,6 @@ export const poolApi = {
     }>(`/api/pools/team-records${qs}`);
   },
 
-  /** Get all H2H records for matchups in a given week. */
-  getH2H(weekNumber: number) {
-    return apiClient.get<Record<string, { awayWins: number; homeWins: number; games: number }>>(
-      `/api/pools/h2h?week=${weekNumber}`
-    );
-  },
-
   // ── Pick'em ──────────────────────────────────────────────────────────
 
   /** Submit or update Pick'em picks for a week. */

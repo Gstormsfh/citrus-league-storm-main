@@ -89,9 +89,9 @@ const PoolConfidence = () => {
         setPicks(pickMap);
         setStandings(await PoolService.getConfidenceStandings(activeLeagueId));
 
-        // Fetch team records
+        // Fetch team records + H2H
         try {
-          const tr = await PoolService.getTeamRecords();
+          const { records: tr } = await PoolService.getTeamRecordsAndH2H(currentWeek);
           setRecords(tr);
         } catch { /* supplementary */ }
       } catch (err) { logger.error('[PoolConfidence] Error:', err); }

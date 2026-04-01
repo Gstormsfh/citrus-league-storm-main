@@ -68,7 +68,7 @@ const PoolSurvivor = () => {
         } catch { /* non-critical */ }
         // Fetch team records
         try {
-          const tr = await PoolService.getTeamRecords();
+          const { records: tr } = await PoolService.getTeamRecordsAndH2H();
           setRecords(tr);
         } catch { /* supplementary */ }
       } catch (err) { logger.error('[PoolSurvivor] Error:', err); } finally { setLoading(false); }
