@@ -307,7 +307,7 @@ const PoolPickem = () => {
 
   const handlePick = (gid: string, team: string) => {
     const m = new Map(picks);
-    m.get(gid) === team ? m.delete(gid) : m.set(gid, team);
+    if (m.get(gid) === team) { m.delete(gid); } else { m.set(gid, team); }
     setPicks(m);
   };
 
@@ -317,8 +317,11 @@ const PoolPickem = () => {
     try {
       const arr = Array.from(picks.entries()).map(([game_id, picked_team]) => ({ game_id, picked_team }));
       const r = await PoolService.submitPickemPicks(activeLeagueId, user.id, currentWeek, arr);
-      r.success ? toast({ title: 'Picks Saved!', description: `${arr.length} picks submitted.` })
-        : toast({ title: 'Error', description: r.error || 'Failed', variant: 'destructive' });
+      if (r.success) {
+        toast({ title: 'Picks Saved!', description: `${arr.length} picks submitted.` });
+      } else {
+        toast({ title: 'Error', description: r.error || 'Failed', variant: 'destructive' });
+      }
     } catch { toast({ title: 'Error', description: 'Failed to submit', variant: 'destructive' }); }
     finally { setSubmitting(false); }
   };
