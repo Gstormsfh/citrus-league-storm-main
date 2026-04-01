@@ -1226,40 +1226,24 @@ const Roster = () => {
     }
   }, [loadRoster, userLeagueState, leagueLoading, isChangingLeague, toast]);
 
-  // Calculate available weeks and first week start date (similar to Matchup tab)
+  // Calculate available weeks and first week start date
+  // Uses activeLeague from context (already loaded) instead of a redundant API call
   useEffect(() => {
-    const calculateWeeks = async () => {
-      if (!userTeam?.league_id) return;
-      
-      try {
-        // Get league to determine first week start
-        const { league, error: leagueError } = await LeagueService.getLeague(userTeam.league_id, user.id);
-        if (leagueError || !league) {
-          logger.error('[Roster] Error loading league for week calculation:', leagueError);
-          return;
-        }
+    if (!activeLeague || activeLeague.draft_status !== 'completed') return;
 
-        const draftCompletionDate = getDraftCompletionDate(league);
-        if (!draftCompletionDate) {
-          return;
-        }
+    const draftCompletionDate = getDraftCompletionDate(activeLeague);
+    if (!draftCompletionDate) return;
 
-        const firstWeek = getFirstWeekStartDate(draftCompletionDate);
-        const weeks = getAvailableWeeks(firstWeek);
-        const currentWeek = getCurrentWeekNumber(firstWeek);
-        
-        setFirstWeekStart(firstWeek);
-        setAvailableWeeks(weeks);
-        setSelectedWeek(currentWeek); // Default to current week
-      } catch (error) {
-        logger.error('[Roster] Error calculating weeks:', error);
-      }
-    };
+    const firstWeek = getFirstWeekStartDate(draftCompletionDate);
+    const weeks = getAvailableWeeks(firstWeek);
+    const currentWeek = getCurrentWeekNumber(firstWeek);
 
-    if (userTeam?.league_id && (userLeagueState === 'active-user' || userLeagueState === 'guest')) {
-      calculateWeeks();
-    }
-  }, [userTeam?.league_id, userLeagueState, user?.id]);
+    setFirstWeekStart(firstWeek);
+    setAvailableWeeks(weeks);
+    // Only set to current week on initial load (selectedWeek still at default 1)
+    // or when league changes — don't override user's manual week selection
+    setSelectedWeek(prev => prev === 1 || prev > weeks.length ? currentWeek : prev);
+  }, [activeLeague]);
 
   // Handle week change
   const handleWeekChange = useCallback((week: number) => {
