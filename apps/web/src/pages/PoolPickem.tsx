@@ -92,11 +92,11 @@ function MatchupRow({ game, picked, existingPick, onPick, records, h2hData }: {
 
       {/* ═══ COLUMN 1: AWAY TEAM ═══ */}
       <button
-        className={`flex items-center gap-3 py-3 px-4 transition-all ${
+        className={`flex items-center gap-1.5 py-2.5 pl-2 pr-1.5 transition-all ${
           locked ? 'cursor-default' : 'cursor-pointer'
         } ${pickedAway ? '' : picked ? 'opacity-30' : ''}`}
         style={{
-          borderLeft: `4px solid ${away.primaryColor}`,
+          borderLeft: `3px solid ${away.primaryColor}`,
           background: pickedAway ? `${away.primaryColor}15` : undefined,
         }}
         onMouseEnter={(e) => { if (!locked && !pickedAway) e.currentTarget.style.background = `${away.primaryColor}0a`; }}
@@ -105,51 +105,41 @@ function MatchupRow({ game, picked, existingPick, onPick, records, h2hData }: {
         disabled={!!locked}
       >
         {/* Monogram */}
-        <div className="w-10 h-10 rounded-full flex items-center justify-center font-varsity font-black text-white text-[10px] shrink-0 shadow"
+        <div className="w-8 h-8 rounded-full flex items-center justify-center font-varsity font-black text-white text-[9px] shrink-0 shadow-sm"
           style={{ background: away.primaryColor }}>
           {game.away_team}
         </div>
-        {/* Name + record — RIGHT aligned toward center */}
+        {/* Name + record */}
         <div className="flex-1 text-right min-w-0">
-          <div className={`font-display font-bold text-sm truncate ${awayWon ? 'text-slate-900' : isFinal ? 'text-slate-400' : 'text-slate-700'}`}>
+          <div className={`font-display font-bold text-xs truncate ${awayWon ? 'text-slate-900' : isFinal ? 'text-slate-400' : 'text-slate-700'}`}>
             {away.name}
           </div>
-          <div className="text-[11px] font-display text-slate-400 flex items-center gap-1.5 justify-end">
-            {ar && (
-              <span className={`font-semibold ${ar.w > ar.l ? 'text-emerald-600' : ar.w < ar.l ? 'text-red-500' : 'text-slate-500'}`}>
-                {ar.w}-{ar.l}-{ar.otl}
-              </span>
-            )}
-            {awayStreak !== '-' && (
-              <span className={`text-[10px] font-bold ${awayStreak.startsWith('W') ? 'text-emerald-500' : 'text-red-400'}`}>
-                {awayStreak}
-              </span>
-            )}
+          <div className="text-[10px] font-display text-slate-400 truncate">
+            {ar ? `${ar.w}-${ar.l}-${ar.otl}` : ''}
+            {awayStreak && awayStreak !== '-' ? ` ${awayStreak}` : ''}
           </div>
         </div>
         {/* Odds */}
         {!isFinal && !isLive && ar && hr && (
-          <div className={`font-varsity font-black text-xl leading-none shrink-0 ${awayPct >= 50 ? 'text-emerald-600' : 'text-slate-400'}`}>
+          <div className={`font-varsity font-black text-base leading-none shrink-0 ${awayPct >= 50 ? 'text-emerald-600' : 'text-slate-400'}`}>
             {awayPct}%
           </div>
         )}
-        {/* Score for final/live */}
         {isFinal && (
-          <span className={`font-varsity text-2xl shrink-0 ${awayWon ? 'text-slate-900 font-black' : 'text-slate-300'}`}>{game.away_score}</span>
+          <span className={`font-varsity text-lg shrink-0 ${awayWon ? 'text-slate-900 font-black' : 'text-slate-300'}`}>{game.away_score}</span>
         )}
-        {isLive && <span className="font-varsity text-xl shrink-0 text-red-600 font-black">{game.away_score}</span>}
-        {/* Pick indicator */}
+        {isLive && <span className="font-varsity text-lg shrink-0 text-red-600 font-black">{game.away_score}</span>}
         {pickedAway && !isFinal && !isLive && (
-          <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0" style={{ background: away.primaryColor }}>
-            <Check className="w-3 h-3 text-white" />
+          <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0" style={{ background: away.primaryColor }}>
+            <Check className="w-2.5 h-2.5 text-white" />
           </div>
         )}
-        {existingPick?.picked_team === game.away_team && existingPick.is_correct === true && <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />}
-        {existingPick?.picked_team === game.away_team && existingPick.is_correct === false && <XCircle className="w-5 h-5 text-red-500 shrink-0" />}
+        {existingPick?.picked_team === game.away_team && existingPick.is_correct === true && <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />}
+        {existingPick?.picked_team === game.away_team && existingPick.is_correct === false && <XCircle className="w-4 h-4 text-red-500 shrink-0" />}
       </button>
 
       {/* ═══ COLUMN 2: CENTER STATS ═══ */}
-      <div className="flex flex-col items-center justify-center w-36 sm:w-44 bg-slate-50/70 border-x border-slate-100 py-2 px-2">
+      <div className="flex flex-col items-center justify-center w-24 sm:w-28 2xl:w-24 bg-slate-50/70 border-x border-slate-100 py-1.5 px-1">
         {/* Row 1: Time or Score */}
         <div className="text-center">
           {isFinal ? (
@@ -196,11 +186,11 @@ function MatchupRow({ game, picked, existingPick, onPick, records, h2hData }: {
 
       {/* ═══ COLUMN 3: HOME TEAM ═══ */}
       <button
-        className={`flex items-center gap-3 py-3 px-4 transition-all flex-row-reverse ${
+        className={`flex items-center gap-1.5 py-2.5 pr-2 pl-1.5 transition-all flex-row-reverse ${
           locked ? 'cursor-default' : 'cursor-pointer'
         } ${pickedHome ? '' : picked ? 'opacity-30' : ''}`}
         style={{
-          borderRight: `4px solid ${home.primaryColor}`,
+          borderRight: `3px solid ${home.primaryColor}`,
           background: pickedHome ? `${home.primaryColor}15` : undefined,
         }}
         onMouseEnter={(e) => { if (!locked && !pickedHome) e.currentTarget.style.background = `${home.primaryColor}0a`; }}
@@ -208,46 +198,35 @@ function MatchupRow({ game, picked, existingPick, onPick, records, h2hData }: {
         onClick={() => !locked && onPick(gid, game.home_team)}
         disabled={!!locked}
       >
-        {/* Monogram */}
-        <div className="w-10 h-10 rounded-full flex items-center justify-center font-varsity font-black text-white text-[10px] shrink-0 shadow"
+        <div className="w-8 h-8 rounded-full flex items-center justify-center font-varsity font-black text-white text-[9px] shrink-0 shadow-sm"
           style={{ background: home.primaryColor }}>
           {game.home_team}
         </div>
-        {/* Name + record — LEFT aligned toward center */}
         <div className="flex-1 text-left min-w-0">
-          <div className={`font-display font-bold text-sm truncate ${homeWon ? 'text-slate-900' : isFinal ? 'text-slate-400' : 'text-slate-700'}`}>
+          <div className={`font-display font-bold text-xs truncate ${homeWon ? 'text-slate-900' : isFinal ? 'text-slate-400' : 'text-slate-700'}`}>
             {home.name}
           </div>
-          <div className="text-[11px] font-display text-slate-400 flex items-center gap-1.5">
-            {homeStreak !== '-' && (
-              <span className={`text-[10px] font-bold ${homeStreak.startsWith('W') ? 'text-emerald-500' : 'text-red-400'}`}>
-                {homeStreak}
-              </span>
-            )}
-            {hr && (
-              <span className={`font-semibold ${hr.w > hr.l ? 'text-emerald-600' : hr.w < hr.l ? 'text-red-500' : 'text-slate-500'}`}>
-                {hr.w}-{hr.l}-{hr.otl}
-              </span>
-            )}
+          <div className="text-[10px] font-display text-slate-400 truncate">
+            {hr ? `${hr.w}-${hr.l}-${hr.otl}` : ''}
+            {homeStreak && homeStreak !== '-' ? ` ${homeStreak}` : ''}
           </div>
         </div>
-        {/* Odds */}
         {!isFinal && !isLive && ar && hr && (
-          <div className={`font-varsity font-black text-xl leading-none shrink-0 ${homePct >= 50 ? 'text-emerald-600' : 'text-slate-400'}`}>
+          <div className={`font-varsity font-black text-base leading-none shrink-0 ${homePct >= 50 ? 'text-emerald-600' : 'text-slate-400'}`}>
             {homePct}%
           </div>
         )}
         {isFinal && (
-          <span className={`font-varsity text-2xl shrink-0 ${homeWon ? 'text-slate-900 font-black' : 'text-slate-300'}`}>{game.home_score}</span>
+          <span className={`font-varsity text-lg shrink-0 ${homeWon ? 'text-slate-900 font-black' : 'text-slate-300'}`}>{game.home_score}</span>
         )}
-        {isLive && <span className="font-varsity text-xl shrink-0 text-red-600 font-black">{game.home_score}</span>}
+        {isLive && <span className="font-varsity text-lg shrink-0 text-red-600 font-black">{game.home_score}</span>}
         {pickedHome && !isFinal && !isLive && (
-          <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0" style={{ background: home.primaryColor }}>
-            <Check className="w-3 h-3 text-white" />
+          <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0" style={{ background: home.primaryColor }}>
+            <Check className="w-2.5 h-2.5 text-white" />
           </div>
         )}
-        {existingPick?.picked_team === game.home_team && existingPick.is_correct === true && <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />}
-        {existingPick?.picked_team === game.home_team && existingPick.is_correct === false && <XCircle className="w-5 h-5 text-red-500 shrink-0" />}
+        {existingPick?.picked_team === game.home_team && existingPick.is_correct === true && <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />}
+        {existingPick?.picked_team === game.home_team && existingPick.is_correct === false && <XCircle className="w-4 h-4 text-red-500 shrink-0" />}
       </button>
     </div>
   );
