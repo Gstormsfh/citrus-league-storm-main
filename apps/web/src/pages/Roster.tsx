@@ -206,7 +206,7 @@ const safeValue = (val: number) => {
     // Projected Points in data is roughly (season points / 20) -> which is basically PPG * 4
     // So if p.projectedPoints is 4.0 => 1.0 PPG approx.
 
-    if (players.length === 0) return { score: 0, label: 'Critical Need', color: 'text-red-500', bg: 'bg-red-500/10' };
+    if (players.length === 0) return { score: 0, label: 'Empty', color: 'text-amber-500', bg: 'bg-amber-500/10' };
     
     const avgProj = players.reduce((sum, p) => sum + (p.projectedPoints || 0), 0) / players.length;
     
@@ -1188,10 +1188,10 @@ const Roster = () => {
             stack: e?.stack,
             name: e?.name
           });
-          toast({ 
-            title: "Error", 
-            description: `Could not load roster. ${errorMessage || 'Unknown error'}`,
-            variant: "destructive" 
+          toast({
+            title: "Unable to Load Roster",
+            description: 'Please try refreshing the page.',
+            variant: "default"
           });
         } else {
           // Silently ignore demo league errors

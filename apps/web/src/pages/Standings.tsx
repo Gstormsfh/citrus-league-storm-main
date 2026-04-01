@@ -364,9 +364,9 @@ const Standings = () => {
       } catch (err: unknown) {
         logger.error('[Standings] Error loading standings:', err);
         toast({
-          title: 'Error',
-          description: err instanceof Error ? err.message : 'Failed to load standings',
-          variant: 'destructive',
+          title: 'Unable to Load Standings',
+          description: 'Please try refreshing the page.',
+          variant: 'default',
         });
         // Fallback to empty teams on error - ensure component still renders
         setTeams([]);
