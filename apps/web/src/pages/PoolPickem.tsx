@@ -419,7 +419,7 @@ const PoolPickem = () => {
                       </div>
 
                       {/* Game rows — 2 columns on xl to reduce empty space */}
-                      <div className="grid grid-cols-1 xl:grid-cols-2 gap-1.5">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-1.5">
                         {dateGames.map(game => (
                           <MatchupRow
                             key={String(game.id)}
