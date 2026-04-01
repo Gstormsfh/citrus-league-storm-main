@@ -90,10 +90,14 @@ export class LineupService {
       }
     }
 
-    // 3. Per-day isolation: when targetDate is provided, read the OLD default
-    //    BEFORE writing so we can snapshot other dates with the pre-edit lineup.
-    let previousLineup: typeof lineup | null = null;
+    // 3. Per-day isolation: when targetDate is provided, only write to
+    //    fantasy_daily_rosters. Do NOT update team_lineups — it must remain
+    //    as the "base" lineup that other dates inherit from.
+    //    The client-side recovery logic (Roster.tsx line ~743) handles any
+    //    players in roster_assignments that are missing from snapshots.
     if (targetDate) {
+      // Read the current base lineup to use for other dates' snapshots
+      let baseLineup: typeof lineup = lineup;
       const { data: prev } = await this.supabase
         .from('team_lineups')
         .select('starters, bench, ir, slot_assignments')
@@ -101,16 +105,21 @@ export class LineupService {
         .eq('league_id', leagueId)
         .maybeSingle();
       if (prev) {
-        previousLineup = {
-          starters: (prev.starters as string[]) || [],
-          bench: (prev.bench as string[]) || [],
-          ir: (prev.ir as string[]) || [],
+        baseLineup = {
+          starters: ((prev.starters as unknown[]) || []).map(String),
+          bench: ((prev.bench as unknown[]) || []).map(String),
+          ir: ((prev.ir as unknown[]) || []).map(String),
           slot_assignments: (prev.slot_assignments as Record<string, string>) || {},
         };
       }
+
+      await this.createDailyRosterSnapshotsIsolated(
+        teamId, leagueId, lineup, baseLineup, targetDate
+      );
+      return { success: true, data: { ...lineup, league_id: leagueId, team_id: teamId } };
     }
 
-    // 4. ALWAYS update team_lineups (the canonical "latest" lineup).
+    // No targetDate — update the base lineup in team_lineups
     const { error, data } = await this.supabase
       .from('team_lineups')
       .upsert({
@@ -128,14 +137,6 @@ export class LineupService {
     if (error) {
       logger.error('[LineupService.saveLineup] Upsert failed:', error);
       return { success: false, error: error.message };
-    }
-
-    // 5. Create per-day snapshots: targetDate gets NEW lineup, other dates
-    //    without existing snapshots get the PREVIOUS default lineup.
-    if (targetDate) {
-      await this.createDailyRosterSnapshotsIsolated(
-        teamId, leagueId, lineup, previousLineup || lineup, targetDate
-      );
     }
 
     return { success: true, data };
