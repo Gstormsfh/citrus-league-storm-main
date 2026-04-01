@@ -246,9 +246,9 @@ const FreeAgents = () => {
     } catch (error) {
       logger.error('Error fetching players:', error);
       toast({
-        title: "Error",
-        description: `Failed to load players: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        variant: "destructive"
+        title: "Unable to Load Players",
+        description: 'Please try refreshing the page.',
+        variant: "default"
       });
     } finally {
       setLoading(false);
