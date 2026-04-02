@@ -754,11 +754,48 @@ const Roster = () => {
               }
             });
 
+            // CRITICAL: Ensure every starter has a slot assignment.
+            // StartersGrid renders by slot lookup — any starter without
+            // a slotAssignments entry is INVISIBLE even though they're
+            // in the starters array. This repairs missing assignments.
+            const repairedSlotAssignments = { ...dailyRoster.slotAssignments };
+            const assignedSlots = new Set(Object.values(repairedSlotAssignments));
+            starters.forEach(player => {
+              const pid = String(player.id);
+              if (!repairedSlotAssignments[pid]) {
+                const pos = getFantasyPosition(player.position);
+                const slotCaps: Record<string, number> = { C: 2, LW: 2, RW: 2, D: 4, G: 2, UTIL: 1 };
+                let assigned = false;
+                // Try primary position slots first
+                for (let i = 1; i <= (slotCaps[pos] || 0); i++) {
+                  const slotId = `slot-${pos}-${i}`;
+                  if (!assignedSlots.has(slotId)) {
+                    repairedSlotAssignments[pid] = slotId;
+                    assignedSlots.add(slotId);
+                    assigned = true;
+                    break;
+                  }
+                }
+                // Fallback to UTIL for non-goalies
+                if (!assigned && pos !== 'G' && !assignedSlots.has('slot-UTIL')) {
+                  repairedSlotAssignments[pid] = 'slot-UTIL';
+                  assignedSlots.add('slot-UTIL');
+                  assigned = true;
+                }
+                if (!assigned) {
+                  // No slot available — move to bench instead of being invisible
+                  bench.push(player);
+                  const idx = starters.indexOf(player);
+                  if (idx >= 0) starters.splice(idx, 1);
+                }
+              }
+            });
+
             setRoster({
               starters,
               bench,
               ir,
-              slotAssignments: dailyRoster.slotAssignments
+              slotAssignments: repairedSlotAssignments
             });
             setLoading(false);
             return; // Exit early - we've loaded from daily roster
@@ -1224,14 +1261,6 @@ const Roster = () => {
       return;
     }
 
-    // For active users with a league, wait for matchup data before loading roster.
-    // This prevents a race where loadRoster runs with selectedDate=null (before
-    // fetchMatchupForWeek sets it), causing a load from team_lineups that shows
-    // an auto-organized layout missing players from their saved slot assignments.
-    if (userLeagueState === 'active-user' && activeLeagueId && !currentMatchup) {
-      return; // Wait for fetchMatchupForWeek to set currentMatchup + selectedDate
-    }
-
     // For guests, load immediately. For logged-in users, wait for league context
     if (userLeagueState === 'guest' || !leagueLoading) {
       try {
@@ -1246,7 +1275,7 @@ const Roster = () => {
         });
       }
     }
-  }, [loadRoster, userLeagueState, leagueLoading, isChangingLeague, activeLeagueId, currentMatchup, toast]);
+  }, [loadRoster, userLeagueState, leagueLoading, isChangingLeague, toast]);
 
   // Calculate available weeks and first week start date
   // Uses activeLeague from context (already loaded) instead of a redundant API call
