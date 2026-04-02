@@ -949,20 +949,11 @@ const Roster = () => {
               }
             }
             
-            // Second pass: Fill any remaining slots with best available players (if still under 13)
-            while (starters.length < totalSlotsNeeded && availableBench.length > 0) {
-              const bestPlayer = availableBench.shift();
-              if (bestPlayer) {
-                starters.push({ ...bestPlayer, starter: true });
-                // Remove from bench
-                const benchIndex = bench.findIndex(p => p.id === bestPlayer.id);
-                if (benchIndex >= 0) {
-                  bench.splice(benchIndex, 1);
-                }
-              }
-            }
+            // NOTE: No position-blind second pass. If starters < 13 because no
+            // eligible players exist for certain positions (e.g., only 3 D for 4 D slots),
+            // those slots stay empty. This matches Yahoo/ESPN fantasy behavior.
           }
-          
+
           // Ensure all slot assignments are valid (player still exists)
           const validSlotAssignments: Record<string, string> = {};
           Object.entries(savedLineup.slotAssignments || {}).forEach(([playerId, slotId]) => {
@@ -970,7 +961,7 @@ const Roster = () => {
               validSlotAssignments[playerId] = slotId as string;
             }
           });
-          
+
           // Recalculate slot assignments for any newly added starters
           // Convert IDs to strings for consistent comparison
           const newStarters = starters.filter(s => !validSlotAssignments[String(s.id)]);
@@ -985,37 +976,22 @@ const Roster = () => {
           }
 
           // Safety net: if any starters still lack slots after incremental assignment,
-          // try a full recalculation first, then force-assign to empty slots, and
-          // finally move truly unplaceable starters to bench (never leave them invisible)
+          // try a full recalculation, then demote still-orphaned starters to bench.
+          // NEVER force a player into a position-ineligible slot (e.g., RW into D4).
+          // Empty starter slots are valid — just like Yahoo/ESPN fantasy.
           const orphanedStarters = starters.filter(s => !validSlotAssignments[String(s.id)]);
           if (orphanedStarters.length > 0) {
-            // Attempt 1: Full recalculation for all starters (no constraints)
             const fullAssignments = calculateInitialSlotAssignments(starters);
             Object.entries(fullAssignments).forEach(([playerId, slotId]) => {
               validSlotAssignments[String(playerId)] = slotId;
             });
 
-            // Attempt 2: Force orphans into any empty slot (position mismatch is better than invisible)
-            const allSlotIds = [
-              'slot-C-1', 'slot-C-2', 'slot-LW-1', 'slot-LW-2', 'slot-RW-1', 'slot-RW-2',
-              'slot-D-1', 'slot-D-2', 'slot-D-3', 'slot-D-4', 'slot-G-1', 'slot-G-2', 'slot-UTIL'
-            ];
+            // Move still-orphaned starters to bench — they have no eligible slot
             const stillOrphaned = starters.filter(s => !validSlotAssignments[String(s.id)]);
-            if (stillOrphaned.length > 0) {
-              const occupiedSlots = new Set(Object.values(validSlotAssignments));
-              const emptySlots = allSlotIds.filter(s => !occupiedSlots.has(s));
-
-              for (const orphan of stillOrphaned) {
-                if (emptySlots.length > 0) {
-                  // Put them in any empty slot — visible in wrong position > invisible
-                  validSlotAssignments[String(orphan.id)] = emptySlots.shift()!;
-                } else {
-                  // No empty slots at all — move to bench so they're at least visible
-                  const idx = starters.indexOf(orphan);
-                  if (idx >= 0) starters.splice(idx, 1);
-                  bench.push({ ...orphan, starter: false } as any);
-                }
-              }
+            for (const orphan of stillOrphaned) {
+              const idx = starters.indexOf(orphan);
+              if (idx >= 0) starters.splice(idx, 1);
+              bench.unshift({ ...orphan, starter: false } as any);
             }
           }
           
