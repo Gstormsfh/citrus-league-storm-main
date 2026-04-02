@@ -1448,19 +1448,13 @@ const Roster = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchLockedPlayerIds transitively covers roster arrays
   }, [fetchLockedPlayerIds]);
 
-  // Reload roster when selected date changes to a PAST date (to load frozen roster)
-  // For TODAY/FUTURE dates, we keep the current roster - projections are fetched by the dedicated useEffect
+  // Reload roster when selected date changes — each day has independent lineup data
+  // (per-day daily roster from fantasy_daily_rosters, or base fallback from team_lineups).
+  // Must reload for ALL dates (past, today, future) to prevent stale React state
+  // from the previous date leaking into the new date's view.
   useEffect(() => {
     if (selectedDate && currentMatchup && userTeamId) {
-      const todayStr = getTodayMST();
-      const isPastDate = selectedDate < todayStr;
-
-      if (isPastDate) {
-        // Past date - need to load frozen roster from database
-        loadRoster(true);
-      }
-      // For today/future dates: projections are automatically fetched by the fetchDailyProjections useEffect
-      // which triggers on selectedDate changes
+      loadRoster(true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- currentMatchup object would cause infinite re-renders; .id is sufficient
   }, [selectedDate, currentMatchup?.id, userTeamId, loadRoster]);
@@ -2592,11 +2586,10 @@ const Roster = () => {
             slotAssignments: newAssignments
           };
           // Yahoo-style: Always save to a specific date (never fall through to base team_lineups)
+          // State is already updated optimistically via setRoster above.
+          // Do NOT call loadRoster in .then() — it captures a stale selectedDate
+          // from the closure and races with date-switch reloads.
           LeagueService.saveLineup(userTeamId, userTeam.league_id, lineupToSave, selectedDate || getTodayMST())
-            .then(() => {
-              // Reload roster to reflect saved changes
-              loadRoster(true);
-            })
             .catch(err => {
               logger.error('[Roster] Failed to save lineup:', err);
             });
