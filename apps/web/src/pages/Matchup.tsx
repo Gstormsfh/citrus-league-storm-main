@@ -3211,67 +3211,87 @@ const Matchup = () => {
   // CRITICAL FIX: If we have a frozen roster for the selected date, use it directly
   // This ensures dropped players appear correctly in the Matchup tab
   const myStarters = useMemo(() => {
-    // If date is selected and we have a frozen roster, use that directly (includes dropped players)
+    // If date is selected and we have a non-empty frozen roster, use that directly (includes dropped players)
     if (selectedDate && frozenRostersByDate.has(selectedDate)) {
       const frozenRoster = frozenRostersByDate.get(selectedDate)!;
-      const directStarters = frozenRoster.myRoster.filter(p => p.isStarter);
+      // Only use frozen data if it actually has players (empty = no DB data, skip to fallback)
+      if (frozenRoster.myRoster.length > 0) {
+        const directStarters = frozenRoster.myRoster.filter(p => p.isStarter);
 
-      // Enrich with stats from dailyStatsByDate
-      const dayStatsMap = dailyStatsByDate.get(selectedDate);
-      const enriched = directStarters.map(player => {
-        const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
-        const stats = dayStatsMap?.get(playerId);
-        return {
-          ...player,
-          daily_total_points: stats?.daily_total_points ?? 0,
-          daily_stats_breakdown: stats?.daily_stats_breakdown
-        };
-      });
+        console.warn('[MATCHUP-DIAG] myStarters: FROZEN path for', selectedDate, {
+          frozenRosterSize: frozenRoster.myRoster.length,
+          starterCount: directStarters.length,
+          starterNames: directStarters.slice(0, 5).map(p => p.name)
+        });
 
-      return enriched;
+        // Enrich with stats from dailyStatsByDate
+        const dayStatsMap = dailyStatsByDate.get(selectedDate);
+        const enriched = directStarters.map(player => {
+          const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
+          const stats = dayStatsMap?.get(playerId);
+          return {
+            ...player,
+            daily_total_points: stats?.daily_total_points ?? 0,
+            daily_stats_breakdown: stats?.daily_stats_breakdown
+          };
+        });
+
+        return enriched;
+      }
     }
 
     // Otherwise use enriched displayMyTeam
+    if (selectedDate) {
+      const frozenEntry = frozenRostersByDate.get(selectedDate);
+      console.warn('[MATCHUP-DIAG] myStarters: FALLBACK (displayMyTeam) for', selectedDate, {
+        hasFrozenEntry: frozenRostersByDate.has(selectedDate),
+        frozenMyRosterLen: frozenEntry?.myRoster?.length ?? 'N/A',
+        displayMyTeamLen: displayMyTeam.length,
+        displayStarterCount: displayMyTeam.filter(p => p.isStarter).length,
+        displayStarterNames: displayMyTeam.filter(p => p.isStarter).slice(0, 5).map(p => p.name)
+      });
+    }
     return displayMyTeam.filter(p => p.isStarter);
   }, [selectedDate, frozenRostersByDate, dailyStatsByDate, displayMyTeam]);
   
   const myBench = useMemo(() => {
-    // If date is selected and we have a frozen roster, use that directly
     if (selectedDate && frozenRostersByDate.has(selectedDate)) {
       const frozenRoster = frozenRostersByDate.get(selectedDate)!;
-      const directBench = frozenRoster.myRoster.filter(p => !p.isStarter);
-      
-      // Enrich with stats
-      const dayStatsMap = dailyStatsByDate.get(selectedDate);
-      return directBench.map(player => {
-        const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
-        const stats = dayStatsMap?.get(playerId);
-        return {
-          ...player,
-          daily_total_points: stats?.daily_total_points ?? 0,
-          daily_stats_breakdown: stats?.daily_stats_breakdown
-        };
-      });
+      if (frozenRoster.myRoster.length > 0) {
+        const directBench = frozenRoster.myRoster.filter(p => !p.isStarter);
+
+        const dayStatsMap = dailyStatsByDate.get(selectedDate);
+        return directBench.map(player => {
+          const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
+          const stats = dayStatsMap?.get(playerId);
+          return {
+            ...player,
+            daily_total_points: stats?.daily_total_points ?? 0,
+            daily_stats_breakdown: stats?.daily_stats_breakdown
+          };
+        });
+      }
     }
     return displayMyTeam.filter(p => !p.isStarter);
   }, [selectedDate, frozenRostersByDate, dailyStatsByDate, displayMyTeam]);
   
   const opponentStarters = useMemo(() => {
-    // Same for opponent
     if (selectedDate && frozenRostersByDate.has(selectedDate)) {
       const frozenRoster = frozenRostersByDate.get(selectedDate)!;
-      const directStarters = frozenRoster.oppRoster.filter(p => p.isStarter);
-      
-      const dayStatsMap = dailyStatsByDate.get(selectedDate);
-      return directStarters.map(player => {
-        const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
-        const stats = dayStatsMap?.get(playerId);
-        return {
-          ...player,
-          daily_total_points: stats?.daily_total_points ?? 0,
-          daily_stats_breakdown: stats?.daily_stats_breakdown
-        };
-      });
+      if (frozenRoster.oppRoster.length > 0) {
+        const directStarters = frozenRoster.oppRoster.filter(p => p.isStarter);
+
+        const dayStatsMap = dailyStatsByDate.get(selectedDate);
+        return directStarters.map(player => {
+          const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
+          const stats = dayStatsMap?.get(playerId);
+          return {
+            ...player,
+            daily_total_points: stats?.daily_total_points ?? 0,
+            daily_stats_breakdown: stats?.daily_stats_breakdown
+          };
+        });
+      }
     }
     return displayOpponentTeam.filter(p => p.isStarter);
   }, [selectedDate, frozenRostersByDate, dailyStatsByDate, displayOpponentTeam]);
@@ -3279,18 +3299,20 @@ const Matchup = () => {
   const opponentBench = useMemo(() => {
     if (selectedDate && frozenRostersByDate.has(selectedDate)) {
       const frozenRoster = frozenRostersByDate.get(selectedDate)!;
-      const directBench = frozenRoster.oppRoster.filter(p => !p.isStarter);
-      
-      const dayStatsMap = dailyStatsByDate.get(selectedDate);
-      return directBench.map(player => {
-        const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
-        const stats = dayStatsMap?.get(playerId);
-        return {
-          ...player,
-          daily_total_points: stats?.daily_total_points ?? 0,
-          daily_stats_breakdown: stats?.daily_stats_breakdown
-        };
-      });
+      if (frozenRoster.oppRoster.length > 0) {
+        const directBench = frozenRoster.oppRoster.filter(p => !p.isStarter);
+
+        const dayStatsMap = dailyStatsByDate.get(selectedDate);
+        return directBench.map(player => {
+          const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
+          const stats = dayStatsMap?.get(playerId);
+          return {
+            ...player,
+            daily_total_points: stats?.daily_total_points ?? 0,
+            daily_stats_breakdown: stats?.daily_stats_breakdown
+          };
+        });
+      }
     }
     return displayOpponentTeam.filter(p => !p.isStarter);
   }, [selectedDate, frozenRostersByDate, dailyStatsByDate, displayOpponentTeam]);
@@ -4494,6 +4516,20 @@ const Matchup = () => {
           const frozenBatchResponse = await matchupApi.getFrozenRosterBatch(matchupData.matchup.id, datesToLoad);
           const allFrozenEntries = frozenBatchResponse.data as any[] | null;
 
+          // Diagnostic: log batch response shape and per-date entry counts
+          console.warn('[MATCHUP-DIAG] getFrozenRosterBatch response:', {
+            totalEntries: allFrozenEntries?.length ?? 0,
+            dates: datesToLoad,
+            myTeamId: matchupData.userTeam.id,
+            oppTeamId: matchupData.opponentTeam?.id,
+            sampleEntry: allFrozenEntries?.[0] ? JSON.stringify(allFrozenEntries[0]) : 'none',
+            entriesPerDate: datesToLoad.map(d => ({
+              date: d,
+              count: allFrozenEntries?.filter((e: any) => e.roster_date === d).length ?? 0,
+              myCount: allFrozenEntries?.filter((e: any) => e.roster_date === d && String(e.team_id) === matchupData.userTeam.id).length ?? 0,
+            }))
+          });
+
           if (allFrozenEntries && allFrozenEntries.length > 0) {
             // Diagnostic: show unique team_ids in frozen entries vs expected team IDs
             const frozenTeamIds = [...new Set((allFrozenEntries as any[]).map((e: any) => String(e.team_id)))];
@@ -4641,17 +4677,11 @@ const Matchup = () => {
                 }
               });
             } else {
-              // FALLBACK: No frozen roster for my team on this past date.
-              // Use current roster as best approximation.
-              log(` No frozen roster for my team on ${date}, using current roster as fallback`);
-              (matchupData.userTeam.roster || []).forEach((p: MatchupPlayer) => {
-                myRoster.push({ ...p } as MatchupPlayer);
-                const pid = String(p.id);
-                const slotId = matchupData.userTeam.slotAssignments?.[pid];
-                if (slotId) {
-                  mySlots[pid] = slotId;
-                }
-              });
+              // No frozen roster entries for my team on this date.
+              // Leave myRoster empty — do NOT fallback to base roster.
+              // This ensures myStarters/Date Change Handler know no per-day data exists
+              // and can fall through to the correct behavior (base roster via displayMyTeam).
+              log(` No frozen roster entries for my team on ${date} — skipping (no fallback)`);
             }
 
             // Build opponent frozen roster
@@ -4701,18 +4731,10 @@ const Matchup = () => {
                   }
                 }
               });
-            } else if (matchupData.opponentTeam) {
-              // FALLBACK: No fantasy_daily_rosters records for opponent on this past date.
-              // Use the opponent's current roster as the best approximation.
-              log(` No frozen roster for opponent on ${date}, using current roster as fallback`);
-              (matchupData.opponentTeam.roster || []).forEach((p: MatchupPlayer) => {
-                oppRoster.push({ ...p } as MatchupPlayer);
-                const pid = String(p.id);
-                const slotId = matchupData.opponentTeam?.slotAssignments?.[pid];
-                if (slotId) {
-                  oppSlots[pid] = slotId;
-                }
-              });
+            } else {
+              // No frozen roster entries for opponent on this date.
+              // Leave oppRoster empty — do NOT fallback to base roster.
+              log(` No frozen roster entries for opponent on ${date} — skipping (no fallback)`);
             }
 
             return {
@@ -4829,6 +4851,120 @@ const Matchup = () => {
       }, 50);
     });
   }, [selectedDate, frozenRostersByDate, baseCurrentRoster, myTeam, opponentTeamPlayers]);
+
+  // ============================================================
+  // FALLBACK: Direct daily roster fetch when frozen data is empty
+  // If frozenRostersByDate has no players for the selected date,
+  // fetch per-team frozen rosters directly (same DB query as Roster tab).
+  // This catches cases where the batch API returned empty data.
+  // ============================================================
+  useEffect(() => {
+    if (!selectedDate || !currentMatchup || userLeagueState !== 'active-user') return;
+    if (!userTeam?.id) return;
+
+    const frozenEntry = frozenRostersByDate.get(selectedDate);
+    // If frozen data already has players for this date, skip the direct fetch
+    if (frozenEntry && frozenEntry.myRoster.length > 0) return;
+
+    const myTeamId = userTeam.id;
+    const oppTeamId = opponentTeam?.id || null;
+    const matchupId = currentMatchup.id;
+
+    let cancelled = false;
+
+    const fetchDirect = async () => {
+      try {
+        // Fetch my team's daily roster entries
+        const [myResponse, oppResponse] = await Promise.all([
+          matchupApi.getFrozenRoster(matchupId, myTeamId, selectedDate),
+          oppTeamId
+            ? matchupApi.getFrozenRoster(matchupId, oppTeamId, selectedDate)
+            : Promise.resolve({ data: [] })
+        ]);
+
+        if (cancelled) return;
+
+        const myEntries = (myResponse?.data || []) as any[];
+        const oppEntries = (oppResponse?.data || []) as any[];
+
+        if (myEntries.length === 0 && oppEntries.length === 0) {
+          log('[FALLBACK] No daily roster entries found for', selectedDate);
+          return; // Truly no data — base roster fallback is correct
+        }
+
+        log('[FALLBACK] Direct fetch found entries for', selectedDate, {
+          myEntries: myEntries.length,
+          oppEntries: oppEntries.length
+        });
+
+        // Build roster from entries — use baseCurrentRoster players as enrichment source
+        const buildRoster = (entries: any[], basePlayers: MatchupPlayer[]) => {
+          const playerMap = new Map(basePlayers.map(p => [String(p.id), p]));
+          const roster: MatchupPlayer[] = [];
+          const slots: Record<string, string> = {};
+
+          entries.forEach((entry: any) => {
+            const playerId = String(entry.player_id);
+            const isStarter = entry.slot_type === 'active';
+            const basePlayer = playerMap.get(playerId);
+
+            if (basePlayer) {
+              roster.push({ ...basePlayer, isStarter } as MatchupPlayer);
+            } else if (entry.player_name) {
+              // Dropped/traded player — build from server-provided details
+              roster.push({
+                id: Number(entry.player_id),
+                name: entry.player_name,
+                position: entry.player_position || '',
+                team: entry.player_team || '',
+                teamAbbreviation: entry.player_team_abbreviation || entry.player_team || '',
+                points: 0, total_points: 0,
+                headshot_url: entry.player_headshot_url || '',
+                isStarter,
+                isOnIR: false,
+                stats: { goals: 0, assists: 0, sog: 0, blk: 0, xGoals: 0 },
+                matchupStats: { goals: 0, assists: 0, sog: 0, blk: 0, xGoals: 0 },
+                games: [], gamesRemaining: 0,
+                isGoalie: entry.player_position === 'G',
+                status: null,
+              } as MatchupPlayer);
+            }
+            if (entry.slot_id) slots[playerId] = entry.slot_id;
+          });
+
+          return { roster, slots };
+        };
+
+        const myBase = baseCurrentRoster?.myRoster || [];
+        const oppBase = baseCurrentRoster?.oppRoster || [];
+        const { roster: myRoster, slots: mySlots } = buildRoster(myEntries, myBase);
+        const { roster: oppRoster, slots: oppSlots } = buildRoster(oppEntries, oppBase);
+
+        if (myRoster.length === 0) return; // No usable data
+
+        // Update frozenRostersByDate with the fetched data
+        setFrozenRostersByDate(prev => {
+          const next = new Map(prev);
+          next.set(selectedDate, { myRoster, oppRoster, mySlots, oppSlots });
+          return next;
+        });
+
+        // Also update myTeam/opponentTeamPlayers to reflect the fetched roster
+        setMyTeam(myRoster);
+        setMyTeamSlotAssignments(mySlots);
+        if (oppRoster.length > 0) {
+          setOpponentTeamPlayers(oppRoster);
+          setOpponentTeamSlotAssignments(oppSlots);
+        }
+      } catch (err) {
+        logger.warn('[Matchup] Fallback daily roster fetch failed for', selectedDate, err);
+      }
+    };
+
+    fetchDirect();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate, frozenRostersByDate, currentMatchup?.id, userTeam?.id, opponentTeam?.id]);
 
   // Refresh matchup when page becomes visible (e.g., navigating back from roster page)
   useEffect(() => {
