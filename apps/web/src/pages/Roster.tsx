@@ -985,45 +985,35 @@ const Roster = () => {
           }
 
           // Safety net: if any starters still lack slots after incremental assignment,
-          // do a full recalculation (handles case where all position slots were already
-          // claimed and the incremental approach couldn't find a slot for orphaned players)
+          // try a full recalculation first, then force-assign to empty slots, and
+          // finally move truly unplaceable starters to bench (never leave them invisible)
           const orphanedStarters = starters.filter(s => !validSlotAssignments[String(s.id)]);
           if (orphanedStarters.length > 0) {
+            // Attempt 1: Full recalculation for all starters (no constraints)
             const fullAssignments = calculateInitialSlotAssignments(starters);
             Object.entries(fullAssignments).forEach(([playerId, slotId]) => {
               validSlotAssignments[String(playerId)] = slotId;
             });
-          }
 
-          // Ensure UTIL slot is assigned if we have 13 starters but no UTIL assignment
-          const hasUtilSlot = Object.values(validSlotAssignments).includes('slot-UTIL');
-          if (starters.length >= 13 && !hasUtilSlot) {
-            // Count how many players are in each position slot
-            const positionSlots = ['slot-C-1', 'slot-C-2', 'slot-LW-1', 'slot-LW-2', 'slot-RW-1', 'slot-RW-2', 
-                                   'slot-D-1', 'slot-D-2', 'slot-D-3', 'slot-D-4', 'slot-G-1', 'slot-G-2'];
-            const positionSlotCount = positionSlots.filter(slot => Object.values(validSlotAssignments).includes(slot)).length;
-            
-            // If we have 12 position slots filled, we need UTIL
-            // If we have 13 starters but only 12 position slots, one should be UTIL
-            if (positionSlotCount >= 12) {
-              // Find a starter that's not in a position-specific slot and not a goalie
-              const starterInUtilSlot = starters.find(s => {
-                const slot = validSlotAssignments[String(s.id)];
-                const pos = getFantasyPosition(s.position);
-                return !slot || (!positionSlots.includes(slot) && pos !== 'G');
-              });
-              
-              if (starterInUtilSlot) {
-                validSlotAssignments[String(starterInUtilSlot.id)] = 'slot-UTIL';
-              } else {
-                // Fallback: find any non-goalie starter without a slot
-                const unassignedStarter = starters.find(s => {
-                  const slot = validSlotAssignments[String(s.id)];
-                  const pos = getFantasyPosition(s.position);
-                  return !slot && pos !== 'G';
-                });
-                if (unassignedStarter) {
-                  validSlotAssignments[String(unassignedStarter.id)] = 'slot-UTIL';
+            // Attempt 2: Force orphans into any empty slot (position mismatch is better than invisible)
+            const allSlotIds = [
+              'slot-C-1', 'slot-C-2', 'slot-LW-1', 'slot-LW-2', 'slot-RW-1', 'slot-RW-2',
+              'slot-D-1', 'slot-D-2', 'slot-D-3', 'slot-D-4', 'slot-G-1', 'slot-G-2', 'slot-UTIL'
+            ];
+            const stillOrphaned = starters.filter(s => !validSlotAssignments[String(s.id)]);
+            if (stillOrphaned.length > 0) {
+              const occupiedSlots = new Set(Object.values(validSlotAssignments));
+              const emptySlots = allSlotIds.filter(s => !occupiedSlots.has(s));
+
+              for (const orphan of stillOrphaned) {
+                if (emptySlots.length > 0) {
+                  // Put them in any empty slot — visible in wrong position > invisible
+                  validSlotAssignments[String(orphan.id)] = emptySlots.shift()!;
+                } else {
+                  // No empty slots at all — move to bench so they're at least visible
+                  const idx = starters.indexOf(orphan);
+                  if (idx >= 0) starters.splice(idx, 1);
+                  bench.push({ ...orphan, starter: false } as any);
                 }
               }
             }
@@ -1040,13 +1030,26 @@ const Roster = () => {
           // Persist recovered lineup if new players were added from roster_assignments
           // This prevents players from disappearing on subsequent saves
           if (newPlayersRecovered && userTeamId && user && userTeam?.league_id && !isDemoLeague(userTeam.league_id)) {
+            // Integrity check: ensure every starter has a slot before saving
+            const startersWithoutSlots = starters.filter(s => !normalizedSlotAssignments[String(s.id)]);
+            if (startersWithoutSlots.length > 0) {
+              const recalculated = calculateInitialSlotAssignments(starters);
+              Object.entries(recalculated).forEach(([pid, slot]) => {
+                normalizedSlotAssignments[String(pid)] = slot;
+              });
+              // Update UI state with repaired assignments
+              setRoster({ starters, bench, ir, slotAssignments: normalizedSlotAssignments });
+            }
+
             logger.info('[Roster] Persisting recovered lineup with newly added players');
+            // CRITICAL: Pass selectedDate so date-specific views write to fantasy_daily_rosters
+            // instead of corrupting the base team_lineups
             await LeagueService.saveLineup(userTeamId, userTeam.league_id, {
               starters: starters.map(p => p.id),
               bench: bench.map(p => p.id),
               ir: ir.map(p => p.id),
               slotAssignments: normalizedSlotAssignments
-            });
+            }, selectedDate || undefined);
           }
         } else {
           // No saved lineup - use EXACT SAME LOGIC AS OtherTeam.tsx
