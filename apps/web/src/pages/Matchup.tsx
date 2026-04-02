@@ -436,7 +436,7 @@ const Matchup = () => {
       for (let i = 0; i < 7; i++) {
         const dayDate = new Date(startYear, startMonth - 1, startDay + i);
         const dateStr = `${dayDate.getFullYear()}-${String(dayDate.getMonth() + 1).padStart(2, '0')}-${String(dayDate.getDate()).padStart(2, '0')}`;
-        if (dateStr < todayStr) {
+        if (dateStr <= todayStr) {
           pastDates.push(dateStr);
         }
       }
@@ -4465,7 +4465,7 @@ const Matchup = () => {
         // This prevents stale frozen roster data from showing dropped players
         // ============================================================
         const todayStr = getTodayMST();
-        const datesToLoad = weekDates.filter(date => date < todayStr); // ONLY past dates
+        const datesToLoad = weekDates.filter(date => date <= todayStr); // Past dates + today
 
         if (datesToLoad.length > 0) {
           log(' Pre-loading rosters for PAST dates only:', datesToLoad);
