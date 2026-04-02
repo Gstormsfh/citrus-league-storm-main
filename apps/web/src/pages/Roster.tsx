@@ -798,9 +798,8 @@ const Roster = () => {
             setLoading(false);
             return; // Exit early - we've loaded from daily roster
           }
-        } else if (selectedDate) {
         }
-        
+
         // Regular lineup loading (from team_lineups or default)
         if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
           // Demo teams: Always auto-organize (don't check for saved lineups)
@@ -1095,7 +1094,6 @@ const Roster = () => {
               ir: ir.map(p => p.id),
               slotAssignments: assignments
             }); // No targetDate = set base lineup
-          } else if (selectedDate) {
           }
         }
         
