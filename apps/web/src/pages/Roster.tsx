@@ -571,15 +571,9 @@ const Roster = () => {
             const rosterResponse = await rosterApi.getPlayerIds(userTeamData.league_id, userTeamData.id);
             const playerIds = (rosterResponse.data || []) as string[];
 
-            // DEBUG: Check if MacKinnon is in roster_assignments
-            console.warn('[ROSTER DEBUG] roster_assignments playerIds count:', playerIds.length, 'MacKinnon (8477492) present:', playerIds.includes('8477492'));
+            // CRITICAL: player_id is TEXT in DB, and p.id is STRING in allPlayers (PlayerService line 287)
             // Compare strings to strings directly — ensure both sides are strings
             dbPlayers = allPlayers.filter(p => playerIds.includes(String(p.id)));
-
-            // DEBUG: Check if MacKinnon survived the allPlayers filter
-            const mackInAllPlayers = allPlayers.find(p => String(p.id) === '8477492');
-            const mackInDbPlayers = dbPlayers.find(p => String(p.id) === '8477492');
-            console.warn('[ROSTER DEBUG] allPlayers count:', allPlayers.length, 'MacKinnon in allPlayers:', !!mackInAllPlayers, 'MacKinnon in dbPlayers:', !!mackInDbPlayers, 'dbPlayers count:', dbPlayers.length);
 
             if (dbPlayers.length < playerIds.length) {
               // Some players in roster_assignments were not found in PlayerService.getAllPlayers()
@@ -718,27 +712,16 @@ const Roster = () => {
         const MCDAVID_ID = 8478402;
         const mcDavidInTransformed = transformedPlayers.find(p => p.id === MCDAVID_ID);
 
-        // DEBUG: Check MacKinnon in transformedPlayers
-        const mackInTransformed = transformedPlayers.find(p => String(p.id) === '8477492');
-        console.warn('[ROSTER DEBUG] transformedPlayers count:', transformedPlayers.length, 'MacKinnon in transformedPlayers:', !!mackInTransformed, mackInTransformed ? `name=${mackInTransformed.name} pos=${mackInTransformed.position}` : 'N/A');
-
         // Check for saved lineup - but for demo teams, always auto-organize (same as OtherTeam.tsx)
         let savedLineup = null;
         const leagueIdForLineup = userTeamData?.league_id;
 
+        // Check fantasy_daily_rosters for per-day lineups when a date is selected.
+        // This handles both past dates (frozen) and today/future (user-set daily lineups).
+        // Falls back to team_lineups (default) if no daily roster exists for that date.
         const todayStr = getTodayMST();
         const isPastDate = selectedDate && selectedDate < todayStr;
-        const matchupForLoading = currentMatchup;
-
-        // DEBUG: Log which load path will be taken
-        console.warn('[ROSTER DEBUG] Load path decision:', {
-          selectedDate,
-          hasMatchup: !!matchupForLoading,
-          teamId,
-          leagueIdForLineup,
-          isDemoLeague: isDemoLeague(leagueIdForLineup),
-          willUseDailyRoster: !!(selectedDate && matchupForLoading && teamId && leagueIdForLineup && !isDemoLeague(leagueIdForLineup))
-        });
+        const matchupForLoading = currentMatchup; // Use from closure
 
         if (selectedDate && matchupForLoading && teamId && leagueIdForLineup && !isDemoLeague(leagueIdForLineup)) {
           const dailyRoster = await LeagueService.loadDailyRoster(
@@ -749,22 +732,9 @@ const Roster = () => {
             !!isPastDate  // Only fetch missing/dropped players for past dates
           );
           
-          // DEBUG: Daily roster result
-          const mackInDailyStarters = dailyRoster?.starters?.find(p => String(p.id) === '8477492');
-          const mackInDailyBench = dailyRoster?.bench?.find(p => String(p.id) === '8477492');
-          const mackSlotInDaily = dailyRoster?.slotAssignments?.['8477492'];
-          console.warn('[ROSTER DEBUG] dailyRoster result:', {
-            found: !!dailyRoster,
-            startersCount: dailyRoster?.starters?.length || 0,
-            benchCount: dailyRoster?.bench?.length || 0,
-            mackInStarters: !!mackInDailyStarters,
-            mackInBench: !!mackInDailyBench,
-            mackSlot: mackSlotInDaily || 'NONE',
-            allSlotAssignments: dailyRoster?.slotAssignments ? Object.keys(dailyRoster.slotAssignments).length : 0
-          });
-
           if (dailyRoster) {
 
+            // Transform to HockeyPlayer format with starter flag
             const starters = dailyRoster.starters.map(p => ({ ...p, starter: true }));
             const bench = [...dailyRoster.bench];
             const ir = dailyRoster.ir;
@@ -820,19 +790,6 @@ const Roster = () => {
               }
             });
 
-            // DEBUG: Final roster state from daily roster path
-            const mackFinal = starters.find(p => String(p.id) === '8477492') || bench.find(p => String(p.id) === '8477492');
-            console.warn('[ROSTER DEBUG] DAILY ROSTER PATH - Final setRoster:', {
-              startersCount: starters.length,
-              benchCount: bench.length,
-              irCount: ir.length,
-              mackFound: !!mackFinal,
-              mackLocation: starters.find(p => String(p.id) === '8477492') ? 'STARTER' : bench.find(p => String(p.id) === '8477492') ? 'BENCH' : 'MISSING',
-              mackSlot: repairedSlotAssignments['8477492'] || 'NO SLOT',
-              starterIds: starters.map(p => String(p.id)),
-              slotKeys: Object.keys(repairedSlotAssignments)
-            });
-
             setRoster({
               starters,
               bench,
@@ -842,16 +799,13 @@ const Roster = () => {
             setLoading(false);
             return; // Exit early - we've loaded from daily roster
           } else {
-            console.warn('[ROSTER DEBUG] No daily roster found for date:', selectedDate);
+            // No daily roster found for this date
           }
         } else if (selectedDate) {
-          console.warn('[ROSTER DEBUG] selectedDate set but missing matchup/team/league — falling to team_lineups path');
-        } else {
-          console.warn('[ROSTER DEBUG] No selectedDate — using team_lineups path');
+          // Selected date without daily roster
         }
         
         // Regular lineup loading (from team_lineups or default)
-        console.warn('[ROSTER DEBUG] Entering team_lineups path. userLeagueState:', userLeagueState);
         if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
           // Demo teams: Always auto-organize (don't check for saved lineups)
           savedLineup = null;
@@ -865,14 +819,6 @@ const Roster = () => {
           }
         }
         
-        console.warn('[ROSTER DEBUG] team_lineups savedLineup:', {
-          found: !!savedLineup,
-          startersCount: savedLineup?.starters?.length || 0,
-          benchCount: savedLineup?.bench?.length || 0,
-          mackInStarters: savedLineup?.starters?.includes('8477492'),
-          mackInBench: savedLineup?.bench?.includes('8477492'),
-          mackSlot: savedLineup?.slotAssignments?.['8477492'] || 'NONE'
-        });
         if (savedLineup && (savedLineup.starters?.length || 0) > 0) {
           // Restore saved lineup from team_lineups
           // IMPORTANT: roster_assignments is the SOURCE OF TRUTH for roster membership
@@ -1037,7 +983,18 @@ const Roster = () => {
               validSlotAssignments[String(playerId)] = slotId;
             });
           }
-          
+
+          // Safety net: if any starters still lack slots after incremental assignment,
+          // do a full recalculation (handles case where all position slots were already
+          // claimed and the incremental approach couldn't find a slot for orphaned players)
+          const orphanedStarters = starters.filter(s => !validSlotAssignments[String(s.id)]);
+          if (orphanedStarters.length > 0) {
+            const fullAssignments = calculateInitialSlotAssignments(starters);
+            Object.entries(fullAssignments).forEach(([playerId, slotId]) => {
+              validSlotAssignments[String(playerId)] = slotId;
+            });
+          }
+
           // Ensure UTIL slot is assigned if we have 13 starters but no UTIL assignment
           const hasUtilSlot = Object.values(validSlotAssignments).includes('slot-UTIL');
           if (starters.length >= 13 && !hasUtilSlot) {
