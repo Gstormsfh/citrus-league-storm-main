@@ -1223,7 +1223,15 @@ const Roster = () => {
     if (isChangingLeague) {
       return;
     }
-    
+
+    // For active users with a league, wait for matchup data before loading roster.
+    // This prevents a race where loadRoster runs with selectedDate=null (before
+    // fetchMatchupForWeek sets it), causing a load from team_lineups that shows
+    // an auto-organized layout missing players from their saved slot assignments.
+    if (userLeagueState === 'active-user' && activeLeagueId && !currentMatchup) {
+      return; // Wait for fetchMatchupForWeek to set currentMatchup + selectedDate
+    }
+
     // For guests, load immediately. For logged-in users, wait for league context
     if (userLeagueState === 'guest' || !leagueLoading) {
       try {
@@ -1238,7 +1246,7 @@ const Roster = () => {
         });
       }
     }
-  }, [loadRoster, userLeagueState, leagueLoading, isChangingLeague, toast]);
+  }, [loadRoster, userLeagueState, leagueLoading, isChangingLeague, activeLeagueId, currentMatchup, toast]);
 
   // Calculate available weeks and first week start date
   // Uses activeLeague from context (already loaded) instead of a redundant API call
