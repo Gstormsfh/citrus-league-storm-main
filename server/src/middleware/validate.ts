@@ -330,11 +330,11 @@ export const schemas = {
 
   // Roster lineup schema
   rosterLineup: z.object({
-    starters: z.array(z.unknown()).optional(),
-    bench: z.array(z.unknown()).optional(),
-    ir: z.array(z.unknown()).optional(),
-    slot_assignments: z.record(z.unknown()).optional(),
-    target_date: z.string().optional(),
+    starters: z.array(z.union([z.string(), z.number()])).optional(),
+    bench: z.array(z.union([z.string(), z.number()])).optional(),
+    ir: z.array(z.union([z.string(), z.number()])).optional(),
+    slot_assignments: z.record(z.string(), z.string()).optional(),
+    target_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     allow_player_removal: z.boolean().optional(),
   }),
 

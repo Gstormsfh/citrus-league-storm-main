@@ -15,6 +15,44 @@ export class LineupService {
   }
 
   /**
+   * Filter a lineup to only contain players currently in roster_assignments.
+   * Prevents stale/dropped/traded players from propagating to daily snapshots.
+   */
+  private async filterLineupAgainstRoster(
+    teamId: string,
+    leagueId: string,
+    lineup: { starters: string[]; bench: string[]; ir: string[]; slot_assignments: Record<string, string> },
+  ): Promise<{ starters: string[]; bench: string[]; ir: string[]; slot_assignments: Record<string, string> }> {
+    const { data: rosterData } = await this.supabase
+      .from('roster_assignments')
+      .select('player_id')
+      .eq('team_id', teamId)
+      .eq('league_id', leagueId);
+
+    if (!rosterData || rosterData.length === 0) {
+      return { starters: [], bench: [], ir: [], slot_assignments: {} };
+    }
+
+    const validIds = new Set(rosterData.map((r: { player_id: string }) => String(r.player_id)));
+
+    const filteredStarters = lineup.starters.filter(id => validIds.has(id));
+    const filteredBench = lineup.bench.filter(id => validIds.has(id));
+    const filteredIr = lineup.ir.filter(id => validIds.has(id));
+
+    // slot_assignments: keep only keys for valid players in starters or ir
+    const starterSet = new Set(filteredStarters);
+    const irSet = new Set(filteredIr);
+    const filteredSlots: Record<string, string> = {};
+    for (const [playerId, slotId] of Object.entries(lineup.slot_assignments)) {
+      if (validIds.has(playerId) && (starterSet.has(playerId) || slotId.startsWith('ir-slot-'))) {
+        filteredSlots[playerId] = slotId;
+      }
+    }
+
+    return { starters: filteredStarters, bench: filteredBench, ir: filteredIr, slot_assignments: filteredSlots };
+  }
+
+  /**
    * Save lineup with full validation, roster protection, and daily snapshots.
    */
   async saveLineup(
@@ -55,6 +93,35 @@ export class LineupService {
           }
         }
       }
+    }
+
+    // 1b. Validate slot_assignments structure
+    const starterSet = new Set(lineup.starters);
+    const irSet = new Set(lineup.ir);
+    const VALID_SLOT_PATTERN = /^slot-(C|LW|RW|D|G)-[1-4]$|^slot-UTIL$|^ir-slot-[1-3]$/;
+    const seenSlots = new Set<string>();
+    for (const playerId of Object.keys(lineup.slot_assignments)) {
+      const slotId = lineup.slot_assignments[playerId];
+      // Keys must be in starters (for starter slots) or ir (for IR slots)
+      const isStarter = starterSet.has(playerId);
+      const isIr = irSet.has(playerId);
+      if (!isStarter && !(isIr && slotId.startsWith('ir-slot-'))) {
+        delete lineup.slot_assignments[playerId];
+        continue;
+      }
+      // Validate slot_id format
+      if (!VALID_SLOT_PATTERN.test(slotId)) {
+        logger.warn('[LineupService.saveLineup] Invalid slot_id:', slotId, 'for player:', playerId);
+        delete lineup.slot_assignments[playerId];
+        continue;
+      }
+      // No duplicate slot_ids
+      if (seenSlots.has(slotId)) {
+        logger.warn('[LineupService.saveLineup] Duplicate slot_id:', slotId, 'removing from player:', playerId);
+        delete lineup.slot_assignments[playerId];
+        continue;
+      }
+      seenSlots.add(slotId);
     }
 
     // 2. Roster protection — check for accidentally lost players
@@ -105,12 +172,14 @@ export class LineupService {
         .eq('league_id', leagueId)
         .maybeSingle();
       if (prev) {
-        baseLineup = {
+        // Filter against roster_assignments to prevent stale/dropped players from
+        // propagating to other dates via createDailyRosterSnapshotsIsolated
+        baseLineup = await this.filterLineupAgainstRoster(teamId, leagueId, {
           starters: ((prev.starters as unknown[]) || []).map(String),
           bench: ((prev.bench as unknown[]) || []).map(String),
           ir: ((prev.ir as unknown[]) || []).map(String),
           slot_assignments: (prev.slot_assignments as Record<string, string>) || {},
-        };
+        });
       }
 
       await this.createDailyRosterSnapshotsIsolated(
@@ -226,10 +295,17 @@ export class LineupService {
       return { backfilledCount: 0, error: null };
     }
 
-    const starters = (savedLineup.starters || []) as string[];
-    const bench = (savedLineup.bench || []) as string[];
-    const ir = (savedLineup.ir || []) as string[];
-    const slotAssignments = (savedLineup.slot_assignments || {}) as Record<string, string>;
+    // Filter against roster_assignments to prevent stale/dropped players from backfilling
+    const filtered = await this.filterLineupAgainstRoster(teamId, leagueId, {
+      starters: ((savedLineup.starters || []) as unknown[]).map(String),
+      bench: ((savedLineup.bench || []) as unknown[]).map(String),
+      ir: ((savedLineup.ir || []) as unknown[]).map(String),
+      slot_assignments: (savedLineup.slot_assignments || {}) as Record<string, string>,
+    });
+    const starters = filtered.starters;
+    const bench = filtered.bench;
+    const ir = filtered.ir;
+    const slotAssignments = filtered.slot_assignments;
 
     // Generate all dates in the matchup week
     const weekStart = new Date(matchup.week_start_date + 'T00:00:00');
