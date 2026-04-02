@@ -174,7 +174,9 @@ export const LineupService = {
         return null;
       }
 
-      const data = await rosterApi.getLineup(leagueId, String(teamId));
+      const response = await rosterApi.getLineup(leagueId, String(teamId));
+      // API returns { data: { starters, bench, ... } } wrapper — unwrap it
+      const data = (response as any)?.data ?? response;
 
       if (data) {
         // Clear any stale localStorage data
@@ -239,11 +241,13 @@ export const LineupService = {
     try {
       // Call API server for daily roster data
       console.warn('[ROSTER-DEBUG] LineupService.loadDailyRoster requesting', { teamId, matchupId, rosterDate });
-      const dailyRosters = await rosterApi.getDailyRoster(
+      const response = await rosterApi.getDailyRoster(
         teamId,
         matchupId,
         rosterDate
       );
+      // API returns { data: [...] } wrapper — unwrap it
+      const dailyRosters = (response as any)?.data ?? response;
       console.warn('[ROSTER-DEBUG] LineupService.loadDailyRoster result', { rosterDate, rowCount: dailyRosters ? (Array.isArray(dailyRosters) ? dailyRosters.length : 'not-array') : 'null' });
 
       if (!dailyRosters || !Array.isArray(dailyRosters) || dailyRosters.length === 0) {

@@ -1096,15 +1096,19 @@ const Roster = () => {
           console.warn('[ROSTER-DEBUG] setRoster (AUTO-ORGANIZE/no saved lineup path) for', selectedDate, { starters: starters.length, bench: bench.length });
           setRoster({ starters, bench, ir, slotAssignments: assignments });
 
-          // Save initial lineup (only for logged-in users with actual teams, not demo league)
-          // Initial save cascades to all dates (no targetDate) since no specific date selected
-          if (userTeamId && user && userTeam?.league_id && !isDemoLeague(userTeam.league_id)) {
+          // Save initial lineup ONLY on first load (selectedDate is null).
+          // Do NOT save during date switches — that overwrites team_lineups base
+          // and wipes any per-day edits the user made.
+          if (!selectedDate && userTeamId && user && userTeam?.league_id && !isDemoLeague(userTeam.league_id)) {
+            console.warn('[ROSTER-DEBUG] Auto-organize: saving initial lineup to team_lineups (selectedDate is null)');
             await LeagueService.saveLineup(userTeamId, userTeam.league_id, {
               starters: starters.map(p => p.id),
               bench: bench.map(p => p.id),
               ir: ir.map(p => p.id),
               slotAssignments: assignments
-            }); // No targetDate = cascade to all future dates
+            }); // No targetDate = set base lineup
+          } else if (selectedDate) {
+            console.warn('[ROSTER-DEBUG] Auto-organize: NOT saving (selectedDate is set, would overwrite base)', { selectedDate });
           }
         }
         
