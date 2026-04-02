@@ -74,7 +74,7 @@ export const DailyRosters = ({
   // Use string comparison to avoid timezone issues with Date objects
   const isPastDate = (dateStr: string): boolean => {
     const todayStr = getTodayMST(); // Returns YYYY-MM-DD format
-    return dateStr < todayStr;
+    return dateStr <= todayStr;
   };
 
   // Fetch frozen lineups for past days using server-side RPC

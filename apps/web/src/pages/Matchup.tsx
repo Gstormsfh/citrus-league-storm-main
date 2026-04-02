@@ -4465,10 +4465,10 @@ const Matchup = () => {
         // This prevents stale frozen roster data from showing dropped players
         // ============================================================
         const todayStr = getTodayMST();
-        const datesToLoad = weekDates.filter(date => date <= todayStr); // Past dates + today
+        const datesToLoad = weekDates; // Load ALL dates — past, today, AND future
 
         if (datesToLoad.length > 0) {
-          log(' Pre-loading rosters for PAST dates only:', datesToLoad);
+          log(' Pre-loading rosters for all week dates:', datesToLoad);
 
           // Create lookup maps from enriched roster players
           const enrichedMyPlayerMap = new Map<string, MatchupPlayer>();
