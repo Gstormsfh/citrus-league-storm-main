@@ -48,6 +48,8 @@ export const rosterApi = {
   }) {
     // Invalidate roster caches for this team after lineup change
     c.invalidate(`rosters:${leagueId}:${teamId}`);
+    // Also invalidate daily roster cache (keyed by teamId, not leagueId)
+    c.invalidate(`rosters:daily:${teamId}`);
     return apiClient.put(`/api/rosters/league/${leagueId}/team/${teamId}/lineup`, lineup);
   },
 

@@ -1025,7 +1025,7 @@ const Roster = () => {
               bench: bench.map(p => p.id),
               ir: ir.map(p => p.id),
               slotAssignments: normalizedSlotAssignments
-            }, selectedDate || undefined);
+            }, selectedDate || getTodayMST());
           }
         } else {
           // No saved lineup - use EXACT SAME LOGIC AS OtherTeam.tsx
@@ -2184,7 +2184,7 @@ const Roster = () => {
           bench: newBench.map(p => String(p.id)),
           ir: prev.ir.map(p => String(p.id)),
           slotAssignments: newAssignments
-        }, selectedDate || undefined).catch(err => {
+        }, selectedDate || getTodayMST()).catch(err => {
           logger.error('Failed to save auto lineup:', err);
           toast({ title: 'Save Failed', description: 'Lineup optimized locally but failed to save. Try again.', variant: 'destructive' });
         });
@@ -2402,7 +2402,7 @@ const Roster = () => {
               bench: newBench.map(p => p.id),
               ir: prev.ir.map(p => p.id),
               slotAssignments: prev.slotAssignments
-            }, selectedDate || undefined).catch(err => logger.error('Failed to save lineup:', err));
+            }, selectedDate || getTodayMST()).catch(err => logger.error('Failed to save lineup:', err));
           }
           
           return updatedRoster;
@@ -2591,8 +2591,8 @@ const Roster = () => {
             ir: newIR.map(p => p.id),
             slotAssignments: newAssignments
           };
-          // Yahoo-style: If selectedDate is set, only save to that date; otherwise cascade
-          LeagueService.saveLineup(userTeamId, userTeam.league_id, lineupToSave, selectedDate || undefined)
+          // Yahoo-style: Always save to a specific date (never fall through to base team_lineups)
+          LeagueService.saveLineup(userTeamId, userTeam.league_id, lineupToSave, selectedDate || getTodayMST())
             .then(() => {
               // Reload roster to reflect saved changes
               loadRoster(true);
@@ -2930,10 +2930,11 @@ const Roster = () => {
                           opponentStarters={[]}
                           onDayClick={(date) => {
                             setSelectedDate(date);
-                            // Reload roster for the selected date
-                            if (date && currentMatchup && userTeamId) {
-                              loadRoster(true);
-                            }
+                            // loadRoster is triggered automatically by the useEffect
+                            // that depends on selectedDate (via useCallback dep chain).
+                            // Do NOT call loadRoster here — it would use the stale
+                            // selectedDate from the current closure, causing a race
+                            // condition with the useEffect-triggered reload.
                           }}
                           selectedDate={selectedDate}
                           dailyStatsByDate={new Map()}
