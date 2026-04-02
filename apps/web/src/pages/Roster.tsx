@@ -1331,12 +1331,8 @@ const Roster = () => {
         }
         setMatchupWeekDates(dates);
 
-        // Default to today's date if it's within the matchup week
-        const todayStr = getTodayMST();
-        if (dates.includes(todayStr)) {
-          setSelectedDate(todayStr);
-        } else if (dates.length > 0) {
-          // Default to first day of week if today is not in the week
+        // Always default to the first day of the matchup week
+        if (dates.length > 0) {
           setSelectedDate(dates[0]);
         }
       } catch (error) {
