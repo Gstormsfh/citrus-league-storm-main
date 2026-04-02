@@ -191,8 +191,6 @@ const Matchup = () => {
     myTotal: number;
     oppTotal: number;
   }>>(new Map());
-  
-  // Removed frozenDayLineup state - now using single source from getMatchupRosters()
   // Start loading as true to prevent initial flash of content
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -220,7 +218,6 @@ const Matchup = () => {
   const prevActiveLeagueIdRef = useRef<string | null>(null);
   const prevWeekIdRef = useRef<string | undefined>(undefined);
   const prevSelectedMatchupIdRef = useRef<string | null>(null);
-  // Note: prevSelectedDateRef removed - date changes handled by separate useEffect using frozenRostersByDate
   const loadedMatchupDataRef = useRef<{ leagueId: string; weekId: string; matchupId: string | null; timestamp: number } | null>(null);
   const CACHE_TTL = 30000; // 30 seconds cache
   
@@ -1187,22 +1184,10 @@ const Matchup = () => {
   // CRITICAL: Also runs for guests/demo to use REAL NHL data
   // Extract to useCallback so it can be reused for live game refreshes
   const fetchAllDailyStats = React.useCallback(async () => {
-      // DEBUG: Log entry into function
-      logger.debug('[DEBUG fetchAllDailyStats] ENTERING function', {
-        statsLoadingRefCurrent: statsLoadingRef.current,
-        hasCurrentMatchup: !!currentMatchup,
-        currentMatchupId: currentMatchup?.id,
-        userLeagueState
-      });
-      
       // Prevent concurrent fetches that cause score flashing
-      if (statsLoadingRef.current) {
-        logger.debug('[DEBUG fetchAllDailyStats] EARLY RETURN: statsLoadingRef is true');
-        return;
-      }
+      if (statsLoadingRef.current) return;
       
       if (!currentMatchup) {
-        logger.debug('[DEBUG fetchAllDailyStats] EARLY RETURN: no currentMatchup');
         setDailyStatsByDate(new Map());
         return;
       }
@@ -1225,19 +1210,7 @@ const Matchup = () => {
       // Combine and dedupe
       const allPlayerIds = [...new Set([...currentRosterIds, ...starterIds])];
       
-      // DEBUG: Log player IDs
-      logger.debug('[DEBUG fetchAllDailyStats] Player IDs:', {
-        userLeagueState,
-        currentRosterIdsCount: currentRosterIds.length,
-        starterIdsCount: starterIds.length,
-        allPlayerIdsCount: allPlayerIds.length,
-        myTeamPlayerIdsRefCount: myTeamPlayerIdsRef.current.length,
-        opponentTeamPlayerIdsRefCount: opponentTeamPlayerIdsRef.current.length,
-        firstFewIds: allPlayerIds.slice(0, 5)
-      });
-      
       if (allPlayerIds.length === 0) {
-        logger.debug('[DEBUG fetchAllDailyStats] EARLY RETURN: no player IDs');
         setDailyStatsByDate(new Map());
         statsLoadingRef.current = false;
         return;
@@ -1431,33 +1404,7 @@ const Matchup = () => {
               daily_stats_breakdown,
             });
             
-            // DEBUG: Log breakdown for today if player has stats
-            if (date === todayStr && dailyTotalPoints > 0) {
-              logger.debug('[DEBUG fetchAllDailyStats] Built breakdown for player:', {
-                player_id: row.player_id,
-                date,
-                aggregated,
-                dailyTotalPoints,
-                daily_stats_breakdown,
-                breakdownKeys: Object.keys(daily_stats_breakdown)
-              });
-            }
           });
-
-          // DEBUG: Log what's stored for today
-          if (date === todayStr && dayStatsMap.size > 0) {
-            const entries = Array.from(dayStatsMap.entries()).slice(0, 3);
-            logger.debug('[DEBUG fetchAllDailyStats] Stored in dayStatsMap for TODAY:', {
-              date,
-              mapSize: dayStatsMap.size,
-              sampleEntries: entries.map(([id, stats]) => ({
-                player_id: id,
-                daily_total_points: stats.daily_total_points,
-                hasBreakdown: !!stats.daily_stats_breakdown,
-                breakdownKeys: stats.daily_stats_breakdown ? Object.keys(stats.daily_stats_breakdown) : []
-              }))
-            });
-          }
 
           statsByDate.set(date, dayStatsMap);
         }));
@@ -1522,9 +1469,6 @@ const Matchup = () => {
     setSelectedDate(weekStartStr);
   }, [currentMatchup, dailyStatsByDate, selectedDate]);
 
-  // Removed duplicate frozen lineup fetch - data now loaded directly in getMatchupRosters()
-  // This eliminates score flashing and ensures single source of truth
-
   // Fetch projections for a specific date - memoized to prevent recreation
   // CRITICAL: Works for BOTH active users AND demo/guest users
   const fetchProjectionsForDate = useCallback(async (date: string) => {
@@ -1554,26 +1498,13 @@ const Matchup = () => {
         ];
 
     if (allPlayerIds.length === 0) {
-      logger.debug('[DEBUG fetchProjectionsForDate] No player IDs, returning early');
       return;
     }
 
     projectionsLoadingRef.current = true;
     
-    logger.debug('[DEBUG fetchProjectionsForDate] Fetching projections:', {
-      date,
-      playerCount: allPlayerIds.length,
-      userLeagueState,
-      firstFewIds: allPlayerIds.slice(0, 5)
-    });
-
     try {
       const projectionMap = await MatchupService.getDailyProjectionsForMatchup(allPlayerIds, date);
-      
-      logger.debug('[DEBUG fetchProjectionsForDate] Got projections:', {
-        date,
-        projectionMapSize: projectionMap.size
-      });
       
       setProjectionsByDate(prev => {
         const newMap = new Map(prev);
@@ -1581,7 +1512,6 @@ const Matchup = () => {
         return newMap;
       });
     } catch (error) {
-      logger.debug('[DEBUG fetchProjectionsForDate] Error:', error);
       // Don't cache errors - allow retry
     } finally {
       projectionsLoadingRef.current = false;
@@ -2649,20 +2579,6 @@ const Matchup = () => {
     // When selectedDate is set, use dailyStatsByDate.get(selectedDate), otherwise use dailyStatsMap
     const statsMapForDate = selectedDate ? dailyStatsByDate.get(selectedDate) : dailyStatsMap;
     
-    // DEBUG: Log stats map status for my team transform
-    const todayDebug = getTodayMST();
-    if (selectedDate === todayDebug) {
-      logger.debug('[DEBUG displayMyTeam] Stats map status:', {
-        selectedDate,
-        todayDebug,
-        hasStatsMapForDate: !!statsMapForDate,
-        statsMapSize: statsMapForDate?.size || 0,
-        dailyStatsByDateHasToday: dailyStatsByDate.has(todayDebug),
-        dailyStatsByDateKeys: Array.from(dailyStatsByDate.keys()),
-        baseTeamCount: baseTeam.length
-      });
-    }
-    
     return baseTeam.map(player => {
       // CRITICAL: Convert player.id to number to match Map<number, any> keys
       // Match MatchupComparison's conversion logic (line 61)
@@ -2670,41 +2586,6 @@ const Matchup = () => {
       const dailyStats = statsMapForDate?.get(playerId);
       const projection = dateProjections?.get(player.id);
       const isGoalie = player.isGoalie || player.position === 'G' || player.position === 'Goalie';
-      
-      // DEBUG: Log dailyStats lookup for ALL players with stats (for today only)
-      if (selectedDate === todayDebug && dailyStats && (dailyStats.goals > 0 || dailyStats.assists > 0 || dailyStats.wins > 0 || dailyStats.saves > 0)) {
-        logger.debug('[DEBUG displayMyTeam] Player with stats found:', {
-          playerName: player.name,
-          playerId,
-          daily_total_points: dailyStats.daily_total_points,
-          hasBreakdown: !!dailyStats.daily_stats_breakdown,
-          breakdownKeys: dailyStats.daily_stats_breakdown ? Object.keys(dailyStats.daily_stats_breakdown) : [],
-          rawStats: {
-            goals: dailyStats.goals,
-            assists: dailyStats.assists,
-            shots_on_goal: dailyStats.shots_on_goal,
-            blocks: dailyStats.blocks,
-            wins: dailyStats.wins,
-            saves: dailyStats.saves
-          }
-        });
-      }
-      
-      // DEBUG: Log first player stats lookup always
-      if (player.id === baseTeam[0]?.id && selectedDate === todayDebug) {
-        logger.debug('[DEBUG displayMyTeam] First player stats lookup:', {
-          playerName: player.name,
-          playerId,
-          foundDailyStats: !!dailyStats,
-          dailyStats: dailyStats ? {
-            daily_total_points: dailyStats.daily_total_points,
-            hasBreakdown: !!dailyStats.daily_stats_breakdown,
-            breakdownKeys: dailyStats.daily_stats_breakdown ? Object.keys(dailyStats.daily_stats_breakdown) : [],
-            goals: dailyStats.goals,
-            assists: dailyStats.assists
-          } : null
-        });
-      }
       
       // CRITICAL: Capture games array from original player before any transformations
       // Always preserve games - use player.games if it exists and is an array
@@ -3218,12 +3099,6 @@ const Matchup = () => {
       if (frozenRoster.myRoster.length > 0) {
         const directStarters = frozenRoster.myRoster.filter(p => p.isStarter);
 
-        console.warn('[MATCHUP-DIAG] myStarters: FROZEN path for', selectedDate, {
-          frozenRosterSize: frozenRoster.myRoster.length,
-          starterCount: directStarters.length,
-          starterNames: directStarters.slice(0, 5).map(p => p.name)
-        });
-
         // Enrich with stats from dailyStatsByDate
         const dayStatsMap = dailyStatsByDate.get(selectedDate);
         const enriched = directStarters.map(player => {
@@ -3241,16 +3116,6 @@ const Matchup = () => {
     }
 
     // Otherwise use enriched displayMyTeam
-    if (selectedDate) {
-      const frozenEntry = frozenRostersByDate.get(selectedDate);
-      console.warn('[MATCHUP-DIAG] myStarters: FALLBACK (displayMyTeam) for', selectedDate, {
-        hasFrozenEntry: frozenRostersByDate.has(selectedDate),
-        frozenMyRosterLen: frozenEntry?.myRoster?.length ?? 'N/A',
-        displayMyTeamLen: displayMyTeam.length,
-        displayStarterCount: displayMyTeam.filter(p => p.isStarter).length,
-        displayStarterNames: displayMyTeam.filter(p => p.isStarter).slice(0, 5).map(p => p.name)
-      });
-    }
     return displayMyTeam.filter(p => p.isStarter);
   }, [selectedDate, frozenRostersByDate, dailyStatsByDate, displayMyTeam]);
   
@@ -3368,9 +3233,6 @@ const Matchup = () => {
     // For today/future: opponentStarters contains current roster
     return opponentStarters;
   }, [opponentStarters]);
-
-  // REMOVED: finalMyDailyBreakdown and finalOppDailyBreakdown useMemo hooks
-  // WeeklySchedule now uses calculatedDailyTotals directly (single source of truth)
 
   // =============================================================================
   // YAHOO/SLEEPER FROZEN SCORING: Team points calculation
@@ -3644,7 +3506,6 @@ const Matchup = () => {
     prevWeekIdRef.current = urlWeekId;
     prevSelectedMatchupIdRef.current = selectedMatchupId;
     prevActiveLeagueIdRef.current = activeLeagueId;
-    // Note: prevSelectedDateRef removed - date changes handled by separate useEffect
     
     log(' useEffect triggered - starting load', {
       hasUser: !!user,
@@ -4516,20 +4377,6 @@ const Matchup = () => {
           const frozenBatchResponse = await matchupApi.getFrozenRosterBatch(matchupData.matchup.id, datesToLoad);
           const allFrozenEntries = frozenBatchResponse.data as any[] | null;
 
-          // Diagnostic: log batch response shape and per-date entry counts
-          console.warn('[MATCHUP-DIAG] getFrozenRosterBatch response:', {
-            totalEntries: allFrozenEntries?.length ?? 0,
-            dates: datesToLoad,
-            myTeamId: matchupData.userTeam.id,
-            oppTeamId: matchupData.opponentTeam?.id,
-            sampleEntry: allFrozenEntries?.[0] ? JSON.stringify(allFrozenEntries[0]) : 'none',
-            entriesPerDate: datesToLoad.map(d => ({
-              date: d,
-              count: allFrozenEntries?.filter((e: any) => e.roster_date === d).length ?? 0,
-              myCount: allFrozenEntries?.filter((e: any) => e.roster_date === d && String(e.team_id) === matchupData.userTeam.id).length ?? 0,
-            }))
-          });
-
           if (allFrozenEntries && allFrozenEntries.length > 0) {
             // Diagnostic: show unique team_ids in frozen entries vs expected team IDs
             const frozenTeamIds = [...new Set((allFrozenEntries as any[]).map((e: any) => String(e.team_id)))];
@@ -5206,20 +5053,6 @@ const Matchup = () => {
     window.location.href = `/matchup/${urlLeagueId}/${urlWeekId}`;
   }, [league?.id, userTeam?.id, urlLeagueId, urlWeekId]);
 
-  // Debug: Log render state (using ref counter to prevent spam)
-  // MUST be declared before early return to maintain hook order
-  const renderCountRef = useRef(0);
-  renderCountRef.current += 1;
-  if (renderCountRef.current <= 3) { // Only log first 3 renders
-    log(' Component rendering', {
-      renderCount: renderCountRef.current,
-      loading,
-      error,
-      userLeagueState,
-      hasMyTeam: myTeam.length > 0,
-      hasOpponentTeam: opponentTeamPlayers.length > 0
-    });
-  }
 
   // =============================================================================
   // SIMPLIFIED LOADING STATE - One-way gate prevents flash/cycling

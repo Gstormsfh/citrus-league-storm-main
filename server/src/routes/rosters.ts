@@ -110,12 +110,6 @@ rosterRoutes.put('/league/:leagueId/team/:teamId/lineup', membershipMiddleware, 
   }
 
   const lineupService = new LineupService(supabase);
-  logger.info('[ROSTER-DEBUG-SERVER] saveLineup called', {
-    teamId, leagueId,
-    target_date: body.target_date,
-    starters: (body.starters || []).length,
-    bench: (body.bench || []).length,
-  });
   const result = await lineupService.saveLineup(
     teamId,
     leagueId,
