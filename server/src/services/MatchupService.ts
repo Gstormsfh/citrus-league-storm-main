@@ -529,7 +529,6 @@ export class MatchupService {
     addRows(finalLineup.ir || [], 'ir', true);
 
     if (rows.length > 0) {
-      logger.info('[backfillDailyRosters] Inserting', rows.length, 'rows for team', teamId);
       const { error: upsertErr } = await admin
         .from('fantasy_daily_rosters')
         .upsert(rows, {
@@ -540,7 +539,6 @@ export class MatchupService {
         logger.error('[backfillDailyRosters] upsert error:', upsertErr);
       }
     } else {
-      logger.info('[backfillDailyRosters] No missing rows for team', teamId);
     }
   }
 
