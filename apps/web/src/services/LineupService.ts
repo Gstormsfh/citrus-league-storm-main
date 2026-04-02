@@ -39,7 +39,7 @@ export const LineupService = {
       bench: lineup.bench?.length || 0,
       ir: lineup.ir?.length || 0,
     });
-    console.log('[ROSTER-DEBUG] LineupService.saveLineup', { targetDate, teamId, starters: lineup.starters?.length, bench: lineup.bench?.length });
+    console.warn('[ROSTER-DEBUG] LineupService.saveLineup', { targetDate, teamId, starters: lineup.starters?.length, bench: lineup.bench?.length });
 
     // Read-only guard: Block all lineup saves for demo league
     if (leagueId === DEMO_LEAGUE_ID_FOR_GUESTS) {
@@ -238,13 +238,13 @@ export const LineupService = {
   } | null> {
     try {
       // Call API server for daily roster data
-      console.log('[ROSTER-DEBUG] LineupService.loadDailyRoster requesting', { teamId, matchupId, rosterDate });
+      console.warn('[ROSTER-DEBUG] LineupService.loadDailyRoster requesting', { teamId, matchupId, rosterDate });
       const dailyRosters = await rosterApi.getDailyRoster(
         teamId,
         matchupId,
         rosterDate
       );
-      console.log('[ROSTER-DEBUG] LineupService.loadDailyRoster result', { rosterDate, rowCount: dailyRosters ? (Array.isArray(dailyRosters) ? dailyRosters.length : 'not-array') : 'null' });
+      console.warn('[ROSTER-DEBUG] LineupService.loadDailyRoster result', { rosterDate, rowCount: dailyRosters ? (Array.isArray(dailyRosters) ? dailyRosters.length : 'not-array') : 'null' });
 
       if (!dailyRosters || !Array.isArray(dailyRosters) || dailyRosters.length === 0) {
         return null;

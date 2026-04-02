@@ -165,9 +165,11 @@ export class LineupService {
     if (targetDate) {
       // Per-day isolation: ONLY write to the target date's fantasy_daily_rosters.
       // Do NOT touch any other date. Each day is independent.
+      logger.info('[ROSTER-DEBUG-SERVER] targetDate path → writing ONLY to fantasy_daily_rosters', { targetDate, teamId });
       await this.createDailyRosterSnapshots(teamId, leagueId, lineup, targetDate);
       return { success: true, data: { ...lineup, league_id: leagueId, team_id: teamId } };
     }
+    logger.info('[ROSTER-DEBUG-SERVER] NO targetDate → writing to team_lineups (base)', { teamId });
 
     // No targetDate — update the base lineup in team_lineups
     const { error, data } = await this.supabase

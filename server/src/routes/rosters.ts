@@ -9,6 +9,7 @@ import { MatchupService } from '../services/MatchupService';
 import { LineupService } from '../services/LineupService';
 import { AuditService } from '../services/AuditService';
 import { AppError } from '../lib/errors';
+import { logger } from '@citrus/shared';
 import { ok, fail, handleError } from '../lib/responses';
 import { COLUMNS } from '@citrus/shared';
 
@@ -109,6 +110,12 @@ rosterRoutes.put('/league/:leagueId/team/:teamId/lineup', membershipMiddleware, 
   }
 
   const lineupService = new LineupService(supabase);
+  logger.info('[ROSTER-DEBUG-SERVER] saveLineup called', {
+    teamId, leagueId,
+    target_date: body.target_date,
+    starters: (body.starters || []).length,
+    bench: (body.bench || []).length,
+  });
   const result = await lineupService.saveLineup(
     teamId,
     leagueId,

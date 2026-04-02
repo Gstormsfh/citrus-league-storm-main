@@ -427,7 +427,7 @@ const Roster = () => {
   // Fetch and adapt players from staging files (SINGLE SOURCE OF TRUTH)
   // Extract loadRoster so it can be called manually for refresh
   const loadRoster = useCallback(async (keepCurrentRoster = false) => {
-    console.log('[ROSTER-DEBUG] loadRoster called', { selectedDate, keepCurrentRoster, timestamp: new Date().toISOString() });
+    console.warn('[ROSTER-DEBUG] loadRoster called', { selectedDate, keepCurrentRoster, timestamp: new Date().toISOString() });
     // For guests, load immediately. For logged-in users, wait for league context to finish loading
     if (user && leagueLoading) {
       return; // Don't load roster until we know the user's league state
@@ -725,7 +725,7 @@ const Roster = () => {
         const matchupForLoading = currentMatchup; // Use from closure
 
         if (selectedDate && matchupForLoading && teamId && leagueIdForLineup && !isDemoLeague(leagueIdForLineup)) {
-          console.log('[ROSTER-DEBUG] Calling loadDailyRoster', { date: selectedDate, matchupId: matchupForLoading.id, teamId });
+          console.warn('[ROSTER-DEBUG] Calling loadDailyRoster', { date: selectedDate, matchupId: matchupForLoading.id, teamId });
           const dailyRoster = await LeagueService.loadDailyRoster(
             String(teamId),
             matchupForLoading.id,
@@ -735,7 +735,7 @@ const Roster = () => {
           );
           
           if (dailyRoster) {
-            console.log('[ROSTER-DEBUG] dailyRoster FOUND for', selectedDate, { starters: dailyRoster.starters.length, bench: dailyRoster.bench.length, ir: dailyRoster.ir.length });
+            console.warn('[ROSTER-DEBUG] dailyRoster FOUND for', selectedDate, { starters: dailyRoster.starters.length, bench: dailyRoster.bench.length, ir: dailyRoster.ir.length });
 
             // Transform to HockeyPlayer format with starter flag
             const starters = dailyRoster.starters.map(p => ({ ...p, starter: true }));
@@ -793,7 +793,7 @@ const Roster = () => {
               }
             });
 
-            console.log('[ROSTER-DEBUG] setRoster (DAILY ROSTER path) for', selectedDate, { starters: starters.length, bench: bench.length, starterIds: starters.slice(0, 3).map(p => p.id) });
+            console.warn('[ROSTER-DEBUG] setRoster (DAILY ROSTER path) for', selectedDate, { starters: starters.length, bench: bench.length, starterIds: starters.slice(0, 3).map(p => p.id) });
             setRoster({
               starters,
               bench,
@@ -803,10 +803,10 @@ const Roster = () => {
             setLoading(false);
             return; // Exit early - we've loaded from daily roster
           } else {
-            console.log('[ROSTER-DEBUG] dailyRoster NULL for', selectedDate, '— will fall through to team_lineups');
+            console.warn('[ROSTER-DEBUG] dailyRoster NULL for', selectedDate, '— will fall through to team_lineups');
           }
         } else if (selectedDate) {
-          console.log('[ROSTER-DEBUG] Skipped dailyRoster check (missing matchup/teamId/etc)', { selectedDate, hasMatchup: !!matchupForLoading, teamId });
+          console.warn('[ROSTER-DEBUG] Skipped dailyRoster check (missing matchup/teamId/etc)', { selectedDate, hasMatchup: !!matchupForLoading, teamId });
         }
         
         // Regular lineup loading (from team_lineups or default)
@@ -815,7 +815,7 @@ const Roster = () => {
           savedLineup = null;
         } else if (teamId && leagueIdForLineup && !isDemoLeague(leagueIdForLineup)) {
           // Real user team - use actual league_id from local variable (not stale state)
-          console.log('[ROSTER-DEBUG] Fell through to getLineup (team_lineups/base)', { selectedDate, teamId });
+          console.warn('[ROSTER-DEBUG] Fell through to getLineup (team_lineups/base)', { selectedDate, teamId });
           savedLineup = await LeagueService.getLineup(teamId, leagueIdForLineup);
           
           if (savedLineup) {
@@ -1006,7 +1006,7 @@ const Roster = () => {
             normalizedSlotAssignments[String(playerId)] = slotId;
           });
           
-          console.log('[ROSTER-DEBUG] setRoster (SAVED LINEUP/team_lineups path) for', selectedDate, { starters: starters.length, bench: bench.length, starterIds: starters.slice(0, 3).map(p => p.id) });
+          console.warn('[ROSTER-DEBUG] setRoster (SAVED LINEUP/team_lineups path) for', selectedDate, { starters: starters.length, bench: bench.length, starterIds: starters.slice(0, 3).map(p => p.id) });
           setRoster({ starters, bench, ir, slotAssignments: normalizedSlotAssignments });
 
           // Persist recovered lineup if new players were added from roster_assignments
@@ -1093,7 +1093,7 @@ const Roster = () => {
             }
           });
           
-          console.log('[ROSTER-DEBUG] setRoster (AUTO-ORGANIZE/no saved lineup path) for', selectedDate, { starters: starters.length, bench: bench.length });
+          console.warn('[ROSTER-DEBUG] setRoster (AUTO-ORGANIZE/no saved lineup path) for', selectedDate, { starters: starters.length, bench: bench.length });
           setRoster({ starters, bench, ir, slotAssignments: assignments });
 
           // Save initial lineup (only for logged-in users with actual teams, not demo league)
@@ -1259,7 +1259,7 @@ const Roster = () => {
 
     // For guests, load immediately. For logged-in users, wait for league context
     if (userLeagueState === 'guest' || !leagueLoading) {
-      console.log('[ROSTER-DEBUG] ▶ Mount/league useEffect FIRED', { userLeagueState, leagueLoading });
+      console.warn('[ROSTER-DEBUG] ▶ Mount/league useEffect FIRED', { userLeagueState, leagueLoading });
       try {
         loadRoster();
       } catch (error) {
@@ -1462,7 +1462,7 @@ const Roster = () => {
   // from the previous date leaking into the new date's view.
   useEffect(() => {
     if (selectedDate && currentMatchup && userTeamId) {
-      console.log('[ROSTER-DEBUG] ▶ Date-change useEffect FIRED', { selectedDate, matchupId: currentMatchup.id, userTeamId });
+      console.warn('[ROSTER-DEBUG] ▶ Date-change useEffect FIRED', { selectedDate, matchupId: currentMatchup.id, userTeamId });
       loadRoster(true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- currentMatchup object would cause infinite re-renders; .id is sufficient
@@ -2598,7 +2598,7 @@ const Roster = () => {
           // State is already updated optimistically via setRoster above.
           // Do NOT call loadRoster in .then() — it captures a stale selectedDate
           // from the closure and races with date-switch reloads.
-          console.log('[ROSTER-DEBUG] ✏️ SAVE from handleDragEnd', { selectedDate, saveDate: selectedDate || getTodayMST(), starters: lineupToSave.starters.length, bench: lineupToSave.bench.length });
+          console.warn('[ROSTER-DEBUG] ✏️ SAVE from handleDragEnd', { selectedDate, saveDate: selectedDate || getTodayMST(), starters: lineupToSave.starters.length, bench: lineupToSave.bench.length });
           LeagueService.saveLineup(userTeamId, userTeam.league_id, lineupToSave, selectedDate || getTodayMST())
             .catch(err => {
               logger.error('[Roster] Failed to save lineup:', err);
@@ -2932,7 +2932,7 @@ const Roster = () => {
                           myStarters={[]}
                           opponentStarters={[]}
                           onDayClick={(date) => {
-                            console.log('[ROSTER-DEBUG] 📅 onDayClick', { clickedDate: date, previousDate: selectedDate });
+                            console.warn('[ROSTER-DEBUG] 📅 onDayClick', { clickedDate: date, previousDate: selectedDate });
                             setSelectedDate(date);
                             // loadRoster is triggered automatically by the useEffect
                             // that depends on selectedDate (via useCallback dep chain).
