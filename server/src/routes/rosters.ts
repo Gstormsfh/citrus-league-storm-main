@@ -90,9 +90,9 @@ rosterRoutes.put('/league/:leagueId/team/:teamId/lineup', membershipMiddleware, 
   const userId = c.get('userId');
   const body = getValidatedBody<z.infer<typeof schemas.rosterLineup>>(c);
 
-  const parsedTeamId = parseInt(teamId, 10);
-  if (isNaN(parsedTeamId)) {
-    return fail(c, AppError.badRequest('Invalid team ID'));
+  // Validate teamId is present (UUIDs are used for team IDs)
+  if (!teamId) {
+    return fail(c, AppError.badRequest('Missing team ID'));
   }
 
   const supabase = createUserClient(c.get('userToken'));
