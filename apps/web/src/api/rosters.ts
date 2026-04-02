@@ -50,6 +50,7 @@ export const rosterApi = {
     c.invalidate(`rosters:${leagueId}:${teamId}`);
     // Also invalidate daily roster cache (keyed by teamId, not leagueId)
     c.invalidate(`rosters:daily:${teamId}`);
+    console.log('[ROSTER-DEBUG] rosterApi.saveLineup API call', { target_date: lineup.target_date, starters: lineup.starters?.length, bench: lineup.bench?.length });
     return apiClient.put(`/api/rosters/league/${leagueId}/team/${teamId}/lineup`, lineup);
   },
 
@@ -75,6 +76,7 @@ export const rosterApi = {
 
   /** Get daily roster entries for a team/matchup/date */
   getDailyRoster(teamId: string, matchupId: string, rosterDate: string) {
+    console.log('[ROSTER-DEBUG] rosterApi.getDailyRoster', { rosterDate, teamId, matchupId, cacheKey: `rosters:daily:${teamId}:${matchupId}:${rosterDate}` });
     return c.cached(
       `rosters:daily:${teamId}:${matchupId}:${rosterDate}`,
       () => apiClient.get(`/api/rosters/daily-roster?team_id=${teamId}&matchup_id=${matchupId}&roster_date=${rosterDate}`),
