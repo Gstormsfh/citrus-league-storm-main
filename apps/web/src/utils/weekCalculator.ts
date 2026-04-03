@@ -3,14 +3,15 @@ import { DEFAULT_TEST_DATE } from '@/utils/seasonConstants';
 import { getTodayMST } from '@/utils/timezoneUtils';
 
 /**
- * Get the date when the draft was completed
- * Uses the league's updated_at timestamp when draft_status is 'completed'
+ * Get the date when the draft was completed.
+ * Uses league.created_at as a stable reference — updated_at changes on every
+ * settings modification, which breaks week calculations.
  */
 export function getDraftCompletionDate(league: League): Date | null {
   if (league.draft_status !== 'completed') {
     return null;
   }
-  return new Date(league.updated_at);
+  return new Date(league.created_at);
 }
 
 /**
