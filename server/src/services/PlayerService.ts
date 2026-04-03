@@ -100,9 +100,9 @@ interface NormalizedPlayer {
   stats_updated_at?: string | null;
 }
 
-// 5-minute cache for player data
+// 2-minute cache for player data (short TTL to surface pipeline updates quickly)
 let playersCache: { data: NormalizedPlayer[]; timestamp: number } | null = null;
-const CACHE_TTL = 5 * 60 * 1000;
+const CACHE_TTL = 2 * 60 * 1000;
 
 function buildPlayer(p: PlayerDirectoryRow, stat: Partial<PlayerStatsRow>, talent?: Partial<TalentMetricsRow>, goalieGsax?: GoalieGsaxRow): NormalizedPlayer {
   const rosterStatus = talent?.roster_status ?? null;

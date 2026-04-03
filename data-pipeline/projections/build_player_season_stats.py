@@ -396,6 +396,39 @@ def main() -> int:
   else:
     logger.info("[build_player_season_stats] No xG/xA data available (will use 0.0)")
 
+  # Compute xg_per_60 and xg_rating for player_talent_metrics
+  logger.info("")
+  logger.info("[build_player_season_stats] Computing xg_per_60 for player_talent_metrics...")
+  xg_per_60_count = 0
+  for out in acc.values():
+    x_goals_val = float(out.get("x_goals") or 0)
+    toi_seconds = float(out.get("nhl_toi_seconds") or 0)
+    if x_goals_val > 0 and toi_seconds > 0:
+      xg_per_60_val = round((x_goals_val * 3600) / toi_seconds, 2)
+      rating = "N/A"
+      if xg_per_60_val >= 1.2:
+        rating = "Elite"
+      elif xg_per_60_val >= 0.9:
+        rating = "Above Avg"
+      elif xg_per_60_val >= 0.6:
+        rating = "Average"
+      elif xg_per_60_val >= 0.3:
+        rating = "Below Avg"
+      else:
+        rating = "Low"
+      pid = int(out["player_id"])
+      try:
+        db.upsert("player_talent_metrics", {
+          "player_id": pid,
+          "season": season,
+          "xg_per_60": xg_per_60_val,
+          "xg_rating": rating,
+        }, on_conflict="player_id,season")
+        xg_per_60_count += 1
+      except Exception as e:
+        logger.warning(f"[build_player_season_stats] Failed to update xg_per_60 for player {pid}: {e}")
+  logger.info(f"[build_player_season_stats] Updated xg_per_60 for {xg_per_60_count} players")
+
   # Plus/minus computation (integrated)
   logger.info("")
   logger.info("[build_player_season_stats] Computing plus/minus from shifts and goals...")
