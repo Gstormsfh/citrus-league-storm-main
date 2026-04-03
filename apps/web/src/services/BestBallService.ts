@@ -16,7 +16,9 @@ import { DEFAULT_ROSTER_SLOTS, type RosterSlotConfig } from '@/types/leagueTypes
 import { logger } from '@/utils/logger';
 import { bestballApi } from '@/api/bestball';
 
-// Mapping of roster slot codes to eligible player positions
+import type { PositionType } from '@/utils/rosterUtils';
+
+// Mapping of roster slot codes to eligible player positions (individual mode)
 const SLOT_ELIGIBLE_POSITIONS: Record<string, string[]> = {
   C: ['C', 'Centre'],
   LW: ['LW', 'Left Wing'],
@@ -25,6 +27,18 @@ const SLOT_ELIGIBLE_POSITIONS: Record<string, string[]> = {
   G: ['G', 'Goalie'],
   UTIL: ['C', 'Centre', 'LW', 'Left Wing', 'RW', 'Right Wing', 'D', 'Defence', 'Defense'],
 };
+
+// Mapping for F/D/G (forward) mode
+const FDG_SLOT_ELIGIBLE_POSITIONS: Record<string, string[]> = {
+  F: ['C', 'Centre', 'LW', 'Left Wing', 'RW', 'Right Wing'],
+  D: ['D', 'Defence', 'Defense'],
+  G: ['G', 'Goalie'],
+  UTIL: ['C', 'Centre', 'LW', 'Left Wing', 'RW', 'Right Wing', 'D', 'Defence', 'Defense'],
+};
+
+function getEligibilityMap(positionType: PositionType = 'individual'): Record<string, string[]> {
+  return positionType === 'forward' ? FDG_SLOT_ELIGIBLE_POSITIONS : SLOT_ELIGIBLE_POSITIONS;
+}
 
 interface PlayerScore {
   player_id: string;
@@ -54,7 +68,8 @@ export class BestBallService {
    */
   static optimizeLineup(
     playerScores: PlayerScore[],
-    rosterSlots: RosterSlotConfig[] = DEFAULT_ROSTER_SLOTS
+    rosterSlots: RosterSlotConfig[] = DEFAULT_ROSTER_SLOTS,
+    positionType: PositionType = 'individual'
   ): { starters: string[]; totalPoints: number; benchPoints: number } {
     // Sort players by points descending — greedy approach
     const sorted = [...playerScores].sort((a, b) => b.points - a.points);
@@ -77,9 +92,10 @@ export class BestBallService {
     const specificSlots = expandedSlots.filter(s => s !== 'UTIL');
     const utilSlots = expandedSlots.filter(s => s === 'UTIL');
     const orderedSlots = [...specificSlots, ...utilSlots];
+    const eligibilityMap = getEligibilityMap(positionType);
 
     for (const slotCode of orderedSlots) {
-      const eligible = SLOT_ELIGIBLE_POSITIONS[slotCode];
+      const eligible = eligibilityMap[slotCode];
       if (!eligible) continue;
 
       // Find the highest-scoring unassigned player eligible for this slot

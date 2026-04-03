@@ -56,21 +56,13 @@ import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, ge
 import { Matchup as MatchupType } from '@/services/MatchupService';
 import { logger } from '@/utils/logger';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
+import { resolveFantasyPosition, type PositionType, getRosterSlots, DEFAULT_ROSTER_SLOTS, DEFAULT_FDG_ROSTER_SLOTS, getSlotPositions } from '@/utils/rosterUtils';
 
 // Helper function to transform position to fantasy slot
-const getFantasyPosition = (position: string): 'C' | 'LW' | 'RW' | 'D' | 'G' | 'UTIL' => {
-  const pos = position?.toUpperCase() || '';
-  
-  if (['C', 'CENTRE', 'CENTER'].includes(pos)) return 'C';
-  if (['LW', 'LEFT WING', 'LEFTWING', 'L'].includes(pos)) return 'LW';
-  if (['RW', 'RIGHT WING', 'RIGHTWING', 'R'].includes(pos)) return 'RW';
-  // Defensemen: All defensemen are just 'D' (no LD/RD distinction)
-  if (['D', 'DEFENCE', 'DEFENSE'].includes(pos)) return 'D';
-  // Also check if position contains 'D' but isn't already matched (e.g., 'D/F' should be D, but not 'FD')
-  if (pos.includes('D') && !pos.includes('DEFENSIVE') && pos !== 'FD' && !pos.includes('LD') && !pos.includes('RD')) return 'D';
-  if (['G', 'GOALIE', 'GOALTENDER'].includes(pos)) return 'G';
-  
-  return 'UTIL';
+// When posType is 'forward', C/LW/RW → 'F'
+const getFantasyPosition = (position: string, posType: PositionType = 'individual'): string => {
+  const result = resolveFantasyPosition(position, posType);
+  return result === 'OTHER' ? 'UTIL' : result;
 };
 
 // Helper function to format position for display (L -> LW, R -> RW)
@@ -218,17 +210,25 @@ const safeValue = (val: number) => {
     return { score: avgProj, label: 'Weak', color: 'text-orange-500', bg: 'bg-orange-500/10' };
   };
 
-  // Position slot configuration
-const POSITION_SLOTS = {
-  'C': { maxPlayers: 2, label: 'Center' },
-  'LW': { maxPlayers: 2, label: 'Left Wing' },
-  'RW': { maxPlayers: 2, label: 'Right Wing' },
-  'D': { maxPlayers: 4, label: 'Defense' },
-  'G': { maxPlayers: 2, label: 'Goalie' },
-  'UTIL': { maxPlayers: 1, label: 'Utility' },
-} as const;
-
-type PositionSlot = keyof typeof POSITION_SLOTS;
+  // Position slot configuration — dynamic based on league position type
+  const POSITION_SLOTS = useMemo(() => {
+    if (leaguePositionType === 'forward') {
+      return {
+        'F': { maxPlayers: 6, label: 'Forward' },
+        'D': { maxPlayers: 4, label: 'Defense' },
+        'G': { maxPlayers: 2, label: 'Goalie' },
+        'UTIL': { maxPlayers: 1, label: 'Utility' },
+      };
+    }
+    return {
+      'C': { maxPlayers: 2, label: 'Center' },
+      'LW': { maxPlayers: 2, label: 'Left Wing' },
+      'RW': { maxPlayers: 2, label: 'Right Wing' },
+      'D': { maxPlayers: 4, label: 'Defense' },
+      'G': { maxPlayers: 2, label: 'Goalie' },
+      'UTIL': { maxPlayers: 1, label: 'Utility' },
+    };
+  }, [leaguePositionType]);
 
 interface RosterState {
   starters: HockeyPlayer[];
@@ -273,6 +273,7 @@ const Roster = () => {
   const [userTeamId, setUserTeamId] = useState<string | number | null>(null);
   const [userTeam, setUserTeam] = useState<{ id: string; league_id: string; team_name: string } | null>(null);
   const [bestBallEnabled, setBestBallEnabled] = useState(false);
+  const [leaguePositionType, setLeaguePositionType] = useState<PositionType>('individual');
   const [teamStats, setTeamStats] = useState({
     record: "0-0-0",
     rank: "-",
@@ -330,34 +331,41 @@ const Roster = () => {
   // Calculate positional stats
   const posStats = useMemo(() => calculateTeamCategoryStats(roster.starters), [roster.starters]);
 
-  // Calculate slots helper
+  // Calculate slots helper — respects F/D/G position type
   // Optional parameter: assignedSlots - Set of slot IDs already taken (to avoid conflicts)
   const calculateInitialSlotAssignments = (starters: HockeyPlayer[], assignedSlots?: Set<string>) => {
     const assignments: Record<string, string> = {};
-    const playersByPos: Record<string, HockeyPlayer[]> = {
-      'C': [], 'LW': [], 'RW': [], 'D': [], 'G': [], 'UTIL': []
-    };
+    const posType = leaguePositionType;
 
-    // Use eligible_positions to bucket players into all their eligible slots
+    // Determine position keys and slot caps based on position type
+    const posKeys = posType === 'forward' ? ['F', 'D', 'G'] : ['C', 'LW', 'RW', 'D', 'G'];
+    const slotCaps: Record<string, number> = posType === 'forward'
+      ? { F: 6, D: 4, G: 2 }
+      : { C: 2, LW: 2, RW: 2, D: 4, G: 2 };
+
+    const playersByPos: Record<string, HockeyPlayer[]> = {};
+    for (const k of posKeys) playersByPos[k] = [];
+
+    // Use eligible_positions to bucket players by their primary resolved position
     starters.forEach(p => {
       const positions = (p.eligible_positions && p.eligible_positions.length > 0)
-        ? p.eligible_positions.map(ep => getFantasyPosition(ep))
-        : [getFantasyPosition(p.position)];
+        ? p.eligible_positions.map(ep => getFantasyPosition(ep, posType))
+        : [getFantasyPosition(p.position, posType)];
       const primary = positions[0];
-      if (primary !== 'UTIL') {
+      if (primary !== 'UTIL' && playersByPos[primary]) {
         playersByPos[primary].push(p);
       }
     });
 
-    // Helper to check if a slot is available
     const isSlotAvailable = (slotId: string) => !assignedSlots || !assignedSlots.has(slotId);
     const assignedIds = new Set<string>();
 
-    // Assign C, LW, RW to first 2 slots (primary position first)
-    ['C', 'LW', 'RW'].forEach(pos => {
+    // First pass: assign players to their primary position slots
+    for (const pos of posKeys) {
       let slotIndex = 1;
+      const cap = slotCaps[pos] || 0;
       for (const p of playersByPos[pos]) {
-        if (slotIndex > 2 || assignedIds.has(String(p.id))) continue;
+        if (slotIndex > cap || assignedIds.has(String(p.id))) continue;
         const slotId = `slot-${pos}-${slotIndex}`;
         if (isSlotAvailable(slotId)) {
           assignments[p.id] = slotId;
@@ -365,46 +373,20 @@ const Roster = () => {
           slotIndex++;
         }
       }
-    });
-
-    // Assign D to first 4 slots
-    let dSlotIndex = 1;
-    for (const p of playersByPos['D']) {
-      if (dSlotIndex > 4 || assignedIds.has(String(p.id))) continue;
-      const slotId = `slot-D-${dSlotIndex}`;
-      if (isSlotAvailable(slotId)) {
-        assignments[p.id] = slotId;
-        assignedIds.add(String(p.id));
-        dSlotIndex++;
-      }
-    }
-
-    // Assign G to first 2 slots
-    let gSlotIndex = 1;
-    for (const p of playersByPos['G']) {
-      if (gSlotIndex > 2 || assignedIds.has(String(p.id))) continue;
-      const slotId = `slot-G-${gSlotIndex}`;
-      if (isSlotAvailable(slotId)) {
-        assignments[p.id] = slotId;
-        assignedIds.add(String(p.id));
-        gSlotIndex++;
-      }
     }
 
     // Second pass: try to fill remaining empty slots with multi-position players
-    const slotCaps: Record<string, number> = { 'C': 2, 'LW': 2, 'RW': 2, 'D': 4, 'G': 2 };
-    for (const pos of ['C', 'LW', 'RW', 'D', 'G']) {
-      const cap = slotCaps[pos];
+    for (const pos of posKeys) {
+      const cap = slotCaps[pos] || 0;
       const filledCount = Object.values(assignments).filter(s => s.startsWith(`slot-${pos}-`)).length;
       if (filledCount >= cap) continue;
 
-      // Find unassigned players eligible for this position (via secondary eligibility)
       const candidates = starters.filter(p => {
         if (assignedIds.has(String(p.id))) return false;
         const positions = (p.eligible_positions && p.eligible_positions.length > 0)
-          ? p.eligible_positions.map(ep => getFantasyPosition(ep))
-          : [getFantasyPosition(p.position)];
-        return positions.includes(pos as 'C' | 'LW' | 'RW' | 'D' | 'G');
+          ? p.eligible_positions.map(ep => getFantasyPosition(ep, posType))
+          : [getFantasyPosition(p.position, posType)];
+        return positions.includes(pos);
       });
 
       let slotIdx = filledCount + 1;
@@ -419,9 +401,9 @@ const Roster = () => {
       }
     }
 
-    // Assign remaining non-goalie starters to UTIL if not already assigned and UTIL slot is available
+    // Assign remaining non-goalie starters to UTIL
     const unassigned = starters.filter(p => !assignedIds.has(String(p.id)));
-    const utilPlayer = unassigned.find(p => getFantasyPosition(p.position) !== 'G');
+    const utilPlayer = unassigned.find(p => getFantasyPosition(p.position, posType) !== 'G');
     if (utilPlayer && isSlotAvailable('slot-UTIL')) {
         assignments[utilPlayer.id] = 'slot-UTIL';
     }
@@ -566,6 +548,11 @@ const Roster = () => {
           // Detect Best Ball mode
           if (leagueData.settings && (leagueData.settings as LeagueSettings).bestBallEnabled) {
             setBestBallEnabled(true);
+          }
+
+          // Detect F/D/G position type
+          if (leagueData.settings && (leagueData.settings as LeagueSettings).positionType === 'forward') {
+            setLeaguePositionType('forward');
           }
 
           teamId = userTeamData.id;
@@ -766,8 +753,10 @@ const Roster = () => {
             starters.forEach(player => {
               const pid = String(player.id);
               if (!repairedSlotAssignments[pid]) {
-                const pos = getFantasyPosition(player.position);
-                const slotCaps: Record<string, number> = { C: 2, LW: 2, RW: 2, D: 4, G: 2, UTIL: 1 };
+                const pos = getFantasyPosition(player.position, leaguePositionType);
+                const slotCaps: Record<string, number> = leaguePositionType === 'forward'
+                  ? { F: 6, D: 4, G: 2, UTIL: 1 }
+                  : { C: 2, LW: 2, RW: 2, D: 4, G: 2, UTIL: 1 };
                 let assigned = false;
                 // Try primary position slots first
                 for (let i = 1; i <= (slotCaps[pos] || 0); i++) {
@@ -893,40 +882,41 @@ const Roster = () => {
             }
           });
           
-          // CRITICAL: Ensure all 13 starter slots are filled with position-aware logic
+          // CRITICAL: Ensure all starter slots are filled with position-aware logic
+          // Slot structure depends on league position type
+          const slotsNeeded: Record<string, number> = leaguePositionType === 'forward'
+            ? { 'F': 6, 'D': 4, 'G': 2, 'UTIL': 1 }
+            : { 'C': 2, 'LW': 2, 'RW': 2, 'D': 4, 'G': 2, 'UTIL': 1 };
+          const totalSlotsNeeded = Object.values(slotsNeeded).reduce((a, b) => a + b, 0);
+
           // Count current positions in starters
-          const positionCounts = {
-            C: starters.filter(p => getFantasyPosition(p.position) === 'C').length,
-            LW: starters.filter(p => getFantasyPosition(p.position) === 'LW').length,
-            RW: starters.filter(p => getFantasyPosition(p.position) === 'RW').length,
-            D: starters.filter(p => getFantasyPosition(p.position) === 'D').length,
-            G: starters.filter(p => getFantasyPosition(p.position) === 'G').length,
-            UTIL: starters.filter(p => getFantasyPosition(p.position) === 'UTIL').length
-          };
-          
-          const slotsNeeded = { 'C': 2, 'LW': 2, 'RW': 2, 'D': 4, 'G': 2, 'UTIL': 1 };
-          const totalSlotsNeeded = 13;
+          const positionCounts: Record<string, number> = {};
+          for (const pos of Object.keys(slotsNeeded)) {
+            positionCounts[pos] = starters.filter(p => getFantasyPosition(p.position, leaguePositionType) === pos).length;
+          }
           
           if (starters.length < totalSlotsNeeded) {
             
             // Get available bench players sorted by points
             const availableBench = [...bench].sort((a, b) => ((b.stats?.points || 0) - (a.stats?.points || 0)));
             
-            // Priority order: Fill critical positions first (G, D), then others
-            const priorityOrder: Array<'G' | 'D' | 'C' | 'LW' | 'RW' | 'UTIL'> = ['G', 'D', 'C', 'LW', 'RW', 'UTIL'];
-            
+            // Priority order: Fill critical positions first (G, D), then forwards
+            const priorityOrder = leaguePositionType === 'forward'
+              ? ['G', 'D', 'F', 'UTIL']
+              : ['G', 'D', 'C', 'LW', 'RW', 'UTIL'];
+
             // First pass: Fill missing positions with position-specific players
             for (const pos of priorityOrder) {
-              const needed = slotsNeeded[pos];
-              const current = positionCounts[pos];
+              const needed = slotsNeeded[pos] || 0;
+              const current = positionCounts[pos] || 0;
               const missing = needed - current;
-              
+
               if (missing > 0) {
                 // Find best available players eligible for this position (includes multi-pos)
                 const positionPlayers = availableBench.filter(p => {
                   const eligible = (p.eligible_positions && p.eligible_positions.length > 0)
-                    ? p.eligible_positions.map(ep => getFantasyPosition(ep))
-                    : [getFantasyPosition(p.position)];
+                    ? p.eligible_positions.map(ep => getFantasyPosition(ep, leaguePositionType))
+                    : [getFantasyPosition(p.position, leaguePositionType)];
                   return eligible.includes(pos);
                 });
                 const bestOfPosition = positionPlayers
@@ -1034,10 +1024,13 @@ const Roster = () => {
           const ir: HockeyPlayer[] = [];
           const assignments: Record<string, string> = {};
           
-          const slotsNeeded = { 'C': 2, 'LW': 2, 'RW': 2, 'D': 4, 'G': 2, 'UTIL': 1 };
-          const slotsFilled = { 'C': 0, 'LW': 0, 'RW': 0, 'D': 0, 'G': 0, 'UTIL': 0 };
+          const slotsNeeded: Record<string, number> = leaguePositionType === 'forward'
+            ? { 'F': 6, 'D': 4, 'G': 2, 'UTIL': 1 }
+            : { 'C': 2, 'LW': 2, 'RW': 2, 'D': 4, 'G': 2, 'UTIL': 1 };
+          const slotsFilled: Record<string, number> = {};
+          for (const k of Object.keys(slotsNeeded)) slotsFilled[k] = 0;
           let irSlotIndex = 1;
-          
+
           transformedPlayers.forEach(p => {
             if (p.status === 'IR' || p.status === 'SUSP') {
               if (irSlotIndex <= 3) {
@@ -1049,11 +1042,11 @@ const Roster = () => {
               }
               return;
             }
-            
+
             // Use eligible_positions for multi-position slot assignment
             const eligiblePos = (p.eligible_positions && p.eligible_positions.length > 0)
-              ? p.eligible_positions.map(ep => getFantasyPosition(ep))
-              : [getFantasyPosition(p.position)];
+              ? p.eligible_positions.map(ep => getFantasyPosition(ep, leaguePositionType))
+              : [getFantasyPosition(p.position, leaguePositionType)];
             const primaryPos = eligiblePos[0];
             let assigned = false;
 
@@ -1153,13 +1146,16 @@ const Roster = () => {
             const starters: HockeyPlayer[] = [];
             const bench: HockeyPlayer[] = [];
             const ir: HockeyPlayer[] = [];
-            const slotsNeeded = { 'C': 2, 'LW': 2, 'RW': 2, 'D': 4, 'G': 2, 'UTIL': 1 };
-            const slotsFilled = { 'C': 0, 'LW': 0, 'RW': 0, 'D': 0, 'G': 0, 'UTIL': 0 };
-            const totalSlotsNeeded = 13;
-            
+            const slotsNeeded: Record<string, number> = leaguePositionType === 'forward'
+              ? { 'F': 6, 'D': 4, 'G': 2, 'UTIL': 1 }
+              : { 'C': 2, 'LW': 2, 'RW': 2, 'D': 4, 'G': 2, 'UTIL': 1 };
+            const slotsFilled: Record<string, number> = {};
+            for (const k of Object.keys(slotsNeeded)) slotsFilled[k] = 0;
+            const totalSlotsNeeded = Object.values(slotsNeeded).reduce((a, b) => a + b, 0);
+
             // Sort by points
             const sorted = [...transformed].sort((a, b) => ((b.stats?.points || 0) - (a.stats?.points || 0)));
-            
+
             // Place IR players first
             sorted.forEach(p => {
               if (p.status === 'IR' || p.status === 'SUSP') {
@@ -1170,12 +1166,12 @@ const Roster = () => {
                 }
               }
             });
-            
+
             // Fill position-specific slots
             const availablePlayers = sorted.filter(p => p.status !== 'IR' && p.status !== 'SUSP');
-            
+
             availablePlayers.forEach(p => {
-              const pos = getFantasyPosition(p.position);
+              const pos = getFantasyPosition(p.position, leaguePositionType);
               
               if (pos !== 'UTIL' && pos !== 'G' && slotsFilled[pos] < slotsNeeded[pos]) {
                 starters.push({ ...p, starter: true });
@@ -2201,15 +2197,14 @@ const Roster = () => {
       };
 
       // 3. Group by fantasy position (using eligible_positions for multi-pos)
-      const grouped: Record<string, HockeyPlayer[]> = {
-        'C': [], 'LW': [], 'RW': [], 'D': [], 'G': []
-      };
+      const posKeys = leaguePositionType === 'forward' ? ['F', 'D', 'G'] : ['C', 'LW', 'RW', 'D', 'G'];
+      const grouped: Record<string, HockeyPlayer[]> = {};
+      for (const k of posKeys) grouped[k] = [];
 
       allActivePlayers.forEach(p => {
         const positions = (p.eligible_positions && p.eligible_positions.length > 0)
-          ? p.eligible_positions.map(ep => getFantasyPosition(ep))
-          : [getFantasyPosition(p.position)];
-        // Add to primary position group
+          ? p.eligible_positions.map(ep => getFantasyPosition(ep, leaguePositionType))
+          : [getFantasyPosition(p.position, leaguePositionType)];
         const primary = positions[0];
         if (primary !== 'UTIL' && grouped[primary]) {
           grouped[primary].push(p);
@@ -2227,7 +2222,6 @@ const Roster = () => {
       const newBench: HockeyPlayer[] = [];
       const assignedIds = new Set<string | number>();
 
-      // Helper to assign players to a list of slot IDs
       const assignToSlots = (players: HockeyPlayer[], slotPrefix: string, count: number) => {
         let filled = 0;
         for (const p of players) {
@@ -2240,29 +2234,28 @@ const Roster = () => {
         }
       };
 
-      // Assign Primary Slots
-      assignToSlots(grouped['C'], 'slot-C', 2);
-      assignToSlots(grouped['LW'], 'slot-LW', 2);
-      assignToSlots(grouped['RW'], 'slot-RW', 2);
-      assignToSlots(grouped['D'], 'slot-D', 4);
-      assignToSlots(grouped['G'], 'slot-G', 2);
+      // Assign Primary Slots (dynamic based on position type)
+      const slotCaps: Record<string, number> = leaguePositionType === 'forward'
+        ? { F: 6, D: 4, G: 2 }
+        : { C: 2, LW: 2, RW: 2, D: 4, G: 2 };
+      for (const pos of posKeys) {
+        assignToSlots(grouped[pos], `slot-${pos}`, slotCaps[pos] || 0);
+      }
 
       // Second pass: fill empty position slots with multi-position eligible players
-      const slotCaps: Record<string, number> = { 'C': 2, 'LW': 2, 'RW': 2, 'D': 4, 'G': 2 };
-      for (const pos of ['C', 'LW', 'RW', 'D', 'G'] as const) {
+      for (const pos of posKeys) {
         const filled = Object.values(newAssignments).filter(s => s.startsWith(`slot-${pos}-`)).length;
-        if (filled >= slotCaps[pos]) continue;
-        // Find unassigned players eligible for this position
+        if (filled >= (slotCaps[pos] || 0)) continue;
         const candidates = sortBestPlayers(allActivePlayers.filter(p => {
           if (assignedIds.has(p.id)) return false;
           const positions = (p.eligible_positions && p.eligible_positions.length > 0)
-            ? p.eligible_positions.map(ep => getFantasyPosition(ep))
-            : [getFantasyPosition(p.position)];
+            ? p.eligible_positions.map(ep => getFantasyPosition(ep, leaguePositionType))
+            : [getFantasyPosition(p.position, leaguePositionType)];
           return positions.includes(pos);
         }));
         let slotIdx = filled;
         for (const p of candidates) {
-          if (slotIdx >= slotCaps[pos]) break;
+          if (slotIdx >= (slotCaps[pos] || 0)) break;
           newAssignments[p.id] = `slot-${pos}-${slotIdx + 1}`;
           newStarters.push({ ...p, starter: true });
           assignedIds.add(p.id);
@@ -2272,7 +2265,7 @@ const Roster = () => {
 
       // 6. Handle UTIL Slot (Best remaining non-goalie)
       const remainingPlayers = allActivePlayers.filter(p => !assignedIds.has(p.id));
-      const utilCandidates = remainingPlayers.filter(p => getFantasyPosition(p.position) !== 'G');
+      const utilCandidates = remainingPlayers.filter(p => getFantasyPosition(p.position, leaguePositionType) !== 'G');
       const bestUtil = sortBestPlayers(utilCandidates)[0];
 
       if (bestUtil) {
@@ -2371,23 +2364,23 @@ const Roster = () => {
       return true;
     }
 
-    let slotPosition: PositionSlot | null = null;
+    let slotPosition: string | null = null;
 
     if (targetSlot === 'slot-UTIL') {
       slotPosition = 'UTIL';
     } else if (targetSlot.startsWith('slot-')) {
        const parts = targetSlot.split('-');
        if (parts.length >= 2) {
-         slotPosition = parts[1] as PositionSlot;
+         slotPosition = parts[1];
        }
     }
 
     if (!slotPosition) return false;
 
-    // Build the set of positions this player is eligible for
+    // Build the set of positions this player is eligible for (respects F/D/G mode)
     const eligiblePositions = (player.eligible_positions && player.eligible_positions.length > 0)
-      ? player.eligible_positions.map(p => getFantasyPosition(p))
-      : [getFantasyPosition(player.position)];
+      ? player.eligible_positions.map(p => getFantasyPosition(p, leaguePositionType))
+      : [getFantasyPosition(player.position, leaguePositionType)];
 
     const isGoalie = eligiblePositions.includes('G');
 
@@ -2732,11 +2725,18 @@ const Roster = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // All known starter slot IDs for tap-to-swap eligibility calculation
-  const ALL_STARTER_SLOT_IDS = useMemo(() => [
-    'slot-C-1', 'slot-C-2', 'slot-LW-1', 'slot-LW-2', 'slot-RW-1', 'slot-RW-2',
-    'slot-D-1', 'slot-D-2', 'slot-D-3', 'slot-D-4', 'slot-G-1', 'slot-G-2', 'slot-UTIL'
-  ], []);
+  // All known starter slot IDs for tap-to-swap eligibility calculation (dynamic based on position type)
+  const ALL_STARTER_SLOT_IDS = useMemo(() => {
+    const slots: string[] = [];
+    const posKeys = leaguePositionType === 'forward'
+      ? [{ pos: 'F', count: 6 }, { pos: 'D', count: 4 }, { pos: 'G', count: 2 }]
+      : [{ pos: 'C', count: 2 }, { pos: 'LW', count: 2 }, { pos: 'RW', count: 2 }, { pos: 'D', count: 4 }, { pos: 'G', count: 2 }];
+    for (const { pos, count } of posKeys) {
+      for (let i = 1; i <= count; i++) slots.push(`slot-${pos}-${i}`);
+    }
+    slots.push('slot-UTIL');
+    return slots;
+  }, [leaguePositionType]);
 
   // Compute which slots the tap-selected player can move to
   const tapEligibleSlots = useMemo(() => {
@@ -3209,6 +3209,7 @@ const Roster = () => {
                         onPlayerNameTap={handlePlayerClick}
                         onSlotTap={handleMobileTapSlot}
                         onBenchTap={handleMobileTapBench}
+                        positionType={leaguePositionType}
                       />
                     </div>
                   ) : userTeam && isDemoLeague(userTeam.league_id) ? (
@@ -3218,6 +3219,7 @@ const Roster = () => {
                         slotAssignments={displayRoster.slotAssignments}
                         onPlayerClick={handlePlayerClick}
                         lockedPlayerIds={lockedPlayerIds}
+                        positionType={leaguePositionType}
                       />
                       <BenchGrid
                         players={displayRoster.bench}
@@ -3245,6 +3247,7 @@ const Roster = () => {
                         lockedPlayerIds={lockedPlayerIds}
                         tapSelectedPlayerId={null}
                         tapEligibleSlots={new Set()}
+                        positionType={leaguePositionType}
                       />
 
                       <BenchGrid

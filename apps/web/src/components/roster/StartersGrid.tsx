@@ -7,32 +7,33 @@ import HockeyPlayerCard, { HockeyPlayer } from "./HockeyPlayerCard";
 import { Plus } from "lucide-react";
 import { CitrusSparkle } from "@/components/icons/CitrusIcons";
 
+import type { PositionType } from "@/utils/rosterUtils";
+
 interface PositionSlot {
   id: string;
-  position: 'C' | 'LW' | 'RW' | 'D' | 'G' | 'UTIL';
+  position: 'C' | 'LW' | 'RW' | 'D' | 'G' | 'UTIL' | 'F';
   label: string;
   maxPlayers: number;
 }
 
-const positionSlots: PositionSlot[] = [
-  { id: 'slot-C', position: 'C', label: 'Center', maxPlayers: 2 },
-  { id: 'slot-LW', position: 'LW', label: 'Left Wing', maxPlayers: 2 },
-  { id: 'slot-RW', position: 'RW', label: 'Right Wing', maxPlayers: 2 },
-  { id: 'slot-D', position: 'D', label: 'Defense', maxPlayers: 4 },
-  { id: 'slot-G', position: 'G', label: 'Goalie', maxPlayers: 2 },
-  { id: 'slot-UTIL', position: 'UTIL', label: 'Utility', maxPlayers: 1 },
-];
+const POSITION_LABELS: Record<string, string> = {
+  C: 'Center',
+  LW: 'Left Wing',
+  RW: 'Right Wing',
+  D: 'Defense',
+  G: 'Goalie',
+  UTIL: 'Utility',
+  F: 'Forward',
+};
 
-// Create individual slots for defense (4 slots) and goalies (2 slots)
-const createIndividualSlots = (position: 'D' | 'G' | 'C' | 'LW' | 'RW', count: number): PositionSlot[] => {
-  const baseSlot = positionSlots.find(s => s.position === position);
-  if (!baseSlot) return [];
-  
+// Create individual slots for a given position and count
+const createIndividualSlots = (position: string, count: number): PositionSlot[] => {
+  const label = POSITION_LABELS[position] || position;
   return Array.from({ length: count }, (_, i) => ({
-    ...baseSlot,
-    id: `${baseSlot.id}-${i + 1}`,
-    label: `${baseSlot.label} ${i + 1}`,
-    maxPlayers: 1, // Each individual slot holds 1 player
+    id: `slot-${position}-${i + 1}`,
+    position: position as PositionSlot['position'],
+    label: `${label} ${i + 1}`,
+    maxPlayers: 1,
   }));
 };
 
@@ -45,9 +46,11 @@ interface StartersGridProps {
   tapSelectedPlayerId?: string | number | null; // Mobile tap-to-swap: currently selected player
   tapEligibleSlots?: Set<string>; // Mobile tap-to-swap: slots this player can move to
   onSlotTap?: (slotId: string) => void; // Mobile tap-to-swap: handler when an eligible slot is tapped
+  positionType?: PositionType; // 'individual' (C/LW/RW/D/G) or 'forward' (F/D/G)
+  rosterSlots?: Record<string, number>; // Custom roster slot counts
 }
 
-const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, className, lockedPlayerIds = new Set(), tapSelectedPlayerId = null, tapEligibleSlots = new Set(), onSlotTap }: StartersGridProps) => {
+const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, className, lockedPlayerIds = new Set(), tapSelectedPlayerId = null, tapEligibleSlots = new Set(), onSlotTap, positionType = 'individual', rosterSlots }: StartersGridProps) => {
   
   const getPlayerInSlot = (slotId: string) => {
     // Look for key in slotAssignments where value is slotId
@@ -85,21 +88,34 @@ const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, className,
      );
   };
 
-  // Group slots by row for visual stacking
-  // Row 1: LW, C, RW (Top Left, Middle, Top Right)
-  const forwardRow = [
-    ...createIndividualSlots('LW', 2),
-    ...createIndividualSlots('C', 2),
-    ...createIndividualSlots('RW', 2)
-  ];
-  
-  // Row 2: Defense (Centered below)
-  const defenseRow = createIndividualSlots('D', 4);
+  // Get slot counts from rosterSlots prop or defaults
+  const getCount = (pos: string, fallback: number) => rosterSlots?.[pos] ?? fallback;
 
-  // Row 3: Goalies & Utility (Bottom)
+  // Group slots by row for visual stacking
+  const isForward = positionType === 'forward';
+
+  // Row 1: Forwards
+  const forwardRow = isForward
+    ? createIndividualSlots('F', getCount('F', 6))
+    : [
+        ...createIndividualSlots('LW', getCount('LW', 2)),
+        ...createIndividualSlots('C', getCount('C', 2)),
+        ...createIndividualSlots('RW', getCount('RW', 2)),
+      ];
+
+  // Row 2: Defense
+  const defenseRow = createIndividualSlots('D', getCount('D', 4));
+
+  // Row 3: Goalies & Utility
+  const utilCount = getCount('UTIL', 1);
   const bottomRow = [
-    ...createIndividualSlots('G', 2),
-    ...positionSlots.filter(slot => slot.position === 'UTIL')
+    ...createIndividualSlots('G', getCount('G', 2)),
+    ...Array.from({ length: utilCount }, (_, i) => ({
+      id: 'slot-UTIL',
+      position: 'UTIL' as const,
+      label: 'Utility',
+      maxPlayers: 1,
+    })),
   ];
 
   return (
@@ -119,16 +135,22 @@ const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, className,
           <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
             Forwards
           </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+          <div className={cn(
+            "grid gap-2",
+            isForward
+              ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-6"
+              : "grid-cols-2 sm:grid-cols-3 md:grid-cols-6"
+          )}>
             {forwardRow.map(slot => {
               // Add colored left border based on position
               const getBorderColor = () => {
+                if (slot.position === 'F') return 'border-l-2 border-emerald-500 pl-1';
                 if (slot.position === 'LW') return 'border-l-2 border-blue-500 pl-1';
                 if (slot.position === 'C') return 'border-l-2 border-primary pl-1';
                 if (slot.position === 'RW') return 'border-l-2 border-purple-500 pl-1';
                 return '';
               };
-              
+
               return (
                 <div key={slot.id} className={getBorderColor()}>
                   {renderSlot(slot)}
@@ -215,6 +237,7 @@ const PositionSlot = ({
     'C': 'bg-primary/10 dark:bg-primary/5 border-primary/30 dark:border-primary/20',
     'RW': 'bg-purple-50/50 dark:bg-purple-950/20 border-purple-200/50 dark:border-purple-800/30',
     'UTIL': 'bg-orange-50/50 dark:bg-orange-950/20 border-orange-200/50 dark:border-orange-800/30',
+    'F': 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200/50 dark:border-emerald-800/30',
   };
 
   const getPositionStyle = () => {

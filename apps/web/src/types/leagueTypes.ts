@@ -133,6 +133,15 @@ export const DEFAULT_ROSTER_SLOTS: RosterSlotConfig[] = [
   { slot: 'IR', label: 'Injured Reserve', count: 2 },
 ];
 
+export const DEFAULT_FDG_ROSTER_SLOTS: RosterSlotConfig[] = [
+  { slot: 'F', label: 'Forward', count: 6 },
+  { slot: 'D', label: 'Defense', count: 4 },
+  { slot: 'G', label: 'Goalie', count: 2 },
+  { slot: 'UTIL', label: 'Utility', count: 1 },
+  { slot: 'BN', label: 'Bench', count: 8 },
+  { slot: 'IR', label: 'Injured Reserve', count: 2 },
+];
+
 // ============================================================================
 // ROTO / CATEGORY STAT DEFINITIONS
 // ============================================================================
@@ -224,6 +233,9 @@ export interface LeagueFormatSettings {
 
   // === Roster Slot Configuration (Commissioner-configurable) ===
   rosterSlots?: Record<string, number>;  // e.g., { C: 2, LW: 2, RW: 2, D: 4, G: 2, UTIL: 2 }
+
+  // === Position Type (Commissioner-configurable) ===
+  positionType?: 'individual' | 'forward';  // 'individual' = C/LW/RW/D/G, 'forward' = F/D/G
 
   // === Transaction Limits (Commissioner-configurable) ===
   weeklyAddLimit?: number;           // Max adds per team per week (0 = unlimited, ESPN/Yahoo/Sleeper standard)
@@ -430,6 +442,9 @@ export function extractFormatSettings(settings: Record<string, unknown>): Partia
 
     // Roster slots (commissioner-configurable)
     rosterSlots: (settings.rosterSlots as Record<string, number>) || undefined,
+
+    // Position type (commissioner-configurable)
+    positionType: (settings.positionType as 'individual' | 'forward') || 'individual',
 
     // Transaction limits
     weeklyAddLimit: (settings.weeklyAddLimit as number) ?? 0,

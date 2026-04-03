@@ -1,4 +1,5 @@
 import { MatchupPlayer } from "./types";
+import { resolveFantasyPosition, type PositionType } from "@/utils/rosterUtils";
 
 export interface PositionGroup {
   position: string;
@@ -8,7 +9,7 @@ export interface PositionGroup {
 }
 
 // Standard slot order matching TeamCard structure
-const standardSlotOrder: Array<{ slot: string; position: string }> = [
+const INDIVIDUAL_SLOT_ORDER: Array<{ slot: string; position: string }> = [
   { slot: 'slot-C-1', position: 'C' },
   { slot: 'slot-C-2', position: 'C' },
   { slot: 'slot-RW-1', position: 'RW' },
@@ -24,15 +25,30 @@ const standardSlotOrder: Array<{ slot: string; position: string }> = [
   { slot: 'slot-UTIL', position: 'UTIL' },
 ];
 
+const FDG_SLOT_ORDER: Array<{ slot: string; position: string }> = [
+  { slot: 'slot-F-1', position: 'F' },
+  { slot: 'slot-F-2', position: 'F' },
+  { slot: 'slot-F-3', position: 'F' },
+  { slot: 'slot-F-4', position: 'F' },
+  { slot: 'slot-F-5', position: 'F' },
+  { slot: 'slot-F-6', position: 'F' },
+  { slot: 'slot-D-1', position: 'D' },
+  { slot: 'slot-D-2', position: 'D' },
+  { slot: 'slot-D-3', position: 'D' },
+  { slot: 'slot-D-4', position: 'D' },
+  { slot: 'slot-G-1', position: 'G' },
+  { slot: 'slot-G-2', position: 'G' },
+  { slot: 'slot-UTIL', position: 'UTIL' },
+];
+
+function getSlotOrder(positionType: PositionType = 'individual') {
+  return positionType === 'forward' ? FDG_SLOT_ORDER : INDIVIDUAL_SLOT_ORDER;
+}
+
 // Helper to normalize position for grouping
-const normalizePosition = (position: string): string => {
-  const pos = position?.toUpperCase() || '';
-  if (pos.includes('C') && !pos.includes('LW') && !pos.includes('RW')) return 'C';
-  if (pos.includes('LW') || pos === 'L' || pos === 'LEFT' || pos === 'LEFTWING') return 'LW';
-  if (pos.includes('RW') || pos === 'R' || pos === 'RIGHT' || pos === 'RIGHTWING') return 'RW';
-  if (pos.includes('D')) return 'D';
-  if (pos.includes('G')) return 'G';
-  return 'UTIL';
+const normalizePosition = (position: string, positionType: PositionType = 'individual'): string => {
+  const result = resolveFantasyPosition(position, positionType);
+  return result === 'OTHER' ? 'UTIL' : result;
 };
 
 // Format position for display
@@ -55,14 +71,18 @@ const formatPositionForDisplay = (position: string): string => {
  * as well as any race condition where slot assignments haven't loaded yet.
  */
 const autoAssignSlots = (
-  starters: MatchupPlayer[]
+  starters: MatchupPlayer[],
+  positionType: PositionType = 'individual'
 ): Record<string, string> => {
-  const slotsNeeded: Record<string, number> = { C: 2, LW: 2, RW: 2, D: 4, G: 2, UTIL: 1 };
-  const slotsFilled: Record<string, number> = { C: 0, LW: 0, RW: 0, D: 0, G: 0, UTIL: 0 };
+  const slotsNeeded: Record<string, number> = positionType === 'forward'
+    ? { F: 6, D: 4, G: 2, UTIL: 1 }
+    : { C: 2, LW: 2, RW: 2, D: 4, G: 2, UTIL: 1 };
+  const slotsFilled: Record<string, number> = {};
+  for (const k of Object.keys(slotsNeeded)) slotsFilled[k] = 0;
   const assignments: Record<string, string> = {};
 
   starters.forEach(player => {
-    const pos = normalizePosition(player.position);
+    const pos = normalizePosition(player.position, positionType);
     if (pos !== 'UTIL' && slotsFilled[pos] < (slotsNeeded[pos] || 0)) {
       slotsFilled[pos]++;
       assignments[String(player.id)] = `slot-${pos}-${slotsFilled[pos]}`;
@@ -70,8 +90,6 @@ const autoAssignSlots = (
       slotsFilled['UTIL']++;
       assignments[String(player.id)] = 'slot-UTIL';
     }
-    // If all slots for this position are full, player just won't be assigned
-    // (overflow — shouldn't happen with correct roster sizes)
   });
 
   return assignments;
@@ -84,19 +102,19 @@ export const organizeMatchupData = (
   userStarters: MatchupPlayer[],
   opponentStarters: MatchupPlayer[],
   userSlotAssignments: Record<string, string>,
-  opponentSlotAssignments: Record<string, string>
+  opponentSlotAssignments: Record<string, string>,
+  positionType: PositionType = 'individual'
 ): PositionGroup[] => {
   // Auto-assign slots when assignments are missing/empty but starters exist.
-  // This handles: AI teams with null slot_id in DB, race conditions on date switch, etc.
   const effectiveUserSlots = (
     userStarters.length > 0 &&
     !userStarters.some(p => userSlotAssignments[String(p.id)])
-  ) ? autoAssignSlots(userStarters) : userSlotAssignments;
+  ) ? autoAssignSlots(userStarters, positionType) : userSlotAssignments;
 
   const effectiveOpponentSlots = (
     opponentStarters.length > 0 &&
     !opponentStarters.some(p => opponentSlotAssignments[String(p.id)])
-  ) ? autoAssignSlots(opponentStarters) : opponentSlotAssignments;
+  ) ? autoAssignSlots(opponentStarters, positionType) : opponentSlotAssignments;
 
   // Create maps of slot -> player for both teams
   const userSlotToPlayer = new Map<string, MatchupPlayer>();
@@ -117,10 +135,11 @@ export const organizeMatchupData = (
   });
 
   // Group slots by position
+  const slotOrder = getSlotOrder(positionType);
   const positionGroups = new Map<string, Array<{ slot: string; position: string }>>();
-  
-  standardSlotOrder.forEach(({ slot, position }) => {
-    const normalizedPos = normalizePosition(position);
+
+  slotOrder.forEach(({ slot, position }) => {
+    const normalizedPos = normalizePosition(position, positionType);
     if (!positionGroups.has(normalizedPos)) {
       positionGroups.set(normalizedPos, []);
     }
@@ -131,7 +150,9 @@ export const organizeMatchupData = (
   const result: PositionGroup[] = [];
 
   // Order positions for display
-  const positionOrder = ['C', 'LW', 'RW', 'D', 'G', 'UTIL'];
+  const positionOrder = positionType === 'forward'
+    ? ['F', 'D', 'G', 'UTIL']
+    : ['C', 'LW', 'RW', 'D', 'G', 'UTIL'];
   
   positionOrder.forEach(pos => {
     const slots = positionGroups.get(pos);

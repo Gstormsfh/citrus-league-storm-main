@@ -233,12 +233,20 @@ const WaiverWire = () => {
 
     setSearchLoading(true);
     try {
+      // For 'F' filter, don't send position to API (it expects C/LW/RW); filter client-side instead
+      const apiPositionFilter = positionFilter === 'all' || positionFilter === 'F'
+        ? undefined
+        : positionFilter || undefined;
       const players = await WaiverService.getAvailablePlayers(
         activeLeagueId,
-        positionFilter === 'all' ? undefined : positionFilter || undefined,
+        apiPositionFilter,
         searchTerm || undefined
       );
-      setAvailablePlayers(players);
+      // Client-side filtering for 'F' (forward = C/LW/RW)
+      const filteredPlayers = positionFilter === 'F'
+        ? players.filter((p: any) => ['C', 'LW', 'RW'].includes(p.position_code?.toUpperCase()))
+        : players;
+      setAvailablePlayers(filteredPlayers);
 
       // Check which teams have started/live games today (those players are game-locked)
       const uniqueTeams = [...new Set(players.map((p: any) => p.team_abbrev).filter(Boolean))];
@@ -520,11 +528,21 @@ const WaiverWire = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Positions</SelectItem>
-                      <SelectItem value="C">Center</SelectItem>
-                      <SelectItem value="LW">Left Wing</SelectItem>
-                      <SelectItem value="RW">Right Wing</SelectItem>
-                      <SelectItem value="D">Defense</SelectItem>
-                      <SelectItem value="G">Goalie</SelectItem>
+                      {activeLeagueFormat?.positionType === 'forward' ? (
+                        <>
+                          <SelectItem value="F">Forward</SelectItem>
+                          <SelectItem value="D">Defense</SelectItem>
+                          <SelectItem value="G">Goalie</SelectItem>
+                        </>
+                      ) : (
+                        <>
+                          <SelectItem value="C">Center</SelectItem>
+                          <SelectItem value="LW">Left Wing</SelectItem>
+                          <SelectItem value="RW">Right Wing</SelectItem>
+                          <SelectItem value="D">Defense</SelectItem>
+                          <SelectItem value="G">Goalie</SelectItem>
+                        </>
+                      )}
                     </SelectContent>
                   </Select>
                   <Button 

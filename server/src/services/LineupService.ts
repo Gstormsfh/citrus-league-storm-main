@@ -98,7 +98,7 @@ export class LineupService {
     // 1b. Validate slot_assignments structure
     const starterSet = new Set(lineup.starters);
     const irSet = new Set(lineup.ir);
-    const VALID_SLOT_PATTERN = /^slot-(C|LW|RW|D|G)-[1-4]$|^slot-UTIL$|^ir-slot-[1-3]$/;
+    const VALID_SLOT_PATTERN = /^slot-(C|LW|RW|D|G|F)-[1-8]$|^slot-UTIL$|^ir-slot-[1-3]$/;
     const seenSlots = new Set<string>();
     for (const playerId of Object.keys(lineup.slot_assignments)) {
       const slotId = lineup.slot_assignments[playerId];
@@ -391,6 +391,14 @@ export class LineupService {
    * Queries player data server-side to determine positions and auto-assign slots.
    */
   async initializeLineup(teamId: string, leagueId: string) {
+    // Get league settings for position type
+    const { data: leagueData } = await this.supabase
+      .from('leagues')
+      .select('settings')
+      .eq('id', leagueId)
+      .single();
+    const positionType: string = (leagueData?.settings as Record<string, unknown>)?.positionType === 'forward' ? 'forward' : 'individual';
+
     // Get roster assignments
     const { data: rosterAssignments, error: rosterError } = await this.supabase
       .from('roster_assignments')
@@ -437,12 +445,19 @@ export class LineupService {
 
     const getFantasyPosition = (position: string): string => {
       const pos = position?.toUpperCase() || '';
-      if (['C', 'CENTRE', 'CENTER'].includes(pos)) return 'C';
-      if (['LW', 'LEFT WING', 'LEFTWING', 'L'].includes(pos)) return 'LW';
-      if (['RW', 'RIGHT WING', 'RIGHTWING', 'R'].includes(pos)) return 'RW';
-      if (['D', 'DEFENCE', 'DEFENSE'].includes(pos)) return 'D';
-      if (['G', 'GOALIE'].includes(pos)) return 'G';
-      return 'UTIL';
+      let normalized: string;
+      if (['C', 'CENTRE', 'CENTER'].includes(pos)) normalized = 'C';
+      else if (['LW', 'LEFT WING', 'LEFTWING', 'L'].includes(pos)) normalized = 'LW';
+      else if (['RW', 'RIGHT WING', 'RIGHTWING', 'R'].includes(pos)) normalized = 'RW';
+      else if (['D', 'DEFENCE', 'DEFENSE'].includes(pos)) normalized = 'D';
+      else if (['G', 'GOALIE'].includes(pos)) normalized = 'G';
+      else return 'UTIL';
+
+      // In F/D/G mode, merge C/LW/RW into F
+      if (positionType === 'forward' && (normalized === 'C' || normalized === 'LW' || normalized === 'RW')) {
+        return 'F';
+      }
+      return normalized;
     };
 
     // Sort players by ID for deterministic assignment
@@ -453,8 +468,13 @@ export class LineupService {
     const ir: string[] = [];
     const slotAssignments: Record<string, string> = {};
 
-    const slotsNeeded: Record<string, number> = { C: 2, LW: 2, RW: 2, D: 4, G: 2, UTIL: 1 };
-    const slotsFilled: Record<string, number> = { C: 0, LW: 0, RW: 0, D: 0, G: 0, UTIL: 0 };
+    // Use F/D/G slot structure when position type is forward
+    const slotsNeeded: Record<string, number> = positionType === 'forward'
+      ? { F: 6, D: 4, G: 2, UTIL: 1 }
+      : { C: 2, LW: 2, RW: 2, D: 4, G: 2, UTIL: 1 };
+    const slotsFilled: Record<string, number> = positionType === 'forward'
+      ? { F: 0, D: 0, G: 0, UTIL: 0 }
+      : { C: 0, LW: 0, RW: 0, D: 0, G: 0, UTIL: 0 };
     let irSlotIndex = 1;
 
     for (const pid of sortedIds) {
@@ -484,24 +504,22 @@ export class LineupService {
     }
 
     // Assign position slots to starters
-    const startersByPos: Record<string, string[]> = { C: [], LW: [], RW: [], D: [], G: [] };
+    const posKeys = positionType === 'forward' ? ['F', 'D', 'G'] : ['C', 'LW', 'RW', 'D', 'G'];
+    const startersByPos: Record<string, string[]> = {};
+    for (const key of posKeys) startersByPos[key] = [];
+
     for (const pid of starters) {
       const pos = getFantasyPosition(positionMap.get(pid) || 'UTIL');
       if (pos !== 'UTIL' && startersByPos[pos]) {
         startersByPos[pos].push(pid);
       }
     }
-    for (const pos of ['C', 'LW', 'RW']) {
-      startersByPos[pos].slice(0, 2).forEach((pid, i) => {
+    for (const pos of posKeys) {
+      const limit = slotsNeeded[pos] || 0;
+      startersByPos[pos].slice(0, limit).forEach((pid, i) => {
         slotAssignments[pid] = `slot-${pos}-${i + 1}`;
       });
     }
-    startersByPos.D.slice(0, 4).forEach((pid, i) => {
-      slotAssignments[pid] = `slot-D-${i + 1}`;
-    });
-    startersByPos.G.slice(0, 2).forEach((pid, i) => {
-      slotAssignments[pid] = `slot-G-${i + 1}`;
-    });
     // UTIL slot
     const assignedIds = new Set(Object.keys(slotAssignments));
     const utilPlayer = starters.find(pid => {
