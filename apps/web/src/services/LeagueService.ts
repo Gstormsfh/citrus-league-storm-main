@@ -64,12 +64,14 @@ export function getLeagueFormat(league: League): {
   leagueType: LeagueType;
   scoringFormat: ScoringFormat;
   draftType: LeagueDraftType;
+  positionType?: 'individual' | 'forward';
 } {
   const fmt = extractFormatSettings(league.settings || {});
   return {
     leagueType: fmt.leagueType || 'fantasy',
     scoringFormat: fmt.scoringFormat || 'h2h-points',
     draftType: fmt.draftType || 'snake',
+    positionType: fmt.positionType || 'individual',
   };
 }
 

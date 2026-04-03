@@ -52,7 +52,6 @@ import { MatchupScheduleSelector } from "@/components/matchup/MatchupScheduleSel
 import { WeeklySchedule } from "@/components/matchup/WeeklySchedule";
 import { getTodayMST, getTodayMSTDate, formatWaiverProcessTime } from '@/utils/timezoneUtils';
 import { CURRENT_SEASON } from '@/utils/seasonConstants';
-import { DEFAULT_ROSTER_SLOTS, getRosterSlots } from '@/utils/rosterUtils';
 import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
 import { Matchup as MatchupType } from '@/services/MatchupService';
 import { logger } from '@/utils/logger';
@@ -211,28 +210,6 @@ const safeValue = (val: number) => {
     return { score: avgProj, label: 'Weak', color: 'text-orange-500', bg: 'bg-orange-500/10' };
   };
 
-  // Position slot configuration — driven by league settings + position type, falls back to defaults
-  const slots = getRosterSlots(leagueRosterSlots, leaguePositionType);
-  const POSITION_SLOTS = useMemo(() => {
-    const s = getRosterSlots(leagueRosterSlots, leaguePositionType);
-    if (leaguePositionType === 'forward') {
-      return {
-        'F': { maxPlayers: s.F ?? 6, label: 'Forward' },
-        'D': { maxPlayers: s.D ?? 4, label: 'Defense' },
-        'G': { maxPlayers: s.G ?? 2, label: 'Goalie' },
-        'UTIL': { maxPlayers: s.UTIL ?? 1, label: 'Utility' },
-      };
-    }
-    return {
-      'C': { maxPlayers: s.C ?? 2, label: 'Center' },
-      'LW': { maxPlayers: s.LW ?? 2, label: 'Left Wing' },
-      'RW': { maxPlayers: s.RW ?? 2, label: 'Right Wing' },
-      'D': { maxPlayers: s.D ?? 4, label: 'Defense' },
-      'G': { maxPlayers: s.G ?? 2, label: 'Goalie' },
-      'UTIL': { maxPlayers: s.UTIL ?? 1, label: 'Utility' },
-    };
-  }, [leaguePositionType, leagueRosterSlots]);
-
 interface RosterState {
   starters: HockeyPlayer[];
   bench: HockeyPlayer[];
@@ -278,6 +255,28 @@ const Roster = () => {
   const [bestBallEnabled, setBestBallEnabled] = useState(false);
   const [leagueRosterSlots, setLeagueRosterSlots] = useState<Record<string, number> | null>(null);
   const [leaguePositionType, setLeaguePositionType] = useState<PositionType>('individual');
+
+  // Position slot configuration — driven by league settings + position type, falls back to defaults
+  const POSITION_SLOTS = useMemo(() => {
+    const s = getRosterSlots(leagueRosterSlots, leaguePositionType);
+    if (leaguePositionType === 'forward') {
+      return {
+        'F': { maxPlayers: s.F ?? 6, label: 'Forward' },
+        'D': { maxPlayers: s.D ?? 4, label: 'Defense' },
+        'G': { maxPlayers: s.G ?? 2, label: 'Goalie' },
+        'UTIL': { maxPlayers: s.UTIL ?? 1, label: 'Utility' },
+      };
+    }
+    return {
+      'C': { maxPlayers: s.C ?? 2, label: 'Center' },
+      'LW': { maxPlayers: s.LW ?? 2, label: 'Left Wing' },
+      'RW': { maxPlayers: s.RW ?? 2, label: 'Right Wing' },
+      'D': { maxPlayers: s.D ?? 4, label: 'Defense' },
+      'G': { maxPlayers: s.G ?? 2, label: 'Goalie' },
+      'UTIL': { maxPlayers: s.UTIL ?? 1, label: 'Utility' },
+    };
+  }, [leaguePositionType, leagueRosterSlots]);
+
   const [teamStats, setTeamStats] = useState({
     record: "0-0-0",
     rank: "-",
@@ -301,7 +300,7 @@ const Roster = () => {
   const [lockedPlayerIds, setLockedPlayerIds] = useState<Set<string>>(new Set());
   
   // Week and date selection state
-  const [selectedWeek, setSelectedWeek] = useState<number>(1);
+  const [selectedWeek, setSelectedWeek] = useState<number>(0); // 0 = not yet calculated
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [currentMatchup, setCurrentMatchup] = useState<MatchupType | null>(null);
   const [matchupWeekDates, setMatchupWeekDates] = useState<string[]>([]);
@@ -1288,9 +1287,9 @@ const Roster = () => {
 
     setFirstWeekStart(firstWeek);
     setAvailableWeeks(weeks);
-    // Only set to current week on initial load (selectedWeek still at default 1)
+    // Only set to current week on initial load (selectedWeek still at 0)
     // or when league changes — don't override user's manual week selection
-    setSelectedWeek(prev => prev === 1 || prev > weeks.length ? currentWeek : prev);
+    setSelectedWeek(prev => prev === 0 || prev > weeks.length ? currentWeek : prev);
   }, [activeLeague]);
 
   // Handle week change
@@ -1302,7 +1301,7 @@ const Roster = () => {
   // Fetch matchup for selected week
   useEffect(() => {
     const fetchMatchupForWeek = async () => {
-      if (!userTeamId || !userTeam?.league_id || !selectedWeek) return;
+      if (!userTeamId || !userTeam?.league_id || selectedWeek <= 0) return;
       // Skip matchup fetch for demo/guest users — they're not league members
       if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') return;
 
@@ -1339,9 +1338,10 @@ const Roster = () => {
         }
         setMatchupWeekDates(dates);
 
-        // Always default to the first day of the matchup week
+        // Default to today if it falls within this matchup week, otherwise first day
         if (dates.length > 0) {
-          setSelectedDate(dates[0]);
+          const todayStr = getTodayMST();
+          setSelectedDate(dates.includes(todayStr) ? todayStr : dates[0]);
         }
       } catch (error) {
         logger.error('[Roster] Error in fetchMatchupForWeek:', error);
@@ -1350,7 +1350,7 @@ const Roster = () => {
       }
     };
 
-    if (userTeamId && userTeam?.league_id && selectedWeek) {
+    if (userTeamId && userTeam?.league_id && selectedWeek > 0) {
       fetchMatchupForWeek();
     }
   }, [userTeamId, userTeam?.league_id, selectedWeek, userLeagueState]);
@@ -2772,7 +2772,7 @@ const Roster = () => {
     // Bench is always a valid target
     eligible.add('bench-grid');
     return eligible;
-  }, [tapSelectedPlayerId, roster, ALL_STARTER_SLOT_IDS]);
+  }, [tapSelectedPlayerId, roster, ALL_STARTER_SLOT_IDS, isPositionValid]);
 
   // Handle mobile tap-to-swap: player tapped
   const handleMobileTapPlayer = (player: HockeyPlayer) => {
@@ -3047,7 +3047,7 @@ const Roster = () => {
                 )}
 
                 {/* Week and Date Selectors */}
-                {userTeam?.league_id && availableWeeks.length > 0 && firstWeekStart && (
+                {userTeam?.league_id && availableWeeks.length > 0 && firstWeekStart && selectedWeek > 0 && (
                   <div className="mb-6 space-y-4">
                     {/* Week Selector */}
                     <MatchupScheduleSelector
