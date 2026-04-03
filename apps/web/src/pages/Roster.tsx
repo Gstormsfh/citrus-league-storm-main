@@ -1287,9 +1287,9 @@ const Roster = () => {
 
     setFirstWeekStart(firstWeek);
     setAvailableWeeks(weeks);
-    // Only set to current week on initial load (selectedWeek still at 0)
-    // or when league changes — don't override user's manual week selection
-    setSelectedWeek(prev => prev === 0 || prev > weeks.length ? currentWeek : prev);
+    // Clamp currentWeek to valid range, then set on initial load or league change
+    const clampedWeek = Math.min(Math.max(1, currentWeek), weeks.length);
+    setSelectedWeek(prev => prev === 0 || prev > weeks.length ? clampedWeek : prev);
   }, [activeLeague]);
 
   // Handle week change
