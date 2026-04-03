@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Star, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, Star, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown, Clock } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { Player } from '@/services/PlayerService';
@@ -56,6 +56,37 @@ export const PlayerPool = ({
   const draftedSet = useMemo(() => {
     return externalDraftedSet || new Set(draftedPlayers);
   }, [externalDraftedSet, draftedPlayers]);
+
+  // Compute data freshness from the most recent last_updated timestamp across all players
+  const dataFreshnessLabel = useMemo(() => {
+    if (!availablePlayers || availablePlayers.length === 0) return null;
+
+    // Check if we're in the offseason (all players have zero stats)
+    const hasAnyStats = availablePlayers.some(p =>
+      p.games_played > 0 || p.goals > 0 || p.assists > 0 || (p.wins != null && p.wins > 0)
+    );
+
+    let mostRecent: Date | null = null;
+    for (const p of availablePlayers) {
+      if (p.last_updated) {
+        const d = new Date(p.last_updated);
+        if (!isNaN(d.getTime()) && (!mostRecent || d > mostRecent)) {
+          mostRecent = d;
+        }
+      }
+    }
+
+    if (!hasAnyStats) {
+      return 'Offseason — showing prior season stats';
+    }
+
+    if (!mostRecent) {
+      return 'Stats reflect latest available data';
+    }
+
+    // Format as a short readable date, e.g. "Apr 2, 2026"
+    return `Data as of ${mostRecent.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+  }, [availablePlayers]);
 
   const filteredAndSortedPlayers = useMemo(() => {
     const lowerSearch = searchTerm.toLowerCase();
@@ -298,8 +329,16 @@ export const PlayerPool = ({
           <Star className="h-4 w-4 sm:h-5 sm:w-5 text-fantasy-primary" />
           Players
         </h2>
-        <div className="text-xs sm:text-sm text-muted-foreground">
-          {filteredAndSortedPlayers.length}
+        <div className="flex items-center gap-3">
+          {dataFreshnessLabel && (
+            <span className="hidden sm:flex items-center gap-1 text-[11px] text-muted-foreground">
+              <Clock className="h-3 w-3" />
+              {dataFreshnessLabel}
+            </span>
+          )}
+          <div className="text-xs sm:text-sm text-muted-foreground">
+            {filteredAndSortedPlayers.length}
+          </div>
         </div>
       </div>
 

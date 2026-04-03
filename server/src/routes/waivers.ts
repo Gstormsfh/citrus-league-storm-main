@@ -189,14 +189,22 @@ waiverRoutes.post('/league/:leagueId/drop-player', membershipMiddleware, validat
 
   const supabase = createUserClient(c.get('userToken'));
 
-  // Verify user owns the team before allowing player drop
+  // Verify user owns the team before allowing player drop.
+  // AI teams (owner_id = NULL) are allowed — the WaiverService.dropPlayer
+  // method handles them via admin client.
   const { data: team } = await supabase
     .from('teams')
     .select('id, owner_id')
     .eq('id', String(body.teamId))
     .eq('league_id', leagueId)
     .single();
-  if (!team || team.owner_id !== userId) {
+
+  // For AI teams (owner_id is null), allow league members to manage their roster.
+  // For human teams, verify ownership.
+  if (!team) {
+    return fail(c, AppError.forbidden('Team not found'));
+  }
+  if (team.owner_id !== null && team.owner_id !== userId) {
     return fail(c, AppError.forbidden('You do not own this team'));
   }
 

@@ -528,22 +528,23 @@ const Profile = () => {
     if (!user) return;
     let cancelled = false;
     accountApi.getStats()
-      .then((stats) => {
-        if (cancelled) return;
-        const record = stats.ties > 0
-          ? `${stats.wins}-${stats.losses}-${stats.ties}`
-          : `${stats.wins}-${stats.losses}`;
-        const totalMatchups = stats.wins + stats.losses + stats.ties;
+      .then((resp) => {
+        if (cancelled || !resp.data) return;
+        const s = resp.data;
+        const record = s.ties > 0
+          ? `${s.wins}-${s.losses}-${s.ties}`
+          : `${s.wins}-${s.losses}`;
+        const totalMatchups = s.wins + s.losses + s.ties;
         setUserStats((prev) => ({
           ...prev,
-          totalSeasons: stats.totalSeasons,
-          wins: stats.wins,
-          losses: stats.losses,
-          ties: stats.ties,
-          totalPoints: stats.totalPoints,
+          totalSeasons: s.totalSeasons,
+          wins: s.wins,
+          losses: s.losses,
+          ties: s.ties,
+          totalPoints: s.totalPoints,
           overallRecord: record,
           avgPointsPerGame: totalMatchups > 0
-            ? Math.round((stats.totalPoints / totalMatchups) * 10) / 10
+            ? Math.round((s.totalPoints / totalMatchups) * 10) / 10
             : 0,
           statsLoaded: true,
         }));

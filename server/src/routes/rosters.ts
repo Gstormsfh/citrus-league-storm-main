@@ -97,7 +97,7 @@ rosterRoutes.put('/league/:leagueId/team/:teamId/lineup', membershipMiddleware, 
 
   const supabase = createUserClient(c.get('userToken'));
 
-  // Verify user owns this team
+  // Verify user owns this team (AI teams with owner_id = NULL are allowed)
   const { data: team } = await supabase
     .from('teams')
     .select('id, owner_id')
@@ -105,7 +105,10 @@ rosterRoutes.put('/league/:leagueId/team/:teamId/lineup', membershipMiddleware, 
     .eq('league_id', leagueId)
     .single();
 
-  if (!team || team.owner_id !== userId) {
+  if (!team) {
+    return fail(c, AppError.forbidden('Team not found'));
+  }
+  if (team.owner_id !== null && team.owner_id !== userId) {
     return fail(c, AppError.forbidden('You can only edit your own lineup'));
   }
 
@@ -235,7 +238,7 @@ rosterRoutes.post('/league/:leagueId/team/:teamId/initialize', membershipMiddlew
   const userId = c.get('userId');
   const supabase = createUserClient(c.get('userToken'));
 
-  // Verify user owns this team
+  // Verify user owns this team (AI teams with owner_id = NULL are allowed)
   const { data: team } = await supabase
     .from('teams')
     .select('id, owner_id')
@@ -243,7 +246,10 @@ rosterRoutes.post('/league/:leagueId/team/:teamId/initialize', membershipMiddlew
     .eq('league_id', leagueId)
     .single();
 
-  if (!team || team.owner_id !== userId) {
+  if (!team) {
+    return fail(c, AppError.forbidden('Team not found'));
+  }
+  if (team.owner_id !== null && team.owner_id !== userId) {
     return fail(c, AppError.forbidden('You can only initialize your own lineup'));
   }
 
