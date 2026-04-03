@@ -177,7 +177,7 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
               <span className="font-semibold">{teamAbbr}</span>
               <span className="text-citrus-charcoal/30">|</span>
               <span>#{player.number}</span>
-              {hasGame && player.nextGame?.opponent && (
+              {player.nextGame?.opponent && (
                 <>
                   <span className="text-citrus-charcoal/30">|</span>
                   <span className="text-citrus-sage font-semibold">{player.nextGame.opponent}</span>
@@ -185,7 +185,7 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
               )}
             </div>
             {/* Game time + projected stat line */}
-            {hasGame && player.nextGame && (
+            {player.nextGame && (
               <div className="flex items-center gap-1.5 mt-0.5">
                 {player.nextGame.gameTime && (
                   <span className="text-[10px] font-display font-semibold text-citrus-charcoal/50">
