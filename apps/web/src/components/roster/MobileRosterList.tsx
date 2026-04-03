@@ -16,6 +16,8 @@ const getPositionAbbr = (pos: string) => {
   return p.substring(0, 2);
 };
 
+import type { PositionType } from "@/utils/rosterUtils";
+
 const posColor: Record<string, string> = {
   LW: 'bg-citrus-green-dark',
   C: 'bg-citrus-sage',
@@ -23,6 +25,7 @@ const posColor: Record<string, string> = {
   D: 'bg-citrus-forest',
   G: 'bg-citrus-peach text-citrus-forest',
   UTIL: 'bg-citrus-green-medium',
+  F: 'bg-emerald-600',
 };
 
 const posRingColor: Record<string, string> = {
@@ -32,6 +35,7 @@ const posRingColor: Record<string, string> = {
   D: 'ring-citrus-forest/30',
   G: 'ring-citrus-peach/50',
   UTIL: 'ring-citrus-green-medium/30',
+  F: 'ring-emerald-600/30',
 };
 
 // ─── Interfaces ──────────────────────────────────────────────────────
@@ -47,23 +51,52 @@ interface MobileRosterListProps {
   onPlayerNameTap?: (player: HockeyPlayer) => void;
   onSlotTap?: (slotId: string) => void;
   onBenchTap?: () => void;
+  positionType?: PositionType;
+  rosterSlots?: Record<string, number>;
 }
 
-// Map slot IDs to display labels
-const slotLabel: Record<string, string> = {
-  'slot-LW-1': 'LW', 'slot-LW-2': 'LW',
-  'slot-C-1': 'C', 'slot-C-2': 'C',
-  'slot-RW-1': 'RW', 'slot-RW-2': 'RW',
-  'slot-D-1': 'D', 'slot-D-2': 'D', 'slot-D-3': 'D', 'slot-D-4': 'D',
-  'slot-G-1': 'G', 'slot-G-2': 'G',
-  'slot-UTIL': 'UTIL',
-};
+/**
+ * Build slot label map and slot arrays dynamically from position type and roster slots.
+ */
+function buildSlotConfig(positionType: PositionType = 'individual', rosterSlots?: Record<string, number>) {
+  const labels: Record<string, string> = {};
+  const allSlots: string[] = [];
 
-const ALL_STARTER_SLOTS = [
-  'slot-LW-1', 'slot-LW-2', 'slot-C-1', 'slot-C-2', 'slot-RW-1', 'slot-RW-2',
-  'slot-D-1', 'slot-D-2', 'slot-D-3', 'slot-D-4',
-  'slot-G-1', 'slot-G-2', 'slot-UTIL',
-];
+  const posKeys = positionType === 'forward'
+    ? ['F', 'D', 'G']
+    : ['C', 'LW', 'RW', 'D', 'G'];
+
+  const defaults: Record<string, number> = positionType === 'forward'
+    ? { F: 6, D: 4, G: 2, UTIL: 1 }
+    : { C: 2, LW: 2, RW: 2, D: 4, G: 2, UTIL: 1 };
+
+  for (const pos of posKeys) {
+    const count = rosterSlots?.[pos] ?? defaults[pos] ?? 0;
+    for (let i = 1; i <= count; i++) {
+      const slotId = `slot-${pos}-${i}`;
+      labels[slotId] = pos;
+      allSlots.push(slotId);
+    }
+  }
+
+  // UTIL slot
+  const utilCount = rosterSlots?.UTIL ?? defaults.UTIL ?? 1;
+  for (let i = 0; i < utilCount; i++) {
+    const slotId = utilCount === 1 ? 'slot-UTIL' : `slot-UTIL-${i + 1}`;
+    labels[slotId] = 'UTIL';
+    allSlots.push(slotId);
+  }
+
+  // Group by section
+  const forwardSlots = positionType === 'forward'
+    ? allSlots.filter(s => s.startsWith('slot-F-'))
+    : allSlots.filter(s => s.startsWith('slot-LW-') || s.startsWith('slot-C-') || s.startsWith('slot-RW-'));
+  const defenseSlots = allSlots.filter(s => s.startsWith('slot-D-'));
+  const goalieSlots = allSlots.filter(s => s.startsWith('slot-G-'));
+  const utilSlots = allSlots.filter(s => s.startsWith('slot-UTIL'));
+
+  return { labels, allSlots, forwardSlots, defenseSlots, goalieSlots, utilSlots };
+}
 
 // ─── Format compact stat line from actual game stats or projection ───
 const formatStatLine = (player: HockeyPlayer): { text: string; isActual: boolean } | null => {
@@ -327,7 +360,13 @@ const MobileRosterList = ({
   onPlayerNameTap,
   onSlotTap,
   onBenchTap,
+  positionType = 'individual',
+  rosterSlots,
 }: MobileRosterListProps) => {
+
+  // Build dynamic slot config from position type
+  const slotConfig = buildSlotConfig(positionType, rosterSlots);
+  const slotLabel = slotConfig.labels;
 
   // Build slot → player map from assignments
   const getPlayerInSlot = (slotId: string): HockeyPlayer | null => {
@@ -344,11 +383,8 @@ const MobileRosterList = ({
     }
   };
 
-  // Group starter slots by section
-  const forwardSlots = ['slot-LW-1', 'slot-LW-2', 'slot-C-1', 'slot-C-2', 'slot-RW-1', 'slot-RW-2'];
-  const defenseSlots = ['slot-D-1', 'slot-D-2', 'slot-D-3', 'slot-D-4'];
-  const goalieSlots = ['slot-G-1', 'slot-G-2'];
-  const utilSlots = ['slot-UTIL'];
+  // Group starter slots by section (from dynamic config)
+  const { forwardSlots, defenseSlots, goalieSlots, utilSlots } = slotConfig;
 
   const renderSlotRows = (slots: string[]) =>
     slots.map(slotId => {

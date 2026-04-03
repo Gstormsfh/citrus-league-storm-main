@@ -225,6 +225,9 @@ export interface LeagueFormatSettings {
   // === Roster Slot Configuration (Commissioner-configurable) ===
   rosterSlots?: Record<string, number>;  // e.g., { C: 2, LW: 2, RW: 2, D: 4, G: 2, UTIL: 2 }
 
+  // === Position Type (Commissioner-configurable) ===
+  positionType?: 'individual' | 'forward';  // 'individual' = C/LW/RW/D/G, 'forward' = F/D/G
+
   // === Transaction Limits (Commissioner-configurable) ===
   weeklyAddLimit?: number;           // Max adds per team per week (0 = unlimited, ESPN/Yahoo/Sleeper standard)
   seasonAddLimit?: number;           // Max adds per team per season (0 = unlimited)
@@ -430,6 +433,9 @@ export function extractFormatSettings(settings: Record<string, unknown>): Partia
 
     // Roster slots (commissioner-configurable)
     rosterSlots: (settings.rosterSlots as Record<string, number>) || undefined,
+
+    // Position type (commissioner-configurable)
+    positionType: (settings.positionType as 'individual' | 'forward') || 'individual',
 
     // Transaction limits
     weeklyAddLimit: (settings.weeklyAddLimit as number) ?? 0,

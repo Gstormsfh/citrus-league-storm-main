@@ -356,8 +356,20 @@ export class MatchupService {
     leagueId: string,
     players: Array<{ player_id: number; position_code: string; is_goalie: boolean }>,
   ): Promise<boolean> {
-    const slotsNeeded: Record<string, number> = { C: 2, LW: 2, RW: 2, D: 4, G: 2, UTIL: 1 };
-    const slotsFilled: Record<string, number> = { C: 0, LW: 0, RW: 0, D: 0, G: 0, UTIL: 0 };
+    // Fetch league position type
+    const { data: leagueData } = await admin
+      .from('leagues')
+      .select('settings')
+      .eq('id', leagueId)
+      .single();
+    const posType = (leagueData?.settings as Record<string, unknown>)?.positionType === 'forward' ? 'forward' : 'individual';
+
+    const slotsNeeded: Record<string, number> = posType === 'forward'
+      ? { F: 6, D: 4, G: 2, UTIL: 1 }
+      : { C: 2, LW: 2, RW: 2, D: 4, G: 2, UTIL: 1 };
+    const slotsFilled: Record<string, number> = posType === 'forward'
+      ? { F: 0, D: 0, G: 0, UTIL: 0 }
+      : { C: 0, LW: 0, RW: 0, D: 0, G: 0, UTIL: 0 };
     const starters: number[] = [];
     const bench: number[] = [];
     const slotAssignments: Record<string, string> = {};
@@ -365,11 +377,18 @@ export class MatchupService {
     const getPos = (p: { position_code: string; is_goalie: boolean }): string => {
       if (p.is_goalie || p.position_code === 'G') return 'G';
       const code = (p.position_code || '').toUpperCase();
-      if (code === 'C') return 'C';
-      if (code === 'LW' || code === 'L') return 'LW';
-      if (code === 'RW' || code === 'R') return 'RW';
-      if (code === 'D') return 'D';
-      return 'UTIL';
+      let normalized: string;
+      if (code === 'C') normalized = 'C';
+      else if (code === 'LW' || code === 'L') normalized = 'LW';
+      else if (code === 'RW' || code === 'R') normalized = 'RW';
+      else if (code === 'D') normalized = 'D';
+      else return 'UTIL';
+
+      // In F/D/G mode, merge C/LW/RW into F
+      if (posType === 'forward' && (normalized === 'C' || normalized === 'LW' || normalized === 'RW')) {
+        return 'F';
+      }
+      return normalized;
     };
 
     for (const player of players) {

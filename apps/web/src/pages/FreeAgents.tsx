@@ -807,9 +807,11 @@ const FreeAgents = () => {
       // Normalize player position for comparison
       const normalizedPlayerPos = formatPositionForDisplay(player.position);
       
-      const matchesPosition = positionFilter === 'ALL' || 
-        (positionFilter === 'W' ? (normalizedPlayerPos === 'LW' || normalizedPlayerPos === 'RW') : normalizedPlayerPos === positionFilter);
-      
+      const matchesPosition = positionFilter === 'ALL' ||
+        (positionFilter === 'W' ? (normalizedPlayerPos === 'LW' || normalizedPlayerPos === 'RW') :
+         positionFilter === 'F' ? (normalizedPlayerPos === 'C' || normalizedPlayerPos === 'LW' || normalizedPlayerPos === 'RW') :
+         normalizedPlayerPos === positionFilter);
+
       return matchesSearch && matchesPosition;
     });
   };
@@ -1107,7 +1109,10 @@ const FreeAgents = () => {
     .sort((a, b) => b.weeklyProjection - a.weeklyProjection)
     .slice(0, 10); // Show top 10 instead of 5
 
-  const positions = ['ALL', 'C', 'LW', 'RW', 'W', 'D', 'G'];
+  const leaguePosType = activeLeagueFormat?.positionType === 'forward' ? 'forward' : 'individual';
+  const positions = leaguePosType === 'forward'
+    ? ['ALL', 'F', 'D', 'G']
+    : ['ALL', 'C', 'LW', 'RW', 'W', 'D', 'G'];
 
   // Redirect pool leagues to their pool page
   const _leagueType = activeLeagueFormat?.leagueType;
@@ -1775,8 +1780,10 @@ const FreeAgents = () => {
                         // Filter by position first
                         const positionFiltered = scheduleMaximizers.filter(player => {
                           const normalizedPos = formatPositionForDisplay(player.position);
-                          return positionFilter === 'ALL' || 
-                            (positionFilter === 'W' ? (normalizedPos === 'LW' || normalizedPos === 'RW') : normalizedPos === positionFilter);
+                          return positionFilter === 'ALL' ||
+                            (positionFilter === 'W' ? (normalizedPos === 'LW' || normalizedPos === 'RW') :
+                             positionFilter === 'F' ? (normalizedPos === 'C' || normalizedPos === 'LW' || normalizedPos === 'RW') :
+                             normalizedPos === positionFilter);
                         });
                         
                         // Sort by weekly projection (highest first) by default
@@ -1955,7 +1962,9 @@ const FreeAgents = () => {
                    const totalSchedule = scheduleMaximizers.filter(player => {
                      const normalizedPos = formatPositionForDisplay(player.position);
                      return positionFilter === 'ALL' ||
-                       (positionFilter === 'W' ? (normalizedPos === 'LW' || normalizedPos === 'RW') : normalizedPos === positionFilter);
+                       (positionFilter === 'W' ? (normalizedPos === 'LW' || normalizedPos === 'RW') :
+                        positionFilter === 'F' ? (normalizedPos === 'C' || normalizedPos === 'LW' || normalizedPos === 'RW') :
+                        normalizedPos === positionFilter);
                    }).length;
                    return (
                      <>

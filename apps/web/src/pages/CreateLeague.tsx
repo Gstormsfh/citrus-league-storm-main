@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 import { useLeague } from "@/contexts/LeagueContext";
@@ -50,6 +51,7 @@ import {
   usesPointValues,
   hasWaivers,
   DEFAULT_ROSTER_SLOTS,
+  DEFAULT_FDG_ROSTER_SLOTS,
 } from "@/types/leagueTypes";
 
 // ============================================================================
@@ -170,6 +172,9 @@ const CreateLeague = () => {
   // ---- Transaction Limit Settings (industry standard: ESPN/Yahoo/Sleeper) ----
   const [weeklyAddLimit, setWeeklyAddLimit] = useState("0");
   const [seasonAddLimit, setSeasonAddLimit] = useState("0");
+
+  // ---- Position Type ----
+  const [positionType, setPositionType] = useState<'individual' | 'forward'>('individual');
 
   // ---- Roster Slot Configuration ----
   const [rosterSlots, setRosterSlots] = useState<Record<string, number>>(() => {
@@ -312,6 +317,7 @@ const CreateLeague = () => {
         settings.stats = enabledStats;
         settings.pickTimeLimit = parseInt(pickTimeLimit);
         settings.rosterSlots = rosterSlots;
+        settings.positionType = positionType;
 
         // Season settings
         settings.playoffTeams = parseInt(playoffTeams);
@@ -1474,38 +1480,87 @@ const CreateLeague = () => {
                   )}
 
                   {/* ======================================================== */}
-                  {/* SECTION 8: ROSTER SLOT CONFIG (Fantasy Only)             */}
+                  {/* SECTION 8: POSITION TYPE + ROSTER SLOT CONFIG            */}
                   {/* ======================================================== */}
                   {isFantasy && (
-                    <div className="border-t pt-6">
-                      <SectionHeader
-                        title="Roster Slots"
-                        subtitle="Customize how many of each position slot"
-                        badge={
-                          <Badge variant="secondary" className="bg-primary/10 text-primary">
-                            {Object.values(rosterSlots).reduce((a, b) => a + b, 0)} Total
-                          </Badge>
-                        }
-                      />
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {DEFAULT_ROSTER_SLOTS.map((slot) => (
-                          <div key={slot.slot} className="space-y-1">
-                            <Label className="text-sm">{slot.label} ({slot.slot})</Label>
-                            <Input
-                              type="number"
-                              min={0}
-                              max={10}
-                              value={rosterSlots[slot.slot] ?? slot.count}
-                              onChange={(e) =>
-                                setRosterSlots(prev => ({
-                                  ...prev,
-                                  [slot.slot]: parseInt(e.target.value) || 0,
-                                }))
-                              }
-                              className="h-10 font-mono"
-                            />
-                          </div>
-                        ))}
+                    <div className="border-t pt-6 space-y-6">
+                      {/* Position Type Toggle */}
+                      <div>
+                        <SectionHeader
+                          title="Position Format"
+                          subtitle="Choose how roster positions are structured"
+                        />
+                        <div className="grid grid-cols-2 gap-3 max-w-md">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPositionType('individual');
+                              const defaults: Record<string, number> = {};
+                              DEFAULT_ROSTER_SLOTS.forEach(s => { defaults[s.slot] = s.count; });
+                              setRosterSlots(defaults);
+                            }}
+                            className={cn(
+                              "p-3 rounded-lg border-2 text-left transition-all",
+                              positionType === 'individual'
+                                ? "border-primary bg-primary/10 ring-2 ring-primary/20"
+                                : "border-border hover:border-primary/50"
+                            )}
+                          >
+                            <div className="font-semibold text-sm">C / LW / RW / D / G</div>
+                            <div className="text-xs text-muted-foreground mt-1">Individual positions</div>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPositionType('forward');
+                              const defaults: Record<string, number> = {};
+                              DEFAULT_FDG_ROSTER_SLOTS.forEach(s => { defaults[s.slot] = s.count; });
+                              setRosterSlots(defaults);
+                            }}
+                            className={cn(
+                              "p-3 rounded-lg border-2 text-left transition-all",
+                              positionType === 'forward'
+                                ? "border-primary bg-primary/10 ring-2 ring-primary/20"
+                                : "border-border hover:border-primary/50"
+                            )}
+                          >
+                            <div className="font-semibold text-sm">F / D / G</div>
+                            <div className="text-xs text-muted-foreground mt-1">Forward / Defense / Goalie</div>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Roster Slot Counts */}
+                      <div>
+                        <SectionHeader
+                          title="Roster Slots"
+                          subtitle="Customize how many of each position slot"
+                          badge={
+                            <Badge variant="secondary" className="bg-primary/10 text-primary">
+                              {Object.values(rosterSlots).reduce((a, b) => a + b, 0)} Total
+                            </Badge>
+                          }
+                        />
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          {(positionType === 'forward' ? DEFAULT_FDG_ROSTER_SLOTS : DEFAULT_ROSTER_SLOTS).map((slot) => (
+                            <div key={slot.slot} className="space-y-1">
+                              <Label className="text-sm">{slot.label} ({slot.slot})</Label>
+                              <Input
+                                type="number"
+                                min={0}
+                                max={10}
+                                value={rosterSlots[slot.slot] ?? slot.count}
+                                onChange={(e) =>
+                                  setRosterSlots(prev => ({
+                                    ...prev,
+                                    [slot.slot]: parseInt(e.target.value) || 0,
+                                  }))
+                                }
+                                className="h-10 font-mono"
+                              />
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   )}
