@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLeague } from '@/contexts/LeagueContext';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
 import { Link, useSearchParams } from 'react-router-dom';
+import { accountApi } from '@/api/account';
 import { leagueApi } from '@/api/leagues';
 import { rosterApi } from '@/api/rosters';
 import { UserAccountService } from '@/services/UserAccountService';
@@ -61,9 +63,11 @@ import {
   Pencil
 } from 'lucide-react';
 import { logger } from '@/utils/logger';
+import { DEFAULT_SCORING } from '@/utils/scoringUtils';
 
 const Profile = () => {
   const { user, signOut } = useAuth();
+  const { userLeagueState } = useLeague();
   const { data: profile } = useProfile();
   const updateProfile = useUpdateProfile();
   const { toast } = useToast();
@@ -227,7 +231,6 @@ const Profile = () => {
 
   // Preferences
   const [preferences, setPreferences] = useState({
-    autoLineup: false,
     emailNotifications: true,
     pushNotifications: true,
     darkMode: false,
@@ -301,10 +304,7 @@ const Profile = () => {
         if (leagueData?.scoring_settings) {
           setCommScoringSettings(leagueData.scoring_settings);
         } else {
-          setCommScoringSettings({
-            skater: { goals: 3, assists: 2, power_play_points: 1, short_handed_points: 2, shots_on_goal: 0.4, blocks: 0.5, hits: 0.2, penalty_minutes: 0.5 },
-            goalie: { wins: 4, shutouts: 3, saves: 0.2, goals_against: -1 }
-          });
+          setCommScoringSettings(DEFAULT_SCORING);
         }
         
         // Initialize draft settings
@@ -507,17 +507,55 @@ const Profile = () => {
     }
   };
 
-  // User stats - will be populated from actual league data later
-  const userStats = {
+  // User stats — fetched from API
+  const [userStats, setUserStats] = useState({
     totalSeasons: 0,
     championships: 0,
     playoffAppearances: 0,
-    overallRecord: '0-0',
-    currentRank: null,
-    bestFinish: null,
+    overallRecord: '—',
+    currentRank: null as number | null,
+    bestFinish: null as string | null,
     totalPoints: 0,
-    avgPointsPerGame: 0
-  };
+    avgPointsPerGame: 0,
+    wins: 0,
+    losses: 0,
+    ties: 0,
+    statsLoaded: false,
+  });
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    accountApi.getStats()
+      .then((resp) => {
+        if (cancelled || !resp.data) return;
+        const s = resp.data;
+        const record = s.ties > 0
+          ? `${s.wins}-${s.losses}-${s.ties}`
+          : `${s.wins}-${s.losses}`;
+        const totalMatchups = s.wins + s.losses + s.ties;
+        setUserStats((prev) => ({
+          ...prev,
+          totalSeasons: s.totalSeasons,
+          wins: s.wins,
+          losses: s.losses,
+          ties: s.ties,
+          totalPoints: s.totalPoints,
+          overallRecord: record,
+          avgPointsPerGame: totalMatchups > 0
+            ? Math.round((s.totalPoints / totalMatchups) * 10) / 10
+            : 0,
+          statsLoaded: true,
+        }));
+      })
+      .catch((err) => {
+        logger.error('Failed to fetch user stats', err);
+        if (!cancelled) {
+          setUserStats((prev) => ({ ...prev, statsLoaded: true }));
+        }
+      });
+    return () => { cancelled = true; };
+  }, [user]);
 
   // Achievements - empty for new users
   const achievements: Array<{ title: string; year?: string; description?: string; icon: any; color: string }> = [];
@@ -1125,16 +1163,16 @@ const Profile = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <Card className="animated-element">
                     <CardContent className="p-6 text-center">
-                      <Trophy className="h-8 w-8 mx-auto mb-2 text-yellow-500" />
-                      <div className="text-2xl font-bold">{userStats.championships}</div>
-                      <div className="text-sm text-muted-foreground">Championships</div>
+                      <Calendar className="h-8 w-8 mx-auto mb-2 text-yellow-500" />
+                      <div className="text-2xl font-bold">{userStats.totalSeasons}</div>
+                      <div className="text-sm text-muted-foreground">Leagues</div>
                     </CardContent>
                   </Card>
                   <Card className="animated-element">
                     <CardContent className="p-6 text-center">
                       <Target className="h-8 w-8 mx-auto mb-2 text-blue-500" />
-                      <div className="text-2xl font-bold">{userStats.playoffAppearances}</div>
-                      <div className="text-sm text-muted-foreground">Playoff Apps</div>
+                      <div className="text-2xl font-bold">{userStats.overallRecord}</div>
+                      <div className="text-sm text-muted-foreground">W-L Record</div>
                     </CardContent>
                   </Card>
                   <Card className="animated-element">
@@ -1147,8 +1185,8 @@ const Profile = () => {
                   <Card className="animated-element">
                     <CardContent className="p-6 text-center">
                       <Medal className="h-8 w-8 mx-auto mb-2 text-purple-500" />
-                      <div className="text-2xl font-bold">{userStats.bestFinish}</div>
-                      <div className="text-sm text-muted-foreground">Best Finish</div>
+                      <div className="text-2xl font-bold">{userStats.avgPointsPerGame || '—'}</div>
+                      <div className="text-sm text-muted-foreground">Avg Pts/Week</div>
                     </CardContent>
                   </Card>
                 </div>
@@ -1156,26 +1194,59 @@ const Profile = () => {
                 <Card className="animated-element">
                   <CardHeader>
                     <CardTitle>Performance History</CardTitle>
-                    <CardDescription>Your finish position over the years</CardDescription>
+                    <CardDescription>Your matchup results across all leagues</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    {userStats.totalSeasons > 0 ? (
+                    {userStats.statsLoaded && userStats.totalSeasons > 0 ? (
                       <div className="space-y-4">
-                        {/* Performance history will be populated from actual league data */}
-                        <p className="text-sm text-muted-foreground text-center py-8">
-                          No season history yet. Join a league to start tracking your performance!
-                        </p>
+                        <div className="grid grid-cols-3 gap-4 text-center">
+                          <div className="p-4 rounded-lg bg-green-500/10">
+                            <div className="text-2xl font-bold text-green-600">{userStats.wins}</div>
+                            <div className="text-xs text-muted-foreground">Wins</div>
+                          </div>
+                          <div className="p-4 rounded-lg bg-red-500/10">
+                            <div className="text-2xl font-bold text-red-600">{userStats.losses}</div>
+                            <div className="text-xs text-muted-foreground">Losses</div>
+                          </div>
+                          <div className="p-4 rounded-lg bg-gray-500/10">
+                            <div className="text-2xl font-bold text-gray-600">{userStats.ties}</div>
+                            <div className="text-xs text-muted-foreground">Ties</div>
+                          </div>
+                        </div>
+                        {(userStats.wins + userStats.losses + userStats.ties) > 0 && (
+                          <div className="flex items-center gap-2 pt-2">
+                            <div className="text-xs text-muted-foreground">Win Rate</div>
+                            <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+                              <div
+                                className="h-full bg-green-500 rounded-full transition-all"
+                                style={{ width: `${Math.round((userStats.wins / (userStats.wins + userStats.losses + userStats.ties)) * 100)}%` }}
+                              />
+                            </div>
+                            <div className="text-xs font-medium">
+                              {Math.round((userStats.wins / (userStats.wins + userStats.losses + userStats.ties)) * 100)}%
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    ) : (
+                    ) : userStats.statsLoaded ? (
                       <div className="text-center py-12">
                         <TrendingUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
                         <h3 className="text-lg font-semibold mb-2">No Performance History</h3>
                         <p className="text-sm text-muted-foreground mb-4">
-                          Join a league and complete a season to see your performance history here.
+                          {userLeagueState === 'active-user'
+                            ? 'Complete a matchup week to see your performance history here.'
+                            : 'Join a league and complete a season to see your performance history here.'}
                         </p>
-                        <Button asChild>
-                          <Link to="/create-league">Create or Join a League</Link>
-                        </Button>
+                        {userLeagueState !== 'active-user' && (
+                          <Button asChild>
+                            <Link to="/create-league">Create or Join a League</Link>
+                          </Button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <Loader2 className="h-8 w-8 mx-auto mb-2 animate-spin text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">Loading stats...</p>
                       </div>
                     )}
                   </CardContent>
@@ -1212,11 +1283,15 @@ const Profile = () => {
                       <Trophy className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
                       <h3 className="text-lg font-semibold mb-2">No Achievements Yet</h3>
                       <p className="text-sm text-muted-foreground mb-4">
-                        Join a league and start competing to earn achievements!
+                        {userLeagueState === 'active-user'
+                          ? 'Keep competing to earn achievements!'
+                          : 'Join a league and start competing to earn achievements!'}
                       </p>
-                      <Button asChild>
-                        <Link to="/create-league">Create or Join a League</Link>
-                      </Button>
+                      {userLeagueState !== 'active-user' && (
+                        <Button asChild>
+                          <Link to="/create-league">Create or Join a League</Link>
+                        </Button>
+                      )}
                     </CardContent>
                   </Card>
                 )}
@@ -1808,19 +1883,6 @@ const Profile = () => {
                     <CardContent className="space-y-6">
                       <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
-                          <Label className="text-base">Auto-Set Lineups</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Automatically optimize lineup based on projections
-                          </p>
-                        </div>
-                        <Switch
-                          checked={preferences.autoLineup}
-                          onCheckedChange={(c) => handlePreferenceChange('autoLineup', c)}
-                        />
-                      </div>
-                      <Separator />
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
                           <Label className="text-base">Email Notifications</Label>
                           <p className="text-sm text-muted-foreground">
                             Receive weekly summaries and alerts
@@ -1918,34 +1980,30 @@ const Profile = () => {
                           </div>
                           <div>
                             <h3 className="text-lg font-bold flex items-center gap-2">
-                              Premium Plan
-                              <span className="bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full">Active</span>
+                              Free Plan
+                              <span className="bg-muted text-muted-foreground text-xs px-2 py-0.5 rounded-full">Premium Coming Soon</span>
                             </h3>
-                            <p className="text-sm text-muted-foreground">Billed annually • Next billing date: Aug 15, 2026</p>
+                            <p className="text-sm text-muted-foreground">All features are free during the beta period</p>
                           </div>
-                        </div>
-                        <div className="flex gap-3 w-full md:w-auto">
-                          <Button variant="outline" className="flex-1 md:flex-none">Change Plan</Button>
-                          <Button variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10 flex-1 md:flex-none">Cancel</Button>
                         </div>
                       </div>
 
                       <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                         <div className="flex items-start gap-2 text-sm">
                           <Check className="h-4 w-4 text-primary mt-0.5" />
-                          <span>Advanced Stats</span>
+                          <span>Advanced Stats <span className="text-xs text-muted-foreground">(Free during Beta)</span></span>
                         </div>
                         <div className="flex items-start gap-2 text-sm">
                           <Check className="h-4 w-4 text-primary mt-0.5" />
-                          <span>Ad-free Experience</span>
+                          <span>Ad-free Experience <span className="text-xs text-muted-foreground">(Free during Beta)</span></span>
                         </div>
                         <div className="flex items-start gap-2 text-sm">
                           <Check className="h-4 w-4 text-primary mt-0.5" />
-                          <span>Priority Support</span>
+                          <span>Priority Support <span className="text-xs text-muted-foreground">(Free during Beta)</span></span>
                         </div>
                         <div className="flex items-start gap-2 text-sm">
                           <Check className="h-4 w-4 text-primary mt-0.5" />
-                          <span>Trade Analyzer</span>
+                          <span>Trade Analyzer <span className="text-xs text-muted-foreground">(Free during Beta)</span></span>
                         </div>
                       </div>
                     </CardContent>

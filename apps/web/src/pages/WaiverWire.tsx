@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
+import MobileMenuButton from '@/components/MobileMenuButton';
 import Footer from '@/components/Footer';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,14 +23,18 @@ import { waiverApi } from '@/api/waivers';
 import { useToast } from '@/hooks/use-toast';
 import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { logger } from '@/utils/logger';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
+import { formatWaiverProcessTime } from '@/utils/timezoneUtils';
+import { ScheduleService } from '@/services/ScheduleService';
+import { Zap, Lock } from 'lucide-react';
 
 const WaiverWire = () => {
   const { user } = useAuth();
   const { userLeagueState, activeLeagueId, activeLeagueFormat } = useLeague();
   const { toast } = useToast();
+  const navigate = useNavigate();
   
   const [loading, setLoading] = useState(true);
   const [waiverClaims, setWaiverClaims] = useState<WaiverClaim[]>([]);
@@ -50,6 +55,9 @@ const WaiverWire = () => {
   const [selectedPlayer, setSelectedPlayer] = useState<any | null>(null);
   const [dropPlayer, setDropPlayer] = useState<number | null>(null);
   const [myRoster, setMyRoster] = useState<any[]>([]);
+
+  // Game-locked teams (players from these teams go through waivers)
+  const [lockedTeams, setLockedTeams] = useState<Set<string>>(new Set());
 
   // FAAB state
   const [isFAAB, setIsFAAB] = useState(false);
@@ -222,15 +230,45 @@ const WaiverWire = () => {
 
   const searchPlayers = async () => {
     if (!activeLeagueId) return;
-    
+
     setSearchLoading(true);
     try {
+      // For 'F' filter, don't send position to API (it expects C/LW/RW); filter client-side instead
+      const apiPositionFilter = positionFilter === 'all' || positionFilter === 'F'
+        ? undefined
+        : positionFilter || undefined;
       const players = await WaiverService.getAvailablePlayers(
         activeLeagueId,
-        positionFilter === 'all' ? undefined : positionFilter || undefined,
+        apiPositionFilter,
         searchTerm || undefined
       );
-      setAvailablePlayers(players);
+      // Client-side filtering for 'F' (forward = C/LW/RW)
+      const filteredPlayers = positionFilter === 'F'
+        ? players.filter((p: any) => ['C', 'LW', 'RW'].includes(p.position_code?.toUpperCase()))
+        : players;
+      setAvailablePlayers(filteredPlayers);
+
+      // Check which teams have started/live games today (those players are game-locked)
+      const uniqueTeams = [...new Set(players.map((p: any) => p.team_abbrev).filter(Boolean))];
+      if (uniqueTeams.length > 0) {
+        try {
+          const gamesMap = await ScheduleService.getNextGamesForTeams(uniqueTeams);
+          const locked = new Set<string>();
+          const now = new Date();
+          gamesMap.forEach((game, team) => {
+            const status = (game.status || 'scheduled').toLowerCase();
+            if (status === 'live' || status === 'final' || status === 'intermission') {
+              locked.add(team);
+            } else if (status === 'scheduled' && game.game_time) {
+              const gameStart = new Date(game.game_time);
+              if (gameStart < now) locked.add(team);
+            }
+          });
+          setLockedTeams(locked);
+        } catch {
+          // Non-critical — just won't show lock indicators
+        }
+      }
     } catch (error) {
       logger.error('Error searching players:', error);
     } finally {
@@ -309,18 +347,28 @@ const WaiverWire = () => {
       } else {
         toast({
           title: "Waiver Claim Submitted",
-          description: `Claim for ${selectedPlayer.full_name} submitted. Will process at 3:00 AM EST.`,
+          description: `Claim for ${selectedPlayer.full_name} submitted. Will process at ${formatWaiverProcessTime(waiverSettings?.waiver_process_time)}.`,
         });
       }
       setSelectedPlayer(null);
       setDropPlayer(null);
       loadWaiverData();
     } else {
-      toast({
-        title: result.isFreeAgent === false ? "Claim Failed" : "Add Failed",
-        description: result.error,
-        variant: "destructive"
-      });
+      // Check if roster is full — redirect to roster to drop a player
+      const errorStr = (result.error || '').toLowerCase();
+      if (errorStr.includes('roster') && (errorStr.includes('full') || errorStr.includes('max') || errorStr.includes('limit'))) {
+        navigate(`/roster?addPlayer=${selectedPlayer.player_id}&playerName=${encodeURIComponent(selectedPlayer.full_name)}`);
+        toast({
+          title: "Roster Full",
+          description: `You must drop a player before adding ${selectedPlayer.full_name}.`,
+        });
+      } else {
+        toast({
+          title: result.isFreeAgent === false ? "Claim Failed" : "Add Failed",
+          description: result.error,
+          variant: "destructive"
+        });
+      }
     }
   };
 
@@ -347,8 +395,10 @@ const WaiverWire = () => {
       <CitrusBackground density="light" />
       <div className="hidden lg:block"><Navbar /></div>
       <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-center h-12 px-4">
+        <div className="flex items-center justify-between h-12 px-4">
+          <div className="w-10" />
           <h1 className="text-lg font-varsity font-bold text-citrus-forest">Waiver Wire</h1>
+          <MobileMenuButton />
         </div>
       </div>
       <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
@@ -430,7 +480,7 @@ const WaiverWire = () => {
                   <div className="flex items-center justify-between p-3 bg-citrus-sage/10 rounded-varsity border-2 border-citrus-sage/30">
                     <span className="text-sm font-display text-citrus-charcoal">Process Time</span>
                     <span className="font-varsity font-bold text-citrus-forest">
-                      {waiverSettings?.waiver_process_time || '2:00 AM'} MT
+                      {formatWaiverProcessTime(waiverSettings?.waiver_process_time)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-citrus-peach/10 rounded-varsity border-2 border-citrus-peach/30">
@@ -478,11 +528,21 @@ const WaiverWire = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Positions</SelectItem>
-                      <SelectItem value="C">Center</SelectItem>
-                      <SelectItem value="LW">Left Wing</SelectItem>
-                      <SelectItem value="RW">Right Wing</SelectItem>
-                      <SelectItem value="D">Defense</SelectItem>
-                      <SelectItem value="G">Goalie</SelectItem>
+                      {activeLeagueFormat?.positionType === 'forward' ? (
+                        <>
+                          <SelectItem value="F">Forward</SelectItem>
+                          <SelectItem value="D">Defense</SelectItem>
+                          <SelectItem value="G">Goalie</SelectItem>
+                        </>
+                      ) : (
+                        <>
+                          <SelectItem value="C">Center</SelectItem>
+                          <SelectItem value="LW">Left Wing</SelectItem>
+                          <SelectItem value="RW">Right Wing</SelectItem>
+                          <SelectItem value="D">Defense</SelectItem>
+                          <SelectItem value="G">Goalie</SelectItem>
+                        </>
+                      )}
                     </SelectContent>
                   </Select>
                   <Button 
@@ -496,25 +556,43 @@ const WaiverWire = () => {
 
                 {availablePlayers.length > 0 && (
                   <div className="space-y-3">
-                    {availablePlayers.map((player) => (
+                    {availablePlayers.map((player) => {
+                      const isGameLocked = lockedTeams.has(player.team_abbrev);
+                      return (
                       <div key={player.player_id} className="flex items-center justify-between p-4 bg-citrus-sage/10 rounded-varsity border-2 border-citrus-sage/30 hover:border-citrus-orange hover:shadow-patch transition-all">
                         <div className="flex-1">
-                          <div className="font-varsity font-bold text-citrus-forest">
-                            {player.full_name}
+                          <div className="flex items-center gap-2">
+                            <span className="font-varsity font-bold text-citrus-forest">
+                              {player.full_name}
+                            </span>
+                            {isGameLocked ? (
+                              <Badge className="bg-amber-500/15 text-amber-700 border-amber-300 text-[10px] font-display font-bold gap-0.5 h-5">
+                                <Lock className="w-3 h-3" />
+                                Waiver
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-green-500/15 text-green-700 border-green-300 text-[10px] font-display font-bold gap-0.5 h-5">
+                                <Zap className="w-3 h-3" />
+                                Free Agent
+                              </Badge>
+                            )}
                           </div>
                           <div className="text-sm font-display text-citrus-charcoal">
                             {player.position_code} - {player.team_abbrev} #{player.jersey_number}
                           </div>
                         </div>
-                        <Button 
+                        <Button
                           onClick={() => setSelectedPlayer(player)}
                           size="sm"
-                          className="bg-citrus-orange border-2 border-citrus-forest rounded-varsity font-varsity font-bold"
+                          className={isGameLocked
+                            ? "bg-amber-500 border-2 border-amber-700 rounded-varsity font-varsity font-bold"
+                            : "bg-citrus-orange border-2 border-citrus-forest rounded-varsity font-varsity font-bold"
+                          }
                         >
-                          Claim
+                          {isGameLocked ? 'Claim' : 'Add'}
                         </Button>
                       </div>
-                    ))}
+                    );})}
                   </div>
                 )}
               </CardContent>

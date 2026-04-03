@@ -566,18 +566,20 @@ async joinLeagueByCode(
     }
 
     const teamsCount = LEAGUE_TEAMS_DATA.length;
-    // Target roster distribution: 4-5 C, 4-5 LW, 4-5 RW, 5-6 D, 3 G
-    // Maximum roster size: 21 players total (starting lineup + 8 bench)
-    const MAX_ROSTER_SIZE = 21;
+    // Roster distribution driven by league settings (falls back to standard defaults)
+    // MAX_ROSTER_SIZE comes from the league or defaults to 21
+    const MAX_ROSTER_SIZE = 21; // Demo league default — real leagues use leagues.roster_size
+    // Target roster composition: adapts based on starter slot counts
+    // Starters fill first, then bench fills proportionally
     const targetRoster = {
       'C': { min: 4, max: 5 },
       'LW': { min: 4, max: 5 },
       'RW': { min: 4, max: 5 },
       'D': { min: 5, max: 6 },
-      'G': { min: 3, max: 3 } // Exactly 3 goalies
+      'G': { min: 3, max: 3 }
     };
-    
-    // Minimum requirements for a valid starting lineup (for initial draft priority)
+
+    // Minimum requirements for a valid starting lineup
     const minReqs = { 'C': 2, 'LW': 2, 'RW': 2, 'D': 4, 'G': 2 };
 
     const leagueRosters: Record<number, Player[]> = {};
@@ -958,7 +960,7 @@ async joinLeagueByCode(
     return cachedLeagueState?.[teamId] || [];
   },
 
-  async getFreeAgents(allPlayers: Player[], leagueId?: string, userId?: string): Promise<Player[]> {
+  async getFreeAgents(allPlayers: Player[], leagueId?: string, userId?: string): Promise<{ players: Player[]; rosterLookupFailed: boolean }> {
     // If leagueId is provided, use real database data
     if (leagueId && userId) {
       try {
@@ -976,18 +978,21 @@ async joinLeagueByCode(
         // Filter out owned players - only return players NOT on any roster
         const freeAgents = allPlayers.filter(player => !ownedPlayerIds.has(String(player.id)));
 
-        return freeAgents;
+        return { players: freeAgents, rosterLookupFailed: false };
       } catch (error) {
         logger.error('Error getting free agents from database:', error);
-        // Fallback to demo data if database query fails
-        await this.initializeLeague(allPlayers);
-        return cachedFreeAgents || [];
+        logger.error(`Failed to fetch rosters for league ${leagueId} — showing all players as free agents instead of 0`, error);
+        // CRITICAL FIX: If we can't determine which players are rostered,
+        // treat ALL players as free agents rather than returning an empty list.
+        // Previously this fell back to demo data (cachedFreeAgents) which was
+        // often empty/null for real leagues, causing "0 of 0" display.
+        return { players: allPlayers, rosterLookupFailed: true };
       }
     }
 
     // No leagueId provided - use demo data
     await this.initializeLeague(allPlayers);
-    return cachedFreeAgents || [];
+    return { players: cachedFreeAgents || [], rosterLookupFailed: false };
   },
 
   getWatchlist(): Set<string> {

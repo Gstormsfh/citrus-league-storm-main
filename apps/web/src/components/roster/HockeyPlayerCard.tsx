@@ -62,8 +62,29 @@ export interface HockeyPlayer {
     opponent: string; // e.g. "vs BOS", "@ NYR"
     isToday: boolean;
     gameTime?: string; // e.g. "7:30 PM"
+    gameStatus?: 'scheduled' | 'live' | 'intermission' | 'final'; // Game status from schedule
+    score?: string; // e.g. "3-2" current score
   };
   projectedPoints?: number; // Legacy field - kept for backwards compatibility
+
+  // Daily actual game stats (populated when game is live or final)
+  daily_actual_points?: number;
+  daily_actual_stats?: {
+    goals?: number;
+    assists?: number;
+    points?: number;
+    shots_on_goal?: number;
+    blocks?: number;
+    hits?: number;
+    ppp?: number;
+    shp?: number;
+    pim?: number;
+    // Goalie
+    wins?: number;
+    saves?: number;
+    goals_against?: number;
+    shutouts?: number;
+  };
   
   // Daily projection from Citrus Projections 2.0 (matches Matchup tab structure)
   // Skater projection object with full projection data

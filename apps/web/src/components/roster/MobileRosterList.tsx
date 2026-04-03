@@ -16,6 +16,8 @@ const getPositionAbbr = (pos: string) => {
   return p.substring(0, 2);
 };
 
+import type { PositionType } from "@/utils/rosterUtils";
+
 const posColor: Record<string, string> = {
   LW: 'bg-citrus-green-dark',
   C: 'bg-citrus-sage',
@@ -23,6 +25,7 @@ const posColor: Record<string, string> = {
   D: 'bg-citrus-forest',
   G: 'bg-citrus-peach text-citrus-forest',
   UTIL: 'bg-citrus-green-medium',
+  F: 'bg-emerald-600',
 };
 
 const posRingColor: Record<string, string> = {
@@ -32,6 +35,7 @@ const posRingColor: Record<string, string> = {
   D: 'ring-citrus-forest/30',
   G: 'ring-citrus-peach/50',
   UTIL: 'ring-citrus-green-medium/30',
+  F: 'ring-emerald-600/30',
 };
 
 // ─── Interfaces ──────────────────────────────────────────────────────
@@ -44,25 +48,123 @@ interface MobileRosterListProps {
   tapSelectedPlayerId?: string | number | null;
   tapEligibleSlots?: Set<string>;
   onPlayerTap?: (player: HockeyPlayer) => void;
+  onPlayerNameTap?: (player: HockeyPlayer) => void;
   onSlotTap?: (slotId: string) => void;
   onBenchTap?: () => void;
+  positionType?: PositionType;
+  rosterSlots?: Record<string, number>;
 }
 
-// Map slot IDs to display labels
-const slotLabel: Record<string, string> = {
-  'slot-LW-1': 'LW', 'slot-LW-2': 'LW',
-  'slot-C-1': 'C', 'slot-C-2': 'C',
-  'slot-RW-1': 'RW', 'slot-RW-2': 'RW',
-  'slot-D-1': 'D', 'slot-D-2': 'D', 'slot-D-3': 'D', 'slot-D-4': 'D',
-  'slot-G-1': 'G', 'slot-G-2': 'G',
-  'slot-UTIL': 'UTIL',
+/**
+ * Build slot label map and slot arrays dynamically from position type and roster slots.
+ */
+function buildSlotConfig(positionType: PositionType = 'individual', rosterSlots?: Record<string, number>) {
+  const labels: Record<string, string> = {};
+  const allSlots: string[] = [];
+
+  const posKeys = positionType === 'forward'
+    ? ['F', 'D', 'G']
+    : ['C', 'LW', 'RW', 'D', 'G'];
+
+  const defaults: Record<string, number> = positionType === 'forward'
+    ? { F: 6, D: 4, G: 2, UTIL: 1 }
+    : { C: 2, LW: 2, RW: 2, D: 4, G: 2, UTIL: 1 };
+
+  for (const pos of posKeys) {
+    const count = rosterSlots?.[pos] ?? defaults[pos] ?? 0;
+    for (let i = 1; i <= count; i++) {
+      const slotId = `slot-${pos}-${i}`;
+      labels[slotId] = pos;
+      allSlots.push(slotId);
+    }
+  }
+
+  // UTIL slot
+  const utilCount = rosterSlots?.UTIL ?? defaults.UTIL ?? 1;
+  for (let i = 0; i < utilCount; i++) {
+    const slotId = utilCount === 1 ? 'slot-UTIL' : `slot-UTIL-${i + 1}`;
+    labels[slotId] = 'UTIL';
+    allSlots.push(slotId);
+  }
+
+  // Group by section
+  const forwardSlots = positionType === 'forward'
+    ? allSlots.filter(s => s.startsWith('slot-F-'))
+    : allSlots.filter(s => s.startsWith('slot-LW-') || s.startsWith('slot-C-') || s.startsWith('slot-RW-'));
+  const defenseSlots = allSlots.filter(s => s.startsWith('slot-D-'));
+  const goalieSlots = allSlots.filter(s => s.startsWith('slot-G-'));
+  const utilSlots = allSlots.filter(s => s.startsWith('slot-UTIL'));
+
+  return { labels, allSlots, forwardSlots, defenseSlots, goalieSlots, utilSlots };
+}
+
+// ─── Format compact stat line from actual game stats or projection ───
+const formatStatLine = (player: HockeyPlayer): { text: string; isActual: boolean } | null => {
+  const isGoalie = player.position === 'Goalie' || player.position === 'G';
+  const gameStatus = player.nextGame?.gameStatus;
+  const isLiveOrFinal = gameStatus === 'live' || gameStatus === 'intermission' || gameStatus === 'final';
+
+  // Show actuals if game is live or final and we have actual stats
+  if (isLiveOrFinal && player.daily_actual_stats) {
+    const s = player.daily_actual_stats;
+    const parts: string[] = [];
+    if (isGoalie) {
+      if (s.saves) parts.push(`${s.saves} SV`);
+      if (s.goals_against != null) parts.push(`${s.goals_against} GA`);
+      if (s.wins) parts.push('W');
+    } else {
+      if (s.goals) parts.push(`${s.goals}G`);
+      if (s.assists) parts.push(`${s.assists}A`);
+      if (s.shots_on_goal) parts.push(`${s.shots_on_goal} SOG`);
+      if (s.hits) parts.push(`${s.hits} HIT`);
+    }
+    return parts.length > 0 ? { text: parts.join(', '), isActual: true } : null;
+  }
+
+  // Fall back to projections
+  if (isGoalie && player.goalieProjection) {
+    const gp = player.goalieProjection;
+    const parts: string[] = [];
+    if (gp.projected_saves > 0) parts.push(`${Math.round(gp.projected_saves)} SV`);
+    if (gp.projected_goals_against > 0) parts.push(`${gp.projected_goals_against.toFixed(1)} GA`);
+    if (gp.projected_wins >= 0.5) parts.push(`W`);
+    return parts.length > 0 ? { text: parts.join(', '), isActual: false } : null;
+  }
+
+  if (!isGoalie && player.daily_projection) {
+    const dp = player.daily_projection;
+    const parts: string[] = [];
+    if (dp.projected_goals >= 0.3) parts.push(`${dp.projected_goals.toFixed(1)}G`);
+    if (dp.projected_assists >= 0.3) parts.push(`${dp.projected_assists.toFixed(1)}A`);
+    if (dp.projected_sog >= 1) parts.push(`${dp.projected_sog.toFixed(0)} SOG`);
+    return parts.length > 0 ? { text: parts.join(', '), isActual: false } : null;
+  }
+
+  return null;
 };
 
-const ALL_STARTER_SLOTS = [
-  'slot-LW-1', 'slot-LW-2', 'slot-C-1', 'slot-C-2', 'slot-RW-1', 'slot-RW-2',
-  'slot-D-1', 'slot-D-2', 'slot-D-3', 'slot-D-4',
-  'slot-G-1', 'slot-G-2', 'slot-UTIL',
-];
+// ─── Game status badge ──────────────────────────────────────────────
+const GameStatusBadge = ({ status, score }: { status?: string; score?: string }) => {
+  if (!status || status === 'scheduled') return null;
+
+  if (status === 'final') {
+    return (
+      <span className="text-[9px] font-varsity font-black tracking-wider px-1.5 py-0.5 rounded-sm bg-citrus-charcoal/10 text-citrus-charcoal/70 uppercase">
+        Final{score ? ` ${score}` : ''}
+      </span>
+    );
+  }
+
+  if (status === 'live' || status === 'intermission') {
+    return (
+      <span className="text-[9px] font-varsity font-black tracking-wider px-1.5 py-0.5 rounded-sm bg-red-500/15 text-red-600 uppercase animate-pulse">
+        {status === 'intermission' ? 'INT' : 'LIVE'}{score ? ` ${score}` : ''}
+      </span>
+    );
+  }
+
+  return null;
+};
 
 // ─── Single Row ──────────────────────────────────────────────────────
 interface PlayerRowProps {
@@ -72,16 +174,22 @@ interface PlayerRowProps {
   isLocked?: boolean;
   isSwapSelected?: boolean;
   isEligibleTarget?: boolean;
-  onTap?: () => void;
+  onPositionTap?: () => void;
+  onNameTap?: () => void;
+  onEmptySlotTap?: () => void;
 }
 
-const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isEligibleTarget, onTap }: PlayerRowProps) => {
+const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isEligibleTarget, onPositionTap, onNameTap, onEmptySlotTap }: PlayerRowProps) => {
   const [imgErr, setImgErr] = useState(false);
 
   const isGoalie = player ? (player.position === 'Goalie' || player.position === 'G') : slotPosition === 'G';
+  const gameStatus = player?.nextGame?.gameStatus;
+  const isLiveOrFinal = gameStatus === 'live' || gameStatus === 'intermission' || gameStatus === 'final';
   const dailyProj = player ? (isGoalie ? player.goalieProjection : player.daily_projection) : null;
-  const hasGame = dailyProj != null;
+  const hasGame = dailyProj != null || (player?.daily_actual_points != null && player.daily_actual_points > 0);
+  const actualPts = player?.daily_actual_points ?? 0;
   const projPts = dailyProj?.total_projected_points || 0;
+  const displayPts = isLiveOrFinal ? actualPts : projPts;
   const teamAbbr = player?.teamAbbreviation || (player?.team?.split(' ').pop()?.substring(0, 3).toUpperCase()) || '';
   const teamLogoUrl = player ? `https://assets.nhle.com/logos/nhl/svg/${player.teamAbbreviation || 'NHL'}_light.svg` : '';
 
@@ -96,22 +204,23 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
     <div
       className={cn(
         "flex items-center gap-2 px-3 py-2.5 transition-all border-b border-citrus-sage/15",
-        "active:bg-citrus-sage/10",
         isSwapSelected && "!bg-citrus-orange/10 !border-citrus-orange/30",
         isEligibleTarget && !isSwapSelected && "!bg-citrus-sage/10 !border-citrus-sage/30",
         isLocked && "opacity-60",
       )}
-      onClick={onTap}
     >
-      {/* Position badge */}
-      <div className={cn(
-        "w-10 h-10 flex-shrink-0 rounded-lg flex items-center justify-center text-white font-varsity text-xs font-black tracking-wide shadow-sm",
-        "ring-2",
-        posColor[slotPosition] || 'bg-citrus-charcoal/40',
-        posRingColor[slotPosition] || 'ring-citrus-charcoal/20',
-        isEligibleTarget && !isSwapSelected && "!ring-citrus-sage !ring-2 animate-pulse",
-        isSwapSelected && "!ring-citrus-orange !ring-2",
-      )}>
+      {/* Position badge — tap to swap */}
+      <div
+        className={cn(
+          "w-10 h-10 flex-shrink-0 rounded-lg flex items-center justify-center text-white font-varsity text-xs font-black tracking-wide shadow-sm",
+          "ring-2 active:scale-95 transition-transform cursor-pointer",
+          posColor[slotPosition] || 'bg-citrus-charcoal/40',
+          posRingColor[slotPosition] || 'ring-citrus-charcoal/20',
+          isEligibleTarget && !isSwapSelected && "!ring-citrus-sage !ring-2 animate-pulse",
+          isSwapSelected && "!ring-citrus-orange !ring-2",
+        )}
+        onClick={(e) => { e.stopPropagation(); onPositionTap?.(); }}
+      >
         {slotPosition}
       </div>
 
@@ -136,8 +245,8 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
             )}
           </div>
 
-          {/* Name + team/number */}
-          <div className="flex-1 min-w-0">
+          {/* Name + team/number + game info — tap name to open player card */}
+          <div className="flex-1 min-w-0 active:bg-citrus-sage/5 rounded-lg -mx-1 px-1 cursor-pointer" onClick={(e) => { e.stopPropagation(); onNameTap?.(); }}>
             <div className="flex items-center gap-1">
               <span className="font-display font-bold text-[13px] text-citrus-forest truncate leading-tight">
                 {player.name}
@@ -152,25 +261,54 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
               <span className="font-semibold">{teamAbbr}</span>
               <span className="text-citrus-charcoal/30">|</span>
               <span>#{player.number}</span>
-              {hasGame && player.nextGame?.opponent && (
+              {player.nextGame?.opponent && (
                 <>
                   <span className="text-citrus-charcoal/30">|</span>
                   <span className="text-citrus-sage font-semibold">{player.nextGame.opponent}</span>
                 </>
               )}
             </div>
+            {/* Game status + actual/projected stat line */}
+            {player.nextGame && (
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <GameStatusBadge status={gameStatus} score={player.nextGame.score} />
+                {!isLiveOrFinal && player.nextGame.gameTime && (
+                  <span className="text-[10px] font-display font-semibold text-citrus-charcoal/50">
+                    {player.nextGame.gameTime}
+                  </span>
+                )}
+                {(() => {
+                  const statInfo = formatStatLine(player);
+                  if (!statInfo) return null;
+                  return (
+                    <>
+                      <span className="text-citrus-charcoal/20 text-[10px]">·</span>
+                      <span className={cn(
+                        "text-[10px] font-display truncate",
+                        statInfo.isActual ? "text-citrus-forest font-semibold" : "text-citrus-charcoal/45 italic"
+                      )}>
+                        {statInfo.text}
+                      </span>
+                    </>
+                  );
+                })()}
+              </div>
+            )}
           </div>
 
-          {/* Projected points */}
-          <div className={cn(
-            "flex-shrink-0 w-14 text-right",
-          )}>
+          {/* Points — actual (live/final) or projected */}
+          <div className="flex-shrink-0 w-14 text-right">
             {hasGame ? (
               <div className="flex flex-col items-end">
-                <span className="font-varsity text-base font-black text-citrus-orange leading-none">
-                  {projPts.toFixed(1)}
+                <span className={cn(
+                  "font-varsity text-base font-black leading-none",
+                  isLiveOrFinal ? "text-citrus-forest" : "text-citrus-orange"
+                )}>
+                  {displayPts.toFixed(1)}
                 </span>
-                <span className="text-[10px] text-citrus-charcoal/50 font-display font-medium uppercase">proj</span>
+                <span className="text-[10px] text-citrus-charcoal/50 font-display font-medium uppercase">
+                  {isLiveOrFinal ? (gameStatus === 'final' ? 'final' : 'live') : 'proj'}
+                </span>
               </div>
             ) : (
               <span className="text-xs text-citrus-charcoal/40 font-display italic">No game</span>
@@ -184,6 +322,7 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
             "flex-1 flex items-center justify-center py-1 rounded-lg border border-dashed",
             isEligibleTarget ? "border-citrus-sage bg-citrus-sage/5" : "border-citrus-charcoal/15 bg-citrus-charcoal/5",
           )}
+          onClick={onEmptySlotTap}
         >
           <span className={cn(
             "text-xs font-display",
@@ -218,9 +357,16 @@ const MobileRosterList = ({
   tapSelectedPlayerId = null,
   tapEligibleSlots = new Set(),
   onPlayerTap,
+  onPlayerNameTap,
   onSlotTap,
   onBenchTap,
+  positionType = 'individual',
+  rosterSlots,
 }: MobileRosterListProps) => {
+
+  // Build dynamic slot config from position type
+  const slotConfig = buildSlotConfig(positionType, rosterSlots);
+  const slotLabel = slotConfig.labels;
 
   // Build slot → player map from assignments
   const getPlayerInSlot = (slotId: string): HockeyPlayer | null => {
@@ -237,11 +383,8 @@ const MobileRosterList = ({
     }
   };
 
-  // Group starter slots by section
-  const forwardSlots = ['slot-LW-1', 'slot-LW-2', 'slot-C-1', 'slot-C-2', 'slot-RW-1', 'slot-RW-2'];
-  const defenseSlots = ['slot-D-1', 'slot-D-2', 'slot-D-3', 'slot-D-4'];
-  const goalieSlots = ['slot-G-1', 'slot-G-2'];
-  const utilSlots = ['slot-UTIL'];
+  // Group starter slots by section (from dynamic config)
+  const { forwardSlots, defenseSlots, goalieSlots, utilSlots } = slotConfig;
 
   const renderSlotRows = (slots: string[]) =>
     slots.map(slotId => {
@@ -259,7 +402,12 @@ const MobileRosterList = ({
           isLocked={player ? lockedPlayerIds.has(String(player.id)) : false}
           isSwapSelected={isSelected}
           isEligibleTarget={isTarget}
-          onTap={() => handleRowTap(player, slotId)}
+          onPositionTap={() => {
+            if (player && onPlayerTap) onPlayerTap(player);
+            else if (!player && onSlotTap) onSlotTap(slotId);
+          }}
+          onNameTap={() => player && onPlayerNameTap?.(player)}
+          onEmptySlotTap={() => onSlotTap?.(slotId)}
         />
       );
     });
@@ -329,7 +477,8 @@ const MobileRosterList = ({
               isLocked={lockedPlayerIds.has(String(player.id))}
               isSwapSelected={isSelected}
               isEligibleTarget={benchIsTarget && !isSelected}
-              onTap={() => onPlayerTap?.(player)}
+              onPositionTap={() => onPlayerTap?.(player)}
+              onNameTap={() => onPlayerNameTap?.(player)}
             />
           );
         })}
@@ -354,7 +503,8 @@ const MobileRosterList = ({
                 slotPosition={pos}
                 isLocked={lockedPlayerIds.has(String(player.id))}
                 isSwapSelected={player.id === tapSelectedPlayerId}
-                onTap={() => onPlayerTap?.(player)}
+                onPositionTap={() => onPlayerTap?.(player)}
+                onNameTap={() => onPlayerNameTap?.(player)}
               />
             );
           })}

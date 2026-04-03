@@ -2,6 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { WaiverService } from '../services/WaiverService';
 import { createChain, createMockSupabase } from './helpers';
 
+// Mock the admin client used internally for AI team operations
+let mockAdminClient: any;
+vi.mock('../lib/supabase', () => ({
+  getSupabaseAdmin: vi.fn(() => mockAdminClient),
+}));
+
 describe('WaiverService', () => {
   let service: WaiverService;
   let mockSupabase: any;
@@ -9,6 +15,11 @@ describe('WaiverService', () => {
   beforeEach(() => {
     mockSupabase = createMockSupabase();
     service = new WaiverService(mockSupabase);
+    // Default admin client for AI team checks
+    mockAdminClient = {
+      from: vi.fn(() => createChain({ data: { owner_id: 'some-user' }, error: null })),
+      rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
+    };
   });
 
   describe('checkTransactionLimits', () => {
@@ -141,7 +152,7 @@ describe('WaiverService', () => {
       expect(result.success).toBe(true);
       expect(mockSupabase.rpc).toHaveBeenCalledWith('process_roster_move', {
         p_league_id: 'league-1',
-        p_team_id: 'team-1',
+        p_user_id: 'user-1',
         p_add_player_id: 100,
         p_drop_player_id: 50,
       });
@@ -152,11 +163,11 @@ describe('WaiverService', () => {
     it('calls roster move RPC with null add', async () => {
       mockSupabase.rpc = vi.fn().mockResolvedValue({ error: null });
 
-      const result = await service.dropPlayer('league-1', 'team-1', 100);
+      const result = await service.dropPlayer('league-1', 'team-1', 100, 'user-1');
       expect(result.success).toBe(true);
       expect(mockSupabase.rpc).toHaveBeenCalledWith('process_roster_move', {
         p_league_id: 'league-1',
-        p_team_id: 'team-1',
+        p_user_id: 'user-1',
         p_add_player_id: null,
         p_drop_player_id: 100,
       });
@@ -173,6 +184,87 @@ describe('WaiverService', () => {
 
       const result = await service.getWaiverPriority('league-1');
       expect(result.priority).toHaveLength(2);
+    });
+  });
+
+  describe('AI team roster operations', () => {
+    it('addFreeAgent uses admin path for AI teams (owner_id = NULL)', async () => {
+      // Mock limit check
+      mockSupabase.from = vi.fn((table: string) => {
+        if (table === 'leagues') return createChain({ data: { settings: {} }, error: null });
+        if (table === 'transaction_ledger') return createChain({ count: 0, error: null });
+        return createChain();
+      });
+
+      // Mock admin client: isAiTeam returns null owner, then roster operations succeed
+      let adminFromCallCount = 0;
+      mockAdminClient = {
+        from: vi.fn((table: string) => {
+          adminFromCallCount++;
+          // First call: isAiTeam check
+          if (table === 'teams' && adminFromCallCount === 1) {
+            return createChain({ data: { owner_id: null }, error: null });
+          }
+          // executeAiTeamRosterMove calls
+          if (table === 'leagues') return createChain({ data: { roster_size: 22, settings: {} }, error: null });
+          if (table === 'roster_assignments') return createChain({ data: null, error: null, count: 5 });
+          if (table === 'nhl_players') return createChain({ data: { position: 'C' }, error: null });
+          if (table === 'transaction_ledger') return createChain({ data: null, error: null });
+          if (table === 'team_lineups') return createChain({ data: { id: 'lineup-1', bench: [] }, error: null });
+          return createChain({ data: null, error: null });
+        }),
+        rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
+      };
+
+      const result = await service.addFreeAgent('league-1', 'ai-team-1', 100, null, 'user-1');
+      expect(result.success).toBe(true);
+      // Should NOT have called process_roster_move RPC
+      expect(mockSupabase.rpc).not.toHaveBeenCalled();
+    });
+
+    it('dropPlayer uses admin path for AI teams (owner_id = NULL)', async () => {
+      let adminFromCallCount = 0;
+      mockAdminClient = {
+        from: vi.fn((table: string) => {
+          adminFromCallCount++;
+          // First call: isAiTeam check
+          if (table === 'teams' && adminFromCallCount === 1) {
+            return createChain({ data: { owner_id: null }, error: null });
+          }
+          // executeAiTeamRosterMove calls
+          if (table === 'leagues') return createChain({ data: { roster_size: 22, settings: {} }, error: null });
+          if (table === 'roster_assignments') return createChain({ data: { id: 'assignment-1' }, error: null });
+          if (table === 'transaction_ledger') return createChain({ data: null, error: null });
+          if (table === 'team_lineups') return createChain({ data: null, error: null });
+          if (table === 'draft_picks') return createChain({ data: null, error: null });
+          return createChain({ data: null, error: null });
+        }),
+        rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
+      };
+
+      const result = await service.dropPlayer('league-1', 'ai-team-1', 100, 'user-1');
+      expect(result.success).toBe(true);
+      // Should NOT have called process_roster_move RPC
+      expect(mockSupabase.rpc).not.toHaveBeenCalled();
+    });
+
+    it('addFreeAgent uses RPC path for human-owned teams', async () => {
+      mockSupabase.from = vi.fn((table: string) => {
+        if (table === 'leagues') return createChain({ data: { settings: {} }, error: null });
+        if (table === 'teams') return createChain({ data: { owner_id: 'user-1' }, error: null });
+        if (table === 'transaction_ledger') return createChain({ count: 0, error: null });
+        return createChain();
+      });
+      mockSupabase.rpc = vi.fn().mockResolvedValue({ error: null });
+
+      // Admin client returns owner_id for human teams
+      mockAdminClient = {
+        from: vi.fn(() => createChain({ data: { owner_id: 'user-1' }, error: null })),
+      };
+
+      const result = await service.addFreeAgent('league-1', 'team-1', 100, null, 'user-1');
+      expect(result.success).toBe(true);
+      expect(mockSupabase.rpc).toHaveBeenCalledWith('process_roster_move', expect.any(Object));
     });
   });
 });

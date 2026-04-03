@@ -6,13 +6,14 @@ import { leagueApi } from '@/api/leagues';
 import { matchupApi } from '@/api/matchups';
 import { rosterApi } from '@/api/rosters';
 import Navbar from '@/components/Navbar';
+import MobileMenuButton from '@/components/MobileMenuButton';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Calendar, TrendingUp, Filter, List, Grid, Star, Info, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Calendar, TrendingUp, Filter, List, Grid, Star, Info, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle, Loader2 } from 'lucide-react';
 import LoadingScreen from '@/components/LoadingScreen';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { PlayerService, Player } from '@/services/PlayerService';
@@ -29,7 +30,7 @@ import { isGuestMode, shouldBlockGuestOperation } from '@/utils/guestHelpers';
 import { DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeagueService';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import { getPlayerWithSeasonStats } from '@/utils/playerStatsHelper';
-import { getTodayMST } from '@/utils/timezoneUtils';
+import { getTodayMST, formatWaiverProcessTime } from '@/utils/timezoneUtils';
 import { CitrusBackground } from '@/components/CitrusBackground';
 import { COLUMNS } from '@/utils/queryColumns';
 import { AdSpace } from '@/components/AdSpace';
@@ -65,6 +66,7 @@ const FreeAgents = () => {
   const [players, setPlayers] = useState<Player[]>([]);
   const [watchlist, setWatchlist] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [rosterLookupFailed, setRosterLookupFailed] = useState(false);
   const [leagueId, setLeagueId] = useState<string | null>(null);
   
   // Tab reset mechanism - reset to default tab when league changes
@@ -95,6 +97,12 @@ const FreeAgents = () => {
   // Player Stats Modal State
   const [selectedPlayer, setSelectedPlayer] = useState<HockeyPlayer | null>(null);
   const [isPlayerDialogOpen, setIsPlayerDialogOpen] = useState(false);
+
+  // Add-player loading state to prevent double-clicks
+  const [addingPlayerId, setAddingPlayerId] = useState<number | null>(null);
+
+  // Waiver process time from league settings (for toast messages)
+  const [waiverProcessTime, setWaiverProcessTime] = useState<string | null>(null);
 
   // Infinite scroll pagination
   const PAGE_SIZE = 50;
@@ -176,7 +184,8 @@ const FreeAgents = () => {
   const fetchPlayers = async () => {
     try {
       setLoading(true);
-      
+      setRosterLookupFailed(false);
+
       // DEMO MODE: For guests, show all players as free agents (no league filtering)
       if (isGuestMode(userLeagueState)) {
         try {
@@ -226,7 +235,14 @@ const FreeAgents = () => {
       }
       
       setLeagueId(currentLeagueId || null);
-      
+
+      // Fetch waiver settings for this league (for dynamic toast messages)
+      if (currentLeagueId && user) {
+        WaiverService.getLeagueWaiverSettings(currentLeagueId, user.id)
+          .then(settings => { if (settings) setWaiverProcessTime(settings.waiver_process_time); })
+          .catch(() => { /* non-critical */ });
+      }
+
       // Get all players from our pipeline tables (player_directory + player_season_stats)
       // PlayerService.getAllPlayers() is the ONLY source for player data
       // CRITICAL: This now filters to only include players with matching stats records (same as getPlayersByIds)
@@ -239,8 +255,12 @@ const FreeAgents = () => {
       
       // LeagueService determines free agents - uses real database if leagueId provided
       // Dropped players (with deleted_at) will be included as free agents
-      const freeAgents = await LeagueService.getFreeAgents(allPlayers, currentLeagueId, user.id);
-      setPlayers(freeAgents);
+      const freeAgentResult = await LeagueService.getFreeAgents(allPlayers, currentLeagueId, user.id);
+      setPlayers(freeAgentResult.players);
+      setRosterLookupFailed(freeAgentResult.rosterLookupFailed);
+      if (freeAgentResult.rosterLookupFailed) {
+        logger.warn(`Roster lookup failed for league ${currentLeagueId} — showing all players as free agents`);
+      }
       
       // Don't calculate schedule maximizers here - will be lazy loaded when tab is active
     } catch (error) {
@@ -596,6 +616,10 @@ const FreeAgents = () => {
   };
 
   const handleAddPlayer = async (player: Player) => {
+    // Prevent double-clicks
+    const playerIdNum = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
+    if (addingPlayerId !== null) return;
+
     // Block guest operations
     if (shouldBlockGuestOperation(userLeagueState, (msg) => {
       toast({
@@ -617,8 +641,11 @@ const FreeAgents = () => {
       return;
     }
 
-    // Check draft status FIRST - must complete draft before adding free agents
+    // Set loading state immediately
+    setAddingPlayerId(playerIdNum);
+
     try {
+      // Check draft status FIRST - must complete draft before adding free agents
       const leagueResponse = await leagueApi.getLeague(leagueId);
       const leagueData = leagueResponse.data as { draft_status?: string } | undefined;
 
@@ -630,17 +657,7 @@ const FreeAgents = () => {
         });
         return;
       }
-    } catch (error) {
-      logger.error("[FreeAgents] Error checking draft status:", error);
-      toast({
-        title: "Error",
-        description: "Could not verify draft status.",
-        variant: "destructive"
-      });
-      return;
-    }
 
-    try {
       // Check roster size before attempting to add
       const { league, error: leagueError } = await LeagueService.getLeague(leagueId, user.id);
       if (leagueError || !league) {
@@ -652,7 +669,7 @@ const FreeAgents = () => {
         return;
       }
 
-      // Get current roster size
+      // Get current roster size via roster_assignments (the source of truth)
       const myTeamResponse = await leagueApi.getMyTeam(leagueId);
       const teamDataResult = myTeamResponse.data as { id: string } | undefined;
 
@@ -666,63 +683,40 @@ const FreeAgents = () => {
       }
       const teamData = teamDataResult;
 
-      // Get lineup data from API
-      let lineupData: { starters?: string[]; bench?: string[]; ir?: string[] } | null = null;
-      try {
-        const lineupResponse = await rosterApi.getLineup(leagueId, teamData.id);
-        lineupData = lineupResponse.data as { starters?: string[]; bench?: string[]; ir?: string[] } | null;
-      } catch (lineupErr) {
-        // No lineup exists yet - lineupData stays null, which is handled below
-        logger.debug('No lineup found for team, will count roster_assignments instead');
+      // Count roster_assignments — this is the authoritative count the RPC uses
+      const { count: currentRosterSize, error: rosterError } = await PlayerService.getRosterAssignmentCount(teamData.id, leagueId);
+
+      if (rosterError) {
+        logger.error('Error counting roster_assignments:', rosterError);
+        toast({
+          title: "Error",
+          description: "Could not load roster for size check.",
+          variant: "destructive"
+        });
+        return;
       }
 
-      // Calculate current roster size
-      // If lineup exists, use it; otherwise count roster_assignments (source of truth)
-      let currentRosterSize = 0;
-      if (lineupData) {
-        // Lineup exists - use lineup data
-        currentRosterSize = 
-          (lineupData.starters?.length || 0) +
-          (lineupData.bench?.length || 0) +
-          (lineupData.ir?.length || 0);
-      } else {
-        // No lineup exists yet - count roster_assignments instead
-        const { count: rosterCount, error: rosterError } = await PlayerService.getRosterAssignmentCount(teamData.id, leagueId);
+      // Use roster_size from league (matches what the RPC uses: COALESCE(l.roster_size, 22))
+      // The RPC checks: roster_count >= roster_size when no drop player specified
+      const maxRosterSize = league.roster_size || 22;
 
-        if (rosterError) {
-          logger.error('Error counting roster_assignments:', rosterError);
-          toast({
-            title: "Error",
-            description: "Could not load roster for size check.",
-            variant: "destructive"
-          });
-          return;
-        } else {
-          currentRosterSize = rosterCount || 0;
-        }
-      }
-
-      const maxRosterSize = league.roster_size + 3; // roster_size + 3 IR slots
-
-      // If roster is full, navigate to roster page with add player intent
-      if (currentRosterSize >= maxRosterSize) {
+      // If roster is full, navigate to roster page to drop first
+      if ((currentRosterSize || 0) >= maxRosterSize) {
         navigate(`/roster?addPlayer=${player.id}&playerName=${encodeURIComponent(player.full_name)}`);
         toast({
           title: "Roster Full",
-          description: `Navigate to your roster to drop a player and add ${player.full_name}.`,
+          description: `You must drop a player before adding ${player.full_name}. Redirecting to your roster.`,
         });
         return;
       }
 
       // Roster has space, proceed with adding
-      // Use WaiverService.addPlayer which checks game locks and handles waivers properly
-      const playerIdNum = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
       const result = await WaiverService.addPlayer(
         leagueId,
         teamData.id,
         playerIdNum,
         null, // No drop player specified
-        user.id // Pass userId for membership validation
+        user.id
       );
 
       if (result.success) {
@@ -741,12 +735,12 @@ const FreeAgents = () => {
         if (result.isFreeAgent) {
           toast({
             title: "Player Added",
-            description: `${player.full_name} has been added to your roster immediately.`,
+            description: `${player.full_name} has been added to your roster.`,
           });
         } else {
           toast({
             title: "Waiver Claim Submitted",
-            description: `${player.full_name} is game-locked. Waiver claim submitted and will process at 3:00 AM EST.`,
+            description: `${player.full_name} is on waivers. Your claim will process at ${formatWaiverProcessTime(waiverProcessTime)}.`,
           });
         }
         // Refresh the free agents list to remove the added player
@@ -754,21 +748,39 @@ const FreeAgents = () => {
         // Refresh trending data to show updated counts
         await fetchTrendingData();
       } else {
-        // Handle error case - isFreeAgent may be undefined on error
-        const isWaiverClaim = result.isFreeAgent === false;
-        toast({
-          title: isWaiverClaim ? "Claim Failed" : "Add Failed",
-          description: result.error || "Failed to add player. Please try again.",
-          variant: "destructive"
-        });
+        // Check if the error is about roster being full — redirect to drop dialog
+        const errorStr = (result.error || '').toLowerCase();
+        if (errorStr.includes('roster') && (errorStr.includes('full') || errorStr.includes('max') || errorStr.includes('limit'))) {
+          navigate(`/roster?addPlayer=${player.id}&playerName=${encodeURIComponent(player.full_name)}`);
+          toast({
+            title: "Roster Full",
+            description: `You must drop a player before adding ${player.full_name}.`,
+          });
+        } else {
+          toast({
+            title: "Add Failed",
+            description: result.error || "Failed to add player. Please try again.",
+            variant: "destructive"
+          });
+        }
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Failed to add player. Please try again.";
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive"
-      });
+      if (errorMessage.toLowerCase().includes('roster') && (errorMessage.toLowerCase().includes('full') || errorMessage.toLowerCase().includes('max'))) {
+        navigate(`/roster?addPlayer=${player.id}&playerName=${encodeURIComponent(player.full_name)}`);
+        toast({
+          title: "Roster Full",
+          description: `You must drop a player before adding ${player.full_name}.`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive"
+        });
+      }
+    } finally {
+      setAddingPlayerId(null);
     }
   };
 
@@ -795,9 +807,11 @@ const FreeAgents = () => {
       // Normalize player position for comparison
       const normalizedPlayerPos = formatPositionForDisplay(player.position);
       
-      const matchesPosition = positionFilter === 'ALL' || 
-        (positionFilter === 'W' ? (normalizedPlayerPos === 'LW' || normalizedPlayerPos === 'RW') : normalizedPlayerPos === positionFilter);
-      
+      const matchesPosition = positionFilter === 'ALL' ||
+        (positionFilter === 'W' ? (normalizedPlayerPos === 'LW' || normalizedPlayerPos === 'RW') :
+         positionFilter === 'F' ? (normalizedPlayerPos === 'C' || normalizedPlayerPos === 'LW' || normalizedPlayerPos === 'RW') :
+         normalizedPlayerPos === positionFilter);
+
       return matchesSearch && matchesPosition;
     });
   };
@@ -1095,7 +1109,10 @@ const FreeAgents = () => {
     .sort((a, b) => b.weeklyProjection - a.weeklyProjection)
     .slice(0, 10); // Show top 10 instead of 5
 
-  const positions = ['ALL', 'C', 'LW', 'RW', 'W', 'D', 'G'];
+  const leaguePosType = activeLeagueFormat?.positionType === 'forward' ? 'forward' : 'individual';
+  const positions = leaguePosType === 'forward'
+    ? ['ALL', 'F', 'D', 'G']
+    : ['ALL', 'C', 'LW', 'RW', 'W', 'D', 'G'];
 
   // Redirect pool leagues to their pool page
   const _leagueType = activeLeagueFormat?.leagueType;
@@ -1108,8 +1125,10 @@ const FreeAgents = () => {
       <CitrusBackground density="light" />
       <div className="hidden lg:block"><Navbar /></div>
       <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-center h-12 px-4">
+        <div className="flex items-center justify-between h-12 px-4">
+          <div className="w-10" />
           <h1 className="text-lg font-varsity font-bold text-citrus-forest">Free Agents</h1>
+          <MobileMenuButton />
         </div>
       </div>
       <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
@@ -1174,6 +1193,14 @@ const FreeAgents = () => {
               ))}
             </div>
 
+            {/* Warning banner when roster lookup failed */}
+            {rosterLookupFailed && (
+              <div className="flex items-center gap-2 rounded-md border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-200">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-yellow-400" />
+                <span>Unable to load roster data for this league. Showing all players — some may already be rostered.</span>
+              </div>
+            )}
+
             {(() => {
               if (displayLoading) {
                 return (
@@ -1215,8 +1242,8 @@ const FreeAgents = () => {
                                   <div className="font-bold text-green-600">{player.adds.toLocaleString()}</div>
                                   <div className="text-[11px] text-muted-foreground">Adds</div>
                                 </div>
-                                <Button size="default" variant="default" className="h-10 w-10 text-primary font-bold text-xl bg-primary/10 hover:bg-primary/20 border border-primary/30" onClick={() => handleAddPlayer(player)}>
-                                  +
+                                <Button size="default" variant="default" className="h-10 w-10 text-primary font-bold text-xl bg-primary/10 hover:bg-primary/20 border border-primary/30 disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                  {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : '+'}
                                 </Button>
                               </div>
                             </div>
@@ -1262,8 +1289,8 @@ const FreeAgents = () => {
                                     >
                                       <Star className={`h-4 w-4 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
                                     </Button>
-                                    <Button size="default" variant="default" className="h-10 w-10 text-primary font-bold text-xl bg-primary/10 hover:bg-primary/20 border border-primary/30" onClick={() => handleAddPlayer(player)}>
-                                      +
+                                    <Button size="default" variant="default" className="h-10 w-10 text-primary font-bold text-xl bg-primary/10 hover:bg-primary/20 border border-primary/30 disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                      {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : '+'}
                                     </Button>
                                   </div>
                                 </TableCell>
@@ -1336,8 +1363,8 @@ const FreeAgents = () => {
                                   </div>
                                   <div className="text-[10px] text-muted-foreground">{player.gamesThisWeek || 0}G</div>
                                 </div>
-                                <Button size="sm" variant="default" className="h-8 w-8 text-primary font-bold bg-primary/10 hover:bg-primary/20 border border-primary/30 p-0" onClick={() => handleAddPlayer(player)}>
-                                  +
+                                <Button size="sm" variant="default" className="h-8 w-8 text-primary font-bold bg-primary/10 hover:bg-primary/20 border border-primary/30 p-0 disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                  {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : '+'}
                                 </Button>
                               </div>
                             </div>
@@ -1413,8 +1440,8 @@ const FreeAgents = () => {
                                     >
                                       <Star className={`h-4 w-4 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
                                     </Button>
-                                    <Button size="sm" variant="default" className="h-8 w-8 text-primary font-bold bg-primary/10 hover:bg-primary/20 border border-primary/30 p-0" onClick={() => handleAddPlayer(player)}>
-                                      +
+                                    <Button size="sm" variant="default" className="h-8 w-8 text-primary font-bold bg-primary/10 hover:bg-primary/20 border border-primary/30 p-0 disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                      {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : '+'}
                                     </Button>
                                   </div>
                                 </TableCell>
@@ -1633,8 +1660,8 @@ const FreeAgents = () => {
                                       <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" onClick={() => handlePlayerClick(player)}>
                                         <Info className="h-3.5 w-3.5" />
                                       </Button>
-                                      <Button size="sm" variant="default" className="h-7 w-7 text-primary font-bold text-base bg-primary/10 hover:bg-primary/20 border border-primary/30 p-0" onClick={() => handleAddPlayer(player)}>
-                                        +
+                                      <Button size="sm" variant="default" className="h-7 w-7 text-primary font-bold text-base bg-primary/10 hover:bg-primary/20 border border-primary/30 p-0 disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                        {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : '+'}
                                       </Button>
                                     </div>
                                   </TableCell>
@@ -1646,7 +1673,9 @@ const FreeAgents = () => {
                       </div>
                       {/* Infinite scroll sentinel + count */}
                       <div className="text-center py-2 text-xs text-muted-foreground">
-                        Showing {visiblePlayers.length} of {filteredPlayers.length} players
+                        {filteredPlayers.length === 0 && players.length > 0
+                          ? 'No players match your current filters'
+                          : `Showing ${visiblePlayers.length} of ${filteredPlayers.length} players`}
                       </div>
                       {hasMorePlayers && (
                         <div ref={loadMoreRef} className="flex justify-center py-4">
@@ -1751,8 +1780,10 @@ const FreeAgents = () => {
                         // Filter by position first
                         const positionFiltered = scheduleMaximizers.filter(player => {
                           const normalizedPos = formatPositionForDisplay(player.position);
-                          return positionFilter === 'ALL' || 
-                            (positionFilter === 'W' ? (normalizedPos === 'LW' || normalizedPos === 'RW') : normalizedPos === positionFilter);
+                          return positionFilter === 'ALL' ||
+                            (positionFilter === 'W' ? (normalizedPos === 'LW' || normalizedPos === 'RW') :
+                             positionFilter === 'F' ? (normalizedPos === 'C' || normalizedPos === 'LW' || normalizedPos === 'RW') :
+                             normalizedPos === positionFilter);
                         });
                         
                         // Sort by weekly projection (highest first) by default
@@ -1912,8 +1943,8 @@ const FreeAgents = () => {
                                    >
                                      <Star className={`h-3.5 w-3.5 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
                                    </Button>
-                                   <Button size="sm" variant="default" className="h-7 px-2 text-xs text-primary font-bold bg-primary/10 hover:bg-primary/20 border border-primary/30" onClick={() => handleAddPlayer(player)}>
-                                     + Add
+                                   <Button size="sm" variant="default" className="h-7 px-2 text-xs text-primary font-bold bg-primary/10 hover:bg-primary/20 border border-primary/30 disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                     {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : '+ Add'}
                                    </Button>
                                  </div>
                                </TableCell>
@@ -1931,7 +1962,9 @@ const FreeAgents = () => {
                    const totalSchedule = scheduleMaximizers.filter(player => {
                      const normalizedPos = formatPositionForDisplay(player.position);
                      return positionFilter === 'ALL' ||
-                       (positionFilter === 'W' ? (normalizedPos === 'LW' || normalizedPos === 'RW') : normalizedPos === positionFilter);
+                       (positionFilter === 'W' ? (normalizedPos === 'LW' || normalizedPos === 'RW') :
+                        positionFilter === 'F' ? (normalizedPos === 'C' || normalizedPos === 'LW' || normalizedPos === 'RW') :
+                        normalizedPos === positionFilter);
                    }).length;
                    return (
                      <>
@@ -2161,8 +2194,8 @@ const FreeAgents = () => {
                                 <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" onClick={() => handlePlayerClick(player)}>
                                   <Info className="h-3.5 w-3.5" />
                                 </Button>
-                                <Button size="sm" variant="default" className="h-7 w-7 text-primary font-bold text-base bg-primary/10 hover:bg-primary/20 border border-primary/30 p-0" onClick={() => handleAddPlayer(player)}>
-                                  +
+                                <Button size="sm" variant="default" className="h-7 w-7 text-primary font-bold text-base bg-primary/10 hover:bg-primary/20 border border-primary/30 p-0 disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                  {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : '+'}
                                 </Button>
                               </div>
                             </TableCell>

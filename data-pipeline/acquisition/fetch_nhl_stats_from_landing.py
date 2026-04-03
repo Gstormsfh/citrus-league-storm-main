@@ -497,26 +497,10 @@ def main() -> int:
         if landing_data:
             stats = extract_all_official_stats(landing_data, DEFAULT_SEASON, is_goalie=is_goalie)
             
-            # For skaters: Attempt StatsAPI for hits/blocks (optional - has DNS issues)
-            # Landing endpoint doesn't provide hits/blocks
-            # CRITICAL: StatsAPI often fails due to DNS issues - don't let it block the script!
-            if not is_goalie:
-                try:
-                    season_string = f"{DEFAULT_SEASON}{DEFAULT_SEASON + 1}"  # "20252026"
-                    statsapi_data = fetch_player_statsapi_data(player_id, season_string)
-                    
-                    if statsapi_data:
-                        hits, blocks = extract_hits_blocks_from_statsapi(statsapi_data)
-                        # Always update with StatsAPI values (even if 0) - this is the official source
-                        stats["nhl_hits"] = hits
-                        stats["nhl_blocks"] = blocks
-                        # Track StatsAPI success (for reporting)
-                        if hits > 0 or blocks > 0:
-                            updated_count["statsapi_hits_blocks"] = updated_count.get("statsapi_hits_blocks", 0) + 1
-                except Exception as e:
-                    # StatsAPI has DNS issues - silently skip, don't trigger circuit breaker
-                    # Hits/blocks will be 0 (can use PBP-calculated values as fallback elsewhere)
-                    pass
+            # StatsAPI (statsapi.web.nhl.com) is DEPRECATED and offline.
+            # Hits/blocks come from PBP-calculated values in player_season_stats.
+            # DO NOT call StatsAPI — it triggers circuit breaker pauses (60s each)
+            # that make this script take hours instead of minutes.
             
             # Update database if we got valid data
             # Ensure all required keys exist in stats dict
@@ -578,11 +562,8 @@ def main() -> int:
                     updates["nhl_ppp"] = stats.get("nhl_ppp", 0)
                 if "nhl_shp" in stats:
                     updates["nhl_shp"] = stats.get("nhl_shp", 0)
-                # Note: hits and blocks are 0 (not in landing endpoint - need StatsAPI)
-                if "nhl_hits" in stats:
-                    updates["nhl_hits"] = stats.get("nhl_hits", 0)
-                if "nhl_blocks" in stats:
-                    updates["nhl_blocks"] = stats.get("nhl_blocks", 0)
+                # NEVER write hits/blocks from landing — they're always 0 here.
+                # Correct values come from boxscore aggregation in build_player_season_stats.
                 if "nhl_toi_seconds" in stats and stats.get("nhl_toi_seconds", 0) > 0:
                     updates["nhl_toi_seconds"] = stats.get("nhl_toi_seconds", 0)
             
@@ -713,22 +694,7 @@ def main() -> int:
             if landing_data:
                 stats = extract_all_official_stats(landing_data, DEFAULT_SEASON, is_goalie=is_goalie)
                 
-                # For skaters: Attempt StatsAPI for hits/blocks (optional - has DNS issues)
-                # CRITICAL: StatsAPI often fails due to DNS issues - don't let it block the script!
-                if not is_goalie:
-                    try:
-                        season_string = f"{DEFAULT_SEASON}{DEFAULT_SEASON + 1}"  # "20252026"
-                        statsapi_data = fetch_player_statsapi_data(player_id, season_string)
-
-                        if statsapi_data:
-                            hits, blocks = extract_hits_blocks_from_statsapi(statsapi_data)
-                            stats["nhl_hits"] = hits
-                            stats["nhl_blocks"] = blocks
-                            if hits > 0 or blocks > 0:
-                                retry_updated_count["statsapi_hits_blocks"] = retry_updated_count.get("statsapi_hits_blocks", 0) + 1
-                    except Exception as e:
-                        # StatsAPI has DNS issues - silently skip
-                        pass
+                # StatsAPI is DEPRECATED and offline — skip hits/blocks fallback
                 
                 # Update database if we got valid data
                 if not stats:
@@ -782,10 +748,7 @@ def main() -> int:
                         updates["nhl_ppp"] = stats.get("nhl_ppp", 0)
                     if "nhl_shp" in stats:
                         updates["nhl_shp"] = stats.get("nhl_shp", 0)
-                    if "nhl_hits" in stats:
-                        updates["nhl_hits"] = stats.get("nhl_hits", 0)
-                    if "nhl_blocks" in stats:
-                        updates["nhl_blocks"] = stats.get("nhl_blocks", 0)
+                    # NEVER write hits/blocks from landing — correct values from boxscore aggregation
                     if "nhl_toi_seconds" in stats and stats.get("nhl_toi_seconds", 0) > 0:
                         updates["nhl_toi_seconds"] = stats.get("nhl_toi_seconds", 0)
                 

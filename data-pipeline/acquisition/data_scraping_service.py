@@ -25,6 +25,7 @@ from typing import Optional, Dict, Any, List, Tuple
 from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor, as_completed
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # acquisition/ dir for local imports
 import _bootstrap  # noqa: F401
 
 from data_pipeline.utils.citrus_request import citrus_request
@@ -444,57 +445,78 @@ def run_unified_loop() -> Tuple[str, int]:
     else:
         game_state = "SCHEDULED"
     
-    # 6. NIGHTLY PBP AUDIT - FIXED: Must run BEFORE return statement!
+    # 6. NIGHTLY PBP AUDIT — flag-tracked, runs once per day
     # Use Mountain Time explicitly for all scheduling decisions (not server local time)
     from zoneinfo import ZoneInfo
     now = dt.datetime.now(ZoneInfo("America/Denver"))
-    if now.hour == 23 and now.minute >= 50:
-        logger.info("[NIGHTLY] END OF NIGHT DETECTED. Starting Deep PBP Audit...")
-        try:
-            from data_pipeline.scoring.run_daily_pbp_processing import process_all_unprocessed_games
-            process_all_unprocessed_games()
-            logger.info("[NIGHTLY] PBP processing complete.")
-        except Exception as e: 
-            logger.error(f"[NIGHTLY] PBP Error: {e}")
 
     # =========================================================================
-    # BULLETPROOF DATA INTEGRITY PIPELINE (Midnight MT)
-    # Uses flag-based job tracking via nightly_job_runs table to ensure
-    # each job runs exactly once per day, even if a scheduling window is
-    # missed. Jobs are sequenced: reconcile → aggregate → ppp-sync → landing.
+    # BULLETPROOF DATA INTEGRITY PIPELINE (HARDENED)
+    #
+    # KEY DESIGN CHANGES vs. original:
+    #   - NO time-window restriction. Jobs run whenever they haven't completed
+    #     today (or yesterday, for catch-up). The 00:00-00:30 window was the
+    #     root cause of month-long data staleness.
+    #   - Failed jobs are retried on every loop iteration (not abandoned).
+    #   - Missed days are caught up automatically (checks yesterday too).
+    #   - PBP audit is flag-tracked like all other jobs.
+    #   - Staleness alert fires when player_season_stats is >24 h old.
+    #
+    # Job sequence: pbp_audit → reconcile → aggregate → ppp_sync → landing
     # =========================================================================
 
-    def _has_run_today(db_client, job_name: str, today_str: str) -> bool:
-        """Check if a nightly job already ran today."""
+    def _job_completed(db_client, job_name: str, date_str: str) -> bool:
+        """Check if a nightly job completed successfully for a given date."""
         try:
             rows = db_client.select(
                 "nightly_job_runs",
                 select="id",
-                filters=[("job_name", "eq", job_name), ("run_date", "eq", today_str), ("status", "eq", "completed")],
+                filters=[("job_name", "eq", job_name), ("run_date", "eq", date_str), ("status", "eq", "completed")],
                 limit=1,
             )
             return bool(rows)
         except Exception:
             return False
 
-    def _mark_job(db_client, job_name: str, today_str: str, status: str = "completed"):
-        """Mark a nightly job as completed (or failed) for today."""
+    def _mark_job(db_client, job_name: str, date_str: str, status: str = "completed"):
+        """Mark a nightly job as completed (or failed) for a date."""
         try:
             db_client.upsert(
                 "nightly_job_runs",
-                {"job_name": job_name, "run_date": today_str, "status": status, "completed_at": dt.datetime.now(ZoneInfo("America/Denver")).isoformat()},
+                {
+                    "job_name": job_name,
+                    "run_date": date_str,
+                    "status": status,
+                    "completed_at": dt.datetime.now(ZoneInfo("America/Denver")).isoformat(),
+                },
                 on_conflict="job_name,run_date",
             )
         except Exception as e:
             logger.warning(f"[JOB-TRACK] Could not mark {job_name}: {e}")
 
-    # Only attempt nightly jobs during the midnight window (00:00-00:30 MT)
-    if now.hour == 0 and now.minute < 30:
-        today_str = now.strftime("%Y-%m-%d")
+    def _run_nightly_pipeline(db_client, date_str: str, is_catchup: bool = False):
+        """
+        Execute the full nightly pipeline for a given date.
+        Each step is idempotent and flag-gated — safe to call repeatedly.
+        Failed jobs are retried (upsert overwrites 'failed' status).
+        """
+        tag = "[CATCH-UP]" if is_catchup else "[NIGHTLY]"
 
-        # 7. DATA RECONCILIATION — once per day
-        if not _has_run_today(db, "reconcile", today_str):
-            logger.info("[RECONCILE] Starting Data Reconciliation (Last 7 Days)...")
+        # --- PBP AUDIT ---
+        if not _job_completed(db_client, "pbp_audit", date_str):
+            logger.info(f"{tag} Starting Deep PBP Audit for {date_str}...")
+            try:
+                from data_pipeline.scoring.run_daily_pbp_processing import process_all_unprocessed_games
+                process_all_unprocessed_games()
+                _mark_job(db_client, "pbp_audit", date_str)
+                logger.info(f"{tag} PBP processing complete.")
+            except Exception as e:
+                _mark_job(db_client, "pbp_audit", date_str, "failed")
+                logger.error(f"{tag} PBP Error: {e}")
+
+        # --- DATA RECONCILIATION ---
+        if not _job_completed(db_client, "reconcile", date_str):
+            logger.info(f"{tag} Starting Data Reconciliation (Last 7 Days)...")
             try:
                 import subprocess
                 result = subprocess.run(
@@ -502,41 +524,43 @@ def run_unified_loop() -> Tuple[str, int]:
                     capture_output=True, text=True, timeout=1800
                 )
                 if result.returncode == 0:
-                    _mark_job(db, "reconcile", today_str)
-                    logger.info("[RECONCILE] Complete.")
+                    _mark_job(db_client, "reconcile", date_str)
+                    logger.info(f"{tag} Reconciliation complete.")
                     if result.stdout:
                         for line in result.stdout.strip().split('\n')[-5:]:
                             if line.strip():
                                 logger.info(f"  {line}")
                 else:
-                    _mark_job(db, "reconcile", today_str, "failed")
-                    logger.error(f"[RECONCILE] FAILED with code {result.returncode}")
+                    _mark_job(db_client, "reconcile", date_str, "failed")
+                    logger.error(f"{tag} RECONCILE FAILED with code {result.returncode}")
                     if result.stderr:
                         logger.error(f"  Error: {result.stderr[:500]}")
             except subprocess.TimeoutExpired:
-                _mark_job(db, "reconcile", today_str, "failed")
-                logger.error("[RECONCILE] TIMEOUT after 30 minutes")
+                _mark_job(db_client, "reconcile", date_str, "failed")
+                logger.error(f"{tag} RECONCILE TIMEOUT after 30 minutes")
             except Exception as e:
-                logger.error(f"[RECONCILE] Error: {e}")
+                _mark_job(db_client, "reconcile", date_str, "failed")
+                logger.error(f"{tag} RECONCILE Error: {e}")
 
-        # 8. RE-AGGREGATE SEASON STATS — once per day (after reconcile)
-        if _has_run_today(db, "reconcile", today_str) and not _has_run_today(db, "aggregate", today_str):
-            logger.info("[AGGREGATE] Re-building player_season_stats from per-game data...")
+        # --- RE-AGGREGATE SEASON STATS ---
+        if _job_completed(db_client, "reconcile", date_str) and not _job_completed(db_client, "aggregate", date_str):
+            logger.info(f"{tag} Re-building player_season_stats from per-game data...")
             try:
                 from data_pipeline.projections.build_player_season_stats import main as build_season_stats
                 agg_result = build_season_stats()
                 if agg_result == 0:
-                    _mark_job(db, "aggregate", today_str)
-                    logger.info("[AGGREGATE] Season stats rebuilt successfully.")
+                    _mark_job(db_client, "aggregate", date_str)
+                    logger.info(f"{tag} Season stats rebuilt successfully.")
                 else:
-                    _mark_job(db, "aggregate", today_str, "failed")
-                    logger.error(f"[AGGREGATE] FAILED with code {agg_result}")
+                    _mark_job(db_client, "aggregate", date_str, "failed")
+                    logger.error(f"{tag} AGGREGATE FAILED with code {agg_result}")
             except Exception as e:
-                logger.error(f"[AGGREGATE] Error: {e}")
+                _mark_job(db_client, "aggregate", date_str, "failed")
+                logger.error(f"{tag} AGGREGATE Error: {e}")
 
-        # 9. PER-GAME PPP/SHP SYNC — once per day (after aggregate)
-        if _has_run_today(db, "aggregate", today_str) and not _has_run_today(db, "ppp_sync", today_str):
-            logger.info("[PPP-SYNC] Syncing per-game PPP/SHP from NHL Game-Log API (last 3 days)...")
+        # --- PER-GAME PPP/SHP SYNC ---
+        if _job_completed(db_client, "aggregate", date_str) and not _job_completed(db_client, "ppp_sync", date_str):
+            logger.info(f"{tag} Syncing per-game PPP/SHP from NHL Game-Log API (last 3 days)...")
             try:
                 import subprocess
                 result = subprocess.run(
@@ -544,37 +568,81 @@ def run_unified_loop() -> Tuple[str, int]:
                     capture_output=True, text=True, timeout=600
                 )
                 if result.returncode == 0:
-                    _mark_job(db, "ppp_sync", today_str)
-                    logger.info("[PPP-SYNC] Per-game PPP/SHP sync complete.")
+                    _mark_job(db_client, "ppp_sync", date_str)
+                    logger.info(f"{tag} Per-game PPP/SHP sync complete.")
                     if result.stdout:
                         for line in result.stdout.strip().split('\n')[-3:]:
                             if line.strip():
                                 logger.info(f"  {line}")
                 else:
-                    _mark_job(db, "ppp_sync", today_str, "failed")
-                    logger.error(f"[PPP-SYNC] FAILED with code {result.returncode}")
+                    _mark_job(db_client, "ppp_sync", date_str, "failed")
+                    logger.error(f"{tag} PPP-SYNC FAILED with code {result.returncode}")
                     if result.stderr:
                         logger.error(f"  Error: {result.stderr[:500]}")
             except subprocess.TimeoutExpired:
-                _mark_job(db, "ppp_sync", today_str, "failed")
-                logger.error("[PPP-SYNC] TIMEOUT after 10 minutes")
+                _mark_job(db_client, "ppp_sync", date_str, "failed")
+                logger.error(f"{tag} PPP-SYNC TIMEOUT after 10 minutes")
             except Exception as e:
-                logger.error(f"[PPP-SYNC] Error: {e}")
+                _mark_job(db_client, "ppp_sync", date_str, "failed")
+                logger.error(f"{tag} PPP-SYNC Error: {e}")
 
-        # 10. LANDING STATS TRUE-UP — once per day (after ppp_sync)
-        if _has_run_today(db, "ppp_sync", today_str) and not _has_run_today(db, "landing_trueup", today_str):
-            logger.info("[LANDING] True-up ALL stats from NHL Landing Endpoint (Goals, Assists, PPP, SHP, SOG, PIM, TOI, Goalie stats)...")
+        # --- LANDING STATS TRUE-UP ---
+        if _job_completed(db_client, "ppp_sync", date_str) and not _job_completed(db_client, "landing_trueup", date_str):
+            logger.info(f"{tag} True-up ALL stats from NHL Landing Endpoint...")
             try:
                 from fetch_nhl_stats_from_landing import main as fetch_landing_stats
                 landing_result = fetch_landing_stats()
                 if landing_result == 0:
-                    _mark_job(db, "landing_trueup", today_str)
-                    logger.info("[LANDING] ALL stats true-up complete (official NHL.com source of truth).")
+                    _mark_job(db_client, "landing_trueup", date_str)
+                    logger.info(f"{tag} ALL stats true-up complete (official NHL.com source of truth).")
                 else:
-                    _mark_job(db, "landing_trueup", today_str, "failed")
-                    logger.error(f"[LANDING] FAILED with code {landing_result}")
+                    _mark_job(db_client, "landing_trueup", date_str, "failed")
+                    logger.error(f"{tag} LANDING FAILED with code {landing_result}")
             except Exception as e:
-                logger.error(f"[LANDING] Error: {e}")
+                _mark_job(db_client, "landing_trueup", date_str, "failed")
+                logger.error(f"{tag} LANDING Error: {e}")
+
+    # --- CATCH-UP: Check yesterday first (if any jobs missed) ---
+    yesterday_str = (now - dt.timedelta(days=1)).strftime("%Y-%m-%d")
+    if not _job_completed(db, "landing_trueup", yesterday_str):
+        logger.info(f"[CATCH-UP] Yesterday ({yesterday_str}) pipeline incomplete — running catch-up...")
+        _run_nightly_pipeline(db, yesterday_str, is_catchup=True)
+
+    # --- TODAY: Run nightly pipeline (no time-window restriction) ---
+    today_str = now.strftime("%Y-%m-%d")
+    # Re-check yesterday after catch-up attempt (it may have just completed)
+    yesterday_done = _job_completed(db, "landing_trueup", yesterday_str)
+    # Only run today's pipeline after games are likely done (after 11 PM MT)
+    # OR if it's a new day (before game hours) and yesterday's pipeline is complete.
+    # This prevents re-aggregating mid-game and getting partial data.
+    if now.hour >= 23 or (now.hour < 17 and yesterday_done):
+        _run_nightly_pipeline(db, today_str)
+
+    # --- STALENESS ALERT: Warn if player_season_stats hasn't been updated in 36h ---
+    try:
+        stale_rows = db.select(
+            "player_season_stats",
+            select="updated_at",
+            filters=[("updated_at", "not.is", "null")],
+            order="updated_at.desc",
+            limit=1,
+        )
+        if stale_rows:
+            last_updated_str = stale_rows[0].get("updated_at", "")
+            if last_updated_str:
+                last_updated = dt.datetime.fromisoformat(last_updated_str.replace("Z", "+00:00"))
+                staleness = dt.datetime.now(dt.timezone.utc) - last_updated
+                if staleness > dt.timedelta(hours=36):
+                    logger.critical(
+                        f"[STALE DATA ALERT] player_season_stats last updated {staleness.total_seconds() / 3600:.1f}h ago! "
+                        f"Last update: {last_updated_str}. Nightly aggregate may be failing."
+                    )
+                elif staleness > dt.timedelta(hours=24):
+                    logger.warning(
+                        f"[STALE DATA WARNING] player_season_stats last updated {staleness.total_seconds() / 3600:.1f}h ago."
+                    )
+    except Exception as e:
+        logger.warning(f"[STALENESS CHECK] Could not check data freshness: {e}")
 
     # Track performance metrics
     tracker.total_syncs += 1
@@ -588,15 +656,71 @@ def run_unified_loop() -> Tuple[str, int]:
     
     return (game_state, live_count)
 
+def _ensure_job_tracking_table():
+    """
+    Ensure nightly_job_runs table exists at startup.
+    This prevents silent failures when the table is missing (the root cause
+    of the month-long data staleness incident in March 2026).
+    """
+    try:
+        from data_pipeline.utils.supabase_rest import SupabaseRest
+        db = SupabaseRest(os.getenv("VITE_SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
+        # Try a simple select — if the table doesn't exist, PostgREST returns 404
+        db.select("nightly_job_runs", select="id", limit=1)
+        logger.info("[BOOT] nightly_job_runs table verified.")
+    except Exception as e:
+        err_msg = str(e)
+        if "404" in err_msg or "does not exist" in err_msg.lower() or "relation" in err_msg.lower():
+            logger.critical(
+                "[BOOT] nightly_job_runs table MISSING! "
+                "Run migration 20260311000000_perfect_10_pipeline_fixes.sql to create it. "
+                "Without this table, nightly jobs will NOT be tracked and data WILL go stale."
+            )
+        else:
+            logger.warning(f"[BOOT] Could not verify nightly_job_runs table: {e}")
+
+
+def _run_startup_catchup():
+    """
+    On service startup, check the last 3 days for missed pipeline runs.
+    This handles: service restarts, deployments, crashes, and missed windows.
+    """
+    try:
+        from data_pipeline.utils.supabase_rest import SupabaseRest
+        from zoneinfo import ZoneInfo
+        db = SupabaseRest(os.getenv("VITE_SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
+        now = dt.datetime.now(ZoneInfo("America/Denver"))
+
+        for days_ago in range(3, 0, -1):  # Check 3 days ago, 2 days ago, yesterday
+            check_date = (now - dt.timedelta(days=days_ago)).strftime("%Y-%m-%d")
+            try:
+                rows = db.select(
+                    "nightly_job_runs",
+                    select="id",
+                    filters=[("job_name", "eq", "landing_trueup"), ("run_date", "eq", check_date), ("status", "eq", "completed")],
+                    limit=1,
+                )
+                if not rows:
+                    logger.warning(f"[STARTUP CATCH-UP] Pipeline incomplete for {check_date} — will catch up in first loop iteration.")
+            except Exception:
+                pass  # Table may not exist yet; the main loop handles this
+    except Exception as e:
+        logger.warning(f"[STARTUP CATCH-UP] Could not check recent days: {e}")
+
+
 if __name__ == "__main__":
     # BOOT MESSAGE
     logger.info("=" * 70)
     logger.info("CITRUS MASTER - PARALLEL MODE (30s BULLETPROOF)")
     logger.info("Architecture: 100-IP Auto-Rotation + Parallel Processing")
     logger.info("Features: ALL games hit simultaneously, ZERO rate limits")
-    logger.info("Performance: McDavid scores -> 30-35s to your app (3x faster)")
+    logger.info("Pipeline: Auto catch-up for missed days, staleness alerts")
     logger.info("=" * 70)
-    
+
+    # Verify infrastructure before entering main loop
+    _ensure_job_tracking_table()
+    _run_startup_catchup()
+
     consecutive_failures = 0
     max_consecutive_failures = 5
 

@@ -31,7 +31,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Users, Clock, Trophy, History, CheckCircle, Loader2, Zap, Play, Pause, Camera, Trash2, Star } from 'lucide-react';
+import { Users, Clock, Trophy, History, CheckCircle, Loader2, Zap, Play, Pause, Camera, Trash2, Star, RotateCcw } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -2789,7 +2789,7 @@ const DraftRoom = () => {
 
   // ALWAYS render something - never return null
   return (
-    <div className="min-h-screen bg-[#D4E8B8] relative">
+    <div className="min-h-screen bg-[#D4E8B8] relative overflow-x-hidden">
       <div className="hidden lg:block"><Navbar /></div>
       <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-center h-12 px-4">
@@ -2802,7 +2802,7 @@ const DraftRoom = () => {
           {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
           <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             {/* Main Content - Scrollable - Appears first on mobile */}
-            <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto px-0 sm:px-2 lg:px-6 order-1 lg:order-2">
+            <div className="min-w-0 overflow-y-visible lg:overflow-y-auto lg:max-h-[calc(100vh-7rem)] px-0 sm:px-2 lg:px-6 order-1 lg:order-2">
         {/* Loading State - Show if loading or auth is loading, but NOT for demo state */}
         {displayLoading && (
           <LoadingScreen
@@ -2833,7 +2833,7 @@ const DraftRoom = () => {
 
         {/* LOBBY PHASE - Default to LOBBY if phase is not ACTIVE or COMPLETED */}
         {!loading && !authLoading && !error && draftPhase !== DraftPhase.ACTIVE && draftPhase !== DraftPhase.COMPLETED && (
-          <div className="container mx-auto px-4 py-8">
+          <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 overflow-x-hidden">
             {teams && Array.isArray(teams) && teams.length > 0 && league ? (
               <DraftLobby
                 teams={lobbyTeams}
@@ -3084,7 +3084,7 @@ const DraftRoom = () => {
             </div>
 
             {/* Draft Content */}
-            <div className="container mx-auto px-2 sm:px-4 py-3 sm:py-6">
+            <div className={`container mx-auto px-2 sm:px-4 py-3 sm:py-6 pb-20 sm:pb-6 ${isCommissioner && (draftHistory?.length || 0) > 0 ? '!pb-32 sm:!pb-6' : ''}`}>
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-6">
                 {/* Main Draft Area */}
                 <div className="lg:col-span-3">
@@ -3620,36 +3620,90 @@ const DraftRoom = () => {
                     </details>
                   )}
 
-                  {/* Floating Pause/Continue button for active drafts */}
-                  {isCommissioner && draftPhase === DraftPhase.ACTIVE && (draftHistory?.length || 0) > 0 && (
-                    <div className="fixed bottom-3 right-3 sm:bottom-4 sm:right-4 z-50">
-                      {league?.settings?.timerStartedAt ? (
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          className="shadow-lg sm:h-10 sm:px-4 sm:text-sm"
-                          onClick={handlePauseDraft}
-                        >
-                          <Pause className="h-4 w-4 mr-1 sm:mr-2" />
-                          <span className="hidden sm:inline">Pause Draft</span>
-                          <span className="sm:hidden">Pause</span>
-                        </Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          className="shadow-lg sm:h-10 sm:px-4 sm:text-sm"
-                          onClick={handleContinueDraft}
-                        >
-                          <Play className="h-4 w-4 mr-1 sm:mr-2" />
-                          <span className="hidden sm:inline">Continue Draft</span>
-                          <span className="sm:hidden">Resume</span>
-                        </Button>
-                      )}
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
+
+            {/* Floating Commissioner Toolbar - mobile: full-width bottom bar, desktop: floating buttons */}
+            {isCommissioner && draftPhase === DraftPhase.ACTIVE && (draftHistory?.length || 0) > 0 && (
+              <>
+                {/* Mobile: Fixed bottom bar spanning full width */}
+                <div className="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t shadow-[0_-2px_10px_rgba(0,0,0,0.1)] px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="text-[10px] font-semibold text-destructive uppercase tracking-wide flex-shrink-0">Commish</span>
+                    {/* Undo Last Pick */}
+                    {draftHistory.length > 0 && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-9 px-3 text-xs"
+                        onClick={handleUndoLastPick}
+                      >
+                        <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                        Undo Pick
+                      </Button>
+                    )}
+                    {/* Pause / Resume */}
+                    {league?.settings?.timerStartedAt ? (
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="h-9 px-3 text-xs"
+                        onClick={handlePauseDraft}
+                      >
+                        <Pause className="h-3.5 w-3.5 mr-1.5" />
+                        Pause
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        className="h-9 px-3 text-xs"
+                        onClick={handleContinueDraft}
+                      >
+                        <Play className="h-3.5 w-3.5 mr-1.5" />
+                        Resume
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                {/* Desktop: Floating buttons in bottom-right corner */}
+                <div className="hidden sm:flex fixed bottom-4 right-4 z-50 items-center gap-2">
+                  {/* Undo Last Pick */}
+                  {draftHistory.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="shadow-lg bg-card h-10 px-4 text-sm"
+                      onClick={handleUndoLastPick}
+                    >
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                      Undo Pick
+                    </Button>
+                  )}
+                  {/* Pause / Resume */}
+                  {league?.settings?.timerStartedAt ? (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="shadow-lg h-10 px-4 text-sm"
+                      onClick={handlePauseDraft}
+                    >
+                      <Pause className="h-4 w-4 mr-2" />
+                      Pause Draft
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      className="shadow-lg h-10 px-4 text-sm"
+                      onClick={handleContinueDraft}
+                    >
+                      <Play className="h-4 w-4 mr-2" />
+                      Continue Draft
+                    </Button>
+                  )}
+                </div>
+              </>
+            )}
           </>
         )}
 

@@ -39,6 +39,7 @@ const Navbar = () => {
   const activeLeague = league?.activeLeague ?? null;
   const userLeagues = league?.userLeagues ?? [];
   const setActiveLeagueId = league?.setActiveLeagueId ?? (() => {});
+  const leagueLoading = league?.loading ?? false;
   const notificationStore = useNotificationStore();
   const unreadCount = activeLeagueId ? (notificationStore.unreadCounts.get(activeLeagueId) || 0) : 0;
 
@@ -120,7 +121,7 @@ const Navbar = () => {
       ];
 
   return (
-    <header className="fixed top-0 left-0 right-0 w-full z-50 lg:block max-lg:py-2 max-lg:pt-[calc(0.5rem+env(safe-area-inset-top))] max-lg:bg-[#D4E8B8]/95 max-lg:dark:bg-citrus-forest/95 max-lg:backdrop-blur-lg max-lg:border-b max-lg:border-citrus-sage/20">
+    <header className="fixed top-0 left-0 right-0 w-full z-50 lg:block max-lg:py-2 max-lg:pt-[calc(0.5rem+env(safe-area-inset-top))] max-lg:bg-[#D4E8B8]/95 max-lg:dark:bg-background/95 max-lg:backdrop-blur-lg max-lg:border-b max-lg:border-citrus-sage/20">
       {/* ===== ROW 1: Brand bar ===== */}
       <div className="hidden lg:block bg-citrus-forest">
         <div className="w-full px-6 h-12 flex items-center justify-between">
@@ -134,7 +135,7 @@ const Navbar = () => {
             </Link>
 
             {/* League switcher */}
-            {user && userLeagues.length === 0 && (
+            {user && !leagueLoading && userLeagues.length === 0 && (
               <button
                 onClick={() => navigate('/create-league')}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors"
@@ -145,7 +146,13 @@ const Navbar = () => {
                 </span>
               </button>
             )}
-            {userLeagues.length > 0 && (
+            {user && leagueLoading && (
+              <div className="flex items-center gap-2 px-3 py-1.5">
+                <Trophy className="h-4 w-4 text-citrus-orange" />
+                <div className="h-4 w-32 bg-white/20 rounded animate-pulse" />
+              </div>
+            )}
+            {userLeagues.length > 0 && !leagueLoading && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors">
@@ -253,7 +260,7 @@ const Navbar = () => {
       </div>
 
       {/* ===== ROW 2: Tab bar ===== */}
-      <div className="hidden lg:block bg-[#D4E8B8] dark:bg-citrus-forest/90 border-b border-citrus-sage/30">
+      <div className="hidden lg:block bg-[#D4E8B8] dark:bg-background/90 border-b border-citrus-sage/30">
         <div className="w-full px-6">
           <nav className="flex items-center gap-0 h-11 -mb-px">
             {navTabs.map((tab) => {
@@ -312,11 +319,13 @@ const Navbar = () => {
             <Link to="/" className="flex items-center gap-1.5 flex-shrink-0">
               <CitrusLogo className="w-8 h-8 drop-shadow-sm" />
             </Link>
-            {activeLeague?.name && (
+            {leagueLoading ? (
+              <div className="h-3 w-20 bg-citrus-forest/15 rounded animate-pulse" />
+            ) : activeLeague?.name ? (
               <span className="text-[11px] font-display font-semibold text-citrus-forest/60 truncate max-w-[140px]">
                 {activeLeague.name}
               </span>
-            )}
+            ) : null}
           </div>
 
           <div className="flex items-center gap-1">
@@ -351,7 +360,7 @@ const Navbar = () => {
         <div className="lg:hidden fixed inset-0 top-[56px] z-50 bg-white/95 backdrop-blur-xl animate-in fade-in slide-in-from-top duration-200 shadow-2xl border-t border-citrus-sage/20">
           <div className="flex flex-col h-[calc(100dvh-56px-env(safe-area-inset-bottom)-4.5rem)] px-4 py-3 bg-gradient-to-b from-white to-[#F5F8ED]">
             {/* League context + switcher */}
-            {user && userLeagues.length === 0 && (
+            {user && !leagueLoading && userLeagues.length === 0 && (
               <div className="mb-3">
                 <button
                   onClick={() => { navigate('/create-league'); closeMobileMenu(); }}
@@ -364,7 +373,13 @@ const Navbar = () => {
                 </button>
               </div>
             )}
-            {userLeagues.length > 0 && (
+            {user && leagueLoading && (
+              <div className="mb-3 flex items-center gap-3 px-3 py-2.5 bg-citrus-forest/5 rounded-xl">
+                <Trophy className="h-4 w-4 text-citrus-orange flex-shrink-0" />
+                <div className="h-4 w-32 bg-citrus-forest/15 rounded animate-pulse" />
+              </div>
+            )}
+            {userLeagues.length > 0 && !leagueLoading && (
               <div className="mb-3">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

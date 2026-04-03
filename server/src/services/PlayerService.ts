@@ -43,6 +43,7 @@ interface PlayerStatsRow {
   nhl_shots_faced: number;
   nhl_goals_against: number;
   x_goals: number;
+  updated_at: string | null;
 }
 
 interface TalentMetricsRow {
@@ -96,11 +97,12 @@ interface NormalizedPlayer {
   gsax?: number | null;
   xg_per_60?: number | null;
   xg_rating?: string | null;
+  stats_updated_at?: string | null;
 }
 
-// 5-minute cache for player data
+// 2-minute cache for player data (short TTL to surface pipeline updates quickly)
 let playersCache: { data: NormalizedPlayer[]; timestamp: number } | null = null;
-const CACHE_TTL = 5 * 60 * 1000;
+const CACHE_TTL = 2 * 60 * 1000;
 
 function buildPlayer(p: PlayerDirectoryRow, stat: Partial<PlayerStatsRow>, talent?: Partial<TalentMetricsRow>, goalieGsax?: GoalieGsaxRow): NormalizedPlayer {
   const rosterStatus = talent?.roster_status ?? null;
@@ -142,6 +144,7 @@ function buildPlayer(p: PlayerDirectoryRow, stat: Partial<PlayerStatsRow>, talen
     gsax: goalieGsax?.gsax || null,
     xg_per_60: talent?.xg_per_60 || null,
     xg_rating: talent?.xg_rating || null,
+    stats_updated_at: stat.updated_at || null,
   };
 }
 

@@ -187,8 +187,32 @@ export class WaiverService {
         ...(faResult.data ?? { success: true }),
         isFreeAgent: true
       };
-    } catch {
-      // If free agent add fails, try submitting as a waiver claim
+    } catch (faError: unknown) {
+      // Extract the error message from the free agent attempt
+      const faErrorMsg = faError instanceof Error ? faError.message : String(faError);
+      const lowerMsg = faErrorMsg.toLowerCase();
+
+      // If the error is about roster being full, do NOT fall through to waiver claim.
+      // The user MUST drop a player first — a waiver claim won't help.
+      if (lowerMsg.includes('roster') && (lowerMsg.includes('full') || lowerMsg.includes('max') || lowerMsg.includes('limit'))) {
+        return {
+          success: false,
+          error: faErrorMsg,
+          isFreeAgent: true
+        };
+      }
+
+      // If the error is about the player already being on a roster, don't retry
+      if (lowerMsg.includes('duplicate') || lowerMsg.includes('already') || lowerMsg.includes('unique')) {
+        return {
+          success: false,
+          error: 'Player is already on a roster in this league.',
+          isFreeAgent: true
+        };
+      }
+
+      // For other errors (e.g., player is on waivers / game-locked),
+      // fall through to waiver claim
       try {
         const claimResult = await waiverApi.submitClaim(leagueId, {
           teamId,

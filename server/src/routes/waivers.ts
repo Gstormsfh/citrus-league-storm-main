@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { membershipMiddleware } from '../middleware/membership';
+import { LeagueMembershipService } from '../services/LeagueMembershipService';
 import { z } from 'zod';
 import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
@@ -189,20 +190,34 @@ waiverRoutes.post('/league/:leagueId/drop-player', membershipMiddleware, validat
 
   const supabase = createUserClient(c.get('userToken'));
 
-  // Verify user owns the team before allowing player drop
+  // Verify user owns the team before allowing player drop.
+  // AI teams (owner_id = NULL) are allowed — the WaiverService.dropPlayer
+  // method handles them via admin client.
   const { data: team } = await supabase
     .from('teams')
     .select('id, owner_id')
     .eq('id', String(body.teamId))
     .eq('league_id', leagueId)
     .single();
-  if (!team || team.owner_id !== userId) {
+
+  if (!team) {
+    return fail(c, AppError.forbidden('Team not found'));
+  }
+  // AI teams (owner_id = null): only commissioners can manage their roster.
+  // Human teams: verify ownership.
+  if (team.owner_id === null) {
+    const membershipService = new LeagueMembershipService(supabase);
+    const membership = await membershipService.checkMembership(leagueId, userId);
+    if (!membership.isCommissioner) {
+      return fail(c, AppError.forbidden('Only commissioners can manage AI teams'));
+    }
+  } else if (team.owner_id !== userId) {
     return fail(c, AppError.forbidden('You do not own this team'));
   }
 
   const service = new WaiverService(supabase);
 
-  const { success, error } = await service.dropPlayer(leagueId, String(body.teamId), Number(body.playerId));
+  const { success, error } = await service.dropPlayer(leagueId, String(body.teamId), Number(body.playerId), userId);
   if (!success) {
     return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to drop player'));
   }

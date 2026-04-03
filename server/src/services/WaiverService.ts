@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { COLUMNS, logger } from '@citrus/shared';
+import { getSupabaseAdmin } from '../lib/supabase';
 import { LeagueMembershipService } from './LeagueMembershipService';
 
 /**
@@ -382,6 +383,254 @@ export class WaiverService {
     return { data, error };
   }
 
+  /**
+   * Check if a team is an AI team (owner_id IS NULL).
+   * AI teams cannot use process_roster_move RPC because it looks up the team
+   * via `WHERE owner_id = p_user_id`, which never matches NULL.
+   */
+  private async isAiTeam(teamId: string): Promise<boolean> {
+    const admin = getSupabaseAdmin();
+    const { data: team } = await admin
+      .from('teams')
+      .select('owner_id')
+      .eq('id', teamId)
+      .single();
+
+    return !team?.owner_id;
+  }
+
+  /**
+   * Execute a roster move for an AI team using the admin client.
+   * Replicates the core logic of process_roster_move RPC but bypasses
+   * the owner_id lookup that fails for AI teams (owner_id = NULL).
+   * Uses supabaseAdmin to bypass RLS since there is no real user.
+   */
+  private async executeAiTeamRosterMove(
+    leagueId: string,
+    teamId: string,
+    addPlayerId: number | null,
+    dropPlayerId: number | null,
+    source = 'AI Team Roster',
+  ): Promise<{ success: boolean; error?: string }> {
+    const admin = getSupabaseAdmin();
+
+    if (!addPlayerId && !dropPlayerId) {
+      return { success: false, error: 'Must specify at least one player to add or drop' };
+    }
+
+    try {
+      // Read roster size limit
+      const { data: league } = await admin
+        .from('leagues')
+        .select('roster_size, settings')
+        .eq('id', leagueId)
+        .single();
+
+      const maxRosterSize = league?.roster_size ?? 22;
+
+      // ======== DROP LOGIC ========
+      if (dropPlayerId) {
+        const { data: assignment } = await admin
+          .from('roster_assignments')
+          .select('id')
+          .eq('league_id', leagueId)
+          .eq('team_id', teamId)
+          .eq('player_id', dropPlayerId)
+          .maybeSingle();
+
+        if (!assignment) {
+          return { success: false, error: `Player ${dropPlayerId} is not on this team's roster` };
+        }
+
+        const { error: deleteErr } = await admin
+          .from('roster_assignments')
+          .delete()
+          .eq('id', assignment.id);
+
+        if (deleteErr) {
+          return { success: false, error: deleteErr.message };
+        }
+
+        // Log to transaction_ledger (user_id is NULL for AI teams)
+        await admin
+          .from('transaction_ledger')
+          .insert({
+            league_id: leagueId,
+            user_id: null,
+            team_id: teamId,
+            type: 'DROP',
+            player_id: String(dropPlayerId),
+            source,
+            created_at: new Date().toISOString(),
+          });
+
+        // Clean up team_lineups
+        await admin
+          .from('team_lineups')
+          .update({
+            updated_at: new Date().toISOString(),
+          })
+          .eq('team_id', teamId)
+          .eq('league_id', leagueId);
+
+        // Soft-delete draft pick
+        await admin
+          .from('draft_picks')
+          .update({ deleted_at: new Date().toISOString() })
+          .eq('league_id', leagueId)
+          .eq('team_id', teamId)
+          .eq('player_id', dropPlayerId)
+          .is('deleted_at', null);
+      }
+
+      // ======== ADD LOGIC ========
+      if (addPlayerId) {
+        // Check roster size (only if not also dropping)
+        if (!dropPlayerId) {
+          const { count: currentSize } = await admin
+            .from('roster_assignments')
+            .select('id', { count: 'exact', head: true })
+            .eq('team_id', teamId)
+            .eq('league_id', leagueId);
+
+          if ((currentSize ?? 0) >= maxRosterSize) {
+            return { success: false, error: `Roster is full (${currentSize} / ${maxRosterSize})` };
+          }
+        }
+
+        // Enforce goalie limit
+        const { data: playerInfo } = await admin
+          .from('nhl_players')
+          .select('position')
+          .eq('id', addPlayerId)
+          .maybeSingle();
+
+        if (playerInfo?.position === 'G') {
+          const settings = league?.settings || {};
+          const goalieLimit = settings.rosterSlots?.G ?? 3;
+
+          const { count: currentGoalies } = await admin
+            .from('roster_assignments')
+            .select('id', { count: 'exact', head: true })
+            .eq('team_id', teamId)
+            .eq('league_id', leagueId)
+            .in('player_id', await this.getGoaliePlayerIds(admin, teamId, leagueId));
+
+          if ((currentGoalies ?? 0) >= goalieLimit) {
+            return { success: false, error: `Goalie limit reached (${currentGoalies} / ${goalieLimit})` };
+          }
+        }
+
+        // Insert roster assignment
+        const { error: insertErr } = await admin
+          .from('roster_assignments')
+          .insert({
+            league_id: leagueId,
+            team_id: teamId,
+            player_id: String(addPlayerId),
+            acquired_at: new Date().toISOString(),
+            created_at: new Date().toISOString(),
+          });
+
+        if (insertErr) {
+          if (insertErr.message?.includes('unique') || insertErr.message?.includes('duplicate')) {
+            return { success: false, error: 'Player is already on a team in this league' };
+          }
+          return { success: false, error: insertErr.message };
+        }
+
+        // Log to transaction_ledger
+        await admin
+          .from('transaction_ledger')
+          .insert({
+            league_id: leagueId,
+            user_id: null,
+            team_id: teamId,
+            type: 'ADD',
+            player_id: String(addPlayerId),
+            source,
+            created_at: new Date().toISOString(),
+          });
+
+        // Ensure team_lineups entry exists with new player on bench
+        const { data: existingLineup } = await admin
+          .from('team_lineups')
+          .select('id')
+          .eq('team_id', teamId)
+          .eq('league_id', leagueId)
+          .maybeSingle();
+
+        if (existingLineup) {
+          // Append to bench via raw SQL-style update isn't possible,
+          // so read-modify-write the bench array
+          const { data: lineupData } = await admin
+            .from('team_lineups')
+            .select('bench')
+            .eq('team_id', teamId)
+            .eq('league_id', leagueId)
+            .single();
+
+          const currentBench = Array.isArray(lineupData?.bench) ? lineupData.bench : [];
+          await admin
+            .from('team_lineups')
+            .update({
+              bench: [...currentBench, String(addPlayerId)],
+              updated_at: new Date().toISOString(),
+            })
+            .eq('team_id', teamId)
+            .eq('league_id', leagueId);
+        } else {
+          await admin
+            .from('team_lineups')
+            .insert({
+              league_id: leagueId,
+              team_id: teamId,
+              bench: [String(addPlayerId)],
+              starters: [],
+              ir: [],
+              slot_assignments: {},
+              updated_at: new Date().toISOString(),
+            });
+        }
+      }
+
+      logger.info(`[executeAiTeamRosterMove] Success: team=${teamId.slice(0,8)} add=${addPlayerId} drop=${dropPlayerId}`);
+      return { success: true };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.error('[executeAiTeamRosterMove] Unexpected error:', message);
+      return { success: false, error: message };
+    }
+  }
+
+  /**
+   * Helper: get player IDs of goalies on a team's roster.
+   * Used for goalie limit enforcement in AI team roster moves.
+   */
+  private async getGoaliePlayerIds(
+    admin: ReturnType<typeof getSupabaseAdmin>,
+    teamId: string,
+    leagueId: string,
+  ): Promise<number[]> {
+    const { data: assignments } = await admin
+      .from('roster_assignments')
+      .select('player_id')
+      .eq('team_id', teamId)
+      .eq('league_id', leagueId);
+
+    if (!assignments || assignments.length === 0) return [];
+
+    const playerIds = assignments.map((a: { player_id: string }) => parseInt(String(a.player_id), 10));
+
+    const { data: goalies } = await admin
+      .from('nhl_players')
+      .select('id')
+      .in('id', playerIds)
+      .eq('position', 'G');
+
+    return (goalies || []).map((g: { id: number }) => g.id);
+  }
+
   /** Add free agent (instant pickup via RPC) */
   async addFreeAgent(
     leagueId: string,
@@ -398,7 +647,58 @@ export class WaiverService {
       }
     }
 
-    // Verify team ownership
+    // Check if player is on waivers (recently dropped) — must use waiver claim instead
+    try {
+      const { data: onWaivers } = await this.supabase.rpc('is_player_on_waivers', {
+        p_league_id: leagueId,
+        p_player_id: playerId,
+      });
+      if (onWaivers === true) {
+        return { success: false, error: 'Player is on waivers (recently dropped). Submit a waiver claim instead.' };
+      }
+    } catch (waiverCheckErr) {
+      // If RPC doesn't exist yet, skip the check (graceful degradation)
+      logger.warn('[addFreeAgent] Could not check waiver status:', waiverCheckErr);
+    }
+
+    // Check if player is already on a roster in this league
+    const admin = getSupabaseAdmin();
+    const { count: existingCount } = await admin
+      .from('roster_assignments')
+      .select('id', { count: 'exact', head: true })
+      .eq('league_id', leagueId)
+      .eq('player_id', String(playerId));
+    if (existingCount && existingCount > 0) {
+      return { success: false, error: 'Player is already on a roster in this league.' };
+    }
+
+    // Pre-check roster size to give clear error before RPC
+    if (!dropPlayerId) {
+      const { count: rosterCount } = await admin
+        .from('roster_assignments')
+        .select('id', { count: 'exact', head: true })
+        .eq('league_id', leagueId)
+        .eq('team_id', teamId);
+      const { data: leagueData } = await this.supabase
+        .from('leagues')
+        .select('roster_size')
+        .eq('id', leagueId)
+        .single();
+      const maxRoster = leagueData?.roster_size || 22;
+      if (rosterCount !== null && rosterCount >= maxRoster) {
+        return { success: false, error: `Roster is full (${rosterCount}/${maxRoster}). Drop a player first.` };
+      }
+    }
+
+    // Check if this is an AI team (owner_id = NULL) — requires admin path
+    const aiTeam = await this.isAiTeam(teamId);
+
+    if (aiTeam) {
+      logger.info(`[addFreeAgent] AI team detected (${teamId.slice(0,8)}), using admin path`);
+      return this.executeAiTeamRosterMove(leagueId, teamId, playerId, dropPlayerId);
+    }
+
+    // Verify team ownership for human teams
     if (userId) {
       const { data: team } = await this.supabase
         .from('teams')
@@ -411,10 +711,10 @@ export class WaiverService {
       }
     }
 
-    // Execute atomic roster move
+    // Execute atomic roster move via RPC (works for human-owned teams)
     const { error } = await this.supabase.rpc('process_roster_move', {
       p_league_id: leagueId,
-      p_team_id: teamId,
+      p_user_id: userId,
       p_add_player_id: playerId,
       p_drop_player_id: dropPlayerId,
     });
@@ -423,10 +723,18 @@ export class WaiverService {
   }
 
   /** Drop a player from roster */
-  async dropPlayer(leagueId: string, teamId: string, playerId: number) {
+  async dropPlayer(leagueId: string, teamId: string, playerId: number, userId: string) {
+    // Check if this is an AI team (owner_id = NULL) — requires admin path
+    const aiTeam = await this.isAiTeam(teamId);
+
+    if (aiTeam) {
+      logger.info(`[dropPlayer] AI team detected (${teamId.slice(0,8)}), using admin path`);
+      return this.executeAiTeamRosterMove(leagueId, teamId, null, playerId);
+    }
+
     const { error } = await this.supabase.rpc('process_roster_move', {
       p_league_id: leagueId,
-      p_team_id: teamId,
+      p_user_id: userId,
       p_add_player_id: null,
       p_drop_player_id: playerId,
     });

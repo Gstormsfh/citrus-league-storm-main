@@ -5,6 +5,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { useLeague } from '@/contexts/LeagueContext';
 import { cn } from '@/lib/utils';
 import Navbar from '@/components/Navbar';
+import MobileMenuButton from '@/components/MobileMenuButton';
 import Footer from '@/components/Footer';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import { TeamCard } from "@/components/matchup/TeamCard";
@@ -38,7 +39,7 @@ import { CitrusSlice, CitrusSparkle, CitrusLeaf, CitrusWedge, CitrusBurst, Citru
 import { CitrusBackground } from '@/components/CitrusBackground';
 import { CitrusSectionDivider } from '@/components/CitrusSectionDivider';
 import { calculateEligibleGamesRemaining } from '@/utils/rosterUtils';
-import { ScoringCalculator } from '@/utils/scoringUtils';
+import { ScoringCalculator, DEFAULT_SCORING } from '@/utils/scoringUtils';
 import { logger } from '@/utils/logger';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { matchupApi } from '@/api/matchups';
@@ -646,10 +647,7 @@ const Matchup = () => {
           setSelectedMatchupId(guestMatchup.id);
 
           const scoringSettingsData = demoLeague.scoring_settings as any;
-          setScoringSettings(scoringSettingsData || {
-            goalie: { wins: 4, saves: 0.2, shutouts: 3, goals_against: -1 },
-            skater: { goals: 3, assists: 2, power_play_points: 1, short_handed_points: 2, shots_on_goal: 0.4, blocks: 0.5, hits: 0.2, penalty_minutes: 0.5 }
-          });
+          setScoringSettings(scoringSettingsData || DEFAULT_SCORING);
 
           setUserTeam(cachedPayload.team1 as unknown as Team);
           setOpponentTeam(cachedPayload.team2 as unknown as Team | null);
@@ -848,19 +846,7 @@ const Matchup = () => {
           setScoringSettings(scoringSettingsData);
         } else {
           // Default scoring settings
-          setScoringSettings({
-            goalie: { wins: 4, saves: 0.2, shutouts: 3, goals_against: -1 },
-            skater: {
-              goals: 3,
-              assists: 2,
-              power_play_points: 1,
-              short_handed_points: 2,
-              shots_on_goal: 0.4,
-              blocks: 0.5,
-              hits: 0.2,
-              penalty_minutes: 0.5
-            }
-          });
+          setScoringSettings(DEFAULT_SCORING);
         }
 
         // Get teams via API (parallel)
@@ -1325,22 +1311,8 @@ const Matchup = () => {
             };
             
             // Calculate daily total points using league scoring settings
-            const goalieScoring = scoringSettings?.goalie || {
-              wins: 4,
-              saves: 0.2,
-              shutouts: 3,
-              goals_against: -1
-            };
-            const skaterScoring = scoringSettings?.skater || {
-              goals: 3,
-              assists: 2,
-              power_play_points: 1,
-              short_handed_points: 2,
-              shots_on_goal: 0.4,
-              blocks: 0.5,
-              hits: 0.2,
-              penalty_minutes: 0.5
-            };
+            const goalieScoring = scoringSettings?.goalie || DEFAULT_SCORING.goalie;
+            const skaterScoring = scoringSettings?.skater || DEFAULT_SCORING.skater;
             
             let dailyTotalPoints = 0;
             if (isGoalie) {
@@ -1610,23 +1582,8 @@ const Matchup = () => {
           const isGoalie = row.is_goalie || false;
           
           // Calculate daily total points using league scoring settings
-          // Use scoringSettings from league.scoring_settings (dynamic, per-league)
-          const goalieScoring = scoringSettings?.goalie || {
-            wins: 4,
-            saves: 0.2,
-            shutouts: 3,
-            goals_against: -1
-          };
-          const skaterScoring = scoringSettings?.skater || {
-            goals: 3,
-            assists: 2,
-            power_play_points: 1,
-            short_handed_points: 2,
-            shots_on_goal: 0.4,
-            blocks: 0.5,
-            hits: 0.2,
-            penalty_minutes: 0.5
-          };
+          const goalieScoring = scoringSettings?.goalie || DEFAULT_SCORING.goalie;
+          const skaterScoring = scoringSettings?.skater || DEFAULT_SCORING.skater;
           
           let dailyTotalPoints = 0;
           if (isGoalie) {
@@ -3773,39 +3730,25 @@ const Matchup = () => {
         log(' Found user team:', userTeamData.id);
         setUserTeam(userTeamData);
 
-        // Extract and store league scoring settings
-        const goalieScoring = currentLeague.scoring_settings?.goalie || {
-          wins: 4,
-          saves: 0.2,
-          shutouts: 3,
-          goals_against: -1
-        };
-        const skaterScoring = currentLeague.scoring_settings?.skater || {
-          goals: 3,
-          assists: 2,
-          power_play_points: 1,
-          short_handed_points: 2,
-          shots_on_goal: 0.4,
-          blocks: 0.5,
-          hits: 0.2,
-          penalty_minutes: 0.5
-        };
+        // Extract and store league scoring settings (falls back to shared defaults)
+        const goalieScoring = currentLeague.scoring_settings?.goalie || DEFAULT_SCORING.goalie;
+        const skaterScoring = currentLeague.scoring_settings?.skater || DEFAULT_SCORING.skater;
         setScoringSettings({
           goalie: {
-            wins: goalieScoring.wins ?? 4,
-            saves: goalieScoring.saves ?? 0.2,
-            shutouts: goalieScoring.shutouts ?? 3,
-            goals_against: goalieScoring.goals_against ?? -1
+            wins: goalieScoring.wins ?? DEFAULT_SCORING.goalie.wins,
+            saves: goalieScoring.saves ?? DEFAULT_SCORING.goalie.saves,
+            shutouts: goalieScoring.shutouts ?? DEFAULT_SCORING.goalie.shutouts,
+            goals_against: goalieScoring.goals_against ?? DEFAULT_SCORING.goalie.goals_against
           },
           skater: {
-            goals: skaterScoring.goals ?? 3,
-            assists: skaterScoring.assists ?? 2,
-            power_play_points: skaterScoring.power_play_points ?? 1,
-            short_handed_points: skaterScoring.short_handed_points ?? 2,
-            shots_on_goal: skaterScoring.shots_on_goal ?? 0.4,
-            blocks: skaterScoring.blocks ?? 0.5,
-            hits: skaterScoring.hits ?? 0.2,
-            penalty_minutes: skaterScoring.penalty_minutes ?? 0.5
+            goals: skaterScoring.goals ?? DEFAULT_SCORING.skater.goals,
+            assists: skaterScoring.assists ?? DEFAULT_SCORING.skater.assists,
+            power_play_points: skaterScoring.power_play_points ?? DEFAULT_SCORING.skater.power_play_points,
+            short_handed_points: skaterScoring.short_handed_points ?? DEFAULT_SCORING.skater.short_handed_points,
+            shots_on_goal: skaterScoring.shots_on_goal ?? DEFAULT_SCORING.skater.shots_on_goal,
+            blocks: skaterScoring.blocks ?? DEFAULT_SCORING.skater.blocks,
+            hits: skaterScoring.hits ?? DEFAULT_SCORING.skater.hits,
+            penalty_minutes: skaterScoring.penalty_minutes ?? DEFAULT_SCORING.skater.penalty_minutes
           }
         });
         log(' Loaded scoring settings (all 8 categories):', {
@@ -5159,14 +5102,15 @@ const Matchup = () => {
             </span>
             <span className="text-xs text-citrus-charcoal/30 font-bold">—</span>
           </div>
-          {/* Opponent score */}
-          <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
+          {/* Opponent score + menu */}
+          <div className="flex items-center gap-1 min-w-0 flex-1 justify-end">
             <span className="text-xs font-display font-semibold text-citrus-orange/70 truncate text-right">
               {userLeagueState === 'active-user' ? (opponentTeam?.team_name || 'Opponent') : 'Thunder Titans'}
             </span>
             <span className="text-lg font-varsity font-black text-citrus-orange tabular-nums">
               {parseFloat(opponentTeamPoints || '0').toFixed(1)}
             </span>
+            <MobileMenuButton />
           </div>
         </div>
       </div>

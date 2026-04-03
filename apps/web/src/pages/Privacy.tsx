@@ -206,7 +206,7 @@ const Privacy = () => {
 
             <section>
               <h2 className="text-xl font-semibold mb-3">13. Contact Us</h2>
-              <div className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg">
+              <div className="bg-muted dark:bg-muted p-4 rounded-lg">
                 <p>If you have questions, concerns, or requests regarding this Privacy Policy or our data practices, please contact us:</p>
                 <p className="mt-2">
                   <strong>Email:</strong> <a href="mailto:CitrusFantasySports@Gmail.com" className="text-green-700 hover:underline">CitrusFantasySports@Gmail.com</a><br />

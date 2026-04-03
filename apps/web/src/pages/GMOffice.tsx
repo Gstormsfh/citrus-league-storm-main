@@ -1,6 +1,7 @@
 import { useLeague } from '@/contexts/LeagueContext';
 import { cn } from '@/lib/utils';
 import Navbar from '@/components/Navbar';
+import MobileMenuButton from '@/components/MobileMenuButton';
 import Footer from '@/components/Footer';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -120,8 +121,10 @@ const GMOffice = () => {
 
       {/* MOBILE: Compact sticky header */}
       <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-center h-12 px-4">
+        <div className="flex items-center justify-between h-12 px-4">
+          <div className="w-10" />
           <h1 className="text-lg font-varsity font-bold text-citrus-forest">GM's Office</h1>
+          <MobileMenuButton />
         </div>
       </div>
 
