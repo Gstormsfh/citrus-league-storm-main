@@ -5,6 +5,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { useLeague } from '@/contexts/LeagueContext';
 import { cn } from '@/lib/utils';
 import Navbar from '@/components/Navbar';
+import MobileMenuButton from '@/components/MobileMenuButton';
 import Footer from '@/components/Footer';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import { TeamCard } from "@/components/matchup/TeamCard";
@@ -5159,14 +5160,15 @@ const Matchup = () => {
             </span>
             <span className="text-xs text-citrus-charcoal/30 font-bold">—</span>
           </div>
-          {/* Opponent score */}
-          <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
+          {/* Opponent score + menu */}
+          <div className="flex items-center gap-1 min-w-0 flex-1 justify-end">
             <span className="text-xs font-display font-semibold text-citrus-orange/70 truncate text-right">
               {userLeagueState === 'active-user' ? (opponentTeam?.team_name || 'Opponent') : 'Thunder Titans'}
             </span>
             <span className="text-lg font-varsity font-black text-citrus-orange tabular-nums">
               {parseFloat(opponentTeamPoints || '0').toFixed(1)}
             </span>
+            <MobileMenuButton />
           </div>
         </div>
       </div>

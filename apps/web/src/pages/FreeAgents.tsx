@@ -6,6 +6,7 @@ import { leagueApi } from '@/api/leagues';
 import { matchupApi } from '@/api/matchups';
 import { rosterApi } from '@/api/rosters';
 import Navbar from '@/components/Navbar';
+import MobileMenuButton from '@/components/MobileMenuButton';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -760,21 +761,39 @@ const FreeAgents = () => {
         // Refresh trending data to show updated counts
         await fetchTrendingData();
       } else {
-        // Handle error case - isFreeAgent may be undefined on error
-        const isWaiverClaim = result.isFreeAgent === false;
-        toast({
-          title: isWaiverClaim ? "Claim Failed" : "Add Failed",
-          description: result.error || "Failed to add player. Please try again.",
-          variant: "destructive"
-        });
+        // Check if the error is about roster being full — redirect to drop dialog
+        const errorStr = (result.error || '').toLowerCase();
+        if (errorStr.includes('roster') && (errorStr.includes('full') || errorStr.includes('max') || errorStr.includes('limit'))) {
+          navigate(`/roster?addPlayer=${player.id}&playerName=${encodeURIComponent(player.full_name)}`);
+          toast({
+            title: "Roster Full",
+            description: `Drop a player to make room for ${player.full_name}.`,
+          });
+        } else {
+          const isWaiverClaim = result.isFreeAgent === false;
+          toast({
+            title: isWaiverClaim ? "Claim Failed" : "Add Failed",
+            description: result.error || "Failed to add player. Please try again.",
+            variant: "destructive"
+          });
+        }
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Failed to add player. Please try again.";
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive"
-      });
+      // Also catch roster-full errors from exceptions
+      if (errorMessage.toLowerCase().includes('roster') && (errorMessage.toLowerCase().includes('full') || errorMessage.toLowerCase().includes('max'))) {
+        navigate(`/roster?addPlayer=${player.id}&playerName=${encodeURIComponent(player.full_name)}`);
+        toast({
+          title: "Roster Full",
+          description: `Drop a player to make room for ${player.full_name}.`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive"
+        });
+      }
     }
   };
 
@@ -1114,8 +1133,10 @@ const FreeAgents = () => {
       <CitrusBackground density="light" />
       <div className="hidden lg:block"><Navbar /></div>
       <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-center h-12 px-4">
+        <div className="flex items-center justify-between h-12 px-4">
+          <div className="w-10" />
           <h1 className="text-lg font-varsity font-bold text-citrus-forest">Free Agents</h1>
+          <MobileMenuButton />
         </div>
       </div>
       <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">

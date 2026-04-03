@@ -27,6 +27,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { StartersGrid, BenchGrid, IRSlot } from '@/components/roster';
 import MobileRosterList from '@/components/roster/MobileRosterList';
+import MobileMenuButton from '@/components/MobileMenuButton';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { useToast } from '@/hooks/use-toast';
 import HockeyPlayerCard from '@/components/roster/HockeyPlayerCard';
@@ -304,6 +305,10 @@ const Roster = () => {
   
   // Daily projections state (similar to Matchup tab)
   const [projectionsByDate, setProjectionsByDate] = useState<Map<string, Map<number, any>>>(new Map());
+  // Daily actual game stats (for live/final games)
+  const [dailyStatsByDateMap, setDailyStatsByDateMap] = useState<Map<string, Map<number, any>>>(new Map());
+  // Game status from schedule (scheduled/live/intermission/final)
+  const [gameStatusMap, setGameStatusMap] = useState<Map<number, { status: string; score?: string }>>(new Map());
   
   // Initial empty roster state
   const [roster, setRoster] = useState<RosterState>({
@@ -1681,6 +1686,102 @@ const Roster = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- roster arrays as deps would cause circular triggers; lengths are sufficient
   }, [selectedDate, roster.starters.length, roster.bench.length, roster.ir.length, fetchProjectionsForDate]);
 
+  // Fetch daily game stats for selected date (actual stats for live/final games)
+  const dailyStatsLoadingRef = useRef<boolean>(false);
+  useEffect(() => {
+    const allPlayerIds: number[] = [];
+    [...roster.starters, ...roster.bench, ...roster.ir].forEach(player => {
+      const playerId = typeof player.id === 'string' ? parseInt(player.id) : player.id;
+      if (!isNaN(playerId) && playerId > 0) allPlayerIds.push(playerId);
+    });
+    if (allPlayerIds.length === 0) return;
+
+    const targetDate = selectedDate || getTodayMST();
+    if (dailyStatsByDateMap.has(targetDate) || dailyStatsLoadingRef.current) return;
+
+    dailyStatsLoadingRef.current = true;
+    (async () => {
+      try {
+        const response = await matchupApi.getDailyGameStats(allPlayerIds, targetDate);
+        const statsArray = response?.data || response || [];
+        const statsMap = new Map<number, any>();
+        if (Array.isArray(statsArray)) {
+          for (const stat of statsArray) {
+            if (stat.player_id) {
+              statsMap.set(stat.player_id, stat);
+            }
+          }
+        }
+        setDailyStatsByDateMap(prev => {
+          const newMap = new Map(prev);
+          newMap.set(targetDate, statsMap);
+          return newMap;
+        });
+      } catch (error) {
+        logger.warn('[Roster] Daily game stats not available:', error);
+      } finally {
+        dailyStatsLoadingRef.current = false;
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate, roster.starters.length, roster.bench.length, roster.ir.length]);
+
+  // Fetch game status from schedule for players with games today
+  useEffect(() => {
+    const targetDate = selectedDate || getTodayMST();
+    const todayStr = getTodayMST();
+    // Only fetch game status for today's games (past games are always final)
+    if (targetDate !== todayStr && targetDate < todayStr) {
+      // Past date: all games are final
+      const allPlayers = [...roster.starters, ...roster.bench, ...roster.ir];
+      const statusMap = new Map<number, { status: string; score?: string }>();
+      allPlayers.forEach(p => {
+        const pid = typeof p.id === 'string' ? parseInt(p.id) : p.id;
+        if (p.nextGame) statusMap.set(pid, { status: 'final' });
+      });
+      setGameStatusMap(statusMap);
+      return;
+    }
+
+    // For today: use schedule data to get live game status
+    const fetchGameStatus = async () => {
+      try {
+        const allPlayers = [...roster.starters, ...roster.bench, ...roster.ir];
+        const uniqueTeams = [...new Set(allPlayers.map(p => p.teamAbbreviation || '').filter(Boolean))];
+        if (uniqueTeams.length === 0) return;
+
+        const gamesMap = await ScheduleService.getNextGamesForTeams(uniqueTeams);
+        const statusMap = new Map<number, { status: string; score?: string }>();
+
+        allPlayers.forEach(player => {
+          const teamAbbrev = player.teamAbbreviation || '';
+          const game = gamesMap.get(teamAbbrev);
+          if (game) {
+            const gameDate = game.game_date?.split('T')[0];
+            if (gameDate === targetDate) {
+              const status = (game.status || 'scheduled').toLowerCase();
+              const homeScore = game.home_score ?? 0;
+              const awayScore = game.away_score ?? 0;
+              const score = (status === 'live' || status === 'intermission' || status === 'final')
+                ? `${homeScore}-${awayScore}` : undefined;
+              const pid = typeof player.id === 'string' ? parseInt(player.id) : player.id;
+              statusMap.set(pid, { status, score });
+            }
+          }
+        });
+        setGameStatusMap(statusMap);
+      } catch (error) {
+        logger.warn('[Roster] Game status fetch error:', error);
+      }
+    };
+
+    fetchGameStatus();
+    // Refresh game status every 60 seconds for live games
+    const interval = setInterval(fetchGameStatus, 60000);
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate, roster.starters.length, roster.bench.length, roster.ir.length]);
+
   // =============================================================================
   // DISPLAY ROSTER - Applies projections at render time (same pattern as Matchup tab)
   // This is the SINGLE SOURCE OF TRUTH for projections in Roster tab
@@ -1695,14 +1796,20 @@ const Roster = () => {
     const dateProjections = projectionsByDate.get(targetDate);
     const userTimezone = profile?.timezone || 'America/Denver';
     
+    const dateActualStats = dailyStatsByDateMap.get(targetDate);
+
     const enrichPlayer = (player: HockeyPlayer): HockeyPlayer => {
       const playerId = typeof player.id === 'string' ? parseInt(player.id) : player.id;
       if (isNaN(playerId) || playerId <= 0) return player;
-      
+
       // Get projection for this player on selected date
       // PROJECTION = GAME EXISTS on that date
       const projection = dateProjections?.get(playerId);
       const isGoalie = player.position === 'G' || player.position === 'Goalie';
+
+      // Enrich with actual game stats and game status
+      const actualStat = dateActualStats?.get(playerId);
+      const gameInfo = gameStatusMap.get(playerId);
       
       if (!projection) {
         // No projection = no game on this date
@@ -1717,16 +1824,36 @@ const Roster = () => {
       }
       
       // Projection exists = player has game on this date
-      // Build nextGame info from projection context
-      const enrichedPlayer = { 
+      // Build nextGame info from projection context + game status
+      const gameStatus = (gameInfo?.status || player.nextGame?.gameStatus || 'scheduled') as 'scheduled' | 'live' | 'intermission' | 'final';
+      const enrichedPlayer = {
         ...player,
         nextGame: {
-          opponent: 'Game', // Could be enhanced with opponent info if available in projection
+          opponent: player.nextGame?.opponent || 'Game',
           isToday: true,
-          gameTime: undefined
-        }
+          gameTime: player.nextGame?.gameTime,
+          gameStatus,
+          score: gameInfo?.score,
+        },
+        // Actual game stats (for live/final games)
+        daily_actual_points: actualStat ? Number(actualStat.total_points || actualStat.fantasy_points || 0) : undefined,
+        daily_actual_stats: actualStat ? {
+          goals: Number(actualStat.goals || 0),
+          assists: Number(actualStat.assists || 0),
+          points: Number(actualStat.points || 0),
+          shots_on_goal: Number(actualStat.shots_on_goal || 0),
+          blocks: Number(actualStat.blocks || 0),
+          hits: Number(actualStat.hits || 0),
+          ppp: Number(actualStat.ppp || 0),
+          shp: Number(actualStat.shp || 0),
+          pim: Number(actualStat.pim || 0),
+          wins: Number(actualStat.wins || 0),
+          saves: Number(actualStat.saves || 0),
+          goals_against: Number(actualStat.goals_against || 0),
+          shutouts: Number(actualStat.shutouts || 0),
+        } : undefined,
       };
-      
+
       const dailyProjectedPoints = Number(projection.total_projected_points || 0);
       
       if (isGoalie) {
@@ -1790,7 +1917,7 @@ const Roster = () => {
       ir: roster.ir.map(enrichPlayer),
       slotAssignments: roster.slotAssignments
     };
-  }, [roster, projectionsByDate, selectedDate, profile?.timezone]);
+  }, [roster, projectionsByDate, dailyStatsByDateMap, gameStatusMap, selectedDate, profile?.timezone]);
 
   // Load CitrusPuck Analytics
   useEffect(() => {
@@ -2767,7 +2894,7 @@ const Roster = () => {
         <Navbar />
       </div>
       
-      {/* MOBILE: Compact sticky header with roster context */}
+      {/* MOBILE: Compact sticky header with roster context + hamburger menu */}
       <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
           <div className="min-w-0 flex-1">
@@ -2780,8 +2907,11 @@ const Roster = () => {
               </div>
             )}
           </div>
-          <div className="text-xs font-varsity font-bold text-citrus-forest/70 flex-shrink-0 ml-2">
-            {teamStats.record}
+          <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+            <span className="text-xs font-varsity font-bold text-citrus-forest/70">
+              {teamStats.record}
+            </span>
+            <MobileMenuButton />
           </div>
         </div>
       </div>
@@ -3075,7 +3205,8 @@ const Roster = () => {
                         lockedPlayerIds={lockedPlayerIds}
                         tapSelectedPlayerId={tapSelectedPlayerId}
                         tapEligibleSlots={tapEligibleSlots}
-                        onPlayerTap={handlePlayerClickWithSwap}
+                        onPlayerTap={handleMobileTapPlayer}
+                        onPlayerNameTap={handlePlayerClick}
                         onSlotTap={handleMobileTapSlot}
                         onBenchTap={handleMobileTapBench}
                       />
