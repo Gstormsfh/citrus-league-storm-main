@@ -211,28 +211,6 @@ const safeValue = (val: number) => {
     return { score: avgProj, label: 'Weak', color: 'text-orange-500', bg: 'bg-orange-500/10' };
   };
 
-  // Position slot configuration — driven by league settings + position type, falls back to defaults
-  const slots = getRosterSlots(leagueRosterSlots, leaguePositionType);
-  const POSITION_SLOTS = useMemo(() => {
-    const s = getRosterSlots(leagueRosterSlots, leaguePositionType);
-    if (leaguePositionType === 'forward') {
-      return {
-        'F': { maxPlayers: s.F ?? 6, label: 'Forward' },
-        'D': { maxPlayers: s.D ?? 4, label: 'Defense' },
-        'G': { maxPlayers: s.G ?? 2, label: 'Goalie' },
-        'UTIL': { maxPlayers: s.UTIL ?? 1, label: 'Utility' },
-      };
-    }
-    return {
-      'C': { maxPlayers: s.C ?? 2, label: 'Center' },
-      'LW': { maxPlayers: s.LW ?? 2, label: 'Left Wing' },
-      'RW': { maxPlayers: s.RW ?? 2, label: 'Right Wing' },
-      'D': { maxPlayers: s.D ?? 4, label: 'Defense' },
-      'G': { maxPlayers: s.G ?? 2, label: 'Goalie' },
-      'UTIL': { maxPlayers: s.UTIL ?? 1, label: 'Utility' },
-    };
-  }, [leaguePositionType, leagueRosterSlots]);
-
 interface RosterState {
   starters: HockeyPlayer[];
   bench: HockeyPlayer[];
@@ -278,6 +256,28 @@ const Roster = () => {
   const [bestBallEnabled, setBestBallEnabled] = useState(false);
   const [leagueRosterSlots, setLeagueRosterSlots] = useState<Record<string, number> | null>(null);
   const [leaguePositionType, setLeaguePositionType] = useState<PositionType>('individual');
+
+  // Position slot configuration — driven by league settings + position type, falls back to defaults
+  const POSITION_SLOTS = useMemo(() => {
+    const s = getRosterSlots(leagueRosterSlots, leaguePositionType);
+    if (leaguePositionType === 'forward') {
+      return {
+        'F': { maxPlayers: s.F ?? 6, label: 'Forward' },
+        'D': { maxPlayers: s.D ?? 4, label: 'Defense' },
+        'G': { maxPlayers: s.G ?? 2, label: 'Goalie' },
+        'UTIL': { maxPlayers: s.UTIL ?? 1, label: 'Utility' },
+      };
+    }
+    return {
+      'C': { maxPlayers: s.C ?? 2, label: 'Center' },
+      'LW': { maxPlayers: s.LW ?? 2, label: 'Left Wing' },
+      'RW': { maxPlayers: s.RW ?? 2, label: 'Right Wing' },
+      'D': { maxPlayers: s.D ?? 4, label: 'Defense' },
+      'G': { maxPlayers: s.G ?? 2, label: 'Goalie' },
+      'UTIL': { maxPlayers: s.UTIL ?? 1, label: 'Utility' },
+    };
+  }, [leaguePositionType, leagueRosterSlots]);
+
   const [teamStats, setTeamStats] = useState({
     record: "0-0-0",
     rank: "-",
@@ -2764,7 +2764,7 @@ const Roster = () => {
     // Bench is always a valid target
     eligible.add('bench-grid');
     return eligible;
-  }, [tapSelectedPlayerId, roster, ALL_STARTER_SLOT_IDS]);
+  }, [tapSelectedPlayerId, roster, ALL_STARTER_SLOT_IDS, isPositionValid]);
 
   // Handle mobile tap-to-swap: player tapped
   const handleMobileTapPlayer = (player: HockeyPlayer) => {
