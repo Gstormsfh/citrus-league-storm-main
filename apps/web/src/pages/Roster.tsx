@@ -1273,24 +1273,67 @@ const Roster = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- loadRoster excluded to prevent double-fire when selectedDate changes (date-change useEffect handles that)
   }, [userLeagueState, leagueLoading, isChangingLeague, toast]);
 
-  // Calculate available weeks and first week start date
-  // Uses activeLeague from context (already loaded) instead of a redundant API call
+  // Calculate available weeks, find current matchup by date, and set initial week
+  // Fetches all matchups to find which week_number contains today's date,
+  // since matchup week_numbers may not align with calendar-based week calculations.
   useEffect(() => {
     if (!activeLeague || activeLeague.draft_status !== 'completed') return;
+    if (!userTeamId || !userTeam?.league_id) return;
+    if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') return;
 
-    const draftCompletionDate = getDraftCompletionDate(activeLeague);
-    if (!draftCompletionDate) return;
+    const initWeeks = async () => {
+      const draftCompletionDate = getDraftCompletionDate(activeLeague);
+      if (!draftCompletionDate) return;
 
-    const firstWeek = getFirstWeekStartDate(draftCompletionDate);
-    const weeks = getAvailableWeeks(firstWeek);
-    const currentWeek = getCurrentWeekNumber(firstWeek);
+      const firstWeek = getFirstWeekStartDate(draftCompletionDate);
+      setFirstWeekStart(firstWeek);
 
-    setFirstWeekStart(firstWeek);
-    setAvailableWeeks(weeks);
-    // Clamp currentWeek to valid range, then set on initial load or league change
-    const clampedWeek = Math.min(Math.max(1, currentWeek), weeks.length);
-    setSelectedWeek(prev => prev === 0 || prev > weeks.length ? clampedWeek : prev);
-  }, [activeLeague]);
+      // Fetch all matchups to determine available weeks and find current week by date
+      try {
+        const resp = await matchupApi.getLeagueMatchups(userTeam.league_id);
+        const allMatchups = (resp.data || []) as any[];
+
+        if (allMatchups.length === 0) {
+          // Fallback to calendar-based calculation if no matchups exist
+          const weeks = getAvailableWeeks(firstWeek);
+          const currentWeek = getCurrentWeekNumber(firstWeek);
+          setAvailableWeeks(weeks);
+          setSelectedWeek(prev => prev === 0 ? Math.min(currentWeek, weeks.length) : prev);
+          return;
+        }
+
+        // Build available weeks from actual matchup data
+        const weekNumbers = [...new Set(allMatchups.map((m: any) => m.week_number as number))].sort((a, b) => a - b);
+        setAvailableWeeks(weekNumbers);
+
+        // Find the matchup week that contains today
+        const todayStr = getTodayMST();
+        const todayMatchup = allMatchups.find((m: any) =>
+          m.week_start_date <= todayStr && m.week_end_date >= todayStr
+        );
+
+        if (todayMatchup) {
+          setSelectedWeek(prev => prev === 0 ? todayMatchup.week_number : prev);
+        } else {
+          // No matchup contains today — use the latest completed or next upcoming
+          const sorted = [...allMatchups].sort((a: any, b: any) => a.week_start_date.localeCompare(b.week_start_date));
+          const upcoming = sorted.find((m: any) => m.week_start_date > todayStr);
+          const latest = sorted[sorted.length - 1];
+          const best = upcoming || latest;
+          setSelectedWeek(prev => prev === 0 ? best.week_number : prev);
+        }
+      } catch (error) {
+        logger.error('[Roster] Error fetching matchups for week init:', error);
+        // Fallback to calendar-based calculation
+        const weeks = getAvailableWeeks(firstWeek);
+        const currentWeek = getCurrentWeekNumber(firstWeek);
+        setAvailableWeeks(weeks);
+        setSelectedWeek(prev => prev === 0 ? Math.min(currentWeek, weeks.length) : prev);
+      }
+    };
+
+    initWeeks();
+  }, [activeLeague, userTeamId, userTeam?.league_id, userLeagueState]);
 
   // Handle week change
   const handleWeekChange = useCallback((week: number) => {
