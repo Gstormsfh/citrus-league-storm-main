@@ -23,7 +23,7 @@ import { waiverApi } from '@/api/waivers';
 import { useToast } from '@/hooks/use-toast';
 import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { logger } from '@/utils/logger';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { ScheduleService } from '@/services/ScheduleService';
@@ -33,6 +33,7 @@ const WaiverWire = () => {
   const { user } = useAuth();
   const { userLeagueState, activeLeagueId, activeLeagueFormat } = useLeague();
   const { toast } = useToast();
+  const navigate = useNavigate();
   
   const [loading, setLoading] = useState(true);
   const [waiverClaims, setWaiverClaims] = useState<WaiverClaim[]>([]);
@@ -344,11 +345,21 @@ const WaiverWire = () => {
       setDropPlayer(null);
       loadWaiverData();
     } else {
-      toast({
-        title: result.isFreeAgent === false ? "Claim Failed" : "Add Failed",
-        description: result.error,
-        variant: "destructive"
-      });
+      // Check if roster is full — redirect to roster to drop a player
+      const errorStr = (result.error || '').toLowerCase();
+      if (errorStr.includes('roster') && (errorStr.includes('full') || errorStr.includes('max') || errorStr.includes('limit'))) {
+        navigate(`/roster?addPlayer=${selectedPlayer.player_id}&playerName=${encodeURIComponent(selectedPlayer.full_name)}`);
+        toast({
+          title: "Roster Full",
+          description: `You must drop a player before adding ${selectedPlayer.full_name}.`,
+        });
+      } else {
+        toast({
+          title: result.isFreeAgent === false ? "Claim Failed" : "Add Failed",
+          description: result.error,
+          variant: "destructive"
+        });
+      }
     }
   };
 

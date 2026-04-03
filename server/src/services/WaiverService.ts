@@ -647,6 +647,49 @@ export class WaiverService {
       }
     }
 
+    // Check if player is on waivers (recently dropped) — must use waiver claim instead
+    try {
+      const { data: onWaivers } = await this.supabase.rpc('is_player_on_waivers', {
+        p_league_id: leagueId,
+        p_player_id: playerId,
+      });
+      if (onWaivers === true) {
+        return { success: false, error: 'Player is on waivers (recently dropped). Submit a waiver claim instead.' };
+      }
+    } catch (waiverCheckErr) {
+      // If RPC doesn't exist yet, skip the check (graceful degradation)
+      logger.warn('[addFreeAgent] Could not check waiver status:', waiverCheckErr);
+    }
+
+    // Check if player is already on a roster in this league
+    const admin = getSupabaseAdmin();
+    const { count: existingCount } = await admin
+      .from('roster_assignments')
+      .select('id', { count: 'exact', head: true })
+      .eq('league_id', leagueId)
+      .eq('player_id', String(playerId));
+    if (existingCount && existingCount > 0) {
+      return { success: false, error: 'Player is already on a roster in this league.' };
+    }
+
+    // Pre-check roster size to give clear error before RPC
+    if (!dropPlayerId) {
+      const { count: rosterCount } = await admin
+        .from('roster_assignments')
+        .select('id', { count: 'exact', head: true })
+        .eq('league_id', leagueId)
+        .eq('team_id', teamId);
+      const { data: leagueData } = await this.supabase
+        .from('leagues')
+        .select('roster_size')
+        .eq('id', leagueId)
+        .single();
+      const maxRoster = leagueData?.roster_size || 22;
+      if (rosterCount !== null && rosterCount >= maxRoster) {
+        return { success: false, error: `Roster is full (${rosterCount}/${maxRoster}). Drop a player first.` };
+      }
+    }
+
     // Check if this is an AI team (owner_id = NULL) — requires admin path
     const aiTeam = await this.isAiTeam(teamId);
 
