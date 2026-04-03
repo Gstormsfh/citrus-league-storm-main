@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
+import MobileMenuButton from '@/components/MobileMenuButton';
 import Footer from '@/components/Footer';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,8 @@ import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { Navigate } from 'react-router-dom';
 import { logger } from '@/utils/logger';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
+import { ScheduleService } from '@/services/ScheduleService';
+import { Zap, Lock } from 'lucide-react';
 
 const WaiverWire = () => {
   const { user } = useAuth();
@@ -50,6 +53,9 @@ const WaiverWire = () => {
   const [selectedPlayer, setSelectedPlayer] = useState<any | null>(null);
   const [dropPlayer, setDropPlayer] = useState<number | null>(null);
   const [myRoster, setMyRoster] = useState<any[]>([]);
+
+  // Game-locked teams (players from these teams go through waivers)
+  const [lockedTeams, setLockedTeams] = useState<Set<string>>(new Set());
 
   // FAAB state
   const [isFAAB, setIsFAAB] = useState(false);
@@ -222,7 +228,7 @@ const WaiverWire = () => {
 
   const searchPlayers = async () => {
     if (!activeLeagueId) return;
-    
+
     setSearchLoading(true);
     try {
       const players = await WaiverService.getAvailablePlayers(
@@ -231,6 +237,28 @@ const WaiverWire = () => {
         searchTerm || undefined
       );
       setAvailablePlayers(players);
+
+      // Check which teams have started/live games today (those players are game-locked)
+      const uniqueTeams = [...new Set(players.map((p: any) => p.team_abbrev).filter(Boolean))];
+      if (uniqueTeams.length > 0) {
+        try {
+          const gamesMap = await ScheduleService.getNextGamesForTeams(uniqueTeams);
+          const locked = new Set<string>();
+          const now = new Date();
+          gamesMap.forEach((game, team) => {
+            const status = (game.status || 'scheduled').toLowerCase();
+            if (status === 'live' || status === 'final' || status === 'intermission') {
+              locked.add(team);
+            } else if (status === 'scheduled' && game.game_time) {
+              const gameStart = new Date(game.game_time);
+              if (gameStart < now) locked.add(team);
+            }
+          });
+          setLockedTeams(locked);
+        } catch {
+          // Non-critical — just won't show lock indicators
+        }
+      }
     } catch (error) {
       logger.error('Error searching players:', error);
     } finally {
@@ -347,8 +375,10 @@ const WaiverWire = () => {
       <CitrusBackground density="light" />
       <div className="hidden lg:block"><Navbar /></div>
       <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-center h-12 px-4">
+        <div className="flex items-center justify-between h-12 px-4">
+          <div className="w-10" />
           <h1 className="text-lg font-varsity font-bold text-citrus-forest">Waiver Wire</h1>
+          <MobileMenuButton />
         </div>
       </div>
       <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
@@ -496,25 +526,43 @@ const WaiverWire = () => {
 
                 {availablePlayers.length > 0 && (
                   <div className="space-y-3">
-                    {availablePlayers.map((player) => (
+                    {availablePlayers.map((player) => {
+                      const isGameLocked = lockedTeams.has(player.team_abbrev);
+                      return (
                       <div key={player.player_id} className="flex items-center justify-between p-4 bg-citrus-sage/10 rounded-varsity border-2 border-citrus-sage/30 hover:border-citrus-orange hover:shadow-patch transition-all">
                         <div className="flex-1">
-                          <div className="font-varsity font-bold text-citrus-forest">
-                            {player.full_name}
+                          <div className="flex items-center gap-2">
+                            <span className="font-varsity font-bold text-citrus-forest">
+                              {player.full_name}
+                            </span>
+                            {isGameLocked ? (
+                              <Badge className="bg-amber-500/15 text-amber-700 border-amber-300 text-[10px] font-display font-bold gap-0.5 h-5">
+                                <Lock className="w-3 h-3" />
+                                Waiver
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-green-500/15 text-green-700 border-green-300 text-[10px] font-display font-bold gap-0.5 h-5">
+                                <Zap className="w-3 h-3" />
+                                Free Agent
+                              </Badge>
+                            )}
                           </div>
                           <div className="text-sm font-display text-citrus-charcoal">
                             {player.position_code} - {player.team_abbrev} #{player.jersey_number}
                           </div>
                         </div>
-                        <Button 
+                        <Button
                           onClick={() => setSelectedPlayer(player)}
                           size="sm"
-                          className="bg-citrus-orange border-2 border-citrus-forest rounded-varsity font-varsity font-bold"
+                          className={isGameLocked
+                            ? "bg-amber-500 border-2 border-amber-700 rounded-varsity font-varsity font-bold"
+                            : "bg-citrus-orange border-2 border-citrus-forest rounded-varsity font-varsity font-bold"
+                          }
                         >
-                          Claim
+                          {isGameLocked ? 'Claim' : 'Add'}
                         </Button>
                       </div>
-                    ))}
+                    );})}
                   </div>
                 )}
               </CardContent>

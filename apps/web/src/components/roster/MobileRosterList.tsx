@@ -44,6 +44,7 @@ interface MobileRosterListProps {
   tapSelectedPlayerId?: string | number | null;
   tapEligibleSlots?: Set<string>;
   onPlayerTap?: (player: HockeyPlayer) => void;
+  onPlayerNameTap?: (player: HockeyPlayer) => void;
   onSlotTap?: (slotId: string) => void;
   onBenchTap?: () => void;
 }
@@ -64,17 +65,37 @@ const ALL_STARTER_SLOTS = [
   'slot-G-1', 'slot-G-2', 'slot-UTIL',
 ];
 
-// ─── Format compact stat line from daily projection ─────────────────
-const formatProjectedStatLine = (player: HockeyPlayer): string | null => {
+// ─── Format compact stat line from actual game stats or projection ───
+const formatStatLine = (player: HockeyPlayer): { text: string; isActual: boolean } | null => {
   const isGoalie = player.position === 'Goalie' || player.position === 'G';
+  const gameStatus = player.nextGame?.gameStatus;
+  const isLiveOrFinal = gameStatus === 'live' || gameStatus === 'intermission' || gameStatus === 'final';
 
+  // Show actuals if game is live or final and we have actual stats
+  if (isLiveOrFinal && player.daily_actual_stats) {
+    const s = player.daily_actual_stats;
+    const parts: string[] = [];
+    if (isGoalie) {
+      if (s.saves) parts.push(`${s.saves} SV`);
+      if (s.goals_against != null) parts.push(`${s.goals_against} GA`);
+      if (s.wins) parts.push('W');
+    } else {
+      if (s.goals) parts.push(`${s.goals}G`);
+      if (s.assists) parts.push(`${s.assists}A`);
+      if (s.shots_on_goal) parts.push(`${s.shots_on_goal} SOG`);
+      if (s.hits) parts.push(`${s.hits} HIT`);
+    }
+    return parts.length > 0 ? { text: parts.join(', '), isActual: true } : null;
+  }
+
+  // Fall back to projections
   if (isGoalie && player.goalieProjection) {
     const gp = player.goalieProjection;
     const parts: string[] = [];
     if (gp.projected_saves > 0) parts.push(`${Math.round(gp.projected_saves)} SV`);
     if (gp.projected_goals_against > 0) parts.push(`${gp.projected_goals_against.toFixed(1)} GA`);
     if (gp.projected_wins >= 0.5) parts.push(`W`);
-    return parts.length > 0 ? parts.join(', ') : null;
+    return parts.length > 0 ? { text: parts.join(', '), isActual: false } : null;
   }
 
   if (!isGoalie && player.daily_projection) {
@@ -83,7 +104,30 @@ const formatProjectedStatLine = (player: HockeyPlayer): string | null => {
     if (dp.projected_goals >= 0.3) parts.push(`${dp.projected_goals.toFixed(1)}G`);
     if (dp.projected_assists >= 0.3) parts.push(`${dp.projected_assists.toFixed(1)}A`);
     if (dp.projected_sog >= 1) parts.push(`${dp.projected_sog.toFixed(0)} SOG`);
-    return parts.length > 0 ? parts.join(', ') : null;
+    return parts.length > 0 ? { text: parts.join(', '), isActual: false } : null;
+  }
+
+  return null;
+};
+
+// ─── Game status badge ──────────────────────────────────────────────
+const GameStatusBadge = ({ status, score }: { status?: string; score?: string }) => {
+  if (!status || status === 'scheduled') return null;
+
+  if (status === 'final') {
+    return (
+      <span className="text-[9px] font-varsity font-black tracking-wider px-1.5 py-0.5 rounded-sm bg-citrus-charcoal/10 text-citrus-charcoal/70 uppercase">
+        Final{score ? ` ${score}` : ''}
+      </span>
+    );
+  }
+
+  if (status === 'live' || status === 'intermission') {
+    return (
+      <span className="text-[9px] font-varsity font-black tracking-wider px-1.5 py-0.5 rounded-sm bg-red-500/15 text-red-600 uppercase animate-pulse">
+        {status === 'intermission' ? 'INT' : 'LIVE'}{score ? ` ${score}` : ''}
+      </span>
+    );
   }
 
   return null;
@@ -97,16 +141,22 @@ interface PlayerRowProps {
   isLocked?: boolean;
   isSwapSelected?: boolean;
   isEligibleTarget?: boolean;
-  onTap?: () => void;
+  onPositionTap?: () => void;
+  onNameTap?: () => void;
+  onEmptySlotTap?: () => void;
 }
 
-const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isEligibleTarget, onTap }: PlayerRowProps) => {
+const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isEligibleTarget, onPositionTap, onNameTap, onEmptySlotTap }: PlayerRowProps) => {
   const [imgErr, setImgErr] = useState(false);
 
   const isGoalie = player ? (player.position === 'Goalie' || player.position === 'G') : slotPosition === 'G';
+  const gameStatus = player?.nextGame?.gameStatus;
+  const isLiveOrFinal = gameStatus === 'live' || gameStatus === 'intermission' || gameStatus === 'final';
   const dailyProj = player ? (isGoalie ? player.goalieProjection : player.daily_projection) : null;
-  const hasGame = dailyProj != null;
+  const hasGame = dailyProj != null || (player?.daily_actual_points != null && player.daily_actual_points > 0);
+  const actualPts = player?.daily_actual_points ?? 0;
   const projPts = dailyProj?.total_projected_points || 0;
+  const displayPts = isLiveOrFinal ? actualPts : projPts;
   const teamAbbr = player?.teamAbbreviation || (player?.team?.split(' ').pop()?.substring(0, 3).toUpperCase()) || '';
   const teamLogoUrl = player ? `https://assets.nhle.com/logos/nhl/svg/${player.teamAbbreviation || 'NHL'}_light.svg` : '';
 
@@ -121,22 +171,23 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
     <div
       className={cn(
         "flex items-center gap-2 px-3 py-2.5 transition-all border-b border-citrus-sage/15",
-        "active:bg-citrus-sage/10",
         isSwapSelected && "!bg-citrus-orange/10 !border-citrus-orange/30",
         isEligibleTarget && !isSwapSelected && "!bg-citrus-sage/10 !border-citrus-sage/30",
         isLocked && "opacity-60",
       )}
-      onClick={onTap}
     >
-      {/* Position badge */}
-      <div className={cn(
-        "w-10 h-10 flex-shrink-0 rounded-lg flex items-center justify-center text-white font-varsity text-xs font-black tracking-wide shadow-sm",
-        "ring-2",
-        posColor[slotPosition] || 'bg-citrus-charcoal/40',
-        posRingColor[slotPosition] || 'ring-citrus-charcoal/20',
-        isEligibleTarget && !isSwapSelected && "!ring-citrus-sage !ring-2 animate-pulse",
-        isSwapSelected && "!ring-citrus-orange !ring-2",
-      )}>
+      {/* Position badge — tap to swap */}
+      <div
+        className={cn(
+          "w-10 h-10 flex-shrink-0 rounded-lg flex items-center justify-center text-white font-varsity text-xs font-black tracking-wide shadow-sm",
+          "ring-2 active:scale-95 transition-transform cursor-pointer",
+          posColor[slotPosition] || 'bg-citrus-charcoal/40',
+          posRingColor[slotPosition] || 'ring-citrus-charcoal/20',
+          isEligibleTarget && !isSwapSelected && "!ring-citrus-sage !ring-2 animate-pulse",
+          isSwapSelected && "!ring-citrus-orange !ring-2",
+        )}
+        onClick={(e) => { e.stopPropagation(); onPositionTap?.(); }}
+      >
         {slotPosition}
       </div>
 
@@ -161,8 +212,8 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
             )}
           </div>
 
-          {/* Name + team/number + game info */}
-          <div className="flex-1 min-w-0">
+          {/* Name + team/number + game info — tap name to open player card */}
+          <div className="flex-1 min-w-0 active:bg-citrus-sage/5 rounded-lg -mx-1 px-1 cursor-pointer" onClick={(e) => { e.stopPropagation(); onNameTap?.(); }}>
             <div className="flex items-center gap-1">
               <span className="font-display font-bold text-[13px] text-citrus-forest truncate leading-tight">
                 {player.name}
@@ -184,22 +235,26 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
                 </>
               )}
             </div>
-            {/* Game time + projected stat line */}
+            {/* Game status + actual/projected stat line */}
             {player.nextGame && (
               <div className="flex items-center gap-1.5 mt-0.5">
-                {player.nextGame.gameTime && (
+                <GameStatusBadge status={gameStatus} score={player.nextGame.score} />
+                {!isLiveOrFinal && player.nextGame.gameTime && (
                   <span className="text-[10px] font-display font-semibold text-citrus-charcoal/50">
                     {player.nextGame.gameTime}
                   </span>
                 )}
                 {(() => {
-                  const statLine = formatProjectedStatLine(player);
-                  if (!statLine) return null;
+                  const statInfo = formatStatLine(player);
+                  if (!statInfo) return null;
                   return (
                     <>
-                      {player.nextGame.gameTime && <span className="text-citrus-charcoal/20 text-[10px]">·</span>}
-                      <span className="text-[10px] font-display text-citrus-charcoal/45 italic truncate">
-                        {statLine}
+                      <span className="text-citrus-charcoal/20 text-[10px]">·</span>
+                      <span className={cn(
+                        "text-[10px] font-display truncate",
+                        statInfo.isActual ? "text-citrus-forest font-semibold" : "text-citrus-charcoal/45 italic"
+                      )}>
+                        {statInfo.text}
                       </span>
                     </>
                   );
@@ -208,16 +263,19 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
             )}
           </div>
 
-          {/* Projected points */}
-          <div className={cn(
-            "flex-shrink-0 w-14 text-right",
-          )}>
+          {/* Points — actual (live/final) or projected */}
+          <div className="flex-shrink-0 w-14 text-right">
             {hasGame ? (
               <div className="flex flex-col items-end">
-                <span className="font-varsity text-base font-black text-citrus-orange leading-none">
-                  {projPts.toFixed(1)}
+                <span className={cn(
+                  "font-varsity text-base font-black leading-none",
+                  isLiveOrFinal ? "text-citrus-forest" : "text-citrus-orange"
+                )}>
+                  {displayPts.toFixed(1)}
                 </span>
-                <span className="text-[10px] text-citrus-charcoal/50 font-display font-medium uppercase">proj</span>
+                <span className="text-[10px] text-citrus-charcoal/50 font-display font-medium uppercase">
+                  {isLiveOrFinal ? (gameStatus === 'final' ? 'final' : 'live') : 'proj'}
+                </span>
               </div>
             ) : (
               <span className="text-xs text-citrus-charcoal/40 font-display italic">No game</span>
@@ -231,6 +289,7 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
             "flex-1 flex items-center justify-center py-1 rounded-lg border border-dashed",
             isEligibleTarget ? "border-citrus-sage bg-citrus-sage/5" : "border-citrus-charcoal/15 bg-citrus-charcoal/5",
           )}
+          onClick={onEmptySlotTap}
         >
           <span className={cn(
             "text-xs font-display",
@@ -265,6 +324,7 @@ const MobileRosterList = ({
   tapSelectedPlayerId = null,
   tapEligibleSlots = new Set(),
   onPlayerTap,
+  onPlayerNameTap,
   onSlotTap,
   onBenchTap,
 }: MobileRosterListProps) => {
@@ -306,7 +366,12 @@ const MobileRosterList = ({
           isLocked={player ? lockedPlayerIds.has(String(player.id)) : false}
           isSwapSelected={isSelected}
           isEligibleTarget={isTarget}
-          onTap={() => handleRowTap(player, slotId)}
+          onPositionTap={() => {
+            if (player && onPlayerTap) onPlayerTap(player);
+            else if (!player && onSlotTap) onSlotTap(slotId);
+          }}
+          onNameTap={() => player && onPlayerNameTap?.(player)}
+          onEmptySlotTap={() => onSlotTap?.(slotId)}
         />
       );
     });
@@ -376,7 +441,8 @@ const MobileRosterList = ({
               isLocked={lockedPlayerIds.has(String(player.id))}
               isSwapSelected={isSelected}
               isEligibleTarget={benchIsTarget && !isSelected}
-              onTap={() => onPlayerTap?.(player)}
+              onPositionTap={() => onPlayerTap?.(player)}
+              onNameTap={() => onPlayerNameTap?.(player)}
             />
           );
         })}
@@ -401,7 +467,8 @@ const MobileRosterList = ({
                 slotPosition={pos}
                 isLocked={lockedPlayerIds.has(String(player.id))}
                 isSwapSelected={player.id === tapSelectedPlayerId}
-                onTap={() => onPlayerTap?.(player)}
+                onPositionTap={() => onPlayerTap?.(player)}
+                onNameTap={() => onPlayerNameTap?.(player)}
               />
             );
           })}
