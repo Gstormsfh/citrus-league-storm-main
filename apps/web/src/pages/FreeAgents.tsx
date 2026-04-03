@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Calendar, TrendingUp, Filter, List, Grid, Star, Info, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle } from 'lucide-react';
+import { Calendar, TrendingUp, Filter, List, Grid, Star, Info, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle, Loader2 } from 'lucide-react';
 import LoadingScreen from '@/components/LoadingScreen';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { PlayerService, Player } from '@/services/PlayerService';
@@ -97,6 +97,9 @@ const FreeAgents = () => {
   // Player Stats Modal State
   const [selectedPlayer, setSelectedPlayer] = useState<HockeyPlayer | null>(null);
   const [isPlayerDialogOpen, setIsPlayerDialogOpen] = useState(false);
+
+  // Add-player loading state to prevent double-clicks
+  const [addingPlayerId, setAddingPlayerId] = useState<number | null>(null);
 
   // Infinite scroll pagination
   const PAGE_SIZE = 50;
@@ -603,6 +606,10 @@ const FreeAgents = () => {
   };
 
   const handleAddPlayer = async (player: Player) => {
+    // Prevent double-clicks
+    const playerIdNum = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
+    if (addingPlayerId !== null) return;
+
     // Block guest operations
     if (shouldBlockGuestOperation(userLeagueState, (msg) => {
       toast({
@@ -624,8 +631,11 @@ const FreeAgents = () => {
       return;
     }
 
-    // Check draft status FIRST - must complete draft before adding free agents
+    // Set loading state immediately
+    setAddingPlayerId(playerIdNum);
+
     try {
+      // Check draft status FIRST - must complete draft before adding free agents
       const leagueResponse = await leagueApi.getLeague(leagueId);
       const leagueData = leagueResponse.data as { draft_status?: string } | undefined;
 
@@ -637,17 +647,7 @@ const FreeAgents = () => {
         });
         return;
       }
-    } catch (error) {
-      logger.error("[FreeAgents] Error checking draft status:", error);
-      toast({
-        title: "Error",
-        description: "Could not verify draft status.",
-        variant: "destructive"
-      });
-      return;
-    }
 
-    try {
       // Check roster size before attempting to add
       const { league, error: leagueError } = await LeagueService.getLeague(leagueId, user.id);
       if (leagueError || !league) {
@@ -659,7 +659,7 @@ const FreeAgents = () => {
         return;
       }
 
-      // Get current roster size
+      // Get current roster size via roster_assignments (the source of truth)
       const myTeamResponse = await leagueApi.getMyTeam(leagueId);
       const teamDataResult = myTeamResponse.data as { id: string } | undefined;
 
@@ -673,63 +673,40 @@ const FreeAgents = () => {
       }
       const teamData = teamDataResult;
 
-      // Get lineup data from API
-      let lineupData: { starters?: string[]; bench?: string[]; ir?: string[] } | null = null;
-      try {
-        const lineupResponse = await rosterApi.getLineup(leagueId, teamData.id);
-        lineupData = lineupResponse.data as { starters?: string[]; bench?: string[]; ir?: string[] } | null;
-      } catch (lineupErr) {
-        // No lineup exists yet - lineupData stays null, which is handled below
-        logger.debug('No lineup found for team, will count roster_assignments instead');
+      // Count roster_assignments — this is the authoritative count the RPC uses
+      const { count: currentRosterSize, error: rosterError } = await PlayerService.getRosterAssignmentCount(teamData.id, leagueId);
+
+      if (rosterError) {
+        logger.error('Error counting roster_assignments:', rosterError);
+        toast({
+          title: "Error",
+          description: "Could not load roster for size check.",
+          variant: "destructive"
+        });
+        return;
       }
 
-      // Calculate current roster size
-      // If lineup exists, use it; otherwise count roster_assignments (source of truth)
-      let currentRosterSize = 0;
-      if (lineupData) {
-        // Lineup exists - use lineup data
-        currentRosterSize = 
-          (lineupData.starters?.length || 0) +
-          (lineupData.bench?.length || 0) +
-          (lineupData.ir?.length || 0);
-      } else {
-        // No lineup exists yet - count roster_assignments instead
-        const { count: rosterCount, error: rosterError } = await PlayerService.getRosterAssignmentCount(teamData.id, leagueId);
+      // Use roster_size from league (matches what the RPC uses: COALESCE(l.roster_size, 22))
+      // The RPC checks: roster_count >= roster_size when no drop player specified
+      const maxRosterSize = league.roster_size || 22;
 
-        if (rosterError) {
-          logger.error('Error counting roster_assignments:', rosterError);
-          toast({
-            title: "Error",
-            description: "Could not load roster for size check.",
-            variant: "destructive"
-          });
-          return;
-        } else {
-          currentRosterSize = rosterCount || 0;
-        }
-      }
-
-      const maxRosterSize = league.roster_size + 3; // roster_size + 3 IR slots
-
-      // If roster is full, navigate to roster page with add player intent
-      if (currentRosterSize >= maxRosterSize) {
+      // If roster is full, navigate to roster page to drop first
+      if ((currentRosterSize || 0) >= maxRosterSize) {
         navigate(`/roster?addPlayer=${player.id}&playerName=${encodeURIComponent(player.full_name)}`);
         toast({
           title: "Roster Full",
-          description: `Navigate to your roster to drop a player and add ${player.full_name}.`,
+          description: `You must drop a player before adding ${player.full_name}. Redirecting to your roster.`,
         });
         return;
       }
 
       // Roster has space, proceed with adding
-      // Use WaiverService.addPlayer which checks game locks and handles waivers properly
-      const playerIdNum = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
       const result = await WaiverService.addPlayer(
         leagueId,
         teamData.id,
         playerIdNum,
         null, // No drop player specified
-        user.id // Pass userId for membership validation
+        user.id
       );
 
       if (result.success) {
@@ -748,12 +725,12 @@ const FreeAgents = () => {
         if (result.isFreeAgent) {
           toast({
             title: "Player Added",
-            description: `${player.full_name} has been added to your roster immediately.`,
+            description: `${player.full_name} has been added to your roster.`,
           });
         } else {
           toast({
             title: "Waiver Claim Submitted",
-            description: `${player.full_name} is game-locked. Waiver claim submitted and will process at 3:00 AM EST.`,
+            description: `${player.full_name} is on waivers. Your claim will process at 2:00 AM MT.`,
           });
         }
         // Refresh the free agents list to remove the added player
@@ -767,12 +744,11 @@ const FreeAgents = () => {
           navigate(`/roster?addPlayer=${player.id}&playerName=${encodeURIComponent(player.full_name)}`);
           toast({
             title: "Roster Full",
-            description: `Drop a player to make room for ${player.full_name}.`,
+            description: `You must drop a player before adding ${player.full_name}.`,
           });
         } else {
-          const isWaiverClaim = result.isFreeAgent === false;
           toast({
-            title: isWaiverClaim ? "Claim Failed" : "Add Failed",
+            title: "Add Failed",
             description: result.error || "Failed to add player. Please try again.",
             variant: "destructive"
           });
@@ -780,12 +756,11 @@ const FreeAgents = () => {
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Failed to add player. Please try again.";
-      // Also catch roster-full errors from exceptions
       if (errorMessage.toLowerCase().includes('roster') && (errorMessage.toLowerCase().includes('full') || errorMessage.toLowerCase().includes('max'))) {
         navigate(`/roster?addPlayer=${player.id}&playerName=${encodeURIComponent(player.full_name)}`);
         toast({
           title: "Roster Full",
-          description: `Drop a player to make room for ${player.full_name}.`,
+          description: `You must drop a player before adding ${player.full_name}.`,
         });
       } else {
         toast({
@@ -794,6 +769,8 @@ const FreeAgents = () => {
           variant: "destructive"
         });
       }
+    } finally {
+      setAddingPlayerId(null);
     }
   };
 
@@ -1250,8 +1227,8 @@ const FreeAgents = () => {
                                   <div className="font-bold text-green-600">{player.adds.toLocaleString()}</div>
                                   <div className="text-[11px] text-muted-foreground">Adds</div>
                                 </div>
-                                <Button size="default" variant="default" className="h-10 w-10 text-primary font-bold text-xl bg-primary/10 hover:bg-primary/20 border border-primary/30" onClick={() => handleAddPlayer(player)}>
-                                  +
+                                <Button size="default" variant="default" className="h-10 w-10 text-primary font-bold text-xl bg-primary/10 hover:bg-primary/20 border border-primary/30 disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                  {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : '+'}
                                 </Button>
                               </div>
                             </div>
@@ -1297,8 +1274,8 @@ const FreeAgents = () => {
                                     >
                                       <Star className={`h-4 w-4 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
                                     </Button>
-                                    <Button size="default" variant="default" className="h-10 w-10 text-primary font-bold text-xl bg-primary/10 hover:bg-primary/20 border border-primary/30" onClick={() => handleAddPlayer(player)}>
-                                      +
+                                    <Button size="default" variant="default" className="h-10 w-10 text-primary font-bold text-xl bg-primary/10 hover:bg-primary/20 border border-primary/30 disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                      {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : '+'}
                                     </Button>
                                   </div>
                                 </TableCell>
@@ -1371,8 +1348,8 @@ const FreeAgents = () => {
                                   </div>
                                   <div className="text-[10px] text-muted-foreground">{player.gamesThisWeek || 0}G</div>
                                 </div>
-                                <Button size="sm" variant="default" className="h-8 w-8 text-primary font-bold bg-primary/10 hover:bg-primary/20 border border-primary/30 p-0" onClick={() => handleAddPlayer(player)}>
-                                  +
+                                <Button size="sm" variant="default" className="h-8 w-8 text-primary font-bold bg-primary/10 hover:bg-primary/20 border border-primary/30 p-0 disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                  {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : '+'}
                                 </Button>
                               </div>
                             </div>
@@ -1448,8 +1425,8 @@ const FreeAgents = () => {
                                     >
                                       <Star className={`h-4 w-4 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
                                     </Button>
-                                    <Button size="sm" variant="default" className="h-8 w-8 text-primary font-bold bg-primary/10 hover:bg-primary/20 border border-primary/30 p-0" onClick={() => handleAddPlayer(player)}>
-                                      +
+                                    <Button size="sm" variant="default" className="h-8 w-8 text-primary font-bold bg-primary/10 hover:bg-primary/20 border border-primary/30 p-0 disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                      {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : '+'}
                                     </Button>
                                   </div>
                                 </TableCell>
@@ -1668,8 +1645,8 @@ const FreeAgents = () => {
                                       <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" onClick={() => handlePlayerClick(player)}>
                                         <Info className="h-3.5 w-3.5" />
                                       </Button>
-                                      <Button size="sm" variant="default" className="h-7 w-7 text-primary font-bold text-base bg-primary/10 hover:bg-primary/20 border border-primary/30 p-0" onClick={() => handleAddPlayer(player)}>
-                                        +
+                                      <Button size="sm" variant="default" className="h-7 w-7 text-primary font-bold text-base bg-primary/10 hover:bg-primary/20 border border-primary/30 p-0 disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                        {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : '+'}
                                       </Button>
                                     </div>
                                   </TableCell>
@@ -1949,8 +1926,8 @@ const FreeAgents = () => {
                                    >
                                      <Star className={`h-3.5 w-3.5 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
                                    </Button>
-                                   <Button size="sm" variant="default" className="h-7 px-2 text-xs text-primary font-bold bg-primary/10 hover:bg-primary/20 border border-primary/30" onClick={() => handleAddPlayer(player)}>
-                                     + Add
+                                   <Button size="sm" variant="default" className="h-7 px-2 text-xs text-primary font-bold bg-primary/10 hover:bg-primary/20 border border-primary/30 disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                     {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : '+ Add'}
                                    </Button>
                                  </div>
                                </TableCell>
@@ -2198,8 +2175,8 @@ const FreeAgents = () => {
                                 <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" onClick={() => handlePlayerClick(player)}>
                                   <Info className="h-3.5 w-3.5" />
                                 </Button>
-                                <Button size="sm" variant="default" className="h-7 w-7 text-primary font-bold text-base bg-primary/10 hover:bg-primary/20 border border-primary/30 p-0" onClick={() => handleAddPlayer(player)}>
-                                  +
+                                <Button size="sm" variant="default" className="h-7 w-7 text-primary font-bold text-base bg-primary/10 hover:bg-primary/20 border border-primary/30 p-0 disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                  {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : '+'}
                                 </Button>
                               </div>
                             </TableCell>
