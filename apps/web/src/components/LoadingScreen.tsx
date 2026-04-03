@@ -84,7 +84,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
     <div
       className={cn(
         'fixed inset-0 z-50 flex items-center justify-center cursor-pointer',
-        'bg-[#D4E8B8] dark:bg-gray-900', // Light green / dark background
+        'bg-[#D4E8B8] dark:bg-background', // Light green / dark background
         className
       )}
       onClick={() => setDismissed(true)}

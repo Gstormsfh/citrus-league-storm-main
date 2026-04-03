@@ -308,50 +308,50 @@
   }
 
   .dark {
-  /* Dark mode with warm tones - avoiding pure black */
-  --background: 146 25% 12%; /* Deep forest, not black */
-  --foreground: 48 100% 95%;
+  /* Citrus Dark Mode — warm charcoal with orange/gold accents */
+  --background: 30 15% 10%; /* Warm dark brown-charcoal */
+  --foreground: 40 50% 93%; /* Warm cream text */
 
-  --card: 146 25% 15%;
-  --card-foreground: 48 100% 95%;
+  --card: 30 12% 14%; /* Slightly lifted warm surface */
+  --card-foreground: 40 50% 93%;
 
-  --popover: 146 25% 15%;
-  --popover-foreground: 48 100% 95%;
+  --popover: 30 12% 16%;
+  --popover-foreground: 40 50% 93%;
 
-  --primary: 113 34% 65%;
-  --primary-foreground: 146 30% 13%;
+  --primary: 30 80% 55%; /* Citrus orange-gold primary */
+  --primary-foreground: 30 15% 10%;
 
-  --secondary: 12 57% 75%;
-  --secondary-foreground: 146 30% 13%;
+  --secondary: 113 25% 30%; /* Muted sage on dark */
+  --secondary-foreground: 40 50% 90%;
 
-  --muted: 146 20% 22%;
-  --muted-foreground: 48 40% 75%;
+  --muted: 30 10% 18%; /* Warm dark muted surface */
+  --muted-foreground: 40 20% 65%; /* Warm muted text */
 
-  --accent: 22 70% 54%;
-  --accent-foreground: 48 100% 98.2%;
+  --accent: 28 89% 55%; /* Sandy citrus orange accent */
+  --accent-foreground: 30 15% 10%;
 
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 48 100% 98.2%;
+  --destructive: 0 62.8% 40%;
+  --destructive-foreground: 40 50% 95%;
 
-  --border: 146 20% 30%;
-  --input: 146 20% 30%;
-  --ring: 22 70% 54%;
+  --border: 30 10% 22%; /* Warm subtle border */
+  --input: 30 10% 22%;
+  --ring: 28 89% 55%; /* Orange ring for focus */
 
-  --sidebar-background: 146 25% 15%;
-  --sidebar-foreground: 48 100% 95%;
-  --sidebar-primary: 113 34% 65%;
-  --sidebar-primary-foreground: 146 30% 13%;
-  --sidebar-accent: 22 70% 54%;
-  --sidebar-accent-foreground: 48 100% 98.2%;
-  --sidebar-border: 146 20% 30%;
-  --sidebar-ring: 22 70% 54%;
-  
-  /* Dark mode vibrant colors with warmth */
-  --vibrant-orange: 22 70% 58%;
-  --vibrant-peach: 12 57% 78%;
-  --vibrant-green: 113 34% 65%;
-  --vibrant-yellow: 39 65% 70%;
-  --vibrant-lime: 113 40% 62%;
+  --sidebar-background: 30 12% 12%;
+  --sidebar-foreground: 40 50% 93%;
+  --sidebar-primary: 30 80% 55%;
+  --sidebar-primary-foreground: 30 15% 10%;
+  --sidebar-accent: 28 89% 55%;
+  --sidebar-accent-foreground: 30 15% 10%;
+  --sidebar-border: 30 10% 22%;
+  --sidebar-ring: 28 89% 55%;
+
+  /* Dark mode vibrant colors — brighter for contrast on dark */
+  --vibrant-orange: 28 85% 58%;
+  --vibrant-peach: 18 60% 70%;
+  --vibrant-green: 113 40% 50%;
+  --vibrant-yellow: 42 80% 65%;
+  --vibrant-lime: 113 45% 55%;
   }
 
   /* Loading screen pulse animation */
@@ -371,13 +371,17 @@
   }
   
   html {
-  background: #D4E8B8; /* Beautiful pastel green from loading screen */
+  background: #D4E8B8;
   }
-  
+
+  .dark html, html.dark {
+  background: hsl(30 15% 10%);
+  }
+
   body {
   overflow-x: hidden;
   overflow-y: auto;
-  background: #D4E8B8; /* Beautiful pastel green from loading screen */
+  background: #D4E8B8;
   @apply text-citrus-forest font-sans corduroy-texture;
   margin: 0;
   padding: 0;
@@ -386,6 +390,16 @@
   font-feature-settings: "kern" 1;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  }
+
+  .dark body,
+  body.dark {
+  background: hsl(30 15% 10%);
+  color: hsl(40 50% 93%);
+  }
+
+  .dark h1, .dark h2, .dark .font-varsity {
+  color: hsl(40 50% 93%);
   }
   
   /* Vintage Varsity Typography Hierarchy */
@@ -1762,4 +1776,98 @@ html, body {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ============================================================
+   DARK MODE OVERRIDES — bulk fix for hardcoded hex backgrounds
+   These selectors target Tailwind arbitrary values so we don't
+   have to edit 72+ component files individually.
+   ============================================================ */
+
+/* Page-level backgrounds: bg-[#D4E8B8] → dark background */
+.dark .bg-\[\#D4E8B8\] {
+  background-color: hsl(30 15% 10%) !important;
+}
+.dark .bg-\[\#D4E8B8\]\/90 {
+  background-color: hsl(30 15% 10% / 0.9) !important;
+}
+.dark .bg-\[\#D4E8B8\]\/95 {
+  background-color: hsl(30 15% 10% / 0.95) !important;
+}
+.dark .bg-\[\#D4E8B8\]\/98 {
+  background-color: hsl(30 15% 10% / 0.98) !important;
+}
+
+/* Card/surface backgrounds: bg-[#E8EED9] → dark card */
+.dark .bg-\[\#E8EED9\] {
+  background-color: hsl(30 12% 14%) !important;
+}
+.dark .bg-\[\#E8EED9\]\/30 {
+  background-color: hsl(30 12% 14% / 0.3) !important;
+}
+.dark .bg-\[\#E8EED9\]\/40 {
+  background-color: hsl(30 12% 14% / 0.4) !important;
+}
+.dark .bg-\[\#E8EED9\]\/50 {
+  background-color: hsl(30 12% 14% / 0.5) !important;
+}
+.dark .bg-\[\#E8EED9\]\/60 {
+  background-color: hsl(30 12% 14% / 0.6) !important;
+}
+.dark .bg-\[\#E8EED9\]\/80 {
+  background-color: hsl(30 12% 14% / 0.8) !important;
+}
+.dark .bg-\[\#E8EED9\]\/95 {
+  background-color: hsl(30 12% 14% / 0.95) !important;
+}
+
+/* Border color overrides for dark mode */
+.dark .border-citrus-sage\/40,
+.dark .border-citrus-sage\/30,
+.dark .border-citrus-sage\/20,
+.dark .border-citrus-sage\/15 {
+  border-color: hsl(30 10% 22%) !important;
+}
+
+/* Text color overrides for dark — ensure citrus-forest text becomes readable */
+.dark .text-citrus-forest {
+  color: hsl(40 50% 93%) !important;
+}
+.dark .text-citrus-charcoal {
+  color: hsl(40 20% 75%) !important;
+}
+
+/* Varsity shadow overrides for dark mode */
+.dark .shadow-\[0_8px_0_rgba\(27\,48\,34\,0\.2\)\] {
+  box-shadow: 0 8px 0 rgba(0, 0, 0, 0.3) !important;
+}
+.dark .shadow-\[0_6px_0_rgba\(27\,48\,34\,0\.2\)\] {
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Card-letterman and card-premium dark overrides */
+.dark .card-letterman,
+.dark .card-letterman-thick {
+  background-color: hsl(30 12% 14% / 0.6) !important;
+  border-color: hsl(30 10% 22%) !important;
+}
+
+.dark .card-premium {
+  background-color: hsl(30 12% 14% / 0.5) !important;
+  border-color: hsl(30 10% 22%) !important;
+}
+
+/* Corduroy texture tint for dark mode */
+.dark .corduroy-texture {
+  background-image: none;
+}
+
+/* Drop shadow overrides — white shadows become dark */
+.dark .drop-shadow-\[0_2px_2px_rgba\(255\,255\,255\,0\.3\)\] {
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.5)) !important;
+}
+
+/* Loading screen in dark mode */
+.dark .bg-\[\#2E7D32\] {
+  background-color: hsl(30 80% 40%) !important;
 }

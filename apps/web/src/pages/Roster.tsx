@@ -2195,8 +2195,8 @@ const Roster = () => {
     setRoster((prev) => {
       // 1. Gather all active players (exclude IR)
       const allActivePlayers = [...prev.starters, ...prev.bench];
-      
-      // 2. Helper to sort players: Games Today > Projected Points > Name
+
+      // 2. Helper to sort players: Games Today > Projected Points
       const sortBestPlayers = (players: HockeyPlayer[]) => {
         return [...players].sort((a, b) => {
           if (a.nextGame?.isToday !== b.nextGame?.isToday) {
@@ -2206,27 +2206,41 @@ const Roster = () => {
         });
       };
 
-      // 3. Group by fantasy position (using eligible_positions for multi-pos)
-      const posKeys = leaguePositionType === 'forward' ? ['F', 'D', 'G'] : ['C', 'LW', 'RW', 'D', 'G'];
+      // 3. Get slot caps from league settings (POSITION_SLOTS) instead of hardcoded values
+      const posKeys = Object.keys(POSITION_SLOTS).filter(k => k !== 'UTIL');
+      const slotCaps: Record<string, number> = {};
+      for (const pos of posKeys) {
+        slotCaps[pos] = POSITION_SLOTS[pos as keyof typeof POSITION_SLOTS]?.maxPlayers ?? 0;
+      }
+      const utilCount = POSITION_SLOTS['UTIL' as keyof typeof POSITION_SLOTS]?.maxPlayers ?? 1;
+
+      // 4. Get all eligible positions for each player
+      const getPlayerPositions = (p: HockeyPlayer): string[] => {
+        if (p.eligible_positions && p.eligible_positions.length > 0) {
+          return [...new Set(p.eligible_positions.map(ep => getFantasyPosition(ep, leaguePositionType)))];
+        }
+        return [getFantasyPosition(p.position, leaguePositionType)];
+      };
+
+      // 5. Group by fantasy position (players appear in ALL eligible groups)
       const grouped: Record<string, HockeyPlayer[]> = {};
       for (const k of posKeys) grouped[k] = [];
 
       allActivePlayers.forEach(p => {
-        const positions = (p.eligible_positions && p.eligible_positions.length > 0)
-          ? p.eligible_positions.map(ep => getFantasyPosition(ep, leaguePositionType))
-          : [getFantasyPosition(p.position, leaguePositionType)];
-        const primary = positions[0];
-        if (primary !== 'UTIL' && grouped[primary]) {
-          grouped[primary].push(p);
+        const positions = getPlayerPositions(p);
+        for (const pos of positions) {
+          if (pos !== 'UTIL' && grouped[pos]) {
+            grouped[pos].push(p);
+          }
         }
       });
 
-      // 4. Sort each group
-      Object.keys(grouped).forEach(key => {
+      // Sort each group by projected points
+      for (const key of Object.keys(grouped)) {
         grouped[key] = sortBestPlayers(grouped[key]);
-      });
+      }
 
-      // 5. Assign Slots
+      // 6. Assign slots using two-pass approach
       const newAssignments: Record<string, string> = {};
       const newStarters: HockeyPlayer[] = [];
       const newBench: HockeyPlayer[] = [];
@@ -2244,10 +2258,7 @@ const Roster = () => {
         }
       };
 
-      // Assign Primary Slots (dynamic based on position type)
-      const slotCaps: Record<string, number> = leaguePositionType === 'forward'
-        ? { F: 6, D: 4, G: 2 }
-        : { C: 2, LW: 2, RW: 2, D: 4, G: 2 };
+      // First pass: assign primary position players
       for (const pos of posKeys) {
         assignToSlots(grouped[pos], `slot-${pos}`, slotCaps[pos] || 0);
       }
@@ -2258,10 +2269,7 @@ const Roster = () => {
         if (filled >= (slotCaps[pos] || 0)) continue;
         const candidates = sortBestPlayers(allActivePlayers.filter(p => {
           if (assignedIds.has(p.id)) return false;
-          const positions = (p.eligible_positions && p.eligible_positions.length > 0)
-            ? p.eligible_positions.map(ep => getFantasyPosition(ep, leaguePositionType))
-            : [getFantasyPosition(p.position, leaguePositionType)];
-          return positions.includes(pos);
+          return getPlayerPositions(p).includes(pos);
         }));
         let slotIdx = filled;
         for (const p of candidates) {
@@ -2273,20 +2281,21 @@ const Roster = () => {
         }
       }
 
-      // 6. Handle UTIL Slot (Best remaining non-goalie)
-      const remainingPlayers = allActivePlayers.filter(p => !assignedIds.has(p.id));
-      const utilCandidates = remainingPlayers.filter(p => getFantasyPosition(p.position, leaguePositionType) !== 'G');
-      const bestUtil = sortBestPlayers(utilCandidates)[0];
-
-      if (bestUtil) {
-        newAssignments[bestUtil.id] = 'slot-UTIL';
-        newStarters.push({ ...bestUtil, starter: true });
-        assignedIds.add(bestUtil.id);
+      // 7. Handle UTIL Slots (support multiple UTIL slots from league settings)
+      const utilCandidates = sortBestPlayers(
+        allActivePlayers.filter(p => !assignedIds.has(p.id) && getFantasyPosition(p.position, leaguePositionType) !== 'G')
+      );
+      for (let i = 0; i < utilCount; i++) {
+        const utilPlayer = utilCandidates[i];
+        if (!utilPlayer) break;
+        const slotId = utilCount === 1 ? 'slot-UTIL' : `slot-UTIL-${i + 1}`;
+        newAssignments[utilPlayer.id] = slotId;
+        newStarters.push({ ...utilPlayer, starter: true });
+        assignedIds.add(utilPlayer.id);
       }
 
-      // 7. Remaining go to Bench
-      const remainingAfterUtil = allActivePlayers.filter(p => !assignedIds.has(p.id));
-      remainingAfterUtil.forEach(p => {
+      // 8. Remaining go to Bench
+      allActivePlayers.filter(p => !assignedIds.has(p.id)).forEach(p => {
         newBench.push({ ...p, starter: false });
       });
 
@@ -2296,9 +2305,8 @@ const Roster = () => {
         bench: newBench,
         slotAssignments: newAssignments
       };
-      
+
       // Save lineup to Supabase (only for logged-in users, not demo league)
-      // Yahoo-style: If selectedDate is set, only save to that date; otherwise cascade
       if (userTeamId && user && userTeam?.league_id && !isDemoLeague(userTeam.league_id)) {
         LeagueService.saveLineup(userTeamId, userTeam.league_id, {
           starters: newStarters.map(p => String(p.id)),

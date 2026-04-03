@@ -36,7 +36,7 @@ const Index = () => {
 
   try {
     return (
-      <div className="min-h-screen relative bg-[#D4E8B8] dark:bg-citrus-forest">
+      <div className="min-h-screen relative bg-[#D4E8B8] dark:bg-background">
         {/* Citrus Background - Floating citrus elements */}
         <CitrusBackground density="medium" animated={true} />
         

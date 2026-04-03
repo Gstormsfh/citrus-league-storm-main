@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLeague } from '@/contexts/LeagueContext';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
 import { Link, useSearchParams } from 'react-router-dom';
 import { accountApi } from '@/api/account';
@@ -66,6 +67,7 @@ import { DEFAULT_SCORING } from '@/utils/scoringUtils';
 
 const Profile = () => {
   const { user, signOut } = useAuth();
+  const { userLeagueState } = useLeague();
   const { data: profile } = useProfile();
   const updateProfile = useUpdateProfile();
   const { toast } = useToast();
@@ -229,7 +231,6 @@ const Profile = () => {
 
   // Preferences
   const [preferences, setPreferences] = useState({
-    autoLineup: false,
     emailNotifications: true,
     pushNotifications: true,
     darkMode: false,
@@ -1232,11 +1233,15 @@ const Profile = () => {
                         <TrendingUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
                         <h3 className="text-lg font-semibold mb-2">No Performance History</h3>
                         <p className="text-sm text-muted-foreground mb-4">
-                          Join a league and complete a season to see your performance history here.
+                          {userLeagueState === 'active-user'
+                            ? 'Complete a matchup week to see your performance history here.'
+                            : 'Join a league and complete a season to see your performance history here.'}
                         </p>
-                        <Button asChild>
-                          <Link to="/create-league">Create or Join a League</Link>
-                        </Button>
+                        {userLeagueState !== 'active-user' && (
+                          <Button asChild>
+                            <Link to="/create-league">Create or Join a League</Link>
+                          </Button>
+                        )}
                       </div>
                     ) : (
                       <div className="text-center py-8">
@@ -1278,11 +1283,15 @@ const Profile = () => {
                       <Trophy className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
                       <h3 className="text-lg font-semibold mb-2">No Achievements Yet</h3>
                       <p className="text-sm text-muted-foreground mb-4">
-                        Join a league and start competing to earn achievements!
+                        {userLeagueState === 'active-user'
+                          ? 'Keep competing to earn achievements!'
+                          : 'Join a league and start competing to earn achievements!'}
                       </p>
-                      <Button asChild>
-                        <Link to="/create-league">Create or Join a League</Link>
-                      </Button>
+                      {userLeagueState !== 'active-user' && (
+                        <Button asChild>
+                          <Link to="/create-league">Create or Join a League</Link>
+                        </Button>
+                      )}
                     </CardContent>
                   </Card>
                 )}
@@ -1872,19 +1881,6 @@ const Profile = () => {
                       <CardDescription>Manage automation and gameplay</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <Label className="text-base">Auto-Set Lineups</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Automatically optimize lineup based on projections
-                          </p>
-                        </div>
-                        <Switch
-                          checked={preferences.autoLineup}
-                          onCheckedChange={(c) => handlePreferenceChange('autoLineup', c)}
-                        />
-                      </div>
-                      <Separator />
                       <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
                           <Label className="text-base">Email Notifications</Label>
