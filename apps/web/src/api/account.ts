@@ -20,6 +20,16 @@ export const accountApi = {
       updated_at: string;
     }>('/api/account/profile');
   },
+  /** Get aggregated performance stats (W-L, total points, seasons). */
+  getStats() {
+    return apiClient.get<{
+      totalSeasons: number;
+      wins: number;
+      losses: number;
+      ties: number;
+      totalPoints: number;
+    }>('/api/account/stats');
+  },
   /** Check if a username is already taken. Returns { available: boolean }. */
   checkUsername(username: string) {
     return apiClient.get<{ available: boolean }>(`/api/account/check-username/${encodeURIComponent(username)}`);

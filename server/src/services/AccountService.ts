@@ -51,4 +51,71 @@ export class AccountService {
     });
     return { success: true };
   }
+
+  /**
+   * Get aggregated performance stats for the authenticated user across all leagues.
+   * Returns W-L record, total seasons, and total fantasy points scored.
+   */
+  async getUserStats(userId: string) {
+    // 1. Get all teams owned by this user
+    const { data: teams, error: teamsError } = await this.supabase
+      .from('teams')
+      .select('id, league_id')
+      .eq('owner_id', userId);
+
+    if (teamsError) return { success: false as const, error: teamsError.message };
+    if (!teams || teams.length === 0) {
+      return {
+        success: true as const,
+        data: { totalSeasons: 0, wins: 0, losses: 0, ties: 0, totalPoints: 0 },
+      };
+    }
+
+    const teamIds = teams.map((t: { id: string }) => t.id);
+    const uniqueLeagueIds = [...new Set(teams.map((t: { league_id: string }) => t.league_id))];
+
+    // 2. Get all completed matchups involving user's teams
+    const { data: matchups, error: matchupsError } = await this.supabase
+      .from('matchups')
+      .select(COLUMNS.MATCHUP_SLIM)
+      .eq('status', 'completed')
+      .or(teamIds.map((id: string) => `team1_id.eq.${id}`).join(',') + ',' + teamIds.map((id: string) => `team2_id.eq.${id}`).join(','));
+
+    if (matchupsError) return { success: false as const, error: matchupsError.message };
+
+    let wins = 0;
+    let losses = 0;
+    let ties = 0;
+    let totalPoints = 0;
+
+    interface MatchupRow {
+      team1_id: string;
+      team2_id: string;
+      team1_score: number | string | null;
+      team2_score: number | string | null;
+    }
+
+    const teamIdSet = new Set(teamIds);
+
+    ((matchups || []) as unknown as MatchupRow[]).forEach((m) => {
+      const isTeam1 = teamIdSet.has(m.team1_id);
+      const myScore = parseFloat(String(isTeam1 ? m.team1_score : m.team2_score)) || 0;
+      const oppScore = parseFloat(String(isTeam1 ? m.team2_score : m.team1_score)) || 0;
+      totalPoints += myScore;
+      if (myScore > oppScore) wins++;
+      else if (oppScore > myScore) losses++;
+      else ties++;
+    });
+
+    return {
+      success: true as const,
+      data: {
+        totalSeasons: uniqueLeagueIds.length,
+        wins,
+        losses,
+        ties,
+        totalPoints: Math.round(totalPoints * 100) / 100,
+      },
+    };
+  }
 }

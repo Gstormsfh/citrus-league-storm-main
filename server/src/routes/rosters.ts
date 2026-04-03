@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { membershipMiddleware } from '../middleware/membership';
+import { LeagueMembershipService } from '../services/LeagueMembershipService';
 import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { MatchupService } from '../services/MatchupService';
@@ -105,7 +106,18 @@ rosterRoutes.put('/league/:leagueId/team/:teamId/lineup', membershipMiddleware, 
     .eq('league_id', leagueId)
     .single();
 
-  if (!team || team.owner_id !== userId) {
+  if (!team) {
+    return fail(c, AppError.forbidden('Team not found'));
+  }
+  // AI teams (owner_id = null): only commissioners can edit their lineup.
+  // Human teams: verify ownership.
+  if (team.owner_id === null) {
+    const membershipService = new LeagueMembershipService(supabase);
+    const membership = await membershipService.checkMembership(leagueId, userId);
+    if (!membership.isCommissioner) {
+      return fail(c, AppError.forbidden('Only commissioners can manage AI teams'));
+    }
+  } else if (team.owner_id !== userId) {
     return fail(c, AppError.forbidden('You can only edit your own lineup'));
   }
 
@@ -243,7 +255,18 @@ rosterRoutes.post('/league/:leagueId/team/:teamId/initialize', membershipMiddlew
     .eq('league_id', leagueId)
     .single();
 
-  if (!team || team.owner_id !== userId) {
+  if (!team) {
+    return fail(c, AppError.forbidden('Team not found'));
+  }
+  // AI teams (owner_id = null): only commissioners can initialize their lineup.
+  // Human teams: verify ownership.
+  if (team.owner_id === null) {
+    const membershipService = new LeagueMembershipService(supabase);
+    const membership = await membershipService.checkMembership(leagueId, userId);
+    if (!membership.isCommissioner) {
+      return fail(c, AppError.forbidden('Only commissioners can manage AI teams'));
+    }
+  } else if (team.owner_id !== userId) {
     return fail(c, AppError.forbidden('You can only initialize your own lineup'));
   }
 

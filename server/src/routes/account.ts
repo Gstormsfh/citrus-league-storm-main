@@ -70,6 +70,20 @@ accountRoutes.post('/audit-log', validateBody(schemas.auditLog), async (c) => {
   return ok(c, { success: true });
 });
 
+// GET /api/account/stats — Get aggregated user performance stats
+accountRoutes.get('/stats', async (c) => {
+  try {
+    const userId = c.get('userId');
+    const supabase = createUserClient(c.get('userToken'));
+    const service = new AccountService(supabase);
+    const result = await service.getUserStats(userId);
+    if (!result.success) return fail(c, AppError.badRequest(result.error || 'Failed to fetch stats'));
+    return ok(c, result.data);
+  } catch (err) {
+    return handleError(c, err, 'Failed to fetch user stats');
+  }
+});
+
 // PUT /api/account/profile — Update profile fields
 accountRoutes.put('/profile', async (c) => {
   try {

@@ -268,7 +268,7 @@ export const DraftLobby = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 overflow-x-hidden overflow-y-visible">
       {/* Draft Header */}
       <div className="text-center space-y-2 sm:space-y-4">
         <div className="flex items-center justify-center gap-2">
@@ -286,7 +286,7 @@ export const DraftLobby = ({
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Draft Settings — appears second on mobile (after controls), first on desktop */}
-        <div className="lg:col-span-2 space-y-6 order-2 lg:order-1">
+        <div className="lg:col-span-2 space-y-6 order-2 lg:order-1 min-w-0">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -295,7 +295,7 @@ export const DraftLobby = ({
                 {!isCommissioner && <Badge variant="secondary" className="ml-2">Read Only</Badge>}
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-6 overflow-x-auto">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="rounds">Number of Rounds</Label>
@@ -445,7 +445,7 @@ export const DraftLobby = ({
               <Separator />
 
               {/* Draft Summary */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 overflow-x-auto">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-primary">{teams.length}</div>
                   <div className="text-sm text-muted-foreground">Teams</div>
@@ -469,26 +469,27 @@ export const DraftLobby = ({
           {/* Draft Order */}
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                 <CardTitle className="flex items-center gap-2">
                   <List className="h-5 w-5" />
                   Draft Order
                 </CardTitle>
                 {isCommissioner && !hasExistingDraft && (
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     {onRandomizeOrder && (
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
                         onClick={onRandomizeOrder}
                         className="gap-2"
                       >
                         <Shuffle className="h-4 w-4" />
-                        Randomize Order
+                        <span className="hidden xs:inline">Randomize</span>
+                        <span className="xs:hidden">Rand.</span> Order
                       </Button>
                     )}
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => setShowCustomOrderDialog(true)}
                       className="gap-2"
@@ -515,11 +516,11 @@ export const DraftLobby = ({
                         />
                         <span className="font-bold text-primary">#{index + 1}</span>
                       </div>
-                      <div className="flex-1">
-                        <div className="font-medium">{team.name}</div>
-                        <div className="text-sm text-muted-foreground">{team.owner}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{team.name}</div>
+                        <div className="text-sm text-muted-foreground truncate">{team.owner}</div>
                       </div>
-                      {index === 0 && <Crown className="h-4 w-4 text-yellow-500" />}
+                      {index === 0 && <Crown className="h-4 w-4 text-yellow-500 shrink-0" />}
                     </div>
                   );
                 })}
@@ -550,16 +551,16 @@ export const DraftLobby = ({
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {teams.map((team) => (
-                  <div key={team.id} className="flex items-center gap-3 p-3 rounded-lg border">
-                    <div className="flex items-center gap-2">
-                      <div 
-                        className="w-4 h-4 rounded-full" 
+                  <div key={team.id} className="flex items-center gap-3 p-3 rounded-lg border min-w-0">
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div
+                        className="w-4 h-4 rounded-full"
                         style={{ backgroundColor: team.color }}
                       />
                     </div>
-                    <div className="flex-1">
-                      <div className="font-medium">{team.name}</div>
-                      <div className="text-sm text-muted-foreground">{team.owner}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">{team.name}</div>
+                      <div className="text-sm text-muted-foreground truncate">{team.owner}</div>
                     </div>
                     {isCommissioner && onDeleteTeam && !hasExistingDraft && (
                       <Button
@@ -690,7 +691,7 @@ export const DraftLobby = ({
         </Dialog>
 
         {/* Sidebar — appears first on mobile (controls + invite), second on desktop */}
-        <div className="space-y-6 order-1 lg:order-2">
+        <div className="space-y-6 order-1 lg:order-2 min-w-0">
           {/* League Invite Code - Commissioner Only */}
           {isCommissioner && joinCode && (
             <Card>

@@ -108,6 +108,7 @@ interface ServerPlayer {
   gsax?: number | null;
   xg_per_60?: number | null;
   xg_rating?: string | null;
+  stats_updated_at?: string | null;
 }
 
 /** Map server NormalizedPlayer to frontend Player interface */
@@ -129,7 +130,7 @@ function mapServerPlayer(sp: ServerPlayer): Player {
     roster_status: sp.roster_status || undefined,
     is_ir_eligible: sp.is_ir_eligible || false,
     headshot_url: sp.headshot_url || getHeadshotUrl(sp.team, sp.id),
-    last_updated: new Date().toISOString(),
+    last_updated: sp.stats_updated_at || null,
     games_played: sp.games_played || 0,
     goals: sp.goals || 0,
     assists: sp.assists || 0,

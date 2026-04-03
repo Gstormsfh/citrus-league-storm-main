@@ -285,22 +285,64 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                   {player.team}
                 </span>
               )}
-              {/* Today's Game Icon - MOBILE ONLY - Show if player has game today */}
+              {/* Today's Game Info - MOBILE ONLY - Show game status, time, and live score */}
               {(() => {
                 const todayStr = getTodayMST();
-                const todaysGame = player.games?.find(g => g.game_date?.split('T')[0] === todayStr);
+                const dateToShow = selectedDate || todayStr;
+                const todaysGame = player.games?.find(g => g.game_date?.split('T')[0] === dateToShow);
                 if (!todaysGame) return null;
                 const isHome = todaysGame.home_team?.toUpperCase() === player.team?.toUpperCase();
                 const opponent = isHome ? todaysGame.away_team : todaysGame.home_team;
+                const opPrefix = isHome ? 'vs' : '@';
                 const logoUrl = `https://assets.nhle.com/logos/nhl/svg/${opponent?.toUpperCase()}_light.svg`;
+                const gameStatus = (todaysGame.status || 'scheduled').toLowerCase();
+                const isLive = gameStatus === 'live' || gameStatus === 'intermission' || gameStatus === 'crit';
+                const isFinal = gameStatus === 'final';
+                const homeScore = todaysGame.home_score ?? 0;
+                const awayScore = todaysGame.away_score ?? 0;
+                const hasScores = homeScore > 0 || awayScore > 0;
+
                 return (
-                  <div className="lg:hidden flex items-center gap-0.5">
-                    <div className="relative w-5 h-5 rounded bg-[#E8EED9]/70 border border-citrus-sage flex items-center justify-center">
+                  <div className="lg:hidden flex items-center gap-1 flex-wrap">
+                    {/* Opponent logo + abbrev */}
+                    <div className="flex items-center gap-0.5">
                       <img src={logoUrl} alt={opponent || ''} className="w-3.5 h-3.5 object-contain" />
-                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-gradient-to-br from-citrus-sage to-citrus-sage/80 rounded-full border border-citrus-forest flex items-center justify-center">
-                        <span className="text-[6px] font-bold text-citrus-forest">T</span>
-                      </div>
+                      <span className="text-[10px] font-display font-semibold text-citrus-charcoal/60">{opPrefix} {opponent}</span>
                     </div>
+                    {/* Live badge + score */}
+                    {isLive && (
+                      <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1 py-0.5 rounded-sm leading-none bg-red-500/15 text-red-600 border border-red-500/30 animate-pulse">
+                        <span className="w-1 h-1 rounded-full bg-red-500" />
+                        LIVE
+                      </span>
+                    )}
+                    {isLive && hasScores && (
+                      <span className="text-[10px] font-display font-bold text-citrus-forest">
+                        {isHome
+                          ? `${player.team} ${homeScore}-${awayScore}`
+                          : `${player.team} ${awayScore}-${homeScore}`}
+                        {todaysGame.period ? `, ${todaysGame.period}` : ''}
+                      </span>
+                    )}
+                    {/* Final badge + score */}
+                    {isFinal && (
+                      <span className="text-[9px] font-bold px-1 py-0.5 rounded-sm leading-none bg-citrus-charcoal/10 text-citrus-charcoal/60 border border-citrus-charcoal/20">
+                        F
+                      </span>
+                    )}
+                    {isFinal && hasScores && (
+                      <span className="text-[10px] font-display font-semibold text-citrus-charcoal/60">
+                        {isHome
+                          ? `${homeScore}-${awayScore}`
+                          : `${awayScore}-${homeScore}`}
+                      </span>
+                    )}
+                    {/* Scheduled: show game time */}
+                    {!isLive && !isFinal && player.gameInfo?.time && (
+                      <span className="text-[10px] font-display text-citrus-charcoal/50">
+                        {player.gameInfo.time}
+                      </span>
+                    )}
                   </div>
                 );
               })()}

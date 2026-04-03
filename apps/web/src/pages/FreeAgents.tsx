@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Calendar, TrendingUp, Filter, List, Grid, Star, Info, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Calendar, TrendingUp, Filter, List, Grid, Star, Info, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle } from 'lucide-react';
 import LoadingScreen from '@/components/LoadingScreen';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { PlayerService, Player } from '@/services/PlayerService';
@@ -65,6 +65,7 @@ const FreeAgents = () => {
   const [players, setPlayers] = useState<Player[]>([]);
   const [watchlist, setWatchlist] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [rosterLookupFailed, setRosterLookupFailed] = useState(false);
   const [leagueId, setLeagueId] = useState<string | null>(null);
   
   // Tab reset mechanism - reset to default tab when league changes
@@ -176,7 +177,8 @@ const FreeAgents = () => {
   const fetchPlayers = async () => {
     try {
       setLoading(true);
-      
+      setRosterLookupFailed(false);
+
       // DEMO MODE: For guests, show all players as free agents (no league filtering)
       if (isGuestMode(userLeagueState)) {
         try {
@@ -239,8 +241,12 @@ const FreeAgents = () => {
       
       // LeagueService determines free agents - uses real database if leagueId provided
       // Dropped players (with deleted_at) will be included as free agents
-      const freeAgents = await LeagueService.getFreeAgents(allPlayers, currentLeagueId, user.id);
-      setPlayers(freeAgents);
+      const freeAgentResult = await LeagueService.getFreeAgents(allPlayers, currentLeagueId, user.id);
+      setPlayers(freeAgentResult.players);
+      setRosterLookupFailed(freeAgentResult.rosterLookupFailed);
+      if (freeAgentResult.rosterLookupFailed) {
+        logger.warn(`Roster lookup failed for league ${currentLeagueId} — showing all players as free agents`);
+      }
       
       // Don't calculate schedule maximizers here - will be lazy loaded when tab is active
     } catch (error) {
@@ -1174,6 +1180,14 @@ const FreeAgents = () => {
               ))}
             </div>
 
+            {/* Warning banner when roster lookup failed */}
+            {rosterLookupFailed && (
+              <div className="flex items-center gap-2 rounded-md border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-200">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-yellow-400" />
+                <span>Unable to load roster data for this league. Showing all players — some may already be rostered.</span>
+              </div>
+            )}
+
             {(() => {
               if (displayLoading) {
                 return (
@@ -1646,7 +1660,9 @@ const FreeAgents = () => {
                       </div>
                       {/* Infinite scroll sentinel + count */}
                       <div className="text-center py-2 text-xs text-muted-foreground">
-                        Showing {visiblePlayers.length} of {filteredPlayers.length} players
+                        {filteredPlayers.length === 0 && players.length > 0
+                          ? 'No players match your current filters'
+                          : `Showing ${visiblePlayers.length} of ${filteredPlayers.length} players`}
                       </div>
                       {hasMorePlayers && (
                         <div ref={loadMoreRef} className="flex justify-center py-4">
