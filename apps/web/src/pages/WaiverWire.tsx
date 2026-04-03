@@ -26,6 +26,7 @@ import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { logger } from '@/utils/logger';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
+import { formatWaiverProcessTime } from '@/utils/timezoneUtils';
 import { ScheduleService } from '@/services/ScheduleService';
 import { Zap, Lock } from 'lucide-react';
 
@@ -338,7 +339,7 @@ const WaiverWire = () => {
       } else {
         toast({
           title: "Waiver Claim Submitted",
-          description: `Claim for ${selectedPlayer.full_name} submitted. Will process at 3:00 AM EST.`,
+          description: `Claim for ${selectedPlayer.full_name} submitted. Will process at ${formatWaiverProcessTime(waiverSettings?.waiver_process_time)}.`,
         });
       }
       setSelectedPlayer(null);
@@ -471,7 +472,7 @@ const WaiverWire = () => {
                   <div className="flex items-center justify-between p-3 bg-citrus-sage/10 rounded-varsity border-2 border-citrus-sage/30">
                     <span className="text-sm font-display text-citrus-charcoal">Process Time</span>
                     <span className="font-varsity font-bold text-citrus-forest">
-                      {waiverSettings?.waiver_process_time || '2:00 AM'} MT
+                      {formatWaiverProcessTime(waiverSettings?.waiver_process_time)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-citrus-peach/10 rounded-varsity border-2 border-citrus-peach/30">

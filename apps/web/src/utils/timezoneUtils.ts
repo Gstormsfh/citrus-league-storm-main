@@ -102,6 +102,23 @@ export function formatTimeMST(timeStr: string, options?: Intl.DateTimeFormatOpti
 }
 
 /**
+ * Format a waiver_process_time (e.g. "02:00:00") into a human-readable string like "2:00 AM MT".
+ * Reads the time from league settings instead of hardcoding.
+ */
+export function formatWaiverProcessTime(processTime?: string | null): string {
+  if (!processTime) return '2:00 AM MT';
+  // processTime is a TIME like "02:00:00" or "14:30:00"
+  const parts = processTime.split(':');
+  let hours = parseInt(parts[0], 10);
+  const minutes = parseInt(parts[1] || '0', 10);
+  if (isNaN(hours)) return '2:00 AM MT';
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12 || 12;
+  const minuteStr = minutes > 0 ? `:${String(minutes).padStart(2, '0')}` : ':00';
+  return `${hours}${minuteStr} ${ampm} MT`;
+}
+
+/**
  * CRITICAL: Parse a date string (YYYY-MM-DD) without timezone interpretation issues
  * This avoids the bug where new Date("2026-02-02") creates UTC midnight which is Feb 1st in MST
  * Returns a Date object at local midnight for the given date

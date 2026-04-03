@@ -146,7 +146,7 @@ export class TradeService {
       .eq('id', trade.league_id)
       .single();
 
-    const maxRoster = (league?.roster_size || 21) + 3; // +3 for IR
+    const maxRoster = league?.roster_size || 22; // matches process_roster_move RPC
 
     const { count: fromCount } = await this.supabase
       .from('roster_assignments')
