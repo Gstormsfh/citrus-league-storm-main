@@ -562,11 +562,8 @@ def main() -> int:
                     updates["nhl_ppp"] = stats.get("nhl_ppp", 0)
                 if "nhl_shp" in stats:
                     updates["nhl_shp"] = stats.get("nhl_shp", 0)
-                # Note: hits and blocks are 0 (not in landing endpoint - need StatsAPI)
-                if "nhl_hits" in stats:
-                    updates["nhl_hits"] = stats.get("nhl_hits", 0)
-                if "nhl_blocks" in stats:
-                    updates["nhl_blocks"] = stats.get("nhl_blocks", 0)
+                # NEVER write hits/blocks from landing — they're always 0 here.
+                # Correct values come from boxscore aggregation in build_player_season_stats.
                 if "nhl_toi_seconds" in stats and stats.get("nhl_toi_seconds", 0) > 0:
                     updates["nhl_toi_seconds"] = stats.get("nhl_toi_seconds", 0)
             
@@ -751,10 +748,7 @@ def main() -> int:
                         updates["nhl_ppp"] = stats.get("nhl_ppp", 0)
                     if "nhl_shp" in stats:
                         updates["nhl_shp"] = stats.get("nhl_shp", 0)
-                    if "nhl_hits" in stats:
-                        updates["nhl_hits"] = stats.get("nhl_hits", 0)
-                    if "nhl_blocks" in stats:
-                        updates["nhl_blocks"] = stats.get("nhl_blocks", 0)
+                    # NEVER write hits/blocks from landing — correct values from boxscore aggregation
                     if "nhl_toi_seconds" in stats and stats.get("nhl_toi_seconds", 0) > 0:
                         updates["nhl_toi_seconds"] = stats.get("nhl_toi_seconds", 0)
                 
