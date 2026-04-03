@@ -566,18 +566,20 @@ async joinLeagueByCode(
     }
 
     const teamsCount = LEAGUE_TEAMS_DATA.length;
-    // Target roster distribution: 4-5 C, 4-5 LW, 4-5 RW, 5-6 D, 3 G
-    // Maximum roster size: 21 players total (starting lineup + 8 bench)
-    const MAX_ROSTER_SIZE = 21;
+    // Roster distribution driven by league settings (falls back to standard defaults)
+    // MAX_ROSTER_SIZE comes from the league or defaults to 21
+    const MAX_ROSTER_SIZE = 21; // Demo league default — real leagues use leagues.roster_size
+    // Target roster composition: adapts based on starter slot counts
+    // Starters fill first, then bench fills proportionally
     const targetRoster = {
       'C': { min: 4, max: 5 },
       'LW': { min: 4, max: 5 },
       'RW': { min: 4, max: 5 },
       'D': { min: 5, max: 6 },
-      'G': { min: 3, max: 3 } // Exactly 3 goalies
+      'G': { min: 3, max: 3 }
     };
-    
-    // Minimum requirements for a valid starting lineup (for initial draft priority)
+
+    // Minimum requirements for a valid starting lineup
     const minReqs = { 'C': 2, 'LW': 2, 'RW': 2, 'D': 4, 'G': 2 };
 
     const leagueRosters: Record<number, Player[]> = {};

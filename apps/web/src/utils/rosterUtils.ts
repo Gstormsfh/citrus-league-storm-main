@@ -2,8 +2,8 @@ import { MatchupPlayer } from "@/components/matchup/types";
 import { NHLGame } from "@/services/ScheduleService";
 import { getTodayMST } from "@/utils/timezoneUtils";
 
-// Roster slot configuration
-const ROSTER_SLOTS = {
+// Default roster slot configuration — used when league.settings.rosterSlots is not set
+export const DEFAULT_ROSTER_SLOTS: Record<string, number> = {
   C: 2,
   LW: 2,
   RW: 2,
@@ -11,6 +11,20 @@ const ROSTER_SLOTS = {
   G: 2,
   UTIL: 1, // Can be filled by any skater (C, LW, RW, D)
 };
+
+/**
+ * Build a roster slots config from league settings, falling back to defaults.
+ * League commissioners can override via leagues.settings.rosterSlots.
+ */
+export function getRosterSlots(leagueRosterSlots?: Record<string, number> | null): Record<string, number> {
+  if (leagueRosterSlots && Object.keys(leagueRosterSlots).length > 0) {
+    return { ...DEFAULT_ROSTER_SLOTS, ...leagueRosterSlots };
+  }
+  return DEFAULT_ROSTER_SLOTS;
+}
+
+// Keep backward-compatible reference
+const ROSTER_SLOTS = DEFAULT_ROSTER_SLOTS;
 
 // Normalize position strings to standard abbreviations
 function normalizePosition(position: string): 'C' | 'LW' | 'RW' | 'D' | 'G' | 'OTHER' {

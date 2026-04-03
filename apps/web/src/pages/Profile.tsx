@@ -62,6 +62,7 @@ import {
   Pencil
 } from 'lucide-react';
 import { logger } from '@/utils/logger';
+import { DEFAULT_SCORING } from '@/utils/scoringUtils';
 
 const Profile = () => {
   const { user, signOut } = useAuth();
@@ -302,10 +303,7 @@ const Profile = () => {
         if (leagueData?.scoring_settings) {
           setCommScoringSettings(leagueData.scoring_settings);
         } else {
-          setCommScoringSettings({
-            skater: { goals: 3, assists: 2, power_play_points: 1, short_handed_points: 2, shots_on_goal: 0.4, blocks: 0.5, hits: 0.2, penalty_minutes: 0.5 },
-            goalie: { wins: 4, shutouts: 3, saves: 0.2, goals_against: -1 }
-          });
+          setCommScoringSettings(DEFAULT_SCORING);
         }
         
         // Initialize draft settings

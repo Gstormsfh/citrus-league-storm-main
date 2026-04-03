@@ -14,20 +14,32 @@ interface PositionSlot {
   maxPlayers: number;
 }
 
-const positionSlots: PositionSlot[] = [
-  { id: 'slot-C', position: 'C', label: 'Center', maxPlayers: 2 },
-  { id: 'slot-LW', position: 'LW', label: 'Left Wing', maxPlayers: 2 },
-  { id: 'slot-RW', position: 'RW', label: 'Right Wing', maxPlayers: 2 },
-  { id: 'slot-D', position: 'D', label: 'Defense', maxPlayers: 4 },
-  { id: 'slot-G', position: 'G', label: 'Goalie', maxPlayers: 2 },
-  { id: 'slot-UTIL', position: 'UTIL', label: 'Utility', maxPlayers: 1 },
-];
+const POSITION_LABELS: Record<string, string> = {
+  C: 'Center', LW: 'Left Wing', RW: 'Right Wing', D: 'Defense', G: 'Goalie', UTIL: 'Utility',
+};
 
-// Create individual slots for defense (4 slots) and goalies (2 slots)
-const createIndividualSlots = (position: 'D' | 'G' | 'C' | 'LW' | 'RW', count: number): PositionSlot[] => {
+/**
+ * Build position slot config from league settings.
+ * Falls back to defaults if no rosterSlots provided.
+ */
+function buildPositionSlots(rosterSlots?: Record<string, number> | null): PositionSlot[] {
+  const defaults: Record<string, number> = { C: 2, LW: 2, RW: 2, D: 4, G: 2, UTIL: 1 };
+  const slots = rosterSlots && Object.keys(rosterSlots).length > 0
+    ? { ...defaults, ...rosterSlots }
+    : defaults;
+  return Object.entries(slots).map(([pos, count]) => ({
+    id: `slot-${pos}`,
+    position: pos as PositionSlot['position'],
+    label: POSITION_LABELS[pos] || pos,
+    maxPlayers: count,
+  }));
+}
+
+// Create individual slots for positions with multiple slots
+const createIndividualSlots = (positionSlots: PositionSlot[], position: 'D' | 'G' | 'C' | 'LW' | 'RW', count: number): PositionSlot[] => {
   const baseSlot = positionSlots.find(s => s.position === position);
   if (!baseSlot) return [];
-  
+
   return Array.from({ length: count }, (_, i) => ({
     ...baseSlot,
     id: `${baseSlot.id}-${i + 1}`,
@@ -45,9 +57,10 @@ interface StartersGridProps {
   tapSelectedPlayerId?: string | number | null; // Mobile tap-to-swap: currently selected player
   tapEligibleSlots?: Set<string>; // Mobile tap-to-swap: slots this player can move to
   onSlotTap?: (slotId: string) => void; // Mobile tap-to-swap: handler when an eligible slot is tapped
+  rosterSlots?: Record<string, number> | null; // League-specific roster slot config
 }
 
-const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, className, lockedPlayerIds = new Set(), tapSelectedPlayerId = null, tapEligibleSlots = new Set(), onSlotTap }: StartersGridProps) => {
+const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, className, lockedPlayerIds = new Set(), tapSelectedPlayerId = null, tapEligibleSlots = new Set(), onSlotTap, rosterSlots }: StartersGridProps) => {
   
   const getPlayerInSlot = (slotId: string) => {
     // Look for key in slotAssignments where value is slotId
@@ -85,20 +98,24 @@ const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, className,
      );
   };
 
+  // Build position slots from league settings (dynamic)
+  const positionSlots = buildPositionSlots(rosterSlots);
+  const getSlotCount = (pos: string) => positionSlots.find(s => s.position === pos)?.maxPlayers ?? 0;
+
   // Group slots by row for visual stacking
   // Row 1: LW, C, RW (Top Left, Middle, Top Right)
   const forwardRow = [
-    ...createIndividualSlots('LW', 2),
-    ...createIndividualSlots('C', 2),
-    ...createIndividualSlots('RW', 2)
+    ...createIndividualSlots(positionSlots, 'LW', getSlotCount('LW')),
+    ...createIndividualSlots(positionSlots, 'C', getSlotCount('C')),
+    ...createIndividualSlots(positionSlots, 'RW', getSlotCount('RW'))
   ];
-  
+
   // Row 2: Defense (Centered below)
-  const defenseRow = createIndividualSlots('D', 4);
+  const defenseRow = createIndividualSlots(positionSlots, 'D', getSlotCount('D'));
 
   // Row 3: Goalies & Utility (Bottom)
   const bottomRow = [
-    ...createIndividualSlots('G', 2),
+    ...createIndividualSlots(positionSlots, 'G', getSlotCount('G')),
     ...positionSlots.filter(slot => slot.position === 'UTIL')
   ];
 

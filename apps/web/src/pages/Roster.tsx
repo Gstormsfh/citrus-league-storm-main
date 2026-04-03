@@ -52,6 +52,7 @@ import { MatchupScheduleSelector } from "@/components/matchup/MatchupScheduleSel
 import { WeeklySchedule } from "@/components/matchup/WeeklySchedule";
 import { getTodayMST, getTodayMSTDate, formatWaiverProcessTime } from '@/utils/timezoneUtils';
 import { CURRENT_SEASON } from '@/utils/seasonConstants';
+import { DEFAULT_ROSTER_SLOTS, getRosterSlots } from '@/utils/rosterUtils';
 import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
 import { Matchup as MatchupType } from '@/services/MatchupService';
 import { logger } from '@/utils/logger';
@@ -218,17 +219,18 @@ const safeValue = (val: number) => {
     return { score: avgProj, label: 'Weak', color: 'text-orange-500', bg: 'bg-orange-500/10' };
   };
 
-  // Position slot configuration
-const POSITION_SLOTS = {
-  'C': { maxPlayers: 2, label: 'Center' },
-  'LW': { maxPlayers: 2, label: 'Left Wing' },
-  'RW': { maxPlayers: 2, label: 'Right Wing' },
-  'D': { maxPlayers: 4, label: 'Defense' },
-  'G': { maxPlayers: 2, label: 'Goalie' },
-  'UTIL': { maxPlayers: 1, label: 'Utility' },
-} as const;
+  // Position slot configuration — driven by league settings, falls back to defaults
+  const slots = getRosterSlots(leagueRosterSlots);
+  const POSITION_SLOTS = {
+    'C': { maxPlayers: slots.C ?? 2, label: 'Center' },
+    'LW': { maxPlayers: slots.LW ?? 2, label: 'Left Wing' },
+    'RW': { maxPlayers: slots.RW ?? 2, label: 'Right Wing' },
+    'D': { maxPlayers: slots.D ?? 4, label: 'Defense' },
+    'G': { maxPlayers: slots.G ?? 2, label: 'Goalie' },
+    'UTIL': { maxPlayers: slots.UTIL ?? 1, label: 'Utility' },
+  };
 
-type PositionSlot = keyof typeof POSITION_SLOTS;
+type PositionSlot = 'C' | 'LW' | 'RW' | 'D' | 'G' | 'UTIL';
 
 interface RosterState {
   starters: HockeyPlayer[];
@@ -273,6 +275,7 @@ const Roster = () => {
   const [userTeamId, setUserTeamId] = useState<string | number | null>(null);
   const [userTeam, setUserTeam] = useState<{ id: string; league_id: string; team_name: string } | null>(null);
   const [bestBallEnabled, setBestBallEnabled] = useState(false);
+  const [leagueRosterSlots, setLeagueRosterSlots] = useState<Record<string, number> | null>(null);
   const [teamStats, setTeamStats] = useState({
     record: "0-0-0",
     rank: "-",
@@ -563,9 +566,15 @@ const Roster = () => {
             return;
           }
 
-          // Detect Best Ball mode
-          if (leagueData.settings && (leagueData.settings as LeagueSettings).bestBallEnabled) {
-            setBestBallEnabled(true);
+          // Detect Best Ball mode and load roster slot config
+          if (leagueData.settings) {
+            const settings = leagueData.settings as LeagueSettings;
+            if (settings.bestBallEnabled) {
+              setBestBallEnabled(true);
+            }
+            if (settings.rosterSlots) {
+              setLeagueRosterSlots(settings.rosterSlots);
+            }
           }
 
           teamId = userTeamData.id;
@@ -3218,6 +3227,7 @@ const Roster = () => {
                         slotAssignments={displayRoster.slotAssignments}
                         onPlayerClick={handlePlayerClick}
                         lockedPlayerIds={lockedPlayerIds}
+                        rosterSlots={leagueRosterSlots}
                       />
                       <BenchGrid
                         players={displayRoster.bench}
@@ -3245,6 +3255,7 @@ const Roster = () => {
                         lockedPlayerIds={lockedPlayerIds}
                         tapSelectedPlayerId={null}
                         tapEligibleSlots={new Set()}
+                        rosterSlots={leagueRosterSlots}
                       />
 
                       <BenchGrid
