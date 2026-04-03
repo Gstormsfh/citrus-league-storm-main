@@ -300,7 +300,7 @@ const Roster = () => {
   const [lockedPlayerIds, setLockedPlayerIds] = useState<Set<string>>(new Set());
   
   // Week and date selection state
-  const [selectedWeek, setSelectedWeek] = useState<number>(1);
+  const [selectedWeek, setSelectedWeek] = useState<number>(0); // 0 = not yet calculated
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [currentMatchup, setCurrentMatchup] = useState<MatchupType | null>(null);
   const [matchupWeekDates, setMatchupWeekDates] = useState<string[]>([]);
@@ -1287,9 +1287,9 @@ const Roster = () => {
 
     setFirstWeekStart(firstWeek);
     setAvailableWeeks(weeks);
-    // Only set to current week on initial load (selectedWeek still at default 1)
+    // Only set to current week on initial load (selectedWeek still at 0)
     // or when league changes — don't override user's manual week selection
-    setSelectedWeek(prev => prev === 1 || prev > weeks.length ? currentWeek : prev);
+    setSelectedWeek(prev => prev === 0 || prev > weeks.length ? currentWeek : prev);
   }, [activeLeague]);
 
   // Handle week change
@@ -1301,7 +1301,7 @@ const Roster = () => {
   // Fetch matchup for selected week
   useEffect(() => {
     const fetchMatchupForWeek = async () => {
-      if (!userTeamId || !userTeam?.league_id || !selectedWeek) return;
+      if (!userTeamId || !userTeam?.league_id || selectedWeek <= 0) return;
       // Skip matchup fetch for demo/guest users — they're not league members
       if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') return;
 
@@ -1338,9 +1338,10 @@ const Roster = () => {
         }
         setMatchupWeekDates(dates);
 
-        // Always default to the first day of the matchup week
+        // Default to today if it falls within this matchup week, otherwise first day
         if (dates.length > 0) {
-          setSelectedDate(dates[0]);
+          const todayStr = getTodayMST();
+          setSelectedDate(dates.includes(todayStr) ? todayStr : dates[0]);
         }
       } catch (error) {
         logger.error('[Roster] Error in fetchMatchupForWeek:', error);
@@ -1349,7 +1350,7 @@ const Roster = () => {
       }
     };
 
-    if (userTeamId && userTeam?.league_id && selectedWeek) {
+    if (userTeamId && userTeam?.league_id && selectedWeek > 0) {
       fetchMatchupForWeek();
     }
   }, [userTeamId, userTeam?.league_id, selectedWeek, userLeagueState]);
@@ -3038,7 +3039,7 @@ const Roster = () => {
                 )}
 
                 {/* Week and Date Selectors */}
-                {userTeam?.league_id && availableWeeks.length > 0 && firstWeekStart && (
+                {userTeam?.league_id && availableWeeks.length > 0 && firstWeekStart && selectedWeek > 0 && (
                   <div className="mb-6 space-y-4">
                     {/* Week Selector */}
                     <MatchupScheduleSelector
