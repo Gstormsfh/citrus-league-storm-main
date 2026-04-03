@@ -107,13 +107,20 @@ def process_single_game(game_id: int, raw_json: dict) -> bool:
     """
     try:
         # Import the processing function from process_xg_stats
-        # The file is in scripts/utilities/ at the repo root
+        # It lives in scripts/utilities/ and depends on modules in data-pipeline/acquisition/
+        # and data-pipeline/utils/ — add all required paths
         import sys
         import os
         repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        scripts_path = os.path.join(repo_root, 'scripts', 'utilities')
-        if scripts_path not in sys.path:
-            sys.path.insert(0, scripts_path)
+        paths_needed = [
+            os.path.join(repo_root, 'scripts', 'utilities'),
+            os.path.join(repo_root, 'data-pipeline', 'acquisition'),
+            os.path.join(repo_root, 'data-pipeline', 'utils'),
+            os.path.join(repo_root, 'data-pipeline'),
+        ]
+        for p in paths_needed:
+            if p not in sys.path:
+                sys.path.insert(0, p)
         
         from process_xg_stats import process_single_game_json
         
