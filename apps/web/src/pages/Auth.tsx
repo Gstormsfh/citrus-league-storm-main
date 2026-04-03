@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -29,6 +29,16 @@ const Auth = () => {
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
   const [tosAccepted, setTosAccepted] = useState(false);
+  const signInSafetyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clean up safety timeout on unmount (e.g., when redirect navigates away)
+  useEffect(() => {
+    return () => {
+      if (signInSafetyTimeoutRef.current) {
+        clearTimeout(signInSafetyTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Reactive redirect: once AuthContext commits user state, navigate away.
   // This replaces imperative navigate('/') calls which raced with setUser.
@@ -83,14 +93,32 @@ const Auth = () => {
     setLoading(true);
 
     const { error } = await signIn(email, password);
-    
+
     if (error) {
       setError(getBetterErrorMessage(error.message));
       setLoading(false);
+      return;
     }
-    // On success: don't navigate here — the useEffect watching `user` handles
-    // redirection after React commits the auth state update. This prevents
-    // the race where navigate fires before setUser is committed.
+
+    // On success: the useEffect watching `user` handles redirection after
+    // React commits the auth state update. However, on mobile the
+    // onAuthStateChange listener can stall (e.g., stale token defers to
+    // TOKEN_REFRESHED which may not fire). As a safety net, verify the
+    // session explicitly and set a timeout to re-enable the sign-in button.
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (sessionData?.session) {
+        // Session exists — AuthContext listener should pick it up shortly.
+        // If it doesn't, the timeout below will clear loading so the user
+        // can retry without refreshing.
+      }
+    } catch {
+      // Session check failed; the timeout below will still clear loading.
+    }
+
+    signInSafetyTimeoutRef.current = setTimeout(() => {
+      setLoading(false);
+    }, 4000);
   };
 
   const handleSignUp = async (e: React.FormEvent) => {

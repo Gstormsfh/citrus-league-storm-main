@@ -78,7 +78,7 @@ export const NHL_GAME_COLUMNS_MINIMAL = 'home_team, away_team';
 // PLAYER SEASON STATS COLUMNS
 // ============================================================================
 // Full stats for player display
-export const PLAYER_STATS_DISPLAY = 'player_id, games_played, nhl_goals, nhl_assists, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_ppp, nhl_shp, nhl_plus_minus, nhl_toi_seconds, goalie_gp, nhl_wins, nhl_losses, nhl_ot_losses, nhl_saves, nhl_save_pct, nhl_gaa, nhl_shutouts, nhl_shots_faced, nhl_goals_against, x_goals';
+export const PLAYER_STATS_DISPLAY = 'player_id, games_played, nhl_goals, nhl_assists, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_ppp, nhl_shp, nhl_plus_minus, nhl_toi_seconds, goalie_gp, nhl_wins, nhl_losses, nhl_ot_losses, nhl_saves, nhl_save_pct, nhl_gaa, nhl_shutouts, nhl_shots_faced, nhl_goals_against, x_goals, updated_at';
 
 // Projection-related stats only
 export const PLAYER_STATS_PROJECTIONS = 'player_id, projected_goals, projected_assists, projected_sog, projected_blocks, projected_ppp, projected_shp, projected_hits, projected_pim, total_projected_points';

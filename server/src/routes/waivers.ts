@@ -202,7 +202,7 @@ waiverRoutes.post('/league/:leagueId/drop-player', membershipMiddleware, validat
 
   const service = new WaiverService(supabase);
 
-  const { success, error } = await service.dropPlayer(leagueId, String(body.teamId), Number(body.playerId));
+  const { success, error } = await service.dropPlayer(leagueId, String(body.teamId), Number(body.playerId), userId);
   if (!success) {
     return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to drop player'));
   }

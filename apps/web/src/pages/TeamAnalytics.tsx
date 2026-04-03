@@ -130,8 +130,8 @@ const TeamAnalytics = () => {
       
       // Get free agents
       const allPlayers = await PlayerService.getAllPlayers();
-      const freeAgents = await LeagueService.getFreeAgents(allPlayers, currentLeagueId, user.id);
-      
+      const { players: freeAgents } = await LeagueService.getFreeAgents(allPlayers, currentLeagueId, user.id);
+
       // Batch fetch games for all teams at once (instead of per-team for-loop)
       const top10 = freeAgents.slice(0, 10);
       const faUniqueTeams = [...new Set(top10.map(p => p.team))];

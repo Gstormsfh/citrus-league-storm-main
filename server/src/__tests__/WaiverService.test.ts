@@ -141,7 +141,7 @@ describe('WaiverService', () => {
       expect(result.success).toBe(true);
       expect(mockSupabase.rpc).toHaveBeenCalledWith('process_roster_move', {
         p_league_id: 'league-1',
-        p_team_id: 'team-1',
+        p_user_id: 'user-1',
         p_add_player_id: 100,
         p_drop_player_id: 50,
       });
@@ -152,11 +152,11 @@ describe('WaiverService', () => {
     it('calls roster move RPC with null add', async () => {
       mockSupabase.rpc = vi.fn().mockResolvedValue({ error: null });
 
-      const result = await service.dropPlayer('league-1', 'team-1', 100);
+      const result = await service.dropPlayer('league-1', 'team-1', 100, 'user-1');
       expect(result.success).toBe(true);
       expect(mockSupabase.rpc).toHaveBeenCalledWith('process_roster_move', {
         p_league_id: 'league-1',
-        p_team_id: 'team-1',
+        p_user_id: 'user-1',
         p_add_player_id: null,
         p_drop_player_id: 100,
       });

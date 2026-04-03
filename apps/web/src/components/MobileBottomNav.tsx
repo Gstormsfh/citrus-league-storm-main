@@ -83,7 +83,7 @@ const MobileBottomNav = () => {
   };
 
   // Don't show on auth pages, draft room, or setup flows
-  const hideOnRoutes = ['/auth', '/draft-room', '/profile-setup', '/verify-email', '/reset-password'];
+  const hideOnRoutes = ['/auth', '/profile-setup', '/verify-email', '/reset-password'];
   if (hideOnRoutes.some(route => location.pathname.startsWith(route))) {
     return null;
   }
