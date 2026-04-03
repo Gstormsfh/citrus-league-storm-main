@@ -27,6 +27,7 @@ interface ActiveLeagueFormat {
   leagueType: LeagueType;
   scoringFormat: ScoringFormat;
   draftType: DraftType;
+  positionType?: 'individual' | 'forward';
 }
 
 interface LeagueContextType {

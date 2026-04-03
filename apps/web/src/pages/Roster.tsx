@@ -52,7 +52,6 @@ import { MatchupScheduleSelector } from "@/components/matchup/MatchupScheduleSel
 import { WeeklySchedule } from "@/components/matchup/WeeklySchedule";
 import { getTodayMST, getTodayMSTDate, formatWaiverProcessTime } from '@/utils/timezoneUtils';
 import { CURRENT_SEASON } from '@/utils/seasonConstants';
-import { DEFAULT_ROSTER_SLOTS, getRosterSlots } from '@/utils/rosterUtils';
 import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
 import { Matchup as MatchupType } from '@/services/MatchupService';
 import { logger } from '@/utils/logger';

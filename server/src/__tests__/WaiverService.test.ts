@@ -189,25 +189,29 @@ describe('WaiverService', () => {
 
   describe('AI team roster operations', () => {
     it('addFreeAgent uses admin path for AI teams (owner_id = NULL)', async () => {
-      // Mock limit check
+      // Mock limit check + waiver check + roster size pre-check
+      mockSupabase.rpc = vi.fn().mockResolvedValue({ data: false, error: null });
       mockSupabase.from = vi.fn((table: string) => {
-        if (table === 'leagues') return createChain({ data: { settings: {} }, error: null });
+        if (table === 'leagues') return createChain({ data: { settings: {}, roster_size: 22 }, error: null });
         if (table === 'transaction_ledger') return createChain({ count: 0, error: null });
         return createChain();
       });
 
-      // Mock admin client: isAiTeam returns null owner, then roster operations succeed
-      let adminFromCallCount = 0;
+      // Mock admin client: existence check, roster size check, isAiTeam, then roster operations
+      let adminRosterCallCount = 0;
       mockAdminClient = {
         from: vi.fn((table: string) => {
-          adminFromCallCount++;
-          // First call: isAiTeam check
-          if (table === 'teams' && adminFromCallCount === 1) {
-            return createChain({ data: { owner_id: null }, error: null });
+          // roster_assignments is called twice: first for existence check (count: 0), then for roster size / move
+          if (table === 'roster_assignments') {
+            adminRosterCallCount++;
+            if (adminRosterCallCount === 1) return createChain({ data: null, error: null, count: 0 }); // not on any roster
+            if (adminRosterCallCount === 2) return createChain({ data: null, error: null, count: 5 }); // roster size check
+            return createChain({ data: null, error: null, count: 5 });
           }
+          // isAiTeam check
+          if (table === 'teams') return createChain({ data: { owner_id: null }, error: null });
           // executeAiTeamRosterMove calls
           if (table === 'leagues') return createChain({ data: { roster_size: 22, settings: {} }, error: null });
-          if (table === 'roster_assignments') return createChain({ data: null, error: null, count: 5 });
           if (table === 'nhl_players') return createChain({ data: { position: 'C' }, error: null });
           if (table === 'transaction_ledger') return createChain({ data: null, error: null });
           if (table === 'team_lineups') return createChain({ data: { id: 'lineup-1', bench: [] }, error: null });
@@ -218,8 +222,8 @@ describe('WaiverService', () => {
 
       const result = await service.addFreeAgent('league-1', 'ai-team-1', 100, null, 'user-1');
       expect(result.success).toBe(true);
-      // Should NOT have called process_roster_move RPC
-      expect(mockSupabase.rpc).not.toHaveBeenCalled();
+      // Should NOT have called process_roster_move RPC (only is_player_on_waivers)
+      expect(mockSupabase.rpc).not.toHaveBeenCalledWith('process_roster_move', expect.any(Object));
     });
 
     it('dropPlayer uses admin path for AI teams (owner_id = NULL)', async () => {
