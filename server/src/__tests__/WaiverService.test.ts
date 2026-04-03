@@ -2,6 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { WaiverService } from '../services/WaiverService';
 import { createChain, createMockSupabase } from './helpers';
 
+// Mock the admin client used internally for AI team operations
+let mockAdminClient: any;
+vi.mock('../lib/supabase', () => ({
+  getSupabaseAdmin: vi.fn(() => mockAdminClient),
+}));
+
 describe('WaiverService', () => {
   let service: WaiverService;
   let mockSupabase: any;
@@ -9,6 +15,11 @@ describe('WaiverService', () => {
   beforeEach(() => {
     mockSupabase = createMockSupabase();
     service = new WaiverService(mockSupabase);
+    // Default admin client for AI team checks
+    mockAdminClient = {
+      from: vi.fn(() => createChain({ data: { owner_id: 'some-user' }, error: null })),
+      rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
+    };
   });
 
   describe('checkTransactionLimits', () => {
