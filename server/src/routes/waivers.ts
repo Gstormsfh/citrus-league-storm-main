@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { membershipMiddleware } from '../middleware/membership';
+import { LeagueMembershipService } from '../services/LeagueMembershipService';
 import { z } from 'zod';
 import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
@@ -199,12 +200,18 @@ waiverRoutes.post('/league/:leagueId/drop-player', membershipMiddleware, validat
     .eq('league_id', leagueId)
     .single();
 
-  // For AI teams (owner_id is null), allow league members to manage their roster.
-  // For human teams, verify ownership.
   if (!team) {
     return fail(c, AppError.forbidden('Team not found'));
   }
-  if (team.owner_id !== null && team.owner_id !== userId) {
+  // AI teams (owner_id = null): only commissioners can manage their roster.
+  // Human teams: verify ownership.
+  if (team.owner_id === null) {
+    const membershipService = new LeagueMembershipService(supabase);
+    const membership = await membershipService.checkMembership(leagueId, userId);
+    if (!membership.isCommissioner) {
+      return fail(c, AppError.forbidden('Only commissioners can manage AI teams'));
+    }
+  } else if (team.owner_id !== userId) {
     return fail(c, AppError.forbidden('You do not own this team'));
   }
 

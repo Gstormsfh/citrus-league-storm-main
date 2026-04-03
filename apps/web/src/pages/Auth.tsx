@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { UserAccountService } from '@/services/UserAccountService';
+import { logger } from '@citrus/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -112,8 +113,8 @@ const Auth = () => {
         // If it doesn't, the timeout below will clear loading so the user
         // can retry without refreshing.
       }
-    } catch {
-      // Session check failed; the timeout below will still clear loading.
+    } catch (sessionError) {
+      logger.warn('Post-sign-in session verification failed', sessionError);
     }
 
     signInSafetyTimeoutRef.current = setTimeout(() => {

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { membershipMiddleware } from '../middleware/membership';
+import { LeagueMembershipService } from '../services/LeagueMembershipService';
 import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { MatchupService } from '../services/MatchupService';
@@ -97,7 +98,7 @@ rosterRoutes.put('/league/:leagueId/team/:teamId/lineup', membershipMiddleware, 
 
   const supabase = createUserClient(c.get('userToken'));
 
-  // Verify user owns this team (AI teams with owner_id = NULL are allowed)
+  // Verify user owns this team
   const { data: team } = await supabase
     .from('teams')
     .select('id, owner_id')
@@ -108,7 +109,15 @@ rosterRoutes.put('/league/:leagueId/team/:teamId/lineup', membershipMiddleware, 
   if (!team) {
     return fail(c, AppError.forbidden('Team not found'));
   }
-  if (team.owner_id !== null && team.owner_id !== userId) {
+  // AI teams (owner_id = null): only commissioners can edit their lineup.
+  // Human teams: verify ownership.
+  if (team.owner_id === null) {
+    const membershipService = new LeagueMembershipService(supabase);
+    const membership = await membershipService.checkMembership(leagueId, userId);
+    if (!membership.isCommissioner) {
+      return fail(c, AppError.forbidden('Only commissioners can manage AI teams'));
+    }
+  } else if (team.owner_id !== userId) {
     return fail(c, AppError.forbidden('You can only edit your own lineup'));
   }
 
@@ -238,7 +247,7 @@ rosterRoutes.post('/league/:leagueId/team/:teamId/initialize', membershipMiddlew
   const userId = c.get('userId');
   const supabase = createUserClient(c.get('userToken'));
 
-  // Verify user owns this team (AI teams with owner_id = NULL are allowed)
+  // Verify user owns this team
   const { data: team } = await supabase
     .from('teams')
     .select('id, owner_id')
@@ -249,7 +258,15 @@ rosterRoutes.post('/league/:leagueId/team/:teamId/initialize', membershipMiddlew
   if (!team) {
     return fail(c, AppError.forbidden('Team not found'));
   }
-  if (team.owner_id !== null && team.owner_id !== userId) {
+  // AI teams (owner_id = null): only commissioners can initialize their lineup.
+  // Human teams: verify ownership.
+  if (team.owner_id === null) {
+    const membershipService = new LeagueMembershipService(supabase);
+    const membership = await membershipService.checkMembership(leagueId, userId);
+    if (!membership.isCommissioner) {
+      return fail(c, AppError.forbidden('Only commissioners can manage AI teams'));
+    }
+  } else if (team.owner_id !== userId) {
     return fail(c, AppError.forbidden('You can only initialize your own lineup'));
   }
 

@@ -3084,7 +3084,7 @@ const DraftRoom = () => {
             </div>
 
             {/* Draft Content */}
-            <div className={`container mx-auto px-2 sm:px-4 py-3 sm:py-6 ${isCommissioner && (draftHistory?.length || 0) > 0 ? 'pb-16 sm:pb-6' : ''}`}>
+            <div className={`container mx-auto px-2 sm:px-4 py-3 sm:py-6 pb-20 sm:pb-6 ${isCommissioner && (draftHistory?.length || 0) > 0 ? '!pb-32 sm:!pb-6' : ''}`}>
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-6">
                 {/* Main Draft Area */}
                 <div className="lg:col-span-3">
