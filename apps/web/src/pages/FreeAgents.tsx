@@ -30,7 +30,7 @@ import { isGuestMode, shouldBlockGuestOperation } from '@/utils/guestHelpers';
 import { DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeagueService';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import { getPlayerWithSeasonStats } from '@/utils/playerStatsHelper';
-import { getTodayMST } from '@/utils/timezoneUtils';
+import { getTodayMST, formatWaiverProcessTime } from '@/utils/timezoneUtils';
 import { CitrusBackground } from '@/components/CitrusBackground';
 import { COLUMNS } from '@/utils/queryColumns';
 import { AdSpace } from '@/components/AdSpace';
@@ -100,6 +100,9 @@ const FreeAgents = () => {
 
   // Add-player loading state to prevent double-clicks
   const [addingPlayerId, setAddingPlayerId] = useState<number | null>(null);
+
+  // Waiver process time from league settings (for toast messages)
+  const [waiverProcessTime, setWaiverProcessTime] = useState<string | null>(null);
 
   // Infinite scroll pagination
   const PAGE_SIZE = 50;
@@ -232,7 +235,14 @@ const FreeAgents = () => {
       }
       
       setLeagueId(currentLeagueId || null);
-      
+
+      // Fetch waiver settings for this league (for dynamic toast messages)
+      if (currentLeagueId && user) {
+        WaiverService.getLeagueWaiverSettings(currentLeagueId, user.id)
+          .then(settings => { if (settings) setWaiverProcessTime(settings.waiver_process_time); })
+          .catch(() => { /* non-critical */ });
+      }
+
       // Get all players from our pipeline tables (player_directory + player_season_stats)
       // PlayerService.getAllPlayers() is the ONLY source for player data
       // CRITICAL: This now filters to only include players with matching stats records (same as getPlayersByIds)
@@ -730,7 +740,7 @@ const FreeAgents = () => {
         } else {
           toast({
             title: "Waiver Claim Submitted",
-            description: `${player.full_name} is on waivers. Your claim will process at 2:00 AM MT.`,
+            description: `${player.full_name} is on waivers. Your claim will process at ${formatWaiverProcessTime(waiverProcessTime)}.`,
           });
         }
         // Refresh the free agents list to remove the added player

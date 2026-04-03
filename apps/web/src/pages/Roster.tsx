@@ -50,7 +50,7 @@ import { matchupApi } from '@/api/matchups';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { MatchupScheduleSelector } from "@/components/matchup/MatchupScheduleSelector";
 import { WeeklySchedule } from "@/components/matchup/WeeklySchedule";
-import { getTodayMST, getTodayMSTDate } from '@/utils/timezoneUtils';
+import { getTodayMST, getTodayMSTDate, formatWaiverProcessTime } from '@/utils/timezoneUtils';
 import { CURRENT_SEASON } from '@/utils/seasonConstants';
 import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
 import { Matchup as MatchupType } from '@/services/MatchupService';
@@ -3669,7 +3669,7 @@ const Roster = () => {
                         } else {
                           toast({
                             title: "Waiver Claim Submitted",
-                            description: `Dropped ${player.name}. ${pendingAddPlayer.name} is game-locked - waiver claim submitted and will process at 3:00 AM EST.`,
+                            description: `Dropped ${player.name}. ${pendingAddPlayer.name} is game-locked - waiver claim submitted and will process at ${formatWaiverProcessTime()}.`,
                           });
                         }
                         // Clear query params and close dialog
