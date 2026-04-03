@@ -2067,7 +2067,7 @@ def calculate_skater_physical_projection(
         "hits": base_projection["hits"] * env_factor,
         "pim": base_projection["pim"] * env_factor,
         # xG projection
-        "xg": base_projection["goals"] / finishing_multiplier if finishing_multiplier > 0 else base_projection["goals"],
+        "xg": base_projection["goals"],
         # Skaters don't have saves
         "saves": 0.0,
         "is_goalie": False,
