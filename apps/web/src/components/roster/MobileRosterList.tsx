@@ -64,6 +64,31 @@ const ALL_STARTER_SLOTS = [
   'slot-G-1', 'slot-G-2', 'slot-UTIL',
 ];
 
+// ─── Format compact stat line from daily projection ─────────────────
+const formatProjectedStatLine = (player: HockeyPlayer): string | null => {
+  const isGoalie = player.position === 'Goalie' || player.position === 'G';
+
+  if (isGoalie && player.goalieProjection) {
+    const gp = player.goalieProjection;
+    const parts: string[] = [];
+    if (gp.projected_saves > 0) parts.push(`${Math.round(gp.projected_saves)} SV`);
+    if (gp.projected_goals_against > 0) parts.push(`${gp.projected_goals_against.toFixed(1)} GA`);
+    if (gp.projected_wins >= 0.5) parts.push(`W`);
+    return parts.length > 0 ? parts.join(', ') : null;
+  }
+
+  if (!isGoalie && player.daily_projection) {
+    const dp = player.daily_projection;
+    const parts: string[] = [];
+    if (dp.projected_goals >= 0.3) parts.push(`${dp.projected_goals.toFixed(1)}G`);
+    if (dp.projected_assists >= 0.3) parts.push(`${dp.projected_assists.toFixed(1)}A`);
+    if (dp.projected_sog >= 1) parts.push(`${dp.projected_sog.toFixed(0)} SOG`);
+    return parts.length > 0 ? parts.join(', ') : null;
+  }
+
+  return null;
+};
+
 // ─── Single Row ──────────────────────────────────────────────────────
 interface PlayerRowProps {
   player: HockeyPlayer | null;
@@ -136,7 +161,7 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
             )}
           </div>
 
-          {/* Name + team/number */}
+          {/* Name + team/number + game info */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1">
               <span className="font-display font-bold text-[13px] text-citrus-forest truncate leading-tight">
@@ -159,6 +184,28 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
                 </>
               )}
             </div>
+            {/* Game time + projected stat line */}
+            {hasGame && player.nextGame && (
+              <div className="flex items-center gap-1.5 mt-0.5">
+                {player.nextGame.gameTime && (
+                  <span className="text-[10px] font-display font-semibold text-citrus-charcoal/50">
+                    {player.nextGame.gameTime}
+                  </span>
+                )}
+                {(() => {
+                  const statLine = formatProjectedStatLine(player);
+                  if (!statLine) return null;
+                  return (
+                    <>
+                      {player.nextGame.gameTime && <span className="text-citrus-charcoal/20 text-[10px]">·</span>}
+                      <span className="text-[10px] font-display text-citrus-charcoal/45 italic truncate">
+                        {statLine}
+                      </span>
+                    </>
+                  );
+                })()}
+              </div>
+            )}
           </div>
 
           {/* Projected points */}
