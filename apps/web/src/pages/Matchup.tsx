@@ -3825,8 +3825,9 @@ const Matchup = () => {
         const firstWeek = getFirstWeekStartDate(draftCompletionDate);
         setFirstWeekStart(firstWeek);
 
-        // Get available weeks
-        const weeks = getAvailableWeeks(firstWeek);
+        // Get available weeks (respect regularSeasonWeeks setting if set)
+        const leagueRegularSeasonWeeks = currentLeague.settings?.regularSeasonWeeks;
+        const weeks = getAvailableWeeks(firstWeek, leagueRegularSeasonWeeks);
         log(` Calculated ${weeks.length} available weeks:`, weeks);
         setAvailableWeeks(weeks);
 

@@ -1273,7 +1273,8 @@ const Roster = () => {
     if (!draftCompletionDate) return;
 
     const firstWeek = getFirstWeekStartDate(draftCompletionDate);
-    const weeks = getAvailableWeeks(firstWeek);
+    const regularSeasonWeeksOverride = activeLeague.settings?.regularSeasonWeeks;
+    const weeks = getAvailableWeeks(firstWeek, regularSeasonWeeksOverride);
     const currentWeek = getCurrentWeekNumber(firstWeek);
 
     setFirstWeekStart(firstWeek);

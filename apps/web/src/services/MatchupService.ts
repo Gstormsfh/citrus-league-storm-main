@@ -379,14 +379,16 @@ export const MatchupService = {
       // Get first week start date
       const draftCompletionDate = league.updated_at ? new Date(league.updated_at) : new Date();
       const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
-      const scheduleLength = getScheduleLength(firstWeekStart);
+      const leagueSettings = league.settings as Record<string, unknown> | null;
+      const regularSeasonWeeks = (leagueSettings?.regularSeasonWeeks as number) || undefined;
+      const scheduleLength = getScheduleLength(firstWeekStart, regularSeasonWeeks);
       const isPlayoffWeek = matchup.week_number > scheduleLength;
 
       // Get user's team to determine which side they're on (if they're in this matchup)
       // CRITICAL: Make this optional - if user isn't in matchup, that's fine, we'll use team1
       let userTeam = null;
       let isUserInMatchup = false;
-      
+
       try {
         const { team } = await LeagueService.getUserTeam(matchup.league_id, userId);
         userTeam = team || null;
@@ -551,7 +553,9 @@ export const MatchupService = {
       // Get first week start date
       const draftCompletionDate = league.updated_at ? new Date(league.updated_at as string) : new Date();
       const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
-      const scheduleLength = getScheduleLength(firstWeekStart);
+      const leagueSettings2 = league.settings as Record<string, unknown> | null;
+      const regularSeasonWeeks2 = (leagueSettings2?.regularSeasonWeeks as number) || undefined;
+      const scheduleLength = getScheduleLength(firstWeekStart, regularSeasonWeeks2);
       const isPlayoffWeek = weekNumber > scheduleLength;
 
       // Get user's team via API
@@ -726,7 +730,7 @@ export const MatchupService = {
       }
 
       // Calculate navigation metadata
-      const availableWeeks = getAvailableWeeks(firstWeekStart);
+      const availableWeeks = getAvailableWeeks(firstWeekStart, regularSeasonWeeks2);
       const currentWeekIndex = availableWeeks.indexOf(weekNumber);
       const previousWeek = currentWeekIndex > 0 ? availableWeeks[currentWeekIndex - 1] : null;
       const nextWeek = currentWeekIndex < availableWeeks.length - 1 ? availableWeeks[currentWeekIndex + 1] : null;

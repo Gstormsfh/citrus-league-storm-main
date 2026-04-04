@@ -136,9 +136,17 @@ export function getCurrentWeekNumber(firstWeekStart: Date): number {
  * @param firstWeekStart - The Sunday date of the first week of the season
  * @returns Array of week numbers (1-based) from week 1 to the last week of regular season
  */
-export function getAvailableWeeks(firstWeekStart: Date): number[] {
+export function getAvailableWeeks(firstWeekStart: Date, regularSeasonWeeksOverride?: number): number[] {
   const weeks: number[] = [];
-  
+
+  // If league has an explicit regularSeasonWeeks setting, use it
+  if (regularSeasonWeeksOverride && regularSeasonWeeksOverride > 0) {
+    for (let i = 1; i <= regularSeasonWeeksOverride; i++) {
+      weeks.push(i);
+    }
+    return weeks;
+  }
+
   // Determine the season year based on when the first week starts
   // If first week is in Oct-Dec, season ends in April of next year
   // If first week is in Jan-Apr, season ends in April of same year
@@ -178,8 +186,8 @@ export function getAvailableWeeks(firstWeekStart: Date): number[] {
  * Get the total number of regular season weeks (schedule length)
  * This is the length of the array returned by getAvailableWeeks
  */
-export function getScheduleLength(firstWeekStart: Date): number {
-  const weeks = getAvailableWeeks(firstWeekStart);
+export function getScheduleLength(firstWeekStart: Date, regularSeasonWeeksOverride?: number): number {
+  const weeks = getAvailableWeeks(firstWeekStart, regularSeasonWeeksOverride);
   return weeks.length;
 }
 

@@ -107,13 +107,17 @@ const Navbar = () => {
     }
   };
 
+  // Show Playoffs tab only when league has playoffs configured and draft is completed
+  const showPlayoffsTab = activeLeagueId && activeLeague?.draft_status === 'completed' &&
+    (activeLeague?.settings?.playoffTeams ?? 0) > 0;
+
   const navTabs = isPool && activeLeagueId
     ? getPoolTabs()
     : [
         { label: 'Matchup', path: activeLeagueId ? `/matchup/${activeLeagueId}` : '/matchup', icon: Swords },
         { label: 'Roster', path: '/roster', icon: Users },
         { label: 'Standings', path: '/standings', icon: BarChart3 },
-        ...(activeLeagueId ? [{ label: 'Playoffs', path: `/league/${activeLeagueId}/playoffs`, icon: Trophy }] : []),
+        ...(showPlayoffsTab ? [{ label: 'Playoffs', path: `/league/${activeLeagueId}/playoffs`, icon: Trophy }] : []),
         { label: 'Players', path: '/free-agents', icon: Search },
         { label: 'GM Office', path: '/gm-office', icon: Settings },
         { label: 'Draft', path: activeLeagueId ? `/draft-room?league=${activeLeagueId}` : '/draft-room', icon: Sparkles },
