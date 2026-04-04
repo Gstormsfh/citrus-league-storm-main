@@ -3875,8 +3875,23 @@ const Matchup = () => {
           if (genError) {
             const isDuplicateKey = genError.message?.includes('duplicate key');
             if (isDuplicateKey && hasAnyMatchups) {
-              // Matchups already exist — duplicate key is expected, continue to look up user's matchup
-              log(' Duplicate key during generation (matchups already exist) — continuing...');
+              // Matchups already exist — duplicate key is expected.
+              // Force regenerate to ensure all current teams are included.
+              log(' Duplicate key during generation — force regenerating with current teams...');
+
+              const { error: regenError } = await MatchupService.generateMatchupsForLeague(
+                currentLeague.id,
+                leagueTeams,
+                firstWeek,
+                true // Force regenerate - deletes and recreates all matchups
+              );
+
+              if (regenError) {
+                logger.error('[Matchup] Error during forced regeneration:', regenError);
+                setError(`Failed to regenerate matchups: ${regenError.message || 'Unknown error'}`);
+                setLoading(false);
+                return;
+              }
             } else {
               logger.error('[Matchup] Error generating matchups:', genError);
               setError(`Failed to generate matchups: ${genError.message || 'Unknown error'}`);
