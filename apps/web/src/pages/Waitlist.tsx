@@ -83,12 +83,12 @@ const Waitlist = () => {
             Why <span className="text-citrus-orange">Citrus?</span>
           </h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6 max-w-5xl mx-auto">
             {[
               {
                 icon: <BarChart3 className="h-6 w-6" />,
                 title: 'xG Projections',
-                desc: '98.7% projection accuracy using Expected Goals, deployment patterns, and line combos updated in real-time.',
+                desc: '31-feature XGBoost model using Expected Goals, deployment patterns, and line combos updated in real-time.',
               },
               {
                 icon: <Zap className="h-6 w-6" />,
@@ -107,8 +107,8 @@ const Waitlist = () => {
               },
               {
                 icon: <Star className="h-6 w-6" />,
-                title: '700+ Player Writeups',
-                desc: 'Every NHL player has a detailed scouting report, projection breakdown, and fantasy outlook.',
+                title: 'Full Player Projections',
+                desc: 'Daily projections with confidence intervals and Monte Carlo ranges for every rostered NHL player.',
               },
               {
                 icon: <CitrusLogo className="h-6 w-6" />,

@@ -12,8 +12,8 @@ import {
 const features = [
   {
     icon: <TrendingUp className="h-6 w-6 md:h-8 md:w-8" />,
-    title: "98.7% Projection Accuracy",
-    description: "Our proprietary model analyzes 200+ data points per player including xGF%, zone entries, deployment patterns, and line chemistry. We're not guessing—we're predicting.",
+    title: "31-Feature xG Model",
+    description: "Our XGBoost model uses 31 features including xGF%, deployment patterns, line chemistry, and Bayesian shrinkage to project every skater and goalie, every night.",
     color: "sage"
   },
   {
@@ -23,29 +23,29 @@ const features = [
     color: "sage"
   },
   {
-    icon: <FileText className="h-6 w-6 md:h-8 md:w-8" />,
-    title: "700+ Player Writeups Daily",
-    description: "Post-game analysis for every NHL player. Every game. Know why Matthews dominated or why your sleeper pick got 0.2 points.",
-    color: "sage"
-  },
-  {
     icon: <Zap className="h-6 w-6 md:h-8 md:w-8" />,
     title: "Live Scoring Updates",
-    description: "Our data pipeline processes goals, assists, and stats so your matchup stays current. Watch your scores shift with every goal.",
+    description: "Our data pipeline processes goals, assists, and stats in real time so your matchup stays current. Watch your scores shift with every goal.",
     color: "sage"
   },
   {
     icon: <MessageSquare className="h-6 w-6 md:h-8 md:w-8" />,
-    title: "AI That Watches Every Shift",
-    description: "Stormy analyzes ice time, PP deployment, line combos, and matchups. Get advice based on actual hockey, not generic algorithms.",
+    title: "AI Draft & Insights",
+    description: "Stormy analyzes ice time, PP deployment, line combos, and matchups. Get draft advice and start/sit recommendations grounded in data.",
     color: "sage"
   },
   {
     icon: <BarChart className="h-6 w-6 md:h-8 md:w-8" />,
     title: "Advanced Metrics Built In",
-    description: "xGF%, Corsi, deployment splits, PP1 percentage, zone entry rates. All the nerdy stats that help you dominate, zero extra subscriptions.",
+    description: "xGF%, Corsi, deployment splits, PP1 percentage, and zone entry rates. All the nerdy stats that help you dominate, zero extra subscriptions.",
     color: "sage"
-  }
+  },
+  {
+    icon: <FileText className="h-6 w-6 md:h-8 md:w-8" />,
+    title: "Full Player Projections",
+    description: "Daily projections with confidence intervals for every rostered player. Monte Carlo ranges show you upside and floor, not just a single number.",
+    color: "sage"
+  },
 ];
 
 const FeaturesSection = () => {
@@ -115,7 +115,7 @@ const FeaturesSection = () => {
       
       <div className="container mx-auto relative z-10">
         {/* Section Header with Vintage Style */}
-        <div className="text-center mb-20 animated-element" ref={el => elementRefs.current[0] = el}>
+        <div className="text-center mb-10 md:mb-16 animated-element" ref={el => elementRefs.current[0] = el}>
           <div className="inline-flex items-center gap-2 bg-citrus-sage/20 border-2 border-citrus-sage rounded-varsity px-5 py-2 mb-6">
             <span className="font-varsity text-xs uppercase tracking-widest text-citrus-forest">The Citrus Advantage</span>
           </div>
@@ -131,7 +131,7 @@ const FeaturesSection = () => {
         </div>
 
         {/* Feature Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 lg:gap-8">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6 lg:gap-8">
           {features.map((feature, index) => {
             const colors = getColorClasses(feature.color);
             return (

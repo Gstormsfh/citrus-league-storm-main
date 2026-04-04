@@ -32,7 +32,7 @@ const HeroSection = () => {
           </h1>
           
           <p className="text-lg md:text-xl mb-4 text-citrus-forest max-w-lg font-sans font-medium leading-relaxed">
-            <span className="font-black text-citrus-green-dark drop-shadow-[0_1px_2px_rgba(255,255,255,0.5)]">98.7% projection accuracy.</span> Writeups for all 700+ NHL players. <span className="font-black text-citrus-green-dark drop-shadow-[0_1px_2px_rgba(255,255,255,0.5)]">Saturday finishes</span> when the entire league is playing.
+            <span className="font-black text-citrus-green-dark drop-shadow-[0_1px_2px_rgba(255,255,255,0.5)]">31-feature xG model.</span> Real-time projections for every NHL player. <span className="font-black text-citrus-green-dark drop-shadow-[0_1px_2px_rgba(255,255,255,0.5)]">Saturday finishes</span> when the entire league is playing.
           </p>
           
           <p className="text-base md:text-lg mb-4 text-citrus-forest/80 max-w-lg font-sans leading-relaxed">
@@ -64,18 +64,18 @@ const HeroSection = () => {
           </div>
           
           {/* Data-driven stats showcase */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 max-w-lg">
-            <div className="bg-[#E8EED9]/80 backdrop-blur-sm border-2 border-citrus-green-dark/40 rounded-xl p-4 text-center shadow-md">
-              <div className="font-varsity text-2xl font-black text-citrus-green-dark drop-shadow-[0_1px_2px_rgba(255,255,255,0.5)] mb-1">98.7%</div>
-              <div className="text-xs text-citrus-forest font-display uppercase tracking-wide font-bold">Accuracy</div>
+          <div className="grid grid-cols-3 gap-3 sm:gap-4 max-w-lg">
+            <div className="bg-[#E8EED9]/80 backdrop-blur-sm border-2 border-citrus-green-dark/40 rounded-xl p-3 sm:p-4 text-center shadow-md">
+              <div className="font-varsity text-xl sm:text-2xl font-black text-citrus-green-dark drop-shadow-[0_1px_2px_rgba(255,255,255,0.5)] mb-1">31</div>
+              <div className="text-[10px] sm:text-xs text-citrus-forest font-display uppercase tracking-wide font-bold">xG Features</div>
             </div>
-            <div className="bg-[#E8EED9]/80 backdrop-blur-sm border-2 border-citrus-green-dark/40 rounded-xl p-4 text-center shadow-md">
-              <div className="font-varsity text-2xl font-black text-citrus-green-dark drop-shadow-[0_1px_2px_rgba(255,255,255,0.5)] mb-1">SAT</div>
-              <div className="text-xs text-citrus-forest font-display uppercase tracking-wide font-bold">Finishes</div>
+            <div className="bg-[#E8EED9]/80 backdrop-blur-sm border-2 border-citrus-green-dark/40 rounded-xl p-3 sm:p-4 text-center shadow-md">
+              <div className="font-varsity text-xl sm:text-2xl font-black text-citrus-green-dark drop-shadow-[0_1px_2px_rgba(255,255,255,0.5)] mb-1">SAT</div>
+              <div className="text-[10px] sm:text-xs text-citrus-forest font-display uppercase tracking-wide font-bold">Finishes</div>
             </div>
-            <div className="bg-[#E8EED9]/80 backdrop-blur-sm border-2 border-citrus-orange/60 rounded-xl p-4 text-center shadow-md">
-              <div className="font-varsity text-2xl font-black text-citrus-orange drop-shadow-[0_1px_2px_rgba(255,255,255,0.5)] mb-1">700+</div>
-              <div className="text-xs text-citrus-forest font-display uppercase tracking-wide font-bold">Writeups</div>
+            <div className="bg-[#E8EED9]/80 backdrop-blur-sm border-2 border-citrus-orange/60 rounded-xl p-3 sm:p-4 text-center shadow-md">
+              <div className="font-varsity text-xl sm:text-2xl font-black text-citrus-orange drop-shadow-[0_1px_2px_rgba(255,255,255,0.5)] mb-1">LIVE</div>
+              <div className="text-[10px] sm:text-xs text-citrus-forest font-display uppercase tracking-wide font-bold">Scoring</div>
             </div>
           </div>
         </div>
