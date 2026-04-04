@@ -522,9 +522,9 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                 </>
               ) : (
                 <>
-                  {/* Full stat grid */}
-                  <div className="rounded-xl border border-citrus-sage/20 overflow-hidden">
-                    <div className="grid grid-cols-4 gap-px bg-citrus-sage/15">
+                  {/* Full stat grid — scrollable on narrow screens */}
+                  <div className="rounded-xl border border-citrus-sage/20 overflow-x-auto">
+                    <div className="grid grid-cols-4 gap-px bg-citrus-sage/15 min-w-[320px]">
                       {[
                         { label: 'G', value: stats.goals ?? 0 },
                         { label: 'A', value: stats.assists ?? 0 },
@@ -664,12 +664,12 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                           </div>
                         </div>
 
-                        {/* Stat breakdown row */}
+                        {/* Stat breakdown row — horizontally scrollable on mobile */}
                         {hasActuals ? (
                           /* ACTUAL STATS for played games */
-                          <div className="px-3 pb-2 pt-0">
+                          <div className="px-3 pb-2 pt-0 overflow-x-auto">
                             {gp.isGoalie ? (
-                              <div className="grid grid-cols-6 gap-1">
+                              <div className="grid grid-cols-6 gap-1 min-w-[320px]">
                                 {[
                                   { label: 'W', value: Number(as.wins || 0) },
                                   { label: 'SV', value: Number(as.saves || 0) },
@@ -685,7 +685,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                                 ))}
                               </div>
                             ) : (
-                              <div className="grid grid-cols-8 gap-1">
+                              <div className="grid grid-cols-8 gap-1 min-w-[380px]">
                                 {[
                                   { label: 'G', value: Number(as.goals || 0) },
                                   { label: 'A', value: Number(as.assists || 0) },
@@ -706,9 +706,9 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                           </div>
                         ) : gp.projection && gp.projectedPoints > 0 ? (
                           /* PROJECTED STATS for future games */
-                          <div className="px-3 pb-2 pt-0">
+                          <div className="px-3 pb-2 pt-0 overflow-x-auto">
                             {gp.isGoalie ? (
-                              <div className="grid grid-cols-6 gap-1">
+                              <div className="grid grid-cols-6 gap-1 min-w-[320px]">
                                 {[
                                   { label: 'W', value: (gp.projection.projected_wins as number | undefined)?.toFixed(2) },
                                   { label: 'SV', value: (gp.projection.projected_saves as number | undefined)?.toFixed(0) },
@@ -724,7 +724,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                                 ))}
                               </div>
                             ) : (
-                              <div className="grid grid-cols-8 gap-1">
+                              <div className="grid grid-cols-8 gap-1 min-w-[380px]">
                                 {[
                                   { label: 'G', value: (gp.projection.projected_goals as number | undefined)?.toFixed(2) },
                                   { label: 'A', value: (gp.projection.projected_assists as number | undefined)?.toFixed(2) },

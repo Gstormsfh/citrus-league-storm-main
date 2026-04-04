@@ -1380,11 +1380,11 @@ const DraftRoom = () => {
     const timerStartMs = new Date(timerStartedAt as string | number).getTime();
     const isAITeam = !currentTeamRef.current.owner_id;
 
-    // For AI teams, auto-pick after 2 seconds
+    // For AI teams, auto-pick after 1.5 seconds
     if (isAITeam) {
       autoPickTimeoutRef.current = setTimeout(() => {
         handleAutoDraftRef.current();
-      }, 2000);
+      }, 1500);
     }
 
     // Track if we already triggered auto-draft for this timer cycle
@@ -1616,7 +1616,20 @@ const DraftRoom = () => {
       // Reset timer refs to allow timer to restart for next pick
       timerRunningRef.current = false;
       lastPickNumberRef.current = 0;
-      await loadDraftState();
+      const freshState = await loadDraftState();
+
+      // If the NEXT team is AI, immediately schedule their pick (don't wait for timer effect)
+      if (freshState?.nextTeamId && isCommissioner) {
+        const nextTeam = teams.find(t => t.id === freshState.nextTeamId);
+        if (nextTeam && !nextTeam.owner_id) {
+          // Clear any existing timeout, then schedule AI pick in 1.5s
+          if (autoPickTimeoutRef.current) clearTimeout(autoPickTimeoutRef.current);
+          autoPickInProgressRef.current = false; // Reset so the next pick can fire
+          autoPickTimeoutRef.current = setTimeout(() => {
+            handleAutoDraftRef.current();
+          }, 1500);
+        }
+      }
     } catch (error: unknown) {
       logger.error('handlePlayerDraft error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
