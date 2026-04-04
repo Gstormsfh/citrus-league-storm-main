@@ -4,12 +4,16 @@ import { getTodayMST } from '@/utils/timezoneUtils';
 
 /**
  * Get the date when the draft was completed.
- * Uses league.created_at as a stable reference — updated_at changes on every
- * settings modification, which breaks week calculations.
+ * Prefers settings.draftCompletedAt (saved at draft completion) for accuracy.
+ * Falls back to league.created_at for leagues created before this field existed.
  */
 export function getDraftCompletionDate(league: League): Date | null {
   if (league.draft_status !== 'completed') {
     return null;
+  }
+  const settings = league.settings as Record<string, unknown> | null;
+  if (settings?.draftCompletedAt) {
+    return new Date(settings.draftCompletedAt as string);
   }
   return new Date(league.created_at);
 }

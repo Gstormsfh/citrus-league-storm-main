@@ -241,12 +241,21 @@ export const DraftService = {
           logger.error('Error saving draft snapshot (non-critical):', snapshotError);
         }
 
+        // Save draftCompletedAt so week calculations are anchored to the actual completion date
+        const draftCompletedAt = new Date().toISOString();
+        try {
+          await leagueApi.updateSettings(leagueId, { draftCompletedAt });
+          logger.log('Saved draftCompletedAt:', draftCompletedAt);
+        } catch (settingsError: unknown) {
+          logger.error('Error saving draftCompletedAt (non-critical):', settingsError);
+        }
+
         // Generate matchups
         try {
           logger.log('Generating matchups for the entire season...');
           const { MatchupService } = await import('./MatchupService');
           const { LeagueService: LS } = await import('./LeagueService');
-          const { getFirstWeekStartDate, getDraftCompletionDate } = await import('@/utils/weekCalculator');
+          const { getFirstWeekStartDate } = await import('@/utils/weekCalculator');
           const { getLeagueFormat } = await import('./LeagueService');
           const { FORMAT_HAS_MATCHUPS } = await import('@/types/leagueTypes');
 
@@ -256,13 +265,11 @@ export const DraftService = {
             const needsMatchups = FORMAT_HAS_MATCHUPS[fmt.scoringFormat] ?? true;
 
             if (needsMatchups) {
-              const draftCompletionDate = getDraftCompletionDate(league);
-              if (draftCompletionDate) {
-                const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
-                const { teams } = await LS.getLeagueTeams(leagueId);
-                await MatchupService.generateMatchupsForLeague(leagueId, teams, firstWeekStart, false);
-                logger.log('Matchups generated successfully for entire season');
-              }
+              const completionDate = new Date(draftCompletedAt);
+              const firstWeekStart = getFirstWeekStartDate(completionDate);
+              const { teams } = await LS.getLeagueTeams(leagueId);
+              await MatchupService.generateMatchupsForLeague(leagueId, teams, firstWeekStart, false);
+              logger.log('Matchups generated successfully for entire season');
             }
           }
         } catch (matchupGenError: unknown) {
