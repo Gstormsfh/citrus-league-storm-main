@@ -117,6 +117,19 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
   const fetchedForPlayerRef = useRef<string | null>(null);
   const todayGameRef = useRef<HTMLDivElement | null>(null);
 
+  // Auto-scroll to today's game after game log renders
+  useEffect(() => {
+    if (gameLog.length === 0 || gameLogLoading) return;
+    // Double rAF ensures React has flushed the DOM update
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (todayGameRef.current) {
+          todayGameRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      });
+    });
+  }, [gameLog, gameLogLoading]);
+
   // Fetch full season game log when modal opens (actuals for played games + projections for future)
   useEffect(() => {
     if (!isOpen || !player) {
@@ -267,13 +280,6 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
         setGameLog(entries);
         setTotalProjected(projTotal);
         setTotalActual(actTotal);
-
-        // Auto-scroll to today's game (or first future game) after render
-        requestAnimationFrame(() => {
-          if (todayGameRef.current) {
-            todayGameRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
-        });
       } catch (error) {
         logger.error('[PlayerStatsModal] Error fetching game log:', error);
       } finally {
