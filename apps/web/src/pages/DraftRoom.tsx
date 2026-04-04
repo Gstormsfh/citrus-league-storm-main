@@ -125,6 +125,7 @@ const DraftRoom = () => {
   const [snapshotData, setSnapshotData] = useState<any>(null);
   const [snapshotCreatedAt, setSnapshotCreatedAt] = useState<string | undefined>(undefined);
   const [savingSnapshot, setSavingSnapshot] = useState(false);
+  const [userAutoDraftEnabled, setUserAutoDraftEnabled] = useState(false);
 
   // Calculate loading state for minimum loading time hook
   const actualLoading = loading || authLoading || (!user && userLeagueState !== 'guest' && userLeagueState !== 'logged-in-no-league');
@@ -1339,8 +1340,10 @@ const DraftRoom = () => {
   // interval recreation. Other values accessed via refs to prevent stale closures.
   const draftPhaseRef = useRef(draftPhase);
   const currentTeamRef = useRef(currentTeam);
+  const userAutoDraftEnabledRef = useRef(userAutoDraftEnabled);
   useEffect(() => { draftPhaseRef.current = draftPhase; }, [draftPhase]);
   useEffect(() => { currentTeamRef.current = currentTeam; }, [currentTeam]);
+  useEffect(() => { userAutoDraftEnabledRef.current = userAutoDraftEnabled; }, [userAutoDraftEnabled]);
 
   useEffect(() => {
     const cleanup = () => {
@@ -1380,8 +1383,9 @@ const DraftRoom = () => {
     const timerStartMs = new Date(timerStartedAt as string | number).getTime();
     const isAITeam = !currentTeamRef.current.owner_id;
 
-    // For AI teams, auto-pick after 1.5 seconds
-    if (isAITeam) {
+    // For AI teams or human users with auto-draft enabled, auto-pick after 1.5 seconds
+    const isUserAutoPicking = !isAITeam && userAutoDraftEnabledRef.current && currentTeamRef.current.owner_id === user?.id;
+    if (isAITeam || isUserAutoPicking) {
       autoPickTimeoutRef.current = setTimeout(() => {
         handleAutoDraftRef.current();
       }, 1500);
@@ -1413,6 +1417,26 @@ const DraftRoom = () => {
   // recreation. draftState is accessed via ?.currentPick granularly. handleAutoDraftRef is a stable ref.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [league?.settings?.timerStartedAt, draftSettings.pickTimeLimit, draftState?.currentPick]);
+
+  // When user enables auto-draft mid-turn, immediately trigger auto-pick
+  useEffect(() => {
+    if (!userAutoDraftEnabled) return;
+    if (draftPhase !== DraftPhase.ACTIVE || !currentTeam || !user) return;
+    if (currentTeam.owner_id !== user.id) return;
+    // It's the user's turn and they just enabled auto-draft — pick immediately
+    if (!autoPickInProgressRef.current) {
+      autoPickTimeoutRef.current = setTimeout(() => {
+        handleAutoDraftRef.current();
+      }, 1500);
+    }
+    return () => {
+      if (autoPickTimeoutRef.current) {
+        clearTimeout(autoPickTimeoutRef.current);
+        autoPickTimeoutRef.current = null;
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userAutoDraftEnabled]);
 
   // Auto-start draft at scheduled time (commissioner only)
   // PERF: Uses a single setTimeout to the exact scheduled time instead of
@@ -2942,18 +2966,33 @@ const DraftRoom = () => {
                     />
                   </div>
 
-                  {/* Right: Draft/Auto button */}
+                  {/* Right: Draft/Auto button + Auto-draft toggle */}
                   <div className="flex-shrink-0 flex items-center gap-2">
                     {currentTeam?.owner_id === user?.id && userLeagueState === 'active-user' && (
-                      <Button
-                        variant="default"
-                        size="sm"
-                        className="text-xs md:text-sm"
-                        onClick={selectedPlayer ? () => handlePlayerDraft(selectedPlayer) : handleAutoDraft}
-                        disabled={!selectedPlayer && draftQueue.length === 0}
-                      >
-                        {selectedPlayer ? 'Draft' : 'Auto'}
-                      </Button>
+                      <>
+                        {!userAutoDraftEnabled && (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            className="text-xs md:text-sm"
+                            onClick={selectedPlayer ? () => handlePlayerDraft(selectedPlayer) : handleAutoDraft}
+                            disabled={!selectedPlayer && draftQueue.length === 0}
+                          >
+                            {selectedPlayer ? 'Draft' : 'Auto'}
+                          </Button>
+                        )}
+                        <div className="flex items-center gap-1.5">
+                          <Switch
+                            id="auto-draft-toggle"
+                            checked={userAutoDraftEnabled}
+                            onCheckedChange={setUserAutoDraftEnabled}
+                            className="scale-75"
+                          />
+                          <Label htmlFor="auto-draft-toggle" className="text-[10px] md:text-xs cursor-pointer whitespace-nowrap">
+                            {userAutoDraftEnabled ? 'Auto ON' : 'Auto'}
+                          </Label>
+                        </div>
+                      </>
                     )}
                     {(userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') && (
                       <Button
@@ -2974,7 +3013,7 @@ const DraftRoom = () => {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <Badge className="text-[10px] flex-shrink-0 bg-primary text-primary-foreground">{selectedPlayer.position}</Badge>
-                        <span className="font-bold text-sm md:text-base truncate">{selectedPlayer.full_name}</span>
+                        <span className="font-bold text-sm md:text-base truncate cursor-pointer hover:text-primary hover:underline" onClick={() => handlePlayerClick(selectedPlayer.id)}>{selectedPlayer.full_name}</span>
                         <span className="text-xs text-muted-foreground flex-shrink-0">{selectedPlayer.team}</span>
                       </div>
                       {/* Full stat line — scrollable on mobile */}
@@ -3036,7 +3075,7 @@ const DraftRoom = () => {
                               <Star className="h-3.5 w-3.5 fill-fantasy-tertiary text-fantasy-tertiary flex-shrink-0" />
                               <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide flex-shrink-0">Up Next</span>
                               <Badge variant="outline" className="text-[10px] flex-shrink-0">{nextQueuedPlayer.position}</Badge>
-                              <span className="font-bold text-sm truncate">{nextQueuedPlayer.full_name}</span>
+                              <span className="font-bold text-sm truncate cursor-pointer hover:text-primary hover:underline" onClick={() => handlePlayerClick(nextQueuedPlayer.id)}>{nextQueuedPlayer.full_name}</span>
                               <span className="text-xs text-muted-foreground flex-shrink-0">{nextQueuedPlayer.team}</span>
                             </div>
                             <div className="flex items-center gap-1.5 mt-1 text-[10px] md:text-xs text-muted-foreground">
@@ -3062,7 +3101,7 @@ const DraftRoom = () => {
                         <div className="flex items-center gap-2 text-xs md:text-sm w-full">
                           <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Last Pick</span>
                           <Badge variant="outline" className="text-[10px]">{lastPlayer.position}</Badge>
-                          <span className="font-semibold truncate">{lastPlayer.full_name}</span>
+                          <span className="font-semibold truncate cursor-pointer hover:text-primary hover:underline" onClick={() => handlePlayerClick(lastPlayer.id)}>{lastPlayer.full_name}</span>
                           <span className="text-muted-foreground hidden sm:inline">to {lastTeam.team_name}</span>
                           <span className="text-muted-foreground ml-auto flex-shrink-0">R{mostRecent!.round_number}</span>
                         </div>
@@ -3344,6 +3383,7 @@ const DraftRoom = () => {
                       <TabsContent value="history" className="space-y-0">
                         <DraftHistory
                           draftHistory={transformedDraftHistory}
+                          onPlayerClick={handlePlayerClick}
                         />
                       </TabsContent>
                     )}
