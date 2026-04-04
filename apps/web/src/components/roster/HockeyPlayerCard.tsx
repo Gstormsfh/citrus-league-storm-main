@@ -470,10 +470,10 @@ const HockeyPlayerCardContent = ({
       {/* Surfer Stats Grid - MAXIMUM GREEN ENERGY */}
       <div className="p-2 bg-gradient-to-br from-citrus-sage/10 via-citrus-sage/5 to-citrus-sage/10 flex-1 flex items-center justify-center border-t-2 border-citrus-sage/40 relative before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-0.5 before:bg-gradient-to-r before:from-citrus-sage/50 before:via-[#7CB518] before:to-citrus-sage/50">
         {isGoalie ? (
-          // GOALIE: Show actual stats when game live/final, else projections
-          hasGameOnSelectedDate && (showActuals || player.goalieProjection) ? (() => {
+          // GOALIE: Show actual stats when game live/final, else season stats
+          showActuals ? (() => {
             const actuals = player.daily_actual_stats;
-            const triggerGrid = showActuals ? (
+            const triggerGrid = (
                 <div className="grid grid-cols-3 gap-1.5 text-center w-full">
                   <div className="bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 rounded-xl p-1.5 border-2 border-emerald-500/50 shadow-sm">
                     <div className="text-[8px] text-emerald-800 font-display font-bold uppercase leading-none mb-1 tracking-wider">W</div>
@@ -488,23 +488,8 @@ const HockeyPlayerCardContent = ({
                     <div className="font-varsity text-[10px] text-emerald-800">{actuals?.goals_against || 0}</div>
                   </div>
                 </div>
-            ) : (
-                <div className="grid grid-cols-3 gap-1.5 text-center w-full cursor-help">
-                  <div className="bg-gradient-to-br from-citrus-sage/30 to-[#7CB518]/20 rounded-xl p-1.5 border-2 border-citrus-sage/50 shadow-sm hover:shadow-patch hover:border-citrus-sage transition-all">
-                    <div className="text-[8px] text-citrus-forest font-display font-bold uppercase leading-none mb-1 tracking-wider">W</div>
-                    <div className="font-varsity text-[11px] text-citrus-forest">{player.goalieProjection?.projected_wins?.toFixed(2) || '0.00'}</div>
-                  </div>
-                  <div className="bg-gradient-to-br from-citrus-sage/30 to-[#7CB518]/20 rounded-xl p-1.5 border-2 border-citrus-sage/50 shadow-sm hover:shadow-patch hover:border-citrus-sage transition-all">
-                    <div className="text-[8px] text-citrus-forest font-display font-bold uppercase leading-none mb-1 tracking-wider">SV</div>
-                    <div className="font-varsity text-[10px] text-citrus-forest">{player.goalieProjection?.projected_saves?.toFixed(0) || '0'}</div>
-                  </div>
-                  <div className="bg-gradient-to-br from-citrus-sage/30 to-[#7CB518]/20 rounded-xl p-1.5 border-2 border-citrus-sage/50 shadow-sm hover:shadow-patch hover:border-citrus-sage transition-all">
-                    <div className="text-[8px] text-citrus-forest font-display font-bold uppercase leading-none mb-1 tracking-wider">SO</div>
-                    <div className="font-varsity text-[10px] text-citrus-forest">{player.goalieProjection?.projected_shutouts?.toFixed(2) || '0.00'}</div>
-                  </div>
-                </div>
             );
-            const detailContent = showActuals ? (
+            const detailContent = (
               <div className="p-3 max-w-xs">
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="font-varsity text-sm text-emerald-800 border-b-2 border-emerald-500/30 pb-1">{gameStatus === 'final' ? 'Final Stats' : 'Live Stats'}</h4>
@@ -518,22 +503,6 @@ const HockeyPlayerCardContent = ({
                 </div>
                 <div className="mt-2 pt-1 border-t-2 border-emerald-500/30 text-xs font-varsity font-bold text-emerald-700">
                   Total: {(player.daily_actual_points || 0).toFixed(1)} pts
-                </div>
-              </div>
-            ) : (
-              <div className="p-3 max-w-xs">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-varsity text-sm text-citrus-forest border-b-2 border-citrus-sage/30 pb-1">Projected Stats</h4>
-                  {isMobile && <button onClick={() => setStatsPopoverOpen(false)} className="min-w-[44px] min-h-[44px] p-2.5 -m-1.5 rounded-full hover:bg-citrus-sage/20 flex items-center justify-center touch-manipulation"><X className="h-4 w-4 text-citrus-forest" /></button>}
-                </div>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">Wins:</span><span className="font-varsity text-citrus-forest">{player.goalieProjection?.projected_wins?.toFixed(2)}</span></div>
-                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">Saves:</span><span className="font-varsity text-citrus-forest">{player.goalieProjection?.projected_saves?.toFixed(0)}</span></div>
-                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">Shutouts:</span><span className="font-varsity text-citrus-forest">{player.goalieProjection?.projected_shutouts?.toFixed(2)}</span></div>
-                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">GA:</span><span className="font-varsity text-citrus-forest">{player.goalieProjection?.projected_goals_against?.toFixed(2)}</span></div>
-                </div>
-                <div className="mt-2 pt-1 border-t-2 border-citrus-sage/30 text-xs font-varsity font-bold text-citrus-sage">
-                  Total: {player.goalieProjection?.total_projected_points?.toFixed(1)} pts
                 </div>
               </div>
             );
@@ -550,7 +519,7 @@ const HockeyPlayerCardContent = ({
               </Tooltip>
             );
           })() : (
-            // No projection - show season stats
+            // Season stats for goalie
             <div className="grid grid-cols-3 gap-0.5 text-center w-full">
               <div>
                 <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">W</div>
@@ -569,10 +538,10 @@ const HockeyPlayerCardContent = ({
             </div>
           )
         ) : (
-          // SKATER: Show actual stats when game live/final, else projections
-          hasGameOnSelectedDate && (showActuals || player.daily_projection) ? (() => {
+          // SKATER: Show actual stats when game live/final, else season stats
+          showActuals ? (() => {
             const actuals = player.daily_actual_stats;
-            const triggerGrid = showActuals ? (
+            const triggerGrid = (
                 <div className="grid grid-cols-4 gap-1 text-center w-full">
                   <div className="bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 rounded-lg p-1 border-2 border-emerald-500/50">
                     <div className="text-[7px] text-emerald-800 font-display font-bold uppercase leading-none mb-0.5">G</div>
@@ -591,27 +560,8 @@ const HockeyPlayerCardContent = ({
                     <div className="font-varsity text-[9px] text-emerald-800">{actuals?.hits || 0}</div>
                   </div>
                 </div>
-            ) : (
-                <div className="grid grid-cols-4 gap-1 text-center w-full cursor-help">
-                  <div className="bg-gradient-to-br from-citrus-sage/30 to-[#7CB518]/20 rounded-lg p-1 border-2 border-citrus-sage/50">
-                    <div className="text-[7px] text-citrus-forest font-display font-bold uppercase leading-none mb-0.5">G</div>
-                    <div className="font-varsity text-[9px] text-citrus-forest">{player.daily_projection?.projected_goals?.toFixed(2) || '0.00'}</div>
-                  </div>
-                  <div className="bg-gradient-to-br from-citrus-sage/30 to-[#7CB518]/20 rounded-lg p-1 border-2 border-citrus-sage/50">
-                    <div className="text-[7px] text-citrus-forest font-display font-bold uppercase leading-none mb-0.5">A</div>
-                    <div className="font-varsity text-[9px] text-citrus-forest">{player.daily_projection?.projected_assists?.toFixed(2) || '0.00'}</div>
-                  </div>
-                  <div className="bg-gradient-to-br from-citrus-sage/30 to-[#7CB518]/20 rounded-lg p-1 border-2 border-citrus-sage/50">
-                    <div className="text-[7px] text-citrus-forest font-display font-bold uppercase leading-none mb-0.5">SOG</div>
-                    <div className="font-varsity text-[9px] text-citrus-forest">{player.daily_projection?.projected_sog?.toFixed(1) || '0.0'}</div>
-                  </div>
-                  <div className="bg-gradient-to-br from-citrus-sage/30 to-[#7CB518]/20 rounded-lg p-1 border-2 border-citrus-sage/50">
-                    <div className="text-[7px] text-citrus-forest font-display font-bold uppercase leading-none mb-0.5">BLK</div>
-                    <div className="font-varsity text-[9px] text-citrus-forest">{player.daily_projection?.projected_blocks?.toFixed(1) || '0.0'}</div>
-                  </div>
-                </div>
             );
-            const detailContent = showActuals ? (
+            const detailContent = (
               <div className="p-3 max-w-xs">
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="font-varsity text-sm text-emerald-800 border-b-2 border-emerald-500/30 pb-1">{gameStatus === 'final' ? 'Final Stats' : 'Live Stats'}</h4>
@@ -631,26 +581,6 @@ const HockeyPlayerCardContent = ({
                   Total: {(player.daily_actual_points || 0).toFixed(1)} pts
                 </div>
               </div>
-            ) : (
-              <div className="p-3 max-w-xs">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-varsity text-sm text-citrus-forest border-b-2 border-citrus-sage/30 pb-1">Projected Stats</h4>
-                  {isMobile && <button onClick={() => setStatsPopoverOpen(false)} className="min-w-[44px] min-h-[44px] p-2.5 -m-1.5 rounded-full hover:bg-citrus-sage/20 flex items-center justify-center touch-manipulation"><X className="h-4 w-4 text-citrus-forest" /></button>}
-                </div>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">Goals:</span><span className="font-varsity text-citrus-forest">{player.daily_projection?.projected_goals?.toFixed(2)}</span></div>
-                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">Assists:</span><span className="font-varsity text-citrus-forest">{player.daily_projection?.projected_assists?.toFixed(2)}</span></div>
-                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">SOG:</span><span className="font-varsity text-citrus-forest">{player.daily_projection?.projected_sog?.toFixed(2)}</span></div>
-                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">Blocks:</span><span className="font-varsity text-citrus-forest">{player.daily_projection?.projected_blocks?.toFixed(2)}</span></div>
-                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">PPP:</span><span className="font-varsity text-citrus-forest">{player.daily_projection?.projected_ppp?.toFixed(2) || '0.00'}</span></div>
-                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">SHP:</span><span className="font-varsity text-citrus-forest">{player.daily_projection?.projected_shp?.toFixed(2) || '0.00'}</span></div>
-                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">Hits:</span><span className="font-varsity text-citrus-forest">{player.daily_projection?.projected_hits?.toFixed(2) || '0.00'}</span></div>
-                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">PIM:</span><span className="font-varsity text-citrus-forest">{player.daily_projection?.projected_pim?.toFixed(2) || '0.00'}</span></div>
-                </div>
-                <div className="mt-2 pt-1 border-t-2 border-citrus-sage/30 text-xs font-varsity font-bold text-citrus-sage">
-                  Total: {player.daily_projection?.total_projected_points?.toFixed(1)} pts
-                </div>
-              </div>
             );
             const contentClass = "bg-[#E8EED9]/95 backdrop-blur-sm border-2 border-citrus-sage rounded-varsity shadow-varsity !z-[9999]";
             return isMobile ? (
@@ -665,7 +595,7 @@ const HockeyPlayerCardContent = ({
               </Tooltip>
             );
           })() : (
-            // No projection - show season stats
+            // Season stats for skater
             <div className="grid grid-cols-4 gap-0.5 text-center w-full">
               <div>
                 <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">GP</div>
