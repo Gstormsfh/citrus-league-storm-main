@@ -443,7 +443,7 @@ export const NHL_CONTRACT_DATA: Record<string, PlayerContract[]> = {
   // ============================================================
   'BUF': [
     // Forwards
-    c('Josh Norris', 'C', 'BUF', 7_950_000, 5, 5, 2030, 'UFA', 'IR', null, '1999-05-05'),
+    c('Josh Norris', 'C', 'BUF', 7_950_000, 5, 5, 2030, 'UFA', 'NHL', null, '1999-05-05'),
     c('Tage Thompson', 'C', 'BUF', 7_142_857, 5, 5, 2030, 'UFA', 'NHL', null, '1997-10-30'),
     c('Josh Doan', 'RW', 'BUF', 6_950_000, 8, 8, 2033, 'UFA', 'NHL', null, '2002-02-01'),
     c('Ryan McLeod', 'C', 'BUF', 5_000_000, 4, 4, 2029, 'UFA', 'NHL', null, '1999-09-21'),
@@ -468,7 +468,7 @@ export const NHL_CONTRACT_DATA: Record<string, PlayerContract[]> = {
     c('Michael Kesselring', 'D', 'BUF', 1_400_000, 1, 1, 2026, 'RFA', 'NHL', null, '2000-01-13'),
     c('Jacob Bryson', 'D', 'BUF', 900_000, 1, 1, 2026, 'UFA', 'NHL', null, '1997-11-18'),
     // Goalies
-    c('Ukko-Pekka Luukkonen', 'G', 'BUF', 4_750_000, 4, 4, 2029, 'UFA', 'IR', null, '1999-03-09'),
+    c('Ukko-Pekka Luukkonen', 'G', 'BUF', 4_750_000, 4, 4, 2029, 'UFA', 'NHL', null, '1999-03-09'),
     c('Alex Lyon', 'G', 'BUF', 1_500_000, 2, 2, 2027, 'UFA', 'NHL', null, '1992-12-09'),
     c('Colten Ellis', 'G', 'BUF', 775_000, 2, 2, 2027, 'RFA', 'NHL', null, '2000-10-05'),
   ],
@@ -512,7 +512,7 @@ export const NHL_CONTRACT_DATA: Record<string, PlayerContract[]> = {
     c('Albert Johansson', 'D', 'DET', 1_125_000, 2, 2, 2027, 'RFA', 'NHL', null, '2001-01-04'),
     c('Travis Hamonic', 'D', 'DET', 1_000_000, 1, 1, 2026, 'UFA', 'NHL', null, '1990-08-16'),
     c('Axel Sandin-Pellikka', 'D', 'DET', 918_333, 4, 3, 2028, 'RFA', 'NHL', null, '2005-03-11'),
-    c('Simon Edvinsson', 'D', 'DET', 894_167, 2, 1, 2026, 'RFA', 'IR', null, '2003-02-05'),
+    c('Simon Edvinsson', 'D', 'DET', 894_167, 2, 1, 2026, 'RFA', 'NHL', null, '2003-02-05'),
     c('Jacob Bernard-Docker', 'D', 'DET', 875_000, 1, 1, 2026, 'RFA', 'NHL', null, '2000-06-30'),
     // AHL Defensemen
     c('Justin Holl', 'D', 'DET', 3_400_000, 2, 1, 2026, 'UFA', 'AHL', null),
@@ -602,7 +602,7 @@ export const NHL_CONTRACT_DATA: Record<string, PlayerContract[]> = {
     c('Josh Anderson', 'RW', 'MTL', 5_500_000, 2, 2, 2027, 'UFA', 'NHL', null, '1994-05-07'),
     c('Phillip Danault', 'C', 'MTL', 5_500_000, 2, 2, 2027, 'UFA', 'NHL', null, '1993-02-24'),
     c('Kirby Dach', 'C', 'MTL', 3_362_500, 1, 1, 2026, 'RFA', 'NHL', null, '2001-01-21'),
-    c('Alex Newhook', 'LW', 'MTL', 2_900_000, 2, 2, 2027, 'RFA', 'IR', null, '2001-01-28'),
+    c('Alex Newhook', 'LW', 'MTL', 2_900_000, 2, 2, 2027, 'RFA', 'NHL', null, '2001-01-28'),
     c('Jake Evans', 'C', 'MTL', 2_850_000, 4, 4, 2029, 'UFA', 'NHL', null, '1996-06-02'),
     c('Alexandre Texier', 'RW', 'MTL', 1_000_000, 1, 1, 2026, 'UFA', 'NHL', null, '1999-09-13'),
     c('Ivan Demidov', 'RW', 'MTL', 940_833, 2, 2, 2027, 'RFA', 'NHL', null, '2005-12-10'),
@@ -683,7 +683,7 @@ export const NHL_CONTRACT_DATA: Record<string, PlayerContract[]> = {
   // ============================================================
   'TBL': [
     // Forwards
-    c('Brayden Point', 'C', 'TBL', 9_500_000, 6, 5, 2030, 'UFA', 'LTIR', 'NMC', '1996-03-13'),
+    c('Brayden Point', 'C', 'TBL', 9_500_000, 6, 5, 2030, 'UFA', 'NHL', 'NMC', '1996-03-13'),
     c('Nikita Kucherov', 'RW', 'TBL', 9_500_000, 3, 2, 2027, 'UFA', 'NHL', 'NMC', '1993-06-17'),
     c('Jake Guentzel', 'LW', 'TBL', 9_000_000, 7, 6, 2031, 'UFA', 'NHL', 'NMC', '1994-10-06'),
     c('Brandon Hagel', 'LW', 'TBL', 6_500_000, 8, 7, 2032, 'UFA', 'NHL', null, '1998-08-27'),
@@ -722,7 +722,7 @@ export const NHL_CONTRACT_DATA: Record<string, PlayerContract[]> = {
     c('Matthew Knies', 'LW', 'TOR', 7_750_000, 6, 6, 2031, 'UFA', 'NHL', null, '2002-10-17'),
     c('John Tavares', 'C', 'TOR', 4_380_000, 4, 4, 2029, 'UFA', 'NHL', null, '1990-09-20'),
     c('Max Domi', 'RW', 'TOR', 3_750_000, 3, 3, 2028, 'UFA', 'NHL', null, '1995-03-02'),
-    c('Dakota Joshua', 'LW', 'TOR', 3_250_000, 3, 3, 2028, 'UFA', 'LTIR', null, '1996-05-15'),
+    c('Dakota Joshua', 'LW', 'TOR', 3_250_000, 3, 3, 2028, 'UFA', 'NHL', null, '1996-05-15'),
     c('Matias Maccelli', 'LW', 'TOR', 3_425_000, 1, 1, 2026, 'RFA', 'NHL', null, '2000-10-14'),
     c('Nicolas Roy', 'C', 'TOR', 3_000_000, 2, 2, 2027, 'UFA', 'NHL', null, '1997-02-05'),
     c('Calle Jarnkrok', 'RW', 'TOR', 2_100_000, 1, 1, 2026, 'UFA', 'NHL', null, '1991-09-25'),
@@ -897,7 +897,7 @@ export const NHL_CONTRACT_DATA: Record<string, PlayerContract[]> = {
     c('Marc McLaughlin', 'C', 'NJD', 775_000, 1, 1, 2026, 'UFA', 'AHL', null),
     // Defensemen
     c('Dougie Hamilton', 'D', 'NJD', 9_000_000, 3, 3, 2028, 'UFA', 'NHL', 'NMC', '1993-06-17'),
-    c('Luke Hughes', 'D', 'NJD', 9_000_000, 7, 7, 2032, 'UFA', 'LTIR', null, '2003-09-09'),
+    c('Luke Hughes', 'D', 'NJD', 9_000_000, 7, 7, 2032, 'UFA', 'NHL', null, '2003-09-09'),
     c('Brett Pesce', 'D', 'NJD', 5_500_000, 5, 5, 2030, 'UFA', 'NHL', null, '1994-11-15'),
     c('Brenden Dillon', 'D', 'NJD', 4_000_000, 2, 2, 2027, 'UFA', 'NHL', null, '1990-11-13'),
     c('Johnathan Kovacevic', 'D', 'NJD', 4_000_000, 5, 5, 2030, 'UFA', 'NHL', null, '1997-07-12'),
@@ -998,8 +998,8 @@ export const NHL_CONTRACT_DATA: Record<string, PlayerContract[]> = {
     c('Brennan Othmann', 'LW', 'NYR', 863_333, 1, 1, 2026, 'RFA', 'NHL', null, '2003-01-05'),
     c('Jonny Brodzinski', 'RW', 'NYR', 787_500, 1, 1, 2026, 'UFA', 'NHL', null, '1993-06-19'),
     c('Brendan Brisson', 'C', 'NYR', 775_000, 1, 1, 2026, 'RFA', 'NHL', null, '2001-10-22'),
-    c('Adam Edstrom', 'LW', 'NYR', 975_000, 2, 2, 2027, 'RFA', 'LTIR', null, '2000-10-12'),
-    c('Conor Sheary', 'LW', 'NYR', 775_000, 1, 1, 2026, 'UFA', 'LTIR', null, '1992-06-08'),
+    c('Adam Edstrom', 'LW', 'NYR', 975_000, 2, 2, 2027, 'RFA', 'NHL', null, '2000-10-12'),
+    c('Conor Sheary', 'LW', 'NYR', 775_000, 1, 1, 2026, 'UFA', 'NHL', null, '1992-06-08'),
     c('Liam Greentree', 'RW', 'NYR', 942_500, 3, 3, 2028, 'RFA', 'AHL', null),
     c('Nathan Aspinall', 'LW', 'NYR', 925_000, 3, 3, 2028, 'RFA', 'AHL', null),
     c('Carey Terrance', 'C', 'NYR', 886_667, 3, 3, 2028, 'RFA', 'AHL', null),
@@ -1013,7 +1013,7 @@ export const NHL_CONTRACT_DATA: Record<string, PlayerContract[]> = {
     c('Anton Blidh', 'LW', 'NYR', 775_000, 2, 2, 2027, 'UFA', 'AHL', null),
     c('Juuso Parssinen', 'LW', 'NYR', 100_000, 2, 2, 2027, 'RFA', 'AHL', null), // buried salary penalty
     // Defensemen
-    c('Adam Fox', 'D', 'NYR', 9_500_000, 4, 4, 2029, 'UFA', 'LTIR', 'NMC', '1998-02-17'),
+    c('Adam Fox', 'D', 'NYR', 9_500_000, 4, 4, 2029, 'UFA', 'NHL', 'NMC', '1998-02-17'),
     c('Vladislav Gavrikov', 'D', 'NYR', 7_000_000, 7, 7, 2032, 'UFA', 'NHL', null, '1995-11-21'),
     c('Will Borgen', 'D', 'NYR', 4_100_000, 5, 5, 2030, 'UFA', 'NHL', null, '1996-12-19'),
     c('Braden Schneider', 'D', 'NYR', 2_200_000, 1, 1, 2026, 'RFA', 'NHL', null, '2001-09-20'),
@@ -1027,7 +1027,7 @@ export const NHL_CONTRACT_DATA: Record<string, PlayerContract[]> = {
     c('Brandon Scanlin', 'D', 'NYR', 775_000, 1, 1, 2026, 'UFA', 'AHL', null),
     c('Connor Mackey', 'D', 'NYR', 775_000, 1, 1, 2026, 'UFA', 'AHL', null),
     // Goalies
-    c('Igor Shesterkin', 'G', 'NYR', 11_500_000, 8, 8, 2033, 'UFA', 'IR', 'NMC', '1995-12-30'),
+    c('Igor Shesterkin', 'G', 'NYR', 11_500_000, 8, 8, 2033, 'UFA', 'NHL', 'NMC', '1995-12-30'),
     c('Jonathan Quick', 'G', 'NYR', 1_550_000, 1, 1, 2026, 'UFA', 'NHL', null, '1986-01-21'),
     c('Hugo Ollas', 'G', 'NYR', 855_000, 1, 1, 2026, 'RFA', 'NHL', null, '2002-04-24'),
     c('Callum Tung', 'G', 'NYR', 872_500, 3, 3, 2028, 'RFA', 'AHL', null),
@@ -1048,7 +1048,7 @@ export const NHL_CONTRACT_DATA: Record<string, PlayerContract[]> = {
     c('Trevor Zegras', 'C', 'PHI', 5_750_000, 1, 1, 2026, 'RFA', 'NHL', null, '2001-03-20'),
     c('Christian Dvorak', 'C', 'PHI', 5_400_000, 6, 6, 2031, 'UFA', 'NHL', null, '1996-02-02'),
     c('Noah Cates', 'C', 'PHI', 4_000_000, 4, 4, 2029, 'UFA', 'NHL', null, '1999-02-05'),
-    c('Tyson Foerster', 'LW', 'PHI', 3_750_000, 2, 2, 2027, 'RFA', 'IR', null, '2002-01-18'),
+    c('Tyson Foerster', 'LW', 'PHI', 3_750_000, 2, 2, 2027, 'RFA', 'NHL', null, '2002-01-18'),
     c('Garnet Hathaway', 'RW', 'PHI', 2_400_000, 2, 2, 2027, 'UFA', 'NHL', null, '1991-11-23'),
     c('Carl Grundstrom', 'LW', 'PHI', 1_800_000, 1, 1, 2026, 'UFA', 'NHL', null, '1997-12-01'),
     c('Nicolas Deslauriers', 'LW', 'PHI', 1_750_000, 1, 1, 2026, 'UFA', 'NHL', null, '1991-02-22'),
@@ -1168,7 +1168,7 @@ export const NHL_CONTRACT_DATA: Record<string, PlayerContract[]> = {
     c('Aliaksei Protas', 'C', 'WSH', 3_375_000, 4, 4, 2029, 'UFA', 'NHL', null, '2001-01-06'),
     c('Nic Dowd', 'C', 'WSH', 3_000_000, 2, 2, 2027, 'UFA', 'NHL', null, '1990-05-27'),
     c('Anthony Beauvillier', 'RW', 'WSH', 2_750_000, 2, 2, 2027, 'UFA', 'NHL', null, '1997-06-08'),
-    c('Connor McMichael', 'C', 'WSH', 2_100_000, 1, 1, 2026, 'RFA', 'IR', null, '2001-01-15'),
+    c('Connor McMichael', 'C', 'WSH', 2_100_000, 1, 1, 2026, 'RFA', 'NHL', null, '2001-01-15'),
     c('Sonny Milano', 'LW', 'WSH', 1_900_000, 1, 1, 2026, 'UFA', 'NHL', null, '1996-05-12'),
     c('Brandon Duhaime', 'LW', 'WSH', 1_850_000, 1, 1, 2026, 'UFA', 'NHL', null, '1997-05-22'),
     c('Ryan Leonard', 'RW', 'WSH', 950_000, 2, 2, 2027, 'RFA', 'NHL', null, '2005-01-21'),
@@ -1190,7 +1190,7 @@ export const NHL_CONTRACT_DATA: Record<string, PlayerContract[]> = {
     c('Ryan Chesley', 'D', 'WSH', 923_333, 3, 3, 2028, 'RFA', 'AHL', null),
     // Goalies
     c('Logan Thompson', 'G', 'WSH', 5_850_000, 6, 6, 2031, 'UFA', 'NHL', null, '1997-02-25'),
-    c('Charlie Lindgren', 'G', 'WSH', 3_000_000, 3, 3, 2028, 'UFA', 'IR', null, '1993-12-18'),
+    c('Charlie Lindgren', 'G', 'WSH', 3_000_000, 3, 3, 2028, 'UFA', 'NHL', null, '1993-12-18'),
     c('Garin Bjorklund', 'G', 'WSH', 775_000, 1, 1, 2026, 'RFA', 'NHL', null),
     c('Mitchell Gibson', 'G', 'WSH', 812_500, 2, 2, 2027, 'UFA', 'AHL', null),
     c('Clay Stevenson', 'G', 'WSH', 775_000, 3, 3, 2028, 'UFA', 'AHL', null, '1999-03-03'),
@@ -1208,12 +1208,12 @@ export const NHL_CONTRACT_DATA: Record<string, PlayerContract[]> = {
     c('Nick Schmaltz', 'C', 'UTA', 5_850_000, 1, 1, 2026, 'UFA', 'NHL', 'M-NTC', '1996-02-23'),
     c('Lawson Crouse', 'LW', 'UTA', 4_300_000, 2, 2, 2027, 'UFA', 'NHL', null, '1997-06-23'),
     c('Jack McBain', 'C', 'UTA', 4_250_000, 5, 5, 2030, 'UFA', 'NHL', null, '2000-01-06'),
-    c('Alex Kerfoot', 'RW', 'UTA', 3_000_000, 1, 1, 2026, 'UFA', 'IR', 'M-NTC'),
+    c('Alex Kerfoot', 'RW', 'UTA', 3_000_000, 1, 1, 2026, 'UFA', 'NHL', 'M-NTC'),
     c('Barrett Hayton', 'C', 'UTA', 2_650_000, 1, 1, 2026, 'RFA', 'NHL', null, '2000-06-09'),
     c('Brandon Tanev', 'LW', 'UTA', 2_500_000, 3, 3, 2028, 'UFA', 'NHL', 'M-NTC', '1991-12-31'),
     c('Kevin Stenlund', 'C', 'UTA', 2_000_000, 1, 1, 2026, 'UFA', 'NHL', null, '1996-09-20'),
     c('Liam O\'Brien', 'RW', 'UTA', 1_000_000, 2, 2, 2027, 'UFA', 'NHL', null),
-    c('Logan Cooley', 'C', 'UTA', 950_000, 9, 9, 2034, 'UFA', 'IR', null, '2004-05-04'),
+    c('Logan Cooley', 'C', 'UTA', 950_000, 9, 9, 2034, 'UFA', 'NHL', null, '2004-05-04'),
     c('Danil But', 'LW', 'UTA', 950_000, 3, 3, 2028, 'RFA', 'NHL', null),
     c('Michael Carcone', 'RW', 'UTA', 775_000, 1, 1, 2026, 'UFA', 'NHL', null, '1996-05-19'),
     c('Kailer Yamamoto', 'RW', 'UTA', 775_000, 1, 1, 2026, 'UFA', 'NHL', null, '1998-09-29'),
@@ -1280,7 +1280,7 @@ export const NHL_CONTRACT_DATA: Record<string, PlayerContract[]> = {
     c('Ryan Ellis', 'D', 'CHI', 6_250_000, 3, 2, 2027, 'UFA', 'IR', null),
     c('Alex Vlasic', 'D', 'CHI', 4_600_000, 6, 5, 2030, 'UFA', 'NHL', 'M-NTC', '2001-06-05'),
     c('Connor Murphy', 'D', 'CHI', 4_400_000, 2, 1, 2026, 'UFA', 'NHL', 'M-NTC', '1993-03-26'),
-    c('Wyatt Kaiser', 'D', 'CHI', 1_700_000, 2, 2, 2027, 'RFA', 'IR', null, '2002-07-31'),
+    c('Wyatt Kaiser', 'D', 'CHI', 1_700_000, 2, 2, 2027, 'RFA', 'NHL', null, '2002-07-31'),
     c('Matt Grzelcyk', 'D', 'CHI', 1_000_000, 1, 1, 2026, 'UFA', 'NHL', null, '1994-01-05'),
     c('Artyom Levshunov', 'D', 'CHI', 975_000, 3, 2, 2027, 'RFA', 'NHL', null, '2005-10-28'),
     c('Kevin Korchinski', 'D', 'CHI', 918_333, 2, 1, 2026, 'RFA', 'NHL', null, '2004-06-21'),
@@ -1458,7 +1458,7 @@ export const NHL_CONTRACT_DATA: Record<string, PlayerContract[]> = {
     c('Brock Faber', 'D', 'MIN', 8_500_000, 8, 8, 2033, 'UFA', 'NHL', 'M-NTC', '2002-08-22'),
     c('Quinn Hughes', 'D', 'MIN', 7_850_000, 2, 2, 2027, 'UFA', 'NHL', null, '1999-10-14'),
     c('Jared Spurgeon', 'D', 'MIN', 7_575_000, 2, 2, 2027, 'UFA', 'NHL', 'M-NTC', '1989-11-29'),
-    c('Jonas Brodin', 'D', 'MIN', 6_000_000, 3, 3, 2028, 'UFA', 'IR', 'NMC', '1993-07-12'),
+    c('Jonas Brodin', 'D', 'MIN', 6_000_000, 3, 3, 2028, 'UFA', 'NHL', 'NMC', '1993-07-12'),
     c('Jake Middleton', 'D', 'MIN', 4_350_000, 4, 4, 2029, 'UFA', 'NHL', 'NMC', '1996-01-02'),
     c('Zach Bogosian', 'D', 'MIN', 1_250_000, 1, 1, 2026, 'UFA', 'NHL', null, '1990-07-15'),
     c('Ben Gleason', 'D', 'MIN', 800_000, 1, 1, 2026, 'UFA', 'NHL', null, '1998-03-25'),
@@ -1562,13 +1562,13 @@ export const NHL_CONTRACT_DATA: Record<string, PlayerContract[]> = {
   'STL': [
     // --- Forwards (Roster) ---
     c('Jordan Kyrou', 'RW', 'STL', 8_125_000, 7, 6, 2031, 'UFA', 'NHL', 'NTC', '1998-05-05'),
-    c('Robert Thomas', 'C', 'STL', 8_125_000, 7, 6, 2031, 'UFA', 'IR', 'NTC', '1999-07-02'),
+    c('Robert Thomas', 'C', 'STL', 8_125_000, 7, 6, 2031, 'UFA', 'NHL', 'NTC', '1999-07-02'),
     c('Pavel Buchnevich', 'LW', 'STL', 8_000_000, 6, 6, 2031, 'UFA', 'NHL', 'NTC', '1995-04-17'),
     c('Brayden Schenn', 'C', 'STL', 6_500_000, 4, 3, 2028, 'UFA', 'NHL', 'M-NTC', '1991-08-22'),
     c('Pius Suter', 'C', 'STL', 4_125_000, 2, 2, 2027, 'UFA', 'NHL', null, '1996-05-24'),
     c('Jake Neighbours', 'LW', 'STL', 3_750_000, 2, 2, 2027, 'RFA', 'NHL', null, '2002-03-29'),
     c('Mathieu Joseph', 'RW', 'STL', 2_950_000, 1, 1, 2026, 'UFA', 'NHL', null, '1997-02-09'),
-    c('Dylan Holloway', 'LW', 'STL', 2_290_457, 2, 1, 2026, 'RFA', 'IR', null, '2001-09-23'),
+    c('Dylan Holloway', 'LW', 'STL', 2_290_457, 2, 1, 2026, 'RFA', 'NHL', null, '2001-09-23'),
     c('Jonatan Berggren', 'RW', 'STL', 1_825_000, 1, 1, 2026, 'RFA', 'NHL', null, '2000-07-16'),
     c('Alexey Toropchenko', 'LW', 'STL', 1_700_000, 3, 3, 2028, 'UFA', 'NHL', null, '1999-06-25'),
     c('Oskar Sundqvist', 'C', 'STL', 1_500_000, 2, 1, 2026, 'UFA', 'NHL', null, '1994-03-23'),
@@ -1641,14 +1641,14 @@ export const NHL_CONTRACT_DATA: Record<string, PlayerContract[]> = {
     c('Tanner Pearson', 'RW', 'WPG', 1_000_000, 1, 1, 2026, 'UFA', 'NHL', null, '1992-08-10'),
     c('Walker Duehr', 'RW', 'WPG', 775_000, 1, 1, 2026, 'UFA', 'NHL', null, '1997-11-23'),
     // --- Defense (Roster) ---
-    c('Neal Pionk', 'D', 'WPG', 7_000_000, 6, 6, 2031, 'UFA', 'IR', 'M-NTC', '1995-07-29'),
-    c('Josh Morrissey', 'D', 'WPG', 6_250_000, 3, 3, 2028, 'UFA', 'IR', 'M-NTC'),
+    c('Neal Pionk', 'D', 'WPG', 7_000_000, 6, 6, 2031, 'UFA', 'NHL', 'M-NTC', '1995-07-29'),
+    c('Josh Morrissey', 'D', 'WPG', 6_250_000, 3, 3, 2028, 'UFA', 'NHL', 'M-NTC'),
     c('Dylan Samberg', 'D', 'WPG', 5_750_000, 3, 3, 2028, 'UFA', 'NHL', null, '1999-01-24'),
     c('Dylan DeMelo', 'D', 'WPG', 4_900_000, 3, 3, 2028, 'UFA', 'NHL', null, '1993-05-01'),
     c('Luke Schenn', 'D', 'WPG', 2_750_000, 1, 1, 2026, 'UFA', 'NHL', null, '1989-11-02'),
     c('Colin Miller', 'D', 'WPG', 1_500_000, 1, 1, 2026, 'UFA', 'IR', null, '1992-10-29'),
     c('Logan Stanley', 'D', 'WPG', 1_250_000, 1, 1, 2026, 'UFA', 'NHL', null, '1998-05-26'),
-    c('Haydn Fleury', 'D', 'WPG', 950_000, 2, 2, 2027, 'UFA', 'IR', null, '1996-07-08'),
+    c('Haydn Fleury', 'D', 'WPG', 950_000, 2, 2, 2027, 'UFA', 'NHL', null, '1996-07-08'),
     c('Elias Salomonsson', 'D', 'WPG', 895_000, 2, 2, 2027, 'RFA', 'NHL', null, '2004-08-31'),
     c('Ville Heinola', 'D', 'WPG', 800_000, 1, 1, 2026, 'UFA', 'NHL', null, '2001-03-02'),
     // --- Goalies (Roster) ---
@@ -1694,11 +1694,11 @@ export const NHL_CONTRACT_DATA: Record<string, PlayerContract[]> = {
     c('Chris Kreider', 'LW', 'ANA', 6_500_000, 2, 2, 2027, 'UFA', 'NHL', null, '1991-04-30'),
     c('Alex Killorn', 'RW', 'ANA', 6_250_000, 2, 2, 2027, 'UFA', 'NHL', null, '1989-09-14'),
     c('Ryan Strome', 'C', 'ANA', 5_000_000, 2, 2, 2027, 'UFA', 'NHL', null, '1993-07-11'),
-    c('Frank Vatrano', 'LW', 'ANA', 4_571_189, 3, 3, 2028, 'UFA', 'IR', null, '1994-03-14'),
+    c('Frank Vatrano', 'LW', 'ANA', 4_571_189, 3, 3, 2028, 'UFA', 'NHL', null, '1994-03-14'),
     c('Ryan Poehling', 'C', 'ANA', 1_900_000, 1, 1, 2026, 'UFA', 'NHL', null, '1999-01-03'),
     c('Ross Johnston', 'LW', 'ANA', 1_100_000, 1, 1, 2026, 'UFA', 'NHL', null, '1994-02-18'),
     c('Cutter Gauthier', 'LW', 'ANA', 950_000, 1, 1, 2026, 'RFA', 'NHL', null, '2004-01-19'),
-    c('Leo Carlsson', 'C', 'ANA', 950_000, 1, 1, 2026, 'RFA', 'IR', null, '2004-12-26'),
+    c('Leo Carlsson', 'C', 'ANA', 950_000, 1, 1, 2026, 'RFA', 'NHL', null, '2004-12-26'),
     c('Beckett Sennecke', 'RW', 'ANA', 942_500, 3, 3, 2028, 'RFA', 'NHL', null, '2006-01-28'),
     c('Jansen Harkins', 'C', 'ANA', 787_500, 1, 1, 2026, 'UFA', 'NHL', null, '1997-05-23'),
     c('Jeffrey Viel', 'LW', 'ANA', 775_000, 1, 1, 2026, 'UFA', 'NHL', null, '1997-01-28'),
@@ -1745,12 +1745,12 @@ export const NHL_CONTRACT_DATA: Record<string, PlayerContract[]> = {
   // ============================================================
   'CGY': [
     // Forwards
-    c('Jonathan Huberdeau', 'LW', 'CGY', 10_500_000, 6, 6, 2031, 'UFA', 'IR', 'NMC', '1993-06-04'),
+    c('Jonathan Huberdeau', 'LW', 'CGY', 10_500_000, 6, 6, 2031, 'UFA', 'LTIR', 'NMC', '1993-06-04'),
     c('Nazem Kadri', 'C', 'CGY', 7_000_000, 4, 4, 2029, 'UFA', 'NHL', 'M-NTC', '1990-10-06'),
     c('Matt Coronato', 'RW', 'CGY', 6_500_000, 7, 7, 2032, 'UFA', 'NHL', null, '2002-11-14'),
     c('Yegor Sharangovich', 'C', 'CGY', 5_750_000, 5, 5, 2030, 'UFA', 'NHL', null, '1998-06-06'),
     c('Joel Farabee', 'RW', 'CGY', 5_000_000, 3, 3, 2028, 'UFA', 'NHL', null, '2000-02-25'),
-    c('Blake Coleman', 'RW', 'CGY', 4_900_000, 2, 2, 2027, 'UFA', 'IR', null, '1991-11-28'),
+    c('Blake Coleman', 'RW', 'CGY', 4_900_000, 2, 2, 2027, 'UFA', 'NHL', null, '1991-11-28'),
     c('Mikael Backlund', 'C', 'CGY', 4_500_000, 3, 3, 2028, 'UFA', 'NHL', null, '1989-03-17'),
     c('Morgan Frost', 'C', 'CGY', 4_375_000, 2, 2, 2027, 'UFA', 'NHL', null, '1999-05-14'),
     c('Connor Zary', 'C', 'CGY', 3_775_000, 3, 3, 2028, 'RFA', 'NHL', null, '2001-09-25'),
@@ -1758,7 +1758,7 @@ export const NHL_CONTRACT_DATA: Record<string, PlayerContract[]> = {
     c('Adam Klapka', 'RW', 'CGY', 1_250_000, 2, 2, 2027, 'RFA', 'NHL', null, '2000-09-14'),
     c('Martin Pospisil', 'C', 'CGY', 1_000_000, 4, 4, 2029, 'UFA', 'NHL', null, '1999-11-19'),
     c('Matvei Gridin', 'RW', 'CGY', 942_500, 3, 3, 2028, 'RFA', 'NHL', null, '2006-03-01'),
-    c('John Beecher', 'C', 'CGY', 900_000, 1, 1, 2026, 'RFA', 'IR', null, '2001-04-05'),
+    c('John Beecher', 'C', 'CGY', 900_000, 1, 1, 2026, 'RFA', 'NHL', null, '2001-04-05'),
     c('Samuel Honzek', 'LW', 'CGY', 886_667, 3, 3, 2028, 'RFA', 'IR', null, '2004-11-12'),
     // Defense
     c('MacKenzie Weegar', 'D', 'CGY', 6_250_000, 6, 6, 2031, 'UFA', 'NHL', 'M-NTC', '1994-01-07'),
@@ -1878,13 +1878,13 @@ export const NHL_CONTRACT_DATA: Record<string, PlayerContract[]> = {
     c('Joel Armia', 'RW', 'LAK', 2_500_000, 2, 2, 2027, 'UFA', 'NHL', null, '1993-05-31'),
     c('Corey Perry', 'RW', 'LAK', 2_000_000, 1, 1, 2026, 'UFA', 'NHL', null, '1985-05-16'),
     c('Samuel Helenius', 'C', 'LAK', 805_833, 3, 3, 2028, 'RFA', 'NHL', null, '2002-11-26'),
-    c('Alex Turcotte', 'C', 'LAK', 775_000, 2, 2, 2027, 'RFA', 'IR', null, '2001-02-26'),
+    c('Alex Turcotte', 'C', 'LAK', 775_000, 2, 2, 2027, 'RFA', 'NHL', null, '2001-02-26'),
     c('Jeff Malott', 'LW', 'LAK', 775_000, 1, 1, 2026, 'UFA', 'NHL', null, '1996-08-07'),
     c('Taylor Ward', 'RW', 'LAK', 775_000, 3, 3, 2028, 'UFA', 'NHL', null, '1998-03-31'),
     // Defense
     c('Drew Doughty', 'D', 'LAK', 11_000_000, 2, 2, 2027, 'UFA', 'NHL', 'NMC', '1989-12-08'),
     c('Cody Ceci', 'D', 'LAK', 4_500_000, 4, 4, 2029, 'UFA', 'NHL', null, '1993-12-21'),
-    c('Mikey Anderson', 'D', 'LAK', 4_125_000, 6, 6, 2031, 'UFA', 'IR', null, '1999-05-25'),
+    c('Mikey Anderson', 'D', 'LAK', 4_125_000, 6, 6, 2031, 'UFA', 'NHL', null, '1999-05-25'),
     c('Brian Dumoulin', 'D', 'LAK', 4_000_000, 3, 3, 2028, 'UFA', 'NHL', null, '1991-09-06'),
     c('Joel Edmundson', 'D', 'LAK', 3_850_000, 3, 3, 2028, 'UFA', 'NHL', null, '1993-06-28'),
     c('Brandt Clarke', 'D', 'LAK', 863_333, 1, 1, 2026, 'RFA', 'NHL', null, '2003-02-09'),
@@ -1936,12 +1936,12 @@ export const NHL_CONTRACT_DATA: Record<string, PlayerContract[]> = {
     c('Eeli Tolvanen', 'RW', 'SEA', 3_475_000, 1, 1, 2026, 'UFA', 'NHL', null, '1999-04-22'),
     c('Frederick Gaudreau', 'C', 'SEA', 2_100_000, 3, 3, 2028, 'UFA', 'NHL', null, '1993-05-01'),
     c('Tye Kartye', 'LW', 'SEA', 1_250_000, 2, 2, 2027, 'RFA', 'NHL', null, '2001-04-30'),
-    c('Berkly Catton', 'LW', 'SEA', 942_500, 3, 3, 2028, 'RFA', 'IR', null, '2006-01-14'),
+    c('Berkly Catton', 'LW', 'SEA', 942_500, 3, 3, 2028, 'RFA', 'NHL', null, '2006-01-14'),
     c('Shane Wright', 'C', 'SEA', 886_667, 2, 2, 2027, 'RFA', 'NHL', null, '2004-01-05'),
     c('Ryan Winterton', 'RW', 'SEA', 828_333, 1, 1, 2026, 'RFA', 'NHL', null, '2003-09-04'),
     c('Jacob Melanson', 'RW', 'SEA', 826_111, 1, 1, 2026, 'RFA', 'NHL', null, '2003-04-22'),
     c('Max McCormick', 'LW', 'SEA', 775_000, 1, 1, 2026, 'UFA', 'NHL', null),
-    c('Ben Meyers', 'C', 'SEA', 775_000, 1, 1, 2026, 'UFA', 'IR', null, '1998-11-15'),
+    c('Ben Meyers', 'C', 'SEA', 775_000, 1, 1, 2026, 'UFA', 'NHL', null, '1998-11-15'),
     // Defense
     c('Vince Dunn', 'D', 'SEA', 7_350_000, 2, 2, 2027, 'UFA', 'NHL', null, '1996-10-29'),
     c('Brandon Montour', 'D', 'SEA', 7_142_857, 6, 6, 2031, 'UFA', 'NHL', 'M-NTC', '1994-04-11'),
@@ -1954,7 +1954,7 @@ export const NHL_CONTRACT_DATA: Record<string, PlayerContract[]> = {
     // Goalies
     c('Philipp Grubauer', 'G', 'SEA', 5_900_000, 2, 2, 2027, 'UFA', 'NHL', null, '1991-11-25'),
     c('Joey Daccord', 'G', 'SEA', 5_000_000, 5, 5, 2030, 'UFA', 'NHL', null, '1996-08-19'),
-    c('Matt Murray', 'G', 'SEA', 1_000_000, 1, 1, 2026, 'UFA', 'IR', null, '1994-05-25'),
+    c('Matt Murray', 'G', 'SEA', 1_000_000, 1, 1, 2026, 'UFA', 'NHL', null, '1994-05-25'),
     // Non-Roster Forwards (AHL)
     c('Jake O\'Brien', 'C', 'SEA', 975_000, 3, 3, 2028, 'RFA', 'AHL', null),
     c('Nathan Villeneuve', 'C', 'SEA', 940_833, 3, 3, 2028, 'RFA', 'AHL', null),
@@ -1998,7 +1998,7 @@ export const NHL_CONTRACT_DATA: Record<string, PlayerContract[]> = {
     c('Adam Gaudette', 'RW', 'SJS', 2_000_000, 2, 2, 2027, 'UFA', 'NHL', null, '1996-10-03'),
     c('Kiefer Sherwood', 'RW', 'SJS', 1_500_000, 1, 1, 2026, 'UFA', 'NHL', null, '1995-03-31'),
     c('Ryan Reaves', 'RW', 'SJS', 1_350_000, 1, 1, 2026, 'UFA', 'IR', null, '1987-01-20'),
-    c('Ty Dellandrea', 'C', 'SJS', 1_300_000, 1, 1, 2026, 'RFA', 'IR', null, '2000-07-21'),
+    c('Ty Dellandrea', 'C', 'SJS', 1_300_000, 1, 1, 2026, 'RFA', 'NHL', null, '2000-07-21'),
     c('Philipp Kurashev', 'LW', 'SJS', 1_200_000, 1, 1, 2026, 'RFA', 'NHL', null, '1999-10-12'),
     c('Macklin Celebrini', 'C', 'SJS', 975_000, 2, 2, 2027, 'RFA', 'NHL', null),
     c('Michael Misa', 'C', 'SJS', 975_000, 3, 3, 2028, 'RFA', 'NHL', null, '2007-02-16'),
@@ -2057,10 +2057,10 @@ export const NHL_CONTRACT_DATA: Record<string, PlayerContract[]> = {
   'VAN': [
     // Forwards
     c('Elias Pettersson', 'C', 'VAN', 11_600_000, 8, 7, 2032, 'UFA', 'NHL', 'NMC', '1998-11-12'),
-    c('Brock Boeser', 'RW', 'VAN', 7_250_000, 7, 7, 2032, 'UFA', 'IR', null, '1997-02-25'),
+    c('Brock Boeser', 'RW', 'VAN', 7_250_000, 7, 7, 2032, 'UFA', 'NHL', null, '1997-02-25'),
     c('Jake DeBrusk', 'LW', 'VAN', 5_500_000, 6, 6, 2031, 'UFA', 'NHL', null, '1996-10-17'),
     c('Evander Kane', 'LW', 'VAN', 5_125_000, 1, 1, 2026, 'UFA', 'NHL', null, '1991-08-02'),
-    c('Marco Rossi', 'C', 'VAN', 5_000_000, 3, 3, 2028, 'RFA', 'IR', null, '2001-09-23'),
+    c('Marco Rossi', 'C', 'VAN', 5_000_000, 3, 3, 2028, 'RFA', 'NHL', null, '2001-09-23'),
     c('Conor Garland', 'RW', 'VAN', 4_950_000, 7, 7, 2032, 'UFA', 'NHL', null, '1996-03-11'),
     c('Filip Chytil', 'C', 'VAN', 4_437_500, 2, 2, 2027, 'UFA', 'NHL', null, '1999-09-05'),
     c('Nils Hoglander', 'LW', 'VAN', 3_000_000, 3, 3, 2028, 'UFA', 'NHL', null, '2000-12-20'),
@@ -2076,7 +2076,7 @@ export const NHL_CONTRACT_DATA: Record<string, PlayerContract[]> = {
     c('Marcus Pettersson', 'D', 'VAN', 5_500_000, 6, 6, 2031, 'UFA', 'NHL', null, '1996-05-08'),
     c('Tyler Myers', 'D', 'VAN', 3_000_000, 2, 2, 2027, 'UFA', 'NHL', null, '1990-02-01'),
     c('Derek Forbort', 'D', 'VAN', 2_000_000, 1, 1, 2026, 'UFA', 'LTIR', null, '1992-03-04'),
-    c('Zeev Buium', 'D', 'VAN', 966_500, 2, 2, 2027, 'RFA', 'IR', null, '2005-12-07'),
+    c('Zeev Buium', 'D', 'VAN', 966_500, 2, 2, 2027, 'RFA', 'NHL', null, '2005-12-07'),
     c('Tom Willander', 'D', 'VAN', 950_000, 3, 3, 2028, 'RFA', 'NHL', null, '2005-02-09'),
     c('Elias Pettersson', 'D', 'VAN', 838_333, 2, 2, 2027, 'RFA', 'NHL', null, '1998-11-12'), // Defenseman Elias Pettersson (different player)
     c('Pierre-Olivier Joseph', 'D', 'VAN', 775_000, 1, 1, 2026, 'RFA', 'NHL', null, '1999-07-01'),
@@ -2128,7 +2128,7 @@ export const NHL_CONTRACT_DATA: Record<string, PlayerContract[]> = {
     c('Mark Stone', 'RW', 'VGK', 9_500_000, 2, 2, 2027, 'UFA', 'NHL', 'NMC', '1992-05-13'),
     c('Tomas Hertl', 'C', 'VGK', 6_750_000, 5, 5, 2030, 'UFA', 'NHL', null, '1993-11-12'),
     c('Ivan Barbashev', 'LW', 'VGK', 5_000_000, 3, 3, 2028, 'UFA', 'NHL', null, '1995-12-14'),
-    c('Brett Howden', 'C', 'VGK', 2_500_000, 5, 5, 2030, 'UFA', 'IR', null, '1998-03-29'),
+    c('Brett Howden', 'C', 'VGK', 2_500_000, 5, 5, 2030, 'UFA', 'NHL', null, '1998-03-29'),
     c('Keegan Kolesar', 'RW', 'VGK', 2_500_000, 3, 3, 2028, 'UFA', 'NHL', null, '1997-04-08'),
     c('Brandon Saad', 'LW', 'VGK', 2_000_000, 1, 1, 2026, 'UFA', 'IR', null, '1992-10-27'),
     c('Reilly Smith', 'RW', 'VGK', 2_000_000, 1, 1, 2026, 'UFA', 'NHL', null, '1991-04-01'),
@@ -2139,10 +2139,10 @@ export const NHL_CONTRACT_DATA: Record<string, PlayerContract[]> = {
     c('Cole Reinhardt', 'LW', 'VGK', 812_500, 2, 2, 2027, 'UFA', 'NHL', null, '2000-02-01'),
     c('Jonas Rondbjerg', 'LW', 'VGK', 775_000, 1, 1, 2026, 'UFA', 'IR', null, '1999-03-31'),
     // Defense
-    c('Alex Pietrangelo', 'D', 'VGK', 8_800_000, 2, 2, 2027, 'UFA', 'IR', 'NMC'), // Season-ending IR
+    c('Alex Pietrangelo', 'D', 'VGK', 8_800_000, 2, 2, 2027, 'UFA', 'LTIR', 'NMC'), // Season-ending LTIR
     c('Shea Theodore', 'D', 'VGK', 7_425_000, 7, 7, 2032, 'UFA', 'NHL', 'M-NTC', '1995-08-03'),
     c('Noah Hanifin', 'D', 'VGK', 7_350_000, 7, 7, 2032, 'UFA', 'NHL', null, '1997-01-25'),
-    c('Brayden McNabb', 'D', 'VGK', 3_650_000, 3, 3, 2028, 'UFA', 'IR', null, '1991-01-21'),
+    c('Brayden McNabb', 'D', 'VGK', 3_650_000, 3, 3, 2028, 'UFA', 'NHL', null, '1991-01-21'),
     // Rasmus Andersson: 50% retained by CGY, VGK carries $2,275,000
     c('Rasmus Andersson', 'D', 'VGK', 2_275_000, 1, 1, 2026, 'UFA', 'NHL', null, '1996-10-27'), // 50% retained by CGY
     c('Jeremy Lauzon', 'D', 'VGK', 2_000_000, 1, 1, 2026, 'UFA', 'NHL', null, '1997-04-28'),
@@ -2150,7 +2150,7 @@ export const NHL_CONTRACT_DATA: Record<string, PlayerContract[]> = {
     c('Kaedan Korczak', 'D', 'VGK', 825_000, 5, 5, 2030, 'UFA', 'NHL', null, '2001-01-29'),
     // Goalies
     c('Adin Hill', 'G', 'VGK', 6_250_000, 6, 6, 2031, 'UFA', 'NHL', null, '1996-05-11'),
-    c('Carter Hart', 'G', 'VGK', 2_000_000, 2, 2, 2027, 'UFA', 'IR', null, '1998-08-13'),
+    c('Carter Hart', 'G', 'VGK', 2_000_000, 2, 2, 2027, 'UFA', 'NHL', null, '1998-08-13'),
     c('Akira Schmid', 'G', 'VGK', 875_000, 1, 1, 2026, 'RFA', 'NHL', null, '2000-05-12'),
     // LTIR
     c('William Karlsson', 'C', 'VGK', 3_817_293, 2, 2, 2027, 'UFA', 'LTIR', null, '1993-01-08'),
