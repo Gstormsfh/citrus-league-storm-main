@@ -2,12 +2,10 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { AlertCircle, Shield, CalendarDays, Skull, Plus, Lock, Info, X } from "lucide-react";
+import { AlertCircle, Shield, CalendarDays, Skull, Plus, Lock, Info } from "lucide-react";
 import { useState, memo } from "react";
-import { useIsMobile } from "@/components/mobile/AppShell";
+
 import { CitrusPuckPlayerData, AggregatedPlayerData } from "@/types/citruspuck";
 
 export interface HockeyPlayer {
@@ -179,8 +177,6 @@ const HockeyPlayerCardContent = ({
   } = useSortable({ id: player?.id || 'unknown' });
   
   const [imageError, setImageError] = useState(false);
-  const [statsPopoverOpen, setStatsPopoverOpen] = useState(false);
-  const isMobile = useIsMobile();
 
   if (!player) return null;
 
@@ -347,24 +343,14 @@ const HockeyPlayerCardContent = ({
   // This is the SINGLE SOURCE OF TRUTH for projections - matches Matchup tab exactly
   // PROJECTION EXISTS = PLAYER HAS GAME ON SELECTED DATE
   const dailyProjection = isGoalie ? player.goalieProjection : player.daily_projection;
-
+  
   // If projection exists, player has a game on this date
   const hasGameOnSelectedDate = dailyProjection !== undefined && dailyProjection !== null;
-
-  // Determine if we should show actual stats (game is live or final)
-  const gameStatus = player.nextGame?.gameStatus;
-  const hasActuals = player.daily_actual_stats && (gameStatus === 'live' || gameStatus === 'intermission' || gameStatus === 'final');
-  const showActuals = hasGameOnSelectedDate && hasActuals;
-
-  // Get points: actual if game played, projected otherwise
-  const displayPoints = showActuals && player.daily_actual_points != null
-    ? player.daily_actual_points
-    : (dailyProjection?.total_projected_points || 0);
-  const pointsLabel = showActuals ? (gameStatus === 'final' ? 'FINAL' : 'LIVE') : 'PROJ';
-
+  
+  // Get projected points from daily projection
   const projectedPoints = dailyProjection?.total_projected_points || 0;
-  const maxProjectedPoints = 8;
-  const projectionPercentage = Math.min((displayPoints / maxProjectedPoints) * 100, 100);
+  const maxProjectedPoints = 8; 
+  const projectionPercentage = Math.min((projectedPoints / maxProjectedPoints) * 100, 100);
 
   // Disable drag if player is locked
   const canDrag = draggable && !isLocked;
@@ -467,155 +453,70 @@ const HockeyPlayerCardContent = ({
         </Badge>
       </div>
 
-      {/* Surfer Stats Grid - MAXIMUM GREEN ENERGY */}
+      {/* Stats Grid — actuals for live/final, season stats otherwise */}
       <div className="p-2 bg-gradient-to-br from-citrus-sage/10 via-citrus-sage/5 to-citrus-sage/10 flex-1 flex items-center justify-center border-t-2 border-citrus-sage/40 relative before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-0.5 before:bg-gradient-to-r before:from-citrus-sage/50 before:via-[#7CB518] before:to-citrus-sage/50">
-        {isGoalie ? (
-          // GOALIE: Show actual stats when game live/final, else season stats
-          showActuals ? (() => {
-            const actuals = player.daily_actual_stats;
-            const triggerGrid = (
+        {(() => {
+          const gameStatus = player.nextGame?.gameStatus;
+          const showActuals = hasGameOnSelectedDate && player.daily_actual_stats &&
+            (gameStatus === 'live' || gameStatus === 'intermission' || gameStatus === 'final');
+
+          if (isGoalie) {
+            if (showActuals && player.daily_actual_stats) {
+              const s = player.daily_actual_stats;
+              return (
                 <div className="grid grid-cols-3 gap-1.5 text-center w-full">
-                  <div className="bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 rounded-xl p-1.5 border-2 border-emerald-500/50 shadow-sm">
-                    <div className="text-[8px] text-emerald-800 font-display font-bold uppercase leading-none mb-1 tracking-wider">W</div>
-                    <div className="font-varsity text-[11px] text-emerald-800">{actuals?.wins || 0}</div>
-                  </div>
-                  <div className="bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 rounded-xl p-1.5 border-2 border-emerald-500/50 shadow-sm">
-                    <div className="text-[8px] text-emerald-800 font-display font-bold uppercase leading-none mb-1 tracking-wider">SV</div>
-                    <div className="font-varsity text-[10px] text-emerald-800">{actuals?.saves || 0}</div>
-                  </div>
-                  <div className="bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 rounded-xl p-1.5 border-2 border-emerald-500/50 shadow-sm">
-                    <div className="text-[8px] text-emerald-800 font-display font-bold uppercase leading-none mb-1 tracking-wider">GA</div>
-                    <div className="font-varsity text-[10px] text-emerald-800">{actuals?.goals_against || 0}</div>
-                  </div>
+                  {[
+                    { label: 'W', value: s.wins || 0 },
+                    { label: 'SV', value: s.saves || 0 },
+                    { label: 'GA', value: s.goals_against || 0 },
+                  ].map((stat) => (
+                    <div key={stat.label} className="bg-gradient-to-br from-emerald-100/60 to-emerald-50/40 rounded-xl p-1.5 border-2 border-emerald-300/50">
+                      <div className="text-[8px] text-emerald-800 font-display font-bold uppercase leading-none mb-1 tracking-wider">{stat.label}</div>
+                      <div className="font-varsity text-[11px] text-emerald-800">{stat.value}</div>
+                    </div>
+                  ))}
                 </div>
-            );
-            const detailContent = (
-              <div className="p-3 max-w-xs">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-varsity text-sm text-emerald-800 border-b-2 border-emerald-500/30 pb-1">{gameStatus === 'final' ? 'Final Stats' : 'Live Stats'}</h4>
-                  {isMobile && <button onClick={() => setStatsPopoverOpen(false)} className="min-w-[44px] min-h-[44px] p-2.5 -m-1.5 rounded-full hover:bg-citrus-sage/20 flex items-center justify-center touch-manipulation"><X className="h-4 w-4 text-citrus-forest" /></button>}
-                </div>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">Wins:</span><span className="font-varsity text-emerald-800">{actuals?.wins || 0}</span></div>
-                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">Saves:</span><span className="font-varsity text-emerald-800">{actuals?.saves || 0}</span></div>
-                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">Shutouts:</span><span className="font-varsity text-emerald-800">{actuals?.shutouts || 0}</span></div>
-                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">GA:</span><span className="font-varsity text-emerald-800">{actuals?.goals_against || 0}</span></div>
-                </div>
-                <div className="mt-2 pt-1 border-t-2 border-emerald-500/30 text-xs font-varsity font-bold text-emerald-700">
-                  Total: {(player.daily_actual_points || 0).toFixed(1)} pts
-                </div>
+              );
+            }
+            // Season stats
+            return (
+              <div className="grid grid-cols-3 gap-0.5 text-center w-full">
+                <div><div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">W</div><div className="font-bold text-[9px]">{displayStats.wins || 0}</div></div>
+                <div><div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">GAA</div><div className="font-bold text-[9px]">{displayStats.gaa?.toFixed(2) || '0.00'}</div></div>
+                <div><div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">SV%</div><div className="font-bold text-[9px]">{displayStats.savePct ? (displayStats.savePct * 100).toFixed(2) : '0.00'}%</div></div>
               </div>
             );
-            const contentClass = "bg-[#E8EED9]/95 backdrop-blur-sm border-2 border-citrus-sage rounded-varsity shadow-varsity !z-[9999]";
-            return isMobile ? (
-              <Popover open={statsPopoverOpen} onOpenChange={setStatsPopoverOpen}>
-                <PopoverTrigger asChild><button className="touch-manipulation w-full" onClick={(e) => e.stopPropagation()}>{triggerGrid}</button></PopoverTrigger>
-                <PopoverContent side="top" align="center" sideOffset={4} className={contentClass} onOpenAutoFocus={(e) => e.preventDefault()}>{detailContent}</PopoverContent>
-              </Popover>
-            ) : (
-              <Tooltip>
-                <TooltipTrigger asChild>{triggerGrid}</TooltipTrigger>
-                <TooltipContent className={cn("p-0", contentClass)}>{detailContent}</TooltipContent>
-              </Tooltip>
-            );
-          })() : (
-            // Season stats for goalie
-            <div className="grid grid-cols-3 gap-0.5 text-center w-full">
-              <div>
-                <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">W</div>
-                <div className="font-bold text-[9px]">{displayStats.wins || 0}</div>
-              </div>
-              <div>
-                <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">GAA</div>
-                <div className="font-bold text-[9px]">{displayStats.gaa?.toFixed(2) || '0.00'}</div>
-              </div>
-              <div>
-                <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">SV%</div>
-                <div className="font-bold text-[9px]">
-                  {displayStats.savePct ? (displayStats.savePct * 100).toFixed(2) : '0.00'}%
-                </div>
-              </div>
-            </div>
-          )
-        ) : (
-          // SKATER: Show actual stats when game live/final, else season stats
-          showActuals ? (() => {
-            const actuals = player.daily_actual_stats;
-            const triggerGrid = (
-                <div className="grid grid-cols-4 gap-1 text-center w-full">
-                  <div className="bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 rounded-lg p-1 border-2 border-emerald-500/50">
-                    <div className="text-[7px] text-emerald-800 font-display font-bold uppercase leading-none mb-0.5">G</div>
-                    <div className="font-varsity text-[9px] text-emerald-800">{actuals?.goals || 0}</div>
+          }
+
+          // Skater
+          if (showActuals && player.daily_actual_stats) {
+            const s = player.daily_actual_stats;
+            return (
+              <div className="grid grid-cols-4 gap-1 text-center w-full">
+                {[
+                  { label: 'G', value: s.goals || 0 },
+                  { label: 'A', value: s.assists || 0 },
+                  { label: 'SOG', value: s.shots_on_goal || 0 },
+                  { label: 'HIT', value: s.hits || 0 },
+                ].map((stat) => (
+                  <div key={stat.label} className="bg-gradient-to-br from-emerald-100/60 to-emerald-50/40 rounded-lg p-1 border-2 border-emerald-300/50">
+                    <div className="text-[7px] text-emerald-800 font-display font-bold uppercase leading-none mb-0.5">{stat.label}</div>
+                    <div className="font-varsity text-[9px] text-emerald-800">{stat.value}</div>
                   </div>
-                  <div className="bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 rounded-lg p-1 border-2 border-emerald-500/50">
-                    <div className="text-[7px] text-emerald-800 font-display font-bold uppercase leading-none mb-0.5">A</div>
-                    <div className="font-varsity text-[9px] text-emerald-800">{actuals?.assists || 0}</div>
-                  </div>
-                  <div className="bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 rounded-lg p-1 border-2 border-emerald-500/50">
-                    <div className="text-[7px] text-emerald-800 font-display font-bold uppercase leading-none mb-0.5">SOG</div>
-                    <div className="font-varsity text-[9px] text-emerald-800">{actuals?.shots_on_goal || 0}</div>
-                  </div>
-                  <div className="bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 rounded-lg p-1 border-2 border-emerald-500/50">
-                    <div className="text-[7px] text-emerald-800 font-display font-bold uppercase leading-none mb-0.5">HIT</div>
-                    <div className="font-varsity text-[9px] text-emerald-800">{actuals?.hits || 0}</div>
-                  </div>
-                </div>
-            );
-            const detailContent = (
-              <div className="p-3 max-w-xs">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-varsity text-sm text-emerald-800 border-b-2 border-emerald-500/30 pb-1">{gameStatus === 'final' ? 'Final Stats' : 'Live Stats'}</h4>
-                  {isMobile && <button onClick={() => setStatsPopoverOpen(false)} className="min-w-[44px] min-h-[44px] p-2.5 -m-1.5 rounded-full hover:bg-citrus-sage/20 flex items-center justify-center touch-manipulation"><X className="h-4 w-4 text-citrus-forest" /></button>}
-                </div>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">Goals:</span><span className="font-varsity text-emerald-800">{actuals?.goals || 0}</span></div>
-                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">Assists:</span><span className="font-varsity text-emerald-800">{actuals?.assists || 0}</span></div>
-                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">SOG:</span><span className="font-varsity text-emerald-800">{actuals?.shots_on_goal || 0}</span></div>
-                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">Blocks:</span><span className="font-varsity text-emerald-800">{actuals?.blocks || 0}</span></div>
-                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">PPP:</span><span className="font-varsity text-emerald-800">{actuals?.ppp || 0}</span></div>
-                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">SHP:</span><span className="font-varsity text-emerald-800">{actuals?.shp || 0}</span></div>
-                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">Hits:</span><span className="font-varsity text-emerald-800">{actuals?.hits || 0}</span></div>
-                  <div className="flex justify-between"><span className="text-citrus-charcoal font-display">PIM:</span><span className="font-varsity text-emerald-800">{actuals?.pim || 0}</span></div>
-                </div>
-                <div className="mt-2 pt-1 border-t-2 border-emerald-500/30 text-xs font-varsity font-bold text-emerald-700">
-                  Total: {(player.daily_actual_points || 0).toFixed(1)} pts
-                </div>
+                ))}
               </div>
             );
-            const contentClass = "bg-[#E8EED9]/95 backdrop-blur-sm border-2 border-citrus-sage rounded-varsity shadow-varsity !z-[9999]";
-            return isMobile ? (
-              <Popover open={statsPopoverOpen} onOpenChange={setStatsPopoverOpen}>
-                <PopoverTrigger asChild><button className="touch-manipulation w-full" onClick={(e) => e.stopPropagation()}>{triggerGrid}</button></PopoverTrigger>
-                <PopoverContent side="top" align="center" sideOffset={4} className={contentClass} onOpenAutoFocus={(e) => e.preventDefault()}>{detailContent}</PopoverContent>
-              </Popover>
-            ) : (
-              <Tooltip>
-                <TooltipTrigger asChild>{triggerGrid}</TooltipTrigger>
-                <TooltipContent className={cn("p-0", contentClass)}>{detailContent}</TooltipContent>
-              </Tooltip>
-            );
-          })() : (
-            // Season stats for skater
+          }
+          // Season stats
+          return (
             <div className="grid grid-cols-4 gap-0.5 text-center w-full">
-              <div>
-                <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">GP</div>
-                <div className="font-bold text-[9px]">{displayStats.gamesPlayed || 0}</div>
-              </div>
-              <div>
-                <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">G</div>
-                <div className="font-bold text-[9px]">{displayStats.goals || 0}</div>
-              </div>
-              <div>
-                <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">A</div>
-                <div className="font-bold text-[9px]">{displayStats.assists || 0}</div>
-              </div>
-              <div>
-                <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">SOG</div>
-                <div className="font-bold text-[9px]">{displayStats.shots || 0}</div>
-              </div>
+              <div><div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">GP</div><div className="font-bold text-[9px]">{displayStats.gamesPlayed || 0}</div></div>
+              <div><div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">G</div><div className="font-bold text-[9px]">{displayStats.goals || 0}</div></div>
+              <div><div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">A</div><div className="font-bold text-[9px]">{displayStats.assists || 0}</div></div>
+              <div><div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">SOG</div><div className="font-bold text-[9px]">{displayStats.shots || 0}</div></div>
             </div>
-          )
-        )}
+          );
+        })()}
       </div>
 
       {/* Projected Points / Game Bar - VARSITY SCOREBOARD STYLE */}
@@ -641,19 +542,13 @@ const HockeyPlayerCardContent = ({
             )}
           </div>
           
-          <div className={cn(
-            "flex items-center gap-1 px-2 py-0.5 rounded-md border-2 shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)]",
-            showActuals ? "bg-emerald-500/20 border-emerald-500/50" : "bg-citrus-peach/30 border-citrus-peach/50"
-          )}>
-             <span className={cn(
-               "text-[7px] uppercase font-varsity font-bold tracking-wider",
-               showActuals ? "text-emerald-800" : "text-citrus-charcoal"
-             )}>{pointsLabel}</span>
+          <div className="flex items-center gap-1 bg-citrus-peach/30 px-2 py-0.5 rounded-md border-2 border-citrus-peach/50 shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)]">
+             <span className="text-[7px] text-citrus-charcoal uppercase font-varsity font-bold tracking-wider">PROJ</span>
              <span className={cn(
                "text-[10px] font-varsity font-black tracking-tight",
-               showActuals ? "text-emerald-800" : (hasGameOnSelectedDate ? "text-citrus-orange" : "text-citrus-charcoal/40")
+               hasGameOnSelectedDate ? "text-citrus-orange" : "text-citrus-charcoal/40"
              )}>
-                 {hasGameOnSelectedDate ? displayPoints.toFixed(1) : '-'}
+                 {hasGameOnSelectedDate ? projectedPoints.toFixed(1) : '-'}
              </span>
           </div>
         </div>

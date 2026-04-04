@@ -16,6 +16,7 @@ import { logger } from '@/utils/logger';
 import { playerApi } from '@/api/players';
 import { MatchupService } from '@/services/MatchupService';
 import { matchupApi } from '@/api/matchups';
+import { ScoringCalculator } from '@/utils/scoringUtils';
 
 // ─── Types for game log entries ──────────────────────────────────────
 interface GameLogEntry {
@@ -114,6 +115,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
   const [totalProjected, setTotalProjected] = useState(0);
   const [totalActual, setTotalActual] = useState(0);
   const fetchedForPlayerRef = useRef<string | null>(null);
+  const todayGameRef = useRef<HTMLDivElement | null>(null);
 
   // Fetch full season game log when modal opens (actuals for played games + projections for future)
   useEffect(() => {
@@ -227,8 +229,10 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
           const actualStat = actualStatsMap.get(gameDate);
           const projection = projectionMap.get(gameDate) || null;
           const projectedPoints = Number(projection?.total_projected_points || 0);
+          // Calculate fantasy points from raw game stats using scoring calculator
+          const scorer = new ScoringCalculator();
           const actualPoints = actualStat
-            ? Number(actualStat.total_points || actualStat.fantasy_points || 0)
+            ? scorer.calculatePoints(actualStat, playerIsGoalie)
             : undefined;
 
           if (isPast && actualPoints != null) actTotal += actualPoints;
@@ -263,6 +267,13 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
         setGameLog(entries);
         setTotalProjected(projTotal);
         setTotalActual(actTotal);
+
+        // Auto-scroll to today's game (or first future game) after render
+        requestAnimationFrame(() => {
+          if (todayGameRef.current) {
+            todayGameRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        });
       } catch (error) {
         logger.error('[PlayerStatsModal] Error fetching game log:', error);
       } finally {
@@ -588,16 +599,23 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                     </div>
                   </div>
 
-                  {/* Game-by-game log — most recent first */}
+                  {/* Game-by-game log — chronological order, auto-scroll to today */}
                   <div className="space-y-2">
-                    {[...gameLog].reverse().map((gp) => {
+                    {(() => {
+                      const hasToday = gameLog.some(g => g.isToday);
+                      let scrollTargetSet = false;
+                      return gameLog.map((gp) => {
                       const hasActuals = gp.isPast && gp.actualStats != null;
                       const displayPoints = hasActuals ? (gp.actualPoints ?? 0) : gp.projectedPoints;
                       const as = gp.actualStats || {};
+                      // Scroll target: today's game, or first non-past game if no today game
+                      const isScrollTarget = gp.isToday || (!hasToday && !gp.isPast && !scrollTargetSet);
+                      if (isScrollTarget && !gp.isPast) scrollTargetSet = true;
 
                       return (
                       <div
                         key={gp.date}
+                        ref={isScrollTarget ? todayGameRef : undefined}
                         className={cn(
                           "rounded-xl border overflow-hidden transition-all",
                           gp.isToday ? "border-citrus-orange bg-citrus-peach/5"
@@ -638,7 +656,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                               "text-xl font-varsity font-black",
                               hasActuals ? "text-citrus-forest" : (displayPoints > 0 ? "text-citrus-orange" : "text-citrus-charcoal/30")
                             )}>
-                              {displayPoints > 0 ? displayPoints.toFixed(1) : (gp.isPast && !hasActuals ? 'DNP' : '—')}
+                              {hasActuals ? displayPoints.toFixed(1) : (displayPoints > 0 ? displayPoints.toFixed(1) : (gp.isPast ? 'DNP' : '—'))}
                             </div>
                             <div className="text-[10px] text-citrus-charcoal/40 font-display uppercase">
                               {hasActuals ? 'pts' : (gp.isPast ? '' : 'proj')}
@@ -750,7 +768,8 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                           </div>
                         ) : null}
                       </div>
-                    );})}
+                    );});
+                    })()}
                   </div>
                 </>
               ) : (

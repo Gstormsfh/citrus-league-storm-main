@@ -98,13 +98,13 @@ function buildSlotConfig(positionType: PositionType = 'individual', rosterSlots?
   return { labels, allSlots, forwardSlots, defenseSlots, goalieSlots, utilSlots };
 }
 
-// ─── Format compact stat line from actual game stats or projection ───
+// ─── Format compact stat line from actual game stats (live/final only) ───
 const formatStatLine = (player: HockeyPlayer): { text: string; isActual: boolean } | null => {
   const isGoalie = player.position === 'Goalie' || player.position === 'G';
   const gameStatus = player.nextGame?.gameStatus;
   const isLiveOrFinal = gameStatus === 'live' || gameStatus === 'intermission' || gameStatus === 'final';
 
-  // Show actuals if game is live or final and we have actual stats
+  // Only show actual stats for live/final games — no projected decimals
   if (isLiveOrFinal && player.daily_actual_stats) {
     const s = player.daily_actual_stats;
     const parts: string[] = [];
@@ -118,26 +118,7 @@ const formatStatLine = (player: HockeyPlayer): { text: string; isActual: boolean
       if (s.shots_on_goal) parts.push(`${s.shots_on_goal} SOG`);
       if (s.hits) parts.push(`${s.hits} HIT`);
     }
-    return parts.length > 0 ? { text: parts.join(', '), isActual: true } : null;
-  }
-
-  // Fall back to projections
-  if (isGoalie && player.goalieProjection) {
-    const gp = player.goalieProjection;
-    const parts: string[] = [];
-    if (gp.projected_saves > 0) parts.push(`${Math.round(gp.projected_saves)} SV`);
-    if (gp.projected_goals_against > 0) parts.push(`${gp.projected_goals_against.toFixed(1)} GA`);
-    if (gp.projected_wins >= 0.5) parts.push(`W`);
-    return parts.length > 0 ? { text: parts.join(', '), isActual: false } : null;
-  }
-
-  if (!isGoalie && player.daily_projection) {
-    const dp = player.daily_projection;
-    const parts: string[] = [];
-    if (dp.projected_goals >= 0.3) parts.push(`${dp.projected_goals.toFixed(1)}G`);
-    if (dp.projected_assists >= 0.3) parts.push(`${dp.projected_assists.toFixed(1)}A`);
-    if (dp.projected_sog >= 1) parts.push(`${dp.projected_sog.toFixed(0)} SOG`);
-    return parts.length > 0 ? { text: parts.join(', '), isActual: false } : null;
+    return parts.length > 0 ? { text: parts.join(' · '), isActual: true } : null;
   }
 
   return null;
@@ -203,7 +184,7 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
   return (
     <div
       className={cn(
-        "flex items-center gap-2 px-3 py-2.5 transition-all border-b border-citrus-sage/15",
+        "flex items-center gap-2.5 px-3 py-2 min-h-[52px] transition-all border-b border-citrus-sage/10",
         isSwapSelected && "!bg-citrus-orange/10 !border-citrus-orange/30",
         isEligibleTarget && !isSwapSelected && "!bg-citrus-sage/10 !border-citrus-sage/30",
         isLocked && "opacity-60",
@@ -212,8 +193,8 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
       {/* Position badge — tap to swap */}
       <div
         className={cn(
-          "w-10 h-10 flex-shrink-0 rounded-lg flex items-center justify-center text-white font-varsity text-xs font-black tracking-wide shadow-sm",
-          "ring-2 active:scale-95 transition-transform cursor-pointer",
+          "w-8 h-8 flex-shrink-0 rounded-md flex items-center justify-center text-white font-varsity text-[11px] font-black tracking-wide",
+          "ring-1 active:scale-95 transition-transform cursor-pointer",
           posColor[slotPosition] || 'bg-citrus-charcoal/40',
           posRingColor[slotPosition] || 'ring-citrus-charcoal/20',
           isEligibleTarget && !isSwapSelected && "!ring-citrus-sage !ring-2 animate-pulse",
@@ -226,8 +207,8 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
 
       {player ? (
         <>
-          {/* Player photo */}
-          <div className="w-9 h-9 flex-shrink-0 rounded-full overflow-hidden bg-citrus-sage/10 border-2 border-citrus-sage/30 relative">
+          {/* Team logo */}
+          <div className="w-7 h-7 flex-shrink-0 rounded-full overflow-hidden bg-citrus-sage/10 border border-citrus-sage/20 relative">
             {!imgErr ? (
               <img
                 src={teamLogoUrl}
@@ -236,82 +217,90 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
                 onError={() => setImgErr(true)}
               />
             ) : (
-              <Shield className="w-5 h-5 text-citrus-sage absolute inset-0 m-auto" />
+              <Shield className="w-4 h-4 text-citrus-sage absolute inset-0 m-auto" />
             )}
             {isLocked && (
               <div className="absolute inset-0 bg-background/50 flex items-center justify-center">
-                <Lock className="w-3 h-3 text-muted-foreground" />
+                <Lock className="w-2.5 h-2.5 text-muted-foreground" />
               </div>
             )}
           </div>
 
-          {/* Name + team/number + game info — tap name to open player card */}
-          <div className="flex-1 min-w-0 active:bg-citrus-sage/5 rounded-lg -mx-1 px-1 cursor-pointer" onClick={(e) => { e.stopPropagation(); onNameTap?.(); }}>
-            <div className="flex items-center gap-1">
+          {/* Player info — 2 lines max, tap to open card */}
+          <div className="flex-1 min-w-0 cursor-pointer" onClick={(e) => { e.stopPropagation(); onNameTap?.(); }}>
+            {/* Line 1: Name + status badge */}
+            <div className="flex items-center gap-1.5">
               <span className="font-display font-bold text-[13px] text-citrus-forest truncate leading-tight">
                 {player.name}
               </span>
               {statusBadge && (
-                <span className={cn("text-[9px] font-bold px-1 py-0.5 rounded-sm leading-none", statusBadge.cls)}>
+                <span className={cn("text-[8px] font-bold px-1 py-px rounded-sm leading-none flex-shrink-0", statusBadge.cls)}>
                   {statusBadge.label}
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-1.5 text-[11px] text-citrus-charcoal/60 font-display">
-              <span className="font-semibold">{teamAbbr}</span>
-              <span className="text-citrus-charcoal/30">|</span>
-              <span>#{player.number}</span>
+            {/* Line 2: Team · Opponent · Game status/time · Stats (single line, truncated) */}
+            <div className="flex items-center gap-1 text-[11px] text-citrus-charcoal/55 font-display leading-tight mt-0.5 overflow-hidden">
+              <span className="font-semibold flex-shrink-0">{teamAbbr}</span>
               {player.nextGame?.opponent && (
                 <>
-                  <span className="text-citrus-charcoal/30">|</span>
-                  <span className="text-citrus-sage font-semibold">{player.nextGame.opponent}</span>
+                  <span className="text-citrus-charcoal/25 flex-shrink-0">·</span>
+                  <span className="text-citrus-sage font-semibold flex-shrink-0">
+                    {player.nextGame.opponent}
+                  </span>
+                </>
+              )}
+              {player.nextGame && (
+                <>
+                  {isLiveOrFinal ? (
+                    <>
+                      <span className="text-citrus-charcoal/25 flex-shrink-0">·</span>
+                      <GameStatusBadge status={gameStatus} score={player.nextGame.score} />
+                      {(() => {
+                        const statInfo = formatStatLine(player);
+                        if (!statInfo) return null;
+                        return (
+                          <>
+                            <span className="text-citrus-charcoal/25 flex-shrink-0">·</span>
+                            <span className="text-emerald-700 font-semibold truncate">
+                              {statInfo.text}
+                            </span>
+                          </>
+                        );
+                      })()}
+                    </>
+                  ) : player.nextGame.gameTime ? (
+                    <>
+                      <span className="text-citrus-charcoal/25 flex-shrink-0">·</span>
+                      <span className="text-citrus-charcoal/45 font-medium flex-shrink-0">
+                        {player.nextGame.gameTime}
+                      </span>
+                    </>
+                  ) : null}
                 </>
               )}
             </div>
-            {/* Game status + actual/projected stat line */}
-            {player.nextGame && (
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <GameStatusBadge status={gameStatus} score={player.nextGame.score} />
-                {!isLiveOrFinal && player.nextGame.gameTime && (
-                  <span className="text-[10px] font-display font-semibold text-citrus-charcoal/50">
-                    {player.nextGame.gameTime}
-                  </span>
-                )}
-                {(() => {
-                  const statInfo = formatStatLine(player);
-                  if (!statInfo) return null;
-                  return (
-                    <>
-                      <span className="text-citrus-charcoal/20 text-[10px]">·</span>
-                      <span className={cn(
-                        "text-[10px] font-display truncate",
-                        statInfo.isActual ? "text-citrus-forest font-semibold" : "text-citrus-charcoal/45 italic"
-                      )}>
-                        {statInfo.text}
-                      </span>
-                    </>
-                  );
-                })()}
-              </div>
-            )}
           </div>
 
-          {/* Points — actual (live/final) or projected */}
-          <div className="flex-shrink-0 w-14 text-right">
+          {/* Points column */}
+          <div className="flex-shrink-0 w-[52px] text-right">
             {hasGame ? (
               <div className="flex flex-col items-end">
                 <span className={cn(
-                  "font-varsity text-base font-black leading-none",
-                  isLiveOrFinal ? "text-citrus-forest" : "text-citrus-orange"
+                  "font-varsity text-[15px] font-black leading-none",
+                  isLiveOrFinal ? "text-emerald-700" : "text-citrus-orange"
                 )}>
                   {displayPts.toFixed(1)}
                 </span>
-                <span className="text-[10px] text-citrus-charcoal/50 font-display font-medium uppercase">
+                <span className={cn(
+                  "text-[9px] font-display font-semibold uppercase leading-tight mt-0.5",
+                  isLiveOrFinal ? "text-emerald-600/70" : "text-citrus-charcoal/40"
+                )}>
                   {isLiveOrFinal ? (gameStatus === 'final' ? 'final' : 'live') : 'proj'}
                 </span>
               </div>
             ) : (
-              <span className="text-xs text-citrus-charcoal/40 font-display italic">No game</span>
+              <span className="text-[11px] text-citrus-charcoal/30 font-display">—</span>
             )}
           </div>
         </>
@@ -319,14 +308,14 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
         /* Empty slot */
         <div
           className={cn(
-            "flex-1 flex items-center justify-center py-1 rounded-lg border border-dashed",
-            isEligibleTarget ? "border-citrus-sage bg-citrus-sage/5" : "border-citrus-charcoal/15 bg-citrus-charcoal/5",
+            "flex-1 flex items-center justify-center py-1.5 rounded-md border border-dashed",
+            isEligibleTarget ? "border-citrus-sage bg-citrus-sage/5" : "border-citrus-charcoal/10 bg-citrus-charcoal/3",
           )}
           onClick={onEmptySlotTap}
         >
           <span className={cn(
             "text-xs font-display",
-            isEligibleTarget ? "text-citrus-sage font-bold" : "text-citrus-charcoal/30",
+            isEligibleTarget ? "text-citrus-sage font-bold" : "text-citrus-charcoal/25",
           )}>
             {isEligibleTarget ? "Tap to move here" : "Empty"}
           </span>
