@@ -3849,7 +3849,7 @@ const Matchup = () => {
           const anyMatchupsRes = await matchupApi.getLeagueMatchups(currentLeague.id);
           const anyMatchups = (anyMatchupsRes?.data || []) as any[];
           const hasAnyMatchups = anyMatchups.length > 0;
-          
+
           // If no matchups exist at all, force regenerate ALL weeks
           // Otherwise, generate only missing weeks (which will include this one)
           const forceRegenerate = !hasAnyMatchups;
@@ -3873,10 +3873,16 @@ const Matchup = () => {
           );
           
           if (genError) {
-            logger.error('[Matchup] Error generating matchups:', genError);
-            setError(`Failed to generate matchups: ${genError.message || 'Unknown error'}`);
-            setLoading(false);
-            return;
+            const isDuplicateKey = genError.message?.includes('duplicate key');
+            if (isDuplicateKey && hasAnyMatchups) {
+              // Matchups already exist — duplicate key is expected, continue to look up user's matchup
+              log(' Duplicate key during generation (matchups already exist) — continuing...');
+            } else {
+              logger.error('[Matchup] Error generating matchups:', genError);
+              setError(`Failed to generate matchups: ${genError.message || 'Unknown error'}`);
+              setLoading(false);
+              return;
+            }
           }
           
           log(' Matchup generation completed successfully');
