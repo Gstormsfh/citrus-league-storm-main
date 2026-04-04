@@ -191,9 +191,26 @@ export class MatchupService {
       return { error: null };
     }
 
-    const { error } = await this.supabase
+    // Check which weeks already have matchups to avoid duplicate key violations
+    // (two unique constraints: league_id+week_number+team1_id AND league_id+week_number+team2_id)
+    const { data: existing } = await this.supabase
       .from('matchups')
-      .upsert(matchups, { onConflict: 'league_id,week_number,team1_id', ignoreDuplicates: true });
+      .select('week_number, team1_id, team2_id')
+      .eq('league_id', leagueId);
+
+    const existingKeys = new Set(
+      (existing || []).map(m => `${m.week_number}:${m.team1_id}:${m.team2_id}`)
+    );
+
+    const newMatchups = matchups.filter(
+      m => !existingKeys.has(`${m.week_number}:${m.team1_id}:${m.team2_id}`)
+    );
+
+    if (newMatchups.length === 0) {
+      return { error: null };
+    }
+
+    const { error } = await this.supabase.from('matchups').insert(newMatchups);
     return { error };
   }
 

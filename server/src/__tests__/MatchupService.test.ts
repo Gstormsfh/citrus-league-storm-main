@@ -234,7 +234,7 @@ describe('MatchupService', () => {
       const result = await service.generateMatchupsForLeague('league-1', teams, weeks);
 
       expect(result.error).toBeNull();
-      expect(chain.upsert).toHaveBeenCalled();
+      expect(chain.insert).toHaveBeenCalled();
     });
 
     it('deletes existing matchups when forceRegenerate is true', async () => {
