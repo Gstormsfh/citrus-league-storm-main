@@ -17,9 +17,10 @@ interface DraftPick {
 
 interface DraftHistoryProps {
   draftHistory: DraftPick[];
+  onPlayerClick?: (playerId: string) => void;
 }
 
-export const DraftHistory = ({ draftHistory }: DraftHistoryProps) => {
+export const DraftHistory = ({ draftHistory, onPlayerClick }: DraftHistoryProps) => {
   const sortedHistory = [...draftHistory].reverse(); // Show most recent first
 
   return (
@@ -44,7 +45,10 @@ export const DraftHistory = ({ draftHistory }: DraftHistoryProps) => {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     <Badge variant="outline" className="text-[10px] px-1 py-0 flex-shrink-0">{pick.position}</Badge>
-                    <span className="font-medium text-sm truncate">{pick.playerName}</span>
+                    <span
+                      className={`font-medium text-sm truncate ${onPlayerClick ? 'cursor-pointer hover:text-primary hover:underline' : ''}`}
+                      onClick={(e) => { if (onPlayerClick) { e.stopPropagation(); onPlayerClick(pick.playerId); } }}
+                    >{pick.playerName}</span>
                   </div>
                   <div className="text-[11px] text-muted-foreground truncate">
                     {pick.teamName} • R{pick.round}
@@ -77,7 +81,10 @@ export const DraftHistory = ({ draftHistory }: DraftHistoryProps) => {
                       <td className="px-3 py-2 text-center font-medium text-primary">
                         #{pick.pick}
                       </td>
-                      <td className="px-3 py-2 font-medium">{pick.playerName}</td>
+                      <td
+                        className={`px-3 py-2 font-medium ${onPlayerClick ? 'cursor-pointer hover:text-primary hover:underline' : ''}`}
+                        onClick={() => onPlayerClick?.(pick.playerId)}
+                      >{pick.playerName}</td>
                       <td className="px-3 py-2">
                         <Badge variant="outline" className="text-xs">
                           {pick.position}

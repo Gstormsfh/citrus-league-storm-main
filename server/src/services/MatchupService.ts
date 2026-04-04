@@ -191,7 +191,9 @@ export class MatchupService {
       return { error: null };
     }
 
-    const { error } = await this.supabase.from('matchups').insert(matchups);
+    const { error } = await this.supabase
+      .from('matchups')
+      .upsert(matchups, { onConflict: 'league_id,week_number,team1_id', ignoreDuplicates: true });
     return { error };
   }
 
