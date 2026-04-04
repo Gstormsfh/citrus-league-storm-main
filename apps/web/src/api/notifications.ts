@@ -5,9 +5,10 @@
 import { apiClient } from './client';
 
 export const notificationApi = {
-  /** Get notifications for the authenticated user */
-  getNotifications(params?: { limit?: number; unread?: boolean }) {
+  /** Get notifications for the authenticated user, scoped to a league */
+  getNotifications(params?: { leagueId?: string; limit?: number; unread?: boolean }) {
     const query = new URLSearchParams();
+    if (params?.leagueId) query.set('leagueId', params.leagueId);
     if (params?.limit) query.set('limit', params.limit.toString());
     if (params?.unread) query.set('unread', 'true');
     const qs = query.toString();

@@ -33,7 +33,7 @@ export const NotificationService = {
     _userId: string
   ): Promise<NotificationServiceResponse<Notification[]>> {
     try {
-      const response = await notificationApi.getNotifications(leagueId);
+      const response = await notificationApi.getNotifications({ leagueId });
       return { data: (response.data || []) as Notification[], error: null };
     } catch (error) {
       logger.error('[NotificationService] Error fetching notifications:', error);

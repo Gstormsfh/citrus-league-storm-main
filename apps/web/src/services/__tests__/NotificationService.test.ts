@@ -90,7 +90,7 @@ describe('NotificationService', () => {
       expect(result.error).toBeNull();
       expect(result.data).toHaveLength(1);
       expect(result.data![0].title).toBe('Trade Offer');
-      expect(mockGetNotifications).toHaveBeenCalledWith('league-1');
+      expect(mockGetNotifications).toHaveBeenCalledWith({ leagueId: 'league-1' });
     });
 
     it('returns empty array when API returns no data', async () => {
