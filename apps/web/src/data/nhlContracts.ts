@@ -1129,7 +1129,7 @@ export const NHL_CONTRACT_DATA: Record<string, PlayerContract[]> = {
     c('Filip Hallander', 'RW', 'PIT', 775_000, 2, 2, 2027, 'UFA', 'AHL', null, '2000-06-29'),
     // Defensemen
     c('Erik Karlsson', 'D', 'PIT', 10_000_000, 2, 2, 2027, 'UFA', 'NHL', 'NMC', '1990-05-31'),
-    c('Kris Letang', 'D', 'PIT', 6_100_000, 3, 3, 2028, 'UFA', 'IR', 'NMC', '1987-04-24'),
+    c('Kris Letang', 'D', 'PIT', 6_100_000, 3, 3, 2028, 'UFA', 'NHL', 'NMC', '1987-04-24'),
     c('Ryan Graves', 'D', 'PIT', 4_500_000, 4, 4, 2029, 'UFA', 'NHL', null, '1995-05-21'),
     c('Connor Clifton', 'D', 'PIT', 3_333_333, 1, 1, 2026, 'UFA', 'NHL', null, '1995-04-28'),
     c('Brett Kulak', 'D', 'PIT', 2_750_000, 1, 1, 2026, 'UFA', 'NHL', null, '1994-01-06'),
