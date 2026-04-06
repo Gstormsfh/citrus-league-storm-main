@@ -90,6 +90,12 @@ const LeagueDashboard = () => {
   // Roster slot settings state
   const [rosterSlotSettings, setRosterSlotSettings] = useState<Record<string, number>>({});
 
+  // Playoff settings state
+  const [playoffSettings, setPlayoffSettings] = useState({
+    playoffTeams: 6 as number,
+    playoffWeeks: 3 as number,
+  });
+
   // Active settings tab
   const [activeSettingsTab, setActiveSettingsTab] = useState('waivers');
 
@@ -177,6 +183,12 @@ const LeagueDashboard = () => {
       if (fmt.categories && fmt.categories.length > 0) {
         setCategorySettings(fmt.categories);
       }
+
+      // Update playoff settings
+      setPlayoffSettings({
+        playoffTeams: (fmt.playoffTeams as number) ?? 6,
+        playoffWeeks: (fmt.playoffWeeks as number) ?? 3,
+      });
 
       // Update roster slot settings
       if (fmt.rosterSlots) {
@@ -428,6 +440,25 @@ const LeagueDashboard = () => {
         );
         saved = success;
         errorMessage = (slotErr as Error)?.message || 'Failed to save roster slot settings';
+      } else if (activeSettingsTab === 'playoffs') {
+        // Save playoff settings into the JSONB settings column
+        const leagueResponse = await leagueApi.getLeague(leagueId);
+        const currentLeague = leagueResponse.data as Record<string, unknown> | undefined;
+        if (currentLeague) {
+          const currentSettings = (currentLeague.settings as LeagueSettings) || {};
+          const { error: playoffErr } = await leagueApi.updateSettings(leagueId, {
+            settings: {
+              ...currentSettings,
+              playoffTeams: playoffSettings.playoffTeams,
+              playoffWeeks: playoffSettings.playoffWeeks,
+            },
+          });
+          saved = !playoffErr;
+          errorMessage = playoffErr || 'Failed to save playoff settings';
+        } else {
+          saved = false;
+          errorMessage = 'Could not load current league settings';
+        }
       }
 
       if (!saved) {
@@ -641,6 +672,7 @@ const LeagueDashboard = () => {
                             <TabsTrigger value="draft">Draft</TabsTrigger>
                             <TabsTrigger value="trades">Trades</TabsTrigger>
                             <TabsTrigger value="rosterslots">Roster Slots</TabsTrigger>
+                            <TabsTrigger value="playoffs">Playoffs</TabsTrigger>
                             <TabsTrigger value="rosters">Rosters</TabsTrigger>
                           </TabsList>
                         </div>
@@ -1189,6 +1221,88 @@ const LeagueDashboard = () => {
                               <p className="text-xs text-amber-600">
                                 Roster slots are locked after the draft is completed.
                               </p>
+                            )}
+                          </div>
+                        </TabsContent>
+
+                        {/* Playoffs Settings Tab */}
+                        <TabsContent value="playoffs" className="space-y-6 py-4">
+                          <div className="space-y-4">
+                            <div>
+                              <h3 className="text-lg font-semibold mb-1">Playoff Settings</h3>
+                              <p className="text-xs text-muted-foreground mb-4">
+                                Configure how many teams make the playoffs and the playoff duration.
+                              </p>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label>Playoff Teams</Label>
+                              <Select
+                                value={String(playoffSettings.playoffTeams)}
+                                onValueChange={(val) => setPlayoffSettings(prev => ({ ...prev, playoffTeams: parseInt(val) }))}
+                              >
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="0">No Playoffs</SelectItem>
+                                  <SelectItem value="4">4 Teams</SelectItem>
+                                  <SelectItem value="6">6 Teams (default)</SelectItem>
+                                  <SelectItem value="8">8 Teams</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <p className="text-xs text-muted-foreground">
+                                {playoffSettings.playoffTeams === 0 && 'League champion determined by regular season standings.'}
+                                {playoffSettings.playoffTeams === 4 && '4-team bracket: Semifinals → Championship (2 rounds).'}
+                                {playoffSettings.playoffTeams === 6 && '6-team bracket: Wild Card → Semifinals → Championship (3 rounds). Top 2 seeds get first-round byes.'}
+                                {playoffSettings.playoffTeams === 8 && '8-team bracket: Quarterfinals → Semifinals → Championship (3 rounds).'}
+                              </p>
+                            </div>
+
+                            {playoffSettings.playoffTeams > 0 && (
+                              <div className="space-y-2">
+                                <Label>Playoff Weeks</Label>
+                                <Select
+                                  value={String(playoffSettings.playoffWeeks)}
+                                  onValueChange={(val) => setPlayoffSettings(prev => ({ ...prev, playoffWeeks: parseInt(val) }))}
+                                >
+                                  <SelectTrigger><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="2">2 Weeks</SelectItem>
+                                    <SelectItem value="3">3 Weeks (default)</SelectItem>
+                                    <SelectItem value="4">4 Weeks</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <p className="text-xs text-muted-foreground">
+                                  Total weeks reserved for the playoff bracket. Regular season length adjusts automatically.
+                                </p>
+                              </div>
+                            )}
+
+                            {playoffSettings.playoffTeams > 0 && (
+                              <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
+                                <h4 className="text-sm font-semibold">Bracket Preview</h4>
+                                <div className="text-xs text-muted-foreground space-y-1">
+                                  {playoffSettings.playoffTeams === 4 && (
+                                    <>
+                                      <p>Round 1 (Semifinals): #1 vs #4, #2 vs #3</p>
+                                      <p>Round 2 (Championship): Winners meet for the title</p>
+                                    </>
+                                  )}
+                                  {playoffSettings.playoffTeams === 6 && (
+                                    <>
+                                      <p>Round 1 (Wild Card): #3 vs #6, #4 vs #5</p>
+                                      <p>Round 2 (Semifinals): #1 vs WC winner, #2 vs WC winner</p>
+                                      <p>Round 3 (Championship): Winners meet for the title</p>
+                                    </>
+                                  )}
+                                  {playoffSettings.playoffTeams === 8 && (
+                                    <>
+                                      <p>Round 1 (Quarterfinals): #1 vs #8, #4 vs #5, #2 vs #7, #3 vs #6</p>
+                                      <p>Round 2 (Semifinals): QF winners face off</p>
+                                      <p>Round 3 (Championship): Winners meet for the title</p>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
                             )}
                           </div>
                         </TabsContent>
