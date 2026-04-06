@@ -42,6 +42,7 @@ const MobileMenuButton = () => {
   const userLeagues = league?.userLeagues ?? [];
   const setActiveLeagueId = league?.setActiveLeagueId ?? (() => {});
   const leagueLoading = league?.loading ?? false;
+  const showPlayoffs = league?.showPlayoffs ?? false;
 
   const closeMenu = () => setMenuOpen(false);
 
@@ -100,7 +101,7 @@ const MobileMenuButton = () => {
         { label: 'Matchup', path: activeLeagueId ? `/matchup/${activeLeagueId}` : '/matchup', icon: Swords },
         { label: 'Roster', path: '/roster', icon: Users },
         { label: 'Standings', path: '/standings', icon: BarChart3 },
-        ...(activeLeagueId ? [{ label: 'Playoffs', path: `/league/${activeLeagueId}/playoffs`, icon: Trophy }] : []),
+        ...(showPlayoffs && activeLeagueId ? [{ label: 'Playoffs', path: `/league/${activeLeagueId}/playoffs`, icon: Trophy }] : []),
         { label: 'Players', path: '/free-agents', icon: Search },
         { label: 'GM Office', path: '/gm-office', icon: Settings },
         { label: 'Draft', path: activeLeagueId ? `/draft-room?league=${activeLeagueId}` : '/draft-room', icon: Sparkles },

@@ -7,6 +7,7 @@ import { MatchupService } from '@/services/MatchupService';
 import { RosterCacheService } from '@/services/RosterCacheService';
 import { PlayerService } from '@/services/PlayerService';
 import { LeagueMembershipService } from '@/services/LeagueMembershipService';
+import { playoffApi } from '@/api/playoffs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import type { LeagueType, ScoringFormat, DraftType } from '@/types/leagueTypes';
@@ -41,6 +42,8 @@ interface LeagueContextType {
   error: string | null;
   refreshLeagues: () => Promise<void>;
   userLeagueState: UserLeagueState;
+  /** True when a playoff bracket exists for the active league (controls nav visibility) */
+  showPlayoffs: boolean;
   demoLeagueId: string;
   isDemoLeague: (leagueId: string | null | undefined) => boolean;
 }
@@ -63,6 +66,7 @@ const defaultContextValue: LeagueContextType = {
   error: null,
   refreshLeagues: async () => {},
   userLeagueState: 'guest',
+  showPlayoffs: false,
   demoLeagueId: DEMO_LEAGUE_ID,
   isDemoLeague,
 };
@@ -93,6 +97,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [isChangingLeague, setIsChangingLeague] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPlayoffs, setShowPlayoffs] = useState(false);
 
   // Extract league_id from URL params if present
   const urlLeagueId = searchParams.get('league');
@@ -359,6 +364,30 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     return getLeagueFormat(activeLeague);
   }, [activeLeague]);
 
+  // Check if a playoff bracket exists for the active league (gates Playoffs nav tab)
+  useEffect(() => {
+    if (!activeLeagueId || !user) {
+      setShowPlayoffs(false);
+      return;
+    }
+
+    const playoffTeams = (activeLeague?.settings as Record<string, unknown>)?.playoffTeams;
+    if (!playoffTeams || Number(playoffTeams) === 0) {
+      setShowPlayoffs(false);
+      return;
+    }
+
+    let cancelled = false;
+    playoffApi.getBracket(activeLeagueId).then((res) => {
+      if (cancelled) return;
+      setShowPlayoffs(!!(res.data?.bracket));
+    }).catch(() => {
+      if (!cancelled) setShowPlayoffs(false);
+    });
+
+    return () => { cancelled = true; };
+  }, [activeLeagueId, activeLeague, user]);
+
   const value: LeagueContextType = {
     activeLeagueId,
     activeLeague,
@@ -370,6 +399,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     error,
     refreshLeagues,
     userLeagueState,
+    showPlayoffs,
     demoLeagueId: DEMO_LEAGUE_ID,
     isDemoLeague,
   };
