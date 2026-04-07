@@ -224,21 +224,43 @@ const GMOffice = () => {
                 </div>
               )}
 
+              {seasonComplete && (
+                <div className="max-w-3xl mx-auto mb-4">
+                  <div
+                    role="status"
+                    aria-live="polite"
+                    className="flex items-center justify-between gap-3 rounded-lg border-2 border-citrus-forest bg-citrus-cream px-4 py-3 shadow-[0_4px_0_rgba(27,48,34,0.15)]"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Trophy className="w-5 h-5 text-citrus-orange shrink-0" />
+                      <span className="font-varsity font-bold text-citrus-forest truncate">
+                        Season Complete — Rosters Locked
+                      </span>
+                    </div>
+                    <Badge className="bg-citrus-sage border-2 border-citrus-forest text-citrus-cream text-xs font-varsity font-bold shrink-0">
+                      Read Only
+                    </Badge>
+                  </div>
+                </div>
+              )}
+
               <div className="max-w-3xl mx-auto mb-4">
                 <HeadlinesBanner />
               </div>
               
               <CitrusSectionDivider />
               
+              <TooltipProvider>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto mt-4">
-                {actions.map((action, index) => (
-                  <Link 
-                    key={action.title} 
-                    to={action.link}
-                    className="group"
-                    style={{ animationDelay: `${index * 50}ms` }}
-                  >
-                    <Card className="h-full transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_0_rgba(223,117,54,0.4)] border-4 border-citrus-forest cursor-pointer overflow-hidden relative bg-citrus-cream corduroy-texture rounded-[2rem] shadow-[0_6px_0_rgba(27,48,34,0.2)]">
+                {actions.map((action, index) => {
+                  const isLocked = seasonComplete && LOCKED_ACTION_TITLES.has(action.title);
+                  const cardInner = (
+                    <Card className={cn(
+                      "h-full border-4 border-citrus-forest overflow-hidden relative bg-citrus-cream corduroy-texture rounded-[2rem] shadow-[0_6px_0_rgba(27,48,34,0.2)]",
+                      isLocked
+                        ? "opacity-60 cursor-not-allowed grayscale"
+                        : "transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_0_rgba(223,117,54,0.4)] cursor-pointer",
+                    )}>
                       {/* Background gradient */}
                       <div className={`absolute top-0 left-0 w-full h-32 bg-gradient-to-br ${action.gradient} opacity-10`} />
                       
@@ -262,9 +284,38 @@ const GMOffice = () => {
                         </CardDescription>
                       </CardHeader>
                     </Card>
-                  </Link>
-                ))}
+                  );
+                  if (isLocked) {
+                    return (
+                      <Tooltip key={action.title}>
+                        <TooltipTrigger asChild>
+                          <div
+                            aria-disabled="true"
+                            className="group"
+                            style={{ animationDelay: `${index * 50}ms` }}
+                          >
+                            {cardInner}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          Season complete — roster locked
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  }
+                  return (
+                    <Link
+                      key={action.title}
+                      to={action.link}
+                      className="group"
+                      style={{ animationDelay: `${index * 50}ms` }}
+                    >
+                      {cardInner}
+                    </Link>
+                  );
+                })}
               </div>
+              </TooltipProvider>
             </div>
 
             {/* Left Sidebar - At bottom on mobile, left on desktop - Extends to edge */}
