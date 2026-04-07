@@ -117,7 +117,7 @@ export class WaiverService {
 
   /** Get waiver claims for a specific team, optionally filtered by status */
   async getTeamWaiverClaims(leagueId: string, teamId: string, status?: string) {
-    return this.queryWaiverClaims((columns) => {
+    const result = await this.queryWaiverClaims((columns) => {
       let query = this.supabase
         .from('waiver_claims')
         .select(columns)
@@ -131,6 +131,62 @@ export class WaiverService {
 
       return query;
     });
+
+    // Enrich with the waiver clear time for each claim's target player so
+    // the UI can surface "clears at" and "will process at" timestamps.
+    return this.enrichClaimsWithClearTime(result, leagueId);
+  }
+
+  private async enrichClaimsWithClearTime(
+    result: { claims: Record<string, unknown>[]; error: unknown },
+    leagueId: string,
+  ): Promise<{ claims: Record<string, unknown>[]; error: unknown }> {
+    if (result.error || result.claims.length === 0) return result;
+    const playerIds = Array.from(new Set(
+      result.claims.map(c => Number(c.player_id)).filter(n => Number.isFinite(n))
+    ));
+    if (playerIds.length === 0) return result;
+
+    const admin = getSupabaseAdmin();
+    const [waiverRes, leagueRes] = await Promise.all([
+      admin
+        .from('player_waiver_status')
+        .select('player_id, dropped_at, cleared_at')
+        .eq('league_id', leagueId)
+        .is('cleared_at', null)
+        .in('player_id', playerIds),
+      admin
+        .from('leagues')
+        .select('waiver_period_hours, waiver_process_time')
+        .eq('id', leagueId)
+        .single(),
+    ]);
+
+    const periodHours = (leagueRes.data as { waiver_period_hours?: number } | null)?.waiver_period_hours ?? 48;
+    const processTime = (leagueRes.data as { waiver_process_time?: string } | null)?.waiver_process_time ?? '02:00:00';
+
+    const latestByPlayer = new Map<number, string>();
+    for (const row of ((waiverRes.data || []) as Array<{ player_id: number; dropped_at: string }>)) {
+      const prev = latestByPlayer.get(row.player_id);
+      if (!prev || new Date(row.dropped_at) > new Date(prev)) {
+        latestByPlayer.set(row.player_id, row.dropped_at);
+      }
+    }
+
+    const enriched = result.claims.map(claim => {
+      const droppedAt = latestByPlayer.get(Number(claim.player_id));
+      if (!droppedAt) return claim;
+      const clearsAt = new Date(new Date(droppedAt).getTime() + periodHours * 3600 * 1000);
+      return {
+        ...claim,
+        waiver_dropped_at: droppedAt,
+        waiver_clears_at: clearsAt.toISOString(),
+        league_waiver_period_hours: periodHours,
+        league_waiver_process_time: processTime,
+      };
+    });
+
+    return { claims: enriched, error: null };
   }
 
   /** Submit a waiver claim */

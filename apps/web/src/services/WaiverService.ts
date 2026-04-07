@@ -17,6 +17,14 @@ export interface WaiverClaim {
   created_at: string;
   processed_at: string | null;
   failure_reason: string | null;
+  /**
+   * Server-side enrichment (see WaiverService.enrichClaimsWithClearTime).
+   * Only present on pending claims whose target is still in the waiver window.
+   */
+  waiver_dropped_at?: string | null;
+  waiver_clears_at?: string | null;
+  league_waiver_period_hours?: number | null;
+  league_waiver_process_time?: string | null;
 }
 
 export interface WaiverPriority {

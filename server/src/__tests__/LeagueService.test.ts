@@ -121,12 +121,46 @@ describe('LeagueService', () => {
   });
 
   describe('fetchTransactions', () => {
-    it('returns transactions', async () => {
-      const transactions = [{ id: 'tx1', created_at: '2026-01-01' }];
-      mockSupabase.from = vi.fn(() => createChain({ data: transactions, error: null }));
+    it('merges transaction_ledger with pending/failed waiver_claims, newest first', async () => {
+      const ledger = [{ id: 'tx1', type: 'ADD', player_id: '100', created_at: '2026-01-03T00:00:00Z' }];
+      const pendingClaims = [
+        { id: 'wc1', league_id: 'league-1', team_id: 't1', player_id: 200, drop_player_id: null, status: 'pending', failure_reason: null, created_at: '2026-01-05T00:00:00Z', processed_at: null, teams: { team_name: 'Team A' } },
+        { id: 'wc2', league_id: 'league-1', team_id: 't2', player_id: 300, drop_player_id: null, status: 'failed', failure_reason: 'Lost priority tiebreaker', created_at: '2026-01-04T00:00:00Z', processed_at: null, teams: { team_name: 'Team B' } },
+      ];
+
+      mockSupabase.from = vi.fn((table: string) => {
+        if (table === 'transaction_ledger') return createChain({ data: ledger, error: null });
+        if (table === 'waiver_claims') return createChain({ data: pendingClaims, error: null });
+        return createChain({ data: [], error: null });
+      });
 
       const result = await service.fetchTransactions('league-1');
-      expect(result.transactions).toEqual(transactions);
+      expect(result.transactions).toHaveLength(3);
+      // Newest first, so the pending waiver claim leads.
+      const first = result.transactions[0] as { id: string; type: string; status: string };
+      expect(first.id).toBe('wc-wc1');
+      expect(first.type).toBe('WAIVER_PENDING');
+      expect(first.status).toBe('pending');
+
+      const second = result.transactions[1] as { id: string; type: string; status: string };
+      expect(second.id).toBe('wc-wc2');
+      expect(second.type).toBe('WAIVER_FAILED');
+      expect(second.status).toBe('failed');
+
+      const third = result.transactions[2] as { id: string; status: string };
+      expect(third.id).toBe('tx1');
+      expect(third.status).toBe('processed');
+    });
+
+    it('propagates transaction_ledger errors and returns empty list', async () => {
+      mockSupabase.from = vi.fn((table: string) => {
+        if (table === 'transaction_ledger') return createChain({ data: null, error: { message: 'boom' } });
+        return createChain({ data: [], error: null });
+      });
+
+      const result = await service.fetchTransactions('league-1');
+      expect(result.transactions).toEqual([]);
+      expect(result.error).toBeTruthy();
     });
   });
 

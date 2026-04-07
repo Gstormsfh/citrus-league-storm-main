@@ -3546,8 +3546,15 @@ const Roster = () => {
                            
                            {/* Type Badge */}
                            <div className="col-span-2 capitalize font-medium flex items-center">
-                             <Badge variant={tx.type === 'claim' ? 'default' : (tx.type === 'drop' ? 'destructive' : 'secondary')} className="text-xs">
-                               {tx.type}
+                             <Badge
+                               variant={
+                                 tx.type === 'claim' ? 'default'
+                                 : tx.type === 'drop' ? 'destructive'
+                                 : 'secondary'
+                               }
+                               className="text-xs"
+                             >
+                               {tx.type === 'waiver' ? 'Waiver' : tx.type}
                              </Badge>
                            </div>
 

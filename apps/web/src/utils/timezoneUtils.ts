@@ -119,6 +119,91 @@ export function formatWaiverProcessTime(processTime?: string | null): string {
 }
 
 /**
+ * Format an ISO timestamp into "Tue Apr 8 • 11:26 PM MT" style for surfacing
+ * waiver clear times. Returns null for invalid input.
+ */
+export function formatMoment(isoString?: string | null): string | null {
+  if (!isoString) return null;
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return null;
+  const datePart = date.toLocaleDateString('en-US', {
+    timeZone: MOUNTAIN_TIMEZONE,
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+  const timePart = date.toLocaleTimeString('en-US', {
+    timeZone: MOUNTAIN_TIMEZONE,
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+  return `${datePart} • ${timePart} MT`;
+}
+
+/**
+ * Given an ISO "clears at" timestamp and a league waiver_process_time (e.g. "02:00:00"),
+ * compute the next daily cron run on or after clearsAt expressed in Mountain Time,
+ * and return "Wed Apr 9 • 2:00 AM MT". Returns null if inputs are invalid.
+ */
+export function computeNextWaiverProcessMoment(
+  clearsAtISO?: string | null,
+  processTime?: string | null,
+): string | null {
+  if (!clearsAtISO) return null;
+  const clearsAt = new Date(clearsAtISO);
+  if (isNaN(clearsAt.getTime())) return null;
+
+  // Parse processTime "HH:MM[:SS]"; default to 02:00.
+  let procHour = 2;
+  let procMinute = 0;
+  if (processTime) {
+    const parts = processTime.split(':');
+    const h = parseInt(parts[0], 10);
+    const m = parseInt(parts[1] || '0', 10);
+    if (!isNaN(h)) procHour = h;
+    if (!isNaN(m)) procMinute = m;
+  }
+
+  // Extract clearsAt's Mountain-Time calendar date + time.
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: MOUNTAIN_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  const parts = fmt.formatToParts(clearsAt);
+  const mtYear = parseInt(parts.find(p => p.type === 'year')?.value || '0', 10);
+  const mtMonth = parseInt(parts.find(p => p.type === 'month')?.value || '0', 10);
+  const mtDay = parseInt(parts.find(p => p.type === 'day')?.value || '0', 10);
+  const mtHour = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
+  const mtMinute = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
+
+  // If the clear moment is at/past today's cron run (MT), the next run is
+  // the following calendar day; otherwise it's the same day.
+  const clearsMinutesMT = mtHour * 60 + mtMinute;
+  const procMinutesMT = procHour * 60 + procMinute;
+  let dayOffset = 0;
+  if (clearsMinutesMT >= procMinutesMT) dayOffset = 1;
+
+  // Build a local-time Date for mtYear/mtMonth/mtDay at procHour:procMinute, then
+  // adjust by offset. We use en-CA formatting on the result to confirm MT parts.
+  const synthetic = new Date(Date.UTC(mtYear, mtMonth - 1, mtDay + dayOffset, 12, 0, 0));
+  // Walk synthetic's MT date parts for the final formatted string.
+  const finalFmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: MOUNTAIN_TIMEZONE,
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+  const datePart = finalFmt.format(synthetic);
+  return `${datePart} • ${formatWaiverProcessTime(processTime)}`;
+}
+
+/**
  * CRITICAL: Parse a date string (YYYY-MM-DD) without timezone interpretation issues
  * This avoids the bug where new Date("2026-02-02") creates UTC midnight which is Feb 1st in MST
  * Returns a Date object at local midnight for the given date

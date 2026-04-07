@@ -220,12 +220,13 @@ export const LEAGUE_TEAMS_DATA = [
 
 export interface Transaction {
   id: string;
-  type: 'claim' | 'drop' | 'trade';
+  type: 'claim' | 'drop' | 'trade' | 'waiver';
   playerId: string;
   playerName: string;
   playerTeam: string;
   date: string;
   status: 'pending' | 'processed' | 'failed';
+  failureReason?: string | null;
 }
 
 let cachedLeagueState: Record<number, Player[]> | null = null;
@@ -1026,19 +1027,42 @@ async joinLeagueByCode(
   async fetchTransactions(leagueId: string): Promise<{ transactions: Transaction[]; error: unknown }> {
     try {
       const response = await leagueApi.getTransactions(leagueId);
-      const data = (response.data || []) as Array<{ id: string; type: string; player_id: string; created_at: string; source: string | null; teams: { team_name: string } | null; profiles: { first_name: string | null; last_name: string | null } | null }>;
+      const data = (response.data || []) as Array<{
+        id: string;
+        type: string;
+        player_id: string;
+        created_at: string;
+        source: string | null;
+        status?: string | null;
+        failure_reason?: string | null;
+        teams: { team_name: string } | null;
+        profiles: { first_name: string | null; last_name: string | null } | null;
+      }>;
 
       // Get all players to map player_id to player details
       const allPlayers = await PlayerService.getAllPlayers();
       const playerMap = new Map(allPlayers.map(p => [p.id, p]));
 
-      const transactions: Transaction[] = (data || []).map((tx: { id: string; type: string; player_id: string; created_at: string; source: string | null; teams: { team_name: string } | null; profiles: { first_name: string | null; last_name: string | null } | null }) => {
-        const player = playerMap.get(tx.player_id);
-        const type = tx.type.toLowerCase() as 'claim' | 'drop' | 'trade';
+      const mapType = (raw: string, source: string | null): Transaction['type'] => {
+        const t = (raw || '').toLowerCase();
+        if (t === 'waiver_pending' || t === 'waiver_failed') return 'waiver';
+        if (t === 'drop') return 'drop';
+        if (t === 'trade') return 'trade';
+        if (t === 'add') return source === 'Waiver Processing' ? 'waiver' : 'claim';
+        return 'claim';
+      };
 
+      const mapStatus = (raw: string | null | undefined): Transaction['status'] => {
+        if (raw === 'pending') return 'pending';
+        if (raw === 'failed') return 'failed';
+        return 'processed';
+      };
+
+      const transactions: Transaction[] = (data || []).map((tx) => {
+        const player = playerMap.get(tx.player_id);
         return {
           id: tx.id,
-          type: type === 'add' ? 'claim' : type, // Map 'ADD' to 'claim' for UI
+          type: mapType(tx.type, tx.source),
           playerId: tx.player_id,
           playerName: player?.full_name || 'Unknown Player',
           playerTeam: player?.team || 'N/A',
@@ -1047,7 +1071,8 @@ async joinLeagueByCode(
             day: 'numeric',
             year: 'numeric'
           }),
-          status: 'processed' as const, // All transactions in DB are processed
+          status: mapStatus(tx.status),
+          failureReason: tx.failure_reason ?? null,
         };
       });
 
@@ -1098,11 +1123,16 @@ async joinLeagueByCode(
 
       const transactions: Transaction[] = data.map((tx: { id: string; type: string; player_id: string; created_at: string; source: string | null; league_id: string; teams: { team_name: string } | null }) => {
         const player = playerMap.get(tx.player_id);
-        const type = tx.type.toLowerCase() as 'claim' | 'drop' | 'trade';
+        const lowered = (tx.type || '').toLowerCase();
+        let type: Transaction['type'] = 'claim';
+        if (lowered === 'drop') type = 'drop';
+        else if (lowered === 'trade') type = 'trade';
+        else if (lowered === 'waiver_pending' || lowered === 'waiver_failed') type = 'waiver';
+        else if (lowered === 'add' && tx.source === 'Waiver Processing') type = 'waiver';
 
         return {
           id: tx.id,
-          type: type === 'add' ? 'claim' : type,
+          type,
           playerId: tx.player_id,
           playerName: player?.full_name || 'Unknown Player',
           playerTeam: player?.team || 'N/A',

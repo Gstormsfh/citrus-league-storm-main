@@ -444,16 +444,80 @@ export class LeagueService {
     return { standings: data || [], error };
   }
 
-  /** Fetch transactions from the transaction ledger */
+  /**
+   * Fetch transactions for the league's Transactions tab.
+   *
+   * Returns processed roster moves from `transaction_ledger` PLUS pending and
+   * failed waiver claims from `waiver_claims` so the tab reflects the full
+   * activity a manager cares about (not just the subset that already settled).
+   * Each row carries an explicit `status` (processed/pending/failed) so the
+   * UI can badge them correctly.
+   */
   async fetchTransactions(leagueId: string) {
-    const { data, error } = await this.supabase
-      .from('transaction_ledger')
-      .select(`${COLUMNS.TRANSACTION_LEDGER}, teams(team_name), profiles(username, first_name, last_name)`)
-      .eq('league_id', leagueId)
-      .order('created_at', { ascending: false })
-      .limit(50);
+    const [ledgerRes, waiverRes] = await Promise.all([
+      this.supabase
+        .from('transaction_ledger')
+        .select(`${COLUMNS.TRANSACTION_LEDGER}, teams(team_name), profiles(username, first_name, last_name)`)
+        .eq('league_id', leagueId)
+        .order('created_at', { ascending: false })
+        .limit(50),
+      this.supabase
+        .from('waiver_claims')
+        .select('id, league_id, team_id, player_id, drop_player_id, status, failure_reason, created_at, processed_at, teams(team_name)')
+        .eq('league_id', leagueId)
+        .in('status', ['pending', 'failed'])
+        .order('created_at', { ascending: false })
+        .limit(50),
+    ]);
 
-    return { transactions: data || [], error };
+    if (ledgerRes.error) return { transactions: [], error: ledgerRes.error };
+
+    type LedgerRow = Record<string, unknown> & { created_at: string };
+    const ledgerRows: LedgerRow[] = ((ledgerRes.data || []) as unknown as LedgerRow[]).map((row) => ({
+      ...row,
+      status: 'processed',
+      source_type: 'ledger',
+    }));
+
+    type WaiverRow = {
+      id: string;
+      league_id: string;
+      team_id: string;
+      player_id: string | number;
+      drop_player_id: string | number | null;
+      status: string;
+      failure_reason: string | null;
+      created_at: string;
+      processed_at: string | null;
+      // Supabase returns the joined table as either an object or an array
+      // depending on the relationship. Tolerate both shapes.
+      teams: { team_name: string } | { team_name: string }[] | null;
+    };
+    const waiverRows: LedgerRow[] = ((waiverRes.data || []) as unknown as WaiverRow[]).map((row) => {
+      const teams = Array.isArray(row.teams) ? (row.teams[0] ?? null) : row.teams;
+      return {
+        id: `wc-${row.id}`,
+        league_id: row.league_id,
+        user_id: null,
+        team_id: row.team_id,
+        type: row.status === 'failed' ? 'WAIVER_FAILED' : 'WAIVER_PENDING',
+        player_id: String(row.player_id),
+        drop_player_id: row.drop_player_id !== null ? String(row.drop_player_id) : null,
+        source: 'Waiver Claim',
+        created_at: row.created_at,
+        teams,
+        profiles: null,
+        status: row.status,
+        failure_reason: row.failure_reason,
+        source_type: 'waiver_claim',
+      };
+    });
+
+    const combined = [...ledgerRows, ...waiverRows]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 50);
+
+    return { transactions: combined, error: null };
   }
 
   /** Update keeper/dynasty settings (commissioner only, locked after draft) */

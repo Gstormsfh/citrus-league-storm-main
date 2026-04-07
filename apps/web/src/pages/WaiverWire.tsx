@@ -26,7 +26,7 @@ import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { logger } from '@/utils/logger';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
-import { formatWaiverProcessTime } from '@/utils/timezoneUtils';
+import { formatWaiverProcessTime, formatMoment, computeNextWaiverProcessMoment } from '@/utils/timezoneUtils';
 import { ScheduleService } from '@/services/ScheduleService';
 import { Zap, Lock } from 'lucide-react';
 
@@ -691,74 +691,176 @@ const WaiverWire = () => {
             )}
 
             {/* Active Waiver Claims */}
-            <Card className="bg-citrus-cream corduroy-texture border-4 border-citrus-forest rounded-[2rem] shadow-patch">
-              <CardHeader>
-                <CardTitle className="font-varsity font-black text-citrus-forest uppercase flex items-center gap-2">
-                  <AlertCircle className="w-5 h-5 text-citrus-orange" />
-                  Active Waiver Claims
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {loading ? (
-                  <div className="text-center py-12 font-display text-citrus-charcoal">
-                    Loading claims...
-                  </div>
-                ) : waiverClaims.length > 0 ? (
-                  <div className="space-y-4">
-                    {waiverClaims.map((claim) => {
-                      const player = claimPlayers.get(claim.player_id);
-                      const dropPlayer = claim.drop_player_id ? claimPlayers.get(claim.drop_player_id) : null;
-                      
-                      return (
-                        <div key={claim.id} className="flex items-center justify-between p-4 bg-gradient-to-r from-citrus-peach/20 to-citrus-orange/20 rounded-varsity border-3 border-citrus-orange/50">
-                          <div className="flex-1">
-                            <div className="font-varsity font-bold text-citrus-forest">
-                              {player?.full_name || `Player #${claim.player_id}`}
-                            </div>
-                            <div className="text-sm font-display text-citrus-charcoal space-y-1">
-                              {player && (
-                                <div>
-                                  {player.position} • {player.team}
-                                </div>
-                              )}
-                              {dropPlayer && (
-                                <div className="text-citrus-orange/80">
-                                  Dropping: {dropPlayer.full_name} ({dropPlayer.position} • {dropPlayer.team})
-                                  {isFAAB && claim.is_conditional_drop && (
-                                    <span className="ml-1 text-xs opacity-70">(conditional)</span>
-                                  )}
-                                </div>
-                              )}
-                              <div>
-                                {isFAAB ? `Bid: $${claim.bid_amount ?? claim.priority}` : `Priority #${claim.priority}`}
+            {(() => {
+              const pendingClaims = waiverClaims.filter(c => c.status === 'pending');
+              const historyClaims = waiverClaims.filter(c => c.status !== 'pending');
+
+              const renderClaimRow = (claim: WaiverClaim, variant: 'pending' | 'history') => {
+                const player = claimPlayers.get(claim.player_id);
+                const dropP = claim.drop_player_id ? claimPlayers.get(claim.drop_player_id) : null;
+                const clearsAtFormatted = formatMoment(claim.waiver_clears_at);
+                const nextProcessFormatted = computeNextWaiverProcessMoment(
+                  claim.waiver_clears_at,
+                  claim.league_waiver_process_time || waiverSettings?.waiver_process_time,
+                );
+                const statusStyles: Record<string, string> = {
+                  pending: 'bg-amber-400 text-citrus-forest',
+                  successful: 'bg-emerald-500 text-white',
+                  failed: 'bg-rose-500 text-white',
+                  cancelled: 'bg-slate-400 text-white',
+                };
+
+                return (
+                  <div
+                    key={claim.id}
+                    className={`p-4 rounded-varsity border-3 ${
+                      variant === 'pending'
+                        ? 'bg-gradient-to-r from-amber-50 to-citrus-peach/30 border-amber-500/60'
+                        : 'bg-citrus-cream/60 border-citrus-forest/30'
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="flex-1 min-w-[200px]">
+                        <div className="font-varsity font-bold text-citrus-forest text-lg">
+                          {player?.full_name || `Player #${claim.player_id}`}
+                        </div>
+                        {player && (
+                          <div className="text-sm font-display text-citrus-charcoal/80">
+                            {player.position} • {player.team}
+                          </div>
+                        )}
+                        {dropP && (
+                          <div className="text-sm font-display text-citrus-orange/90 mt-1">
+                            Dropping: {dropP.full_name} ({dropP.position} • {dropP.team})
+                            {isFAAB && claim.is_conditional_drop && (
+                              <span className="ml-1 text-xs opacity-70">(conditional)</span>
+                            )}
+                          </div>
+                        )}
+                        <div className="text-xs font-display text-citrus-charcoal/70 mt-1">
+                          {isFAAB
+                            ? `Bid: $${claim.bid_amount ?? 0}`
+                            : `Your priority: #${claim.priority}`}
+                          {' · Submitted '}
+                          {formatMoment(claim.created_at) || new Date(claim.created_at).toLocaleString()}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          className={`font-varsity font-bold uppercase text-xs ${
+                            statusStyles[claim.status] || 'bg-citrus-sage text-citrus-cream'
+                          }`}
+                        >
+                          {claim.status}
+                        </Badge>
+                        {variant === 'pending' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleCancelClaim(claim.id)}
+                            className="border-2 border-citrus-forest rounded-varsity font-varsity"
+                          >
+                            Cancel
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    {variant === 'pending' && (clearsAtFormatted || nextProcessFormatted) && (
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2 text-xs font-display">
+                        {clearsAtFormatted && (
+                          <div className="flex items-start gap-2 rounded-md bg-white/70 border border-amber-500/40 p-2">
+                            <Clock className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                            <div>
+                              <div className="uppercase tracking-wide text-[10px] text-amber-700 font-bold">
+                                Waiver window clears
+                              </div>
+                              <div className="text-citrus-forest font-semibold">
+                                {clearsAtFormatted}
                               </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-4">
-                            <Badge className="bg-citrus-sage text-citrus-cream font-varsity font-bold">
-                              {claim.status}
-                            </Badge>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => handleCancelClaim(claim.id)}
-                              className="border-2 border-citrus-forest rounded-varsity font-varsity"
-                            >
-                              Cancel
-                            </Button>
+                        )}
+                        {nextProcessFormatted && (
+                          <div className="flex items-start gap-2 rounded-md bg-white/70 border border-citrus-forest/40 p-2">
+                            <Zap className="w-4 h-4 text-citrus-forest mt-0.5 shrink-0" />
+                            <div>
+                              <div className="uppercase tracking-wide text-[10px] text-citrus-forest font-bold">
+                                Claim processes
+                              </div>
+                              <div className="text-citrus-forest font-semibold">
+                                {nextProcessFormatted}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        )}
+                      </div>
+                    )}
+
+                    {claim.failure_reason && variant === 'history' && (
+                      <div className="mt-2 text-xs font-display text-rose-700">
+                        Reason: {claim.failure_reason}
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <User className="w-16 h-16 text-citrus-sage/30 mx-auto mb-4" />
-                    <p className="font-display text-citrus-charcoal">No active waiver claims</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                );
+              };
+
+              return (
+                <Card className="bg-citrus-cream corduroy-texture border-4 border-citrus-forest rounded-[2rem] shadow-patch">
+                  <CardHeader>
+                    <CardTitle className="font-varsity font-black text-citrus-forest uppercase flex items-center gap-2">
+                      <AlertCircle className="w-5 h-5 text-citrus-orange" />
+                      Active Waiver Claims
+                      {pendingClaims.length > 0 && (
+                        <Badge className="ml-2 bg-citrus-orange text-white font-varsity">
+                          {pendingClaims.length}
+                        </Badge>
+                      )}
+                    </CardTitle>
+                    <CardDescription className="font-display text-citrus-charcoal/80">
+                      All times shown in Mountain Time (MT)
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {loading ? (
+                      <div className="text-center py-12 font-display text-citrus-charcoal">
+                        Loading claims...
+                      </div>
+                    ) : pendingClaims.length === 0 && historyClaims.length === 0 ? (
+                      <div className="text-center py-12">
+                        <User className="w-16 h-16 text-citrus-sage/30 mx-auto mb-4" />
+                        <p className="font-display text-citrus-charcoal">No active waiver claims</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-6">
+                        {pendingClaims.length > 0 ? (
+                          <div className="space-y-3">
+                            {pendingClaims.map(c => renderClaimRow(c, 'pending'))}
+                          </div>
+                        ) : (
+                          <div className="rounded-lg border-2 border-dashed border-citrus-forest/30 py-6 text-center font-display text-citrus-charcoal/70">
+                            No pending claims. Submit one above.
+                          </div>
+                        )}
+
+                        {historyClaims.length > 0 && (
+                          <details className="group">
+                            <summary className="cursor-pointer font-varsity font-bold text-citrus-forest uppercase text-sm list-none flex items-center gap-2">
+                              <span className="group-open:rotate-90 transition-transform inline-block">▶</span>
+                              Recent activity ({historyClaims.length})
+                            </summary>
+                            <div className="mt-3 space-y-3">
+                              {historyClaims.slice(0, 10).map(c => renderClaimRow(c, 'history'))}
+                            </div>
+                          </details>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })()}
             </div>
 
             {/* Left Sidebar - At bottom on mobile, left on desktop */}
