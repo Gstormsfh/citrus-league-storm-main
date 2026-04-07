@@ -49,6 +49,7 @@ import { matchupApi } from '@/api/matchups';
 import { leagueApi } from '@/api/leagues';
 import { playerApi } from '@/api/players';
 import { publicApi } from '@/api/public';
+import { syncLeagueFromUrl } from './matchupUrlSync';
 
 // ============================================================
 // Local type definitions for data used throughout this file
@@ -3359,29 +3360,25 @@ const Matchup = () => {
     }
     
     // The URL path is the source of truth for which league's matchup we're viewing.
-    // If the URL has a leagueId that differs from activeLeagueId, sync the context TO
-    // the URL (not the other way around) — otherwise navigating to /matchup/<beta> while
-    // activeLeagueId is stale (e.g. Charlie from first-league default) would yank the
-    // user back to Charlie instead of honoring the Beta URL they clicked on.
-    if (urlLeagueId && activeLeagueId && urlLeagueId !== activeLeagueId) {
+    // See apps/web/src/pages/matchupUrlSync.ts for the full rationale (Beta→Charlie
+    // hijack regression fix from commits 8dc7b06 / c5f6798).
+    const syncDecision = syncLeagueFromUrl({ urlLeagueId, activeLeagueId });
+    if (syncDecision.action === 'sync-context') {
       log(' [SYNC] URL leagueId differs from activeLeagueId, updating context to match URL:', {
         activeLeagueId,
         urlLeagueId,
       });
-      setActiveLeagueId(urlLeagueId);
+      setActiveLeagueId(syncDecision.payload.leagueId);
       return;
     }
-    if (activeLeagueId) {
-      // If URL has no leagueId but activeLeagueId is set, navigate to include it
-      if (!urlLeagueId) {
-        log(' [EARLY REDIRECT] activeLeagueId set but URL has no leagueId, navigating:', {
-          activeLeagueId,
-          currentPath: window.location.pathname
-        });
-        const weekParam = urlWeekId ? `/${urlWeekId}` : '';
-        navigate(`/matchup/${activeLeagueId}${weekParam}`, { replace: true });
-        return;
-      }
+    if (syncDecision.action === 'navigate') {
+      log(' [EARLY REDIRECT] activeLeagueId set but URL has no leagueId, navigating:', {
+        activeLeagueId,
+        currentPath: window.location.pathname
+      });
+      const weekParam = urlWeekId ? `/${urlWeekId}` : '';
+      navigate(`/matchup/${syncDecision.payload.leagueId}${weekParam}`, { replace: true });
+      return;
     }
     
     if (!user?.id) {
