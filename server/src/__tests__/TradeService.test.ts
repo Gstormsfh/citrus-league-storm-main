@@ -31,8 +31,16 @@ describe('TradeService', () => {
   });
 
   describe('createTradeOffer', () => {
+    const teamsRows = (ownerId: string) => [
+      { id: 'team-1', owner_id: ownerId, league_id: 'league-1' },
+      { id: 'team-2', owner_id: 'user-2', league_id: 'league-1' },
+    ];
+
     it('rejects when user does not own from_team', async () => {
-      mockSupabase.from = vi.fn(() => createChain({ data: { owner_id: 'other-user' }, error: null }));
+      mockSupabase.from = vi.fn((table: string) => {
+        if (table === 'teams') return createChain({ data: teamsRows('other-user'), error: null });
+        return createChain({ data: [], error: null });
+      });
 
       const result = await service.createTradeOffer(
         'league-1', 'team-1', 'team-2', [100], [200], 'user-1',
@@ -42,11 +50,13 @@ describe('TradeService', () => {
     });
 
     it('rejects trades in best-ball leagues', async () => {
-      let callCount = 0;
-      mockSupabase.from = vi.fn(() => {
-        callCount++;
-        if (callCount === 1) return createChain({ data: { owner_id: 'user-1' }, error: null });
-        return createChain({ data: { settings: { scoring_format: 'best-ball' } }, error: null });
+      mockSupabase.from = vi.fn((table: string) => {
+        if (table === 'teams') return createChain({ data: teamsRows('user-1'), error: null });
+        if (table === 'roster_assignments') {
+          return createChain({ data: [{ player_id: '100' }, { player_id: '200' }], error: null });
+        }
+        if (table === 'leagues') return createChain({ data: { settings: { scoring_format: 'best-ball' } }, error: null });
+        return createChain({ data: null, error: null });
       });
 
       const result = await service.createTradeOffer(
@@ -57,14 +67,13 @@ describe('TradeService', () => {
     });
 
     it('rejects when trade deadline has passed', async () => {
-      let callCount = 0;
-      mockSupabase.from = vi.fn(() => {
-        callCount++;
-        if (callCount === 1) return createChain({ data: { owner_id: 'user-1' }, error: null });
-        return createChain({
-          data: { settings: { trade_deadline: '2020-01-01T00:00:00Z' } },
-          error: null,
-        });
+      mockSupabase.from = vi.fn((table: string) => {
+        if (table === 'teams') return createChain({ data: teamsRows('user-1'), error: null });
+        if (table === 'roster_assignments') {
+          return createChain({ data: [{ player_id: '100' }, { player_id: '200' }], error: null });
+        }
+        if (table === 'leagues') return createChain({ data: { settings: { trade_deadline: '2020-01-01T00:00:00Z' } }, error: null });
+        return createChain({ data: null, error: null });
       });
 
       const result = await service.createTradeOffer(
@@ -75,12 +84,14 @@ describe('TradeService', () => {
     });
 
     it('creates trade offer with expiration', async () => {
-      let callCount = 0;
-      mockSupabase.from = vi.fn(() => {
-        callCount++;
-        if (callCount === 1) return createChain({ data: { owner_id: 'user-1' }, error: null });
-        if (callCount === 2) return createChain({ data: { settings: { trade_expiration_days: 3 } }, error: null });
-        return createChain({ data: { id: 'trade-1', status: 'pending' }, error: null });
+      mockSupabase.from = vi.fn((table: string) => {
+        if (table === 'teams') return createChain({ data: teamsRows('user-1'), error: null });
+        if (table === 'roster_assignments') {
+          return createChain({ data: [{ player_id: '100' }, { player_id: '200' }], error: null });
+        }
+        if (table === 'leagues') return createChain({ data: { settings: { trade_expiration_days: 3 } }, error: null });
+        if (table === 'trade_offers') return createChain({ data: { id: 'trade-1', status: 'pending' }, error: null });
+        return createChain({ data: null, error: null });
       });
 
       const result = await service.createTradeOffer(
@@ -145,12 +156,27 @@ describe('TradeService', () => {
     it('approves and executes via RPC', async () => {
       mockSupabase.from = vi.fn((table: string) => {
         if (table === 'leagues') return createChain({ data: { commissioner_id: 'commish-1' }, error: null });
+        if (table === 'trade_offers') return createChain({
+          data: {
+            league_id: 'league-1',
+            from_team_id: 'team-1',
+            to_team_id: 'team-2',
+            offered_player_ids: [100],
+            requested_player_ids: [200],
+          },
+          error: null,
+        });
         return createChain({ data: null, error: null });
       });
-      mockSupabase.rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+      mockSupabase.rpc = vi.fn().mockResolvedValue({ data: { success: true }, error: null });
 
       const result = await service.commissionerDecision('trade-1', 'league-1', 'approve', 'commish-1');
-      expect(mockSupabase.rpc).toHaveBeenCalledWith('execute_trade', { p_trade_id: 'trade-1' });
+      expect(mockSupabase.rpc).toHaveBeenCalledWith('execute_trade', expect.objectContaining({
+        p_trade_id: 'trade-1',
+        p_league_id: 'league-1',
+        p_from_team_id: 'team-1',
+        p_to_team_id: 'team-2',
+      }));
       expect(result.success).toBe(true);
     });
   });
