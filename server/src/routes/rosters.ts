@@ -8,6 +8,7 @@ import { validateBody, schemas, getValidatedBody } from '../middleware/validate'
 import { createUserClient } from '../lib/supabase';
 import { MatchupService } from '../services/MatchupService';
 import { LineupService } from '../services/LineupService';
+import { SeasonStateService } from '../services/SeasonStateService';
 import { AuditService } from '../services/AuditService';
 import { AppError } from '../lib/errors';
 import { logger } from '@citrus/shared';
@@ -97,6 +98,13 @@ rosterRoutes.put('/league/:leagueId/team/:teamId/lineup', membershipMiddleware, 
   }
 
   const supabase = createUserClient(c.get('userToken'));
+
+  // Season-complete guard: once the fantasy season is over, rosters lock.
+  const seasonState = await new SeasonStateService(supabase).isSeasonComplete(leagueId);
+  if (seasonState.complete) {
+    logger.info('[rosters] lineup save blocked — season complete', { leagueId, teamId });
+    return fail(c, AppError.forbidden('Season is complete; rosters are locked'));
+  }
 
   // Verify user owns this team
   const { data: team } = await supabase

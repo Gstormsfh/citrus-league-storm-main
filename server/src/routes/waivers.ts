@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { WaiverService } from '../services/WaiverService';
+import { SeasonStateService } from '../services/SeasonStateService';
 import { AuditService } from '../services/AuditService';
 import { AppError, getErrorMessage } from '../lib/errors';
 import { ok, created, fail, handleError } from '../lib/responses';
@@ -111,6 +112,13 @@ waiverRoutes.post('/league/:leagueId', membershipMiddleware, validateBody(schema
   const leagueId = c.req.param('leagueId');
   const body = getValidatedBody<z.infer<typeof schemas.submitWaiverClaim>>(c);
   const supabase = createUserClient(c.get('userToken'));
+
+  const seasonState = await new SeasonStateService(supabase).isSeasonComplete(leagueId);
+  if (seasonState.complete) {
+    logger.info('[waivers] claim blocked — season complete', { leagueId });
+    return fail(c, AppError.forbidden('Season is complete; rosters are locked'));
+  }
+
   const service = new WaiverService(supabase);
 
   const { success, error, claimId } = await service.submitWaiverClaim(
@@ -135,6 +143,13 @@ waiverRoutes.post('/league/:leagueId/faab-bid', membershipMiddleware, validateBo
   const leagueId = c.req.param('leagueId');
   const body = getValidatedBody<z.infer<typeof schemas.submitFAABBid>>(c);
   const supabase = createUserClient(c.get('userToken'));
+
+  const seasonState = await new SeasonStateService(supabase).isSeasonComplete(leagueId);
+  if (seasonState.complete) {
+    logger.info('[waivers] faab bid blocked — season complete', { leagueId });
+    return fail(c, AppError.forbidden('Season is complete; rosters are locked'));
+  }
+
   const service = new WaiverService(supabase);
 
   const { success, error, claimId } = await service.submitFAABBid(
@@ -162,6 +177,13 @@ waiverRoutes.post('/league/:leagueId/add-free-agent', membershipMiddleware, vali
   const userId = c.get('userId');
   const body = getValidatedBody<z.infer<typeof schemas.addFreeAgent>>(c);
   const supabase = createUserClient(c.get('userToken'));
+
+  const seasonState = await new SeasonStateService(supabase).isSeasonComplete(leagueId);
+  if (seasonState.complete) {
+    logger.info('[waivers] add free agent blocked — season complete', { leagueId });
+    return fail(c, AppError.forbidden('Season is complete; rosters are locked'));
+  }
+
   const service = new WaiverService(supabase);
 
   const { success, error } = await service.addFreeAgent(
@@ -189,6 +211,12 @@ waiverRoutes.post('/league/:leagueId/drop-player', membershipMiddleware, validat
   const body = getValidatedBody<z.infer<typeof schemas.dropPlayer>>(c);
 
   const supabase = createUserClient(c.get('userToken'));
+
+  const seasonState = await new SeasonStateService(supabase).isSeasonComplete(leagueId);
+  if (seasonState.complete) {
+    logger.info('[waivers] drop player blocked — season complete', { leagueId });
+    return fail(c, AppError.forbidden('Season is complete; rosters are locked'));
+  }
 
   // Verify user owns the team before allowing player drop.
   // AI teams (owner_id = NULL) are allowed — the WaiverService.dropPlayer

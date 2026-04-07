@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { LeagueService } from '../services/LeagueService';
+import { SeasonStateService } from '../services/SeasonStateService';
 import { AuditService } from '../services/AuditService';
 import { AppError } from '../lib/errors';
 import { ok, created, fail, handleError } from '../lib/responses';
@@ -48,6 +49,15 @@ leagueRoutes.get('/:leagueId', membershipMiddleware, async (c) => {
   } catch (err) {
     return handleError(c, err, 'Failed to fetch league');
   }
+});
+
+// GET /api/leagues/:leagueId/season-state — Is the fantasy season complete?
+leagueRoutes.get('/:leagueId/season-state', membershipMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new SeasonStateService(supabase);
+  const state = await service.isSeasonComplete(leagueId);
+  return ok(c, state);
 });
 
 // POST /api/leagues — Create a new league

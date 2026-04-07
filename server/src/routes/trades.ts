@@ -6,9 +6,11 @@ import { z } from 'zod';
 import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { TradeService } from '../services/TradeService';
+import { SeasonStateService } from '../services/SeasonStateService';
 import { AuditService } from '../services/AuditService';
 import { AppError } from '../lib/errors';
 import { ok, created, fail, handleError } from '../lib/responses';
+import { logger } from '@citrus/shared';
 
 const tradeRoutes = new Hono<Env>();
 
@@ -45,6 +47,14 @@ tradeRoutes.post('/league/:leagueId', membershipMiddleware, validateBody(schemas
   const userId = c.get('userId');
   const body = getValidatedBody<z.infer<typeof schemas.createTrade>>(c);
   const supabase = createUserClient(c.get('userToken'));
+
+  // Season-complete guard: no new trades after the season ends.
+  const seasonState = await new SeasonStateService(supabase).isSeasonComplete(leagueId);
+  if (seasonState.complete) {
+    logger.info('[trades] create blocked — season complete', { leagueId });
+    return fail(c, AppError.forbidden('Season is complete; rosters are locked'));
+  }
+
   const service = new TradeService(supabase);
 
   const { success, error, tradeId } = await service.createTradeOffer(
@@ -76,6 +86,14 @@ tradeRoutes.put('/:tradeId/accept', async (c) => {
 
   const access = await service.verifyTradeAccess(tradeId, userId);
   if (access.error) return fail(c, AppError.forbidden(access.error));
+
+  if (access.leagueId) {
+    const seasonState = await new SeasonStateService(supabase).isSeasonComplete(access.leagueId);
+    if (seasonState.complete) {
+      logger.info('[trades] accept blocked — season complete', { leagueId: access.leagueId, tradeId });
+      return fail(c, AppError.forbidden('Season is complete; rosters are locked'));
+    }
+  }
 
   const { success, error } = await service.acceptTradeOffer(tradeId, userId);
   if (!success) {

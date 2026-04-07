@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { useParams, useNavigate, Navigate } from "react-router-dom";
+import { useParams, useNavigate, Navigate, Link } from "react-router-dom";
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useLeague } from '@/contexts/LeagueContext';
@@ -42,6 +42,9 @@ import { calculateEligibleGamesRemaining } from '@/utils/rosterUtils';
 import { ScoringCalculator, DEFAULT_SCORING } from '@/utils/scoringUtils';
 import { logger } from '@/utils/logger';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
+import { usePlayoffChampion } from '@/hooks/usePlayoffChampion';
+import { Card, CardContent } from '@/components/ui/card';
+import { Trophy } from 'lucide-react';
 import { matchupApi } from '@/api/matchups';
 import { leagueApi } from '@/api/leagues';
 import { playerApi } from '@/api/players';
@@ -174,7 +177,7 @@ const log = DEBUG_MATCHUP ? logger.log.bind(logger, '[Matchup]') : () => {};
 const Matchup = () => {
   const { user, loading: authLoading } = useAuth();
   const { data: profile } = useProfile();
-  const { userLeagueState, loading: leagueContextLoading, activeLeagueId, activeLeagueFormat, isChangingLeague } = useLeague();
+  const { userLeagueState, loading: leagueContextLoading, activeLeagueId, activeLeagueFormat, isChangingLeague, setActiveLeagueId } = useLeague();
   const { leagueId: urlLeagueId, weekId: urlWeekId } = useParams<{ leagueId?: string; weekId?: string }>();
   const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -3355,20 +3358,20 @@ const Matchup = () => {
       return;
     }
     
-    // CRITICAL: Check activeLeagueId vs URL IMMEDIATELY - before any other logic
-    // This ensures league switching works even when navigating to /matchup without leagueId
+    // The URL path is the source of truth for which league's matchup we're viewing.
+    // If the URL has a leagueId that differs from activeLeagueId, sync the context TO
+    // the URL (not the other way around) — otherwise navigating to /matchup/<beta> while
+    // activeLeagueId is stale (e.g. Charlie from first-league default) would yank the
+    // user back to Charlie instead of honoring the Beta URL they clicked on.
+    if (urlLeagueId && activeLeagueId && urlLeagueId !== activeLeagueId) {
+      log(' [SYNC] URL leagueId differs from activeLeagueId, updating context to match URL:', {
+        activeLeagueId,
+        urlLeagueId,
+      });
+      setActiveLeagueId(urlLeagueId);
+      return;
+    }
     if (activeLeagueId) {
-      // If URL has a leagueId that differs from activeLeagueId, navigate immediately (smooth, no reload)
-      if (urlLeagueId && urlLeagueId !== activeLeagueId) {
-        log(' [EARLY REDIRECT] activeLeagueId differs from URL, navigating immediately:', {
-          activeLeagueId,
-          urlLeagueId,
-          currentPath: window.location.pathname
-        });
-        const weekParam = urlWeekId ? `/${urlWeekId}` : '';
-        navigate(`/matchup/${activeLeagueId}${weekParam}`, { replace: true });
-        return;
-      }
       // If URL has no leagueId but activeLeagueId is set, navigate to include it
       if (!urlLeagueId) {
         log(' [EARLY REDIRECT] activeLeagueId set but URL has no leagueId, navigating:', {
@@ -3559,63 +3562,29 @@ const Matchup = () => {
         setLoading(true);
         setError(null);
 
-        // Determine which league to use - PRIORITIZE activeLeagueId from context over URL
-        // This ensures that when user switches leagues, we use the selected league, not the URL
+        // Determine which league to use - URL path is the source of truth.
+        // activeLeagueId from LeagueContext may be stale (e.g. first-league default)
+        // and using it here would hijack users from /matchup/<beta> into Charlie.
+        // Only fall back to activeLeagueId when the URL has no leagueId at all.
         let targetLeagueId: string | null = null;
         let cachedUserLeagues: League[] | null = null;
         let cachedLeagueTeams: Team[] | null = null;
-        
-        // Step 1: Always prioritize activeLeagueId from LeagueContext (source of truth)
-        // CRITICAL: If activeLeagueId differs from URL, redirect IMMEDIATELY before any data loading
-        if (activeLeagueId && activeLeagueId !== urlLeagueId) {
-          log(' activeLeagueId differs from URL, redirecting immediately to sync:', {
-            activeLeagueId,
-            urlLeagueId,
-            currentPath: window.location.pathname
-          });
+
+        // Step 1: URL leagueId wins
+        if (urlLeagueId) {
+          targetLeagueId = urlLeagueId;
+          log(' Using leagueId from URL path (source of truth):', targetLeagueId);
+        } else if (activeLeagueId) {
+          // Step 2: No URL leagueId — fall back to context and sync URL
+          targetLeagueId = activeLeagueId;
+          log(' No URL leagueId, falling back to activeLeagueId:', targetLeagueId);
           const weekParam = urlWeekId ? `/${urlWeekId}` : '';
-          // Use window.location for immediate, hard redirect to ensure URL sync
-          window.location.href = `/matchup/${activeLeagueId}${weekParam}`;
+          navigate(`/matchup/${targetLeagueId}${weekParam}`, { replace: true });
           return;
         }
-        
-        // Step 1b: If activeLeagueId matches URL or is set, validate it
-        if (activeLeagueId) {
-          // Validate that activeLeagueId is in user's leagues
-          const { leagues: userLeagues, error: leaguesError } = await LeagueService.getUserLeagues(user.id);
-          cachedUserLeagues = userLeagues || [];
-          
-          if (leaguesError) {
-            logger.error('[MATCHUP] Error fetching leagues for validation:', leaguesError);
-            log(' Cannot validate activeLeagueId, will fall back to URL league');
-          } else {
-            const isValidLeague = userLeagues?.some(l => l.id === activeLeagueId);
-            if (isValidLeague) {
-              targetLeagueId = activeLeagueId;
-              log(' Using activeLeagueId from LeagueContext:', targetLeagueId);
-            } else {
-              log(' activeLeagueId not found in user leagues, will fall back to URL:', activeLeagueId);
-            }
-          }
-        }
-        
-        // Step 2: Fall back to URL leagueId if activeLeagueId not set or invalid
-        if (!targetLeagueId && urlLeagueId) {
-          targetLeagueId = urlLeagueId;
-          log(' Using leagueId from URL path:', targetLeagueId);
-        }
-        
-        // Step 3: If still no targetLeagueId, check activeLeagueId one more time before falling back
+
+        // Step 3: Still no targetLeagueId — use first league as absolute fallback
         if (!targetLeagueId) {
-          // Last chance: if activeLeagueId is set, use it (even if validation failed earlier)
-          if (activeLeagueId) {
-            log(' No targetLeagueId but activeLeagueId is set, using it:', activeLeagueId);
-            targetLeagueId = activeLeagueId;
-            const weekParam = urlWeekId ? `/${urlWeekId}` : '';
-            window.location.href = `/matchup/${targetLeagueId}${weekParam}`;
-            return;
-          }
-          
           log(' No leagueId available, fetching user leagues to use first league...');
           
           // Fetch user's leagues if not already cached
@@ -3644,7 +3613,7 @@ const Matchup = () => {
           
           // Redirect to URL with leagueId (and weekId if available)
           const weekParam = urlWeekId ? `/${urlWeekId}` : '';
-          window.location.href = `/matchup/${targetLeagueId}${weekParam}`;
+          navigate(`/matchup/${targetLeagueId}${weekParam}`, { replace: true });
           return;
         }
 
@@ -3672,19 +3641,8 @@ const Matchup = () => {
         const currentLeague = userLeagues.find((l: League) => l.id === targetLeagueId);
         if (!currentLeague) {
           logger.error('[MATCHUP] League not found in user leagues:', targetLeagueId);
-          
-          // If activeLeagueId is set and different, try using it
-          if (activeLeagueId && activeLeagueId !== targetLeagueId) {
-            const validLeague = userLeagues.find(l => l.id === activeLeagueId);
-            if (validLeague) {
-              log(' Redirecting to activeLeagueId:', activeLeagueId);
-              const weekParam = urlWeekId ? `/${urlWeekId}` : '';
-              navigate(`/matchup/${activeLeagueId}${weekParam}`, { replace: true });
-              return;
-            }
-          }
-          
-          // If no valid league found, show error but don't redirect to create-league
+          // URL is the source of truth — do NOT auto-redirect to activeLeagueId here
+          // (that would re-introduce the cross-league hijack bug). Show error instead.
           setError('League not found. Please select a valid league.');
           setLoading(false);
           loadingRef.current = false;
@@ -3774,21 +3732,29 @@ const Matchup = () => {
 
         // Determine which week to show (from URL or current week)
         let weekToShow: number;
+        // Helper: pick best week when current isn't in list — prefer the LAST
+        // played week over week 1 so completed seasons land on the final week
+        // instead of jumping back to opening week.
+        const pickFallbackWeek = (current: number): number => {
+          if (weeks.includes(current)) return current;
+          const lastWeek = weeks[weeks.length - 1];
+          if (lastWeek && current > lastWeek) return lastWeek;
+          return weeks[0] || 1;
+        };
+
         if (urlWeekId) {
           weekToShow = parseInt(urlWeekId);
           if (isNaN(weekToShow) || !weeks.includes(weekToShow)) {
-            // Invalid week in URL, use current week
             const currentWeek = getCurrentWeekNumber(firstWeek);
-            weekToShow = weeks.includes(currentWeek) ? currentWeek : weeks[0] || 1;
+            weekToShow = pickFallbackWeek(currentWeek);
             window.location.href = `/matchup/${targetLeagueId}/${weekToShow}`;
-            return; // Exit early to prevent further execution
+            return;
           }
         } else {
-          // No week in URL, use current week
           const currentWeek = getCurrentWeekNumber(firstWeek);
-          weekToShow = weeks.includes(currentWeek) ? currentWeek : weeks[0] || 1;
+          weekToShow = pickFallbackWeek(currentWeek);
           window.location.href = `/matchup/${targetLeagueId}/${weekToShow}`;
-          return; // Exit early to prevent further execution
+          return;
         }
 
         setSelectedWeek(weekToShow);
@@ -5072,6 +5038,12 @@ const Matchup = () => {
   // This ensures a single, smooth loading screen without cycling
   const shouldShowLoading = useMinimumLoadingTime(actualLoading, 1000);
   
+  // Playoff champion / in-progress banner data (fantasy leagues only)
+  const playoffChampion = usePlayoffChampion(
+    league?.id || activeLeagueId || null,
+    activeLeagueFormat?.leagueType || null,
+  );
+
   // Redirect pool leagues to their pool page
   const _leagueType = activeLeagueFormat?.leagueType;
   if (isPoolLeague(_leagueType) && activeLeagueId) {
@@ -5154,6 +5126,38 @@ const Matchup = () => {
           )}>
             {/* Main Content - MOBILE: Full width, full height / DESKTOP: Scrollable panel */}
             <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto px-0 lg:px-4 order-1 lg:order-2">
+              {/* Playoff status banner — only for fantasy leagues with a generated bracket */}
+              {(league?.id || activeLeagueId) && playoffChampion.status === 'completed' && (
+                <Card className="mb-4 border-amber-300 dark:border-amber-700 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 dark:from-amber-950/40 dark:via-yellow-950/40 dark:to-orange-950/40">
+                  <CardContent className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4">
+                    <div className="flex items-center gap-3">
+                      <Trophy className="w-6 h-6 text-amber-600 shrink-0" />
+                      <div>
+                        <div className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                          Season Complete
+                        </div>
+                        <div className="text-base font-bold text-foreground">
+                          Champion: {playoffChampion.championTeamName}
+                        </div>
+                      </div>
+                    </div>
+                    <Button asChild size="sm" variant="default">
+                      <Link to={`/playoffs/${league?.id || activeLeagueId}`}>View Bracket</Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+              {(league?.id || activeLeagueId) && playoffChampion.status === 'in_progress' && (
+                <div className="mb-4 flex items-center justify-between px-3 py-2 rounded-md border border-border/40 bg-muted/30 text-sm">
+                  <span className="text-muted-foreground">Playoffs in Progress</span>
+                  <Link
+                    to={`/playoffs/${league?.id || activeLeagueId}`}
+                    className="font-medium text-primary hover:underline"
+                  >
+                    View Bracket
+                  </Link>
+                </div>
+              )}
               {/* Header Section - Clean and Professional with Citrus Colors */}
               <div className="mb-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">

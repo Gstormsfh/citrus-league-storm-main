@@ -1,5 +1,9 @@
+import { useEffect, useState } from 'react';
 import { useLeague } from '@/contexts/LeagueContext';
+import { leagueApi } from '@/api';
+import { logger } from '@citrus/shared';
 import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import Navbar from '@/components/Navbar';
 import MobileMenuButton from '@/components/MobileMenuButton';
 import Footer from '@/components/Footer';
@@ -9,6 +13,7 @@ import { ArrowLeftRight, Users, TrendingUp, Calendar, FileText, BarChart3, ListC
 import { Link } from 'react-router-dom';
 import { Narwhal } from '@/components/icons/Narwhal';
 import { isPoolLeague, getPoolRoute, getPoolLabel } from '@/utils/leagueTypeHelpers';
+import { usePlayoffChampion } from '@/hooks/usePlayoffChampion';
 import { HeadlinesBanner } from '@/components/gm-office/HeadlinesBanner';
 import { TeamIntelHub } from '@/components/gm-office/TeamIntelHub';
 import { isGuestMode } from '@/utils/guestHelpers';
@@ -112,6 +117,36 @@ const GMOffice = () => {
   const leagueType = activeLeagueFormat?.leagueType;
   const isPool = isPoolLeague(leagueType) && !!activeLeagueId;
   const actions = isPool ? getPoolActions(leagueType!, activeLeagueId!) : gmActions;
+  const playoffChampion = usePlayoffChampion(activeLeagueId, leagueType || null);
+
+  // Season-complete state: once the regular season + playoffs are done, the
+  // GM Office goes read-only for roster/lineup/trade/waiver actions.
+  const [seasonComplete, setSeasonComplete] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    if (!activeLeagueId || isPool) {
+      setSeasonComplete(false);
+      return;
+    }
+    leagueApi
+      .getSeasonState(activeLeagueId)
+      .then((res) => {
+        if (!cancelled) setSeasonComplete(Boolean(res?.data?.complete));
+      })
+      .catch((err) => {
+        logger.warn('[GMOffice] season-state fetch failed:', err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeLeagueId, isPool]);
+
+  const LOCKED_ACTION_TITLES = new Set([
+    'Make a Trade',
+    'Free Agents',
+    'Waiver Wire',
+    'Lineup Manager',
+  ]);
   return (
     <div className="min-h-screen bg-[#D4E8B8] text-foreground relative">
       {/* Desktop Navbar - Hidden on mobile */}
@@ -159,21 +194,73 @@ const GMOffice = () => {
                 </div>
               )}
               
+              {playoffChampion.status === 'completed' && activeLeagueId && (
+                <div className="max-w-3xl mx-auto mb-4">
+                  <Link
+                    to={`/playoffs/${activeLeagueId}`}
+                    className="flex items-center justify-between gap-3 rounded-lg border-2 border-amber-400 bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/40 dark:to-yellow-950/40 px-4 py-3 hover:shadow-md transition-shadow"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Trophy className="w-5 h-5 text-amber-600 shrink-0" />
+                      <span className="font-bold text-foreground truncate">
+                        {playoffChampion.championTeamName} — League Champion
+                      </span>
+                    </div>
+                    <span className="text-xs font-semibold text-amber-700 dark:text-amber-400 shrink-0">
+                      View Bracket
+                    </span>
+                  </Link>
+                </div>
+              )}
+              {playoffChampion.status === 'in_progress' && activeLeagueId && (
+                <div className="max-w-3xl mx-auto mb-4">
+                  <Link
+                    to={`/playoffs/${activeLeagueId}`}
+                    className="flex items-center justify-between px-3 py-2 rounded-md border border-border/40 bg-muted/30 text-sm hover:bg-muted/50 transition-colors"
+                  >
+                    <span className="text-muted-foreground">Playoffs in Progress</span>
+                    <span className="font-medium text-primary">View Bracket</span>
+                  </Link>
+                </div>
+              )}
+
+              {seasonComplete && (
+                <div className="max-w-3xl mx-auto mb-4">
+                  <div
+                    role="status"
+                    aria-live="polite"
+                    className="flex items-center justify-between gap-3 rounded-lg border-2 border-citrus-forest bg-citrus-cream px-4 py-3 shadow-[0_4px_0_rgba(27,48,34,0.15)]"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Trophy className="w-5 h-5 text-citrus-orange shrink-0" />
+                      <span className="font-varsity font-bold text-citrus-forest truncate">
+                        Season Complete — Rosters Locked
+                      </span>
+                    </div>
+                    <Badge className="bg-citrus-sage border-2 border-citrus-forest text-citrus-cream text-xs font-varsity font-bold shrink-0">
+                      Read Only
+                    </Badge>
+                  </div>
+                </div>
+              )}
+
               <div className="max-w-3xl mx-auto mb-4">
                 <HeadlinesBanner />
               </div>
               
               <CitrusSectionDivider />
               
+              <TooltipProvider>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto mt-4">
-                {actions.map((action, index) => (
-                  <Link 
-                    key={action.title} 
-                    to={action.link}
-                    className="group"
-                    style={{ animationDelay: `${index * 50}ms` }}
-                  >
-                    <Card className="h-full transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_0_rgba(223,117,54,0.4)] border-4 border-citrus-forest cursor-pointer overflow-hidden relative bg-citrus-cream corduroy-texture rounded-[2rem] shadow-[0_6px_0_rgba(27,48,34,0.2)]">
+                {actions.map((action, index) => {
+                  const isLocked = seasonComplete && LOCKED_ACTION_TITLES.has(action.title);
+                  const cardInner = (
+                    <Card className={cn(
+                      "h-full border-4 border-citrus-forest overflow-hidden relative bg-citrus-cream corduroy-texture rounded-[2rem] shadow-[0_6px_0_rgba(27,48,34,0.2)]",
+                      isLocked
+                        ? "opacity-60 cursor-not-allowed grayscale"
+                        : "transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_0_rgba(223,117,54,0.4)] cursor-pointer",
+                    )}>
                       {/* Background gradient */}
                       <div className={`absolute top-0 left-0 w-full h-32 bg-gradient-to-br ${action.gradient} opacity-10`} />
                       
@@ -197,9 +284,38 @@ const GMOffice = () => {
                         </CardDescription>
                       </CardHeader>
                     </Card>
-                  </Link>
-                ))}
+                  );
+                  if (isLocked) {
+                    return (
+                      <Tooltip key={action.title}>
+                        <TooltipTrigger asChild>
+                          <div
+                            aria-disabled="true"
+                            className="group"
+                            style={{ animationDelay: `${index * 50}ms` }}
+                          >
+                            {cardInner}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          Season complete — roster locked
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  }
+                  return (
+                    <Link
+                      key={action.title}
+                      to={action.link}
+                      className="group"
+                      style={{ animationDelay: `${index * 50}ms` }}
+                    >
+                      {cardInner}
+                    </Link>
+                  );
+                })}
               </div>
+              </TooltipProvider>
             </div>
 
             {/* Left Sidebar - At bottom on mobile, left on desktop - Extends to edge */}
