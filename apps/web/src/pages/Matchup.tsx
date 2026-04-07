@@ -3562,63 +3562,29 @@ const Matchup = () => {
         setLoading(true);
         setError(null);
 
-        // Determine which league to use - PRIORITIZE activeLeagueId from context over URL
-        // This ensures that when user switches leagues, we use the selected league, not the URL
+        // Determine which league to use - URL path is the source of truth.
+        // activeLeagueId from LeagueContext may be stale (e.g. first-league default)
+        // and using it here would hijack users from /matchup/<beta> into Charlie.
+        // Only fall back to activeLeagueId when the URL has no leagueId at all.
         let targetLeagueId: string | null = null;
         let cachedUserLeagues: League[] | null = null;
         let cachedLeagueTeams: Team[] | null = null;
-        
-        // Step 1: Always prioritize activeLeagueId from LeagueContext (source of truth)
-        // CRITICAL: If activeLeagueId differs from URL, redirect IMMEDIATELY before any data loading
-        if (activeLeagueId && activeLeagueId !== urlLeagueId) {
-          log(' activeLeagueId differs from URL, redirecting immediately to sync:', {
-            activeLeagueId,
-            urlLeagueId,
-            currentPath: window.location.pathname
-          });
+
+        // Step 1: URL leagueId wins
+        if (urlLeagueId) {
+          targetLeagueId = urlLeagueId;
+          log(' Using leagueId from URL path (source of truth):', targetLeagueId);
+        } else if (activeLeagueId) {
+          // Step 2: No URL leagueId — fall back to context and sync URL
+          targetLeagueId = activeLeagueId;
+          log(' No URL leagueId, falling back to activeLeagueId:', targetLeagueId);
           const weekParam = urlWeekId ? `/${urlWeekId}` : '';
-          // Use window.location for immediate, hard redirect to ensure URL sync
-          window.location.href = `/matchup/${activeLeagueId}${weekParam}`;
+          navigate(`/matchup/${targetLeagueId}${weekParam}`, { replace: true });
           return;
         }
-        
-        // Step 1b: If activeLeagueId matches URL or is set, validate it
-        if (activeLeagueId) {
-          // Validate that activeLeagueId is in user's leagues
-          const { leagues: userLeagues, error: leaguesError } = await LeagueService.getUserLeagues(user.id);
-          cachedUserLeagues = userLeagues || [];
-          
-          if (leaguesError) {
-            logger.error('[MATCHUP] Error fetching leagues for validation:', leaguesError);
-            log(' Cannot validate activeLeagueId, will fall back to URL league');
-          } else {
-            const isValidLeague = userLeagues?.some(l => l.id === activeLeagueId);
-            if (isValidLeague) {
-              targetLeagueId = activeLeagueId;
-              log(' Using activeLeagueId from LeagueContext:', targetLeagueId);
-            } else {
-              log(' activeLeagueId not found in user leagues, will fall back to URL:', activeLeagueId);
-            }
-          }
-        }
-        
-        // Step 2: Fall back to URL leagueId if activeLeagueId not set or invalid
-        if (!targetLeagueId && urlLeagueId) {
-          targetLeagueId = urlLeagueId;
-          log(' Using leagueId from URL path:', targetLeagueId);
-        }
-        
-        // Step 3: If still no targetLeagueId, check activeLeagueId one more time before falling back
+
+        // Step 3: Still no targetLeagueId — use first league as absolute fallback
         if (!targetLeagueId) {
-          // Last chance: if activeLeagueId is set, use it (even if validation failed earlier)
-          if (activeLeagueId) {
-            log(' No targetLeagueId but activeLeagueId is set, using it:', activeLeagueId);
-            targetLeagueId = activeLeagueId;
-            const weekParam = urlWeekId ? `/${urlWeekId}` : '';
-            window.location.href = `/matchup/${targetLeagueId}${weekParam}`;
-            return;
-          }
-          
           log(' No leagueId available, fetching user leagues to use first league...');
           
           // Fetch user's leagues if not already cached
@@ -3647,7 +3613,7 @@ const Matchup = () => {
           
           // Redirect to URL with leagueId (and weekId if available)
           const weekParam = urlWeekId ? `/${urlWeekId}` : '';
-          window.location.href = `/matchup/${targetLeagueId}${weekParam}`;
+          navigate(`/matchup/${targetLeagueId}${weekParam}`, { replace: true });
           return;
         }
 
@@ -3675,19 +3641,8 @@ const Matchup = () => {
         const currentLeague = userLeagues.find((l: League) => l.id === targetLeagueId);
         if (!currentLeague) {
           logger.error('[MATCHUP] League not found in user leagues:', targetLeagueId);
-          
-          // If activeLeagueId is set and different, try using it
-          if (activeLeagueId && activeLeagueId !== targetLeagueId) {
-            const validLeague = userLeagues.find(l => l.id === activeLeagueId);
-            if (validLeague) {
-              log(' Redirecting to activeLeagueId:', activeLeagueId);
-              const weekParam = urlWeekId ? `/${urlWeekId}` : '';
-              navigate(`/matchup/${activeLeagueId}${weekParam}`, { replace: true });
-              return;
-            }
-          }
-          
-          // If no valid league found, show error but don't redirect to create-league
+          // URL is the source of truth — do NOT auto-redirect to activeLeagueId here
+          // (that would re-introduce the cross-league hijack bug). Show error instead.
           setError('League not found. Please select a valid league.');
           setLoading(false);
           loadingRef.current = false;
