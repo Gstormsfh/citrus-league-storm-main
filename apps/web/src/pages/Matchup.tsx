@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { useParams, useNavigate, Navigate } from "react-router-dom";
+import { useParams, useNavigate, Navigate, Link } from "react-router-dom";
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useLeague } from '@/contexts/LeagueContext';
@@ -42,6 +42,9 @@ import { calculateEligibleGamesRemaining } from '@/utils/rosterUtils';
 import { ScoringCalculator, DEFAULT_SCORING } from '@/utils/scoringUtils';
 import { logger } from '@/utils/logger';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
+import { usePlayoffChampion } from '@/hooks/usePlayoffChampion';
+import { Card, CardContent } from '@/components/ui/card';
+import { Trophy } from 'lucide-react';
 import { matchupApi } from '@/api/matchups';
 import { leagueApi } from '@/api/leagues';
 import { playerApi } from '@/api/players';
