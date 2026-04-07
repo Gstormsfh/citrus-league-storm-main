@@ -1305,7 +1305,7 @@ const FreeAgents = () => {
                                   <div className="font-bold text-green-600">{player.adds.toLocaleString()}</div>
                                   <div className="text-[11px] text-muted-foreground">Adds</div>
                                 </div>
-                                <Button size="default" variant="default" className="h-10 w-10 text-primary font-bold text-xl bg-primary/10 hover:bg-primary/20 border border-primary/30 disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                <Button size="default" variant="default" className="h-10 w-10 font-bold text-xl bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700 shadow-sm disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
                                   {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : '+'}
                                 </Button>
                               </div>
@@ -1352,7 +1352,7 @@ const FreeAgents = () => {
                                     >
                                       <Star className={`h-4 w-4 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
                                     </Button>
-                                    <Button size="default" variant="default" className="h-10 w-10 text-primary font-bold text-xl bg-primary/10 hover:bg-primary/20 border border-primary/30 disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                    <Button size="default" variant="default" className="h-10 w-10 font-bold text-xl bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700 shadow-sm disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
                                       {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : '+'}
                                     </Button>
                                   </div>
@@ -1426,7 +1426,7 @@ const FreeAgents = () => {
                                   </div>
                                   <div className="text-[10px] text-muted-foreground">{player.gamesThisWeek || 0}G</div>
                                 </div>
-                                <Button size="sm" variant="default" className="h-8 w-8 text-primary font-bold bg-primary/10 hover:bg-primary/20 border border-primary/30 p-0 disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                <Button size="sm" variant="default" className="h-8 w-8 font-bold bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700 shadow-sm p-0 disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
                                   {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : '+'}
                                 </Button>
                               </div>
@@ -1503,7 +1503,7 @@ const FreeAgents = () => {
                                     >
                                       <Star className={`h-4 w-4 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
                                     </Button>
-                                    <Button size="sm" variant="default" className="h-8 w-8 text-primary font-bold bg-primary/10 hover:bg-primary/20 border border-primary/30 p-0 disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                    <Button size="sm" variant="default" className="h-8 w-8 font-bold bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700 shadow-sm p-0 disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
                                       {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : '+'}
                                     </Button>
                                   </div>
@@ -1723,7 +1723,7 @@ const FreeAgents = () => {
                                       <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" onClick={() => handlePlayerClick(player)}>
                                         <Info className="h-3.5 w-3.5" />
                                       </Button>
-                                      <Button size="sm" variant="default" className="h-7 w-7 text-primary font-bold text-base bg-primary/10 hover:bg-primary/20 border border-primary/30 p-0 disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                      <Button size="sm" variant="default" className="h-7 w-7 font-bold text-base bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700 shadow-sm p-0 disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
                                         {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : '+'}
                                       </Button>
                                     </div>
@@ -2006,7 +2006,7 @@ const FreeAgents = () => {
                                    >
                                      <Star className={`h-3.5 w-3.5 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
                                    </Button>
-                                   <Button size="sm" variant="default" className="h-7 px-2 text-xs text-primary font-bold bg-primary/10 hover:bg-primary/20 border border-primary/30 disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                   <Button size="sm" variant="default" className="h-7 px-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700 shadow-sm disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
                                      {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : '+ Add'}
                                    </Button>
                                    <Button
@@ -2268,7 +2268,7 @@ const FreeAgents = () => {
                                 <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" onClick={() => handlePlayerClick(player)}>
                                   <Info className="h-3.5 w-3.5" />
                                 </Button>
-                                <Button size="sm" variant="default" className="h-7 w-7 text-primary font-bold text-base bg-primary/10 hover:bg-primary/20 border border-primary/30 p-0 disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                <Button size="sm" variant="default" className="h-7 w-7 font-bold text-base bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700 shadow-sm p-0 disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
                                   {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : '+'}
                                 </Button>
                               </div>
