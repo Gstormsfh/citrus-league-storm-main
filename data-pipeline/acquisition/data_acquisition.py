@@ -67,8 +67,8 @@ warnings.filterwarnings('ignore', message='.*Trying to unpickle.*', category=Use
 def _verify_model_files():
     """Verify critical model files exist, provide helpful error if not."""
     import os
-    # Models are now stored in models/ folder
-    model_dir = os.path.join(os.path.dirname(__file__), 'models')
+    # Models live at data-pipeline/models/ (one level up from acquisition/)
+    model_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models')
     critical_files = ['xg_model_moneypuck.joblib', 'xg_model.joblib']
     missing = [f for f in critical_files if not os.path.exists(os.path.join(model_dir, f))]
     if len(missing) == len(critical_files):
@@ -85,7 +85,7 @@ def _verify_model_files():
 def _model_path(filename):
     """Get the full path to a model file."""
     import os
-    return os.path.join(os.path.dirname(__file__), 'models', filename)
+    return os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', filename)
 
 # Verify files before loading
 if not _verify_model_files():

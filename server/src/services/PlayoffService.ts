@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { CURRENT_SEASON, COLUMNS } from '@citrus/shared';
+import { getSupabaseAdmin } from '../lib/supabase';
 
 export class PlayoffService {
   private supabase: SupabaseClient;
@@ -9,6 +10,17 @@ export class PlayoffService {
   }
 
   async getBracket(leagueId: string) {
+    // Auto-generate bracket if conditions are met (regular season complete,
+    // fantasy league, draft completed, no bracket yet). Uses service role so
+    // it bypasses the commissioner auth check. Fire-and-forget on errors —
+    // we never want auto-gen failures to block reads.
+    try {
+      const admin = getSupabaseAdmin();
+      await admin.rpc('auto_generate_playoff_bracket', { p_league_id: leagueId });
+    } catch {
+      // Admin client may be unavailable in dev; ignore.
+    }
+
     const { data: bracket, error: bracketError } = await this.supabase
       .from('playoff_brackets')
       .select(COLUMNS.PLAYOFF_BRACKET)
