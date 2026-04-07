@@ -333,12 +333,13 @@ export class WaiverService {
 
   /** Get waiver priority for all teams in a league */
   async getWaiverPriority(leagueId: string) {
-    // Fetch every team in the league so the priority list is complete
-    // even when waiver_priority hasn't been seeded yet (rows are only
-    // written when claims succeed). Teams without an explicit priority
-    // are appended after the explicitly-ranked ones in stable order.
+    // Use the admin client for the teams lookup so the denominator is
+    // always the true league size regardless of the caller's RLS scope.
+    // waiver_priority is only written when claims succeed, so without
+    // this merge a league would show "#1 of 1" after its first claim.
+    const admin = getSupabaseAdmin();
     const [teamsRes, priorityRes] = await Promise.all([
-      this.supabase
+      admin
         .from('teams')
         .select('id, team_name, created_at')
         .eq('league_id', leagueId)
@@ -366,7 +367,7 @@ export class WaiverService {
       }
     }
 
-    // Renumber 1..N so the UI denominator matches the league size.
+    // Renumber 1..N so the UI denominator always matches the real league size.
     const merged = ordered.map((row, idx) => ({ ...row, priority: idx + 1 }));
     return { priority: merged, error: null };
   }
