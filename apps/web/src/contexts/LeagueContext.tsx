@@ -6,6 +6,7 @@ import { DEMO_LEAGUE_ID, DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeague
 import { MatchupService } from '@/services/MatchupService';
 import { RosterCacheService } from '@/services/RosterCacheService';
 import { PlayerService } from '@/services/PlayerService';
+import { DataCacheService } from '@/services/DataCacheService';
 import { LeagueMembershipService } from '@/services/LeagueMembershipService';
 import { playoffApi } from '@/api/playoffs';
 import { supabase } from '@/integrations/supabase/client';
@@ -184,6 +185,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     MatchupService.clearRosterCache();
     RosterCacheService.clearCache();
     PlayerService.clearCache();
+    DataCacheService.clear();
     
     // Update state synchronously
     setActiveLeagueIdState(leagueId);
