@@ -3774,21 +3774,29 @@ const Matchup = () => {
 
         // Determine which week to show (from URL or current week)
         let weekToShow: number;
+        // Helper: pick best week when current isn't in list — prefer the LAST
+        // played week over week 1 so completed seasons land on the final week
+        // instead of jumping back to opening week.
+        const pickFallbackWeek = (current: number): number => {
+          if (weeks.includes(current)) return current;
+          const lastWeek = weeks[weeks.length - 1];
+          if (lastWeek && current > lastWeek) return lastWeek;
+          return weeks[0] || 1;
+        };
+
         if (urlWeekId) {
           weekToShow = parseInt(urlWeekId);
           if (isNaN(weekToShow) || !weeks.includes(weekToShow)) {
-            // Invalid week in URL, use current week
             const currentWeek = getCurrentWeekNumber(firstWeek);
-            weekToShow = weeks.includes(currentWeek) ? currentWeek : weeks[0] || 1;
+            weekToShow = pickFallbackWeek(currentWeek);
             window.location.href = `/matchup/${targetLeagueId}/${weekToShow}`;
-            return; // Exit early to prevent further execution
+            return;
           }
         } else {
-          // No week in URL, use current week
           const currentWeek = getCurrentWeekNumber(firstWeek);
-          weekToShow = weeks.includes(currentWeek) ? currentWeek : weeks[0] || 1;
+          weekToShow = pickFallbackWeek(currentWeek);
           window.location.href = `/matchup/${targetLeagueId}/${weekToShow}`;
-          return; // Exit early to prevent further execution
+          return;
         }
 
         setSelectedWeek(weekToShow);

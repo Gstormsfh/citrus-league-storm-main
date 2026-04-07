@@ -366,16 +366,14 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
 
   // Check if a playoff bracket exists for the active league (gates Playoffs nav tab)
   useEffect(() => {
-    if (!activeLeagueId || !user) {
-      setShowPlayoffs(false);
-      return;
-    }
+    // Reset immediately on every league switch so stale state from the previous
+    // league doesn't leak the Playoffs tab into leagues that have no bracket.
+    setShowPlayoffs(false);
+
+    if (!activeLeagueId || !user) return;
 
     const playoffTeams = (activeLeague?.settings as Record<string, unknown>)?.playoffTeams;
-    if (!playoffTeams || Number(playoffTeams) === 0) {
-      setShowPlayoffs(false);
-      return;
-    }
+    if (!playoffTeams || Number(playoffTeams) === 0) return;
 
     let cancelled = false;
     playoffApi.getBracket(activeLeagueId).then((res) => {
