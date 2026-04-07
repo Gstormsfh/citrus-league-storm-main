@@ -174,7 +174,7 @@ const log = DEBUG_MATCHUP ? logger.log.bind(logger, '[Matchup]') : () => {};
 const Matchup = () => {
   const { user, loading: authLoading } = useAuth();
   const { data: profile } = useProfile();
-  const { userLeagueState, loading: leagueContextLoading, activeLeagueId, activeLeagueFormat, isChangingLeague } = useLeague();
+  const { userLeagueState, loading: leagueContextLoading, activeLeagueId, activeLeagueFormat, isChangingLeague, setActiveLeagueId } = useLeague();
   const { leagueId: urlLeagueId, weekId: urlWeekId } = useParams<{ leagueId?: string; weekId?: string }>();
   const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -3355,20 +3355,20 @@ const Matchup = () => {
       return;
     }
     
-    // CRITICAL: Check activeLeagueId vs URL IMMEDIATELY - before any other logic
-    // This ensures league switching works even when navigating to /matchup without leagueId
+    // The URL path is the source of truth for which league's matchup we're viewing.
+    // If the URL has a leagueId that differs from activeLeagueId, sync the context TO
+    // the URL (not the other way around) — otherwise navigating to /matchup/<beta> while
+    // activeLeagueId is stale (e.g. Charlie from first-league default) would yank the
+    // user back to Charlie instead of honoring the Beta URL they clicked on.
+    if (urlLeagueId && activeLeagueId && urlLeagueId !== activeLeagueId) {
+      log(' [SYNC] URL leagueId differs from activeLeagueId, updating context to match URL:', {
+        activeLeagueId,
+        urlLeagueId,
+      });
+      setActiveLeagueId(urlLeagueId);
+      return;
+    }
     if (activeLeagueId) {
-      // If URL has a leagueId that differs from activeLeagueId, navigate immediately (smooth, no reload)
-      if (urlLeagueId && urlLeagueId !== activeLeagueId) {
-        log(' [EARLY REDIRECT] activeLeagueId differs from URL, navigating immediately:', {
-          activeLeagueId,
-          urlLeagueId,
-          currentPath: window.location.pathname
-        });
-        const weekParam = urlWeekId ? `/${urlWeekId}` : '';
-        navigate(`/matchup/${activeLeagueId}${weekParam}`, { replace: true });
-        return;
-      }
       // If URL has no leagueId but activeLeagueId is set, navigate to include it
       if (!urlLeagueId) {
         log(' [EARLY REDIRECT] activeLeagueId set but URL has no leagueId, navigating:', {
