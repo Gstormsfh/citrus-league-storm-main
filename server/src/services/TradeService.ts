@@ -59,15 +59,56 @@ export class TradeService {
     userId: string,
     message?: string,
   ) {
-    // Verify user owns the from_team
-    const { data: team } = await this.supabase
-      .from('teams')
-      .select('owner_id')
-      .eq('id', fromTeamId)
-      .single();
+    if (String(fromTeamId) === String(toTeamId)) {
+      return { success: false, error: 'Cannot trade with yourself' };
+    }
 
-    if (team?.owner_id !== userId) {
+    // Verify user owns the from_team AND both teams belong to this league
+    const { data: teamsRows } = await this.supabase
+      .from('teams')
+      .select('id, owner_id, league_id')
+      .in('id', [fromTeamId, toTeamId]);
+
+    const fromTeam = (teamsRows || []).find((t: { id: string }) => String(t.id) === String(fromTeamId));
+    const toTeam = (teamsRows || []).find((t: { id: string }) => String(t.id) === String(toTeamId));
+
+    if (!fromTeam || fromTeam.owner_id !== userId) {
       return { success: false, error: 'You do not own the offering team' };
+    }
+    if (!toTeam) {
+      return { success: false, error: 'Target team not found' };
+    }
+    if (String(fromTeam.league_id) !== String(leagueId) || String(toTeam.league_id) !== String(leagueId)) {
+      return { success: false, error: 'Both teams must belong to this league' };
+    }
+
+    // Verify all offered players are actually on the from-team roster
+    if (offeredPlayerIds.length > 0) {
+      const { data: ownedRows } = await this.supabase
+        .from('roster_assignments')
+        .select('player_id')
+        .eq('league_id', leagueId)
+        .eq('team_id', fromTeamId)
+        .in('player_id', offeredPlayerIds.map(String));
+      const ownedSet = new Set((ownedRows || []).map((r: { player_id: string | number }) => String(r.player_id)));
+      const missing = offeredPlayerIds.filter((p) => !ownedSet.has(String(p)));
+      if (missing.length > 0) {
+        return { success: false, error: `Offered players not on your roster: ${missing.join(', ')}` };
+      }
+    }
+    // Verify all requested players are actually on the to-team roster
+    if (requestedPlayerIds.length > 0) {
+      const { data: toRows } = await this.supabase
+        .from('roster_assignments')
+        .select('player_id')
+        .eq('league_id', leagueId)
+        .eq('team_id', toTeamId)
+        .in('player_id', requestedPlayerIds.map(String));
+      const toSet = new Set((toRows || []).map((r: { player_id: string | number }) => String(r.player_id)));
+      const missing = requestedPlayerIds.filter((p) => !toSet.has(String(p)));
+      if (missing.length > 0) {
+        return { success: false, error: `Requested players not on target roster: ${missing.join(', ')}` };
+      }
     }
 
     // Check league settings for best ball (trades not allowed)
@@ -177,12 +218,32 @@ export class TradeService {
       return this.submitTradeForReview(tradeId, String(trade.league_id));
     }
 
-    // Execute trade immediately
-    const { error } = await this.supabase.rpc('execute_trade', {
+    // Execute trade immediately — pass all 6 args required by execute_trade RPC
+    const { data: rpcData, error } = await this.supabase.rpc('execute_trade', {
       p_trade_id: tradeId,
+      p_league_id: String(trade.league_id),
+      p_from_team_id: String(trade.from_team_id),
+      p_to_team_id: String(trade.to_team_id),
+      p_offered_player_ids: (trade.offered_player_ids || []).map((p: unknown) => String(p)),
+      p_requested_player_ids: (trade.requested_player_ids || []).map((p: unknown) => String(p)),
     });
 
-    return { success: !error, error: error?.message };
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    // execute_trade returns JSONB { success, error } — surface inner failure
+    const result = typeof rpcData === 'string' ? JSON.parse(rpcData) : rpcData;
+    if (result && result.success === false) {
+      return { success: false, error: result.error || 'Trade execution failed' };
+    }
+
+    // Mark the trade offer as accepted (execute_trade only moves rosters)
+    await this.supabase
+      .from('trade_offers')
+      .update({ status: 'accepted', processed_at: new Date().toISOString() })
+      .eq('id', tradeId);
+
+    return { success: true };
   }
 
   /** Reject a trade offer */
@@ -351,12 +412,42 @@ export class TradeService {
       return { success: !error, error: error?.message };
     }
 
-    // Approve: execute the trade
-    const { error } = await this.supabase.rpc('execute_trade', {
+    // Approve: execute the trade — fetch trade payload to pass all 6 RPC args
+    const { data: tradeRow, error: fetchErr } = await this.supabase
+      .from('trade_offers')
+      .select('league_id, from_team_id, to_team_id, offered_player_ids, requested_player_ids')
+      .eq('id', tradeId)
+      .single();
+
+    if (fetchErr || !tradeRow) {
+      return { success: false, error: 'Trade not found' };
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tr = tradeRow as any;
+    const { data: rpcData, error } = await this.supabase.rpc('execute_trade', {
       p_trade_id: tradeId,
+      p_league_id: String(tr.league_id),
+      p_from_team_id: String(tr.from_team_id),
+      p_to_team_id: String(tr.to_team_id),
+      p_offered_player_ids: (tr.offered_player_ids || []).map((p: unknown) => String(p)),
+      p_requested_player_ids: (tr.requested_player_ids || []).map((p: unknown) => String(p)),
     });
 
-    return { success: !error, error: error?.message };
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    const result = typeof rpcData === 'string' ? JSON.parse(rpcData) : rpcData;
+    if (result && result.success === false) {
+      return { success: false, error: result.error || 'Trade execution failed' };
+    }
+
+    await this.supabase
+      .from('trade_offers')
+      .update({ status: 'accepted', processed_at: new Date().toISOString() })
+      .eq('id', tradeId);
+
+    return { success: true };
   }
 
   /** Get trade review settings for a league */

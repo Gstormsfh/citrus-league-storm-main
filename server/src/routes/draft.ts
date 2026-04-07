@@ -99,11 +99,32 @@ draftRoutes.get('/league/:leagueId', membershipMiddleware, async (c) => {
 // POST /api/draft/league/:leagueId/pick — Make a draft pick
 draftRoutes.post('/league/:leagueId/pick', membershipMiddleware, validateBody(schemas.makeDraftPick), async (c) => {
   const leagueId = c.req.param('leagueId');
+  const userId = c.get('userId');
   const body = getValidatedBody<z.infer<typeof schemas.makeDraftPick>>(c);
   const supabase = createUserClient(c.get('userToken'));
   const service = new DraftService(supabase);
 
   const { playerId, teamId, pickNumber, roundNumber, draftSessionId, teamsCount } = body;
+
+  // SECURITY: Verify the caller owns the team they're picking for, OR is the commissioner.
+  // Without this, any league member could submit picks assigning players to ANY team in
+  // the league (the underlying make_draft_pick RPC only verifies league membership, not
+  // team ownership). Commissioners may pick on behalf of any team for offline/manual drafts.
+  const membership = new LeagueMembershipService(supabase);
+  const membershipResult = await membership.checkMembership(leagueId, userId);
+  if (!membershipResult.isCommissioner && membershipResult.teamId !== String(teamId)) {
+    return fail(c, AppError.forbidden('You can only make picks for your own team'));
+  }
+
+  // SECURITY: Verify the league draft is actually in progress before accepting picks.
+  const { data: leagueRow } = await supabase
+    .from('leagues')
+    .select('draft_status')
+    .eq('id', leagueId)
+    .single();
+  if (leagueRow && leagueRow.draft_status === 'completed') {
+    return fail(c, AppError.badRequest('Draft is already completed'));
+  }
 
   const { pick, error, isComplete } = await service.makePick(
     leagueId,
@@ -201,10 +222,19 @@ draftRoutes.post('/league/:leagueId/undo', commissionerMiddleware, async (c) => 
 // POST /api/draft/league/:leagueId/autopick — Autopick for a team
 draftRoutes.post('/league/:leagueId/autopick', membershipMiddleware, validateBody(schemas.draftAutopick), async (c) => {
   const leagueId = c.req.param('leagueId');
+  const userId = c.get('userId');
   const body = getValidatedBody<z.infer<typeof schemas.draftAutopick>>(c);
 
   const supabase = createUserClient(c.get('userToken'));
   const service = new DraftService(supabase);
+
+  // SECURITY: Only the team's owner or the commissioner may trigger an autopick
+  // for a given team. Otherwise any league member could exhaust an opponent's queue.
+  const membership = new LeagueMembershipService(supabase);
+  const membershipResult = await membership.checkMembership(leagueId, userId);
+  if (!membershipResult.isCommissioner && membershipResult.teamId !== String(body.teamId)) {
+    return fail(c, AppError.forbidden('You can only autopick for your own team'));
+  }
 
   const result = await service.autopickForTeam(
     leagueId,

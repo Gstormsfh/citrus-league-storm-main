@@ -268,8 +268,35 @@ export const DraftService = {
               const completionDate = new Date(draftCompletedAt);
               const firstWeekStart = getFirstWeekStartDate(completionDate);
               const { teams } = await LS.getLeagueTeams(leagueId);
-              await MatchupService.generateMatchupsForLeague(leagueId, teams, firstWeekStart, false);
-              logger.log('Matchups generated successfully for entire season');
+
+              // Honor commissioner playoff settings: reserve playoff weeks at
+              // the end of the season for the playoff bracket. If the league
+              // has playoffs enabled (playoffTeams > 0), trim the regular
+              // season schedule to leave room for playoffWeeks at the end.
+              const { getScheduleLength } = await import('@/utils/weekCalculator');
+              const totalWeeks = getScheduleLength(firstWeekStart);
+              const playoffTeams = Number((fmt as any).playoffTeams ?? 0) || 0;
+              const playoffWeeks = Number((fmt as any).playoffWeeks ?? 0) || 0;
+              const cfgRegularWeeks = Number((fmt as any).regularSeasonWeeks ?? 0) || 0;
+
+              let regularSeasonWeeks: number | undefined;
+              if (cfgRegularWeeks > 0) {
+                regularSeasonWeeks = cfgRegularWeeks;
+              } else if (playoffTeams >= 4 && playoffWeeks > 0 && totalWeeks > playoffWeeks) {
+                regularSeasonWeeks = totalWeeks - playoffWeeks;
+              }
+
+              if (regularSeasonWeeks && regularSeasonWeeks > 0) {
+                try {
+                  await leagueApi.updateSettings(leagueId, { regularSeasonWeeks });
+                  logger.log(`Persisted regularSeasonWeeks=${regularSeasonWeeks} (totalWeeks=${totalWeeks}, playoffWeeks=${playoffWeeks})`);
+                } catch (persistErr) {
+                  logger.error('Error persisting regularSeasonWeeks (non-critical):', persistErr);
+                }
+              }
+
+              await MatchupService.generateMatchupsForLeague(leagueId, teams, firstWeekStart, false, regularSeasonWeeks);
+              logger.log('Matchups generated successfully for regular season');
             }
           }
         } catch (matchupGenError: unknown) {
