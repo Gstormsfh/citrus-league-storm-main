@@ -67,6 +67,10 @@ export interface Player {
   highDangerSavePct: number;
   goalsSavedAboveExpected: number;
   goalie_gp?: number; // Goalie games played (separate from skater games_played)
+
+  // Waiver status (populated for league free-agent lists)
+  is_on_waivers?: boolean;
+  waiver_clears_at?: string | null;
 }
 
 /** Shape returned by the API server's NormalizedPlayer */

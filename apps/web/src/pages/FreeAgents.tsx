@@ -41,6 +41,12 @@ import { ScoringCalculator } from '@/utils/scoringUtils';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { DropPlayerForAddDialog } from '@/components/freeagents/DropPlayerForAddDialog';
 import { ArrowLeftRight } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+
+// Returns extra Tailwind classes for the +Add button based on waiver state.
+const addBtnColorCls = (p: Player) => p.is_on_waivers
+  ? 'bg-amber-500 hover:bg-amber-600 text-white border-amber-600'
+  : 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700';
 
 // Helper function to format position for display (L -> LW, R -> RW)
 const formatPositionForDisplay = (position: string): string => {
@@ -264,6 +270,43 @@ const FreeAgents = () => {
       // LeagueService determines free agents - uses real database if leagueId provided
       // Dropped players (with deleted_at) will be included as free agents
       const freeAgentResult = await LeagueService.getFreeAgents(allPlayers, currentLeagueId, user.id);
+
+      // Enrich free agents with waiver status (rows where cleared_at IS NULL and within waiver window)
+      if (currentLeagueId) {
+        try {
+          const { data: waiverRows } = await (supabase as unknown as {
+            from: (t: string) => {
+              select: (c: string) => {
+                eq: (k: string, v: string) => {
+                  is: (k: string, v: null) => Promise<{ data: Array<{ player_id: number; dropped_at: string }> | null }>
+                }
+              }
+            }
+          })
+            .from('player_waiver_status')
+            .select('player_id, dropped_at')
+            .eq('league_id', currentLeagueId)
+            .is('cleared_at', null);
+          const waiverWindowMs = 48 * 60 * 60 * 1000;
+          const now = Date.now();
+          const waiverMap = new Map<string, string>();
+          for (const r of (waiverRows || [])) {
+            const droppedMs = new Date(r.dropped_at).getTime();
+            if (now - droppedMs < waiverWindowMs) {
+              waiverMap.set(String(r.player_id), new Date(droppedMs + waiverWindowMs).toISOString());
+            }
+          }
+          if (waiverMap.size > 0) {
+            freeAgentResult.players = freeAgentResult.players.map(p => {
+              const clearsAt = waiverMap.get(String(p.id));
+              return clearsAt ? { ...p, is_on_waivers: true, waiver_clears_at: clearsAt } : p;
+            });
+          }
+        } catch (err) {
+          logger.warn('Failed to load waiver status for free agents', err);
+        }
+      }
+
       setPlayers(freeAgentResult.players);
       setRosterLookupFailed(freeAgentResult.rosterLookupFailed);
       if (freeAgentResult.rosterLookupFailed) {
@@ -1307,8 +1350,8 @@ const FreeAgents = () => {
                                   <div className="font-bold text-green-600">{player.adds.toLocaleString()}</div>
                                   <div className="text-[11px] text-muted-foreground">Adds</div>
                                 </div>
-                                <Button size="default" variant="default" className="h-10 w-10 font-bold text-xl bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700 shadow-sm disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
-                                  {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : '+'}
+                                <Button size="default" variant="default" className={`h-10 w-10 font-bold text-xl border shadow-sm disabled:opacity-50 ${addBtnColorCls(player)}`} title={player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                  {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : (player.is_on_waivers ? 'W' : '+')}
                                 </Button>
                               </div>
                             </div>
@@ -1354,8 +1397,8 @@ const FreeAgents = () => {
                                     >
                                       <Star className={`h-4 w-4 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
                                     </Button>
-                                    <Button size="default" variant="default" className="h-10 w-10 font-bold text-xl bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700 shadow-sm disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
-                                      {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : '+'}
+                                    <Button size="default" variant="default" className={`h-10 w-10 font-bold text-xl border shadow-sm disabled:opacity-50 ${addBtnColorCls(player)}`} title={player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                      {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : (player.is_on_waivers ? 'W' : '+')}
                                     </Button>
                                   </div>
                                 </TableCell>
@@ -1428,8 +1471,8 @@ const FreeAgents = () => {
                                   </div>
                                   <div className="text-[10px] text-muted-foreground">{player.gamesThisWeek || 0}G</div>
                                 </div>
-                                <Button size="sm" variant="default" className="h-8 w-8 font-bold bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700 shadow-sm p-0 disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
-                                  {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : '+'}
+                                <Button size="sm" variant="default" className={`h-8 w-8 font-bold border shadow-sm p-0 disabled:opacity-50 ${addBtnColorCls(player)}`} title={player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                  {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : (player.is_on_waivers ? 'W' : '+')}
                                 </Button>
                               </div>
                             </div>
@@ -1505,8 +1548,8 @@ const FreeAgents = () => {
                                     >
                                       <Star className={`h-4 w-4 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
                                     </Button>
-                                    <Button size="sm" variant="default" className="h-8 w-8 font-bold bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700 shadow-sm p-0 disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
-                                      {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : '+'}
+                                    <Button size="sm" variant="default" className={`h-8 w-8 font-bold border shadow-sm p-0 disabled:opacity-50 ${addBtnColorCls(player)}`} title={player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                      {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : (player.is_on_waivers ? 'W' : '+')}
                                     </Button>
                                   </div>
                                 </TableCell>
@@ -1725,8 +1768,8 @@ const FreeAgents = () => {
                                       <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" onClick={() => handlePlayerClick(player)}>
                                         <Info className="h-3.5 w-3.5" />
                                       </Button>
-                                      <Button size="sm" variant="default" className="h-7 w-7 font-bold text-base bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700 shadow-sm p-0 disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
-                                        {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : '+'}
+                                      <Button size="sm" variant="default" className={`h-7 w-7 font-bold text-base border shadow-sm p-0 disabled:opacity-50 ${addBtnColorCls(player)}`} title={player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                        {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : (player.is_on_waivers ? 'W' : '+')}
                                       </Button>
                                     </div>
                                   </TableCell>
@@ -2008,7 +2051,7 @@ const FreeAgents = () => {
                                    >
                                      <Star className={`h-3.5 w-3.5 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
                                    </Button>
-                                   <Button size="sm" variant="default" className="h-7 px-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700 shadow-sm disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                   <Button size="sm" variant="default" className={`h-7 px-2 text-xs font-bold border shadow-sm disabled:opacity-50 ${addBtnColorCls(player)}`} title={player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
                                      {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : '+ Add'}
                                    </Button>
                                    <Button
@@ -2270,8 +2313,8 @@ const FreeAgents = () => {
                                 <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" onClick={() => handlePlayerClick(player)}>
                                   <Info className="h-3.5 w-3.5" />
                                 </Button>
-                                <Button size="sm" variant="default" className="h-7 w-7 font-bold text-base bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700 shadow-sm p-0 disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
-                                  {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : '+'}
+                                <Button size="sm" variant="default" className={`h-7 w-7 font-bold text-base border shadow-sm p-0 disabled:opacity-50 ${addBtnColorCls(player)}`} title={player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                  {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : (player.is_on_waivers ? 'W' : '+')}
                                 </Button>
                               </div>
                             </TableCell>
