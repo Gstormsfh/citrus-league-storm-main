@@ -333,13 +333,42 @@ export class WaiverService {
 
   /** Get waiver priority for all teams in a league */
   async getWaiverPriority(leagueId: string) {
-    const { data, error } = await this.supabase
-      .from('waiver_priority')
-      .select(`${COLUMNS.WAIVER_PRIORITY}, teams(team_name)`)
-      .eq('league_id', leagueId)
-      .order('priority', { ascending: true });
+    // Fetch every team in the league so the priority list is complete
+    // even when waiver_priority hasn't been seeded yet (rows are only
+    // written when claims succeed). Teams without an explicit priority
+    // are appended after the explicitly-ranked ones in stable order.
+    const [teamsRes, priorityRes] = await Promise.all([
+      this.supabase
+        .from('teams')
+        .select('id, team_name, created_at')
+        .eq('league_id', leagueId)
+        .order('created_at', { ascending: true }),
+      this.supabase
+        .from('waiver_priority')
+        .select(`${COLUMNS.WAIVER_PRIORITY}, teams(team_name)`)
+        .eq('league_id', leagueId)
+        .order('priority', { ascending: true }),
+    ]);
 
-    return { priority: data || [], error };
+    if (priorityRes.error) return { priority: [], error: priorityRes.error };
+
+    type PriorityRow = { team_id: string; priority: number; teams?: { team_name: string } | null };
+    const explicit = (priorityRes.data || []) as unknown as PriorityRow[];
+    const teams = (teamsRes.data || []) as Array<{ id: string; team_name: string; created_at: string }>;
+
+    const ranked = new Map<string, PriorityRow>();
+    for (const row of explicit) ranked.set(row.team_id, row);
+
+    const ordered: PriorityRow[] = [...explicit].sort((a, b) => a.priority - b.priority);
+    for (const t of teams) {
+      if (!ranked.has(t.id)) {
+        ordered.push({ team_id: t.id, priority: 0, teams: { team_name: t.team_name } });
+      }
+    }
+
+    // Renumber 1..N so the UI denominator matches the league size.
+    const merged = ordered.map((row, idx) => ({ ...row, priority: idx + 1 }));
+    return { priority: merged, error: null };
   }
 
   /** Get league waiver settings */
