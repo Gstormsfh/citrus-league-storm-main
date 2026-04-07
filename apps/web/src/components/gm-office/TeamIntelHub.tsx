@@ -673,8 +673,10 @@ export const TeamIntelHub = () => {
             </div>
           )}
 
-          {/* Component 5: Waiver Priority Tracker */}
-          {myPriority !== null && (
+          {/* Component 5: Waiver Priority Tracker — only show when there are
+              at least 2 ranked teams. "#1 of 1" implied a guaranteed pickup,
+              which is not how waivers actually work. */}
+          {myPriority !== null && waiverPriority.length >= 2 && (
             <div className="space-y-2 p-3 bg-citrus-sage/10 rounded-lg border-2 border-citrus-sage/30">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold flex items-center gap-2">
