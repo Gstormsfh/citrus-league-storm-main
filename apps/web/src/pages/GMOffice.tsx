@@ -1,5 +1,9 @@
+import { useEffect, useState } from 'react';
 import { useLeague } from '@/contexts/LeagueContext';
+import { leagueApi } from '@/api';
+import { logger } from '@citrus/shared';
 import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import Navbar from '@/components/Navbar';
 import MobileMenuButton from '@/components/MobileMenuButton';
 import Footer from '@/components/Footer';
@@ -114,6 +118,35 @@ const GMOffice = () => {
   const isPool = isPoolLeague(leagueType) && !!activeLeagueId;
   const actions = isPool ? getPoolActions(leagueType!, activeLeagueId!) : gmActions;
   const playoffChampion = usePlayoffChampion(activeLeagueId, leagueType || null);
+
+  // Season-complete state: once the regular season + playoffs are done, the
+  // GM Office goes read-only for roster/lineup/trade/waiver actions.
+  const [seasonComplete, setSeasonComplete] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    if (!activeLeagueId || isPool) {
+      setSeasonComplete(false);
+      return;
+    }
+    leagueApi
+      .getSeasonState(activeLeagueId)
+      .then((res) => {
+        if (!cancelled) setSeasonComplete(Boolean(res?.data?.complete));
+      })
+      .catch((err) => {
+        logger.warn('[GMOffice] season-state fetch failed:', err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeLeagueId, isPool]);
+
+  const LOCKED_ACTION_TITLES = new Set([
+    'Make a Trade',
+    'Free Agents',
+    'Waiver Wire',
+    'Lineup Manager',
+  ]);
   return (
     <div className="min-h-screen bg-[#D4E8B8] text-foreground relative">
       {/* Desktop Navbar - Hidden on mobile */}
