@@ -39,6 +39,8 @@ import { GameLogosBar } from '@/components/matchup/GameLogosBar';
 import { logger } from '@/utils/logger';
 import { ScoringCalculator } from '@/utils/scoringUtils';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
+import { DropPlayerForAddDialog } from '@/components/freeagents/DropPlayerForAddDialog';
+import { ArrowLeftRight } from 'lucide-react';
 
 // Helper function to format position for display (L -> LW, R -> RW)
 const formatPositionForDisplay = (position: string): string => {
@@ -100,6 +102,12 @@ const FreeAgents = () => {
 
   // Add-player loading state to prevent double-clicks
   const [addingPlayerId, setAddingPlayerId] = useState<number | null>(null);
+
+  // Atomic swap dialog state — opened when the roster is full, a position limit
+  // is hit, or the user explicitly chooses "Add with drop".
+  const [swapDialogOpen, setSwapDialogOpen] = useState(false);
+  const [swapAddPlayer, setSwapAddPlayer] = useState<Player | null>(null);
+  const [swapTeamId, setSwapTeamId] = useState<string | null>(null);
 
   // Waiver process time from league settings (for toast messages)
   const [waiverProcessTime, setWaiverProcessTime] = useState<string | null>(null);
@@ -700,12 +708,15 @@ const FreeAgents = () => {
       // The RPC checks: roster_count >= roster_size when no drop player specified
       const maxRosterSize = league.roster_size || 22;
 
-      // If roster is full, navigate to roster page to drop first
+      // If roster is full, open atomic swap dialog so the add+drop happen
+      // together inside a single process_roster_move RPC call.
       if ((currentRosterSize || 0) >= maxRosterSize) {
-        navigate(`/roster?addPlayer=${player.id}&playerName=${encodeURIComponent(player.full_name)}`);
+        setSwapAddPlayer(player);
+        setSwapTeamId(teamData.id);
+        setSwapDialogOpen(true);
         toast({
           title: "Roster Full",
-          description: `You must drop a player before adding ${player.full_name}. Redirecting to your roster.`,
+          description: `Select a player to drop in exchange for ${player.full_name}. The swap is atomic.`,
         });
         return;
       }
@@ -748,13 +759,21 @@ const FreeAgents = () => {
         // Refresh trending data to show updated counts
         await fetchTrendingData();
       } else {
-        // Check if the error is about roster being full — redirect to drop dialog
+        // Check if the error is about a roster/position limit — open atomic swap dialog
         const errorStr = (result.error || '').toLowerCase();
-        if (errorStr.includes('roster') && (errorStr.includes('full') || errorStr.includes('max') || errorStr.includes('limit'))) {
-          navigate(`/roster?addPlayer=${player.id}&playerName=${encodeURIComponent(player.full_name)}`);
+        const isLimitError =
+          errorStr.includes('full') ||
+          errorStr.includes('max') ||
+          errorStr.includes('limit') ||
+          errorStr.includes('goalie') ||
+          errorStr.includes('position');
+        if (isLimitError) {
+          setSwapAddPlayer(player);
+          setSwapTeamId(teamData.id);
+          setSwapDialogOpen(true);
           toast({
-            title: "Roster Full",
-            description: `You must drop a player before adding ${player.full_name}.`,
+            title: "Drop a Player",
+            description: `Select a player to drop to add ${player.full_name}.`,
           });
         } else {
           toast({
@@ -766,7 +785,12 @@ const FreeAgents = () => {
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Failed to add player. Please try again.";
-      if (errorMessage.toLowerCase().includes('roster') && (errorMessage.toLowerCase().includes('full') || errorMessage.toLowerCase().includes('max'))) {
+      const lower = errorMessage.toLowerCase();
+      const isLimitError =
+        lower.includes('full') || lower.includes('max') || lower.includes('limit') ||
+        lower.includes('goalie') || lower.includes('position');
+      // Fallback: if we don't have a team id cached (rare), redirect to roster.
+      if (isLimitError) {
         navigate(`/roster?addPlayer=${player.id}&playerName=${encodeURIComponent(player.full_name)}`);
         toast({
           title: "Roster Full",
@@ -781,6 +805,45 @@ const FreeAgents = () => {
       }
     } finally {
       setAddingPlayerId(null);
+    }
+  };
+
+  /**
+   * Proactive "Add with drop" — opens the atomic swap dialog directly so
+   * users can pick a drop before the roster is full (Yahoo/ESPN/Sleeper UX).
+   */
+  const handleAddWithDrop = async (player: Player) => {
+    if (shouldBlockGuestOperation(userLeagueState, (msg) => {
+      toast({ title: "Sign Up Required", description: msg, variant: "default" });
+      navigate('/auth?redirect=/free-agents');
+    })) {
+      return;
+    }
+    if (!user || !leagueId) {
+      toast({
+        title: "Error",
+        description: "You must be logged in and have a team to swap players.",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      const myTeamResponse = await leagueApi.getMyTeam(leagueId);
+      const teamDataResult = myTeamResponse.data as { id: string } | undefined;
+      if (!teamDataResult) {
+        toast({ title: "Error", description: "Team not found.", variant: "destructive" });
+        return;
+      }
+      setSwapAddPlayer(player);
+      setSwapTeamId(teamDataResult.id);
+      setSwapDialogOpen(true);
+    } catch (err) {
+      logger.error('handleAddWithDrop failed', err);
+      toast({
+        title: "Error",
+        description: "Could not open swap dialog. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -1946,6 +2009,17 @@ const FreeAgents = () => {
                                    <Button size="sm" variant="default" className="h-7 px-2 text-xs text-primary font-bold bg-primary/10 hover:bg-primary/20 border border-primary/30 disabled:opacity-50" disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
                                      {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : '+ Add'}
                                    </Button>
+                                   <Button
+                                     size="sm"
+                                     variant="outline"
+                                     title="Add with drop (swap)"
+                                     aria-label="Add with drop"
+                                     className="h-7 w-7 p-0 border-emerald-700 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+                                     disabled={addingPlayerId !== null}
+                                     onClick={() => handleAddWithDrop(player)}
+                                   >
+                                     <ArrowLeftRight className="h-3.5 w-3.5" />
+                                   </Button>
                                  </div>
                                </TableCell>
                              </TableRow>
@@ -2216,6 +2290,27 @@ const FreeAgents = () => {
           isOpen={isPlayerDialogOpen}
           onClose={() => setIsPlayerDialogOpen(false)}
         />
+
+        {/* Atomic add+drop swap dialog */}
+        {user && leagueId && swapTeamId && (
+          <DropPlayerForAddDialog
+            open={swapDialogOpen}
+            onOpenChange={(v) => {
+              setSwapDialogOpen(v);
+              if (!v) {
+                setSwapAddPlayer(null);
+              }
+            }}
+            addPlayer={swapAddPlayer}
+            leagueId={leagueId}
+            teamId={swapTeamId}
+            userId={user.id}
+            onSuccess={() => {
+              fetchPlayers();
+              fetchTrendingData();
+            }}
+          />
+        )}
             </div>
 
             {/* Left Sidebar - At bottom on mobile, left on desktop */}
