@@ -181,6 +181,17 @@ describe('WaiverService', () => {
         { team_id: 't2', priority: 2, teams: { team_name: 'Team B' } },
       ];
       mockSupabase.from = vi.fn(() => createChain({ data: priorities, error: null }));
+      // The service now fetches the full league team list via the admin
+      // client so the denominator always matches the real league size.
+      mockAdminClient = {
+        from: vi.fn(() => createChain({
+          data: [
+            { id: 't1', team_name: 'Team A', created_at: '2025-01-01' },
+            { id: 't2', team_name: 'Team B', created_at: '2025-01-02' },
+          ],
+          error: null,
+        })),
+      };
 
       const result = await service.getWaiverPriority('league-1');
       expect(result.priority).toHaveLength(2);
