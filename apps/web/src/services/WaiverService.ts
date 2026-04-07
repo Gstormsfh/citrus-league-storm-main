@@ -183,13 +183,20 @@ export class WaiverService {
         dropPlayerId: dropPlayerId ? String(dropPlayerId) : null,
       });
 
-      return {
-        ...(faResult.data ?? { success: true }),
-        isFreeAgent: true
-      };
+      const faData = (faResult.data ?? { success: true }) as { success: boolean; error?: string };
+      logger.info('[WaiverService.addPlayer] free-agent response', faData);
+      if (faData.success === false) {
+        return {
+          success: false,
+          error: faData.error || 'Server rejected add but returned no reason. Check server logs.',
+          isFreeAgent: true,
+        };
+      }
+      return { success: true, isFreeAgent: true };
     } catch (faError: unknown) {
       // Extract the error message from the free agent attempt
       const faErrorMsg = faError instanceof Error ? faError.message : String(faError);
+      logger.error('[WaiverService.addPlayer] free-agent threw:', faErrorMsg, faError);
       const lowerMsg = faErrorMsg.toLowerCase();
 
       // If the error is about roster being full, do NOT fall through to waiver claim.
@@ -220,15 +227,22 @@ export class WaiverService {
           dropPlayerId: dropPlayerId ? String(dropPlayerId) : null,
         });
 
-        return {
-          ...(claimResult.data ?? { success: true }),
-          isFreeAgent: false
-        };
+        const claimData = (claimResult.data ?? { success: true }) as { success: boolean; error?: string; claimId?: string };
+        logger.info('[WaiverService.addPlayer] waiver-claim response', claimData);
+        if (claimData.success === false) {
+          return {
+            success: false,
+            error: claimData.error || `Free agent failed (${faErrorMsg}); waiver claim also failed.`,
+            isFreeAgent: false,
+          };
+        }
+        return { success: true, claimId: claimData.claimId, isFreeAgent: false };
       } catch (error: unknown) {
-        logger.error('Error adding player:', error);
+        const claimErrMsg = error instanceof Error ? error.message : String(error);
+        logger.error('[WaiverService.addPlayer] waiver-claim threw:', claimErrMsg, error);
         return {
           success: false,
-          error: error instanceof Error ? error.message : String(error)
+          error: `${faErrorMsg} (waiver claim fallback also failed: ${claimErrMsg})`,
         };
       }
     }
