@@ -5083,6 +5083,12 @@ const Matchup = () => {
   // This ensures a single, smooth loading screen without cycling
   const shouldShowLoading = useMinimumLoadingTime(actualLoading, 1000);
   
+  // Playoff champion / in-progress banner data (fantasy leagues only)
+  const playoffChampion = usePlayoffChampion(
+    league?.id || activeLeagueId || null,
+    activeLeagueFormat?.leagueType || null,
+  );
+
   // Redirect pool leagues to their pool page
   const _leagueType = activeLeagueFormat?.leagueType;
   if (isPoolLeague(_leagueType) && activeLeagueId) {
@@ -5165,6 +5171,38 @@ const Matchup = () => {
           )}>
             {/* Main Content - MOBILE: Full width, full height / DESKTOP: Scrollable panel */}
             <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto px-0 lg:px-4 order-1 lg:order-2">
+              {/* Playoff status banner — only for fantasy leagues with a generated bracket */}
+              {(league?.id || activeLeagueId) && playoffChampion.status === 'completed' && (
+                <Card className="mb-4 border-amber-300 dark:border-amber-700 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 dark:from-amber-950/40 dark:via-yellow-950/40 dark:to-orange-950/40">
+                  <CardContent className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4">
+                    <div className="flex items-center gap-3">
+                      <Trophy className="w-6 h-6 text-amber-600 shrink-0" />
+                      <div>
+                        <div className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                          Season Complete
+                        </div>
+                        <div className="text-base font-bold text-foreground">
+                          Champion: {playoffChampion.championTeamName}
+                        </div>
+                      </div>
+                    </div>
+                    <Button asChild size="sm" variant="default">
+                      <Link to={`/playoffs/${league?.id || activeLeagueId}`}>View Bracket</Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+              {(league?.id || activeLeagueId) && playoffChampion.status === 'in_progress' && (
+                <div className="mb-4 flex items-center justify-between px-3 py-2 rounded-md border border-border/40 bg-muted/30 text-sm">
+                  <span className="text-muted-foreground">Playoffs in Progress</span>
+                  <Link
+                    to={`/playoffs/${league?.id || activeLeagueId}`}
+                    className="font-medium text-primary hover:underline"
+                  >
+                    View Bracket
+                  </Link>
+                </div>
+              )}
               {/* Header Section - Clean and Professional with Citrus Colors */}
               <div className="mb-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">

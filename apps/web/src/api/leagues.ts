@@ -21,6 +21,15 @@ export const leagueApi = {
     return c.cached(`leagues:${leagueId}`, () => apiClient.get(`/api/leagues/${leagueId}`), CACHE_TTL.MEDIUM);
   },
 
+  /** Get fantasy season-complete state for a league */
+  getSeasonState(leagueId: string) {
+    return c.cached(
+      `leagues:${leagueId}:season-state`,
+      () => apiClient.get<{ complete: boolean; reason?: string }>(`/api/leagues/${leagueId}/season-state`),
+      CACHE_TTL.MEDIUM,
+    );
+  },
+
   /** Create a new league */
   createLeague(params: {
     name: string;

@@ -9,6 +9,7 @@ import { ArrowLeftRight, Users, TrendingUp, Calendar, FileText, BarChart3, ListC
 import { Link } from 'react-router-dom';
 import { Narwhal } from '@/components/icons/Narwhal';
 import { isPoolLeague, getPoolRoute, getPoolLabel } from '@/utils/leagueTypeHelpers';
+import { usePlayoffChampion } from '@/hooks/usePlayoffChampion';
 import { HeadlinesBanner } from '@/components/gm-office/HeadlinesBanner';
 import { TeamIntelHub } from '@/components/gm-office/TeamIntelHub';
 import { isGuestMode } from '@/utils/guestHelpers';
@@ -112,6 +113,7 @@ const GMOffice = () => {
   const leagueType = activeLeagueFormat?.leagueType;
   const isPool = isPoolLeague(leagueType) && !!activeLeagueId;
   const actions = isPool ? getPoolActions(leagueType!, activeLeagueId!) : gmActions;
+  const playoffChampion = usePlayoffChampion(activeLeagueId, leagueType || null);
   return (
     <div className="min-h-screen bg-[#D4E8B8] text-foreground relative">
       {/* Desktop Navbar - Hidden on mobile */}
@@ -159,6 +161,36 @@ const GMOffice = () => {
                 </div>
               )}
               
+              {playoffChampion.status === 'completed' && activeLeagueId && (
+                <div className="max-w-3xl mx-auto mb-4">
+                  <Link
+                    to={`/playoffs/${activeLeagueId}`}
+                    className="flex items-center justify-between gap-3 rounded-lg border-2 border-amber-400 bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/40 dark:to-yellow-950/40 px-4 py-3 hover:shadow-md transition-shadow"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Trophy className="w-5 h-5 text-amber-600 shrink-0" />
+                      <span className="font-bold text-foreground truncate">
+                        {playoffChampion.championTeamName} — League Champion
+                      </span>
+                    </div>
+                    <span className="text-xs font-semibold text-amber-700 dark:text-amber-400 shrink-0">
+                      View Bracket
+                    </span>
+                  </Link>
+                </div>
+              )}
+              {playoffChampion.status === 'in_progress' && activeLeagueId && (
+                <div className="max-w-3xl mx-auto mb-4">
+                  <Link
+                    to={`/playoffs/${activeLeagueId}`}
+                    className="flex items-center justify-between px-3 py-2 rounded-md border border-border/40 bg-muted/30 text-sm hover:bg-muted/50 transition-colors"
+                  >
+                    <span className="text-muted-foreground">Playoffs in Progress</span>
+                    <span className="font-medium text-primary">View Bracket</span>
+                  </Link>
+                </div>
+              )}
+
               <div className="max-w-3xl mx-auto mb-4">
                 <HeadlinesBanner />
               </div>
