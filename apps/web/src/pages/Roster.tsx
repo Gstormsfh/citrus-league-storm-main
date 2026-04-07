@@ -1273,6 +1273,16 @@ const Roster = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- loadRoster excluded to prevent double-fire when selectedDate changes (date-change useEffect handles that)
   }, [userLeagueState, leagueLoading, isChangingLeague, toast]);
 
+  // Listen for cross-page roster-change events (fired by FreeAgents, WaiverWire,
+  // Roster drop dialog, etc.) and refresh without requiring a hard reset.
+  useEffect(() => {
+    const handler = () => {
+      try { loadRoster(true); } catch (e) { logger.error('[Roster] refresh-on-event failed:', e); }
+    };
+    window.addEventListener('citrus:roster-changed', handler);
+    return () => window.removeEventListener('citrus:roster-changed', handler);
+  }, [loadRoster]);
+
   // Calculate available weeks, find current matchup by date, and set initial week
   // Fetches all matchups to find which week_number contains today's date,
   // since matchup week_numbers may not align with calendar-based week calculations.
@@ -3744,6 +3754,8 @@ const Roster = () => {
                         setPendingAddPlayer(null);
                         // Refresh roster without full page reload (keeps current roster visible)
                         refreshRoster();
+                        // Notify other pages (FreeAgents, etc.) to refresh
+                        window.dispatchEvent(new CustomEvent('citrus:roster-changed'));
                       } else {
                         toast({
                           title: result.isFreeAgent === false ? "Claim Failed" : "Add Failed",

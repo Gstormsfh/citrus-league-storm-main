@@ -758,6 +758,8 @@ const FreeAgents = () => {
         await fetchPlayers();
         // Refresh trending data to show updated counts
         await fetchTrendingData();
+        // Notify Roster page (and any other listeners) to refresh without a hard reload
+        window.dispatchEvent(new CustomEvent('citrus:roster-changed'));
       } else {
         // Check if the error is about a roster/position limit — open atomic swap dialog
         const errorStr = (result.error || '').toLowerCase();

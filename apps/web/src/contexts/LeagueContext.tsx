@@ -135,12 +135,23 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
 
       // Determine active league:
       // 1. Use league_id from URL if present and valid
-      // 2. Otherwise use first league
-      // 3. Otherwise null
+      // 2. Otherwise use last-active league from localStorage if still a member
+      // 3. Otherwise use first league
+      // 4. Otherwise null
       let selectedLeagueId: string | null = null;
-      
+      const storageKey = `citrus:activeLeagueId:${user.id}`;
+      const storedLeagueId = (() => {
+        try { return localStorage.getItem(storageKey); } catch { return null; }
+      })();
+
       if (urlLeagueId && filteredLeagues.some(l => l.id === urlLeagueId)) {
         selectedLeagueId = urlLeagueId;
+      } else if (storedLeagueId && filteredLeagues.some(l => l.id === storedLeagueId)) {
+        selectedLeagueId = storedLeagueId;
+        // Reflect restored league in URL so downstream effects see it
+        const newParams = new URLSearchParams(searchParams);
+        newParams.set('league', selectedLeagueId);
+        setSearchParams(newParams, { replace: true });
       } else if (filteredLeagues.length > 0) {
         selectedLeagueId = filteredLeagues[0].id;
         // Update URL if no league param but we have leagues
@@ -152,6 +163,9 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       }
 
       setActiveLeagueIdState(selectedLeagueId);
+      if (selectedLeagueId) {
+        try { localStorage.setItem(storageKey, selectedLeagueId); } catch { /* ignore quota */ }
+      }
 
       // Load full league details
       if (selectedLeagueId) {
@@ -189,7 +203,14 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     
     // Update state synchronously
     setActiveLeagueIdState(leagueId);
-    
+    if (user) {
+      try {
+        const storageKey = `citrus:activeLeagueId:${user.id}`;
+        if (leagueId) localStorage.setItem(storageKey, leagueId);
+        else localStorage.removeItem(storageKey);
+      } catch { /* ignore */ }
+    }
+
     if (leagueId) {
       const league = userLeagues.find(l => l.id === leagueId);
       setActiveLeague(league || null);

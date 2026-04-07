@@ -125,6 +125,8 @@ export function DropPlayerForAddDialog({
         });
         onOpenChange(false);
         onSuccess?.();
+        // Notify Roster page (and any other listeners) to refresh
+        window.dispatchEvent(new CustomEvent('citrus:roster-changed'));
       } else {
         toast({
           title: 'Swap Failed',
