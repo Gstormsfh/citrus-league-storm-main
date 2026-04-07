@@ -127,10 +127,9 @@ BEGIN
     -- BUG 3 FIX: AI / orphaned team — use the league commissioner as the
     -- transaction actor so process_roster_move still has a valid user_id.
     IF v_user_id IS NULL THEN
-      SELECT lm.user_id INTO v_user_id
-      FROM league_members lm
-      WHERE lm.league_id = p_league_id
-        AND lm.role = 'commissioner'
+      SELECT l.commissioner_id INTO v_user_id
+      FROM leagues l
+      WHERE l.id = p_league_id
       LIMIT 1;
     END IF;
 
