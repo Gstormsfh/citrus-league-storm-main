@@ -107,11 +107,28 @@ BEGIN
       INSERT INTO public.team_lineups (league_id, team_id, bench, starters, ir, slot_assignments, updated_at)
       VALUES (p_league_id, v_team_id, jsonb_build_array(p_add_player_id), '[]'::jsonb, '[]'::jsonb, '{}'::jsonb, NOW())
       ON CONFLICT (league_id, team_id) DO NOTHING;
-      INSERT INTO public.draft_picks (league_id, team_id, player_id, round_number, pick_number, picked_at, deleted_at)
-      VALUES (p_league_id, v_team_id, p_add_player_id, 999,
-        (SELECT COALESCE(MAX(pick_number), 0) + 1 FROM public.draft_picks WHERE league_id = p_league_id),
-        NOW(), NULL)
-      ON CONFLICT (league_id, team_id, player_id) DO UPDATE SET deleted_at = NULL, picked_at = NOW();
+
+      -- The real unique index on draft_picks is a PARTIAL index:
+      -- (league_id, player_id) WHERE deleted_at IS NULL.
+      -- ON CONFLICT cannot target a partial index by column list, so use
+      -- an UPDATE-then-INSERT pattern instead. (Prior version referenced a
+      -- nonexistent (league_id, team_id, player_id) constraint and failed
+      -- every free-agent add with "there is no unique or exclusion
+      -- constraint matching the ON CONFLICT specification".)
+      UPDATE public.draft_picks
+      SET deleted_at = NULL, picked_at = NOW(), team_id = v_team_id
+      WHERE league_id = p_league_id AND player_id = p_add_player_id AND deleted_at IS NOT NULL;
+
+      IF NOT FOUND THEN
+        INSERT INTO public.draft_picks (league_id, team_id, player_id, round_number, pick_number, picked_at, deleted_at)
+        SELECT p_league_id, v_team_id, p_add_player_id, 999,
+          (SELECT COALESCE(MAX(pick_number), 0) + 1 FROM public.draft_picks WHERE league_id = p_league_id),
+          NOW(), NULL
+        WHERE NOT EXISTS (
+          SELECT 1 FROM public.draft_picks
+          WHERE league_id = p_league_id AND player_id = p_add_player_id AND deleted_at IS NULL
+        );
+      END IF;
     END IF;
 
     v_operation_duration := NOW() - v_operation_start;

@@ -498,16 +498,18 @@ export class WaiverService {
           }
         }
 
-        // Enforce goalie limit
+        // Enforce goalie limit (match RPC: GREATEST(starting_G + 2, 4))
         const { data: playerInfo } = await admin
-          .from('nhl_players')
-          .select('position')
-          .eq('id', addPlayerId)
+          .from('player_directory')
+          .select('is_goalie')
+          .eq('player_id', addPlayerId)
+          .limit(1)
           .maybeSingle();
 
-        if (playerInfo?.position === 'G') {
+        if (playerInfo?.is_goalie === true) {
           const settings = league?.settings || {};
-          const goalieLimit = settings.rosterSlots?.G ?? 3;
+          const startingG = Number(settings.rosterSlots?.G ?? 2);
+          const goalieLimit = Math.max(startingG + 2, 4);
 
           const { count: currentGoalies } = await admin
             .from('roster_assignments')
@@ -623,12 +625,12 @@ export class WaiverService {
     const playerIds = assignments.map((a: { player_id: string }) => parseInt(String(a.player_id), 10));
 
     const { data: goalies } = await admin
-      .from('nhl_players')
-      .select('id')
-      .in('id', playerIds)
-      .eq('position', 'G');
+      .from('player_directory')
+      .select('player_id')
+      .in('player_id', playerIds)
+      .eq('is_goalie', true);
 
-    return (goalies || []).map((g: { id: number }) => g.id);
+    return (goalies || []).map((g: { player_id: number }) => g.player_id);
   }
 
   /** Add free agent (instant pickup via RPC) */
