@@ -268,7 +268,8 @@ export const MatchupService = {
     leagueId: string,
     teams: Team[],
     firstWeekStart: Date,
-    forceRegenerate: boolean = false
+    forceRegenerate: boolean = false,
+    regularSeasonWeeks?: number
   ): Promise<{ error: Error | null }> {
     try {
       if (teams.length < 2) {
@@ -287,8 +288,13 @@ export const MatchupService = {
         return { error: new Error('Cannot generate matchups: Duplicate team IDs found') };
       }
 
-      // Build fantasy weeks from available weeks
-      const availableWeeks = getAvailableWeeks(firstWeekStart);
+      // Build fantasy weeks from available weeks. If regularSeasonWeeks is
+      // provided (commissioner-configured), truncate so playoff weeks are NOT
+      // populated by the regular-season round-robin scheduler.
+      const allAvailableWeeks = getAvailableWeeks(firstWeekStart);
+      const availableWeeks = (regularSeasonWeeks && regularSeasonWeeks > 0)
+        ? allAvailableWeeks.filter(w => w <= regularSeasonWeeks)
+        : allAvailableWeeks;
       const formatLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
       const fantasyWeeks = availableWeeks.map(weekNumber => {
