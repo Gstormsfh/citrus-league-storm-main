@@ -8,7 +8,7 @@ import { LeagueMembershipService } from "./LeagueMembershipService";
 import { DEMO_LEAGUE_ID_FOR_GUESTS } from "./DemoLeagueService";
 import { logger } from "@/utils/logger";
 import { ScoringCalculator, type CategoryStats } from "@/utils/scoringUtils";
-import { getTodayMST, getTodayMSTDate } from "@/utils/timezoneUtils";
+import { getTodayMST, getTodayMSTDate, formatMoment } from "@/utils/timezoneUtils";
 import { CURRENT_SEASON } from "@/utils/seasonConstants";
 import type { LeagueType, ScoringFormat, DraftType as LeagueDraftType, LeagueSettings } from "@/types/leagueTypes";
 import { extractFormatSettings } from "@/types/leagueTypes";
@@ -1066,10 +1066,13 @@ async joinLeagueByCode(
           playerId: tx.player_id,
           playerName: player?.full_name || 'Unknown Player',
           playerTeam: player?.team || 'N/A',
-          date: new Date(tx.created_at).toLocaleDateString('en-US', {
+          // Mountain Time formatted label like "Tue Apr 7 • 12:52 PM MT".
+          // Roster.tsx renders this verbatim so the Transactions tab shows
+          // the same explicit MT language as the Waiver Wire page.
+          date: formatMoment(tx.created_at) || new Date(tx.created_at).toLocaleDateString('en-US', {
             month: 'short',
             day: 'numeric',
-            year: 'numeric'
+            year: 'numeric',
           }),
           status: mapStatus(tx.status),
           failureReason: tx.failure_reason ?? null,

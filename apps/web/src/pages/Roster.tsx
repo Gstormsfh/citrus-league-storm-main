@@ -3512,7 +3512,10 @@ const Roster = () => {
 
                 <TabsContent value="transactions" className="m-0 p-6">
                 <div className="space-y-4">
-                  <h3 className="text-lg font-bold mb-4">Transaction History</h3>
+                  <div className="mb-4">
+                    <h3 className="text-lg font-bold">Transaction History</h3>
+                    <p className="text-xs text-muted-foreground mt-1">All times shown in Mountain Time (MT)</p>
+                  </div>
                   {transactions.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground border rounded-lg border-dashed">
                       No transactions found.
@@ -3520,9 +3523,9 @@ const Roster = () => {
                   ) : (
                     <div className="rounded-md border">
                        <div className="hidden md:grid grid-cols-12 gap-4 p-4 border-b bg-muted/50 font-medium text-sm">
-                          <div className="col-span-2">Date</div>
+                          <div className="col-span-3">Date</div>
                           <div className="col-span-2">Type</div>
-                          <div className="col-span-4">Player</div>
+                          <div className="col-span-3">Player</div>
                           <div className="col-span-2">Team</div>
                           <div className="col-span-2 text-right">Status</div>
                        </div>
@@ -3533,7 +3536,7 @@ const Roster = () => {
                                <div className="text-muted-foreground text-xs">{tx.date}</div>
                                <div className="text-right">
                                  <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                   tx.status === 'processed' ? 'bg-green-100 text-green-700' : 
+                                   tx.status === 'processed' ? 'bg-green-100 text-green-700' :
                                    (tx.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700')
                                  }`}>
                                    {tx.status}
@@ -3542,8 +3545,8 @@ const Roster = () => {
                            </div>
 
                            {/* Desktop: Date */}
-                           <div className="hidden md:block col-span-2 text-muted-foreground">{tx.date}</div>
-                           
+                           <div className="hidden md:block col-span-3 text-muted-foreground text-xs">{tx.date}</div>
+
                            {/* Type Badge */}
                            <div className="col-span-2 capitalize font-medium flex items-center">
                              <Badge
@@ -3559,23 +3562,30 @@ const Roster = () => {
                            </div>
 
                            {/* Player & Team (Mobile: Combined) */}
-                           <div className="col-span-4 font-medium text-base md:text-sm flex items-center gap-2">
+                           <div className="col-span-3 font-medium text-base md:text-sm flex items-center gap-2">
                                {tx.playerName}
                                <span className="md:hidden text-muted-foreground font-normal text-xs">• {tx.playerTeam}</span>
                            </div>
 
                            {/* Desktop: Team */}
                            <div className="hidden md:block col-span-2">{tx.playerTeam}</div>
-                           
+
                            {/* Desktop: Status */}
                            <div className="hidden md:block col-span-2 text-right">
                              <span className={`text-xs px-2 py-1 rounded-full ${
-                               tx.status === 'processed' ? 'bg-green-100 text-green-700' : 
+                               tx.status === 'processed' ? 'bg-green-100 text-green-700' :
                                (tx.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700')
                              }`}>
                                {tx.status}
                              </span>
                            </div>
+
+                           {/* Failure reason (spans full row when present) */}
+                           {tx.status === 'failed' && tx.failureReason && (
+                             <div className="col-span-12 text-xs text-red-600 mt-1 md:mt-0">
+                               Reason: {tx.failureReason}
+                             </div>
+                           )}
                          </div>
                        ))}
                     </div>
