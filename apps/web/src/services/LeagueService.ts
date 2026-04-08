@@ -223,10 +223,31 @@ export interface Transaction {
   type: 'claim' | 'drop' | 'trade' | 'waiver';
   playerId: string;
   playerName: string;
+  playerPosition?: string | null;
   playerTeam: string;
   date: string;
+  /** Raw ISO timestamp of when the row was created (for MT formatting). */
+  createdAt?: string | null;
   status: 'pending' | 'processed' | 'failed';
   failureReason?: string | null;
+  // ─── Pending waiver-claim enrichment (only populated for waiver rows) ──
+  /** Player being dropped as part of this waiver claim. */
+  dropPlayerId?: string | null;
+  dropPlayerName?: string | null;
+  dropPlayerPosition?: string | null;
+  dropPlayerTeam?: string | null;
+  /** Team's waiver priority at claim time (rolling/reverse-standings). */
+  priority?: number | null;
+  /** Bid amount in FAAB leagues. */
+  bidAmount?: number | null;
+  isConditionalDrop?: boolean | null;
+  /** ISO when this player's waiver window opened. */
+  waiverDroppedAt?: string | null;
+  /** ISO when the player clears waivers. */
+  waiverClearsAt?: string | null;
+  /** League's waiver processing time (e.g. "02:00:00"). */
+  leagueWaiverProcessTime?: string | null;
+  leagueWaiverPeriodHours?: number | null;
 }
 
 let cachedLeagueState: Record<number, Player[]> | null = null;
@@ -1031,12 +1052,21 @@ async joinLeagueByCode(
         id: string;
         type: string;
         player_id: string;
+        drop_player_id?: string | null;
         created_at: string;
         source: string | null;
         status?: string | null;
         failure_reason?: string | null;
         teams: { team_name: string } | null;
         profiles: { first_name: string | null; last_name: string | null } | null;
+        // Waiver claim enrichment fields (present on WAIVER_PENDING/WAIVER_FAILED rows)
+        priority?: number | null;
+        bid_amount?: number | null;
+        is_conditional_drop?: boolean | null;
+        waiver_dropped_at?: string | null;
+        waiver_clears_at?: string | null;
+        league_waiver_period_hours?: number | null;
+        league_waiver_process_time?: string | null;
       }>;
 
       // Get all players to map player_id to player details
@@ -1060,11 +1090,13 @@ async joinLeagueByCode(
 
       const transactions: Transaction[] = (data || []).map((tx) => {
         const player = playerMap.get(tx.player_id);
+        const dropPlayer = tx.drop_player_id ? playerMap.get(tx.drop_player_id) : null;
         return {
           id: tx.id,
           type: mapType(tx.type, tx.source),
           playerId: tx.player_id,
           playerName: player?.full_name || 'Unknown Player',
+          playerPosition: player?.position || null,
           playerTeam: player?.team || 'N/A',
           // Mountain Time formatted label like "Tue Apr 7 • 12:52 PM MT".
           // Roster.tsx renders this verbatim so the Transactions tab shows
@@ -1074,8 +1106,20 @@ async joinLeagueByCode(
             day: 'numeric',
             year: 'numeric',
           }),
+          createdAt: tx.created_at ?? null,
           status: mapStatus(tx.status),
           failureReason: tx.failure_reason ?? null,
+          dropPlayerId: tx.drop_player_id ?? null,
+          dropPlayerName: dropPlayer?.full_name ?? null,
+          dropPlayerPosition: dropPlayer?.position ?? null,
+          dropPlayerTeam: dropPlayer?.team ?? null,
+          priority: tx.priority ?? null,
+          bidAmount: tx.bid_amount ?? null,
+          isConditionalDrop: tx.is_conditional_drop ?? null,
+          waiverDroppedAt: tx.waiver_dropped_at ?? null,
+          waiverClearsAt: tx.waiver_clears_at ?? null,
+          leagueWaiverProcessTime: tx.league_waiver_process_time ?? null,
+          leagueWaiverPeriodHours: tx.league_waiver_period_hours ?? null,
         };
       });
 

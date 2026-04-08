@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { COLUMNS } from '@citrus/shared';
+import { getSupabaseAdmin } from '../lib/supabase';
 import { LeagueMembershipService } from './LeagueMembershipService';
 
 // Demo league IDs that should never appear in user league lists
@@ -461,9 +462,13 @@ export class LeagueService {
         .eq('league_id', leagueId)
         .order('created_at', { ascending: false })
         .limit(50),
+      // Pull the full waiver claim payload for pending/failed rows so the
+      // Transactions tab can render the same rich "clears at / processes at"
+      // card that the Waiver Wire page shows. priority + bid_amount +
+      // drop_player_id + is_conditional_drop are needed to match the layout.
       this.supabase
         .from('waiver_claims')
-        .select('id, league_id, team_id, player_id, drop_player_id, status, failure_reason, created_at, processed_at, teams(team_name)')
+        .select('id, league_id, team_id, player_id, drop_player_id, priority, bid_amount, is_conditional_drop, status, failure_reason, created_at, processed_at, teams(team_name)')
         .eq('league_id', leagueId)
         .in('status', ['pending', 'failed'])
         .order('created_at', { ascending: false })
@@ -485,6 +490,9 @@ export class LeagueService {
       team_id: string;
       player_id: string | number;
       drop_player_id: string | number | null;
+      priority: number | null;
+      bid_amount: number | null;
+      is_conditional_drop: boolean | null;
       status: string;
       failure_reason: string | null;
       created_at: string;
@@ -493,8 +501,54 @@ export class LeagueService {
       // depending on the relationship. Tolerate both shapes.
       teams: { team_name: string } | { team_name: string }[] | null;
     };
-    const waiverRows: LedgerRow[] = ((waiverRes.data || []) as unknown as WaiverRow[]).map((row) => {
+
+    // Enrich pending waiver rows with waiver_clears_at + league waiver timing
+    // using the same logic as WaiverService.enrichClaimsWithClearTime so the
+    // Transactions tab can mirror the Waiver Wire "Active Waiver Claims" card.
+    const waiverRawRows = ((waiverRes.data || []) as unknown as WaiverRow[]);
+    const pendingWaiverRows = waiverRawRows.filter((r) => r.status === 'pending');
+    const pendingPlayerIds = Array.from(new Set(
+      pendingWaiverRows.map((r) => Number(r.player_id)).filter((n) => Number.isFinite(n))
+    ));
+
+    let periodHours = 48;
+    let processTime = '02:00:00';
+    const droppedAtByPlayer = new Map<number, string>();
+
+    if (pendingPlayerIds.length > 0) {
+      const admin = getSupabaseAdmin();
+      const [waiverStatusRes, leagueRes] = await Promise.all([
+        admin
+          .from('player_waiver_status')
+          .select('player_id, dropped_at, cleared_at')
+          .eq('league_id', leagueId)
+          .is('cleared_at', null)
+          .in('player_id', pendingPlayerIds),
+        admin
+          .from('leagues')
+          .select('waiver_period_hours, waiver_process_time')
+          .eq('id', leagueId)
+          .single(),
+      ]);
+
+      const leagueData = leagueRes.data as { waiver_period_hours?: number; waiver_process_time?: string } | null;
+      if (leagueData?.waiver_period_hours != null) periodHours = leagueData.waiver_period_hours;
+      if (leagueData?.waiver_process_time) processTime = leagueData.waiver_process_time;
+
+      for (const row of ((waiverStatusRes.data || []) as Array<{ player_id: number; dropped_at: string }>)) {
+        const prev = droppedAtByPlayer.get(row.player_id);
+        if (!prev || new Date(row.dropped_at) > new Date(prev)) {
+          droppedAtByPlayer.set(row.player_id, row.dropped_at);
+        }
+      }
+    }
+
+    const waiverRows: LedgerRow[] = waiverRawRows.map((row) => {
       const teams = Array.isArray(row.teams) ? (row.teams[0] ?? null) : row.teams;
+      const droppedAt = droppedAtByPlayer.get(Number(row.player_id));
+      const clearsAt = droppedAt
+        ? new Date(new Date(droppedAt).getTime() + periodHours * 3600 * 1000).toISOString()
+        : null;
       return {
         id: `wc-${row.id}`,
         league_id: row.league_id,
@@ -510,6 +564,13 @@ export class LeagueService {
         status: row.status,
         failure_reason: row.failure_reason,
         source_type: 'waiver_claim',
+        priority: row.priority,
+        bid_amount: row.bid_amount,
+        is_conditional_drop: row.is_conditional_drop,
+        waiver_dropped_at: droppedAt || null,
+        waiver_clears_at: clearsAt,
+        league_waiver_period_hours: periodHours,
+        league_waiver_process_time: processTime,
       };
     });
 

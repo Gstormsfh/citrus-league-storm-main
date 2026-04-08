@@ -2,6 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { LeagueService } from '../services/LeagueService';
 import { createChain, createMockSupabase } from './helpers';
 
+// Mock the admin client used by fetchTransactions to enrich pending waivers.
+let mockAdminClient: any;
+vi.mock('../lib/supabase', () => ({
+  getSupabaseAdmin: vi.fn(() => mockAdminClient),
+}));
+
 describe('LeagueService', () => {
   let service: LeagueService;
   let mockSupabase: any;
@@ -9,6 +15,20 @@ describe('LeagueService', () => {
   beforeEach(() => {
     mockSupabase = createMockSupabase();
     service = new LeagueService(mockSupabase);
+    // Default admin client returns empty player_waiver_status + default league
+    // waiver settings. Tests that need real enrichment can override per-test.
+    mockAdminClient = {
+      from: vi.fn((table: string) => {
+        if (table === 'player_waiver_status') {
+          return createChain({ data: [], error: null });
+        }
+        if (table === 'leagues') {
+          return createChain({ data: { waiver_period_hours: 48, waiver_process_time: '02:00:00' }, error: null });
+        }
+        return createChain({ data: null, error: null });
+      }),
+      rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
+    };
   });
 
   describe('getUserLeagues', () => {
@@ -161,6 +181,49 @@ describe('LeagueService', () => {
       const result = await service.fetchTransactions('league-1');
       expect(result.transactions).toEqual([]);
       expect(result.error).toBeTruthy();
+    });
+
+    it('enriches pending waiver rows with waiver_clears_at and league waiver timing', async () => {
+      const droppedAt = '2026-04-07T00:00:00Z';
+      const pendingClaims = [
+        { id: 'wc1', league_id: 'league-1', team_id: 't1', player_id: 200, drop_player_id: 150, priority: 1, bid_amount: null, is_conditional_drop: false, status: 'pending', failure_reason: null, created_at: '2026-04-07T18:52:00Z', processed_at: null, teams: { team_name: 'Team A' } },
+      ];
+
+      mockSupabase.from = vi.fn((table: string) => {
+        if (table === 'transaction_ledger') return createChain({ data: [], error: null });
+        if (table === 'waiver_claims') return createChain({ data: pendingClaims, error: null });
+        return createChain({ data: [], error: null });
+      });
+
+      mockAdminClient.from = vi.fn((table: string) => {
+        if (table === 'player_waiver_status') {
+          return createChain({ data: [{ player_id: 200, dropped_at: droppedAt, cleared_at: null }], error: null });
+        }
+        if (table === 'leagues') {
+          return createChain({ data: { waiver_period_hours: 48, waiver_process_time: '02:00:00' }, error: null });
+        }
+        return createChain({ data: null, error: null });
+      });
+
+      const result = await service.fetchTransactions('league-1');
+      expect(result.transactions).toHaveLength(1);
+      const row = result.transactions[0] as {
+        id: string;
+        priority: number | null;
+        drop_player_id: string | null;
+        waiver_dropped_at: string | null;
+        waiver_clears_at: string | null;
+        league_waiver_period_hours: number;
+        league_waiver_process_time: string;
+      };
+      expect(row.id).toBe('wc-wc1');
+      expect(row.priority).toBe(1);
+      expect(row.drop_player_id).toBe('150');
+      expect(row.waiver_dropped_at).toBe(droppedAt);
+      // 48 hours after 2026-04-07T00:00:00Z = 2026-04-09T00:00:00Z
+      expect(row.waiver_clears_at).toBe('2026-04-09T00:00:00.000Z');
+      expect(row.league_waiver_period_hours).toBe(48);
+      expect(row.league_waiver_process_time).toBe('02:00:00');
     });
   });
 

@@ -13,7 +13,7 @@ import { LeagueCreationCTA, InlineCTA } from '@/components/LeagueCreationCTA';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, TrendingDown, Wand2, Trophy, Activity, ArrowUpRight, Users, Loader2, Calendar, Target, Shield, Skull, Zap, BarChart3, PieChart, Lock } from 'lucide-react';
+import { TrendingUp, TrendingDown, Wand2, Trophy, Activity, ArrowUpRight, Users, Loader2, Calendar, Target, Shield, Skull, Zap, BarChart3, PieChart, Lock, Clock, AlertCircle } from 'lucide-react';
 import LoadingScreen from '@/components/LoadingScreen';
 import { CitrusSlice, CitrusSparkle, CitrusLeaf, CitrusBurst, CitrusWedge, CitrusZest } from '@/components/icons/CitrusIcons';
 import { AdSpace } from '@/components/AdSpace';
@@ -50,7 +50,7 @@ import { matchupApi } from '@/api/matchups';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { MatchupScheduleSelector } from "@/components/matchup/MatchupScheduleSelector";
 import { WeeklySchedule } from "@/components/matchup/WeeklySchedule";
-import { getTodayMST, getTodayMSTDate, formatWaiverProcessTime } from '@/utils/timezoneUtils';
+import { getTodayMST, getTodayMSTDate, formatWaiverProcessTime, formatMoment, computeNextWaiverProcessMoment } from '@/utils/timezoneUtils';
 import { CURRENT_SEASON } from '@/utils/seasonConstants';
 import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
 import { Matchup as MatchupType } from '@/services/MatchupService';
@@ -3511,85 +3511,193 @@ const Roster = () => {
                 </TabsContent>
 
                 <TabsContent value="transactions" className="m-0 p-6">
-                <div className="space-y-4">
-                  <div className="mb-4">
-                    <h3 className="text-lg font-bold">Transaction History</h3>
-                    <p className="text-xs text-muted-foreground mt-1">All times shown in Mountain Time (MT)</p>
-                  </div>
-                  {transactions.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground border rounded-lg border-dashed">
-                      No transactions found.
-                    </div>
-                  ) : (
-                    <div className="rounded-md border">
-                       <div className="hidden md:grid grid-cols-12 gap-4 p-4 border-b bg-muted/50 font-medium text-sm">
-                          <div className="col-span-3">Date</div>
-                          <div className="col-span-2">Type</div>
-                          <div className="col-span-3">Player</div>
-                          <div className="col-span-2">Team</div>
-                          <div className="col-span-2 text-right">Status</div>
-                       </div>
-                       {transactions.map((tx) => (
-                         <div key={tx.id} className="flex flex-col md:grid md:grid-cols-12 gap-2 md:gap-4 p-4 border-b last:border-0 text-sm md:items-center hover:bg-muted/20 transition-colors relative">
-                           {/* Mobile Top Row: Date & Status */}
-                           <div className="flex md:hidden justify-between items-start mb-1">
-                               <div className="text-muted-foreground text-xs">{tx.date}</div>
-                               <div className="text-right">
-                                 <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                   tx.status === 'processed' ? 'bg-green-100 text-green-700' :
-                                   (tx.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700')
-                                 }`}>
-                                   {tx.status}
-                                 </span>
-                               </div>
-                           </div>
+                <div className="space-y-6">
+                  {(() => {
+                    // Split out pending waiver claims so we can render them as
+                    // rich "Active Waiver Claims" cards matching the Waiver
+                    // Wire page, while processed/failed rows stay in the
+                    // compact Transaction History table.
+                    const pendingWaivers = transactions.filter(
+                      (tx) => tx.type === 'waiver' && tx.status === 'pending'
+                    );
+                    const historyRows = transactions.filter(
+                      (tx) => !(tx.type === 'waiver' && tx.status === 'pending')
+                    );
 
-                           {/* Desktop: Date */}
-                           <div className="hidden md:block col-span-3 text-muted-foreground text-xs">{tx.date}</div>
+                    return (
+                      <>
+                        {pendingWaivers.length > 0 && (
+                          <div>
+                            <div className="mb-3 flex items-center gap-2">
+                              <AlertCircle className="w-4 h-4 text-orange-600" />
+                              <h3 className="text-lg font-bold">Active Waiver Claims</h3>
+                              <Badge variant="secondary" className="text-xs">{pendingWaivers.length}</Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground mb-3">All times shown in Mountain Time (MT)</p>
+                            <div className="space-y-3">
+                              {pendingWaivers.map((tx) => {
+                                const clearsAtFormatted = formatMoment(tx.waiverClearsAt);
+                                const nextProcessFormatted = computeNextWaiverProcessMoment(
+                                  tx.waiverClearsAt,
+                                  tx.leagueWaiverProcessTime,
+                                );
+                                return (
+                                  <div
+                                    key={tx.id}
+                                    className="p-4 rounded-lg border-2 bg-gradient-to-r from-amber-50 to-orange-50 border-amber-500/60"
+                                  >
+                                    <div className="flex flex-wrap items-start justify-between gap-3">
+                                      <div className="flex-1 min-w-[200px]">
+                                        <div className="font-bold text-base">{tx.playerName}</div>
+                                        {(tx.playerPosition || tx.playerTeam) && (
+                                          <div className="text-sm text-muted-foreground">
+                                            {tx.playerPosition || ''}{tx.playerPosition && tx.playerTeam ? ' • ' : ''}{tx.playerTeam || ''}
+                                          </div>
+                                        )}
+                                        {tx.dropPlayerName && (
+                                          <div className="text-sm text-orange-700 mt-1">
+                                            Dropping: {tx.dropPlayerName}
+                                            {(tx.dropPlayerPosition || tx.dropPlayerTeam) && (
+                                              <> ({tx.dropPlayerPosition || ''}{tx.dropPlayerPosition && tx.dropPlayerTeam ? ' • ' : ''}{tx.dropPlayerTeam || ''})</>
+                                            )}
+                                            {tx.isConditionalDrop && (
+                                              <span className="ml-1 text-xs opacity-70">(conditional)</span>
+                                            )}
+                                          </div>
+                                        )}
+                                        <div className="text-xs text-muted-foreground mt-1">
+                                          {tx.bidAmount != null
+                                            ? `Bid: $${tx.bidAmount}`
+                                            : tx.priority != null
+                                              ? `Your priority: #${tx.priority}`
+                                              : ''}
+                                          {(tx.bidAmount != null || tx.priority != null) && ' · '}
+                                          Submitted {tx.date}
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <Badge className="bg-amber-400 text-amber-900 uppercase text-xs font-bold">
+                                          Pending
+                                        </Badge>
+                                      </div>
+                                    </div>
 
-                           {/* Type Badge */}
-                           <div className="col-span-2 capitalize font-medium flex items-center">
-                             <Badge
-                               variant={
-                                 tx.type === 'claim' ? 'default'
-                                 : tx.type === 'drop' ? 'destructive'
-                                 : 'secondary'
-                               }
-                               className="text-xs"
-                             >
-                               {tx.type === 'waiver' ? 'Waiver' : tx.type}
-                             </Badge>
-                           </div>
+                                    {(clearsAtFormatted || nextProcessFormatted) && (
+                                      <div className="mt-3 grid gap-2 sm:grid-cols-2 text-xs">
+                                        {clearsAtFormatted && (
+                                          <div className="flex items-start gap-2 rounded-md bg-white/70 border border-amber-500/40 p-2">
+                                            <Clock className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                                            <div>
+                                              <div className="uppercase tracking-wide text-[10px] text-amber-700 font-bold">
+                                                Waiver window clears
+                                              </div>
+                                              <div className="font-semibold">{clearsAtFormatted}</div>
+                                            </div>
+                                          </div>
+                                        )}
+                                        {nextProcessFormatted && (
+                                          <div className="flex items-start gap-2 rounded-md bg-white/70 border border-green-600/40 p-2">
+                                            <Zap className="w-4 h-4 text-green-700 mt-0.5 shrink-0" />
+                                            <div>
+                                              <div className="uppercase tracking-wide text-[10px] text-green-700 font-bold">
+                                                Claim processes
+                                              </div>
+                                              <div className="font-semibold">{nextProcessFormatted}</div>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
 
-                           {/* Player & Team (Mobile: Combined) */}
-                           <div className="col-span-3 font-medium text-base md:text-sm flex items-center gap-2">
-                               {tx.playerName}
-                               <span className="md:hidden text-muted-foreground font-normal text-xs">• {tx.playerTeam}</span>
-                           </div>
+                        <div>
+                          <div className="mb-3">
+                            <h3 className="text-lg font-bold">Transaction History</h3>
+                            <p className="text-xs text-muted-foreground mt-1">All times shown in Mountain Time (MT)</p>
+                          </div>
+                          {historyRows.length === 0 ? (
+                            <div className="text-center py-8 text-muted-foreground border rounded-lg border-dashed">
+                              No transactions found.
+                            </div>
+                          ) : (
+                            <div className="rounded-md border">
+                              <div className="hidden md:grid grid-cols-12 gap-4 p-4 border-b bg-muted/50 font-medium text-sm">
+                                <div className="col-span-3">Date</div>
+                                <div className="col-span-2">Type</div>
+                                <div className="col-span-3">Player</div>
+                                <div className="col-span-2">Team</div>
+                                <div className="col-span-2 text-right">Status</div>
+                              </div>
+                              {historyRows.map((tx) => (
+                                <div key={tx.id} className="flex flex-col md:grid md:grid-cols-12 gap-2 md:gap-4 p-4 border-b last:border-0 text-sm md:items-center hover:bg-muted/20 transition-colors relative">
+                                  {/* Mobile Top Row: Date & Status */}
+                                  <div className="flex md:hidden justify-between items-start mb-1">
+                                    <div className="text-muted-foreground text-xs">{tx.date}</div>
+                                    <div className="text-right">
+                                      <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                        tx.status === 'processed' ? 'bg-green-100 text-green-700' :
+                                        (tx.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700')
+                                      }`}>
+                                        {tx.status}
+                                      </span>
+                                    </div>
+                                  </div>
 
-                           {/* Desktop: Team */}
-                           <div className="hidden md:block col-span-2">{tx.playerTeam}</div>
+                                  {/* Desktop: Date */}
+                                  <div className="hidden md:block col-span-3 text-muted-foreground text-xs">{tx.date}</div>
 
-                           {/* Desktop: Status */}
-                           <div className="hidden md:block col-span-2 text-right">
-                             <span className={`text-xs px-2 py-1 rounded-full ${
-                               tx.status === 'processed' ? 'bg-green-100 text-green-700' :
-                               (tx.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700')
-                             }`}>
-                               {tx.status}
-                             </span>
-                           </div>
+                                  {/* Type Badge */}
+                                  <div className="col-span-2 capitalize font-medium flex items-center">
+                                    <Badge
+                                      variant={
+                                        tx.type === 'claim' ? 'default'
+                                        : tx.type === 'drop' ? 'destructive'
+                                        : 'secondary'
+                                      }
+                                      className="text-xs"
+                                    >
+                                      {tx.type === 'waiver' ? 'Waiver' : tx.type}
+                                    </Badge>
+                                  </div>
 
-                           {/* Failure reason (spans full row when present) */}
-                           {tx.status === 'failed' && tx.failureReason && (
-                             <div className="col-span-12 text-xs text-red-600 mt-1 md:mt-0">
-                               Reason: {tx.failureReason}
-                             </div>
-                           )}
-                         </div>
-                       ))}
-                    </div>
-                  )}
+                                  {/* Player & Team (Mobile: Combined) */}
+                                  <div className="col-span-3 font-medium text-base md:text-sm flex items-center gap-2">
+                                    {tx.playerName}
+                                    <span className="md:hidden text-muted-foreground font-normal text-xs">• {tx.playerTeam}</span>
+                                  </div>
+
+                                  {/* Desktop: Team */}
+                                  <div className="hidden md:block col-span-2">{tx.playerTeam}</div>
+
+                                  {/* Desktop: Status */}
+                                  <div className="hidden md:block col-span-2 text-right">
+                                    <span className={`text-xs px-2 py-1 rounded-full ${
+                                      tx.status === 'processed' ? 'bg-green-100 text-green-700' :
+                                      (tx.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700')
+                                    }`}>
+                                      {tx.status}
+                                    </span>
+                                  </div>
+
+                                  {/* Failure reason (spans full row when present) */}
+                                  {tx.status === 'failed' && tx.failureReason && (
+                                    <div className="col-span-12 text-xs text-red-600 mt-1 md:mt-0">
+                                      Reason: {tx.failureReason}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
                 </TabsContent>
               </div>
