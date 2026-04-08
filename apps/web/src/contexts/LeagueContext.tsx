@@ -100,6 +100,15 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
   const [error, setError] = useState<string | null>(null);
   const [showPlayoffs, setShowPlayoffs] = useState(false);
 
+  // Track the current active league in a ref so closures (TOKEN_REFRESHED
+  // handler, loadUserLeagues) always see the user's latest in-session
+  // selection — protects against token-refresh-triggered reloads stomping
+  // the user's chosen league with the fallback "first league" value.
+  const activeLeagueIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    activeLeagueIdRef.current = activeLeagueId;
+  }, [activeLeagueId]);
+
   // Extract league_id from URL params if present
   const urlLeagueId = searchParams.get('league');
 
@@ -135,17 +144,26 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
 
       // Determine active league:
       // 1. Use league_id from URL if present and valid
-      // 2. Otherwise use last-active league from localStorage if still a member
-      // 3. Otherwise use first league
-      // 4. Otherwise null
+      // 2. Otherwise preserve the user's current in-session selection if still a member
+      // 3. Otherwise use last-active league from localStorage if still a member
+      // 4. Otherwise use first league
+      // 5. Otherwise null
       let selectedLeagueId: string | null = null;
       const storageKey = `citrus:activeLeagueId:${user.id}`;
       const storedLeagueId = (() => {
         try { return localStorage.getItem(storageKey); } catch { return null; }
       })();
+      const currentActiveLeagueId = activeLeagueIdRef.current;
 
       if (urlLeagueId && filteredLeagues.some(l => l.id === urlLeagueId)) {
         selectedLeagueId = urlLeagueId;
+      } else if (
+        currentActiveLeagueId &&
+        filteredLeagues.some(l => l.id === currentActiveLeagueId)
+      ) {
+        // Preserve the user's in-session selection across any re-load
+        // (e.g. token refresh) so we never silently flip leagues on them.
+        selectedLeagueId = currentActiveLeagueId;
       } else if (storedLeagueId && filteredLeagues.some(l => l.id === storedLeagueId)) {
         selectedLeagueId = storedLeagueId;
         // Reflect restored league in URL so downstream effects see it
@@ -274,7 +292,12 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
   // Track whether league load succeeded so TOKEN_REFRESHED can retry
   const leagueLoadSucceeded = useRef(false);
 
-  // Load leagues on mount and when user changes
+  // Load leagues on mount and when the signed-in user changes.
+  // NOTE: Depend on user?.id (not the full user object) so that Supabase
+  // TOKEN_REFRESHED events — which hand us a new user object with the same
+  // uid — do NOT re-fire this effect. Re-firing on every token refresh was
+  // causing loadUserLeagues to re-run every ~40-55 minutes and re-select a
+  // league, which could silently flip the user off their chosen league.
   useEffect(() => {
     leagueLoadSucceeded.current = false;
     loadUserLeagues().then(() => {
@@ -283,10 +306,12 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     }).catch(() => {
       leagueLoadSucceeded.current = false;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadUserLeagues is not memoized; user is the only meaningful trigger
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadUserLeagues is not memoized; user?.id is the only meaningful trigger
+  }, [user?.id]);
 
-  // When Supabase finishes refreshing the token, retry if leagues failed to load
+  // When Supabase finishes refreshing the token, retry ONLY if the initial
+  // league load failed. This handler deliberately does not re-run on
+  // successful refreshes — those should leave the user's active league alone.
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'TOKEN_REFRESHED' && user && !leagueLoadSucceeded.current) {
@@ -298,7 +323,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     });
     return () => subscription.unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user?.id]);
 
   // Update active league when URL param changes (with membership validation)
   useEffect(() => {
