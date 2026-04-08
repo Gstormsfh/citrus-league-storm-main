@@ -13,24 +13,28 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Search, 
-  ArrowLeftRight, 
-  TrendingUp, 
-  TrendingDown, 
-  ShieldAlert, 
-  CheckCircle2, 
-  UserPlus, 
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import {
+  Search,
+  ArrowLeftRight,
+  TrendingUp,
+  TrendingDown,
+  ShieldAlert,
+  CheckCircle2,
+  UserPlus,
   UserMinus,
   Scale,
   Info,
   Send,
-  History
+  History,
+  LayoutGrid,
+  List as ListIcon
 } from 'lucide-react';
 import { PlayerService, Player } from '@/services/PlayerService';
 import { LeagueService, LeagueTeam } from '@/services/LeagueService';
 import { TradeService, type TradeOfferWithPlayers } from '@/services/TradeService';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
+import { TradeGridView } from '@/components/trade/TradeGridView';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { isGuestMode } from '@/utils/guestHelpers';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
@@ -42,6 +46,20 @@ import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { logger } from '@/utils/logger';
 import { ScoringCalculator } from '@/utils/scoringUtils';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
+
+// Position-based cell colors (mirrors DraftBoard.tsx getPositionColor)
+const getPositionColor = (position: string): string => {
+  const upper = (position || '').toUpperCase();
+  const normalized = upper === 'L' ? 'LW' : upper === 'R' ? 'RW' : upper;
+  switch (normalized) {
+    case 'C': return 'bg-fantasy-primary/20 border-fantasy-primary/40 hover:bg-fantasy-primary/30';
+    case 'LW': return 'bg-fantasy-secondary/20 border-fantasy-secondary/40 hover:bg-fantasy-secondary/30';
+    case 'RW': return 'bg-fantasy-tertiary/20 border-fantasy-tertiary/40 hover:bg-fantasy-tertiary/30';
+    case 'D': return 'bg-blue-200/40 border-blue-300/50 hover:bg-blue-200/60';
+    case 'G': return 'bg-purple-200/40 border-purple-300/50 hover:bg-purple-200/60';
+    default: return 'bg-muted/20 border-border hover:bg-muted/30';
+  }
+};
 
 const TradeAnalyzer = () => {
   const [searchParams] = useSearchParams();
@@ -64,6 +82,9 @@ const TradeAnalyzer = () => {
   const [tradeOffers, setTradeOffers] = useState<TradeOfferWithPlayers[]>([]);
   const [activeTab, setActiveTab] = useState('propose');
   const [tradeMessage, setTradeMessage] = useState('');
+
+  // Propose-tab view mode: list (default) or grid
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
 
   const loadTradeOffers = useCallback(async (teamId: string) => {
     if (!activeLeagueId) return;
@@ -549,27 +570,46 @@ const TradeAnalyzer = () => {
           </TabsList>
 
           <TabsContent value="propose" className="mt-4">
-          <div className="w-full md:w-72 mb-6">
-             <Select value={String(selectedTeamId)} onValueChange={(val) => {
-               setSelectedTeamId(val);
-               setTheirSelectedPlayers([]);
-             }}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select Trading Partner" />
-              </SelectTrigger>
-              <SelectContent>
-                {opponentTeams.map(team => (
-                  <SelectItem key={team.id} value={String(team.id)}>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="w-8 justify-center">{team.logo}</Badge>
-                      <span>{team.name}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex flex-col md:flex-row md:items-center gap-3 mb-6">
+            <div className="w-full md:w-72">
+              <Select value={String(selectedTeamId)} onValueChange={(val) => {
+                setSelectedTeamId(val);
+                setTheirSelectedPlayers([]);
+              }}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select Trading Partner" />
+                </SelectTrigger>
+                <SelectContent>
+                  {opponentTeams.map(team => (
+                    <SelectItem key={team.id} value={String(team.id)}>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="w-8 justify-center">{team.logo}</Badge>
+                        <span>{team.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2 md:ml-auto">
+              <span className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">View</span>
+              <ToggleGroup
+                type="single"
+                value={viewMode}
+                onValueChange={(val) => val && setViewMode(val as 'list' | 'grid')}
+                className="bg-muted/40 rounded-md p-0.5"
+              >
+                <ToggleGroupItem value="list" aria-label="List view" className="h-8 px-3 data-[state=on]:bg-white data-[state=on]:shadow-sm">
+                  <ListIcon className="h-4 w-4 mr-1" /> List
+                </ToggleGroupItem>
+                <ToggleGroupItem value="grid" aria-label="Grid view" className="h-8 px-3 data-[state=on]:bg-white data-[state=on]:shadow-sm">
+                  <LayoutGrid className="h-4 w-4 mr-1" /> Grid
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
           </div>
 
+        {viewMode === 'list' ? (
         <div className="grid lg:grid-cols-12 gap-6 h-[calc(100vh-240px)] min-h-[600px]">
           {/* Left Column: My Team */}
           <Card className="lg:col-span-3 flex flex-col h-full border-primary/10 shadow-sm">
@@ -645,15 +685,25 @@ const TradeAnalyzer = () => {
             {/* Trade Area */}
             <Card className="flex-1 border-primary/20 shadow-md flex flex-col">
               <CardHeader className="border-b bg-muted/20 pb-4">
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center gap-3 flex-wrap">
                   <CardTitle className="flex items-center gap-2">
                     <Scale className="h-5 w-5" /> Trade Proposal
                   </CardTitle>
-                  {selectedPartnerTeam && (
-                    <Badge variant={isFair ? "secondary" : "outline"} className="text-xs">
-                      {Math.abs(valueDiff) < 10 ? "Balanced Deal" : "Trade Impact Analysis"}
-                    </Badge>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {selectedPartnerTeam && (
+                      <Badge variant={isFair ? "secondary" : "outline"} className="text-xs">
+                        {Math.abs(valueDiff) < 10 ? "Balanced Deal" : "Trade Impact Analysis"}
+                      </Badge>
+                    )}
+                    <Button
+                      size="sm"
+                      className="bg-blue-600 hover:bg-blue-500 text-white shadow-sm"
+                      disabled={myAssets.length === 0 || theirAssets.length === 0 || !selectedPartnerTeam}
+                      onClick={handleProposeTrade}
+                    >
+                      <Send className="h-4 w-4 mr-2" /> Submit Trade Offer
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               
@@ -770,7 +820,7 @@ const TradeAnalyzer = () => {
                     disabled={myAssets.length === 0 || theirAssets.length === 0 || !selectedPartnerTeam}
                     onClick={handleProposeTrade}
                   >
-                    <Send className="h-4 w-4 mr-2" /> Submit Official Proposal
+                    <Send className="h-4 w-4 mr-2" /> Submit Trade Offer
                   </Button>
                 </div>
               </CardContent>
@@ -859,7 +909,36 @@ const TradeAnalyzer = () => {
             </CardContent>
           </Card>
         </div>
-        
+        ) : (
+        <TradeGridView
+          myTeamRoster={myTeamRoster}
+          opponentTeams={opponentTeams}
+          selectedPartnerTeam={selectedPartnerTeam}
+          mySelectedPlayers={mySelectedPlayers}
+          theirSelectedPlayers={theirSelectedPlayers}
+          onToggleMyPlayer={toggleMyPlayer}
+          onToggleTheirPlayer={toggleTheirPlayer}
+          onSelectPartner={(teamId) => {
+            setSelectedTeamId(teamId);
+            setTheirSelectedPlayers([]);
+          }}
+          onPlayerClick={(player) => {
+            setSelectedPlayerForStats(toHockeyPlayer(player));
+            setIsPlayerDialogOpen(true);
+          }}
+          getPositionColor={getPositionColor}
+          myTotalValue={myTotalValue}
+          theirTotalValue={theirTotalValue}
+          isFair={isFair}
+          valueDiff={valueDiff}
+          tradeMessage={tradeMessage}
+          onTradeMessageChange={setTradeMessage}
+          onSubmit={handleProposeTrade}
+          myAssets={myAssets}
+          theirAssets={theirAssets}
+        />
+        )}
+
         {/* Player Stats Modal */}
         <PlayerStatsModal
           player={selectedPlayerForStats}
