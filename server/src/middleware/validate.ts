@@ -128,6 +128,12 @@ export const schemas = {
     decision: z.enum(['approve', 'veto']),
   }),
 
+  tradeReviewSettings: z.object({
+    trade_review_type: z.enum(['none', 'commissioner', 'league_vote']),
+    trade_review_period_hours: z.number().int().min(1).max(168),
+    trade_veto_threshold: z.number().min(0.01).max(1),
+  }),
+
   // Auction schemas
   auctionInitialize: z.object({
     sessionId: z.string().min(1, 'sessionId is required'),

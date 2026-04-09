@@ -41,6 +41,46 @@ tradeRoutes.get('/league/:leagueId/review-settings', membershipMiddleware, async
   return ok(c, result);
 });
 
+// PUT /api/trades/league/:leagueId/review-settings — Update trade review settings (commissioner only)
+tradeRoutes.put(
+  '/league/:leagueId/review-settings',
+  membershipMiddleware,
+  validateBody(schemas.tradeReviewSettings),
+  async (c) => {
+    const leagueId = c.req.param('leagueId');
+    const userId = c.get('userId');
+    // zod 3.23 infers fields as optional for some compound schemas, but
+    // validateBody guarantees required fields at runtime — safe to assert.
+    const body = getValidatedBody<{
+      trade_review_type: 'none' | 'commissioner' | 'league_vote';
+      trade_review_period_hours: number;
+      trade_veto_threshold: number;
+    }>(c);
+    const supabase = createUserClient(c.get('userToken'));
+    const service = new TradeService(supabase);
+
+    try {
+      const { success, error } = await service.updateTradeReviewSettings(leagueId, userId, body);
+      if (!success) {
+        return fail(
+          c,
+          AppError.badRequest(typeof error === 'string' ? error : (error as Error)?.message || 'Failed to update trade review settings'),
+        );
+      }
+
+      const audit = new AuditService(supabase);
+      audit.log('ADMIN_ACTION', leagueId, {
+        action: 'update_trade_review_settings',
+        settings: body,
+      });
+
+      return ok(c, { success: true });
+    } catch (err) {
+      return handleError(c, err, 'Failed to update trade review settings');
+    }
+  },
+);
+
 // POST /api/trades/league/:leagueId — Create a trade offer
 tradeRoutes.post('/league/:leagueId', membershipMiddleware, validateBody(schemas.createTrade), async (c) => {
   const leagueId = c.req.param('leagueId');

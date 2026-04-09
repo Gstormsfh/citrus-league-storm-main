@@ -92,7 +92,7 @@ export const WAIVER_CLAIM_COLUMNS_BASE = 'id, league_id, team_id, player_id, dro
 // Full columns including FAAB-specific fields (bid_amount, is_conditional_drop)
 export const WAIVER_CLAIM_COLUMNS = 'id, league_id, team_id, player_id, drop_player_id, priority, bid_amount, status, created_at, processed_at, failure_reason, is_conditional_drop';
 
-export const TRADE_OFFER_COLUMNS = 'id, league_id, from_team_id, to_team_id, offered_player_ids, requested_player_ids, status, message, created_at, expires_at, processed_at, counter_offer_id';
+export const TRADE_OFFER_COLUMNS = 'id, league_id, from_team_id, to_team_id, offered_player_ids, requested_player_ids, status, message, created_at, expires_at, processed_at, counter_offer_id, review_type, review_started_at, review_ends_at, vetoed_at';
 
 // ============================================================================
 // FANTASY MATCHUP LINES COLUMNS

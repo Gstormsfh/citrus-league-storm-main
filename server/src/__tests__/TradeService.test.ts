@@ -12,12 +12,35 @@ describe('TradeService', () => {
   });
 
   describe('getLeagueTrades', () => {
-    it('returns trades for a league', async () => {
-      const trades = [{ id: 't1', status: 'pending' }, { id: 't2', status: 'completed' }];
-      mockSupabase.from = vi.fn(() => createChain({ data: trades, error: null }));
+    it('returns enriched trades for a league', async () => {
+      const trades = [
+        { id: 't1', status: 'pending', from_team_id: 'team-a', to_team_id: 'team-b', offered_player_ids: [101], requested_player_ids: [201] },
+        { id: 't2', status: 'completed', from_team_id: 'team-a', to_team_id: 'team-b', offered_player_ids: [], requested_player_ids: [] },
+      ];
+      mockSupabase.from = vi.fn((table: string) => {
+        if (table === 'trade_offers') return createChain({ data: trades, error: null });
+        if (table === 'teams') return createChain({ data: [{ id: 'team-a', team_name: 'Alpha' }, { id: 'team-b', team_name: 'Beta' }], error: null });
+        if (table === 'player_directory') {
+          return createChain({
+            data: [
+              { player_id: 101, full_name: 'Connor McDavid', position_code: 'C', team_abbrev: 'EDM' },
+              { player_id: 201, full_name: 'Nikita Kucherov', position_code: 'RW', team_abbrev: 'TBL' },
+            ],
+            error: null,
+          });
+        }
+        return createChain({ data: [], error: null });
+      });
 
       const result = await service.getLeagueTrades('league-1');
-      expect(result.trades).toEqual(trades);
+      expect(result.trades).toHaveLength(2);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const first = result.trades[0] as any;
+      expect(first.from_team_name).toBe('Alpha');
+      expect(first.to_team_name).toBe('Beta');
+      expect(first.offered_players).toHaveLength(1);
+      expect(first.offered_players[0].full_name).toBe('Connor McDavid');
+      expect(first.requested_players[0].full_name).toBe('Nikita Kucherov');
       expect(result.error).toBeNull();
     });
 

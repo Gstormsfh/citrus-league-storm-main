@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { COLUMNS } from '@citrus/shared';
+import { COLUMNS, CURRENT_SEASON } from '@citrus/shared';
 import { LeagueMembershipService } from './LeagueMembershipService';
 
 /**
@@ -33,7 +33,7 @@ export class TradeService {
     return { leagueId: data.league_id, error: null };
   }
 
-  /** Get all trades for a league */
+  /** Get all trades for a league — enriched with team names and player summaries */
   async getLeagueTrades(leagueId: string, status?: string) {
     let query = this.supabase
       .from('trade_offers')
@@ -46,7 +46,61 @@ export class TradeService {
     }
 
     const { data, error } = await query;
-    return { trades: data || [], error };
+    if (error || !data) return { trades: [], error };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const trades = data as any[];
+    if (trades.length === 0) return { trades: [], error: null };
+
+    // Collect distinct team ids and player ids for enrichment
+    const teamIds = new Set<string>();
+    const playerIds = new Set<string>();
+    for (const t of trades) {
+      if (t.from_team_id) teamIds.add(String(t.from_team_id));
+      if (t.to_team_id) teamIds.add(String(t.to_team_id));
+      for (const p of (t.offered_player_ids || [])) playerIds.add(String(p));
+      for (const p of (t.requested_player_ids || [])) playerIds.add(String(p));
+    }
+
+    const [teamsResult, playersResult] = await Promise.all([
+      this.supabase
+        .from('teams')
+        .select('id, team_name')
+        .in('id', Array.from(teamIds)),
+      playerIds.size > 0
+        ? this.supabase
+            .from('player_directory')
+            .select('player_id, full_name, position_code, team_abbrev')
+            .eq('season', CURRENT_SEASON)
+            .in('player_id', Array.from(playerIds).map((id) => parseInt(id, 10)).filter((n) => !isNaN(n)))
+        : Promise.resolve({ data: [] as Array<{ player_id: number; full_name: string; position_code: string; team_abbrev: string }> }),
+    ]);
+
+    const teamMap = new Map<string, string>();
+    for (const t of (teamsResult.data || [])) {
+      teamMap.set(String((t as { id: string }).id), (t as { team_name: string }).team_name);
+    }
+    const playerMap = new Map<string, { player_id: number; full_name: string; position_code: string; team_abbrev: string }>();
+    for (const p of (playersResult.data || [])) {
+      playerMap.set(
+        String((p as { player_id: number }).player_id),
+        p as { player_id: number; full_name: string; position_code: string; team_abbrev: string },
+      );
+    }
+
+    const enriched = trades.map((t) => ({
+      ...t,
+      from_team_name: teamMap.get(String(t.from_team_id)) || 'Unknown Team',
+      to_team_name: teamMap.get(String(t.to_team_id)) || 'Unknown Team',
+      offered_players: (t.offered_player_ids || [])
+        .map((id: unknown) => playerMap.get(String(id)))
+        .filter(Boolean),
+      requested_players: (t.requested_player_ids || [])
+        .map((id: unknown) => playerMap.get(String(id)))
+        .filter(Boolean),
+    }));
+
+    return { trades: enriched, error: null };
   }
 
   /** Create a trade offer with validation */

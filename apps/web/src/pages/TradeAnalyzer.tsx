@@ -33,8 +33,10 @@ import {
 import { PlayerService, Player } from '@/services/PlayerService';
 import { LeagueService, LeagueTeam } from '@/services/LeagueService';
 import { TradeService, type TradeOfferWithPlayers } from '@/services/TradeService';
+import { tradeApi } from '@/api/trades';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { TradeGridView } from '@/components/trade/TradeGridView';
+import { TradeReviewSection } from '@/components/trade/TradeReviewSection';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { isGuestMode } from '@/utils/guestHelpers';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
@@ -88,10 +90,28 @@ const TradeAnalyzer = () => {
 
   const loadTradeOffers = useCallback(async (teamId: string) => {
     if (!activeLeagueId) return;
-    
+
     try {
-      const offers = await TradeService.getTeamTradeOffers(activeLeagueId, teamId);
-      setTradeOffers(offers);
+      // Load BOTH the user's trades AND any league-wide trades under review
+      // (so non-involved members can vote).
+      const [teamOffers, reviewResult] = await Promise.all([
+        TradeService.getTeamTradeOffers(activeLeagueId, teamId),
+        tradeApi.getLeagueTrades(activeLeagueId, 'under_review'),
+      ]);
+
+      const reviewOffers = (reviewResult?.data || []) as TradeOfferWithPlayers[];
+
+      // Merge and de-dupe by id — team offers win on conflicts since they
+      // carry richer player/team data when the user is involved.
+      const seen = new Set<string>();
+      const merged: TradeOfferWithPlayers[] = [];
+      for (const o of [...teamOffers, ...reviewOffers]) {
+        if (!seen.has(o.id)) {
+          seen.add(o.id);
+          merged.push(o);
+        }
+      }
+      setTradeOffers(merged);
     } catch (error) {
       logger.error("Failed to load trade offers", error);
       setTradeOffers([]);
@@ -950,6 +970,13 @@ const TradeAnalyzer = () => {
           {/* Trade Offers Tab */}
           <TabsContent value="offers" className="mt-4">
             <div className="space-y-6">
+              {/* Trades under league-vote review (user not involved) — shows for any league member */}
+              <TradeReviewSection
+                tradeOffers={tradeOffers}
+                myTeamId={myTeamId}
+                onVoted={() => (myTeamId ? loadTradeOffers(myTeamId) : Promise.resolve())}
+              />
+
               {tradeOffers.length === 0 ? (
                 <Card className="p-8 text-center">
                   <History className="h-12 w-12 mx-auto mb-4 text-muted-foreground/30" />

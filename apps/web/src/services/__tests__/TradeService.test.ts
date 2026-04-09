@@ -74,6 +74,10 @@ describe('TradeService Interfaces', () => {
       expires_at: '2025-01-08T00:00:00Z',
       processed_at: null,
       counter_offer_id: null,
+      review_type: null,
+      review_started_at: null,
+      review_ends_at: null,
+      vetoed_at: null,
     };
     expect(offer.status).toBe('pending');
     expect(offer.offered_player_ids).toHaveLength(2);
@@ -90,6 +94,7 @@ describe('TradeService Interfaces', () => {
         offered_player_ids: [], requested_player_ids: [],
         status, message: null, created_at: '', expires_at: null,
         processed_at: null, counter_offer_id: null,
+        review_type: null, review_started_at: null, review_ends_at: null, vetoed_at: null,
       };
       expect(offer.status).toBe(status);
     });
@@ -109,6 +114,10 @@ describe('TradeService Interfaces', () => {
       expires_at: null,
       processed_at: null,
       counter_offer_id: null,
+      review_type: null,
+      review_started_at: null,
+      review_ends_at: null,
+      vetoed_at: null,
       from_team_name: 'Hurricanes',
       to_team_name: 'Lightning',
       offered_players: [

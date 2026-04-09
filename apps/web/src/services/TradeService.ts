@@ -16,6 +16,10 @@ export interface TradeOffer {
   expires_at: string | null;
   processed_at: string | null;
   counter_offer_id: string | null;
+  review_type: 'none' | 'commissioner' | 'league_vote' | null;
+  review_started_at: string | null;
+  review_ends_at: string | null;
+  vetoed_at: string | null;
 }
 
 interface TradePlayerSummary {
