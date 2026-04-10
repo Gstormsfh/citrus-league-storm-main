@@ -461,10 +461,35 @@ export const DraftService = {
         }
       )
       .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR') {
-          logger.error(`Draft picks subscription error for league ${leagueId}`);
-        } else if (status === 'TIMED_OUT') {
-          logger.warn(`Draft picks subscription timed out for league ${leagueId}, retrying...`);
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          const label = status === 'CHANNEL_ERROR' ? 'error' : 'timeout';
+          logger.warn(`Draft picks subscription ${label} for league ${leagueId}, reconnecting...`);
+          // Exponential backoff reconnection: remove broken channel and re-subscribe
+          let attempt = 0;
+          const maxAttempts = 5;
+          const tryReconnect = () => {
+            if (attempt >= maxAttempts) {
+              logger.error(`Draft picks subscription failed after ${maxAttempts} reconnect attempts for league ${leagueId}`);
+              return;
+            }
+            const delay = Math.min(1000 * Math.pow(2, attempt), 16000);
+            attempt++;
+            setTimeout(() => {
+              logger.log(`Draft picks reconnect attempt ${attempt} for league ${leagueId}`);
+              supabase.removeChannel(channel);
+              // Re-subscribe by re-calling this method — the returned cleanup
+              // from the outer call already ran (channel removed above), so
+              // the caller's polling fallback keeps working in the meantime.
+              channel.subscribe((retryStatus) => {
+                if (retryStatus === 'SUBSCRIBED') {
+                  logger.log(`Draft picks reconnected for league ${leagueId}`);
+                } else if (retryStatus === 'CHANNEL_ERROR' || retryStatus === 'TIMED_OUT') {
+                  tryReconnect();
+                }
+              });
+            }, delay);
+          };
+          tryReconnect();
         }
       });
 

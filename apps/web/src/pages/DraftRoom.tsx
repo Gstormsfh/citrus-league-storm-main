@@ -1263,6 +1263,32 @@ const DraftRoom = () => {
   // Ref for handleAutoDraft to avoid stale closures in timer intervals
   const handleAutoDraftRef = useRef<() => void>(() => {});
 
+  // Play a short audio tone when it becomes the user's turn to pick
+  const prevIsMyTurnRef = useRef(false);
+  useEffect(() => {
+    const isMyTurn = !!(currentTeam && user && currentTeam.owner_id === user.id && draftPhase === DraftPhase.ACTIVE);
+    if (isMyTurn && !prevIsMyTurnRef.current) {
+      try {
+        const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+        // Two-tone chime: C5 (523 Hz) then E5 (659 Hz)
+        [523, 659].forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.3, ctx.currentTime + i * 0.15);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.15 + 0.25);
+          osc.connect(gain).connect(ctx.destination);
+          osc.start(ctx.currentTime + i * 0.15);
+          osc.stop(ctx.currentTime + i * 0.15 + 0.25);
+        });
+      } catch {
+        // AudioContext may not be available (e.g., before user gesture)
+      }
+    }
+    prevIsMyTurnRef.current = isMyTurn;
+  }, [currentTeam, user, draftPhase]);
+
   // Handler to start the draft timer (commissioner only)
   // Saves timerStartedAt to DB so ALL clients can sync their timers
   const handleBeginDraft = async () => {
@@ -3143,21 +3169,21 @@ const DraftRoom = () => {
                   <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-3 sm:space-y-6">
                     {/* Mobile: 4 tabs (includes Roster). Desktop: 3 tabs (Roster in sidebar) */}
                     <TabsList className="grid w-full grid-cols-4 lg:grid-cols-3 h-11 sm:h-10">
-                      <TabsTrigger value="players" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
-                        <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                        <span>Players</span>
+                      <TabsTrigger value="players" className="flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
+                        <Users className="h-4 w-4 flex-shrink-0" />
+                        <span className="hidden min-[360px]:inline">Players</span>
                       </TabsTrigger>
-                      <TabsTrigger value="board" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
-                        <Trophy className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                        Board
+                      <TabsTrigger value="board" className="flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
+                        <Trophy className="h-4 w-4 flex-shrink-0" />
+                        <span className="hidden min-[360px]:inline">Board</span>
                       </TabsTrigger>
-                      <TabsTrigger value="history" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
-                        <History className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                        History
+                      <TabsTrigger value="history" className="flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
+                        <History className="h-4 w-4 flex-shrink-0" />
+                        <span className="hidden min-[360px]:inline">History</span>
                       </TabsTrigger>
-                      <TabsTrigger value="roster" className="flex items-center gap-1 text-xs px-1 lg:hidden">
-                        <Star className="h-3.5 w-3.5" />
-                        Roster
+                      <TabsTrigger value="roster" className="flex items-center justify-center gap-1 text-xs px-1 lg:hidden">
+                        <Star className="h-4 w-4 flex-shrink-0" />
+                        <span className="hidden min-[360px]:inline">Roster</span>
                       </TabsTrigger>
                     </TabsList>
 

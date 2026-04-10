@@ -237,7 +237,7 @@ export const PlayerPool = ({
     return (
       <tr
         className={cn(
-          'border-b border-fantasy-border/50 hover:bg-fantasy-light/30 transition-colors cursor-pointer',
+          'border-b border-fantasy-border/50 hover:bg-fantasy-light/30 active:bg-fantasy-light/50 transition-colors cursor-pointer',
           isSelected && 'bg-fantasy-primary/10 ring-2 ring-fantasy-primary/30',
           isDrafted && 'opacity-50'
         )}
@@ -289,7 +289,7 @@ export const PlayerPool = ({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 w-6 p-0 relative z-20"
+                className="h-9 w-9 p-0 relative z-20"
                 onClick={(e) => {
                   e.stopPropagation();
                   e.preventDefault();
@@ -540,9 +540,9 @@ export const PlayerPool = ({
                     <td className="px-1.5 py-1" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-0.5">
                         {onAddToQueue && (
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0"
+                          <Button variant="ghost" size="sm" className="h-9 w-9 p-0"
                             onClick={(e) => { e.stopPropagation(); e.preventDefault(); onAddToQueue(player.id); }}>
-                            <Star className={cn("h-3.5 w-3.5", isInQueue ? "fill-fantasy-tertiary text-fantasy-tertiary" : "text-muted-foreground")} />
+                            <Star className={cn("h-4 w-4", isInQueue ? "fill-fantasy-tertiary text-fantasy-tertiary" : "text-muted-foreground")} />
                           </Button>
                         )}
                         {isSelected && isDraftActive && !isDrafted && (
