@@ -8,6 +8,7 @@ import { Search, Star, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown, Clock } fro
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { Player } from '@/services/PlayerService';
+import { ScoringCalculator, ScoringSettings } from '@citrus/shared';
 
 interface PlayerPoolProps {
   onPlayerSelect: (player: Player) => void;
@@ -22,6 +23,8 @@ interface PlayerPoolProps {
   watchlist?: Set<string>;
   /** Pre-built Set for O(1) drafted lookups (optional, built from draftedPlayers if not provided) */
   draftedPlayerSet?: Set<string>;
+  /** League scoring settings for calculating fantasy points */
+  scoringSettings?: ScoringSettings | null;
 }
 
 // Normalize position (L -> LW, R -> RW)
@@ -44,11 +47,12 @@ export const PlayerPool = ({
   onToggleWatchlist,
   queue = [],
   watchlist = new Set(),
-  draftedPlayerSet: externalDraftedSet
+  draftedPlayerSet: externalDraftedSet,
+  scoringSettings
 }: PlayerPoolProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPosition, setSelectedPosition] = useState('All');
-  const [sortBy, setSortBy] = useState('points');
+  const [sortBy, setSortBy] = useState('fpts');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [showDrafted, setShowDrafted] = useState(false);
 
@@ -56,6 +60,25 @@ export const PlayerPool = ({
   const draftedSet = useMemo(() => {
     return externalDraftedSet || new Set(draftedPlayers);
   }, [externalDraftedSet, draftedPlayers]);
+
+  // Fantasy points calculator using league scoring settings
+  const scorer = useMemo(() => new ScoringCalculator(scoringSettings), [scoringSettings]);
+  const calcFpts = (p: Player): number => {
+    const isGoalie = p.position === 'G';
+    return scorer.calculatePoints(
+      isGoalie
+        ? { wins: p.wins || 0, saves: p.saves || 0, shutouts: p.shutouts || 0, goals_against: p.goals_against || 0 }
+        : { goals: p.goals || 0, assists: p.assists || 0, shots: p.shots || 0, blocks: p.blocks || 0, hits: p.hits || 0, pim: p.pim || 0, ppp: p.ppp || 0, shp: p.shp || 0 },
+      isGoalie
+    );
+  };
+  // Pre-compute FPTS map for O(1) lookups in sort + render
+  const fptsMap = useMemo(() => {
+    const map = new Map<string, number>();
+    availablePlayers.forEach(p => map.set(p.id, calcFpts(p)));
+    return map;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availablePlayers, scorer]);
 
   // Compute data freshness from the most recent last_updated timestamp across all players
   const dataFreshnessLabel = useMemo(() => {
@@ -138,6 +161,16 @@ export const PlayerPool = ({
           case 'shutouts':
             comparison = (b.shutouts || 0) - (a.shutouts || 0);
             break;
+          case 'fpts': {
+            comparison = (fptsMap.get(b.id) || 0) - (fptsMap.get(a.id) || 0);
+            break;
+          }
+          case 'fptsPerGp': {
+            const fptsA = a.games_played ? (fptsMap.get(a.id) || 0) / a.games_played : 0;
+            const fptsB = b.games_played ? (fptsMap.get(b.id) || 0) / b.games_played : 0;
+            comparison = fptsB - fptsA;
+            break;
+          }
           case 'name':
             comparison = a.full_name.localeCompare(b.full_name);
             break;
@@ -186,6 +219,16 @@ export const PlayerPool = ({
             comparison = toiB - toiA;
             break;
           }
+          case 'fpts': {
+            comparison = (fptsMap.get(b.id) || 0) - (fptsMap.get(a.id) || 0);
+            break;
+          }
+          case 'fptsPerGp': {
+            const fptsA = a.games_played ? (fptsMap.get(a.id) || 0) / a.games_played : 0;
+            const fptsB = b.games_played ? (fptsMap.get(b.id) || 0) / b.games_played : 0;
+            comparison = fptsB - fptsA;
+            break;
+          }
           case 'name':
             comparison = a.full_name.localeCompare(b.full_name);
             break;
@@ -197,7 +240,7 @@ export const PlayerPool = ({
     });
 
     return filtered;
-  }, [searchTerm, selectedPosition, sortBy, sortDirection, draftedSet, showDrafted, availablePlayers]);
+  }, [searchTerm, selectedPosition, sortBy, sortDirection, draftedSet, showDrafted, availablePlayers, fptsMap]);
 
   // PERF: Paginate to avoid rendering 500+ DOM nodes at once
   const PAGE_SIZE = 75;
@@ -283,6 +326,8 @@ export const PlayerPool = ({
             <td className="px-2 py-1.5 text-xs text-center text-muted-foreground">{player.xGoals.toFixed(2)}</td>
           </>
         )}
+        <td className="px-2 py-1.5 text-xs text-center font-bold text-green-700 bg-green-50/30">{(fptsMap.get(player.id) || 0).toFixed(1)}</td>
+        <td className="px-2 py-1.5 text-xs text-center font-semibold text-green-600 bg-green-50/30">{player.games_played ? ((fptsMap.get(player.id) || 0) / player.games_played).toFixed(2) : '-'}</td>
         <td className="px-2 py-1.5">
           <div className="flex items-center gap-1 relative z-10" onClick={(e) => e.stopPropagation()}>
             {onAddToQueue && (
@@ -488,6 +533,8 @@ export const PlayerPool = ({
                     <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('xGoals')}>xG</th>
                   </>
                 )}
+                <th className="px-1.5 py-1.5 text-center font-bold text-green-700 bg-green-50/50 text-[11px] cursor-pointer" onClick={() => handleHeaderClick('fpts')}>FPTS</th>
+                <th className="px-1.5 py-1.5 text-center font-bold text-green-700 bg-green-50/50 text-[11px] cursor-pointer" onClick={() => handleHeaderClick('fptsPerGp')}>F/GP</th>
                 <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px]"></th>
               </tr>
             </thead>
@@ -537,6 +584,8 @@ export const PlayerPool = ({
                         <td className="px-1.5 py-1 text-[11px] text-center text-muted-foreground">{player.xGoals.toFixed(1)}</td>
                       </>
                     )}
+                    <td className="px-1.5 py-1 text-[11px] text-center font-bold text-green-700 bg-green-50/30">{(fptsMap.get(player.id) || 0).toFixed(1)}</td>
+                    <td className="px-1.5 py-1 text-[11px] text-center font-semibold text-green-600 bg-green-50/30">{player.games_played ? ((fptsMap.get(player.id) || 0) / player.games_played).toFixed(1) : '-'}</td>
                     <td className="px-1.5 py-1" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-0.5">
                         {onAddToQueue && (
@@ -808,6 +857,30 @@ export const PlayerPool = ({
                 </th>
                   </>
                 )}
+                <th
+                  className="px-2 py-1.5 text-center font-bold text-green-700 bg-green-50/50 cursor-pointer hover:bg-green-100/50 transition-colors select-none text-xs"
+                  onClick={() => handleHeaderClick('fpts')}
+                >
+                  <div className="flex items-center justify-center gap-1">
+                    FPTS
+                    {sortBy === 'fpts' && (
+                      sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
+                    )}
+                    {sortBy !== 'fpts' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                  </div>
+                </th>
+                <th
+                  className="px-2 py-1.5 text-center font-bold text-green-700 bg-green-50/50 cursor-pointer hover:bg-green-100/50 transition-colors select-none text-xs"
+                  onClick={() => handleHeaderClick('fptsPerGp')}
+                >
+                  <div className="flex items-center justify-center gap-1">
+                    FPTS/GP
+                    {sortBy === 'fptsPerGp' && (
+                      sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
+                    )}
+                    {sortBy !== 'fptsPerGp' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                  </div>
+                </th>
                 <th className="px-2 py-1.5 text-center font-semibold text-fantasy-dark text-xs">Actions</th>
               </tr>
             </thead>

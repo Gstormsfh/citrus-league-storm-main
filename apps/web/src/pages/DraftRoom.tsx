@@ -1739,7 +1739,6 @@ const DraftRoom = () => {
     // Strategy 1: If it's a human team with a queue, pick from queue first
     const isHumanTeam = currentTeam.owner_id !== null;
     if (isHumanTeam && draftQueue.length > 0) {
-      // Try to pick the first available player from the queue
       for (const queuedPlayerId of draftQueue) {
         const queuedPlayer = undraftedPlayers.find(p => p.id === queuedPlayerId);
         if (queuedPlayer) {
@@ -1755,86 +1754,62 @@ const DraftRoom = () => {
       }
     }
 
-    // Strategy 2: AI teams pick by positional need, then best available
+    // Strategy 2: Fantasy points + positional need (applies to ALL teams, not just AI)
     if (!selectedPlayer) {
-      const isAITeam = !currentTeam.owner_id;
+      // Calculate fantasy points for each undrafted player
+      const scorer = new ScoringCalculator(league?.scoring_settings);
+      const calcFpts = (p: Player): number => {
+        const isGoalie = p.position === 'G';
+        return scorer.calculatePoints(
+          isGoalie
+            ? { wins: p.wins || 0, saves: p.saves || 0, shutouts: p.shutouts || 0, goals_against: p.goals_against || 0 }
+            : { goals: p.goals || 0, assists: p.assists || 0, shots: p.shots || 0, blocks: p.blocks || 0, hits: p.hits || 0, pim: p.pim || 0, ppp: p.ppp || 0, shp: p.shp || 0 },
+          isGoalie
+        );
+      };
 
-      if (isAITeam) {
-        // Get what this AI team has already drafted
-        const teamPicks = draftHistory.filter(p => p.team_id === currentTeam.id && !p.deleted_at);
-        const teamPlayerIds = teamPicks.map(p => p.player_id);
-        const teamPlayers = availablePlayers.filter(p => teamPlayerIds.includes(p.id));
+      // Get what this team has already drafted to determine positional need
+      const teamPicks = draftHistory.filter(p => p.team_id === currentTeam.id && !p.deleted_at);
+      const teamPlayerIds = teamPicks.map(p => p.player_id);
+      const teamPlayers = availablePlayers.filter(p => teamPlayerIds.includes(p.id));
 
-        // Count positions already drafted
-        const positionCounts: Record<string, number> = {};
-        teamPlayers.forEach(p => {
-          const pos = p.position || 'F';
-          positionCounts[pos] = (positionCounts[pos] || 0) + 1;
-        });
+      // Count positions already drafted
+      const positionCounts: Record<string, number> = {};
+      teamPlayers.forEach(p => {
+        const pos = p.position || 'F';
+        positionCounts[pos] = (positionCounts[pos] || 0) + 1;
+      });
 
-        // Read roster composition from league settings if available, otherwise use defaults
-        const leagueRosterSlots = (league?.settings as LeagueSettings)?.rosterSlots;
-        const positionNeeds: Record<string, number> = leagueRosterSlots
-          ? {
-              'C': (leagueRosterSlots['C'] || 0) + Math.floor((leagueRosterSlots['BN'] || 0) / 5),
-              'LW': (leagueRosterSlots['LW'] || 0) + Math.floor((leagueRosterSlots['BN'] || 0) / 5),
-              'RW': (leagueRosterSlots['RW'] || 0) + Math.floor((leagueRosterSlots['BN'] || 0) / 5),
-              'D': (leagueRosterSlots['D'] || 0) + Math.floor((leagueRosterSlots['BN'] || 0) * 2 / 5),
-              'G': leagueRosterSlots['G'] || 2,
-              'F': Math.floor((leagueRosterSlots['UTIL'] || 0) / 2) + 1,
-              'W': Math.floor((leagueRosterSlots['UTIL'] || 0) / 2) + 1,
-            }
-          : { 'C': 4, 'LW': 3, 'RW': 3, 'D': 6, 'G': 2, 'F': 3, 'W': 3 };
+      // Read starting roster slots from league settings
+      const leagueRosterSlots = (league?.settings as LeagueSettings)?.rosterSlots;
+      const startingNeeds: Record<string, number> = leagueRosterSlots
+        ? { 'C': leagueRosterSlots['C'] || 2, 'LW': leagueRosterSlots['LW'] || 2, 'RW': leagueRosterSlots['RW'] || 2, 'D': leagueRosterSlots['D'] || 4, 'G': leagueRosterSlots['G'] || 2 }
+        : { 'C': 2, 'LW': 2, 'RW': 2, 'D': 4, 'G': 2 };
 
-        // Find position with biggest need gap
-        let bestNeedPosition: string | null = null;
-        let biggestGap = -Infinity;
-        for (const [pos, need] of Object.entries(positionNeeds)) {
-          const have = positionCounts[pos] || 0;
-          const gap = need - have;
-          if (gap > 0 && gap > biggestGap) {
-            // Check if there are available players at this position
-            // Expand generic positions: F = any forward (C/LW/RW), W = any wing (LW/RW)
-            const availableAtPos = undraftedPlayers.filter(p => {
-              if (pos === 'F') return ['C', 'LW', 'RW'].includes(p.position);
-              if (pos === 'W') return ['LW', 'RW'].includes(p.position);
-              return p.position === pos;
-            });
-            if (availableAtPos.length > 0) {
-              biggestGap = gap;
-              bestNeedPosition = pos;
-            }
-          }
-        }
-
-        if (bestNeedPosition) {
-          // Pick the best available player at the needed position
-          const posPlayers = undraftedPlayers
-            .filter(p => {
-              if (bestNeedPosition === 'F') return ['C', 'LW', 'RW'].includes(p.position);
-              if (bestNeedPosition === 'W') return ['LW', 'RW'].includes(p.position);
-              return p.position === bestNeedPosition;
-            })
-            .sort((a, b) => (b.points || 0) - (a.points || 0));
-          if (posPlayers.length > 0) {
-            selectedPlayer = posPlayers[0];
-            logger.log('handleAutoDraft: AI picking by positional need', {
-              team: currentTeam.team_name,
-              position: bestNeedPosition,
-              player: selectedPlayer.full_name,
-              points: selectedPlayer.points
-            });
-          }
-        }
+      // Check which starting positions still have empty slots
+      const unfilledPositions = new Set<string>();
+      for (const [pos, need] of Object.entries(startingNeeds)) {
+        if ((positionCounts[pos] || 0) < need) unfilledPositions.add(pos);
       }
 
-      // Fallback: pick highest points player regardless of position
-      if (!selectedPlayer) {
-        selectedPlayer = undraftedPlayers.sort((a, b) => (b.points || 0) - (a.points || 0))[0];
-        logger.log('handleAutoDraft: Picking best available player', {
+      // Score each undrafted player: FPTS is primary, positional need adds a 15% boost
+      const scored = undraftedPlayers.map(p => {
+        const fpts = calcFpts(p);
+        const needsPosition = unfilledPositions.has(p.position);
+        // Boost players who fill a starting roster need
+        const score = needsPosition ? fpts * 1.15 : fpts;
+        return { player: p, fpts, score };
+      });
+
+      scored.sort((a, b) => b.score - a.score);
+      if (scored.length > 0) {
+        selectedPlayer = scored[0].player;
+        logger.log('handleAutoDraft: Picking by FPTS + positional need', {
           team: currentTeam.team_name,
-          player: selectedPlayer?.full_name,
-          points: selectedPlayer?.points,
+          player: selectedPlayer.full_name,
+          fpts: scored[0].fpts.toFixed(1),
+          boosted: unfilledPositions.has(selectedPlayer.position),
+          position: selectedPlayer.position,
           isAI: !currentTeam.owner_id
         });
       }
@@ -2992,32 +2967,32 @@ const DraftRoom = () => {
                     />
                   </div>
 
-                  {/* Right: Draft/Auto button + Auto-draft toggle */}
+                  {/* Right: Draft button + Auto-draft toggle */}
                   <div className="flex-shrink-0 flex items-center gap-2">
                     {currentTeam?.owner_id === user?.id && userLeagueState === 'active-user' && (
                       <>
-                        {!userAutoDraftEnabled && (
+                        {!userAutoDraftEnabled && selectedPlayer && (
                           <Button
                             variant="default"
                             size="sm"
                             className="text-xs md:text-sm"
-                            onClick={selectedPlayer ? () => handlePlayerDraft(selectedPlayer) : handleAutoDraft}
-                            disabled={!selectedPlayer && draftQueue.length === 0}
+                            onClick={() => handlePlayerDraft(selectedPlayer)}
                           >
-                            {selectedPlayer ? 'Draft' : 'Auto'}
+                            Draft
                           </Button>
                         )}
-                        <div className="flex items-center gap-1.5">
-                          <Switch
-                            id="auto-draft-toggle"
-                            checked={userAutoDraftEnabled}
-                            onCheckedChange={setUserAutoDraftEnabled}
-                            className="scale-75"
-                          />
-                          <Label htmlFor="auto-draft-toggle" className="text-[10px] md:text-xs cursor-pointer whitespace-nowrap">
-                            {userAutoDraftEnabled ? 'Auto ON' : 'Auto'}
-                          </Label>
-                        </div>
+                        <button
+                          onClick={() => setUserAutoDraftEnabled(prev => !prev)}
+                          className={cn(
+                            'flex items-center gap-1.5 px-3 py-1.5 md:px-4 md:py-2 rounded-full font-semibold text-xs md:text-sm transition-all border-2',
+                            userAutoDraftEnabled
+                              ? 'bg-green-600 border-green-600 text-white shadow-md shadow-green-600/30 animate-pulse'
+                              : 'bg-muted border-border text-muted-foreground hover:border-green-500 hover:text-green-600'
+                          )}
+                        >
+                          <Zap className={cn('h-3.5 w-3.5 md:h-4 md:w-4', userAutoDraftEnabled && 'fill-white')} />
+                          {userAutoDraftEnabled ? 'AUTO ON' : 'Auto'}
+                        </button>
                       </>
                     )}
                     {(userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') && (
@@ -3381,6 +3356,7 @@ const DraftRoom = () => {
                         onToggleWatchlist={handleToggleWatchlist}
                         queue={draftQueue}
                         watchlist={watchlist}
+                        scoringSettings={league?.scoring_settings}
                       />
                     </TabsContent>
 
