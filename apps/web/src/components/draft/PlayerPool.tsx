@@ -286,8 +286,9 @@ export const PlayerPool = ({
     }
   };
 
-  // Desktop table row for a player
-  const PlayerRow = ({ player }: { player: Player }) => {
+  // Desktop table row for a player — memoized to prevent re-rendering all rows on each pick
+  const PlayerRow = useMemo(() => {
+    const Row = memo(({ player }: { player: Player }) => {
     const isSelected = selectedPlayer?.id === player.id;
     const isDrafted = draftedSet.has(player.id);
     const isInQueue = queue.includes(player.id);
@@ -382,7 +383,10 @@ export const PlayerPool = ({
         </td>
       </tr>
     );
-  };
+  });
+    Row.displayName = 'PlayerRow';
+    return Row;
+  }, [selectedPlayer?.id, draftedSet, isDraftActive, queue, onPlayerSelect, onPlayerDraft, onAddToQueue, fptsMap, projectedFptsMap]);
 
   return (
     <Card className="p-2 sm:p-4 border-fantasy-border bg-fantasy-surface">
@@ -521,8 +525,8 @@ export const PlayerPool = ({
 
       {/* Mobile: Table view with unified horizontal scroll — scrolls all players as one */}
       <div className="md:hidden border border-fantasy-border rounded-lg overflow-hidden bg-[#E8EED9]/50 backdrop-blur-sm max-w-full">
-        <div className="overflow-x-auto w-full scrollbar-styled" style={{ scrollbarGutter: 'stable' }}>
-          <table className="w-full min-w-[700px] text-sm border-collapse">
+        <div className="overflow-x-auto w-full scrollbar-styled" style={{ scrollbarGutter: 'stable', WebkitOverflowScrolling: 'touch' }}>
+          <table className="w-full min-w-[900px] text-sm border-collapse">
             <thead className="bg-fantasy-light/50 border-b border-fantasy-border">
               <tr>
                 <th className="px-2 py-1.5 text-left font-semibold text-fantasy-dark sticky left-0 bg-fantasy-light/95 z-10 min-w-[120px] text-xs">Player</th>
@@ -646,8 +650,8 @@ export const PlayerPool = ({
 
       {/* Desktop: Full table view — horizontally scrollable to show all stats */}
       <div className="hidden md:block border border-fantasy-border rounded-lg overflow-hidden bg-[#E8EED9]/50 backdrop-blur-sm max-w-full">
-        <div className="overflow-x-auto w-full scrollbar-styled" style={{ scrollbarGutter: 'stable' }}>
-          <table className="w-full min-w-[1100px] text-sm border-collapse">
+        <div className="overflow-x-auto w-full scrollbar-styled" style={{ scrollbarGutter: 'stable', WebkitOverflowScrolling: 'touch' }}>
+          <table className="w-full min-w-[1400px] text-sm border-collapse">
             <thead className="bg-fantasy-light/50 border-b border-fantasy-border">
               <tr>
                 <th className="px-2 py-2 text-left font-semibold text-fantasy-dark sticky left-0 bg-fantasy-light/95 z-10 min-w-[160px]">Player</th>

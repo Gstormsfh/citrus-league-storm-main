@@ -1283,13 +1283,18 @@ const DraftRoom = () => {
   // Ref for handleAutoDraft to avoid stale closures in timer intervals
   const handleAutoDraftRef = useRef<() => void>(() => {});
 
-  // Play a short audio tone when it becomes the user's turn to pick
+  // Reusable AudioContext for turn notifications (avoids creating/leaking new contexts)
+  const audioCtxRef = useRef<AudioContext | null>(null);
   const prevIsMyTurnRef = useRef(false);
   useEffect(() => {
     const isMyTurn = !!(currentTeam && user && currentTeam.owner_id === user.id && draftPhase === DraftPhase.ACTIVE);
     if (isMyTurn && !prevIsMyTurnRef.current) {
       try {
-        const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+        if (!audioCtxRef.current) {
+          audioCtxRef.current = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+        }
+        const ctx = audioCtxRef.current;
+        if (ctx.state === 'suspended') ctx.resume();
         // Two-tone chime: C5 (523 Hz) then E5 (659 Hz)
         [523, 659].forEach((freq, i) => {
           const osc = ctx.createOscillator();
@@ -3006,7 +3011,7 @@ const DraftRoom = () => {
                           className={cn(
                             'flex items-center gap-1.5 px-3 py-1.5 md:px-4 md:py-2 rounded-full font-semibold text-xs md:text-sm transition-all border-2',
                             userAutoDraftEnabled
-                              ? 'bg-green-600 border-green-600 text-white shadow-md shadow-green-600/30 animate-pulse'
+                              ? 'bg-green-600 border-green-600 text-white shadow-md shadow-green-600/30'
                               : 'bg-muted border-border text-muted-foreground hover:border-green-500 hover:text-green-600'
                           )}
                         >
