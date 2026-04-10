@@ -57,6 +57,18 @@ import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 // DraftPick interface is now imported from DraftService
 // Team interface is now imported from LeagueService
 
+// Safe sessionStorage helpers — prevent crashes in private/incognito browsing
+// where sessionStorage.setItem() throws QuotaExceededError
+const ssGet = (key: string): string | null => {
+  try { return sessionStorage.getItem(key); } catch { return null; }
+};
+const ssSet = (key: string, value: string): void => {
+  try { sessionStorage.setItem(key, value); } catch { /* private browsing */ }
+};
+const ssRemove = (key: string): void => {
+  try { sessionStorage.removeItem(key); } catch { /* private browsing */ }
+};
+
 interface DraftSettings {
   rounds: number;
   pickTimeLimit: number;
@@ -369,7 +381,7 @@ const DraftRoom = () => {
 
     try {
       // Only show loading screen on initial load, not on return visits
-      const isReturnVisit = sessionStorage.getItem(`draft_phase_${leagueId}`);
+      const isReturnVisit = ssGet(`draft_phase_${leagueId}`);
       if (!isReturnVisit) {
         setLoading(true);
       }
@@ -590,7 +602,7 @@ const DraftRoom = () => {
         }
 
         // Check if user was previously in ACTIVE phase (returning from another page/tab)
-        const cachedPhase = sessionStorage.getItem(`draft_phase_${leagueId}`);
+        const cachedPhase = ssGet(`draft_phase_${leagueId}`);
         if (cachedPhase === DraftPhase.ACTIVE) {
           // Auto-resume to ACTIVE phase without requiring lobby click
           setDraftPhase(DraftPhase.ACTIVE);
@@ -633,8 +645,8 @@ const DraftRoom = () => {
         }
         setDraftPhase(DraftPhase.COMPLETED);
         // Clear cached phase on completion
-        sessionStorage.removeItem(`draft_phase_${leagueId}`);
-        sessionStorage.removeItem(`draft_timer_${leagueId}`);
+        ssRemove(`draft_phase_${leagueId}`);
+        ssRemove(`draft_timer_${leagueId}`);
         logger.debug('DraftRoom: Draft completed, showing COMPLETED phase');
       } else {
         // Unknown status - default to lobby
@@ -843,7 +855,7 @@ const DraftRoom = () => {
             setDraftedPlayerIds(new Set());
             setDraftTimerStarted(false);
             draftTimerStartedRef.current = false;
-            sessionStorage.removeItem(`draft_phase_${leagueId}`);
+            ssRemove(`draft_phase_${leagueId}`);
             return; // Skip further processing
           }
         }
@@ -864,23 +876,51 @@ const DraftRoom = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftPhase, leagueId, user?.id]);
 
-  // Reload teams when page becomes visible again (e.g., user changed team name in another tab)
+  // Resync timer, draft state, and teams when page becomes visible again
+  // (phone sleep/wake, tab switch, app backgrounded). The setInterval timer
+  // self-corrects via Date.now(), but fetching fresh league data ensures we
+  // catch picks made while the device was asleep and update timerStartedAt.
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && leagueId && user) {
-        logger.debug('DraftRoom: Page visible again, reloading teams');
-        // Reload teams to get updated team names
-        LeagueService.getLeagueTeamsWithOwners(leagueId).then(({ teams: teamsData, error: teamsError }) => {
-          if (!teamsError && teamsData) {
-            logger.debug('DraftRoom: Teams reloaded:', teamsData.length, 'teams');
-            setTeams(teamsData);
+      if (document.visibilityState !== 'visible' || !leagueId || !user) return;
+      logger.debug('DraftRoom: Page visible again, resyncing');
+
+      // Reload teams (in case names changed in another tab)
+      LeagueService.getLeagueTeamsWithOwners(leagueId).then(({ teams: teamsData, error: teamsError }) => {
+        if (!teamsError && teamsData) {
+          setTeams(teamsData);
+        }
+      });
+
+      // During active draft: resync league settings (timer) + picks + draft state
+      if (draftPhaseRef.current === DraftPhase.ACTIVE) {
+        clearDraftCache();
+        // Fetch fresh league data so timerStartedAt is current
+        leagueApi.getLeague(leagueId).then(res => {
+          const freshLeague = res.data as League | null;
+          if (freshLeague) {
+            setLeague(prev => prev ? {
+              ...prev,
+              settings: freshLeague.settings || prev.settings,
+              draft_status: freshLeague.draft_status || prev.draft_status
+            } : null);
           }
         });
+        // Fetch fresh picks in case we missed any while asleep
+        DraftService.getDraftPicks(leagueId, user.id).then(({ picks }) => {
+          const activePicks = picks.filter(p => !p.deleted_at);
+          setDraftHistory(activePicks);
+          setDraftedPlayerIds(new Set(activePicks.map(p => p.player_id)));
+        });
+        // Reload draft state (currentPick, currentRound, etc.)
+        loadDraftState();
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  // leagueId/user for identity; loadDraftState excluded (not memoized) — accessed via closure
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leagueId, user]);
 
   // Keep refs in sync with state for realtime callbacks (avoids stale closures)
@@ -890,12 +930,12 @@ const DraftRoom = () => {
   // Persist draft phase and timer state to sessionStorage for tab/page navigation resilience
   useEffect(() => {
     if (leagueId && draftPhase) {
-      sessionStorage.setItem(`draft_phase_${leagueId}`, draftPhase);
+      ssSet(`draft_phase_${leagueId}`, draftPhase);
     }
   }, [draftPhase, leagueId]);
   useEffect(() => {
     if (leagueId) {
-      sessionStorage.setItem(`draft_timer_${leagueId}`, String(draftTimerStarted));
+      ssSet(`draft_timer_${leagueId}`, String(draftTimerStarted));
     }
   }, [draftTimerStarted, leagueId]);
 
@@ -1020,8 +1060,8 @@ const DraftRoom = () => {
             setDraftedPlayerIds(new Set());
             setDraftTimerStarted(false);
             draftTimerStartedRef.current = false;
-            sessionStorage.removeItem(`draft_phase_${leagueId}`);
-            sessionStorage.removeItem(`draft_timer_${leagueId}`);
+            ssRemove(`draft_phase_${leagueId}`);
+            ssRemove(`draft_timer_${leagueId}`);
           }
 
           // When draft starts, pre-load state but stay in LOBBY with join banner
@@ -1072,8 +1112,8 @@ const DraftRoom = () => {
           if (updatedLeague.draft_status === 'completed' && draftPhase !== DraftPhase.COMPLETED) {
             logger.debug('DraftRoom: Draft completed via realtime');
             setDraftPhase(DraftPhase.COMPLETED);
-            sessionStorage.removeItem(`draft_phase_${leagueId}`);
-            sessionStorage.removeItem(`draft_timer_${leagueId}`);
+            ssRemove(`draft_phase_${leagueId}`);
+            ssRemove(`draft_timer_${leagueId}`);
           }
         }
       )
@@ -1943,8 +1983,8 @@ const DraftRoom = () => {
       logger.log('Nuclear draft delete complete for league:', leagueId);
 
       // Clear all sessionStorage for this league
-      sessionStorage.removeItem(`draft_phase_${leagueId}`);
-      sessionStorage.removeItem(`draft_timer_${leagueId}`);
+      ssRemove(`draft_phase_${leagueId}`);
+      ssRemove(`draft_timer_${leagueId}`);
 
       // Force a full page reload to get completely clean React state
       // Surgical state updates are unreliable because polling, realtime,
