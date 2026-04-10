@@ -177,14 +177,14 @@
   
   /* Styled scrollbar for both horizontal and vertical scrolling - matches citrus theme */
   .scrollbar-styled {
-    scrollbar-width: thin;
+    scrollbar-width: auto;
     scrollbar-color: #7A9B7A #E8EED9; /* citrus-sage thumb on citrus-cream track */
     -webkit-overflow-scrolling: touch; /* iOS momentum scrolling */
   }
 
   .scrollbar-styled::-webkit-scrollbar {
-    height: 8px; /* Horizontal scrollbar */
-    width: 8px;  /* Vertical scrollbar */
+    height: 12px; /* Horizontal scrollbar — prominent for discoverability */
+    width: 8px;   /* Vertical scrollbar */
   }
 
   .scrollbar-styled::-webkit-scrollbar-track {

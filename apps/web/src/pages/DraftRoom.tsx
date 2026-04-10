@@ -3045,7 +3045,7 @@ const DraftRoom = () => {
 
   // ALWAYS render something - never return null
   return (
-    <div className="min-h-screen bg-[#D4E8B8] relative overflow-x-hidden touch-manipulation">
+    <div className="min-h-screen bg-[#D4E8B8] relative touch-manipulation overflow-x-clip">
       <div className="hidden lg:block"><Navbar /></div>
       <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-center h-12 px-4">
@@ -3056,9 +3056,9 @@ const DraftRoom = () => {
       <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
         <div className="w-full m-0 p-0">
           {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
-          <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
+          <div className="flex flex-col lg:grid lg:grid-cols-[1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             {/* Main Content - Scrollable - Appears first on mobile */}
-            <div className="min-w-0 overflow-y-visible lg:overflow-y-auto lg:max-h-[calc(100dvh-7rem)] px-0 sm:px-2 lg:px-6 order-1 lg:order-2">
+            <div className="min-w-0 overflow-y-visible lg:overflow-y-auto lg:overflow-x-hidden lg:max-h-[calc(100dvh-7rem)] px-0 sm:px-2 lg:px-2 order-1 lg:order-1">
         {/* Loading State - Show if loading or auth is loading, but NOT for demo state */}
         {displayLoading && (
           <LoadingScreen
@@ -4077,9 +4077,9 @@ const DraftRoom = () => {
         )}
             </div>
 
-            {/* Left Sidebar - At bottom on mobile, left on desktop */}
-            <aside className="w-full lg:w-auto order-2 lg:order-1">
-              <div className="lg:sticky lg:top-24 space-y-4 lg:space-y-4">
+            {/* Left Sidebar - Hidden on desktop during draft to maximize player table space */}
+            <aside className="w-full lg:hidden order-2 lg:order-1">
+              <div className="space-y-4">
                 <AdSpace size="300x250" label="Draft Sponsor" />
                 <AdSpace size="300x250" label="Fantasy Partner" />
               </div>
@@ -4087,7 +4087,7 @@ const DraftRoom = () => {
 
             {/* Right Sidebar - Notifications (hidden on mobile) */}
             {userLeagueState === 'active-user' && (activeLeagueId || leagueId) && (
-              <aside className="hidden lg:block order-3">
+              <aside className="hidden lg:block order-2">
                 <div className="lg:sticky lg:top-24 h-[calc(100dvh-7rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
                   <LeagueNotifications leagueId={activeLeagueId || leagueId || ''} />
                 </div>
