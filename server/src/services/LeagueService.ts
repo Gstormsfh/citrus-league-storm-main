@@ -167,7 +167,7 @@ export class LeagueService {
     }
 
     const { data, error } = await this.supabase.rpc('join_league_with_code', {
-      p_join_code: joinCode.toUpperCase().trim(),
+      p_join_code: joinCode.trim(),
       p_user_id: userId,
       p_team_name: teamName || null,
     });
