@@ -550,7 +550,7 @@ const CreateLeague = () => {
           </div>
 
           <Card className="card-citrus border-none shadow-xl overflow-hidden">
-            <CardContent className="p-8">
+            <CardContent className="p-4 sm:p-8">
               <Tabs defaultValue={defaultTab} value={defaultTab} onValueChange={(v) => setDefaultTab(v as "create" | "join")} className="w-full">
                 <TabsList className="grid w-full grid-cols-2 mb-8">
                   <TabsTrigger value="create" className="flex items-center gap-2">
@@ -1600,7 +1600,7 @@ const CreateLeague = () => {
                 {/* ============================================================ */}
                 {/* JOIN LEAGUE TAB                                              */}
                 {/* ============================================================ */}
-                <TabsContent value="join" className="space-y-6">
+                <TabsContent value="join" className="space-y-4">
                   {error && (
                     <Alert variant="destructive">
                       <AlertCircle className="h-4 w-4" />
@@ -1608,17 +1608,17 @@ const CreateLeague = () => {
                     </Alert>
                   )}
 
-                  <div className="text-center pb-4">
-                    <UserPlus className="w-12 h-12 mx-auto mb-4 text-primary" />
-                    <h2 className="text-2xl font-bold mb-2">Join a League</h2>
-                    <p className="text-muted-foreground">
+                  <div className="text-center pb-2">
+                    <UserPlus className="w-10 h-10 mx-auto mb-3 text-primary" />
+                    <h2 className="text-xl font-bold mb-1">Join a League</h2>
+                    <p className="text-sm text-muted-foreground">
                       Enter the join code provided by your league commissioner
                     </p>
                   </div>
 
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="join-code" className="text-base font-semibold">Join Code</Label>
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="join-code" className="text-sm font-semibold">Join Code</Label>
                       <div className="flex items-center gap-2">
                         <Input
                           id="join-code"
@@ -1626,12 +1626,13 @@ const CreateLeague = () => {
                           value={joinCode}
                           onChange={(e) => setJoinCode(e.target.value)}
                           disabled={loading}
-                          className="font-mono text-base h-12 text-lg"
+                          className="font-mono text-sm h-10"
                         />
                         {joinCode && (
                           <Button
                             variant="outline"
                             size="icon"
+                            className="h-10 w-10 flex-shrink-0"
                             onClick={() => {
                               navigator.clipboard.writeText(joinCode);
                               toast({
@@ -1649,8 +1650,8 @@ const CreateLeague = () => {
                       </p>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="team-name-join" className="text-base">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="team-name-join" className="text-sm">
                         Team Name <span className="text-muted-foreground font-normal">(optional)</span>
                       </Label>
                       <Input
@@ -1659,6 +1660,7 @@ const CreateLeague = () => {
                         value={teamNameForJoin}
                         onChange={(e) => setTeamNameForJoin(e.target.value)}
                         disabled={loading}
+                        className="h-10"
                       />
                       <p className="text-xs text-muted-foreground">
                         Leave blank to use your default team name
@@ -1666,12 +1668,12 @@ const CreateLeague = () => {
                     </div>
                   </div>
 
-                  <div className="bg-muted/30 rounded-lg p-4 space-y-2">
+                  <div className="bg-muted/30 rounded-lg p-3 space-y-1.5">
                     <div className="flex items-start gap-2">
-                      <CheckCircle className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+                      <CheckCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
                       <div>
-                        <p className="font-medium">Before joining:</p>
-                        <ul className="text-sm text-muted-foreground space-y-1 mt-1">
+                        <p className="text-sm font-medium">Before joining:</p>
+                        <ul className="text-xs text-muted-foreground space-y-0.5 mt-0.5">
                           <li>- Make sure you trust the league commissioner</li>
                           <li>- Check if the draft has already happened</li>
                           <li>- You can only own one team per league</li>
@@ -1680,17 +1682,18 @@ const CreateLeague = () => {
                     </div>
                   </div>
 
-                  <div className="pt-4 flex justify-end items-center gap-4">
+                  <div className="pt-2 pb-4 flex justify-end items-center gap-3">
                     <Button
                       variant="outline"
                       onClick={() => navigate('/gm-office')}
                       disabled={loading}
+                      className="min-w-[100px]"
                     >
                       Cancel
                     </Button>
                     <Button
                       size="lg"
-                      className="rounded-full px-8 min-w-[200px]"
+                      className="rounded-full px-6 min-w-[160px]"
                       onClick={handleJoinLeague}
                       disabled={loading || !joinCode.trim()}
                     >

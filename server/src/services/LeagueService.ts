@@ -176,17 +176,27 @@ export class LeagueService {
       return { league: null, team: null, error: error.message };
     }
 
-    // Parse RPC response
+    // Parse RPC response — the function returns a flat JSONB object, not nested league/team
     let result;
     try {
       result = typeof data === 'string' ? JSON.parse(data) : data;
     } catch {
       return { league: null, team: null, error: 'Invalid response from join league' };
     }
+
+    if (result?.error) {
+      return { league: null, team: null, error: result.error };
+    }
+
+    if (!result?.success) {
+      return { league: null, team: null, error: 'Join failed unexpectedly' };
+    }
+
+    // Transform flat RPC response into the league/team structure the client expects
     return {
-      league: result?.league || null,
-      team: result?.team || null,
-      error: result?.error || null,
+      league: result.league_id ? { id: result.league_id, name: result.league_name, settings: result.settings || {} } : null,
+      team: result.team_id ? { id: result.team_id, team_name: result.team_name } : null,
+      error: null,
     };
   }
 

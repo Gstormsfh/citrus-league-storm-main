@@ -103,7 +103,7 @@ describe('LeagueService', () => {
   describe('joinLeagueByCode', () => {
     it('calls join_league_with_code RPC', async () => {
       mockSupabase.rpc = vi.fn().mockResolvedValue({
-        data: { league: { id: 'l1' }, team: { id: 't1' } },
+        data: { success: true, league_id: 'l1', league_name: 'Test League', team_id: 't1', team_name: 'My Team' },
         error: null,
       });
 
@@ -113,7 +113,8 @@ describe('LeagueService', () => {
         p_user_id: 'user-1',
         p_team_name: 'My Team',
       });
-      expect(result.league).toEqual({ id: 'l1' });
+      expect(result.league).toEqual({ id: 'l1', name: 'Test League', settings: {} });
+      expect(result.team).toEqual({ id: 't1', team_name: 'My Team' });
     });
 
     it('rejects empty join code', async () => {
