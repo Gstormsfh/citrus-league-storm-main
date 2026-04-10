@@ -9,6 +9,7 @@ import { PlayerService, Player } from '@/services/PlayerService';
 import { AuctionDraftService } from '@/services/AuctionDraftService';
 import { supabase } from '@/integrations/supabase/client';
 import { leagueApi } from '@/api/leagues';
+import { playerApi } from '@/api/players';
 import { publicApi } from '@/api/public';
 import { logger } from '@/utils/logger';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
@@ -88,6 +89,8 @@ const DraftRoom = () => {
   const [draftHistory, setDraftHistory] = useState<DraftPick[]>([]);
   const [availablePlayers, setAvailablePlayers] = useState<Player[]>([]);
   const [draftedPlayerIds, setDraftedPlayerIds] = useState<Set<string>>(new Set());
+  // Map of player_id → { projectedFpts, projectedFptsPerGp, gamesRemaining }
+  const [projectedFptsMap, setProjectedFptsMap] = useState<Map<string, { total: number; perGp: number; gamesRemaining: number }>>(new Map());
   
   const [draftPhase, setDraftPhase] = useState<DraftPhase>(DraftPhase.LOBBY);
   const [timeRemaining, setTimeRemaining] = useState(90); // Will be updated from league settings when loaded
@@ -636,10 +639,27 @@ const DraftRoom = () => {
         logger.debug('DraftRoom: Unknown draft status, defaulting to LOBBY');
       }
 
-      // Load available players
-      const allPlayers = await PlayerService.getAllPlayers();
+      // Load available players + ROS projections in parallel
+      const [allPlayers, rosProjectionsRes] = await Promise.all([
+        PlayerService.getAllPlayers(),
+        playerApi.getRosProjections(500).catch(() => ({ data: [] }))
+      ]);
       setAvailablePlayers(allPlayers);
-      
+
+      // Build projected FPTS lookup map (keyed by string player_id)
+      const projMap = new Map<string, { total: number; perGp: number; gamesRemaining: number }>();
+      const rosData = (rosProjectionsRes as { data?: Array<{ player_id: number; total_projected_points: number; avg_points_per_game: number; games_remaining: number }> }).data;
+      if (Array.isArray(rosData)) {
+        rosData.forEach((p) => {
+          projMap.set(String(p.player_id), {
+            total: p.total_projected_points || 0,
+            perGp: p.avg_points_per_game || 0,
+            gamesRemaining: p.games_remaining || 0,
+          });
+        });
+      }
+      setProjectedFptsMap(projMap);
+
       logger.debug('DraftRoom: All data loaded successfully', {
         draftPhase,
         teamsCount: teams.length,
@@ -3357,6 +3377,7 @@ const DraftRoom = () => {
                         queue={draftQueue}
                         watchlist={watchlist}
                         scoringSettings={league?.scoring_settings}
+                        projectedFptsMap={projectedFptsMap}
                       />
                     </TabsContent>
 

@@ -25,6 +25,8 @@ interface PlayerPoolProps {
   draftedPlayerSet?: Set<string>;
   /** League scoring settings for calculating fantasy points */
   scoringSettings?: ScoringSettings | null;
+  /** Pre-computed projected FPTS from ROS projections */
+  projectedFptsMap?: Map<string, { total: number; perGp: number; gamesRemaining: number }>;
 }
 
 // Normalize position (L -> LW, R -> RW)
@@ -48,7 +50,8 @@ export const PlayerPool = ({
   queue = [],
   watchlist = new Set(),
   draftedPlayerSet: externalDraftedSet,
-  scoringSettings
+  scoringSettings,
+  projectedFptsMap = new Map()
 }: PlayerPoolProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPosition, setSelectedPosition] = useState('All');
@@ -171,6 +174,12 @@ export const PlayerPool = ({
             comparison = fptsB - fptsA;
             break;
           }
+          case 'projFpts':
+            comparison = (projectedFptsMap.get(b.id)?.total || 0) - (projectedFptsMap.get(a.id)?.total || 0);
+            break;
+          case 'projFptsPerGp':
+            comparison = (projectedFptsMap.get(b.id)?.perGp || 0) - (projectedFptsMap.get(a.id)?.perGp || 0);
+            break;
           case 'name':
             comparison = a.full_name.localeCompare(b.full_name);
             break;
@@ -229,6 +238,12 @@ export const PlayerPool = ({
             comparison = fptsB - fptsA;
             break;
           }
+          case 'projFpts':
+            comparison = (projectedFptsMap.get(b.id)?.total || 0) - (projectedFptsMap.get(a.id)?.total || 0);
+            break;
+          case 'projFptsPerGp':
+            comparison = (projectedFptsMap.get(b.id)?.perGp || 0) - (projectedFptsMap.get(a.id)?.perGp || 0);
+            break;
           case 'name':
             comparison = a.full_name.localeCompare(b.full_name);
             break;
@@ -240,7 +255,7 @@ export const PlayerPool = ({
     });
 
     return filtered;
-  }, [searchTerm, selectedPosition, sortBy, sortDirection, draftedSet, showDrafted, availablePlayers, fptsMap]);
+  }, [searchTerm, selectedPosition, sortBy, sortDirection, draftedSet, showDrafted, availablePlayers, fptsMap, projectedFptsMap]);
 
   // PERF: Paginate to avoid rendering 500+ DOM nodes at once
   const PAGE_SIZE = 75;
@@ -328,6 +343,8 @@ export const PlayerPool = ({
         )}
         <td className="px-2 py-1.5 text-xs text-center font-bold text-green-700 bg-green-50/30">{(fptsMap.get(player.id) || 0).toFixed(1)}</td>
         <td className="px-2 py-1.5 text-xs text-center font-semibold text-green-600 bg-green-50/30">{player.games_played ? ((fptsMap.get(player.id) || 0) / player.games_played).toFixed(2) : '-'}</td>
+        <td className="px-2 py-1.5 text-xs text-center font-bold text-blue-700 bg-blue-50/30">{(projectedFptsMap.get(player.id)?.total || 0) > 0 ? (projectedFptsMap.get(player.id)!.total).toFixed(1) : '-'}</td>
+        <td className="px-2 py-1.5 text-xs text-center font-semibold text-blue-600 bg-blue-50/30">{(projectedFptsMap.get(player.id)?.perGp || 0) > 0 ? (projectedFptsMap.get(player.id)!.perGp).toFixed(2) : '-'}</td>
         <td className="px-2 py-1.5">
           <div className="flex items-center gap-1 relative z-10" onClick={(e) => e.stopPropagation()}>
             {onAddToQueue && (
@@ -535,6 +552,8 @@ export const PlayerPool = ({
                 )}
                 <th className="px-1.5 py-1.5 text-center font-bold text-green-700 bg-green-50/50 text-[11px] cursor-pointer" onClick={() => handleHeaderClick('fpts')}>FPTS</th>
                 <th className="px-1.5 py-1.5 text-center font-bold text-green-700 bg-green-50/50 text-[11px] cursor-pointer" onClick={() => handleHeaderClick('fptsPerGp')}>F/GP</th>
+                <th className="px-1.5 py-1.5 text-center font-bold text-blue-700 bg-blue-50/50 text-[11px] cursor-pointer" onClick={() => handleHeaderClick('projFpts')}>Proj</th>
+                <th className="px-1.5 py-1.5 text-center font-bold text-blue-700 bg-blue-50/50 text-[11px] cursor-pointer" onClick={() => handleHeaderClick('projFptsPerGp')}>P/GP</th>
                 <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px]"></th>
               </tr>
             </thead>
@@ -586,6 +605,8 @@ export const PlayerPool = ({
                     )}
                     <td className="px-1.5 py-1 text-[11px] text-center font-bold text-green-700 bg-green-50/30">{(fptsMap.get(player.id) || 0).toFixed(1)}</td>
                     <td className="px-1.5 py-1 text-[11px] text-center font-semibold text-green-600 bg-green-50/30">{player.games_played ? ((fptsMap.get(player.id) || 0) / player.games_played).toFixed(1) : '-'}</td>
+                    <td className="px-1.5 py-1 text-[11px] text-center font-bold text-blue-700 bg-blue-50/30">{(projectedFptsMap.get(player.id)?.total || 0) > 0 ? (projectedFptsMap.get(player.id)!.total).toFixed(1) : '-'}</td>
+                    <td className="px-1.5 py-1 text-[11px] text-center font-semibold text-blue-600 bg-blue-50/30">{(projectedFptsMap.get(player.id)?.perGp || 0) > 0 ? (projectedFptsMap.get(player.id)!.perGp).toFixed(1) : '-'}</td>
                     <td className="px-1.5 py-1" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-0.5">
                         {onAddToQueue && (
@@ -879,6 +900,30 @@ export const PlayerPool = ({
                       sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
                     )}
                     {sortBy !== 'fptsPerGp' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                  </div>
+                </th>
+                <th
+                  className="px-2 py-1.5 text-center font-bold text-blue-700 bg-blue-50/50 cursor-pointer hover:bg-blue-100/50 transition-colors select-none text-xs"
+                  onClick={() => handleHeaderClick('projFpts')}
+                >
+                  <div className="flex items-center justify-center gap-1">
+                    Proj
+                    {sortBy === 'projFpts' && (
+                      sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
+                    )}
+                    {sortBy !== 'projFpts' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                  </div>
+                </th>
+                <th
+                  className="px-2 py-1.5 text-center font-bold text-blue-700 bg-blue-50/50 cursor-pointer hover:bg-blue-100/50 transition-colors select-none text-xs"
+                  onClick={() => handleHeaderClick('projFptsPerGp')}
+                >
+                  <div className="flex items-center justify-center gap-1">
+                    Proj/GP
+                    {sortBy === 'projFptsPerGp' && (
+                      sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
+                    )}
+                    {sortBy !== 'projFptsPerGp' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                   </div>
                 </th>
                 <th className="px-2 py-1.5 text-center font-semibold text-fantasy-dark text-xs">Actions</th>
