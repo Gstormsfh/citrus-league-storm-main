@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, memo } from 'react';
+import { useState, useMemo, useRef, useEffect, memo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -38,7 +38,7 @@ const normalizePosition = (pos: string): string => {
   return upper;
 };
 
-export const PlayerPool = ({
+export const PlayerPool = memo(({
   onPlayerSelect,
   onPlayerDraft,
   selectedPlayer,
@@ -54,6 +54,7 @@ export const PlayerPool = ({
   projectedFptsMap = new Map()
 }: PlayerPoolProps) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedPosition, setSelectedPosition] = useState('All');
   const [sortBy, setSortBy] = useState('fpts');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
@@ -63,6 +64,12 @@ export const PlayerPool = ({
   const draftedSet = useMemo(() => {
     return externalDraftedSet || new Set(draftedPlayers);
   }, [externalDraftedSet, draftedPlayers]);
+
+  // Debounce search input (200ms) to avoid re-filtering 500+ players on every keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 200);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   // Fantasy points calculator using league scoring settings
   const scorer = useMemo(() => new ScoringCalculator(scoringSettings), [scoringSettings]);
@@ -115,7 +122,7 @@ export const PlayerPool = ({
   }, [availablePlayers]);
 
   const filteredAndSortedPlayers = useMemo(() => {
-    const lowerSearch = searchTerm.toLowerCase();
+    const lowerSearch = debouncedSearch.toLowerCase();
     const normalizedFilterPos = normalizePosition(selectedPosition);
 
     const filtered = availablePlayers.filter(player => {
@@ -255,14 +262,14 @@ export const PlayerPool = ({
     });
 
     return filtered;
-  }, [searchTerm, selectedPosition, sortBy, sortDirection, draftedSet, showDrafted, availablePlayers, fptsMap, projectedFptsMap]);
+  }, [debouncedSearch, selectedPosition, sortBy, sortDirection, draftedSet, showDrafted, availablePlayers, fptsMap, projectedFptsMap]);
 
   // PERF: Paginate to avoid rendering 500+ DOM nodes at once
   const PAGE_SIZE = 75;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   // Reset visible count when filters change (user expects fresh results from top)
-  const filterKey = `${searchTerm}|${selectedPosition}|${sortBy}|${sortDirection}|${showDrafted}`;
+  const filterKey = `${debouncedSearch}|${selectedPosition}|${sortBy}|${sortDirection}|${showDrafted}`;
   const prevFilterKey = useRef(filterKey);
   if (filterKey !== prevFilterKey.current) {
     prevFilterKey.current = filterKey;
@@ -956,4 +963,6 @@ export const PlayerPool = ({
       </div>
     </Card>
   );
-};
+});
+
+PlayerPool.displayName = 'PlayerPool';

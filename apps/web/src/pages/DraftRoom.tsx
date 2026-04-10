@@ -152,7 +152,7 @@ const DraftRoom = () => {
 
   // Calculate loading state for minimum loading time hook
   const actualLoading = loading || authLoading || (!user && userLeagueState !== 'guest' && userLeagueState !== 'logged-in-no-league');
-  const displayLoading = useMinimumLoadingTime(actualLoading, 800);
+  const displayLoading = useMinimumLoadingTime(actualLoading, 400);
 
   // ── Lookup Maps (O(1) instead of O(n) for .find()) ──────────────
   const teamsById = useMemo(() => {
@@ -160,6 +160,9 @@ const DraftRoom = () => {
     teams.forEach(t => map.set(t.id, t));
     return map;
   }, [teams]);
+
+  // Stable array of drafted player IDs — avoids re-creating on every render for child props
+  const draftedPlayerIdsArray = useMemo(() => draftedPlayerIdsArray, [draftedPlayerIds]);
 
   const playersById = useMemo(() => {
     const map = new Map<string, Player>();
@@ -1689,6 +1692,11 @@ const DraftRoom = () => {
       return;
     }
 
+    // Optimistic update: show the pick immediately in the UI before the API call
+    const previousSelectedPlayer = selectedPlayer;
+    setDraftedPlayerIds(prev => new Set([...prev, player.id]));
+    setSelectedPlayer(null);
+
     try {
       logger.log('Making draft pick:', {
         leagueId,
@@ -1717,9 +1725,10 @@ const DraftRoom = () => {
 
       logger.log('Draft pick successful:', pick);
 
-      // Update local state immediately
-      setDraftedPlayerIds(prev => new Set([...prev, player.id]));
-      setSelectedPlayer(null);
+      // Success feedback
+      if (!isAutoDraft) {
+        toast({ title: `${player.full_name} drafted!`, description: `Round ${effectiveDraftState.currentRound}, Pick ${effectiveDraftState.currentPick}` });
+      }
 
       // Clear cache + reload all picks to ensure sync
       clearDraftCache();
@@ -1790,8 +1799,19 @@ const DraftRoom = () => {
       if (isRaceCondition) {
         logger.log('handlePlayerDraft: Pick already handled, reloading state');
         await loadDraftState();
-      } else if (!isAutoDraft) {
-        toast({ title: "Error", description: `Failed to draft player: ${errorMessage}`, variant: "destructive" });
+      } else {
+        // Rollback optimistic update on non-race-condition errors
+        setDraftedPlayerIds(prev => {
+          const rolled = new Set(prev);
+          rolled.delete(player.id);
+          return rolled;
+        });
+        if (previousSelectedPlayer?.id === player.id) {
+          setSelectedPlayer(previousSelectedPlayer);
+        }
+        if (!isAutoDraft) {
+          toast({ title: "Error", description: `Failed to draft player: ${errorMessage}`, variant: "destructive" });
+        }
       }
       // Don't throw - let draft continue
     } finally {
@@ -2684,17 +2704,14 @@ const DraftRoom = () => {
   };
 
   // Queue handlers
-  const handleAddToQueue = (playerId: string) => {
-    if (!draftQueue.includes(playerId)) {
-      setDraftQueue(prev => [...prev, playerId]);
-    } else {
-      // Remove from queue if already in it
-      setDraftQueue(prev => prev.filter(id => id !== playerId));
-    }
-  };
+  const handleAddToQueue = useCallback((playerId: string) => {
+    setDraftQueue(prev =>
+      prev.includes(playerId) ? prev.filter(id => id !== playerId) : [...prev, playerId]
+    );
+  }, []);
 
   // Watchlist handlers
-  const handleToggleWatchlist = (playerId: string) => {
+  const handleToggleWatchlist = useCallback((playerId: string) => {
     setWatchlist(prev => {
       const newWatchlist = new Set(prev);
       if (newWatchlist.has(playerId)) {
@@ -2706,7 +2723,7 @@ const DraftRoom = () => {
       }
       return newWatchlist;
     });
-  };
+  }, []);
 
   // Load watchlist on mount
   useEffect(() => {
@@ -2755,17 +2772,28 @@ const DraftRoom = () => {
     return map;
   }, [teams, transformedDraftHistory]);
 
+  // Memoize DraftBoard teams prop to avoid re-creating objects every render
+  const draftBoardTeams = useMemo(() => {
+    return (orderedTeamsForBoard.length > 0 ? orderedTeamsForBoard : teams).map(t => ({
+      id: t.id,
+      name: t.team_name,
+      owner: t.owner_name || (t.owner_id ? 'User' : 'AI'),
+      color: '#7CB518',
+      picks: teamPicksMap.get(t.id) || []
+    }));
+  }, [orderedTeamsForBoard, teams, teamPicksMap]);
+
   // Handle player click to open stats modal
-  const handlePlayerClick = async (playerId: string) => {
+  const handlePlayerClick = useCallback((playerId: string) => {
     try {
       // Get player data from cached Map (no network call needed)
       const player = playersById.get(playerId);
-      
+
       if (!player) {
         logger.error('Player not found:', playerId);
         return;
       }
-      
+
       // Convert to HockeyPlayer format
       // Uses the same stat mapping as Matchup tab to ensure consistency
       const hockeyPlayer: HockeyPlayer = {
@@ -2810,13 +2838,13 @@ const DraftRoom = () => {
             }, false, player.games_played)
           : 0
       };
-      
+
       setSelectedPlayerForStats(hockeyPlayer);
       setIsPlayerDialogOpen(true);
     } catch (error) {
       logger.error('Error loading player stats:', error);
     }
-  };
+  }, [playersById]);
 
   // Handle saving/viewing draft snapshot
   const handleViewDraftSnapshot = async () => {
@@ -3091,7 +3119,7 @@ const DraftRoom = () => {
                             disabled={pickInProgress}
                             onClick={() => handlePlayerDraft(selectedPlayer)}
                           >
-                            Draft
+                            {pickInProgress ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />Drafting...</> : 'Draft'}
                           </Button>
                         )}
                         <button
@@ -3166,7 +3194,7 @@ const DraftRoom = () => {
                         className="flex-shrink-0 relative z-20 bg-primary hover:bg-primary/90 font-bold px-4"
                         disabled={pickInProgress || draftedPlayerIds.has(selectedPlayer.id)}
                       >
-                        {draftedPlayerIds.has(selectedPlayer.id) ? 'Taken' : 'Draft'}
+                        {draftedPlayerIds.has(selectedPlayer.id) ? 'Taken' : pickInProgress ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />Drafting...</> : 'Draft'}
                       </Button>
                     )}
                   </div>
@@ -3462,7 +3490,7 @@ const DraftRoom = () => {
                           }
                         } : handlePlayerDraft}
                         selectedPlayer={selectedPlayer}
-                        draftedPlayers={Array.from(draftedPlayerIds)}
+                        draftedPlayers={draftedPlayerIdsArray}
                         isDraftActive={draftPhase === DraftPhase.ACTIVE}
                         availablePlayers={availablePlayers}
                         onAddToQueue={handleAddToQueue}
@@ -3477,14 +3505,8 @@ const DraftRoom = () => {
                     {/* Lazy load other tabs - only render when active */}
                      {activeTab === 'board' && (
                        <TabsContent value="board" className="space-y-0">
-                         <DraftBoard 
-                           teams={(orderedTeamsForBoard.length > 0 ? orderedTeamsForBoard : teams).map(t => ({
-                             id: t.id,
-                             name: t.team_name,
-                             owner: t.owner_name || (t.owner_id ? 'User' : 'AI'),
-                             color: '#7CB518',
-                             picks: teamPicksMap.get(t.id) || []
-                           }))}
+                         <DraftBoard
+                           teams={draftBoardTeams}
                            draftHistory={transformedDraftHistory}
                            currentPick={draftState?.currentPick || 1}
                            currentRound={draftState?.currentRound || 1}
@@ -3561,7 +3583,7 @@ const DraftRoom = () => {
                               size="lg"
                               disabled={pickInProgress || draftedPlayerIds.has(selectedPlayer.id)}
                             >
-                              {draftedPlayerIds.has(selectedPlayer.id) ? 'Already Drafted' : 'Draft This Player'}
+                              {draftedPlayerIds.has(selectedPlayer.id) ? 'Already Drafted' : pickInProgress ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />Drafting...</> : 'Draft This Player'}
                             </Button>
                           </Card>
                         )}
@@ -3571,7 +3593,7 @@ const DraftRoom = () => {
                           <DraftQueue
                             queue={draftQueue}
                             players={availablePlayers}
-                            draftedPlayers={Array.from(draftedPlayerIds)}
+                            draftedPlayers={draftedPlayerIdsArray}
                             onQueueChange={handleQueueChange}
                             onDraftFromQueue={handleDraftFromQueue}
                             isDraftActive={draftPhase === DraftPhase.ACTIVE}
@@ -3707,7 +3729,7 @@ const DraftRoom = () => {
                           <span className="font-semibold text-fantasy-primary">{selectedPlayer.points} PTS</span>
                         </div>
                       </div>
-                      <Button 
+                      <Button
                         onClick={(e) => {
                           e.stopPropagation();
                           handlePlayerDraft(selectedPlayer);
@@ -3716,7 +3738,7 @@ const DraftRoom = () => {
                         size="lg"
                         disabled={pickInProgress || draftedPlayerIds.has(selectedPlayer.id)}
                       >
-                        {draftedPlayerIds.has(selectedPlayer.id) ? 'Already Drafted' : 'Draft This Player'}
+                        {draftedPlayerIds.has(selectedPlayer.id) ? 'Already Drafted' : pickInProgress ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Drafting...</> : 'Draft This Player'}
                       </Button>
                       <Button
                         variant="ghost"
@@ -3733,7 +3755,7 @@ const DraftRoom = () => {
                     <DraftQueue
                       queue={draftQueue}
                       players={availablePlayers}
-                      draftedPlayers={Array.from(draftedPlayerIds)}
+                      draftedPlayers={draftedPlayerIdsArray}
                       onQueueChange={handleQueueChange}
                       onDraftFromQueue={handleDraftFromQueue}
                       isDraftActive={draftPhase === DraftPhase.ACTIVE}
@@ -3930,13 +3952,7 @@ const DraftRoom = () => {
                      </CardHeader>
                      <CardContent>
                         <DraftBoard 
-                           teams={(orderedTeamsForBoard.length > 0 ? orderedTeamsForBoard : teams).map(t => ({
-                             id: t.id,
-                             name: t.team_name,
-                             owner: t.owner_id ? 'Owner' : 'AI',
-                             color: '#7CB518',
-                             picks: teamPicksMap.get(t.id) || []
-                           }))}
+                           teams={draftBoardTeams}
                            draftHistory={transformedDraftHistory}
                            currentPick={draftState?.currentPick || 1}
                            currentRound={draftState?.currentRound || 1}
